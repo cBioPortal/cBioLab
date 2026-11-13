@@ -23,6 +23,20 @@ export interface BinInput { value: string; count: number }
 /** at or below this many distinct values (outliers aside), every value gets a bar of its own */
 export const DISTINCT_VALUE_THRESHOLD = 10;
 
+/**
+ * A chart's bins as its menu sets them (the portal's `binMethod`, `customBins`,
+ * `binsGeneratorConfig` and `disableLogScale`): edges typed in, generated from a size and an
+ * anchor, the median split, or the quartiles. None of them applies to an attribute with at most
+ * DISTINCT_VALUE_THRESHOLD distinct values, which keeps a bar per value (the portal's order).
+ */
+export type BinMethod =
+  | { method: "custom"; edges: number[] }
+  | { method: "generate"; size: number; anchor: number }
+  | { method: "median" }
+  | { method: "quartile" };
+/** `bins` null: the default bins, even for an attribute that starts with others (INITIAL_BIN_EDGES) */
+export type BinSettings = { bins?: BinMethod | null; disableLog?: boolean };
+
 // ---- exact decimals ---------------------------------------------------------------------------
 
 /**
@@ -147,7 +161,7 @@ interface Bound { op: ">" | "<"; at: Dec }
  * The bars for one attribute's values in a cohort, in order: the "<=" bar, the numeric bars, the ">"
  * bar, then one bar per non-numeric value. Values spelled as missing never reach here (clinicalTable).
  */
-export function dataBins(values: BinInput[], attributeId?: string): Bin[] {
+export function dataBins(values: BinInput[], attributeId?: string, settings: BinSettings = {}): Bin[] {
   const entries: { d: Dec; n: number }[] = [];
   const bounds: Bound[] = [];
   const words = new Map<string, { value: string; count: number }>();
@@ -186,7 +200,19 @@ export function dataBins(values: BinInput[], attributeId?: string): Bin[] {
     if (without.d.length > 0 && without.d.length <= DISTINCT_VALUE_THRESHOLD) {
       bins = without.d.map((d, i) => ({ start: d, end: d, count: without.n[i] }));
     } else if (without.d.length) {
-      if (cmp(sub(box.hi, box.lo), THOUSAND) > 0) {
+      const m = settings.bins;
+      if (m?.method === "custom") {
+        const edges = customEdges(m.edges, lower.end, upper.start);
+        if (edges.length === 1) { lower.end = edges[0]; upper.start = edges[0]; }
+        else bins = binsFromEdges(edges, all);
+      } else if (m?.method === "generate") {
+        bins = binsFromEdges(generatedEdges(all, decOf(m.size), decOf(m.anchor)), all);
+      } else if (m?.method === "median") {
+        lower.end = upper.start = median(all, 0, total(all));
+      } else if (m?.method === "quartile") {
+        bins = binsFromEdges(quartileEdges(all), all);
+        if (!bins.length) lower.end = upper.start = median(all, 0, total(all));
+      } else if (cmp(sub(box.hi, box.lo), THOUSAND) > 0 && !settings.disableLog) {
         bins = logScaleBins(box, without, lower.end, upper.start);
       } else if (isSmallData(all)) {
         bins = smallDataBins(all, without, lower.end, upper.start);
@@ -335,6 +361,46 @@ function smallDataBins(all: Vals, without: Vals, lowerOutlier: Dec | undefined, 
   }
   const kept = edges.filter((d) => (!lowerOutlier || cmp(d, lowerOutlier) > 0) && (!upperOutlier || cmp(d, upperOutlier) < 0));
   return binsFromEdges(kept, without);
+}
+
+/** DataBinner.adjustCustomBins: typed edges past a bound recorded in the data are replaced by that bound */
+function customEdges(typed: number[], lowerBound: Dec | undefined, upperBound: Dec | undefined): Dec[] {
+  const sorted = typed.filter(Number.isFinite).map(decOf).sort(cmp)
+    .filter((d, i, a) => i === 0 || cmp(a[i - 1], d) !== 0);
+  const kept = sorted.filter((d) => (!lowerBound || cmp(d, lowerBound) >= 0) && (!upperBound || cmp(d, upperBound) <= 0));
+  if (lowerBound && sorted.some((d) => cmp(d, lowerBound) < 0)) kept.unshift(lowerBound);
+  if (upperBound && sorted.some((d) => cmp(d, upperBound) > 0)) kept.push(upperBound);
+  return kept;
+}
+
+/** DataBinHelper.generateBins: from min + ((anchor − min) mod size), every size, while below the max */
+function generatedEdges(v: Vals, size: Dec, anchor: Dec): Dec[] {
+  if (!v.d.length || !(size.x > 0)) return [];
+  const lo = v.d[0], hi = v.d[v.d.length - 1];
+  let r = rem(sub(anchor, lo), size);
+  if (r.x < 0) r = add(r, size);
+  const edges: Dec[] = [];
+  for (let e = add(lo, r); cmp(e, hi) < 0 && edges.length <= 10000; e = add(e, size)) edges.push(e);
+  return edges;
+}
+
+const HALF: Dec = { x: 0.5, m: 5n, s: 1 };
+/** DataBinHelper.calcMedian over positions [from, to) of the full sorted list: the mean of the middle two when even */
+function median(v: Vals, from: number, to: number): Dec {
+  const k = to - from, i = from + Math.floor(k / 2);
+  return k % 2 ? at(v, i) : mul(add(at(v, i), at(v, i - 1)), HALF);
+}
+
+/** DataBinHelper.calcQuartileBoundaries: Q1, Q2, Q3 (halves exclude the middle value when odd), equal ones dropped */
+function quartileEdges(v: Vals): Dec[] {
+  const n = total(v);
+  if (!n) return [];
+  const half = Math.floor(n / 2);
+  const q1 = median(v, 0, half), q2 = median(v, 0, n), q3 = median(v, half + (n % 2), n);
+  const out = [q1];
+  if (cmp(q1, q2) < 0) out.push(q2);
+  if (cmp(q2, q3) < 0) out.push(q3);
+  return out;
 }
 
 /** DataBinHelper.initDataBins: a bar between each pair of consecutive edges, counted */

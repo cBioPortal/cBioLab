@@ -10,7 +10,7 @@ import { driverEventSql } from "./oql.ts";
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
-import { dataBins, recountBins, type BinInput } from "./data-binner.ts";
+import { dataBins, recountBins, type BinInput, type BinSettings } from "./data-binner.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
 
 /**
@@ -171,7 +171,7 @@ const GENE_TABLE_LIMIT = 500;
 const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
-import { chartOrder, chartPriority } from "./study-view-config.ts";
+import { chartBinSettings, chartOrder, chartPriority } from "./study-view-config.ts";
 
 
 export interface ExploreArgs {
@@ -182,6 +182,8 @@ export interface ExploreArgs {
   derived?: DerivedRequest[];
   /** count only OncoKB drivers (at `oncokbPin`) in the gene tables and gene charts */
   drivers?: boolean;
+  /** each numeric chart's bins as its menu sets them, by attribute (lib/data-binner.ts) */
+  bins?: Record<string, BinSettings>;
   /** the draft's cohort, already resolved by a caller that needed it first (the pooled gene pass) */
   resolved?: Awaited<ReturnType<typeof resolveCohort>>;
   /** this study's rows of the facet queries, fetched for every study on its connection at once */
@@ -197,7 +199,7 @@ export function buildExplore(args: ExploreArgs): Promise<ExploreResult> {
   return ensureChContext(() => buildExploreOne(args));
 }
 
-async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, attributes, geneCharts, derived: derivedReq, drivers, resolved, prefetched }: ExploreArgs): Promise<ExploreResult> {
+async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, conn = PRIMARY, geneSearch, skipBins, skipGenes, attributes, geneCharts, derived: derivedReq, drivers, bins: binSettings, resolved, prefetched }: ExploreArgs): Promise<ExploreResult> {
   const db = conn.db;
   const driverPin = driversPin(drivers, oncokbPin);
   const t0 = Date.now();
@@ -320,7 +322,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   if (!skipBins) {
     const numFacets = clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
     await fillHistograms({ facets: numFacets, groups: [{ conn, studies: [study], set: draftSet, scan }], cohort: totals,
-      draft, ctx: sctx, bases });
+      draft, ctx: sctx, bases, settings: binSettings });
   }
 
   // ---- timeline event types ----------------------------------------------
@@ -876,6 +878,8 @@ export interface ExploreFederatedArgs {
   derived?: DerivedRequest[];
   /** count only OncoKB drivers in the gene tables and gene charts */
   drivers?: boolean;
+  /** each numeric chart's bins as its menu sets them, by attribute */
+  bins?: Record<string, BinSettings>;
 }
 
 /** One context for the whole federated request, so pass 2 can still see pass 1's cohorts. */
@@ -883,7 +887,7 @@ export function buildExploreFederated(args: ExploreFederatedArgs): Promise<Explo
   return ensureChContext(() => buildExploreFederatedInner(args));
 }
 
-async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived, drivers }: ExploreFederatedArgs): Promise<ExploreResult> {
+async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived, drivers, bins: binSettings }: ExploreFederatedArgs): Promise<ExploreResult> {
   const driverPin = driversPin(drivers, oncokbPin);
   // Every query below runs once per CONNECTION over all its studies, not once per study
   // (docs/PERFORMANCE.md §3b): the counts are additive over study-qualified ids, so a pooled count
@@ -936,7 +940,8 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
     const facets = mergeExplore(parts, !!draft);
     const numFacets = facets.clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
     await fillHistograms({ facets: numFacets, cohort: facets.totals || { patients: 0, samples: 0 },
-      groups: groups.map((g) => ({ ...g, set: setOf.get(g)!, scan: scans.get(g) })), draft, ctx: { oncokbPin, profilesByStudy }, bases: await basesP });
+      groups: groups.map((g) => ({ ...g, set: setOf.get(g)!, scan: scans.get(g) })), draft, ctx: { oncokbPin, profilesByStudy }, bases: await basesP,
+      settings: binSettings });
     return new Map(numFacets.filter((f) => f.bins).map((f) => [f.per + "|" + f.attribute, { bins: f.bins!, naCount: f.naCount, disjunctive: f.disjunctive }]));
   });
   const [parts, geneParts, bins] = await Promise.all([
@@ -997,9 +1002,11 @@ async function fillHistograms(opts: {
   ctx?: DefCtx;
   /** each filtered attribute's cohort without its own clauses (draftedBases) */
   bases?: Map<string, DraftedBase>;
+  settings?: Record<string, BinSettings>;
 }): Promise<void> {
   const { facets, groups, cohort } = opts;
   if (!facets.length) return;
+  const set = (f: { attribute: string }) => chartBinSettings(opts.settings, f.attribute);
   if (opts.draft?.all?.length && groups.length && groups.every((g) => g.scan)) return fillFromScans(opts as Parameters<typeof fillFromScans>[0]);
   const filtered = !!opts.draft?.all?.length;
   const own = new Map(draftedClinical(opts.draft).map((d) => [d.attr, d.rest]));
@@ -1014,7 +1021,7 @@ async function fillHistograms(opts: {
     const layout = await layoutP;
     for (const f of fs) {
       const values = lists.flatMap((m) => m.get(key(f)) || []);
-      f.bins = layout ? recountBins(dataBins(layout.flatMap((m) => m.get(key(f)) || []), f.attribute), values) : dataBins(values, f.attribute);
+      f.bins = layout ? recountBins(dataBins(layout.flatMap((m) => m.get(key(f)) || []), f.attribute, set(f)), values) : dataBins(values, f.attribute, set(f));
       const counted = values.reduce((n, v) => n + v.count, 0);
       f.naCount = Math.max(0, base(f) - counted);
     }
@@ -1045,6 +1052,7 @@ async function fillFromScans(opts: {
   cohort: { patients: number; samples: number };
   draft: CohortDef;
   bases?: Map<string, DraftedBase>;
+  settings?: Record<string, BinSettings>;
 }): Promise<void> {
   const { facets, groups, cohort } = opts;
   const own = new Set(draftedClinical(opts.draft).map((d) => d.attr));
@@ -1053,7 +1061,7 @@ async function fillFromScans(opts: {
   const key = (f: { per: string; attribute: string }) => f.per + "|" + f.attribute;
   for (const f of facets) {
     const values = scans.flatMap((x) => x.sel.get(key(f)) || []);
-    f.bins = recountBins(dataBins(scans.flatMap((x) => x.all.get(key(f)) || []), f.attribute), values);
+    f.bins = recountBins(dataBins(scans.flatMap((x) => x.all.get(key(f)) || []), f.attribute, chartBinSettings(opts.settings, f.attribute)), values);
     const counted = values.reduce((n, v) => n + v.count, 0);
     const b = own.has(f.attribute) ? bases.get(f.attribute) : undefined;
     f.naCount = Math.max(0, (f.per === "sample" ? (b ?? cohort).samples : (b ?? cohort).patients) - counted);

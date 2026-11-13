@@ -8,7 +8,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { dataBins, recountBins } from "../lib/data-binner.ts";
+import { dataBins, recountBins, type BinSettings } from "../lib/data-binner.ts";
 
 interface PortalBin { specialValue?: string; start?: number; end?: number; count: number }
 const { cases } = JSON.parse(readFileSync(new URL("./fixtures/data-binner.json", import.meta.url), "utf8")) as
@@ -74,5 +74,30 @@ describe("data binner: the portal's STATIC bins, laid out once and counted again
     assert.equal(again.length, bins.length);
     assert.equal(again.reduce((n, b) => n + b.count, 0), 2);
     assert.ok(again.some((b) => b.count === 0));
+  });
+});
+
+// Each bin setting a chart's menu offers (STS-BAR-7, STS-BAR-8, STS-STM-4), against the bars
+// cbioportal.org draws for the same values and setting: test/fixtures/data-binner-methods.json.
+const methods = JSON.parse(readFileSync(new URL("./fixtures/data-binner-methods.json", import.meta.url), "utf8")) as
+  { cases: { study: string; attribute: string; values: { value: string; count: number }[]; runs: { settings: BinSettings; portal: PortalBin[] }[] }[] };
+
+describe("data binner: the chart menu's bins, as the portal draws them", () => {
+  for (const c of methods.cases) for (const r of c.runs) test(c.attribute + " " + JSON.stringify(r.settings), () => {
+    const ours = dataBins(c.values, c.attribute, r.settings).filter((b) => b.value == null);
+    assert.ok(r.portal.length > 0, "the portal drew bars");
+    assert.deepEqual(ours.map((b) => [b.special, b.start, b.end, b.count]), r.portal.map((p) => [p.specialValue, p.start, p.end, p.count]));
+  });
+  test("bins: null is the default bars; a setting for another chart changes nothing", () => {
+    const age = methods.cases.find((c) => c.attribute === "AGE")!;
+    assert.deepEqual(dataBins(age.values, "AGE", { bins: null }), dataBins(age.values, "AGE"));
+  });
+  test("at most ten values keep a bar each, whatever the setting (the portal's order)", () => {
+    const few = [{ value: "1", count: 4 }, { value: "2", count: 3 }, { value: "5", count: 1 }];
+    assert.deepEqual(dataBins(few, "X", { bins: { method: "median" } }), dataBins(few, "X"));
+  });
+  test("a bin size of 0 makes no bars of its own", () => {
+    const vals = Array.from({ length: 30 }, (_, i) => ({ value: String(i), count: 1 }));
+    assert.doesNotThrow(() => dataBins(vals, "X", { bins: { method: "generate", size: 0, anchor: 0 } }));
   });
 });

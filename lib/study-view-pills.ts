@@ -125,3 +125,12 @@ export function editInterval(draft: CohortDef, clause: number, leaf: number, end
   }
   return { draft: withLeaves(draft, clause, leaves.map((x, j) => j === leaf ? next : x)) };
 }
+
+/** the numbers an interval pill's leaf now holds: its ends, or its one value */
+export function intervalEnds(draft: CohortDef, clause: number, leaf: number): number[] {
+  const c = draft.all?.[clause];
+  const l = c ? leavesOf(c)[leaf] : undefined;
+  const iv = l && leafInterval(l);
+  if (!iv) return [];
+  return iv.kind === "point" ? [iv.value] : [iv.lo, iv.hi].filter((x): x is number => x != null);
+}

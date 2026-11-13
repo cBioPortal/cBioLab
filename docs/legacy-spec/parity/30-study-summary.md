@@ -64,7 +64,7 @@ Legacy numbers from `/api/clinical-data-counts`, `/api/clinical-data-bin-counts?
 | 2 | **Categorical % leaves NA out.** NA is never a slice/row, and Freq = count ÷ Σ non-NA values: Sex Male 52.7 % (legacy 52.5 %); Race White 78.7 % of 362 (legacy 48.0 % of 594, NA 232) | PIE-9, TBL-1, STM-1, STM-3, MD-9 | not tracked |
 | 3 | **Numeric bins are dynamic, and a numeric chart is not freed of its own filter.** Edges recomputed on the filtered cohort (Q2: MSI MANTIS 0.02-wide bars vs legacy's stable 0.01; MSIsensor ">2.8" vs ">2.2"; TBL ">170" vs ">160"); Q3 AGE (50,60] collapses the AGE chart to ten one-value bars 51…60 (legacy keeps all bins, own filter excluded) | BAR-1, STM-2, STM-8, MD-6 | not tracked |
 | 4 | **Clicking a second bar of one histogram ANDs the ranges → 0 patients** (AGE (50,60] + (70,75] = 0); categorical values OR correctly | BAR-5 (cBioLab bug) | not tracked |
-| 5 | **No bar-chart menu**: no Custom Bins / Quartiles / Median / Generate, no Log Scale toggle, no Show NA; no default MSI custom bins (legacy MANTIS 468/22/67, MSIsensor 496/10/78) | BAR-1, BAR-6…8, HD-5 | not tracked |
+| 5 | **No bar-chart menu**: no Custom Bins / Quartiles / Median / Generate, no Log Scale toggle, no Show NA; no default MSI custom bins (legacy MANTIS 468/22/67, MSIsensor 496/10/78) | BAR-1, BAR-6…8, HD-5 | fixed (PR #203) |
 | 6 | **Gene tables**: 500-row cap ("500 of 18,275 genes"), no column sort, title lacks "(N profiled samples)", no OncoKB cancer-gene icon/filter, no MutSig/GISTIC q-value, no gene-panel tooltip, no query-queue on gene click, Union only, SV default sort by # altered not # SV | GT-2, GT-3, GT-5…GT-9 | not tracked |
 | 7 | **No chart downloads** (Summary/Full data, SVG, PDF, gene-table TSV) | DL-*, HD-5 | Data-governance switch tracked; downloads themselves not |
 | 8 | **Missing chart kinds**: treatment tables, GA frequency table (arm-level CNA shown by default in legacy), mutation-type counts, variant annotations, X-vs-Y density/violin, gene-specific violin, continuous gene bar | OT-3…6, VI-*, GS-4, SC-1 | not tracked |
@@ -99,8 +99,8 @@ Legacy numbers from `/api/clinical-data-counts`, `/api/clinical-data-bin-counts?
 | Q1 / Q2 FGA bins | STM-5 | ≤0.05 87 … >0.7 8, NA 11 / … NA 5 | identical | ✅ |
 | Q1 / Q2 OS_MONTHS, Aneuploidy | STM-5 | ≤5 71 … >70 34 / ≤5 41 … >70 22; Aneuploidy ≤2 97 … | identical | ✅ |
 | Q1 Days to Birth (log) | STM-6 | −10⁵…−31622: 21, −31622…−10⁴: 569 | same | ✅ |
-| Q1 MSI MANTIS | BAR-1, STM-4 | custom [0.4,0.6]: ≤0.4 468, 0.4-0.6 22, >0.6 67, NA 37 | default 19 linear bars (≤0.26 14 … >0.43 82) = legacy's no-custom bins exactly | 🔶 no initial custom bins |
-| Q1 MSIsensor | BAR-1 | custom [4,10]: 496 / 10 / 78 | ≤0.2 211 … >2.2 92 (= legacy default binning) | 🔶 |
+| Q1 MSI MANTIS | BAR-1, STM-4 | custom [0.4,0.6]: ≤0.4 468, 0.4-0.6 22, >0.6 67, NA 37 | ≤0.4 468, 0.4-0.6 22, >0.6 67 (initial custom bins); an empty Custom box gives legacy's default 19 bars | ✅ |
+| Q1 MSIsensor | BAR-1 | custom [4,10]: 496 / 10 / 78 | 496 / 10 / 78 | ✅ |
 | Q2 MSI MANTIS | STM-8 | STATIC 0.01 bars: ≤0.26 7, 0.26-0.27 14 … >0.43 49 | re-binned 0.02: ≤0.26 7, 0.26-0.28 24 … >0.46 44 | 🔶 dynamic |
 | Q2 MSIsensor | STM-8 | … 2-2.2 2, >2.2 51 | … 2.6-2.8 0, >2.8 49 | 🔶 dynamic |
 | Q2 TBL score | STM-8 | … 150-160 1, >160 9 | … 160-170 1, >170 8 | 🔶 dynamic |
@@ -156,7 +156,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-HD-2 | 🔶 | B | "…" menu button always visible, not hover-only |
 | STS-HD-3 | ❌ | B | No ⓘ, ↶ reset, ✕ delete buttons; only the "…" menu (remove a filter via its pill, hide a chart via Add chart) |
 | STS-HD-4 | 🟡 | B | Title `data-tip` = "ID — description"; no survival unit lines |
-| STS-HD-5 | ❌ | B | Menu holds only "Compare groups" / "Analyze groups" (+ "Compare selected (n)"); none of Log Scale, Swap Axes, Show Table/Pie, Custom Bins, Show NA, Download |
+| STS-HD-5 | 🟡 | B | Numeric charts: Log Scale (when offered), Compare / Analyze groups, Custom Bins…, Show NA, in the portal's order; no Swap Axes, Show Table/Pie or Download |
 | STS-HD-6 | ❌ | C | No pie ↔ table switch (shape fixed by allowlist) |
 | STS-HD-7 | 🟡 | BC | Compare → new tab `/portal/comparison` with one group per value, top 20 by count ✅ (`explore-sections.tsx:621-638`); bar: Quartiles / Median / Current bins ✅ (single study only for quartiles); checked rows restrict the groups (legacy ignores the selection); extra "Analyze groups" target |
 
@@ -190,14 +190,14 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-BAR-1 | 🔶 | BC | Clinical bins from `lib/data-binner.ts` (DataBinner port, DYNAMIC over the filtered cohort); no initial MSI custom bins; GA bars use `numericBinEdges`, not DataBinner |
+| STS-BAR-1 | 🟡 | BC | Clinical bins from `lib/data-binner.ts` (DataBinner port, STATIC); the MSI scores' initial custom bins ✅; GA bars use `numericBinEdges`, not DataBinner |
 | STS-BAR-2 | 🟡 | B | Numeric bins then category bins ✅; HTML bars, NA as a right-hand "NA n" note; no y axis |
 | STS-BAR-3 | 🟡 | B | Tick = bin start ("≤35 40 50 …", thinned to fit); no trailing end tick, no 10^n superscripts |
 | STS-BAR-4 | 🐞 ok | B | Tip "35–40 · 11 patients — click to filter": unit follows the attribute's level (legacy bug says "samples"); range "35–40" not "(35, 40]" |
 | STS-BAR-5 | 🔶 | BC | Click one bar adds a range clause; no drag; bars not greyed. **Bug:** a second bar of the same attribute is ANDed (`use-explore-state.ts:471`), AGE (50,60] + (70,75] → 0 patients |
-| STS-BAR-6 | 🟡 | B | NA always as the "NA n" note (= legacy Show NA off); no Show NA toggle |
-| STS-BAR-7 | ❌ | C | No log toggle (binner chooses log automatically, e.g. Days to Birth) |
-| STS-BAR-8 | ❌ | C | No Custom Bins modal |
+| STS-BAR-6 | ✅ | B | Show NA [off]: off the "NA n" note, on an NA bar last (clicking it filters to NA); the y-max takes it in only when drawn; kept per chart by the browser |
+| STS-BAR-7 | ✅ | C | Log Scale [checked] offered when the bars look logarithmic or it is off (`looksLogarithmic`); unchecking gives linear bars (Days to Birth ≤-32000 … >-12000, = the portal's). It does not clear the chart's filter (ours are ranges, valid on any bars) |
+| STS-BAR-8 | ✅ | C | Custom Bins dialog: Quartiles / Median split / Generate bins (size, min value) / Custom bins [default], the box starting from the bars' edges (0 kept, unlike legacy); a non-number refused by name. Disabled, saying why, on a chart of ≤10 values (legacy shows it and ignores it) |
 | STS-BAR-9 | ✅ | BC | "Compare groups ▸ Quartiles / Median / Current bins" (`explore-sections.tsx:640-652`) |
 
 ### §6 Gene tables
@@ -258,7 +258,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-KM-1 | 🔶 | B | One card "Overall survival of the selection" with an endpoint select (OS, PFS, …), not one 1×1 tile per prefix |
+| STS-KM-1 | 🔶 | B | One card "Overall survival of the selection" with an endpoint select (OS, PFS, …), not one 1×1 tile per prefix — kept on purpose (decided 2026-11-13) |
 | STS-KM-2 | ✅ | B | Patients of the selection, one curve, no p-value |
 | STS-KM-3 | 🔶 | B | Full KM with axes, number-at-risk table and "median 81.4 mo · n = 590 · 120 events" line |
 | STS-KM-4 | 🐞 ok | C | No selection on the curve (legacy's is dead code) |
@@ -313,7 +313,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-MD-5 | 🔶 | C | Conflicting-level attributes become two facets keyed `per|attribute`, not one per-sample count |
 | STS-MD-6 | 🔶 | BC | Categorical own filter excluded (disjunctive) ✅; numeric, scatter own filter included and re-binned (Q3) |
 | STS-MD-7 | ✅ | C | ≤10 distinct values → one bar per value (`DISTINCT_VALUE_THRESHOLD`) |
-| STS-MD-8 | 🟡 | B | Log bins chosen automatically (Days to Birth) ✅; no Log Scale item |
+| STS-MD-8 | ✅ | B | Log bins chosen automatically (Days to Birth); the Log Scale item switches them off |
 | STS-MD-9 | 🔶 | B | Bar "NA n" ✅; pie/list has no NA |
 | STS-MD-10 | 🔶 | C | Shape from allowlist, not >20 categories |
 | STS-MD-11 | N/A | C | cBioLab never shows cancer-gene icons, so there is nothing for this mode to hide (the gap is GT-6) |
@@ -334,13 +334,13 @@ Filters not in the URL (as legacy); study list and drivers toggle are (`?study=`
 | STS-STM-1 | 🟡 | BC | count by folded value (`clinicalValueFoldSql`, most frequent spelling kept; legacy greatest) at the attribute's level ✅, numbers identical; no NA row |
 | STS-STM-2 | 🟡 | BC | Disjunctive counts for categorical, derived, gene and assay facets (`explore.ts:247-254`); not numeric histograms |
 | STS-STM-3 | 🔶 | B | % = count ÷ Σ non-NA values (`explore-sections.tsx:718`); 1 decimal; Sex 52.7 vs 52.5 |
-| STS-STM-4 | 🟡 | C | Discrete / log / scientific / linear dispatch ported; no CUSTOM / GENERATE / MEDIAN / QUARTILE bin methods |
+| STS-STM-4 | ✅ | C | The whole dispatch: discrete first, then CUSTOM (adjustCustomBins), GENERATE, MEDIAN, QUARTILE (median fallback), log unless disabled, scientific, linear. 29 recorded cases match the portal's bars (`test/fixtures/data-binner-methods.json`) |
 | STS-STM-5 | ✅ | BC | Linear bins identical on every Q1 attribute (incl. AGE ≤35) |
 | STS-STM-6 | ✅ | BC | Days to Birth log bins identical |
 | STS-STM-7 | ✅ | C | Scientific-small binner ported (`lib/data-binner.ts`) |
 | STS-STM-8 | 🔶 | BC | Edges from the filtered cohort (DYNAMIC), so they move with filters (Q2 MANTIS, MSIsensor, TBL) |
 | STS-STM-9 | 🟡 | C | Range clause `gt/lte` = (start, end] ✅; one value `=`; bars of one attribute AND (bug) instead of OR |
-| STS-STM-10 | ❌ | C | No custom bins |
+| STS-STM-10 | ✅ | C | An empty Custom box is the default bars (sent as `bins: null`, which also overrides the MSI initial bins) |
 | STS-STM-11 | ✅ | B | NA n = cohort − counted values (`explore.ts:965`): AGE 2, MC 60, FGA 11 match |
 | STS-STM-12 | 🟡 | C | Quartiles/Median cut by the server over the selection's values (`compareQuantiles`); Current bins one group per bar ✅; quartiles single study only |
 | STS-STM-13 | ✅ | BC | # = altered incl. off-panel, Freq = on-panel ÷ profiled, UNCALLED excluded; identical numbers. A sample on two panels counted once (`surplus`, `explore.ts:574-588`) where legacy counts per panel — no difference on these studies |

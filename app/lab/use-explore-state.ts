@@ -20,6 +20,7 @@ import { useExplore, type ExploreAsk } from "./use-explore.ts";
 import { toggleBin, toggleNa, toggleValue } from "../../lib/explore-selection.ts";
 import { defaultChartKeys } from "../../lib/study-view-config.ts";
 import { FILTERS_PARAM, writeFilters } from "../../lib/study-view-url.ts";
+import { serverBins, type ChartBins } from "../../lib/study-view-bins.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { encodeParam } from "../portal/page-doc.ts";
 import { currentLinkUrlMax, linkParams, linkTo, writeSearch } from "../_links/link-state.ts";
@@ -69,6 +70,9 @@ export const SHOW_DERIVED_FACETS = false;
  *  it is hidden. The server computes only what is asked for. */
 const DEFAULT_DERIVED: DerivedRequest[] = SHOW_DERIVED_FACETS
   ? [{ metric: "followupMonths" }, { metric: "historyMonths" }, { metric: "alteredGenes" }] : [];
+
+/** the browser storage key of every chart's bins, by set of studies */
+const BINS_KEY = "cbiolab.explore.bins";
 
 export function useExploreState(page: ExplorePage) {
   const { linkedStudies, addCohortToView, analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, setError, setStudy, study } = page;
@@ -140,6 +144,31 @@ export function useExploreState(page: ExplorePage) {
   /** derived facets beyond the fixed three, switched on from "show more derivations" */
   const [exDerived, setExDerived] = useState<DerivedRequest[]>(DEFAULT_DERIVED);
   const exDerivedRef = useRef<DerivedRequest[]>(DEFAULT_DERIVED);   // fetchExplore reads this, not the closure
+  /**
+   * Each numeric chart's bins as its menu sets them (Custom Bins, Log Scale, Show NA), per set of
+   * studies: the reader's own, kept by this browser, never in the URL or a saved cohort. Read when
+   * first needed, so a page drawn on the server never touches storage.
+   */
+  const binStore = useRef<Record<string, Record<string, ChartBins>> | null>(null);
+  const [, setBinsVersion] = useState(0);
+  const binsOf = (studies: string[]): Record<string, ChartBins> => {
+    if (!binStore.current) {
+      try { binStore.current = JSON.parse(localStorage.getItem(BINS_KEY) || "{}") || {}; } catch { binStore.current = {}; }
+    }
+    return binStore.current![[...studies].sort().join(",")] || {};
+  };
+  const chartBins = (attribute: string): ChartBins | undefined => binsOf(exSel.current)[attribute];
+  /** a chart's bins set (null: back to the default), then the facets asked for again unless `refetch` is false */
+  const setChartBins = (attribute: string, v: ChartBins | null, refetch = true) => {
+    const key = [...exSel.current].sort().join(",");
+    const mine = { ...binsOf(exSel.current) };
+    if (v && (v.bins !== undefined || v.disableLog || v.showNa)) mine[attribute] = v; else delete mine[attribute];
+    binStore.current = { ...binStore.current, [key]: mine };
+    if (!Object.keys(mine).length) delete binStore.current[key];
+    try { localStorage.setItem(BINS_KEY, JSON.stringify(binStore.current)); } catch { /* kept for this page only */ }
+    setBinsVersion((n) => n + 1);
+    if (refetch) fetchExplore();
+  };
   const [geneChartInput, setGeneChartInput] = useState("");
   /** the header lists selected studies as chips; past a handful it is summarised */
   const [studyChipsOpen, setStudyChipsOpen] = useState(false);
@@ -426,6 +455,7 @@ export function useExploreState(page: ExplorePage) {
       derived: exDerivedRef.current,
       uploads: customDataKey(),
       drivers: driversRef.current,
+      bins: serverBins(binsOf(studies)),
     }, !(attrsOverride ?? []).length && !(attrCoverage > 0));
   };
 
@@ -793,7 +823,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

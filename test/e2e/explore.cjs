@@ -363,6 +363,43 @@ async function explore({ ok, BASE, page }) {
     pillOk = name === "Diagnosis Age" && ends.join("-") === "50-60" && /< x ≤/.test(text) && wide > narrow;
   } catch (e) { pillDetail = String(e.message).split("\n")[0]; }
   ok("explore: filter pills are named by chart, an interval's end is edited in place, and × removes the filter", pillOk, pillDetail);
+
+  // A histogram's menu (lib/study-view-bins.ts): Custom Bins' median split draws two bars, kept by
+  // this browser across a reload; an empty Custom box is the default bars again; Show NA adds a bar.
+  let binDetail = "", binOk = false;
+  try {
+    const chart = "[data-attr='patient|AGE']";
+    const bars = () => page.locator(chart + " .hbar").count();
+    const openMenu = async (item) => {
+      await page.locator(chart + " .chartgear").click();
+      await page.getByRole("menuitem", { name: item }).or(page.getByRole("menuitemcheckbox", { name: item })).first().click();
+    };
+    const barsBecome = (lo, hi) => page.waitForFunction(([sel, a, b]) => { const n = document.querySelectorAll(sel + " .hbar").length; return n >= a && n <= b; }, [chart, lo, hi], { timeout: 120000 });
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.evaluate(() => { try { localStorage.removeItem("cbiolab.explore.bins"); } catch { /* none kept */ } });
+    await page.waitForSelector(chart + " .hbar", { timeout: 240000 });
+    const before = await bars();
+    await openMenu("Custom Bins…");
+    await page.getByRole("radio", { name: "Median split" }).click();
+    await page.getByRole("button", { name: "Update" }).click();
+    await barsBecome(2, 2);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector(chart + " .hbar", { timeout: 240000 });
+    await barsBecome(2, 2);
+    const kept = await bars();
+    await openMenu("Custom Bins…");
+    await page.getByRole("radio", { name: "Custom bins" }).click();
+    await page.locator("#cb-edges").fill("");
+    await page.getByRole("button", { name: "Update" }).click();
+    await barsBecome(3, 1000);
+    const back = await bars();
+    await openMenu("Show NA");
+    await page.waitForSelector(chart + " .hbar.nabar", { timeout: 30000 });
+    await page.evaluate(() => { try { localStorage.removeItem("cbiolab.explore.bins"); } catch { /* none kept */ } });
+    binDetail = JSON.stringify({ before, kept, back });
+    binOk = before > 2 && kept === 2 && back === before;
+  } catch (e) { binDetail = String(e.message).split("\n")[0]; }
+  ok("explore: a histogram's Custom Bins redraws its bars, kept by the browser, an empty box restores them, and Show NA adds a bar", binOk, binDetail);
 }
 
 module.exports = { explore };

@@ -408,6 +408,28 @@ describe("one study", () => {
       assert.equal(age.bins!.filter((b) => b.count === 0).length, layout.length - 1, "empty bars are kept");
     });
 
+    test("a chart's menu settings lay out its bars, filtered or not; the MSI scores start on the portal's edges", async () => {
+      facetAnswers();
+      on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }, { pid: "P2", sid: "S2" }]);
+      answers = answers.filter(([re]) => !/attribute_value AS v/.test(re.source));
+      const all = Array.from({ length: 40 }, (_, i) => ({ type: "patient", a: "AGE", v: String(20 + i * 1.5), n: 2 }));
+      on(/attribute_value AS v, uniqExact/, (q) => q.includes("_cohort_st1") ? [{ type: "patient", a: "AGE", v: "50", n: 1 }] : all);
+      const edges = (r: Awaited<ReturnType<typeof buildExplore>>) => {
+        const a = r.clinical.find((c) => c.attribute === "AGE")!;
+        assert.ok(a.kind === "num");
+        return a.bins!.map((b) => [b.special, b.start, b.end]);
+      };
+      const custom = { AGE: { bins: { method: "custom" as const, edges: [40, 60] } } };
+      assert.deepEqual(edges(await buildExplore({ study: S, skipGenes: true, bins: custom })), [["<=", undefined, 40], [undefined, 40, 60], [">", 60, undefined]]);
+      assert.deepEqual(edges(await buildExplore({ study: S, draft: female, skipGenes: true, bins: custom })), [["<=", undefined, 40], [undefined, 40, 60], [">", 60, undefined]], "kept under a filter");
+      assert.deepEqual(edges(await buildExplore({ study: S, skipGenes: true, bins: { AGE: { bins: { method: "median" } } } })).map((b) => b[0]), ["<=", ">"]);
+      const { dataBins } = await import("../lib/data-binner.ts");
+      const vals = Array.from({ length: 30 }, (_, i) => ({ value: (0.2 + i * 0.02).toFixed(2), count: 1 }));
+      const { INITIAL_BIN_EDGES } = await import("../lib/study-view-config.ts");
+      assert.deepEqual(INITIAL_BIN_EDGES.MSI_SCORE_MANTIS, [0.4, 0.6]);
+      assert.notDeepEqual(dataBins(vals, "MSI_SCORE_MANTIS", { bins: { method: "custom", edges: [0.4, 0.6] } }), dataBins(vals, "MSI_SCORE_MANTIS"));
+    });
+
     describe("the single scan (three filter groups or more)", () => {
       const age = { kind: "clinical" as const, attribute: "AGE", range: { gt: 40, lte: 70 } };
       const tmb = { kind: "clinical" as const, attribute: "TMB", range: { gt: 1 } };
