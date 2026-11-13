@@ -356,6 +356,17 @@ describe("one study", () => {
       assert.ok(tmb.kind === "num" && tmb.disjunctive === undefined, "an attribute the draft does not filter on is drawn under it");
     });
 
+    test("a filtered attribute no study declares is reported, at any depth; a declared one is not", async () => {
+      facetAnswers();
+      on(/SELECT DISTINCT pid, sid FROM/, []);
+      const draft = { all: [{ kind: "clinical" as const, attribute: "SEX", values: ["Female"] },
+        { not: { kind: "clinical" as const, attribute: "FOO", values: ["x"] } }, { any: [{ kind: "clinical" as const, attribute: "BAR", range: { gt: 1 } }] }] };
+      const r = await buildExplore({ study: S, draft, skipGenes: true, skipBins: true });
+      assert.deepEqual(r.unknownAttributes, ["FOO", "BAR"]);
+      const ok = await buildExplore({ study: S, draft: female, skipGenes: true, skipBins: true });
+      assert.equal(ok.unknownAttributes, undefined);
+    });
+
     test("past the bound, the definition is read inline and its size counted once", async () => {
       facetAnswers();
       on(/SELECT DISTINCT pid, sid FROM/, [1, 2, 3, 4].map((i) => ({ pid: "P" + i, sid: "S" + i })));

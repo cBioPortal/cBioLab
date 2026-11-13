@@ -1000,6 +1000,8 @@ export interface DerivedRequest {
 }
 export interface ExploreResult {
   study: string; studies?: string[]; draftCount: number | null;
+  /** clinical attributes the draft filters on that no selected study declares (a filter on one selects nobody) */
+  unknownAttributes?: string[];
   /** the OncoKB pin when the gene tables and gene charts count drivers only; absent when they count every alteration */
   drivers?: string;
   studyBreakdown?: StudyBreakdownRow[];

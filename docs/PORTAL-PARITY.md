@@ -61,7 +61,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [x] Study View: clicking a selected pie value again re-adds it (`SEX = Female` becomes `SEX ∈ {Female}`); only the pill's × removes it ([30-study-summary](legacy-spec/parity/30-study-summary.md)) (PR #188 open)
 - [x] Study View: a numeric chart under its own filter collapses (AGE (50,60] redraws AGE as ten one-value bars), so other ranges can't be added (`draftedClinical` skips NUMBER, `lib/explore.ts:268`) ([30-study-summary](legacy-spec/parity/30-study-summary.md)) (PR #188 open)
 - [x] Study View: the default charts include constant attributes (Cancer Type, Sample Type, Somatic Status, Samples per Patient; DAYS_TO_INITIAL_PATHOLOGIC_DIAGNOSIS, all 0, draws no bars) and leave out Sex, Race and Subtype ([30-study-summary](legacy-spec/parity/30-study-summary.md)) (PR #188 open)
-- [ ] Study View: the filters can't be shared or restored: Copy link drops them and a reload loses them, though the page keeps the rest of its state in the URL (`?study=`, `?drivers=`) ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
+- [x] Study View: the filters can't be shared or restored: Copy link drops them and a reload loses them, though the page keeps the rest of its state in the URL (`?study=`, `?drivers=`) ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md)) (PR #189 open)
 - [x] Patient: Allele Freq is rounded twice, to 3 decimals (`lib/views/alterations/run.ts:32`), then `toFixed(2)` (`app/lab/alterations-body.tsx:102`): 10/57 = 0.1754 shows "0.17". 5 of 64 rows wrong on TCGA-A6-2671 ([40-patient-summary](legacy-spec/parity/40-patient-summary.md)) (#183)
 - [x] Patient: an unknown patient (`?caseId=NOPE`) prints "no patient NOPE in lgg_ucsf_2014", then lays out every tab, each refusing on an empty cohort ([40-patient-summary](legacy-spec/parity/40-patient-summary.md)) (#183)
 - [x] Patient: Genomic Evolution is offered to single-sample patients, then refuses (TCGA-A6-2671, msk P-0000004); `app/portal/patient-layout.ts:57` does not check for two samples with allele counts ([40-patient-summary](legacy-spec/parity/40-patient-summary.md), [41-patient-tabs](legacy-spec/parity/41-patient-tabs.md)) (#183)
@@ -204,7 +204,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
   - [ ] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12)
   - [ ] "Download clinical data" (⤓) for the selection (STV-AB-4, STV-STM-5, STV-HD-2)
-  - [ ] Filters in the URL: the bookmark, `#filterJson`, `filterAttributeId` / `filterValues` (STV-URL-2, STV-URL-3, STV-BM-1…3, STV-FB-7; see bugs)
+  - [x] Filters in the URL: the bookmark, `#filterJson`, `filterAttributeId` / `filterValues` (STV-URL-2, STV-URL-3, STV-BM-1…3, STV-FB-7; see bugs) (PR #189 open)
+    - [ ] A bookmark icon in the filter bar (STV-FB-7): the header's Copy link carries the filters instead
+    - [ ] `sharedGroups`, `sharedCustomData` and the Plots tab's parameters (STV-URL-2): no Groups manager or Plots tab yet
   - [ ] The Groups manager: a group from the selection, its colour, share, Filter by union, compare 2–20 saved groups ("Save as a Cohort" stands in) (STV-GR-1…9, STV-STM-10)
   - [ ] Virtual study: description and its auto-text, static or dynamic, a shareable `/study?id=` (ours "Save as a Cohort": a name, always a definition) (STV-VS-1…6, STV-STM-9, STV-MD-3, STV-MD-4)
   - [ ] Custom Selection by sample or patient ids on the page (Analysis has it, signed-in only) (STV-CS-1…9)
