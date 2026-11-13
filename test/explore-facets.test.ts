@@ -22,9 +22,12 @@ type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
 
 let sent: string[] = [];
+/** the external tables each statement carried, as name and text */
+let shipped: { query: string; name: string; text: Promise<string> }[] = [];
 let answers: [RegExp, Row[] | ((q: string) => Row[])][] = [];
-setChTransport(async ({ query }) => {
+setChTransport(async ({ query, externals }) => {
   sent.push(query);
+  for (const e of externals) shipped.push({ query, name: e.name, text: e.blob.text() });
   for (const [re, rows] of answers) if (re.test(query)) {
     const data = typeof rows === "function" ? rows(query) : rows;
     return JSON.stringify({ meta: [], data, rows: data.length });
@@ -32,7 +35,7 @@ setChTransport(async ({ query }) => {
   return JSON.stringify({ meta: [], data: [], rows: 0 });
 });
 after(() => setChTransport(null));
-beforeEach(() => { sent = []; answers = []; });
+beforeEach(() => { sent = []; answers = []; shipped = []; });
 const on = (re: RegExp, rows: Row[] | ((q: string) => Row[])) => { answers.push([re, rows]); };
 const fail = (re: RegExp) => on(re, () => { throw new Error("no such table"); });
 
@@ -315,7 +318,10 @@ describe("one study", () => {
       assert.equal(disj.length, 1);
     });
 
-    test("a drafted numeric attribute's values are not counted without its clause, as no facet draws them", async () => {
+    test("a drafted numeric attribute's values are not counted without its clause, as no facet draws them", async (t) => {
+      // three filter groups would be scanned; this is the chart-by-chart path
+      process.env.EXPLORE_SCAN = "off";
+      t.after(() => { delete process.env.EXPLORE_SCAN; });
       facetAnswers();
       on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }, { pid: "P2", sid: "S2" }]);
       const draft = { all: [
@@ -400,6 +406,61 @@ describe("one study", () => {
       assert.deepEqual(age.bins!.map((b) => [b.special, b.start, b.end]), layout.map((b) => [b.special, b.start, b.end]), "the unfiltered study's bars");
       assert.equal(age.bins!.reduce((n, b) => n + b.count, 0), 1, "counted over the selection");
       assert.equal(age.bins!.filter((b) => b.count === 0).length, layout.length - 1, "empty bars are kept");
+    });
+
+    describe("the single scan (three filter groups or more)", () => {
+      const age = { kind: "clinical" as const, attribute: "AGE", range: { gt: 40, lte: 70 } };
+      const tmb = { kind: "clinical" as const, attribute: "TMB", range: { gt: 1 } };
+      const three = { all: [female.all[0], age, tmb] };
+
+      test("one mask statement replaces resolving the draft and every per-chart count; patients carry the OR of their samples' masks", async () => {
+        // bits: 0 = all but SEX, 1 = all but AGE, 2 = all but TMB, 3 = the draft
+        on(/^SELECT st, s, p, pm FROM/, [{ st: S, s: S + "_S1", p: S + "_P1", pm: "15" }, { st: S, s: S + "_S2", p: S + "_P1", pm: "1" },
+          { st: S, s: S + "_S3", p: S + "_P2", pm: "8" }]);
+        on(/topKIf\(1\)/, [{ s: S, type: "patient", a: "SEX", v: "Female", vkey: "female", n: 2 }, { s: S, type: "patient", a: "SEX", v: "Male", vkey: "male", n: 1 },
+          { s: S, type: "sample", a: "CODE", v: "1", vkey: "1", n: 2 }]);
+        on(/AS n_all/, [{ type: "patient", a: "AGE", v: "30", n: 1, n_all: 40 }, { type: "patient", a: "AGE", v: "60", n: 2, n_all: 50 }, { type: "sample", a: "TMB", v: "5", n: 2, n_all: 100 }]);
+        on(/ARRAY JOIN range\(3\)/, [{ lvl: "patient", k: 0, n: 3 }, { lvl: "sample", k: 0, n: 3 }, { lvl: "patient", k: 1, n: 3 }, { lvl: "sample", k: 1, n: 3 }]);
+        on(/GROUP BY type, a\s*(FORMAT|$)/, [{ type: "patient", a: "SEX", n: 3 }, { type: "patient", a: "AGE", n: 3 }]);
+        facetAnswers();
+        const r = await buildExplore({ study: S, draft: three, skipGenes: true });
+        assert.equal(r.draftCount, 2, "the samples with bit 3 (S1, S3) and their two owners");
+        assert.ok(!sent.some((q) => /SELECT DISTINCT pid, sid FROM/.test(q)), "the draft is not resolved again");
+        assert.ok(!sent.some((q) => /AS vkey/.test(q) && !/_scan_/.test(q)), "no value list counted chart by chart");
+        assert.ok(!sent.some((q) => /attribute_value AS v, uniqExact/.test(q)), "no histogram counted chart by chart");
+        assert.equal(sent.filter((q) => /^SELECT st, s, p, pm FROM/.test(q)).length, 1);
+        const mask = sent.find((q) => /^SELECT st, s, p, pm FROM/.test(q))!;
+        assert.match(mask, /'Female'/);
+        assert.match(mask, /\* 8 AS pm/, "bit 3, every filter, is the last term");
+        const table = await shipped.find((x) => x.name.startsWith("_scan_"))!.text;
+        assert.match(table, /^patient\tst1_P1\t15$/m, "P1 owns S1 (15) and S2 (1)");
+        assert.match(table, /^sample\tst1_S2\t1$/m);
+        const sex = r.clinical.find((c) => c.attribute === "SEX")!;
+        assert.ok(sex.kind === "cat" && sex.disjunctive);
+        assert.deepEqual(sex.values, [{ v: "Female", n: 2 }, { v: "Male", n: 1 }]);
+        assert.equal(sex.na, 0, "3 patients without SEX's own filter, 3 with a value");
+        const a = r.clinical.find((c) => c.attribute === "AGE")!;
+        assert.ok(a.kind === "num" && a.disjunctive);
+        assert.equal(a.bins!.reduce((n, b) => n + b.count, 0), 3, "counted at its own bit");
+        assert.deepEqual([a.min, a.median, a.max], [30, 60, 60]);
+      });
+
+      test("past the external-table bound the page counts chart by chart", async () => {
+        on(/^SELECT st, s, p, pm FROM/, [1, 2, 3, 4].map((i) => ({ st: S, s: S + "_S" + i, p: S + "_P" + i, pm: "8" })));
+        on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }]);
+        facetAnswers();
+        const r = await buildExplore({ study: S, draft: three, skipGenes: true, skipBins: true });
+        assert.ok(sent.some((q) => /SELECT DISTINCT pid, sid FROM/.test(q)), "the draft resolved as before");
+        assert.ok(!shipped.some((x) => x.name.startsWith("_scan_")));
+        assert.equal(r.draftCount, 1);
+      });
+
+      test("two groups are counted chart by chart", async () => {
+        facetAnswers();
+        on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }]);
+        await buildExplore({ study: S, draft: { all: [female.all[0], age] }, skipGenes: true });
+        assert.ok(!sent.some((q) => /^SELECT st, s, p, pm FROM/.test(q)));
+      });
     });
 
     test("past the bound, the definition is read inline and its size counted once", async () => {
@@ -552,6 +613,25 @@ describe("several studies", () => {
     assert.ok(pooled.some((q) => q.includes("_cohorts_b_cbio_b")));
     const sex = r.clinical.find((c) => c.attribute === "SEX")!;
     assert.equal((sex as { disjunctive?: boolean }).disjunctive, true, "the drafted attribute is counted without its clause, pooled");
+  });
+
+  test("three filter groups: one scan per connection, its cohort each study's, no value list counted per study", async () => {
+    // two filtered attributes (bits 0, 1) and the OQL clause as the rest: bit 2 is every filter
+    on(/^SELECT st, s, p, pm FROM/, (q) => /cbio_b\./.test(q) ? [{ st: "st2", s: "st2_X1", p: "st2_Y1", pm: "4" }]
+      : [{ st: "st1", s: "st1_S1", p: "st1_P1", pm: "7" }, { st: "st1", s: "st1_S2", p: "st1_P2", pm: "1" }]);
+    on(/topKIf\(1\)/, (q) => [{ s: /cbio_b\./.test(q) ? "st2" : "st1", type: "patient", a: "SEX", v: "Female", vkey: "female", n: 1 }]);
+    on(/AS n_all/, (q) => [{ type: "patient", a: "AGE", v: /cbio_b\./.test(q) ? "40" : "60", n: 1, n_all: 5 }]);
+    twoConnAnswers();
+    const draft = { all: [{ kind: "clinical" as const, attribute: "SEX", values: ["Female"] }, { kind: "clinical" as const, attribute: "AGE", range: { gt: 1 } },
+      { kind: "oql" as const, q: "KRAS: MUT" }] };
+    const r = await buildExploreFederated({ studies: ["st1", "st2"], draft, connByStudy, profilesByStudy: profiles });
+    assert.equal(sent.filter((q) => /^SELECT st, s, p, pm FROM/.test(q)).length, 2, "one per connection");
+    assert.equal(r.draftCount, 2, "st1's S1 and st2's X1, from the scans");
+    assert.ok(!sent.some((q) => /SELECT DISTINCT pid, sid FROM/.test(q)));
+    assert.ok(!sent.some((q) => /AS vkey/.test(q) && !/_scan_/.test(q)), "every value list from a scan");
+    const age = r.clinical.find((c) => c.attribute === "AGE")!;
+    assert.ok(age.kind === "num" && age.disjunctive);
+    assert.equal(age.bins!.reduce((n, b) => n + b.count, 0), 2, "both connections' values at AGE's own bit, pooled");
   });
 
   test("drivers only is carried into the merged answer", async () => {

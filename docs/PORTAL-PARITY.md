@@ -187,7 +187,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Numeric bins fixed for the study, and a chart freed of its own filter (Q2 MSI MANTIS 0.01-wide bars; ours 0.02, recomputed on the filtered cohort) (STS-BAR-1, STS-STM-2, STS-STM-8, STS-MD-6; see bugs)
     - [x] A numeric chart freed of its own filter: its bars counted over the rest of the filters (STS-STM-2, STS-MD-6) (PR #188 open)
     - [x] Bins fixed for the study rather than recomputed on the filtered cohort (STS-BAR-1, STS-STM-8) (PR #190 open)
-    - [ ] The single scan (per-sample bitmask, `uniqExactIf`) in place of one query per filtered chart (spike)
+    - [x] The single scan (per-sample bitmask, `uniqExactIf`) in place of one query per filtered chart (spike), from three filter groups (PR #190 open)
+    - [ ] The unfiltered bin layout cached per study (spike step 2); one query per filtered click for now
     - Measured ([spike](spikes/explore-filter-parity.md)). Re-running Explore once per filtered chart doubles a click (msk_chord_2024 + genie_public at 4 filters: 3.0 → 6.3 s). Instead:
       - per drafted numeric attribute, its value counts without its own clause, in parallel (≈0 ms added);
       - bin edges from the unfiltered distribution, cached per study set and attribute;
