@@ -119,7 +119,7 @@ export const STYLE = {
     cellPad: 1, padMinZoom: 6,
     // a row pooling several genes wears the brackets that made it, the way the query spells it
     mergedBrackets: ["[", "]"] },
-  percent: { gutterDecimals: 1, runRule: "portal" }   // runRule: integer at 3 % and above, one decimal below, N/P
+  percent: { label: "portal", tooltip: "portal" }   // label (gutter, gaps): 0%, <1%, else integer; tooltip: integer at 3 % and above, one decimal below; N/P
 };
 
 // Deliberately not `as const`: a resolved override is the same shape with different values,
@@ -221,15 +221,27 @@ export function formatPct(p: number | null | undefined): string {
   return (p < 3 ? Math.round(p * 10) / 10 : Math.round(p)) + "%";
 }
 /**
- * Gutter frequency: "driver% / any%" at one decimal, N/P when nothing was profiled, and the
- * portal's asterisk when the denominator is smaller than the number of columns — a reader
- * should not have to work out that a percentage was taken over part of the cohort.
+ * The portal's track-label percent (ONC-LY-4): "0%", "<1%" above 0 and under 1, otherwise an
+ * integer; N/P when nothing was profiled. Gap labels use it too (ONC-STM-3).
  */
-export function formatGutterPct(driverPct: number | null | undefined, freqPct: number | null | undefined,
-  profiled?: number, columns?: number): string {
-  if (freqPct == null) return "N/P";
-  const star = profiled != null && columns != null && profiled > 0 && profiled < columns ? "*" : "";
-  return (driverPct != null ? driverPct + "% / " + freqPct + "%" : freqPct + "%") + star;
+export function formatLabelPct(p: number | null | undefined): string {
+  if (p == null) return "N/P";
+  if (p === 0) return "0%";
+  return p < 1 ? "<1%" : Math.round(p) + "%";
+}
+export interface GutterCounts { altered?: number; driverAltered?: number; profiled?: number; freqPct?: number | null; driverPct?: number | null }
+/**
+ * Gutter frequency: "driver% / any%", each in the portal's label format, from the counts when the
+ * track has them (the 1-decimal % otherwise); N/P when nothing was profiled, and the portal's
+ * asterisk when the denominator is smaller than the number of columns.
+ */
+export function formatGutterPct(t: GutterCounts, columns?: number): string {
+  const pct = (n: number | undefined, p: number | null | undefined) => n != null && t.profiled ? 100 * n / t.profiled : p;
+  const any = pct(t.altered, t.freqPct);
+  if (any == null) return "N/P";
+  const driver = pct(t.driverAltered, t.driverPct);
+  const star = t.profiled != null && columns != null && t.profiled > 0 && t.profiled < columns ? "*" : "";
+  return (driver != null ? formatLabelPct(driver) + " / " : "") + formatLabelPct(any) + star;
 }
 export const PARTIAL_PROFILE_NOTE = "* = % over the columns profiled for that gene";
 

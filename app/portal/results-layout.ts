@@ -7,6 +7,7 @@ import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
 import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
 import { arrange, type PageLayout } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
+import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 
 const CLINICAL_SHOWN = 8;
 
@@ -269,4 +270,14 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     // the portal's Download tab, after Pathways, last as there: the files of the queried samples for the query's lines
     { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, ...pinsOf(q), cohorts: queried })] }
   ], left, { partial: data.partial || (svHeld && data.svs === undefined) });
+}
+
+/**
+ * The header's samples line, as the portal adds it when the queried samples outnumber the patients
+ * (ONC-STM-2): altered samples of all queried samples, the % rounded to an integer.
+ */
+export function samplesLine(a: { queried: number; alteredSamples?: number; queriedSamples?: number }): string | null {
+  const { alteredSamples: n, queriedSamples: of } = a;
+  if (n == null || !of || of === a.queried) return null;
+  return fmtInt(n) + " (" + fmtPct(100 * n / of, 0) + ") of " + fmtInt(of) + " queried samples altered";
 }

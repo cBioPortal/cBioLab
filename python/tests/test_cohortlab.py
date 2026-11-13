@@ -24,6 +24,19 @@ from cohortlab import BITS, NOT_PROFILED, Oncoprint, read_opb1, write_opb1  # no
 FIX = os.path.join(ROOT, "test", "fixtures", "oncoprint")
 
 
+
+class LabelPctTest(unittest.TestCase):
+    """The portal's track-label percent, as lib/oncoprint-style.ts formats it."""
+
+    def test_label_and_gutter(self) -> None:
+        from cohortlab.style import format_gutter_pct, format_label_pct
+        self.assertEqual([format_label_pct(p) for p in (None, 0, 0.04, 1.2, 2.5, 37.37)], ["N/P", "0%", "<1%", "1%", "3%", "37%"])
+        self.assertEqual(format_gutter_pct({"driverAltered": 219, "altered": 222, "profiled": 594}, 594), "37% / 37%")
+        self.assertEqual(format_gutter_pct({"driverAltered": 40, "altered": 128, "profiled": 10336}, 10336), "<1% / 1%")
+        self.assertEqual(format_gutter_pct({"altered": 3645, "profiled": 10000, "freqPct": 36.5}), "36%")
+        self.assertEqual(format_gutter_pct({"driverAltered": 0, "altered": 0, "profiled": 7773}, 10336), "0% / 0%*")
+        self.assertEqual(format_gutter_pct({"freqPct": None, "profiled": 0, "altered": 0}), "N/P")
+
 class LocalTables(unittest.TestCase):
     def setUp(self):
         self.op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"), os.path.join(FIX, "coverage.tsv"),

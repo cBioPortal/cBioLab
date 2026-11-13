@@ -9,7 +9,7 @@
 // hiding unaltered columns or re-sorting on the client never touches the data.
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 
-import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
+import { STYLE, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -187,8 +187,8 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
       const y = snap(header + ti * (rowH + rowGap));
       if (opts.pctLabels && g.pct && g.pct[ti] != null) {
         ctx.fillStyle = P.muted; ctx.font = "10px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
-        if (pctLeft) { ctx.textAlign = "right"; ctx.fillText(formatPct(g.pct[ti]), gx - sx + gutter - 3, y + 14, gapPx - 4); ctx.textAlign = "left"; }
-        else ctx.fillText(formatPct(g.pct[ti]), gEnd - sx + gutter + 3, y + 14, gapPx - 4);
+        if (pctLeft) { ctx.textAlign = "right"; ctx.fillText(formatLabelPct(g.pct[ti]), gx - sx + gutter - 3, y + 14, gapPx - 4); ctx.textAlign = "left"; }
+        else ctx.fillText(formatLabelPct(g.pct[ti]), gEnd - sx + gutter + 3, y + 14, gapPx - 4);
         ctx.font = "11px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
       }
       if (zoom >= 1) {
@@ -229,7 +229,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     ctx.fillText(trackLabelText(t, S), 4, y + 14);
     if (t.freqPct != null) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
-      ctx.fillText(formatGutterPct(t.driverPct, t.freqPct, t.profiled, data.n), gutter - 8, y + 14);
+      ctx.fillText(formatGutterPct(t, data.n), gutter - 8, y + 14);
       ctx.textAlign = "left";
     }
   });
