@@ -6,16 +6,16 @@ Cohorts:
 
 TP53 mutations: (A) Basal-like 153 of 171 profiled patients mutated vs (B) Luminal A 53 of 499 profiled patients mutated; Fisher exact two-sided p for all mutations < 1e-10.
   132 protein changes; 7 at q<0.05. Most significant:
-    R342*: Basal-like 6 (3.51%), Luminal A 0 (0.00%), p=0.0003, q=0.0269, enriched in Basal-like
+    R342*: Basal-like 6 (3.51%), Luminal A 0 (0%), p=0.0003, q=0.0269, enriched in Basal-like
     R175H: Basal-like 9 (5.26%), Luminal A 4 (0.80%), p=0.0010, q=0.0269, enriched in Basal-like
-    I195T: Basal-like 5 (2.92%), Luminal A 0 (0.00%), p=0.0010, q=0.0269, enriched in Basal-like
-    X225_splice: Basal-like 5 (2.92%), Luminal A 0 (0.00%), p=0.0010, q=0.0269, enriched in Basal-like
-    Y220C: Basal-like 5 (2.92%), Luminal A 0 (0.00%), p=0.0010, q=0.0269, enriched in Basal-like
+    I195T: Basal-like 5 (2.92%), Luminal A 0 (0%), p=0.0010, q=0.0269, enriched in Basal-like
+    X225_splice: Basal-like 5 (2.92%), Luminal A 0 (0%), p=0.0010, q=0.0269, enriched in Basal-like
+    Y220C: Basal-like 5 (2.92%), Luminal A 0 (0%), p=0.0010, q=0.0269, enriched in Basal-like
     R273H: Basal-like 7 (4.09%), Luminal A 2 (0.40%), p=0.0014, q=0.0269, enriched in Basal-like
     R196*: Basal-like 6 (3.51%), Luminal A 1 (0.20%), p=0.0014, q=0.0269, enriched in Basal-like
-    R248Q: Basal-like 3 (1.75%), Luminal A 0 (0.00%), p=0.0164, q=0.2166, enriched in Basal-like
-    X125_splice: Basal-like 3 (1.75%), Luminal A 0 (0.00%), p=0.0164, q=0.2166, enriched in Basal-like
-    X331_splice: Basal-like 3 (1.75%), Luminal A 0 (0.00%), p=0.0164, q=0.2166, enriched in Basal-like
+    R248Q: Basal-like 3 (1.75%), Luminal A 0 (0%), p=0.0164, q=0.2166, enriched in Basal-like
+    X125_splice: Basal-like 3 (1.75%), Luminal A 0 (0%), p=0.0164, q=0.2166, enriched in Basal-like
+    X331_splice: Basal-like 3 (1.75%), Luminal A 0 (0%), p=0.0164, q=0.2166, enriched in Basal-like
   genes by highest mutated share: TP53 89.5%, PIK3CA 47.5%, TTN 24.0%, CDH1 21.8%, GATA3 15.4%, MAP3K1 14.2%, MUC16 12.3%, KMT2C 11.8%, USH2A 9.9%, SPTA1 9.4%
   CAVEAT (tell the user): Every share is of the cohort's patients with a sample profiled for TP53 (a panel listing it, or whole-exome): 171 in “Basal-like”, 499 in “Luminal A”. Each protein change counts the patients carrying it in one of the cohort's samples; uncalled mutations are left out, VUS and germline mutations kept, as on the portal. p is a two-sided Fisher's exact test of carriers against the rest of the profiled patients, per change; q is Benjamini–Hochberg across the 132 changes listed. A stem's height is the distinct patient + protein change pairs at that codon, as a share of the profiled patients, as the portal draws it. The gene picker ranks genes by their higher share of mutated samples over profiled samples in the two cohorts, as the portal's does. Driver = OncoKB oncogenic (v7.5). 
   METHOD:

@@ -9,10 +9,10 @@ Cumulative incidence of brain metastasis, death competing (Aalen-Johansen):
   NSCLC: n=6,457, 1406 events, 1967 died first, 3084 censored; not at risk: 1352 already had it, 0 before observation, 0 no anchor, 0 no follow-up
   Breast: n=4,723, 905 events, 956 died first, 2862 censored; not at risk: 645 already had it, 0 before observation, 0 no anchor, 0 no follow-up
   Colorectal: n=5,439, 447 events, 1783 died first, 3209 censored; not at risk: 104 already had it, 0 before observation, 0 no anchor, 0 no follow-up
-  at 12 months: NSCLC 13.1% (95% CI 12.3-13.9; 1-KM would say 14.1%) | Breast 9.1% (95% CI 8.2-9.9; 1-KM would say 9.5%) | Colorectal 3.1% (95% CI 2.7-3.6; 1-KM would say 3.3%)
-  at 24 months: NSCLC 18.4% (95% CI 17.4-19.3; 1-KM would say 20.8%) | Breast 13.6% (95% CI 12.6-14.6; 1-KM would say 14.5%) | Colorectal 5.8% (95% CI 5.1-6.4; 1-KM would say 6.6%)
-  at 60 months: NSCLC 24.7% (95% CI 23.5-25.8; 1-KM would say 30.4%) | Breast 20.6% (95% CI 19.3-21.8; 1-KM would say 23.3%) | Colorectal 10.8% (95% CI 9.7-11.8; 1-KM would say 14.4%)
-  Gray's test: statistic 375.87, permutation p=0.0005 (2000 shuffles)
+  at 12 months: NSCLC 13.1% (95% CI 12.3%–13.9%; 1-KM would say 14.1%) | Breast 9.1% (95% CI 8.2%–9.9%; 1-KM would say 9.5%) | Colorectal 3.1% (95% CI 2.7%–3.6%; 1-KM would say 3.3%)
+  at 24 months: NSCLC 18.4% (95% CI 17.4%–19.3%; 1-KM would say 20.8%) | Breast 13.6% (95% CI 12.6%–14.6%; 1-KM would say 14.5%) | Colorectal 5.8% (95% CI 5.1%–6.4%; 1-KM would say 6.6%)
+  at 60 months: NSCLC 24.7% (95% CI 23.5%–25.8%; 1-KM would say 30.4%) | Breast 20.6% (95% CI 19.3%–21.8%; 1-KM would say 23.3%) | Colorectal 10.8% (95% CI 9.7%–11.8%; 1-KM would say 14.4%)
+  Gray's test: statistic 376, permutation p=0.0005 (2000 shuffles)
   CAVEAT (tell the user): Cumulative incidence of the first brain metastasis after the study's day 0, with death (OS_STATUS) as a competing risk: Aalen–Johansen, 95% intervals from its delta-method standard error. It is not 1 − Kaplan–Meier: that treats the dead as still at risk of the event and overstates incidence whenever death is common — the table sets the two side by side. Excluded rather than counted as event-free: 2101 who already had it by day 0, 0 without follow-up. Gray's test (weight 1) by permutation of cohort labels, 2000 shuffles, seeded; exact under the null that the cohorts share one distribution, entry times included. An event recorded from notes or registries is only as complete as the recording.
   METHOD:
     - Classify and count each patient's outcome [NSCLC · msk_chord_2024]: The incidence query above. Per patient, months from the study's day 0 (days ÷ 30.4375, rounded to 4 decimals) to the first brain metastasis after it (cause 1), death without it (cause 2, from OS_STATUS), or last follow-up (censored, OS_MONTHS); then counted by (entry, months, cause). Counts only.

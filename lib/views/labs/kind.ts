@@ -1,6 +1,7 @@
 // The labs view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { labsSvg } from "./figure.ts";
+import { fmtShare } from "../../chart/format.ts";
 
 export const labsKind: ViewKindDef<"labs"> = {
   kind: "labs",
@@ -10,7 +11,7 @@ export const labsKind: ViewKindDef<"labs"> = {
     const lb = v.labs;
     out.push(`Lab course: ${lb.test} % change from baseline, weeks from ${lb.anchoredTo}:\n` +
       lb.panels.map((pn) => `  ${pn.cohort}: ${pn.anchored.toLocaleString()} started, ${pn.baseline.toLocaleString()} with a baseline, ${pn.evaluable.toLocaleString()} measured after; ` +
-        `${pn.evaluable ? (100 * pn.responders / pn.evaluable).toFixed(1) : "—"}% fell ≥${lb.responseDrop}% (${pn.responders}/${pn.evaluable})\n` +
+        `${fmtShare(pn.responders / pn.evaluable)} fell ≥${lb.responseDrop}% (${pn.responders}/${pn.evaluable})\n` +
         `    median [IQR] by week: ` + pn.course.filter((c) => c.n >= 5).map((c) => `${c.week}w ${c.median}% [${c.q1}, ${c.q3}]`).join(", ")).join("\n") +
       (lb.responseP != null ? `\n  response rates differ: Fisher p=${pFmt(lb.responseP)}` : "") +
       caveatOf(v) + noteOf(v));

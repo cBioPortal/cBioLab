@@ -5,6 +5,8 @@ import { fitBackground } from "../lib/views/exclusivity/run.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import type { DrawnResultOf } from "../lib/types.ts";
+import { kindText } from "./support/kind-text.ts";
+import { exclusivityKind } from "../lib/views/exclusivity/kind.ts";
 
 describe("poissonBinomialTails", () => {
   test("p = ½, ½, ⅕ by hand: P(0)=.2, P(1)=.45, P(2)=.3, P(3)=.05", () => {
@@ -53,4 +55,10 @@ describe("exclusivity figure", () => {
       assert.deepEqual(lintSvg(svg), []);
     }
   });
+});
+
+test("an exact DISCOVER test and no odds ratio when a cell is empty", () => {
+  const [t] = kindText(exclusivityKind, { exclusivity: { samples: 100, matrixGenes: 5, stratifyBy: null, strata: [], measure: "any", converged: true, iterations: 3, cohort: "A",
+    unassessable: [], pairs: [{ a: "KRAS", b: "EGFR", both: 0, profiled: 100, expected: 2.5, qExclusive: 0.01, qCooccur: 1, exact: true, fisherQ: 0.02, log2Odds: null }] } });
+  assert.ok(t.endsWith("co-occurrence q=1; Fisher q=0.02"), t);
 });

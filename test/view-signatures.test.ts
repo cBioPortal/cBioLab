@@ -22,6 +22,7 @@ import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
 import type { SignaturesView, SignaturesResult } from "../lib/views/signatures/types.ts";
+import { kindText } from "./support/kind-text.ts";
 
 type Row = Record<string, unknown>;
 const base = (label: string) => label.replace(/:(rows|counts|values|rank)$/, "");
@@ -274,17 +275,13 @@ describe("the figure, text and method", () => {
   });
   test("the text lists the signatures above zero and the largest channels", async () => {
     const v = await result();
-    const out: string[] = [];
-    const t = { out, pFmt: String, caveatOf: () => "", noteOf: () => "", plotUnit: () => "", methodOf: () => "" };
-    signaturesKind.text!(v as never, t);
+    const out = kindText(signaturesKind, v);
     assert.match(out[0], /SBS7a \(UV\): 75% \* \| 40%/);
     assert.match(out[0], /… 1 more signatures at 0/);
     assert.match(out[0], /T1's spectrum: 40 mutations in 2 channels; largest: T\[C>T\]G 30 \(75\.0%\)/);
     assert.match(out[0], /Not profiled for mutational signatures: T3/);
     assert.equal(signaturesKind.title!(v as never), "Mutational signatures — P1");
-    const empty: string[] = [];
-    signaturesKind.text!({ ...v, signatures: { ...v.signatures, patient: null } } as never, { ...t, out: empty });
-    assert.match(empty[0], /patients to choose from/);
+    assert.match(kindText(signaturesKind, { ...v, signatures: { ...v.signatures, patient: null } })[0], /patients to choose from/);
     assert.equal(SIGNIFICANT_P, 0.05);
   });
   test("the method record recomputes the spectrum's shares, or says there is nothing to compute", () => {

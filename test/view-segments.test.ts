@@ -18,6 +18,7 @@ import * as federation from "../lib/federation.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult, PatientEvent } from "../lib/types.ts";
 import type { SegmentsView, SegmentsResult } from "../lib/views/segments/types.ts";
+import { kindText } from "./support/kind-text.ts";
 
 type Seg = { sid: number; sample: string; patient: string; stype: string; chrom: string; st: number; en: number; m: number };
 
@@ -287,10 +288,9 @@ describe("segments figure and text", () => {
   });
   test("results text and title", async () => {
     const v = await run({ cohorts: ["A"], gene: "ERBB2", sort: "gained" }, ctx({ A: cohort({ s1: 3 }) }, { s1: local(COHORT) }));
-    const out: string[] = [];
-    segmentsKind.text!(v as never, { out, pFmt: String, caveatOf: () => "", noteOf: () => "", plotUnit: () => "", methodOf: () => "" });
+    const out = kindText(segmentsKind, v);
     assert.match(out[0], /3 of 3 samples with segments drawn/);
-    assert.match(out[0], /S2: \+2\.10 \(1 segment\)/);
+    assert.match(out[0], /S2: \+2\.1 \(1 segment\)/);
     assert.match(out[0], /S1: no segment in the region/);
     assert.equal(segmentsKind.title!(v as never), "Copy-number segments — ERBB2 (chr17:37,844,337-37,884,915)");
     assert.equal(segmentsKind.figure!({ ...v, segments: { ...seg(v), samples: [] } } as never, {}), null);

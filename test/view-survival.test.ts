@@ -10,6 +10,8 @@ import { Untimed, type ViewRun, type EvaluatedCohort } from "../lib/views/run.ts
 import type { ViewResult, ViewParticipation } from "../lib/types.ts";
 import type { SurvivalCount } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
+import { kindText } from "./support/kind-text.ts";
+import { survivalKind } from "../lib/views/survival/kind.ts";
 
 /** counts per cohort, per study, as each site answers them */
 type Answers = Record<string, Record<string, SurvivalCount[]>>;
@@ -282,4 +284,12 @@ describe("survival: options", () => {
     const v = unwrap(await runSurvival({ kind: "survival" } as never, ctx({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }))) as Out;
     assert.ok(v.method.steps.length > 0);
   });
+});
+
+test("a median never reached, patients missing OS or never followed, and a k-group test", () => {
+  const [t] = kindText(survivalKind, { endpoint: "OS", caveat: "c", logrankK: { p: 0.04 },
+    curves: [{ cohort: "A", median: null, n: 10, events: 3, missing: 2, unobserved: 1 }, { cohort: "B", median: 12.34, n: 5, events: 5 }] });
+  assert.ok(t.includes("A: median not reached (n=10, 3 events, 2 missing OS, 1 with no follow-up after entry left out)"), t);
+  assert.ok(t.includes("B: median 12.3 mo (n=5, 5 events)"), t);
+  assert.ok(t.includes("k-group log-rank p=0.04"), t);
 });

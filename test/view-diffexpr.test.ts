@@ -184,8 +184,8 @@ describe("diffexpr: the per-gene test", () => {
     assert.match(r.caveat!, /as the portal's group comparison tests three or more groups/);
     const text = analysisText({ study: "s", cohorts: {}, views: [] } as never, { cohorts: {}, involvedStudies: ["s"], stats: { ms: 1 }, views: [r] } as never).join("\n");
     assert.match(text, /across A, B, C on mrna_zscores, one-way ANOVA: 3 genes tested/);
-    assert.match(text, /UP F=[\d.]+, q=.* — highest in A; A 5\.90, B 0\.48, C 1\.05/);
-    assert.match(text, /picked: UP \(p=.*; A 5\.90/);
+    assert.match(text, /UP F=[\d.]+, q=.* — highest in A; A 5\.9, B 0\.48, C 1\.05/);
+    assert.match(text, /picked: UP \(p=.*; A 5\.9,/);
     // the method's script recomputes the same test
     assert.match(r.method!.python!, /anova_generic\(.*use_var="equal"\)/);
     assert.ok(r.method!.steps.some((s) => s.title === "One-way ANOVA per gene"));

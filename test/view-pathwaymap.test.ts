@@ -15,6 +15,7 @@ import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation } from "../lib/types.ts";
 import type { PathwayMapResult } from "../lib/views/pathwaymap/types.ts";
 import { PRIMARY } from "../lib/ch.ts";
+import { kindText } from "./support/kind-text.ts";
 
 /** a pathway in PathwayMapper's text format: gene nodes in one row, A → B → … */
 const lines = (name: string, genes: string[], extra: string[] = []) => [name, "", "about " + name, "", "--NODE_NAME\tNODE_ID\tNODE_TYPE\tPARENT_ID\tPOSX\tPOSY--",
@@ -239,8 +240,7 @@ describe("pathwaymap: the figure", () => {
     const v = await result() as never as { pathwaymap: PathwayMapResult };
     assert.ok(pathwaymapKind.figure!(v as never, { width: 720 })!.startsWith("<svg"));
     assert.equal(pathwaymapKind.title!(v as never), "RTK-RAS: pathway diagram");
-    const out: string[] = [];
-    pathwaymapKind.text!(v as never, { out, pFmt: String, caveatOf: () => "", noteOf: () => "", plotUnit: () => "", methodOf: () => "" });
+    const out = kindText(pathwaymapKind, v);
     assert.match(out[0], /PathwayMapper pathway RTK-RAS \(best-ranked; ranked by count, TCGA PanCanAtlas pathways; query KRAS NRAS TP53\)/);
     assert.match(out[0], /RTK-RAS 2 \(KRAS,NRAS\)/);
     assert.match(out[0], /KRAS A 30%/);

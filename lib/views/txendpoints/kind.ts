@@ -1,6 +1,7 @@
 // The txendpoints view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { txMedianText, txendpointsSvg } from "./figure.ts";
+import { fmtNum } from "../../chart/format.ts";
 
 export const txendpointsKind: ViewKindDef<"txendpoints"> = {
   kind: "txendpoints",
@@ -12,7 +13,7 @@ export const txendpointsKind: ViewKindDef<"txendpoints"> = {
       t.curves.map((c) => `  ${c.cohort}: n=${c.n.toLocaleString()}, ${c.events} events, ${txMedianText(c)}; ` +
         `${c.anchored} of ${c.cohortPatients} anchored; left out ${c.excluded.noAnchor} without the anchor, ${c.excluded.noFollowup} without follow-up` +
         (t.endpoint === "tot" ? `, ${c.excluded.noStop} without a stop date` : "")).join("\n") +
-      (t.logrank ? `\n  log-rank chi2=${t.logrank.chi2.toFixed(2)} (${t.logrank.df} df), p=${pFmt(t.logrank.p)}` : t.noTest ? `\n  ${t.noTest}` : "") +
+      (t.logrank ? `\n  log-rank chi2=${fmtNum(t.logrank.chi2)} (${t.logrank.df} df), p=${pFmt(t.logrank.p)}` : t.noTest ? `\n  ${t.noTest}` : "") +
       caveatOf(v) + noteOf(v));
   },
   help: {

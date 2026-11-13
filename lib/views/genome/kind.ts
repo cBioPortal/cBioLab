@@ -1,6 +1,7 @@
 // The genome view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { genomeSvg } from "./figure.ts";
+import { fmtPct } from "../../chart/format.ts";
 
 export const genomeKind: ViewKindDef<"genome"> = {
   kind: "genome",
@@ -19,7 +20,7 @@ export const genomeKind: ViewKindDef<"genome"> = {
         cur.loss = Math.max(cur.loss, 100 * s.loss[i] / s.profiled[i]);
         best.set(b.chrom, cur);
       });
-      return [...best].map(([c, x]) => `chr${c} +${x.gain.toFixed(0)}/−${x.loss.toFixed(0)}`).join(", ");
+      return [...best].map(([c, x]) => `chr${c} +${fmtPct(x.gain, 0)}/−${fmtPct(x.loss, 0)}`).join(", ");
     };
     out.push(`Genome-wide copy number (${g.build}, ${g.binMb} Mb bins, |log2| ≥ ${g.threshold}; peak % gained/lost per chromosome):\n` +
       g.series.map((s) => `  ${s.cohort} (${s.segmented.toLocaleString()} segmented samples): ${perChrom(s)}`).join("\n") +

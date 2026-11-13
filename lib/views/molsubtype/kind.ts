@@ -1,21 +1,22 @@
 // The molsubtype view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { molsubtypeSvg } from "./figure.ts";
+import { fmtMonths, fmtNum, fmtShare } from "../../chart/format.ts";
 
 export const molsubtypeKind: ViewKindDef<"molsubtype"> = {
   kind: "molsubtype",
   figure: (v, o) => v.molsubtype.panels.some((pn) => pn.classified) ? molsubtypeSvg(v, o) : null,
   title: (v) => "Molecular subtypes" + (v.molsubtype ? " — " + v.molsubtype.classifier + (v.molsubtype.by ? " by " + v.molsubtype.by : "") : ""),
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
-    const m = v.molsubtype, pct = (k: number, n: number) => n ? (100 * k / n).toFixed(1) + "%" : "–";
+    const m = v.molsubtype, pct = (k: number, n: number) => fmtShare(k / n);
     const line = (label: string, c: { counts: number[]; classified: number; notClassifiable: number }) =>
       `  ${label} (${c.classified.toLocaleString()} classified, ${c.notClassifiable.toLocaleString()} not classifiable): ` + m.subtypes.map((s, i) => `${s} ${c.counts[i]} (${pct(c.counts[i], c.classified)})`).join(", ");
     out.push(`Molecular subtypes — ${m.classifierLabel}; MSI by ${m.msi}; p53 abnormal = ${m.p53}:\n` +
       m.panels.map((pn) => [line(pn.cohort, pn), ...(pn.groups || []).map((g) => line("  " + g.label, g)),
-        ...(pn.byTest ? [`    by ${m.by}: chi-squared ${pn.byTest.chi2.toFixed(1)} (${pn.byTest.df} df), p=${pFmt(pn.byTest.p)}`] : [])].join("\n")).join("\n") +
-      (m.cohortTest ? `\n  Between cohorts: chi-squared ${m.cohortTest.chi2.toFixed(1)} (${m.cohortTest.df} df), p=${pFmt(m.cohortTest.p)}` : "") +
-      (m.survival || []).map((s) => `\n  OS by subtype, ${s.cohort}: ` + s.curves.map((c) => `${c.subtype} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + " mo"}`).join("; ") +
-        (s.logrank ? `; log-rank chi-squared ${s.logrank.chi2.toFixed(1)} (${s.logrank.df} df), p=${pFmt(s.logrank.p)}` : s.noTest ? "; " + s.noTest : "")).join("") + caveatOf(v) + noteOf(v));
+        ...(pn.byTest ? [`    by ${m.by}: chi-squared ${fmtNum(pn.byTest.chi2)} (${pn.byTest.df} df), p=${pFmt(pn.byTest.p)}`] : [])].join("\n")).join("\n") +
+      (m.cohortTest ? `\n  Between cohorts: chi-squared ${fmtNum(m.cohortTest.chi2)} (${m.cohortTest.df} df), p=${pFmt(m.cohortTest.p)}` : "") +
+      (m.survival || []).map((s) => `\n  OS by subtype, ${s.cohort}: ` + s.curves.map((c) => `${c.subtype} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : fmtMonths(c.median)}`).join("; ") +
+        (s.logrank ? `; log-rank chi-squared ${fmtNum(s.logrank.chi2)} (${s.logrank.df} df), p=${pFmt(s.logrank.p)}` : s.noTest ? "; " + s.noTest : "")).join("") + caveatOf(v) + noteOf(v));
   },
   help: {
     title: "What is this?",

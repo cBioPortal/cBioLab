@@ -6,8 +6,8 @@ Cohorts:
 
 Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 493 genes; 328 at q<0.05):
   APC: Colorectal, MSS 76.9% (3813/4957) | Pancreatic, MSS 1.3% (39/3097), log2 ratio 5.93, q=<1e-300, enriched in Colorectal, MSS
-  KRAS: Colorectal, MSS 43.7% (2167/4957) | Pancreatic, MSS 80.9% (2507/3097), log2 ratio -0.89, q=8.4e-249, enriched in Pancreatic, MSS
-  CDKN2A: Colorectal, MSS 1% (49/4957) | Pancreatic, MSS 20.2% (627/3097), log2 ratio -4.36, q=5.4e-211, enriched in Pancreatic, MSS
+  KRAS: Colorectal, MSS 43.7% (2167/4957) | Pancreatic, MSS 80.9% (2507/3097), log2 ratio −0.889, q=8.4e-249, enriched in Pancreatic, MSS
+  CDKN2A: Colorectal, MSS 1% (49/4957) | Pancreatic, MSS 20.2% (627/3097), log2 ratio −4.36, q=5.4e-211, enriched in Pancreatic, MSS
   PIK3CA: Colorectal, MSS 17.7% (875/4957) | Pancreatic, MSS 2.1% (66/3097), log2 ratio 3.05, q=6.9e-119, enriched in Colorectal, MSS
   TCF7L2: Colorectal, MSS 11.5% (547/4777) | Pancreatic, MSS 0.1% (2/3064), log2 ratio 7.45, q=2.0e-117, enriched in Colorectal, MSS
   FBXW7: Colorectal, MSS 12.8% (635/4957) | Pancreatic, MSS 1% (32/3097), log2 ratio 3.63, q=2.2e-97, enriched in Colorectal, MSS
@@ -15,14 +15,14 @@ Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 493 ge
   BRAF: Colorectal, MSS 7.5% (371/4957) | Pancreatic, MSS 1.3% (40/3097), log2 ratio 2.53, q=2.1e-39, enriched in Colorectal, MSS
   AMER1: Colorectal, MSS 5.6% (280/4957) | Pancreatic, MSS 0.8% (24/3097), log2 ratio 2.87, q=2.2e-33, enriched in Colorectal, MSS
   SMAD2: Colorectal, MSS 4.2% (210/4957) | Pancreatic, MSS 0.3% (9/3097), log2 ratio 3.87, q=3.8e-32, enriched in Colorectal, MSS
-  MEN1: Colorectal, MSS 0.5% (25/4957) | Pancreatic, MSS 4.1% (128/3097), log2 ratio -3.03, q=2.9e-29, enriched in Pancreatic, MSS
-  TP53: Colorectal, MSS 78.2% (3877/4957) | Pancreatic, MSS 66.9% (2072/3097), log2 ratio 0.23, q=3.4e-27, enriched in Colorectal, MSS
+  MEN1: Colorectal, MSS 0.5% (25/4957) | Pancreatic, MSS 4.1% (128/3097), log2 ratio −3.03, q=2.9e-29, enriched in Pancreatic, MSS
+  TP53: Colorectal, MSS 78.2% (3877/4957) | Pancreatic, MSS 66.9% (2072/3097), log2 ratio 0.225, q=3.4e-27, enriched in Colorectal, MSS
   CTNNB1: Colorectal, MSS 5.4% (269/4957) | Pancreatic, MSS 1.1% (33/3097), log2 ratio 2.35, q=7.7e-26, enriched in Colorectal, MSS
   PIK3R1: Colorectal, MSS 3.6% (178/4957) | Pancreatic, MSS 0.4% (11/3097), log2 ratio 3.34, q=4.9e-24, enriched in Colorectal, MSS
   NRAS: Colorectal, MSS 4% (196/4957) | Pancreatic, MSS 0.5% (16/3097), log2 ratio 2.94, q=8.2e-24, enriched in Colorectal, MSS
   PTPRT: Colorectal, MSS 6.3% (313/4957) | Pancreatic, MSS 1.8% (57/3097), log2 ratio 1.78, q=1.4e-21, enriched in Colorectal, MSS
   PTPRS: Colorectal, MSS 5.3% (261/4957) | Pancreatic, MSS 1.5% (48/3097), log2 ratio 1.76, q=1.0e-17, enriched in Colorectal, MSS
-  CARD11: Colorectal, MSS 3.3% (165/4957) | Pancreatic, MSS 0.7% (21/3097), log2 ratio 2.30, q=2.1e-15, enriched in Colorectal, MSS
+  CARD11: Colorectal, MSS 3.3% (165/4957) | Pancreatic, MSS 0.7% (21/3097), log2 ratio 2.3, q=2.1e-15, enriched in Colorectal, MSS
   EPHA3: Colorectal, MSS 3.4% (171/4957) | Pancreatic, MSS 0.7% (23/3097), log2 ratio 2.22, q=2.5e-15, enriched in Colorectal, MSS
   GRIN2A: Colorectal, MSS 3.8% (188/4957) | Pancreatic, MSS 0.9% (29/3097), log2 ratio 2.02, q=5.5e-15, enriched in Colorectal, MSS
   MTOR: Colorectal, MSS 3% (149/4957) | Pancreatic, MSS 0.5% (17/3097), log2 ratio 2.45, q=6.4e-15, enriched in Colorectal, MSS
@@ -31,7 +31,7 @@ Alteration enrichment (mutation; two-sided Fisher's exact test, BH q over 493 ge
   KDR: Colorectal, MSS 2.9% (146/4957) | Pancreatic, MSS 0.6% (18/3097), log2 ratio 2.34, q=6.7e-14, enriched in Colorectal, MSS
   ERBB2: Colorectal, MSS 3.1% (155/4957) | Pancreatic, MSS 0.7% (21/3097), log2 ratio 2.21, q=9.1e-14, enriched in Colorectal, MSS
   PDGFRA: Colorectal, MSS 2.2% (109/4957) | Pancreatic, MSS 0.3% (8/3097), log2 ratio 3.09, q=9.1e-14, enriched in Colorectal, MSS
-  EPHA5: Colorectal, MSS 3.6% (179/4957) | Pancreatic, MSS 1% (30/3097), log2 ratio 1.90, q=1.9e-13, enriched in Colorectal, MSS
+  EPHA5: Colorectal, MSS 3.6% (179/4957) | Pancreatic, MSS 1% (30/3097), log2 ratio 1.9, q=1.9e-13, enriched in Colorectal, MSS
   NF1: Colorectal, MSS 3.3% (165/4957) | Pancreatic, MSS 0.8% (26/3097), log2 ratio 1.99, q=4.1e-13, enriched in Colorectal, MSS
   PIK3CG: Colorectal, MSS 3.1% (156/4957) | Pancreatic, MSS 0.8% (24/3097), log2 ratio 2.02, q=1.3e-12, enriched in Colorectal, MSS
   PTEN: Colorectal, MSS 3.9% (191/4957) | Pancreatic, MSS 1.2% (37/3097), log2 ratio 1.69, q=2.5e-12, enriched in Colorectal, MSS

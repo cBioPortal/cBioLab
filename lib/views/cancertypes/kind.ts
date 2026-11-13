@@ -1,6 +1,7 @@
 // The cancertypes view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { cancertypesSvg } from "./figure.ts";
+import { fmtShare } from "../../chart/format.ts";
 
 export const cancertypesKind: ViewKindDef<"cancertypes"> = {
   kind: "cancertypes",
@@ -9,7 +10,7 @@ export const cancertypesKind: ViewKindDef<"cancertypes"> = {
   text: (v, { out, caveatOf, noteOf }) => {
     const ct = v.cancertypes;
     const line = (g: { label: string; altered: number; profiled: number; mutation: number; amp: number; homdel: number; sv: number; multiple: number }) =>
-      `    ${g.label}: ${(100 * g.altered / (g.profiled || 1)).toFixed(1)}% (${g.altered}/${g.profiled}; mutation ${g.mutation}, amp ${g.amp}, deep del ${g.homdel}, SV ${g.sv}, multiple ${g.multiple})`;
+      `    ${g.label}: ${fmtShare(g.profiled ? g.altered / g.profiled : 0)} (${g.altered}/${g.profiled}; mutation ${g.mutation}, amp ${g.amp}, deep del ${g.homdel}, SV ${g.sv}, multiple ${g.multiple})`;
     out.push(`Cancer types summary: ${ct.genes.join(", ")} by ${ct.groupBy} (${ct.measure === "driver" ? "drivers" : "any alteration"}; ${ct.unit}s profiled for at least one gene):\n` +
       ct.panels.map((pn) => `  ${pn.cohort}: ${pn.altered.toLocaleString()} of ${pn.profiled.toLocaleString()} profiled ${ct.unit}s altered\n` +
         [...pn.groups, ...(pn.pooled ? [pn.pooled] : [])].map(line).join("\n")).join("\n") +

@@ -5,8 +5,8 @@ Cohorts:
 - MSS: 148 patients — MSI_STATUS in [MSS]
 
 Survival (KM, PFS_1L):
-  MSI-H: median 18.4mo (n=28, 23 events)
-  MSS: median 15.3mo (n=148, 142 events)
+  MSI-H: median 18.4 mo (n=28, 23 events)
+  MSS: median 15.3 mo (n=148, 142 events)
   log-rank p=0.5301
 CAVEAT (tell the user): PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. Log-rank on a single study, so no stratification applies.
   METHOD:

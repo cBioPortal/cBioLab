@@ -1,20 +1,21 @@
 // The ctdna view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
 import { ctdnaSvg } from "./figure.ts";
+import { fmtMonths, fmtShare } from "../../chart/format.ts";
 
 export const ctdnaKind: ViewKindDef<"ctdna"> = {
   kind: "ctdna",
   figure: (v, o) => v.ctdna && v.ctdna.panels.some((pn) => pn.patients) ? ctdnaSvg(v, o) : null,
   title: () => "ctDNA vs tissue",
   text: (v, { out, pFmt, caveatOf, noteOf }) => {
-    const cr = v.ctdna, pc = (x: number | null) => x == null ? "—" : (100 * x).toFixed(0) + "%";
+    const cr = v.ctdna, pc = (x: number | null) => x == null ? "—" : fmtShare(x, 0);
     out.push(`ctDNA vs tissue (plasma ${cr.attribute} = ${cr.plasma.join("/")}${cr.plasmaPanels.length ? " or panel " + cr.plasmaPanels.join("/") : ""}, tissue ${cr.tissue.join("/")}; ` +
       `${cr.measure === "driver" ? "OncoKB oncogenic" : "any alteration"}${cr.withinDays != null ? `; samples within ${cr.withinDays} days` : ""}; both panels cover the gene):\n` +
       cr.panels.map((pn) => `  ${pn.cohort} (${pn.patients.toLocaleString()} patients with both; ctDNA detected in ${pn.detected.toLocaleString()} of ${pn.plasmaPatients.toLocaleString()} with plasma, ` +
         `${pc(pn.plasmaPatients ? pn.detected / pn.plasmaPatients : null)} [95% CI ${pc(pn.detectedLow)}–${pc(pn.detectedHigh)}]):\n` +
         pn.genes.map((g) => `    ${g.gene}: both ${g.both}, tissue-only ${g.tissueOnly}, plasma-only ${g.plasmaOnly}, neither ${g.neither} of ${g.pairs}; ` +
           `PPA ${pc(g.ppa)}${g.ppa != null ? ` [${pc(g.ppaLow)}–${pc(g.ppaHigh)}]` : ""}, concordance ${pc(g.concordance)}`).join("\n") +
-        (pn.survival ? `\n    OS: ` + pn.survival.curves.map((c) => `${c.label} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : c.median.toFixed(1) + "mo"}`).join("; ") +
+        (pn.survival ? `\n    OS: ` + pn.survival.curves.map((c) => `${c.label} n=${c.n}, ${c.events} deaths, median ${c.median == null ? "not reached" : fmtMonths(c.median)}`).join("; ") +
           (pn.survival.logrank ? `; log-rank p=${pFmt(pn.survival.logrank.p)}` : "") : pn.survivalWhy ? `\n    OS by ctDNA not drawn: ${pn.survivalWhy}` : "") +
         (pn.ch ? `\n    CH filter: removed ${pn.ch.removed} of ${pn.ch.calls} plasma mutation calls in ${pn.ch.patients} patients (${pn.ch.byGene} by gene, ${pn.ch.byNormal} by the matched normal)` +
           (pn.ch.genes.length ? ": " + pn.ch.genes.map((g) => `${g.gene} ${g.calls}`).join(", ") : "") +

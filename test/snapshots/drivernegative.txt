@@ -7,32 +7,32 @@ Driver-negative analysis (drivers: EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2,
   mutation frequency, driver-negative vs driver-positive, Fisher + BH over 486 genes, 103 at q<0.05:
   KMT2D: 370/2911 (12.7%) vs 251/4898 (5.1%), log2 ratio 1.31, p=7.9e-32 q=2.5e-29
   NF1: 360/2911 (12.4%) vs 240/4898 (4.9%), log2 ratio 1.34, p=1.0e-31 q=2.5e-29
-  RBM10: 158/2911 (5.4%) vs 628/4898 (12.8%), log2 ratio -1.24, p=8.5e-28 q=1.4e-25
-  TP53: 1717/2911 (59.0%) vs 2288/4898 (46.7%), log2 ratio 0.34, p=8.4e-26 q=1.0e-23
+  RBM10: 158/2911 (5.4%) vs 628/4898 (12.8%), log2 ratio −1.24, p=8.5e-28 q=1.4e-25
+  TP53: 1717/2911 (59.0%) vs 2288/4898 (46.7%), log2 ratio 0.336, p=8.4e-26 q=1.0e-23
   NFE2L2: 161/2911 (5.5%) vs 76/4898 (1.6%), log2 ratio 1.83, p=3.8e-22 q=3.7e-20
   CDKN2A: 296/2911 (10.2%) vs 247/4898 (5.0%), log2 ratio 1.01, p=2.9e-17 q=2.3e-15
   RASA1: 124/2911 (4.3%) vs 72/4898 (1.5%), log2 ratio 1.53, p=1.1e-13 q=7.5e-12
-  PTEN: 152/2911 (5.2%) vs 104/4898 (2.1%), log2 ratio 1.30, p=3.5e-13 q=2.1e-11
-  KEAP1: 472/2911 (16.2%) vs 561/4898 (11.5%), log2 ratio 0.50, p=3.2e-9 q=1.7e-7
+  PTEN: 152/2911 (5.2%) vs 104/4898 (2.1%), log2 ratio 1.3, p=3.5e-13 q=2.1e-11
+  KEAP1: 472/2911 (16.2%) vs 561/4898 (11.5%), log2 ratio 0.501, p=3.2e-9 q=1.7e-7
   MAP2K1: 53/2911 (1.8%) vs 24/4898 (0.5%), log2 ratio 1.89, p=1.9e-8 q=9.4e-7
-  ARID1A: 257/2911 (8.8%) vs 269/4898 (5.5%), log2 ratio 0.68, p=2.4e-8 q=1.1e-6
+  ARID1A: 257/2911 (8.8%) vs 269/4898 (5.5%), log2 ratio 0.685, p=2.4e-8 q=1.1e-6
   ANKRD11: 98/2770 (3.5%) vs 73/4713 (1.5%), log2 ratio 1.19, p=5.5e-8 q=2.2e-6
-  FBXW7: 94/2911 (3.2%) vs 69/4898 (1.4%), log2 ratio 1.20, p=1.1e-7 q=4.1e-6
+  FBXW7: 94/2911 (3.2%) vs 69/4898 (1.4%), log2 ratio 1.2, p=1.1e-7 q=4.1e-6
   CASP8: 43/2911 (1.5%) vs 19/4898 (0.4%), log2 ratio 1.93, p=4.1e-7 q=1.4e-5
-  U2AF1: 32/2911 (1.1%) vs 134/4898 (2.7%), log2 ratio -1.32, p=5.5e-7 q=1.7e-5
-  RB1: 198/2911 (6.8%) vs 204/4898 (4.2%), log2 ratio 0.71, p=5.7e-7 q=1.7e-5
+  U2AF1: 32/2911 (1.1%) vs 134/4898 (2.7%), log2 ratio −1.32, p=5.5e-7 q=1.7e-5
+  RB1: 198/2911 (6.8%) vs 204/4898 (4.2%), log2 ratio 0.708, p=5.7e-7 q=1.7e-5
   NRAS: 46/2911 (1.6%) vs 24/4898 (0.5%), log2 ratio 1.69, p=1.4e-6 q=4.1e-5
-  NOTCH1: 142/2911 (4.9%) vs 135/4898 (2.8%), log2 ratio 0.82, p=1.8e-6 q=4.8e-5
-  KMT2C: 216/2911 (7.4%) vs 236/4898 (4.8%), log2 ratio 0.62, p=2.9e-6 q=7.5e-5
-  ERBB4: 170/2911 (5.8%) vs 178/4898 (3.6%), log2 ratio 0.68, p=6.9e-6 q=0.0002
-  IRS2: 94/2911 (3.2%) vs 81/4898 (1.7%), log2 ratio 0.97, p=8.3e-6 q=0.0002
+  NOTCH1: 142/2911 (4.9%) vs 135/4898 (2.8%), log2 ratio 0.824, p=1.8e-6 q=4.8e-5
+  KMT2C: 216/2911 (7.4%) vs 236/4898 (4.8%), log2 ratio 0.623, p=2.9e-6 q=7.5e-5
+  ERBB4: 170/2911 (5.8%) vs 178/4898 (3.6%), log2 ratio 0.684, p=6.9e-6 q=0.0002
+  IRS2: 94/2911 (3.2%) vs 81/4898 (1.7%), log2 ratio 0.965, p=8.3e-6 q=0.0002
   PIK3CB: 56/2911 (1.9%) vs 38/4898 (0.8%), log2 ratio 1.31, p=1.3e-5 q=0.0003
-  PREX2: 137/2298 (6.0%) vs 137/3849 (3.6%), log2 ratio 0.74, p=1.7e-5 q=0.0004
-  KMT2A: 114/2911 (3.9%) vs 109/4898 (2.2%), log2 ratio 0.82, p=2.2e-5 q=0.0005
-  KMT2B: 114/2298 (5.0%) vs 110/3849 (2.9%), log2 ratio 0.80, p=3.0e-5 q=0.0006
-  EP300: 111/2911 (3.8%) vs 107/4898 (2.2%), log2 ratio 0.80, p=3.5e-5 q=0.0006
-  EPHB1: 141/2911 (4.8%) vs 146/4898 (3.0%), log2 ratio 0.70, p=3.7e-5 q=0.0007
-  NOTCH3: 130/2911 (4.5%) vs 132/4898 (2.7%), log2 ratio 0.73, p=3.9e-5 q=0.0007
-  DICER1: 108/2911 (3.7%) vs 105/4898 (2.1%), log2 ratio 0.79, p=5.4e-5 q=0.0009
+  PREX2: 137/2298 (6.0%) vs 137/3849 (3.6%), log2 ratio 0.744, p=1.7e-5 q=0.0004
+  KMT2A: 114/2911 (3.9%) vs 109/4898 (2.2%), log2 ratio 0.815, p=2.2e-5 q=0.0005
+  KMT2B: 114/2298 (5.0%) vs 110/3849 (2.9%), log2 ratio 0.796, p=3.0e-5 q=0.0006
+  EP300: 111/2911 (3.8%) vs 107/4898 (2.2%), log2 ratio 0.804, p=3.5e-5 q=0.0006
+  EPHB1: 141/2911 (4.8%) vs 146/4898 (3.0%), log2 ratio 0.7, p=3.7e-5 q=0.0007
+  NOTCH3: 130/2911 (4.5%) vs 132/4898 (2.7%), log2 ratio 0.729, p=3.9e-5 q=0.0007
+  DICER1: 108/2911 (3.7%) vs 105/4898 (2.1%), log2 ratio 0.791, p=5.4e-5 q=0.0009
   COP1: 67/2911 (2.3%) vs 54/4898 (1.1%), log2 ratio 1.06, p=5.8e-5 q=0.0009
   CAVEAT (tell the user): Of the 7,809 patients of “NSCLC” sequenced for mutations, 4,898 (62.7%) carry an OncoKB driver (v7.5) — a called mutation, a high-level copy-number call or a structural variant the store calls oncogenic or likely oncogenic — in EGFR, KRAS, ALK, ROS1, BRAF, MET, RET, ERBB2, NTRK1, NTRK2, NTRK3; 2,911 (37.3%) carry none and were sequenced on a panel covering every one of those genes (or whole-exome): the driver-negative group. 0 (0.0%) carry none but were not profiled for every listed gene, so are neither — kept out of both sides, never counted as driver-negative. Coverage is read from the mutation panels and calls from the cohort's own samples only; a fusion driver is called only where the study reports structural variants. Then every other gene's mutation frequency is compared between driver-negative and driver-positive patients, in PATIENTS over the patients profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), two-sided Fisher's exact test, Benjamini–Hochberg q over the 486 genes tested; 4 altered genes were not tested (fewer than 5 altered patients, or not profiled in a group). The log ratio is log2 of the driver-negative share over the driver-positive one. Driver-positive tumours are often mutually exclusive with other drivers by biology, so a gene enriched in the driver-negative group is a candidate alternative driver, not a proven one; smoking history and tumour mutation burden also differ between the groups and are not adjusted for. 

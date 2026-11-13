@@ -5,11 +5,11 @@ Cohorts:
 - TP53 wt: 24,675 patients — NOT OQL[TP53:] AND profiled for TP53 MUTATION — across 2 studies
 
 Compare (driver%/any%, panel-aware denominators; annotation OncoKB v7.5 (pinned)):
-  APC: TP53 mut 21.6%/23.8% | TP53 wt 8.3%/10.1%  p=0.0e+0
-  KRAS: TP53 mut 29.8%/30% | TP53 wt 21.5%/21.7%  p=5.4e-100
-  CDKN2A: TP53 mut 14%/15.6% | TP53 wt 8.9%/9.7%  p=1.4e-86
-  PIK3CA: TP53 mut 11.7%/13% | TP53 wt 16%/17.1%  p=1.6e-37
-  EGFR: TP53 mut 8.4%/10.1% | TP53 wt 5.9%/7.3%  p=8.7e-29
+  APC: TP53 mut 21.6%/23.8% | TP53 wt 8.3%/10.1%  p < 1e-300
+  KRAS: TP53 mut 29.8%/30% | TP53 wt 21.5%/21.7%  p = 5.4e-100
+  CDKN2A: TP53 mut 14%/15.6% | TP53 wt 8.9%/9.7%  p = 1.4e-86
+  PIK3CA: TP53 mut 11.7%/13% | TP53 wt 16%/17.1%  p = 1.6e-37
+  EGFR: TP53 mut 8.4%/10.1% | TP53 wt 5.9%/7.3%  p = 8.7e-29
   cross-study comparison (msk_chord_2024, msk_met_2021): denominators are per-study panel-aware; patient overlap across studies is NOT deduplicated; counts are POOLED across studies, so the p-value is unstratified — site composition differences can invert a pooled association (Simpson's paradox), and a stratified test (Cochran–Mantel–Haenszel) would be the principled statistic
   METHOD:
     - Count profiled and altered patients per gene [TP53 mut · msk_chord_2024]: The geneCounts query above. Per gene: patients with a sample on a gene panel that covers the gene (profiled — the denominator, so a gene a panel omits is not counted as wild-type), altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion), and driver: an alteration OncoKB calls oncogenic, from the OncoKB release pinned for this run (v7.5). Counts only.
@@ -27,8 +27,8 @@ Compare (driver%/any%, panel-aware denominators; annotation OncoKB v7.5 (pinned)
     Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg matches statsmodels 0.15.0 multipletests(method="fdr_bh"), to a relative 1e-6 (test/tables-golden.test.ts).
 
 Survival (KM, OS):
-  TP53 mut: median 30.6mo (n=25498, 12607 events, 57 missing OS)
-  TP53 wt: median 68.4mo (n=24618, 8609 events, 57 missing OS)
+  TP53 mut: median 30.6 mo (n=25498, 12607 events, 57 missing OS)
+  TP53 wt: median 68.4 mo (n=24618, 8609 events, 57 missing OS)
   log-rank p=<1e-300 (stratified by study)
 CAVEAT (tell the user): Left out of the survival analysis (OS_MONTHS / OS_STATUS), as on cBioPortal — a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored: “TP53 mut”: 57 patients with a status but no usable time; “TP53 wt”: 57 patients with a status but no usable time. OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.
   METHOD:
@@ -50,8 +50,8 @@ CAVEAT (tell the user): Left out of the survival analysis (OS_MONTHS / OS_STATUS
     The count-row functions return exactly what kaplanMeier, logRank and logRankK return on the same rows expanded to one record per patient (test/survival-counts.test.ts). Kaplan–Meier matches lifelines 0.30.3 KaplanMeierFitter (curves are reported to 4 decimals); the log-rank matches statsmodels 0.15.0 survdiff to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).
 
 Clinical comparison across cohorts:
-  FRACTION_GENOME_ALTERED [sample, num]: TP53 mut mean 0.22 sd 0.20 (n=25,490) | TP53 wt mean 0.15 sd 0.17 (n=24,612)  Welch t p=<1e-300 q=<1e-300
-  TMB_NONSYNONYMOUS [sample, num]: TP53 mut mean 8.69 sd 20.07 (n=25,574) | TP53 wt mean 6.56 sd 15.68 (n=24,697)  Welch t p=2.5e-40 q=2.5e-40
+  FRACTION_GENOME_ALTERED [sample, num]: TP53 mut mean 0.224 sd 0.198 (n=25,490) | TP53 wt mean 0.147 sd 0.168 (n=24,612)  Welch t p=<1e-300 q=<1e-300
+  TMB_NONSYNONYMOUS [sample, num]: TP53 mut mean 8.69 sd 20.1 (n=25,574) | TP53 wt mean 6.56 sd 15.7 (n=24,697)  Welch t p=2.5e-40 q=2.5e-40
   CURRENT_AGE_DEID [patient, cat]:   SKIPPED: not declared by msk_met_2021
   Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary; numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across the 2 tested attributes. Counts are pooled across 2 studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged.
   METHOD:
@@ -69,12 +69,12 @@ Clinical comparison across cohorts:
     χ² matches scipy 1.18.1 chi2_contingency; Welch's t scipy ttest_ind(equal_var=False) and Welch's ANOVA statsmodels 0.15.0 anova_generic from the same moments; Mann–Whitney, Kruskal–Wallis and quantiles scipy/numpy on the expanded distribution; Benjamini–Hochberg statsmodels multipletests — all to a relative 1e-6 (test/tables-golden.test.ts, test/moments-golden.test.ts).
 
 Co-occurrence (2x2 per pair, among samples profiled for BOTH genes):
-  KRAS/APC: both 2,241, KRAS only 5,431, APC only 3,836, neither 14,066 (of 25,574 profiled)  MH log2OR=0.56 (pooled 0.60) (co-occur)  p=6.8e-40 q=5.7e-35  stratified p=9.4e-36
-  KRAS/PIK3CA: both 711, KRAS only 6,961, PIK3CA only 2,625, neither 15,277 (of 25,574 profiled)  MH log2OR=-0.75 (pooled -0.75) (mutually exclusive)  p=1.8e-33 q=3.9e-31  stratified p=1.3e-31
-  PIK3CA/APC: both 925, PIK3CA only 2,411, APC only 5,152, neither 17,086 (of 25,574 profiled)  MH log2OR=0.35 (pooled 0.35) (co-occur)  p=1.4e-8 q=1.1e-8  stratified p=5.7e-9
-  TP53/KRAS: both 7,672, TP53 only 17,902, KRAS only 0, neither 0 (of 25,574 profiled)  log2OR=-1.22 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
-  TP53/PIK3CA: both 3,336, TP53 only 22,238, PIK3CA only 0, neither 0 (of 25,574 profiled)  log2OR=-2.74 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
-  TP53/APC: both 6,077, TP53 only 19,497, APC only 0, neither 0 (of 25,574 profiled)  log2OR=-1.68 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
+  KRAS/APC: both 2,241, KRAS only 5,431, APC only 3,836, neither 14,066 (of 25,574 profiled)  MH log2OR=0.557 (pooled 0.597) (co-occur)  p=6.8e-40 q=5.7e-35  stratified p=9.4e-36
+  KRAS/PIK3CA: both 711, KRAS only 6,961, PIK3CA only 2,625, neither 15,277 (of 25,574 profiled)  MH log2OR=−0.749 (pooled −0.75) (mutually exclusive)  p=1.8e-33 q=3.9e-31  stratified p=1.3e-31
+  PIK3CA/APC: both 925, PIK3CA only 2,411, APC only 5,152, neither 17,086 (of 25,574 profiled)  MH log2OR=0.353 (pooled 0.348) (co-occur)  p=1.4e-8 q=1.1e-8  stratified p=5.7e-9
+  TP53/KRAS: both 7,672, TP53 only 17,902, KRAS only 0, neither 0 (of 25,574 profiled)  log2OR=−1.22 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
+  TP53/PIK3CA: both 3,336, TP53 only 22,238, PIK3CA only 0, neither 0 (of 25,574 profiled)  log2OR=−2.74 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
+  TP53/APC: both 6,077, TP53 only 19,497, APC only 0, neither 0 (of 25,574 profiled)  log2OR=−1.68 (mutually exclusive)  p=1.0000 q=1.0000  stratified p=1.0000
   Pairwise co-occurrence within “TP53 mut” (the first cohort in this view; co-occurrence describes one cohort, not a contrast). Denominators are the samples profiled for BOTH genes, computed per study against that study's own panels — a pair is never scored on samples whose panel could not have detected it. With 2 studies the reported test is STRATIFIED by study (Cochran–Mantel–Haenszel): each study contributes a 2×2 and the coordinator combines them, so a pair cannot be manufactured by differing case mix between sites. The pooled Fisher p is shown alongside. q-values are Benjamini–Hochberg across the 6 assessable pairs. Every site returns four counts per pair and nothing else.
   METHOD:
     - Count each gene pair's 2×2 table [TP53 mut · msk_chord_2024]: The pairCounts query above. Of the samples on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (altered: any mutation or structural variant, or a copy-number change of ±2 (amplification or deep deletion)). Four counts per pair, nothing else.

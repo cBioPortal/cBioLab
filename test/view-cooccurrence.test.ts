@@ -9,6 +9,7 @@ import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewResult, ViewParticipation } from "../lib/types.ts";
 import type { PairCounts } from "../lib/federation.ts";
 import { PRIMARY } from "../lib/ch.ts";
+import { fmtNum } from "../lib/chart/format.ts";
 
 type Cells = [both: number, onlyA: number, onlyB: number, neither: number];
 
@@ -57,7 +58,7 @@ describe("cooccurrence: tendency (MEX: log₂ OR > 0 co-occurrence, ≤ 0 mutual
     const r = await run({ s1: [8, 2, 2, 8], s2: [1, 9, 9, 1] });
     const t = text(r);
     const mh = Math.log2(pair(r).oddsRatioMH!);
-    assert.match(t, new RegExp("MH log2OR=" + mh.toFixed(2).replace("-", "\\-") + " \\(pooled " + pair(r).log2Odds!.toFixed(2) + "\\)"));
+    assert.ok(t.includes("MH log2OR=" + fmtNum(mh) + " (pooled " + fmtNum(pair(r).log2Odds!) + ")"), t);
     assert.match(t, /among samples profiled for BOTH genes/);
     assert.match((r as unknown as { note: string }).note, /Denominators are the samples profiled/);
   });

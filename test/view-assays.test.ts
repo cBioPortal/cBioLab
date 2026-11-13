@@ -11,6 +11,8 @@ import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { AssaysResult, AssaysView } from "../lib/views/assays/types.ts";
 import { palette } from "../lib/svg-kit.ts";
 import { PRIMARY } from "../lib/ch.ts";
+import { kindText } from "./support/kind-text.ts";
+import { assaysKind } from "../lib/views/assays/kind.ts";
 
 type Row = Record<string, unknown>;
 const PT = "sigs";
@@ -318,4 +320,14 @@ describe("assays: figures", () => {
     const plain = valueColors(["x", "y"], p);
     assert.notEqual(plain.get("x")!.color, plain.get("y")!.color);
   });
+});
+
+test("a numeric mean that is missing, no difference, and a categorical mix as shares", () => {
+  const base = { profileName: "Signatures", profileType: "MUTATIONAL_SIGNATURE", unit: "samples", test: "Wilcoxon", tested: 2, significant: 0 };
+  const [num] = kindText(assaysKind, { assays: { ...base, datatype: "numeric",
+    rows: [{ name: "SBS1", cells: [{ cohort: "A", mean: null, n: 3 }], diff: null, q: 0.5, higherIn: "A", value: "" }] } });
+  assert.ok(num.includes("SBS1: A mean — (n=3), q=0.5, higher in A"), num);
+  const [cat] = kindText(assaysKind, { assays: { ...base, datatype: "categorical",
+    rows: [{ name: "1p", cells: [{ cohort: "A", values: { Gain: 1, Loss: 3 }, n: 4 }], diff: null, q: 0.1, higherIn: "A", value: "Loss" }] } });
+  assert.ok(cat.includes("1p: A Gain 25.0%, Loss 75.0% (n=4), q=0.1, higher in A (Loss)"), cat);
 });
