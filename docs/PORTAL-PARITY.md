@@ -310,7 +310,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] gnomAD, dbSNP and Functional Impact (Mutation Assessor, SIFT, PolyPhen-2, AlphaMissense) columns, read from the offline store (#182)
   - [ ] The Functional Impact column's sectioned filter menu (by predictor and call); its header icons are text labels, not the tools' logos
   - [ ] gnomAD and dbSNP for the ~2% of variants Genome Nexus cannot serve myvariant.info's record of (asking myvariant.info directly would be a second source)
-  - [x] The Annotation column's OncoKB call for the sample's tumour type (gene, protein change, mutation type, tumour type, as the portal asks), not the highest level across types, synced offline to `annotation.oncokb_tumor_type` (#PRNUM)
+  - [x] The Annotation column's OncoKB call for the sample's tumour type (gene, protein change, mutation type, tumour type, as the portal asks), not the highest level across types, synced offline to `annotation.oncokb_tumor_type` (#202)
   - [ ] Shown once the full sync puts both OncoKB tables at one release (they are read at the same pin; the test studies are at v7.7, the gene-level store at v7.5)
   - [ ] Resistance, diagnostic and prognostic levels, and OncoKB's answer for the card, are stored but not shown (the card is MUT-AN-1)
   - [ ] CIViC
