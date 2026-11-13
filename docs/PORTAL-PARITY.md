@@ -143,7 +143,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Tracks › Clinical: display names, Freq %, Select / Deselect all, applied by Update tracks, no cap of 8 (ONC-TR-1, ONC-STM-4) (#196)
     - [ ] A patient-level attribute's Freq in samples, as the portal counts it (ours its patients; msk_impact_2017 OS_MONTHS 73.3 % vs 74.4 %): needs a samples count in Explore's facet query
     - [ ] Mutation spectrum, Profiled-in and Study of origin listed first as rows of the tab
-  - [ ] Clinical tracks: every value its own colour (ours the top 8 + "Other", Okabe-Ito); a patient's value as the portal's (mean, MUTATION_COUNT max, "Mixed"; ours the patient row, else one sample's); exact tooltip values (ours "≈x" from a 256-step code) (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
+  - [ ] Clinical tracks (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
+    - [x] Every value its own colour, the portal's list and reserved colours (ONC-TT-1) (#197)
+    - [ ] A patient's value as the portal's (mean, MUTATION_COUNT max, "Mixed"; ours the patient row, else one sample's); exact tooltip values (ours "≈x" from a 256-step code) (ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
   - [ ] The mutation spectrum track (ONC-TT-3, ONC-STM-6)
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
     - [ ] Generic-assay pivot and sort order (ONC-TT-8); VAF's "Not mutated/no VAF data" state; the #e0e0e0 null colour

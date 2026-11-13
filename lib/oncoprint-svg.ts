@@ -77,7 +77,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     const [s0, s1] = S.glyph.notProfiled.stripe.band;
     parts.push(rect(x, y, w, ROW_H, S.glyph.notProfiled.fill), rect(x, y + ROW_H * s0, w, ROW_H * (s1 - s0), S.glyph.notProfiled.stripe.color));
   };
-  const scratch = new Int32Array(64);
+  const scratch = new Int32Array(Math.max(64, ...contract.tracks.map((t) => (t.categories?.length ?? 0) + 2)));
   const fmtNum = (x: number): string | number => Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : Math.round(x * 10) / 10;
 
   // Cells at a fractional width would each antialias their edges against the paper, and the

@@ -399,15 +399,12 @@ export function assembleContract(input: AssembleInput): Contract {
     }
     const counts = new Map<string, number>();
     for (let i = 0; i < val.length; i++) { const v = val[i]; if (v != null) counts.set(v, (counts.get(v) || 0) + 1); }
-    const categories = [...counts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 8).map((e) => e[0]);
+    // every value is its own category, as in the portal, most frequent first
+    const categories = [...counts.entries()].sort((x, y) => y[1] - x[1]).map((e) => e[0]);
     const catIdx = new Map<string, number>(categories.map((c, i) => [c, i]));
     const cells = new Int32Array(allPids.length).fill(-1);
-    for (let i = 0; i < val.length; i++) {
-      const v = val[i];
-      if (v != null) { const ci = catIdx.get(v); cells[i] = ci === undefined ? categories.length : ci; } // last = Other
-    }
-    const hasOther = [...counts.keys()].some((v) => !catIdx.has(v));
-    clinTracks.push({ kind: "clinical", label: attr, categories: hasOther ? [...categories, "Other"] : categories, cells });
+    for (let i = 0; i < val.length; i++) { const v = val[i]; if (v != null) cells[i] = catIdx.get(v)!; }
+    clinTracks.push({ kind: "clinical", label: attr, categories, cells });
   }
 
   phase("clinical");

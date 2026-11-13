@@ -196,7 +196,8 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   const offs = groupOffsets(groups, zoom, gap);
   const pad = view.whitespace && zoom >= STYLE.geometry.padMinZoom ? STYLE.geometry.cellPad : 0;
   let cellsDrawn = 0, bucketsDrawn = 0;
-  const scratch = new Int32Array(64);
+  // the zoomed-out vote counts every category of the widest categorical track
+  const scratch = new Int32Array(Math.max(64, ...data.tracks.map((t) => (t.categories?.length ?? 0) + 2)));
   const dpr = ctx.getTransform().a || 1;
   const snap = (v: number): number => Math.round(v * dpr) / dpr;
 
