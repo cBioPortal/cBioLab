@@ -89,3 +89,8 @@ test("a numeric row gives the exact value where the contract carries one, and th
   assert.deepEqual(rows[1], ["TMB", "CLINICAL", "100.4", "0.1", ""], "float32 at the digits it holds; the code would say 100 for both");
   assert.deepEqual(rows[2], ["AGE", "CLINICAL", "61", "0", ""], "an older contract: no values, the code's");
 });
+
+test("the mutation spectrum exports as the portal's: one row per substitution, its counts", () => {
+  const tsv = contractToTsv({ columns: ["A", "B"], tracks: [{ kind: "clinical", label: "MUTATION_SPECTRUM", stack: ["C>A", "C>G"], cells: [0, -1], values: [119, 186, 0, 0] }] } as never);
+  assert.deepEqual(tsv.split("\n").filter(Boolean).slice(1), ["MUTATION_SPECTRUM (C>A)\tCLINICAL\t119\t", "MUTATION_SPECTRUM (C>G)\tCLINICAL\t186\t"]);
+});

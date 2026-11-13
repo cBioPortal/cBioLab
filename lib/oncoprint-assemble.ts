@@ -6,10 +6,10 @@
 // panel-aware frequencies — separated from where the rows come from. `buildContract`
 // fetches from ClickHouse and calls this; a CLI or a notebook can call it on local
 // tables, and a port in another language has this function as its conformance target.
-import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
+import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, SPECTRUM_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
-import { STYLE, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
+import { STYLE, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec } from "./types.ts";
@@ -357,6 +357,21 @@ export function assembleContract(input: AssembleInput): Contract {
     clinTracks.push(...rows.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })));
   }
   for (const { attr, values: valByPid } of clinical) {
+    if (attr === SPECTRUM_TRACK) {
+      // each column's six substitution counts, as the engine's rows carry them ("a,b,c,d,e,f");
+      // a column with none is no data, as in the portal
+      const k = STYLE.glyph.spectrum.categories.length;
+      const cells = new Int32Array(allPids.length).fill(-1), values = new Float32Array(allPids.length * k);
+      for (let i = 0; i < allPids.length; i++) {
+        const v = valByPid.get(allPids[i]);
+        if (!v) continue;
+        const n = v.split(",").map(Number);
+        if (n.length !== k || !n.some((x) => x > 0)) continue;
+        values.set(n, i * k); cells[i] = i;
+      }
+      clinTracks.push({ kind: "clinical", label: attr, stack: STYLE.glyph.spectrum.categories.slice(), cells, values });
+      continue;
+    }
     // One string-keyed lookup per column, then three passes over a positional array. The map
     // is keyed by column id, and at 400k columns three passes over it was the single most
     // expensive phase of assembly.
@@ -506,7 +521,11 @@ export function assembleContract(input: AssembleInput): Contract {
     for (let r = 0; r < idx.length; r++) idRank[idx[r]] = r;
   }
   const sortableTracks = new Map<string, Track>([...clinTracks, ...devTracks, ...heatTracks].map((t) => [t.label, t]));
-  const trackCmp = (t: Track, sign: number) => t.values ? (x: number, y: number): number => {
+  const trackCmp = (t: Track, sign: number) => t.stack ? (x: number, y: number): number => {
+    const a = (t.cells as number[])[x], b = (t.cells as number[])[y];
+    if (a === -1 || b === -1) return a === b ? 0 : a === -1 ? 1 : -1;
+    return sign * stackCompare(t.values!, t.stack!.length, x, y);
+  } : t.values ? (x: number, y: number): number => {
     // a numeric track sorts by its exact values, missing last
     const a = t.values![x], b = t.values![y], na = Number.isNaN(a), nb = Number.isNaN(b);
     if (na || nb) return na === nb ? 0 : na ? 1 : -1;
@@ -557,7 +576,12 @@ export function assembleContract(input: AssembleInput): Contract {
   // Rows top to bottom in the portal's order: clinical (the study, sample-count and profiled-for
   // rows first), then the derived-cohort rows beside them, then genes, then heatmaps.
   const remapValues = (t: Track) => t.values ? { values: order.map((i) => { const x = t.values![i]; return Number.isNaN(x) ? null : x; }) as number[] } : {};
-  const tracks: Track[] = clinTracks.map((t) => ({ ...t, cells: remap(t.cells), ...remapValues(t) }));
+  // a stacked row moves each column's counts together, and its cells name their new positions
+  const remapStack = (t: Track): Track => {
+    const k = t.stack!.length, v = t.values!;
+    return { ...t, cells: order.map((i, j) => (t.cells as Int32Array)[i] === -1 ? -1 : j), values: order.flatMap((i) => Array.from(v.slice(i * k, i * k + k))) };
+  };
+  const tracks: Track[] = clinTracks.map((t) => t.stack ? remapStack(t) : ({ ...t, cells: remap(t.cells), ...remapValues(t) }));
   // an overlay is evidence about the gene, not an alteration of it: expression does not
   // enter the altered fraction, which is what the portal reports too
   const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;

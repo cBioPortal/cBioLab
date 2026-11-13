@@ -167,3 +167,9 @@ test("the browser sorts a numeric track by values finer than float32, as the por
     assert.deepEqual(pick, dir === "asc" ? ["R02", "R01"] : ["R01", "R02"], dir);
   }
 });
+
+test("zoomed out, a stacked row shows the first column with data", async () => {
+  const { aggregate } = await import("../lib/oncoprint-lod.ts");
+  assert.equal(aggregate({ kind: "clinical", stack: ["a"] }, [-1, 4, 7], null, 0, 3, new Int32Array(4)), 4);
+  assert.equal(aggregate({ kind: "clinical", stack: ["a"] }, [-1, -1], null, 0, 2, new Int32Array(4)), -1);
+});

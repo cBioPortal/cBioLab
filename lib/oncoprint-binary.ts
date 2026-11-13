@@ -70,8 +70,8 @@ export function packContract(contract: Contract): Uint8Array {
     if (m.dtype === "i16") new Int16Array(out.buffer, base + m.offset, m.length).set(t.cells as ArrayLike<number>);
     else new Int32Array(out.buffer, base + m.offset, m.length).set(t.cells as ArrayLike<number>);
     if (t.values && m.valuesOffset != null) {
-      const v = new DataView(out.buffer, base + m.valuesOffset, m.length * 4);
-      for (let i = 0; i < m.length; i++) { const x = t.values[i]; v.setFloat32(i * 4, x == null ? NaN : x, true); }
+      const v = new DataView(out.buffer, base + m.valuesOffset, t.values.length * 4);
+      for (let i = 0; i < t.values.length; i++) { const x = t.values[i]; v.setFloat32(i * 4, x == null ? NaN : x, true); }
     }
   });
   out.set(colBytes, base + columnsOffset);
@@ -88,8 +88,10 @@ export function unpackContract(buf: ArrayBuffer): UnpackedContract {
     const { dtype, offset, length, valuesOffset, ...meta } = m;
     const cells = dtype === "i16" ? new Int16Array(buf, base + offset, length) : new Int32Array(buf, base + offset, length);
     if (valuesOffset == null) return { ...meta, cells };
-    const dv2 = new DataView(buf, base + valuesOffset, length * 4), values = new Float32Array(length);
-    for (let i = 0; i < length; i++) values[i] = dv2.getFloat32(i * 4, true);
+    // a stacked row holds stack.length values per column
+    const nv = length * (meta.stack ? meta.stack.length : 1);
+    const dv2 = new DataView(buf, base + valuesOffset, nv * 4), values = new Float32Array(nv);
+    for (let i = 0; i < nv; i++) values[i] = dv2.getFloat32(i * 4, true);
     return { ...meta, cells, values };
   });
   let cols: string[] | null = null;

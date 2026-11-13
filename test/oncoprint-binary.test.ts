@@ -80,3 +80,13 @@ test("a numeric track's exact values ride beside its cells as float32, NaN where
   assert.deepEqual(Array.from(u.tracks[1].cells), [0, 0, -1], "the cells after it are where they were");
   assert.deepEqual(u.columns(), ["A", "B", "C"]);
 });
+
+test("a stacked row's values ride as stack.length per column", () => {
+  const c = { study: "s", studies: ["s"], groups: [{ name: "all", start: 0, count: 2 }], columns: ["A", "B"], unit: "patient", conventions: {}, stats: {}, display: {},
+    tracks: [{ kind: "clinical", label: "MUTATION_SPECTRUM", stack: ["a", "b", "c"], cells: [0, -1], values: [1, 2, 3, 0, 0, 0] },
+      { kind: "clinical", label: "X", categories: ["y"], cells: [0, 0] }] } as unknown as Contract;
+  const buf = packContract(c);
+  const u = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+  assert.deepEqual(Array.from(u.tracks[0].values!), [1, 2, 3, 0, 0, 0]);
+  assert.deepEqual(Array.from(u.tracks[1].cells), [0, 0]);
+});

@@ -10,7 +10,7 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, heatColor, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -157,6 +157,17 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     const [s0, s1] = S.glyph.notProfiled.stripe.band;
     ctx.fillStyle = P.np; ctx.fillRect(x, y, w, h);
     ctx.fillStyle = P.npStripe; ctx.fillRect(x, y + h * s0, w, h * (s1 - s0));
+    return;
+  }
+  if (t.stack && t.values) {
+    // the column's counts, each a share of the cell, the first category on top
+    const k = t.stack.length, v = t.values;
+    let total = 0; for (let j = 0; j < k; j++) total += v[code * k + j];
+    let y0 = y;
+    for (let j = 0; j < k; j++) {
+      const hj = total ? h * v[code * k + j] / total : 0;
+      ctx.fillStyle = S.glyph.spectrum.colors[j % S.glyph.spectrum.colors.length]; ctx.fillRect(x, y0, w, hj); y0 += hj;
+    }
     return;
   }
   if (t.bar) {
@@ -356,6 +367,7 @@ export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: 
     if (!t) throw new Error("sort: no track labelled '" + k.track + "'");
     const c = t.cells;
     const v = t.values;
+    if (t.stack && v) return (a, b) => { const x = c[a], y = c[b]; if (x === -1 || y === -1) return x === y ? 0 : x === -1 ? 1 : -1; return sign * stackCompare(v, t.stack!.length, x, y); };
     if (v) return (a, b) => { const x = v[a], y = v[b], na = Number.isNaN(x), nb = Number.isNaN(y); if (na || nb) return na === nb ? 0 : na ? 1 : -1; return sign * (x - y); };
     return (a, b) => { const x = c[a], y = c[b]; if (x === y) return 0; if (x === -1) return 1; if (y === -1) return -1; return sign * (x - y); };
   });

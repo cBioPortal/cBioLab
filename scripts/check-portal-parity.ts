@@ -30,6 +30,7 @@
  *   8. Uncalled mutations: glioma_msk_2018, the study that holds them (read support for a
  *      patient's other samples, below the caller's thresholds), against the portal's mutation
  *      profile, which leaves them out. Counted in samples, where they would differ.
+ *  20. The mutation spectrum row: per sample (coadread) and summed per patient (msk_impact_2017).
  *  19. An oncoprint patient column's clinical value when the patient has several samples
  *      (msk_impact_2017): the portal's mean / MUTATION_COUNT max / "Mixed" of its sample data.
  *
@@ -52,7 +53,7 @@ import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
 import { resolverFor, hasViewAggregates } from "../lib/federation.ts";
 import { survivalLeftOutSql } from "../lib/survival-queries.ts";
 import { oqlCasesSql } from "../lib/oql.ts";
-import { clinicalSql } from "../lib/oncoprint.ts";
+import { clinicalSql, spectrumSql } from "../lib/oncoprint.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 import type { CohortDef, GeneTableRow, ClinicalFacet } from "../lib/types.ts";
@@ -659,6 +660,28 @@ for (const studies of [["brca_tcga_pan_can_atlas_2018"], ["prostate_pcbm_swiss_2
     const mine = ours.data.find((r) => r.pid === p && r.k === a)?.v ?? "(none)";
     const agree = isNumber.has(a) ? Math.abs(Number(mine) - Number(theirs)) <= 1e-9 * Math.max(1, Math.abs(Number(theirs))) : mine === theirs;
     record({ study, group: "oncoprint", what: `${p} ${a} over ${vals.length} samples (patient column)`, ours: mine, portal: theirs, agree });
+  }
+}
+
+// 20. the mutation spectrum row: each sample's six single-base substitution counts, and a
+// patient's (its samples' summed), against the portal's mutation-spectrum service
+{
+  const K = ["CtoA", "CtoG", "CtoT", "TtoA", "TtoC", "TtoG"] as const;
+  type Spectrum = { sampleId: string; patientId: string } & Record<(typeof K)[number], number>;
+  for (const [study, unit] of [["coadread_tcga_pan_can_atlas_2018", "sample"], ["msk_impact_2017", "patient"]] as const) {
+    const portal = await api<Spectrum[]>("/molecular-profiles/" + study + "_mutations/mutation-spectrums/fetch", { sampleListId: study + "_all" });
+    const theirs = new Map<string, number[]>();
+    for (const r of portal) {
+      const id = unit === "sample" ? r.sampleId : r.patientId, n = theirs.get(id) || [0, 0, 0, 0, 0, 0];
+      K.forEach((k, j) => { n[j] += r[k]; }); theirs.set(id, n);
+    }
+    // a case whose mutations hold no single-base substitution is no data in both (the portal leaves it out, the row draws it blank)
+    const ours = new Map((await chQuery<{ pid: string; v: string }>(spectrumSql(study, DB, unit), PRIMARY)).data
+      .filter((r) => r.v !== "0,0,0,0,0,0").map((r) => [r.pid, r.v]));
+    const differ = [...theirs].filter(([id, n]) => ours.get(id) !== n.join(","));
+    record({ study, group: "oncoprint", what: `mutation spectrum per ${unit} (six counts each, ${theirs.size.toLocaleString()} ${unit}s)`,
+      ours: (theirs.size - differ.length) + " identical" + (differ.length ? ", e.g. " + differ[0][0] + " " + (ours.get(differ[0][0]) ?? "none") : ""),
+      portal: theirs.size + (differ.length ? ", e.g. " + differ[0][1].join(",") : ""), agree: differ.length === 0 && ours.size === theirs.size });
   }
 }
 

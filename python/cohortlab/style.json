@@ -285,6 +285,25 @@
       "color": "#008000",
       "negative": "#ff0000"
     },
+    "spectrum": {
+      "label": "Mutation spectrum",
+      "categories": [
+        "C>A",
+        "C>G",
+        "C>T",
+        "T>A",
+        "T>C",
+        "T>G"
+      ],
+      "colors": [
+        "#3D6EB1",
+        "#8EBFDC",
+        "#DFF1F8",
+        "#FCE08E",
+        "#F78F5E",
+        "#D62B23"
+      ]
+    },
     "profiled": {
       "color": "#1b9e77",
       "yes": "Yes",

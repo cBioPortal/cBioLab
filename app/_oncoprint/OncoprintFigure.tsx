@@ -633,6 +633,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         if (t.members && t.members.length > 1) lines.push({ text: "merged: " + t.members.join(" · "), dim: true });
       }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
+      else if (t.stack && t.values) {
+        // each substitution with its count, in its colour's order, as the portal's tooltip lists them
+        const k = t.stack.length;
+        lines.push({ text: c === -1 ? t.label + ": no data" : t.label + ": " + t.stack.map((s, j) => s + " " + t.values![c * k + j]).join(" · ") });
+      }
       else if (t.numeric) {
         // the exact value where the contract carries it; an older contract has only the drawing code
         const x = t.values ? t.values[hit.ci] : NaN;
@@ -1116,7 +1121,9 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
       {!!data.stats.offPanel && <span className="mark" data-tip="the gene is not on any panel that column was sequenced with, so the column is not profiled for it — as on cBioPortal, the call is not drawn and the % leaves it out">{data.stats.offPanel.toLocaleString()} off-panel {data.stats.offPanel === 1 ? "call" : "calls"} not drawn — those cells are not profiled</span>}
       {data.display?.annotate === "none" && <span className="mark">driver annotation off: nothing is called a driver</span>}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
-        <span key={t.label}>{t.label}: {t.bar
+        <span key={t.label}>{t.label}: {t.stack
+          ? <>{t.stack.map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(S.glyph.spectrum.colors[i])}{c}</span>)}</>
+          : t.bar
           ? <><span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1, height: 10, marginRight: 4, verticalAlign: -1 }}>
               {[3, 5, 7, 10].map((hh) => <span key={hh} style={{ width: 3, height: hh, background: S.glyph.bar.color }} />)}</span>
               {fmtRange(t.min!)} → {fmtRange(t.max!)}{t.logScale ? " (log scale)" : ""}</>

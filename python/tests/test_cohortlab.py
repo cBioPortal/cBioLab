@@ -101,6 +101,19 @@ class LocalTables(unittest.TestCase):
 
 
 class Binary(unittest.TestCase):
+    def test_stacked_row_roundtrip_and_tsv(self):
+        from cohortlab.contract import Contract, Track
+        from cohortlab.render import raster
+        t = Track("clinical", "MUTATION_SPECTRUM", np.asarray([0, -1], dtype=np.int32),
+                  {"stack": ["C>A", "C>G"], "values": [119.0, 186.0, 0.0, 0.0]})
+        c = Contract("s", ["s"], [{"name": "all", "start": 0, "count": 2}], ["A", "B"], [t], {}, {}, "patient", None)
+        back = read_opb1(write_opb1(c))
+        self.assertEqual(back.tracks[0].meta["values"], [119.0, 186.0, 0.0, 0.0])
+        rows = [r for r in back.rows()][1:]
+        self.assertEqual(rows, [["MUTATION_SPECTRUM (C>A)", "CLINICAL", "119", ""], ["MUTATION_SPECTRUM (C>G)", "CLINICAL", "186", ""]])
+        img, _ = raster(back, width=40)
+        self.assertEqual(img.shape[1] > 0, True)
+
     def test_opb1_roundtrip(self):
         op = Oncoprint.from_tables(os.path.join(FIX, "events.tsv"), os.path.join(FIX, "clinical.tsv"))
         data = write_opb1(op.contract)

@@ -495,3 +495,17 @@ test("a numeric clinical value is a number only when its whole text is one (the 
   const at = (i: number) => t.values![c.columns.indexOf(pids[i])];
   assert.deepEqual(raw.map((_, i) => at(i)), [null, null, 1000, null, 0.5, null], "12abc, 0x10, 1e3, >90, .5, 1,5");
 });
+
+test("the mutation spectrum row: six counts per column, sorted by its largest share, carried with its column (ONC-TT-3, ONC-STM-6)", () => {
+  const pids = ["A", "B", "C", "D"];
+  const spec = new Map([["A", "1,0,9,0,0,0"], ["B", "8,0,2,0,0,0"], ["C", "0,0,0,0,0,0"], ["D", "0,0,6,0,0,0"]]);
+  const c = assembleContract({ ...input(), genes: ["TP53"], groups: [{ name: "all", pids }], derived: [], events: [],
+    coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })), clinical: [{ attr: "MUTATION_SPECTRUM", values: spec }],
+    sort: [{ track: "MUTATION_SPECTRUM", dir: "asc" }] });
+  const t = c.tracks.find((x) => x.label === "MUTATION_SPECTRUM")!;
+  assert.deepEqual(t.stack, ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"]);
+  // B's largest is C>A (the first category); A (90 % C>T) before D (100 % C>T); C, all zero, has no data and goes last
+  assert.deepEqual(c.columns, ["B", "A", "D", "C"]);
+  assert.deepEqual(Array.from(t.cells), [0, 1, 2, -1], "a cell names its own column");
+  assert.deepEqual(Array.from(t.values!).slice(0, 12), [8, 0, 2, 0, 0, 0, 1, 0, 9, 0, 0, 0], "each column's counts moved with it");
+});

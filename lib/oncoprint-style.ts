@@ -94,6 +94,12 @@ export const STYLE = {
     driverLabels: { driver: " (putative driver)", vus: " (unknown significance)" },
     /** a numeric track drawn as bars (the portal's bar rule: green up from the bottom of the cell) */
     bar: { color: "#008000", negative: "#ff0000" },
+    /**
+     * The mutation spectrum row: each column a bar of its single-base substitutions, stacked in
+     * this order and sized by their share (the portal's MUTATION_SPECTRUM_CATEGORIES and _FILLS)
+     */
+    spectrum: { label: "Mutation spectrum", categories: ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"],
+      colors: ["#3D6EB1", "#8EBFDC", "#DFF1F8", "#FCE08E", "#F78F5E", "#D62B23"] },
     /** the "Profiled for <type>" rows: the portal's reserved colour for "yes"; "no" is drawn as no data */
     profiled: { color: "#1b9e77", yes: "Yes", no: "No" },
     notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
@@ -273,6 +279,17 @@ export function formatGutterPct(t: GutterCounts, columns?: number): string {
   return (driver != null ? formatLabelPct(driver) + " / " : "") + formatLabelPct(any) + star;
 }
 export const PARTIAL_PROFILE_NOTE = "* = % over the columns profiled for that gene";
+
+/**
+ * Two columns of a stacked row (the mutation spectrum), as the portal's counts comparator orders
+ * them (makeCountsMapClinicalComparator): the column whose largest category comes earlier in the
+ * list first, then the smaller share of that category. `values` holds k counts per column.
+ */
+export function stackCompare(values: ArrayLike<number>, k: number, x: number, y: number): number {
+  const top = (c: number) => { let m = 0, tot = 0; for (let j = 0; j < k; j++) { const v = values[c * k + j]; tot += v; if (v > values[c * k + m]) m = j; } return { m, share: tot ? values[c * k + m] / tot : 0 }; };
+  const a = top(x), b = top(y);
+  return a.m !== b.m ? a.m - b.m : Math.sign(a.share - b.share);
+}
 
 /** The staircase's switches, the portal's Sort-menu toggles; left out, each is the portal's default. */
 export interface StaircaseOptions { byType?: boolean; byDriver?: boolean; ignoreVus?: boolean }
