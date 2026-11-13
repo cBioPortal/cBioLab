@@ -9,7 +9,7 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
-import { GEOM, canvasHeight, decodeGene, draw, fitZoom, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { STYLE, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
@@ -300,11 +300,16 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const minZoom = visible ? fitZoom(visible.groups, plotW, gapPx) : 1;
   const maxScroll = visible ? Math.max(0, virtualWidth(visible.groups, view.zoom, gapPx) - plotW) : 0;
 
-  // Fit when the set of drawn columns changes — not on a re-sort of the same columns, and not
-  // when the width changes: a reader who has zoomed in should keep their zoom when the page
-  // reflows (the scrollbar appearing was enough to snap them back to fit).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (visible) setView((v) => ({ ...v, zoom: fitZoom(visible.groups, plotW, gapPx), scrollX: 0 })); }, [data, display.showUnaltered, gapMode]);
+  // Fit the altered columns, as the portal opens, when the set of drawn columns changes — not on
+  // a re-sort of the same columns, and not when the width changes: a reader who has zoomed in
+  // should keep their zoom when the page reflows (the scrollbar appearing was enough to snap them
+  // back to fit). The width is read from the element: on a first draw it is not in state yet.
+  useEffect(() => {
+    if (!visible || !data) return;
+    const w = wrapRef.current ? Math.max(50, wrapRef.current.clientWidth - GEOM.gutter) : plotW;
+    setView((v) => ({ ...v, ...fitAlteredView(data, visible.order, visible.groups, w, gapPx) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, display.showUnaltered, gapMode]);
   // a narrower figure can leave the zoom below what now fits, or scrolled past the end
   useEffect(() => {
     if (!visible) return;

@@ -66,6 +66,35 @@ export function fitZoom(groups: VisibleGroup[], plotW: number, gap: Gap = GEOM.g
   return n ? Math.max(1e-6, (plotW - gapsWidth(groups, gap)) / n) : 1;
 }
 
+/** a gene cell's alteration bits: what makes a column altered, not an mRNA / protein overlay */
+const ALTERED = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
+/** the portal's 100 % zoom: a 6 px cell and 3 px of padding per column */
+export const PORTAL_FULL_ZOOM = 9;
+
+/**
+ * The portal's initial zoom (ONC-ZM-2, ONC-STM-13): the span from the leftmost to the rightmost
+ * altered column fills the plot, at most the portal's 100 %, scrolled to the span's start. With
+ * nothing altered, 100 %. Never below fitting every column, which is as far out as this figure zooms.
+ */
+export function fitAlteredView(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], plotW: number, gap: Gap = GEOM.groupGap): { zoom: number; scrollX: number } {
+  const genes = data.tracks.filter((t) => t.kind === "gene");
+  let lo = -1, hi = -1, gLo = 0, gHi = 0;
+  groups.forEach((g, gi) => {
+    for (let k = g.start; k < g.start + g.count; k++) {
+      const col = order[k];
+      if (!genes.some((t) => t.cells[col] > 0 && t.cells[col] & ALTERED)) continue;
+      if (lo < 0) { lo = k; gLo = gi; }
+      hi = k; gHi = gi;
+    }
+  });
+  const fit = fitZoom(groups, plotW, gap);
+  if (lo < 0) return { zoom: Math.max(fit, PORTAL_FULL_ZOOM), scrollX: 0 };
+  const want = (plotW - (gHi - gLo) * gapOf(gap).px) / (hi - lo + 1);
+  const zoom = Math.max(fit, Math.min(PORTAL_FULL_ZOOM, want));
+  const x = groupOffsets(groups, zoom, gap)[gLo] + (lo - groups[gLo].start) * zoom;
+  return { zoom, scrollX: Math.max(0, Math.min(x, virtualWidth(groups, zoom, gap) - plotW)) };
+}
+
 export { formatPct };
 
 /**

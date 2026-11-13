@@ -4,7 +4,7 @@
 // land on a device pixel, and neighbours must meet, at any zoom and any pixel ratio.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { draw, fitZoom, sortColumns, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
+import { draw, fitZoom, fitAlteredView, PORTAL_FULL_ZOOM, sortColumns, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
 import { assembleContract, normalizeDisplay, type EventRow } from "../lib/oncoprint-assemble.ts";
 
@@ -50,6 +50,42 @@ for (const dpr of [1, 1.25, 1.5, 2]) for (const [label, n, zoom] of [["zoomed ou
     assert.ok(gaps.size === 1, `gaps between cells vary (${[...gaps].join(", ")} device px): that is banding`);
   });
 }
+
+test("the initial zoom fits the altered columns, at most the portal's 100 % (ONC-ZM-2, ONC-STM-13)", () => {
+  const view = (n: number, altered: string[], groups?: string[][]) => {
+    const pids = Array.from({ length: n }, (_, i) => "P" + String(i).padStart(4, "0"));
+    const gs = groups ? groups.map((g, i) => ({ name: "g" + i, pids: g })) : [{ name: "all", pids }];
+    const c = assembleContract({ genes: ["G"], groups: gs, studies: ["s"],
+      events: altered.map((pid) => ({ pid, gene: "G", vt: "mutation", mt: "Missense_Mutation" })),
+      coverage: pids.map((pid) => ({ pid, genes: ["G"] })), isDriver: () => false, annotationSource: "t",
+      clinical: [], heatmap: [], derived: [], sort: [], lineGap: 0 });
+    const buf = packContract(c);
+    const data = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+    const order = Uint32Array.from({ length: data.n }, (_, i) => i);
+    let start = 0;
+    const vg: VisibleGroup[] = c.groups.map((g) => { const r = { name: g.name, start, count: g.count, patients: g.count }; start += g.count; return r; });
+    return { data, order, vg };
+  };
+  // 594 columns, 485 altered (sorted first) in 1,000 px: the altered span fills the plot
+  const q1 = view(594, Array.from({ length: 485 }, (_, i) => "P" + String(i).padStart(4, "0")));
+  const z1 = fitAlteredView(q1.data, q1.order, q1.vg, 1000);
+  assert.ok(Math.abs(z1.zoom - 1000 / 485) < 1e-9 && z1.scrollX === 0);
+  assert.ok(z1.zoom > fitZoom(q1.vg, 1000), "closer than fitting every column");
+  // a few altered columns: no closer than the portal's 100 %
+  const few = view(1000, ["P0000", "P0001"]);
+  assert.equal(fitAlteredView(few.data, few.order, few.vg, 1000).zoom, PORTAL_FULL_ZOOM);
+  // nothing altered: 100 %, but never below fitting every column
+  const none = view(50, []);
+  assert.equal(fitAlteredView(none.data, none.order, none.vg, 1000).zoom, fitZoom(none.vg, 1000));
+  const noneBig = view(5000, []);
+  assert.equal(fitAlteredView(noneBig.data, noneBig.order, noneBig.vg, 1000).zoom, PORTAL_FULL_ZOOM);
+  // the altered span in a second group: scrolled to its start, the gap inside the span counted
+  const ids = Array.from({ length: 400 }, (_, i) => "P" + String(i).padStart(4, "0"));
+  const two = view(400, ["P0250", "P0300"], [ids.slice(0, 200), ids.slice(200)]);
+  const z2 = fitAlteredView(two.data, two.order, two.vg, 600, 10);
+  assert.equal(z2.zoom, PORTAL_FULL_ZOOM);
+  assert.ok(z2.scrollX > 200 * PORTAL_FULL_ZOOM, "starts at the first altered column, in the second group");
+});
 
 test("the browser's genomic re-sort is the engine's staircase, ids in the portal's natural order", () => {
   const pids = ["P10", "P2", "TCGA-AA-3864", "TCGA-AA-A00N", "A", "B", "C", "D", "E", "G"];

@@ -136,7 +136,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] **Results → OncoPrint, the default view** — what a reader sees differ from the portal's before touching a control ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
   - [x] Gutter % as the portal prints it: an integer, "<1%", "0%"; the header "485 (82%)". We keep both numbers, "driver% / any%" ("37% / 37%"), where the portal prints one (ONC-LY-4, ONC-STM-1, ONC-STM-2) (#192)
   - [x] The Results header's samples line when samples ≠ patients (msk_impact_2017 TP53 KRAS TERT: "6494 (59%) of queried samples") (ONC-RV-1, ONC-STM-2) (#192)
-  - [ ] Initial zoom fits the altered columns, not every column (the portal's 30 % on Q1, 3 % on Q3) (ONC-ZM-2, ONC-STM-13, ONC-MD-11)
+  - [x] Initial zoom fits the altered columns, not every column (the portal's 30 % on Q1, 3 % on Q3) (ONC-ZM-2, ONC-STM-13, ONC-MD-11) (#194)
   - [x] Staircase sort per key, CNA then mutation, drivers before VUS, not profiled last, natural id order; over the portal's own cells our order is its order (Q1 594/594, Q3 10,336/10,336); over our cells Q1 449 of 594 positions agree, the rest from annotation differences (ONC-ST-1, ONC-ST-2) (#193)
   - [x] Sort menu: the Mutation Type, Driver and Ignore VUS toggles (ONC-SO-1, ONC-ST-3) (#195)
     - [ ] "Case list order" (ONC-SO-3): the portal offers it only for a query naming sample ids, which no Results query here can yet
