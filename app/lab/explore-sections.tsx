@@ -257,6 +257,9 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
             {(() => { const dr = parseDraft(); return dr && <CohortPills def={dr} onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />; })()}
           </div>
           {exMsg && <p className="note flush mt-1.5">{exMsg}</p>}
+          {!!explore?.unknownAttributes?.length && <p className="error flush mt-1.5" data-unknown-attrs>
+            {explore.unknownAttributes.map((a) => "The clinical attribute " + a + " is not available for " + (exStudies.length === 1 ? "this study" : "these studies")).join(". ")}
+            {" — a filter on it selects nobody; remove its pill."}</p>}
           {saving != null && <SaveCohortDialog initial={saving} onSave={confirmSave} onClose={() => setSaving(null)}
             meta={clauses + (clauses === 1 ? " filter" : " filters") + " on " + exStudies.length + " stud" + (exStudies.length === 1 ? "y" : "ies")} />}
           {savingFeature != null && <SaveFeatureDialog initial={savingFeature} onSave={confirmSaveFeature} onClose={() => setSavingFeature(null)}

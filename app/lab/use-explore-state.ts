@@ -5,7 +5,7 @@
 // result to Explore's sections (explore-sections.tsx); the facets themselves come from
 // use-explore.ts.
 import { useSaved } from "../_saved/saved-context.tsx";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { normalizeDef } from "./pills";
 import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, NumericBin, PartitionArm, PartitionDef } from "../../lib/types.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
@@ -19,9 +19,10 @@ import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { useExplore, type ExploreAsk } from "./use-explore.ts";
 import { toggleBin, toggleValue } from "../../lib/explore-selection.ts";
 import { defaultChartKeys } from "../../lib/study-view-config.ts";
+import { FILTERS_PARAM, writeFilters } from "../../lib/study-view-url.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { encodeParam } from "../portal/page-doc.ts";
-import { currentLinkUrlMax, linkTo } from "../_links/link-state.ts";
+import { currentLinkUrlMax, linkParams, linkTo, writeSearch } from "../_links/link-state.ts";
 
 /** how many clinical charts Explore draws until the reader picks — cBioPortal's own default
  *  (studyview_clinical_attribute_chart_count) */
@@ -91,7 +92,11 @@ export function useExploreState(page: ExplorePage) {
   const [addChartOpen, setAddChartOpen] = useState(false);
   const [chartTab, setChartTab] = useState<"clinical" | "gene" | "assay" | "derived" | "custom">("clinical");
   const [cName, setCName] = useState("");
-  const [cDefText, setCDefText] = useState(JSON.stringify({ all: [] }, null, 2));
+  const [cDefText, setCDefTextState] = useState(JSON.stringify({ all: [] }, null, 2));
+  // The draft as last set, for callers holding an older render's closure (a mount effect, a
+  // dialog's callback): they ask for the current draft's facets, never the one they were made with.
+  const cDefRef = useRef(cDefText);
+  const setCDefText = (t: string) => { cDefRef.current = t; setCDefTextState(t); };
   const exploring = useExplore(setError);
   const { explore, busy: exploreBusy } = exploring;
   const [sQuery, setSQuery] = useState("");                             // study-panel search
@@ -344,7 +349,7 @@ export function useExploreState(page: ExplorePage) {
     } catch (e) { setExMsg("could not save the feature: " + String((e as Error)?.message || e)); }
   };
 
-  const parseDraft = () => { try { const d = JSON.parse(cDefText); return d.all && d.all.length ? d : null; } catch { return null; } };
+  const parseDraft = () => { try { const d = JSON.parse(cDefRef.current); return d.all && d.all.length ? d : null; } catch { return null; } };
 
   /** "per|attribute", matching data-attr — the one key format every attribute lookup here uses */
   const attrKey = (c: { per: string; attribute: string }) => c.per + "|" + c.attribute;
@@ -473,6 +478,23 @@ export function useExploreState(page: ExplorePage) {
     d.all.push(clause);
     const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d);
   };
+
+  /**
+   * The filters follow the draft into the URL's `filters` (lib/study-view-url.ts), so a reload,
+   * Back and Copy link keep them; past the address's limit writeSearch holds them in the tab's
+   * history and Copy link stores them (docs/LINKS.md). Not before the page has read the URL it
+   * opened with (`urlRead`, set by page.tsx), and not while Explore is open for one cohort.
+   */
+  const urlRead = useRef(false);
+  useEffect(() => {
+    if (!urlRead.current || addMode) return;
+    let all; try { all = normalizeDef(JSON.parse(cDefText)).all; } catch { return; }
+    const next = writeFilters(all), q = linkParams();
+    if ((q.get(FILTERS_PARAM) || null) === next) return;
+    if (next) q.set(FILTERS_PARAM, next); else q.delete(FILTERS_PARAM);
+    for (const legacy of ["filterAttributeId", "filterValues"]) q.delete(legacy);
+    writeSearch("?" + q.toString());
+  }, [cDefText, addMode]);
 
   /** the draft as the page holds it, or an empty one */
   const currentDraft = (): CohortDef => {
@@ -763,7 +785,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

@@ -320,6 +320,25 @@ async function explore({ ok, BASE, page }) {
     drvOk = before.includes("TTN") && !after.includes("TTN") && after.includes("EGFR") && url === "1" && counted > 0 && matched === counted;
   } catch (e) { drv = String(e.message).split("\n")[0]; }
   ok("explore: drivers only counts OncoKB driver calls, and a checked gene selects exactly the samples it counted", drvOk, drv);
+
+  // Filters live in the URL (lib/study-view-url.ts): a cbioportal.org link's filterAttributeId /
+  // filterValues opens filtered and becomes the page's own `filters`, which a reload keeps.
+  let urlDetail = "", urlOk = false;
+  try {
+    const matchCount = async () => {
+      await page.waitForFunction(() => /[\d,]+ patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+      return (/([\d,]+) patients match/.exec(await page.locator(".exbar").innerText()) || [])[1];
+    };
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018&filterAttributeId=SEX&filterValues=Female", { waitUntil: "domcontentloaded" });
+    const first = await matchCount();
+    await page.waitForFunction(() => new URL(location.href).searchParams.has("filters"), null, { timeout: 30000 });
+    const q = new URL(page.url()).searchParams;
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const again = await matchCount();
+    urlDetail = JSON.stringify({ first, again, filters: q.has("filters"), legacyLeft: q.has("filterAttributeId") });
+    urlOk = !!first && first === again && q.has("filters") && !q.has("filterAttributeId");
+  } catch (e) { urlDetail = String(e.message).split("\n")[0]; }
+  ok("explore: a portal link's filters open filtered, are written as the page's own, and survive a reload", urlOk, urlDetail);
 }
 
 module.exports = { explore };

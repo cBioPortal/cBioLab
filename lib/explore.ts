@@ -348,9 +348,14 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     draft, ctx: { oncokbPin, profiles, gaProfiles }, driverPin
   });
 
+  // the draft's clinical attributes this study does not declare (a filter on one selects nobody here)
+  const declared = new Set<string>([...meta.keys(), ...cls.data.map((r) => r.a), ...customAttributesFor(study).map((c) => c.attribute)].map(String));
+  const unknownAttributes = meta.size ? clinicalAttrsOf(draft).filter((a) => !declared.has(a)) : [];
+
   return {
     study, draftCount, studyBreakdown,
     clinical, derived,
+    ...(unknownAttributes.length ? { unknownAttributes } : {}),
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
     mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
@@ -1049,6 +1054,20 @@ function draftedClinical(draft: CohortDef | null | undefined): { attr: string; r
   return [...attrs].map((attr) => ({ attr, rest: draftWithout(draft, (c) => clinicalClauseAttr(c) === attr) }));
 }
 
+/** every clinical attribute a draft names, at any depth (all, any, not) */
+function clinicalAttrsOf(draft: CohortDef | null | undefined): string[] {
+  const out = new Set<string>();
+  const walk = (c: unknown): void => {
+    if (!c || typeof c !== "object") return;
+    if (isClinicalLeaf(c as NonNullable<CohortDef["all"]>[number])) out.add((c as { attribute: string }).attribute);
+    const o = c as { any?: unknown[]; not?: unknown };
+    if (Array.isArray(o.any)) o.any.forEach(walk);
+    if (o.not) walk(o.not);
+  };
+  (draft?.all || []).forEach(walk);
+  return [...out];
+}
+
 /**
  * The attribute a top-level clause constrains: a clinical leaf's, a negated clinical leaf's, or
  * that of an `any` whose leaves are all clinical on one attribute (a chart's several bars).
@@ -1356,9 +1375,14 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     const cur = lm.get(l.id) || { id: l.id, name: l.name, n: 0 };
     cur.n += l.n; lm.set(l.id, cur);
   }
+  // unknown only where no participating study declares it (a gene-only part names no study)
+  const studyParts = parts.filter((p) => p.study || p.studies?.length);
+  const unknownAttributes = studyParts.length ? [...new Set(studyParts.flatMap((p) => p.unknownAttributes || []))]
+    .filter((a) => studyParts.every((p) => p.unknownAttributes?.includes(a))) : [];
   return {
     study: studies.join(" + "),
     studies,
+    ...(unknownAttributes.length ? { unknownAttributes } : {}),
     draftCount: draft ? parts.reduce((s, p) => s + (p.draftCount || 0), 0) : null,
     studyBreakdown: parts.flatMap((p) => p.studyBreakdown || []).sort((a, b) => b.n - a.n),
     clinical,

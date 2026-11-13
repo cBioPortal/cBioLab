@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { currentLinkUrlMax, linkParams } from "../_links/link-state.ts";
+import { readFilters } from "../../lib/study-view-url.ts";
 import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -340,12 +341,24 @@ export default function AnalysisPage() {
         // ?study=a,b opens Explore scoped to those studies (the data sets page links here)
         const only = (linkParams().get("study") || "")
           .split(",").map((x) => x.trim().replace(/[^A-Za-z0-9._-]/g, "")).filter(Boolean);
-        if (only.length) { setStudy(only[0]); setExStudies(only); exSel.current = only; }
+        // the filters a link carries: the page's own `filters`, or a cbioportal.org link's (lib/study-view-url.ts)
+        const linked = readFilters(linkParams(), location.hash);
+        const ids = only.length ? only : linked?.studies || [];
+        if (ids.length) { setStudy(ids[0]); setExStudies(ids); exSel.current = ids; }
         // &custom=add opens Custom data → Add data on them (the homepage's "add custom data to" icon)
         if (only.length && linkParams().get("custom") === "add") exploreState.setCustomTab("add");
-        if (tabRef.current === "explore") fetchExplore();
+        let draft: CohortDef | undefined;
+        if (linked?.all.length && ids.length) {
+          draft = { ...exploreState.draftScaffold(ids), all: linked.all };
+          exploreState.setCDefText(JSON.stringify(draft, null, 2));
+        }
+        if (linked?.refused?.length) exploreState.setExMsg("Left out of this link's filters, as Explore has no filter for them: " + linked.refused.join("; "));
+        // a portal link's #filterJson is read once; from here the page's own `filters` say what is filtered
+        if (/filterJson=/.test(location.hash)) history.replaceState(history.state, "", location.pathname + location.search);
+        if (tabRef.current === "explore") fetchExplore(draft);
       }
     } catch (e) { setError("bad ?doc= link: " + String((e as Error)?.message || e)); }
+    exploreState.urlRead.current = true;
     setLinkLoading(false);
   }, []); // eslint-disable-line
 
