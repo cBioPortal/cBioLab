@@ -160,11 +160,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - Not as the portal, on purpose: a case whose substitutions are all ref = alt (one row in the warehouse) has no spectrum here; the portal keeps six zeros, draws no data, and writes 0 in its TSV
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
     - [ ] Generic-assay pivot and sort order (ONC-TT-8); VAF's "Not mutated/no VAF data" state; the #e0e0e0 null colour
-  - [ ] Clustering: average linkage on 1 − Spearman, rows and columns (ours Ward on Euclidean over per-gene z-scores, NaN → mean, columns only, ≤4,000 columns) (ONC-SO-4, ONC-TM-5, ONC-STM-9)
-    - Measured ([spike](spikes/oncoprint-clustering.md)). Legacy's own library takes 20–34 s at 4k columns and fails past ~8–10k: 25k would need ~8 GB. Clustering the distinct column patterns instead is exact and fast: msk_chord_2024 CNA (25,040 columns) → 7,689 with data → 602 patterns, 0.33 s. Plan:
-      - legacy's method over distinct rank patterns, weighted by count, with all-null/0 columns placed last;
-      - cap ~8,000 distinct patterns, not 4,000 raw columns;
-      - past the cap, cluster a 2,000-pattern sample and place the rest by nearest neighbour, marked approximate in the caption and method record.
+  - [x] Clustering: average linkage on 1 − Spearman over distinct rank patterns, rows and columns, no-value columns last; exact to 8,000 patterns, a 2,000-pattern sample past that (said so), refused past 50,000 (ONC-SO-4, ONC-TM-5, ONC-STM-9) (#201)
+    - [ ] Cluster from the heatmap group header's menu, the Sort menu's disabled indicator (ours: an option of the sort select)
 - [ ] **Results → Mutations tab** — lollipop and table against the portal's ([05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] Fusions as "A-B Fusion" mutations: Q2 TMPRSS2 4 rows vs 240, 0.8 % vs 41.5 %, Fusion badges 0/0 vs 207/29; ERG shows nothing (the portal 220 fusions) (MUT-0-4, MUT-MD-11, MUT-STM-1, MUT-STM-4, SV-STM-5; [06-structural-variants](legacy-spec/parity/06-structural-variants.md))
   - [ ] Table defaults: Copy # and Allele Freq (T) shown; Mutation Type as the portal's coloured label (ours `Missense_Mutation`); sorted by Annotation ↓ (KRAS: G12C first; ours "drivers, then codon", A11_G12dup first) (MUT-COL-38, MUT-COL-11, MUT-COL-T1, MUT-TB-9, MUT-STM-10)
