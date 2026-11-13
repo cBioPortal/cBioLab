@@ -117,7 +117,7 @@ test("byGroup is only on gene tracks, not clinical/derived/heatmap rows", () => 
   for (const t of nonGene) assert.equal((t as { byGroup?: unknown }).byGroup, undefined);
 });
 
-test("clinical typing: categorical with Other, numeric only past 10 distinct values, absent attribute labelled", () => {
+test("clinical typing: every value its own category, numeric only past 10 distinct values, absent attribute labelled", () => {
   const c = assembleContract(input());
   const type = c.tracks.find((t) => t.label === "TYPE")!;
   assert.deepEqual(type.categories, ["x", "y"]);
@@ -141,8 +141,8 @@ test("clinical typing: categorical with Other, numeric only past 10 distinct val
   assert.equal(num.cells[wide.columns.indexOf("P12")], 255);
   assert.equal(num.cells[wide.columns.indexOf("P1")], 0);
   const st = wide.tracks.find((t) => t.label === "ST")!;
-  assert.equal(st.categories!.length, 9, "top 8 categories plus Other");
-  assert.equal(st.categories![8], "Other");
+  assert.equal(st.categories!.length, 9, "nine values, nine categories: no Other, as in the portal");
+  assert.ok(!st.categories!.includes("Other"));
 });
 
 test("groups keep their order and the staircase sorts within each group", () => {

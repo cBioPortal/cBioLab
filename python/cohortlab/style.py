@@ -369,7 +369,22 @@ def track_category_color(track: Any, code: int, S: dict[str, Any] = STYLE, color
             return override
     if hasattr(track, "meta") and track.meta.get("profiledFor"):
         return S["glyph"]["profiled"]["color"]
-    return (reserved_color(value, S) if value is not None else None) or category_color(code, S)
+    if value is None:
+        return category_color(code, S)
+    reserved = reserved_color(value, S)
+    if reserved:
+        return reserved
+    k = sum(1 for c in cats[:code] if not reserved_color(c, S))
+    return clinical_color(k, S)
+
+
+def clinical_color(k: int, S: dict[str, Any] = STYLE) -> str:
+    """The k-th colour the portal hands a categorical track's values (port of clinicalColor)."""
+    lst = S["palette"]["clinical"]
+    c = lst[k % len(lst)]
+    for _ in range(k // len(lst)):
+        c = "#" + "".join(f"{math.floor(int(c[i:i + 2], 16) * 0.95 + 0.5):02x}" for i in (1, 3, 5))
+    return c
 
 
 def style_for_display(S: dict[str, Any], display: dict[str, Any] | None) -> dict[str, Any]:

@@ -24,6 +24,14 @@ export const STYLE = {
     text: "#1f2933", muted: "#5b6b76", groupLine: "#c9d2d8",
     categorical: ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"],
     /**
+     * A categorical oncoprint track's values: the portal's list (oncoprintjs makeUniqueColorGetter,
+     * from D3), handed out in order to the values without a reserved colour; past its end a colour
+     * already used comes back darkened (each channel × 0.95, once per pass).
+     */
+    clinical: ["#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00", "#b82e2e", "#316395",
+      "#994499", "#22aa99", "#aaaa11", "#6633cc", "#e67300", "#8b0707", "#651067", "#329262", "#5574a6", "#3b3eac", "#b77322",
+      "#16d620", "#b91383", "#f4359e", "#9c5935", "#a9c413", "#2a778d", "#668d1c", "#bea413", "#0c5922", "#743411"],
+    /**
      * Values that always take the same colour, whichever attribute holds them: the portal's
      * RESERVED_CLINICAL_VALUE_COLORS (shared/lib/Colors.ts). Keys are the value without spaces,
      * lower-cased, which is how a value is looked up (reservedColor), so "Yes", "YES" and
@@ -505,7 +513,22 @@ export function trackCategoryColor(track: { label: string; categories?: string[]
   const override = value != null && colors && colors[track.label] ? colors[track.label][value] : undefined;
   if (override) return override;
   if (track.profiledFor) return S.glyph.profiled.color;
-  return (value != null && reservedColor(value, S)) || categoryColor(code, S);
+  if (value == null) return categoryColor(code, S);
+  const reserved = reservedColor(value, S);
+  if (reserved) return reserved;
+  // the k-th value without a reserved colour takes the k-th colour of the list
+  let k = 0;
+  for (let i = 0; i < code; i++) if (!reservedColor(track.categories![i], S)) k++;
+  return clinicalColor(k, S);
+}
+
+/** the k-th colour the portal hands a categorical track's values: its list in order, darkened once per pass past its end */
+export function clinicalColor(k: number, S: Style = STYLE): string {
+  const list = S.palette.clinical;
+  let c = list[k % list.length];
+  for (let pass = Math.floor(k / list.length); pass > 0; pass--)
+    c = "#" + [1, 3, 5].map((i) => Math.round(parseInt(c.slice(i, i + 2), 16) * 0.95).toString(16).padStart(2, "0")).join("");
+  return c;
 }
 
 

@@ -251,7 +251,7 @@ class ReservedColors(unittest.TestCase):
         from cohortlab.style import STYLE, track_category_color
         t = Track("clinical", "OS_STATUS", np.zeros(1, dtype=np.int32), {"categories": ["1:DECEASED", "Disease Free", "Female", "Intersex"]})
         self.assertEqual([track_category_color(t, i) for i in range(3)], ["#d95f02", "#1b9e77", "#e0699e"])
-        self.assertEqual(track_category_color(t, 3), STYLE["palette"]["categorical"][3])
+        self.assertEqual(track_category_color(t, 3), STYLE["palette"]["clinical"][0])
 
 
 class StyleOverrides(unittest.TestCase):

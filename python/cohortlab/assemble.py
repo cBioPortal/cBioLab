@@ -211,15 +211,14 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             v = val_by_pid.get(p)
             if v is not None:
                 counts[v] = counts.get(v, 0) + 1
-        categories = [k for k, _ in sorted(counts.items(), key=lambda e: -e[1])[:8]]
+        categories = [k for k, _ in sorted(counts.items(), key=lambda e: -e[1])]
         cat_idx = {c_: i for i, c_ in enumerate(categories)}
         cells = np.full(n, -1, dtype=np.int32)
         for i, p in enumerate(all_pids):
             v = val_by_pid.get(p)
             if v is not None:
-                cells[i] = cat_idx.get(v, len(categories))
-        has_other = any(v not in cat_idx for v in counts)
-        clin.append(Track("clinical", attr, cells, {"categories": categories + (["Other"] if has_other else [])}))
+                cells[i] = cat_idx[v]
+        clin.append(Track("clinical", attr, cells, {"categories": categories}))
 
     # ---- heatmap tracks ----------------------------------------------------
     heat: list[Track] = []

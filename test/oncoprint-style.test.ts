@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, heatColor, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank } from "../lib/oncoprint-style.ts";
+import { STYLE, heatColor, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank, clinicalColor } from "../lib/oncoprint-style.ts";
 import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -151,10 +151,10 @@ test("overrides are rejected loudly: typos, wrong types, meaning changes, illegi
 test("per-track colours override the categorical cycle for that track only", () => {
   const track = { label: "CANCER_TYPE", categories: ["Lung", "Colon"] };
   const colors = { CANCER_TYPE: { Colon: "#123456" } };
-  assert.equal(trackCategoryColor(track, 0, STYLE, colors), STYLE.palette.categorical[0]);
+  assert.equal(trackCategoryColor(track, 0, STYLE, colors), STYLE.palette.clinical[0]);
   assert.equal(trackCategoryColor(track, 1, STYLE, colors), "#123456");
-  assert.equal(trackCategoryColor({ label: "OTHER", categories: ["Colon"] }, 0, STYLE, colors), STYLE.palette.categorical[0]);
-  assert.equal(trackCategoryColor(track, 1, STYLE), STYLE.palette.categorical[1], "no override map: the cycle");
+  assert.equal(trackCategoryColor({ label: "OTHER", categories: ["Colon"] }, 0, STYLE, colors), STYLE.palette.clinical[0]);
+  assert.equal(trackCategoryColor(track, 1, STYLE), STYLE.palette.clinical[1], "no override map: the cycle");
 });
 
 test("a merged gene row wears brackets in the gutter, a single gene does not", () => {
@@ -201,7 +201,7 @@ test("numeric clinical rows are the portal's bars: from the bottom, both ways ac
 test("clinical values the portal reserves a colour for keep it, whatever the attribute; Edit colours still wins", () => {
   const sex = { label: "SEX", categories: ["Male", "Female", "Unknown", "Intersex"] };
   assert.deepEqual([0, 1, 2].map((i) => trackCategoryColor(sex, i, STYLE)), ["#2986e2", "#e0699e", "#d3d3d3"]);
-  assert.equal(trackCategoryColor(sex, 3, STYLE), STYLE.palette.categorical[3], "an unreserved value takes the cycle");
+  assert.equal(trackCategoryColor(sex, 3, STYLE), STYLE.palette.clinical[0], "an unreserved value takes the portal's list, from its start");
   const os = { label: "OS_STATUS", categories: ["1:DECEASED", "0:LIVING", "Disease Free", "DISEASEFREE"] };
   assert.deepEqual([0, 1, 2, 3].map((i) => trackCategoryColor(os, i, STYLE)), ["#d95f02", "#1b9e77", "#1b9e77", "#1b9e77"], "case and spaces do not matter");
   assert.equal(trackCategoryColor(sex, 1, STYLE, { SEX: { Female: "#123456" } }), "#123456");
@@ -275,4 +275,14 @@ test("heatmap rows take the portal's ramps: expression blue-black-red, methylati
   assert.equal(heatColor(meth, 0.35 * 255), "rgb(255,255,255)", "methylation's white sits at 0.35");
   assert.equal(heatColor(vaf, 0), "rgb(241,242,181)"); assert.equal(heatColor(vaf, 255), "rgb(19,80,88)");
   assert.equal(heatColor({ min: -3, max: 3, center: 128 }, 128), numericColor(128, 128), "no ramp: the generic diverging ramp");
+});
+
+test("categorical tracks take the portal's colours: its D3 list in order, reserved values apart, darkened past the end (ONC-TT-1)", () => {
+  const t = { label: "X", categories: ["Breast", "Yes", "Lung", "Male", "Colon"] };
+  assert.deepEqual(t.categories.map((_, i) => trackCategoryColor(t, i)), ["#3366cc", "#1b9e77", "#dc3912", "#2986e2", "#ff9900"],
+    "a reserved value keeps its colour and does not use up a slot of the list");
+  assert.equal(clinicalColor(30), "#743411");
+  assert.equal(clinicalColor(31), "#3061c2", "#3366cc × 0.95 per channel, past the list's end");
+  assert.equal(clinicalColor(62), "#2e5cb8", "twice darkened on the second pass");
+  assert.equal(new Set(Array.from({ length: 200 }, (_, k) => clinicalColor(k))).size, 200, "every value its own colour");
 });
