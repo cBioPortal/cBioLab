@@ -176,20 +176,20 @@ describe("label", () => {
 describe("freq", () => {
   test("12: single study, fixture database — sample-level Freq = samples with a value / queried samples (RVS:1250-1290, TM:242-256)", { skip: dbReason ?? false }, async () => {
     const { totals, byId } = await fixtureRows();
-    assert.deepEqual(totals, { patients: 40, samples: 44 });
-    // counted from data_clinical_sample.txt: non-blank cells of 44 samples
-    const expected: [string, string][] = [["SAMPLE_TYPE", "100.0%"], ["CANCER_TYPE", "100.0%"], ["FRACTION_GENOME_ALTERED", "100.0%"],
-      ["PARSE_PROBE", "27.3%"] /* 12/44 */, ["KI67_INDEX", "13.6%"] /* 6/44, ">90" and "high" count */, ["SITE_LABEL", "13.6%"] /* 6/44 */,
-      ["FLAG_BOOL", "11.4%"] /* 5/44 */, ["TUMOR_GRADE", "9.1%"] /* 4/44 */];
+    assert.deepEqual(totals, { patients: 44, samples: 49 });
+    // counted from data_clinical_sample.txt: non-blank cells of 49 samples (FX-P41-T1's CANCER_TYPE is blank)
+    const expected: [string, string][] = [["SAMPLE_TYPE", "100.0%"], ["CANCER_TYPE", "98.0%"] /* 48/49 */, ["FRACTION_GENOME_ALTERED", "100.0%"],
+      ["PARSE_PROBE", "24.5%"] /* 12/49 */, ["KI67_INDEX", "12.2%"] /* 6/49, ">90" and "high" count */, ["SITE_LABEL", "12.2%"] /* 6/49 */,
+      ["FLAG_BOOL", "10.2%"] /* 5/49 */, ["TUMOR_GRADE", "8.2%"] /* 4/49 */];
     assert.deepEqual(expected.map(([id]) => [id, freqOf(byId, id)]), expected);
   });
 
   test("13: a sample subset (custom case set) — counts over those samples only, fixture database, SEX = Female (RVS:1257-1264)", { skip: dbReason ?? false }, async () => {
     const { totals, byId } = await fixtureRows(FEMALE);
-    // 24 female patients; FX-P02 and FX-P04 have two samples: 26 samples
-    assert.deepEqual(totals, { patients: 24, samples: 26 });
-    const expected: [string, string][] = [["SAMPLE_TYPE", "100.0%"], ["PARSE_PROBE", "26.9%"] /* 7/26: P02×2, P04×2, P05, P06, P08 */,
-      ["FLAG_BOOL", "11.5%"] /* 3/26: P02×2, P05 */, ["TUMOR_GRADE", "7.7%"] /* 2/26 */, ["KI67_INDEX", "7.7%"], ["SITE_LABEL", "7.7%"]];
+    // 26 female patients; FX-P02, FX-P04 and FX-P43 have two samples: 29 samples
+    assert.deepEqual(totals, { patients: 26, samples: 29 });
+    const expected: [string, string][] = [["SAMPLE_TYPE", "100.0%"], ["PARSE_PROBE", "24.1%"] /* 7/29: P02×2, P04×2, P05, P06, P08 */,
+      ["FLAG_BOOL", "10.3%"] /* 3/29: P02×2, P05 */, ["TUMOR_GRADE", "6.9%"] /* 2/29 */, ["KI67_INDEX", "6.9%"], ["SITE_LABEL", "6.9%"]];
     assert.deepEqual(expected.map(([id]) => [id, freqOf(byId, id)]), expected);
   });
 
@@ -206,10 +206,10 @@ describe("freq", () => {
   test("15: patient-level attribute counted over queried PATIENTS is OUR documented divergence (PR #196; the portal counts those patients' samples / #samples) (RVS:1275-1290)", { skip: dbReason ?? false }, async () => {
     const all = await fixtureRows();
     const female = await fixtureRows(FEMALE);
-    // PATIENT_SCORE: FX-P01 (2 samples), FX-P02 (2 samples). Portal: 4/44 = 9.1%, females 2/26 = 7.7%.
-    // PATIENT_FLAG: FX-P01 only. Portal: 2/44 = 4.5%.
+    // PATIENT_SCORE: FX-P01 (2 samples), FX-P02 (2 samples). Portal: 4/49 = 8.2%, females 2/29 = 6.9%.
+    // PATIENT_FLAG: FX-P01 only. Portal: 2/49 = 4.1%.
     assert.deepEqual([freqOf(all.byId, "PATIENT_SCORE"), freqOf(all.byId, "PATIENT_FLAG"), freqOf(female.byId, "PATIENT_SCORE"), freqOf(all.byId, "OS_MONTHS")],
-      ["5.0%" /* 2/40 */, "2.5%" /* 1/40 */, "4.2%" /* 1/24 */, "100.0%" /* 40/40; the portal's 44/44 */]);
+      ["4.5%" /* 2/44 */, "2.3%" /* 1/44 */, "3.8%" /* 1/26 */, "100.0%" /* 44/44; the portal's 49/49 */]);
   });
 
   test("15: the patient-level row's tooltip says it counts patients and that the portal counts samples (documented, PR #196)", async (t) => {
@@ -311,10 +311,11 @@ describe("sort", () => {
     const top = got.slice(0, 14).map((r) => r.attribute);
     assert.deepEqual(top, ["MUTATION_COUNT", // 100%, priority 30
       // 100%, priority 1, by display name lowercased
-      "AGE", "CANCER_TYPE", "CANCER_TYPE_DETAILED", "DEAD", "FRACTION_GENOME_ALTERED", "SAMPLE_COUNT" /* Number of Samples Per Patient */,
-      "ONCOTREE_CODE", "OS_MONTHS", "OS_STATUS", "SAMPLE_TYPE", "SEX", "SMOKING_HISTORY",
-      "PARSE_PROBE" /* 27.3% */]);
-    assert.deepEqual(got.slice(14, 18).map((r) => r.attribute), ["KI67_INDEX", "SITE_LABEL" /* 13.6%: "ki-67 index" < "site label" */, "FLAG_BOOL" /* 11.4% */, "TUMOR_GRADE" /* 9.1% */]);
+      "AGE", "DEAD", "FRACTION_GENOME_ALTERED", "SAMPLE_COUNT" /* Number of Samples Per Patient */,
+      "OS_MONTHS", "OS_STATUS", "SAMPLE_TYPE", "SEX", "SMOKING_HISTORY",
+      "CANCER_TYPE" /* 98.0%: FX-P41-T1's is blank */, "CANCER_TYPE_DETAILED", "ONCOTREE_CODE" /* 95.9%: FX-P41-T1 and FX-P42-T1 have none */,
+      "PARSE_PROBE" /* 24.5% */]);
+    assert.deepEqual(got.slice(14, 18).map((r) => r.attribute), ["KI67_INDEX", "SITE_LABEL" /* 12.2%: "ki-67 index" < "site label" */, "FLAG_BOOL" /* 10.2% */, "TUMOR_GRADE" /* 8.2% */]);
   });
 
   test("34: the table re-sorts by its Name / Freq headers (ACT:178-184, 216-217)", { skip: "our menu has no column headers to sort by (not claimed by PR #196)" });
