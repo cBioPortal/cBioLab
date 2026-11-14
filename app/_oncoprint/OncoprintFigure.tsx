@@ -13,7 +13,7 @@ import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOff
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { portalTipNumber } from "../../lib/chart/format.ts";
-import { STYLE, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, clinicalLegend, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
@@ -1027,7 +1027,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             onMouseMove={(e) => { if (e.buttons === 1) miniScroll(e); }} />
         )}
         <div className="vfoot">
-          <Legend data={data} display={display} colors={display.colors ?? data.display?.colors} />
+          <Legend data={data} display={display} colors={display.colors ?? data.display?.colors} shown={visible?.order} />
           {props.footer}
         </div>
         {props.timings && (
@@ -1090,9 +1090,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   );
 }
 
-const fmtRange = (x: number): string => (Math.abs(x) >= 100 ? Math.round(x).toLocaleString("en-US") : String(Math.round(x * 10) / 10));
 
-function Legend({ data, display, colors }: { data: UnpackedContract; display: FigureDisplay; colors?: Record<string, Record<string, string>> }) {
+function Legend({ data, display, colors, shown }: { data: UnpackedContract; display: FigureDisplay; colors?: Record<string, Record<string, string>>; shown?: ArrayLike<number> }) {
   const S = figureStyle(data, display);
   const white = display.whiteBackground;
   const P = paletteOf(S);
@@ -1128,14 +1127,24 @@ function Legend({ data, display, colors }: { data: UnpackedContract; display: Fi
         <span key={t.label}>{t.label}: {t.stack
           ? <>{t.stack.map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(S.glyph.spectrum.colors[i])}{c}</span>)}</>
           : t.bar
-          ? <><span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1, height: 10, marginRight: 4, verticalAlign: -1 }}>
-              {[3, 5, 7, 10].map((hh) => <span key={hh} style={{ width: 3, height: hh, background: S.glyph.bar.color }} />)}</span>
-              {fmtRange(t.min!)} → {fmtRange(t.max!)}{t.logScale ? " (log scale)" : ""}</>
+          ? (() => {
+              // the portal's key: green above 0, red below, both when the range spans 0
+              const key = clinicalLegend(t, S, colors, shown);
+              const fill = key.kind === "number" ? key.fill : "positive";
+              return <><span style={{ display: "inline-flex", alignItems: "flex-end", gap: 1, height: 10, marginRight: 4, verticalAlign: -1 }}>
+                {[3, 5, 7, 10].map((hh, i) => <span key={hh} style={{ width: 3, height: hh,
+                  background: fill === "negative" || (fill === "split" && i < 2) ? S.glyph.bar.negative : S.glyph.bar.color }} />)}</span>
+                {key.kind === "number" ? key.min + " → " + key.max : ""}{t.logScale ? " (log scale)" : ""}</>;
+            })()
           : t.numeric
           ? <>{sw("linear-gradient(90deg," + [0, 64, 128, 191, 255].map((c) => heatColor(t, c, S)).join(",") + ")", 44)}{t.min} → {t.max}</>
-          : <>{(t.categories || []).slice(0, 8).map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(trackCategoryColor(t, i, S, colors))}{c}</span>)}
-            {t.profiledFor && <span style={{ marginRight: 6 }}>{np}{S.glyph.profiled.no}</span>}
-            {(t.categories || []).length > 8 && <span className="meta">+{(t.categories || []).length - 8} more</span>}</>}</span>
+          : (() => {
+              const key = clinicalLegend(t, S, colors, shown);
+              if (key.kind !== "categories") return null;
+              return <>{key.entries.map((e) => <span key={e.label} style={{ marginRight: 6 }}>{e.noData ? np : sw(e.color)}{e.label}</span>)}
+                {t.profiledFor && <span style={{ marginRight: 6 }}>{np}{S.glyph.profiled.no}</span>}
+                {key.more > 0 && <span className="meta">+{key.more} more</span>}</>;
+            })()}</span>
       ))}
     </div>
   );

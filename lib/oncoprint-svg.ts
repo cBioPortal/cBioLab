@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { heatColor, barBand, cellLayers, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { heatColor, barBand, cellLayers, clinicalLegend, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -158,8 +158,12 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     parts.push(`<text x="4" y="${cy}" fill="${P.text}">${esc(truncateLabel(t.label, S))}</text>`);
     let cx = GUTTER;
     if (t.bar) {
-      for (let i = 0; i < 4; i++) parts.push(rect(cx + i * 6, cy - 1 - 2.5 * (i + 1), 4, 2.5 * (i + 1), S.glyph.bar.color));
-      parts.push(`<text x="${cx + 4 * 6 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.logScale ? " (log scale)" : ""}</text>`);
+      const key = clinicalLegend(t, S, colors);
+      if (key.kind !== "number") continue;
+      // the portal's key: green for values above 0, red below, both when the range spans 0
+      const barColor = (i: number) => key.fill === "negative" || (key.fill === "split" && i < 2) ? S.glyph.bar.negative : S.glyph.bar.color;
+      for (let i = 0; i < 4; i++) parts.push(rect(cx + i * 6, cy - 1 - 2.5 * (i + 1), 4, 2.5 * (i + 1), barColor(i)));
+      parts.push(`<text x="${cx + 4 * 6 + 8}" y="${cy}" fill="${P.muted}">${key.min} → ${key.max}${t.logScale ? " (log scale)" : ""}</text>`);
       continue;
     }
     if (t.stack) {
@@ -175,13 +179,16 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       parts.push(`<text x="${cx + 24 * 4 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.ramp === "expression" ? " (0 at black)" : t.ramp === "methylation" ? " (white at 0.35)" : t.center != null ? " (0 at white)" : ""}${t.kind === "heatmap" ? " · " + esc(t.profileType) + ", " + esc(t.note || "") : ""}</text>`);
       continue;
     }
-    t.categories!.slice(0, 8).forEach((c, i: number) => {
-      const name = String(c).length > 20 ? String(c).slice(0, 19) + "…" : String(c);
-      parts.push(rect(cx, cy - 9, 10, 10, trackCategoryColor(t, i, S, colors)));
+    const key = clinicalLegend(t, S, colors);
+    if (key.kind !== "categories") continue;
+    for (const e of key.entries) {
+      const name = e.label.length > 20 ? e.label.slice(0, 19) + "…" : e.label;
+      if (e.noData) parts.push(rect(cx, cy - 9, 10, 10, S.glyph.notProfiled.fill), rect(cx, cy - 4.5, 10, 1, S.glyph.notProfiled.stripe.color));
+      else parts.push(rect(cx, cy - 9, 10, 10, e.color));
       parts.push(`<text x="${cx + 14}" y="${cy}" fill="${P.muted}">${esc(name)}</text>`);
       cx += 14 + name.length * 6.2 + 16;
-    });
-    if (t.categories!.length > 8) parts.push(`<text x="${cx}" y="${cy}" fill="${P.muted}">+${t.categories!.length - 8} more</text>`);
+    }
+    if (key.more) parts.push(`<text x="${cx}" y="${cy}" fill="${P.muted}">+${key.more} more</text>`);
     if (t.profiledFor) {
       parts.push(rect(cx, cy - 9, 10, 10, S.glyph.notProfiled.fill), rect(cx, cy - 4.5, 10, 1, S.glyph.notProfiled.stripe.color));
       parts.push(`<text x="${cx + 14}" y="${cy}" fill="${P.muted}">${esc(S.glyph.profiled.no)}</text>`);
