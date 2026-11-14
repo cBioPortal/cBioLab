@@ -317,3 +317,9 @@ test("#199 T1: a spectrum cell's tooltip gives each class's count, not its share
   assert.equal(stackCellText(t, 1), "Mutation spectrum: C>A 0 · C>G 0 · C>T 0 · T>A 0 · T>C 0 · T>G 2", "the second column's six");
   assert.equal(stackCellText(t, -1), "Mutation spectrum: no data");
 });
+
+test("a patient's \"Mixed\" is coloured as the portal's oncoprint colours a value it was not given: #3366cc, darkened while taken, using no slot (oncoprintruleset makeUniqueColorGetter)", () => {
+  const t = { label: "X", categories: ["Mixed", "A", "B"] };
+  assert.deepEqual([0, 1, 2].map((i) => trackCategoryColor(t, i)), ["#3061c2", "#3366cc", "#dc3912"]);
+  assert.equal(trackCategoryColor({ label: "X", categories: ["Mixed", "Yes"] }, 0), "#3366cc", "nothing else has #3366cc");
+});

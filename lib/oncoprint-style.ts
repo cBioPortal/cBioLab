@@ -590,18 +590,31 @@ export function trackCategoryColor(track: { label: string; categories?: string[]
   if (value == null) return categoryColor(code, S);
   const reserved = reservedColor(value, S);
   if (reserved) return reserved;
+  if (value === MIXED) {
+    // A patient's "Mixed" is none of the study's values, so the portal's oncoprint colours it
+    // itself: the list's first colour, darkened while another value of the track already has it
+    // (oncoprintruleset makeUniqueColorGetter).
+    const used = new Set(track.categories!.map((v, i) => v === MIXED ? "" : trackCategoryColor(track, i, S, colors).toLowerCase()));
+    let c = S.palette.clinical[0];
+    for (let d = darken(c); used.has(c) && d !== c; d = darken(c)) c = d;
+    return c;
+  }
   // the k-th value without a reserved colour takes the k-th colour of the list
   let k = 0;
-  for (let i = 0; i < code; i++) if (!reservedColor(track.categories![i], S)) k++;
+  for (let i = 0; i < code; i++) if (!reservedColor(track.categories![i], S) && track.categories![i] !== MIXED) k++;
   return clinicalColor(k, S);
 }
+
+/** a patient's clinical value when its samples disagree (lib/oncoprint.ts) */
+export const MIXED = "Mixed";
+const darken = (c: string): string =>
+  "#" + [1, 3, 5].map((i) => Math.round(parseInt(c.slice(i, i + 2), 16) * 0.95).toString(16).padStart(2, "0")).join("");
 
 /** the k-th colour the portal hands a categorical track's values: its list in order, darkened once per pass past its end */
 export function clinicalColor(k: number, S: Style = STYLE): string {
   const list = S.palette.clinical;
   let c = list[k % list.length];
-  for (let pass = Math.floor(k / list.length); pass > 0; pass--)
-    c = "#" + [1, 3, 5].map((i) => Math.round(parseInt(c.slice(i, i + 2), 16) * 0.95).toString(16).padStart(2, "0")).join("");
+  for (let pass = Math.floor(k / list.length); pass > 0; pass--) c = darken(c);
   return c;
 }
 

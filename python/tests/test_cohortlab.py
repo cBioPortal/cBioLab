@@ -367,6 +367,12 @@ class ReservedColors(unittest.TestCase):
         self.assertEqual([track_category_color(t, i) for i in range(3)], ["#d95f02", "#1b9e77", "#e0699e"])
         self.assertEqual(track_category_color(t, 3), STYLE["palette"]["clinical"][0])
 
+    def test_mixed_is_darkened_and_uses_no_slot(self):
+        from cohortlab.contract import Track
+        from cohortlab.style import track_category_color
+        t = Track("clinical", "X", np.zeros(1, dtype=np.int32), {"categories": ["Mixed", "A", "B"]})
+        self.assertEqual([track_category_color(t, i) for i in range(3)], ["#3061c2", "#3366cc", "#dc3912"])
+
 
 class StyleOverrides(unittest.TestCase):
     """resolve_style mirrors lib/oncoprint-style.ts, and an override reaches the drawn pixels."""
