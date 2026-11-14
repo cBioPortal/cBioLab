@@ -232,11 +232,13 @@ test("level of detail: a germline mark goes with the mutation classes it was dra
   assert.deepEqual(bucketCodes(gene, [B.SPLICE | B.GERMLINE, 0], 0, 2, 1), [B.SPLICE | B.GERMLINE]);
 });
 
-test("track-label percent is the portal's: 0%, <1%, else an integer (ONC-LY-4, ONC-STM-3)", () => {
+test("track-label percent is the portal's: one decimal under 3%, then an integer, <1% above 0 (ONC-LY-4, ONC-STM-3)", () => {
   assert.equal(formatLabelPct(null), "N/P");
   assert.equal(formatLabelPct(0), "0%");
-  assert.equal(formatLabelPct(0.04), "<1%");
-  assert.equal(formatLabelPct(0.99), "<1%");
+  assert.equal(formatLabelPct(0.04), "<1%", "ours: the portal's two roundings print 0%");
+  assert.equal(formatLabelPct(0.99), "1%", "\"1.0\" drops its 0, then 1");
+  assert.equal(formatLabelPct(0.95), "<1%", "0.95 is 0.9499… as a double: \"0.9\"");
+  assert.equal(formatLabelPct(1.46), "2%", "\"1.5\", then rounded again");
   assert.equal(formatLabelPct(1.2), "1%");
   assert.equal(formatLabelPct(2.5), "3%");
   assert.equal(formatLabelPct(37.37), "37%");

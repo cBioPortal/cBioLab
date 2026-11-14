@@ -119,7 +119,7 @@ export function segmentByTrack(data: UnpackedContract, order: Uint32Array, group
         if (tr.kind !== "gene" && tr.kind !== "derivedEvent") return null;
         let alt = 0, prof = 0;
         for (let i = runStart; i < k; i++) { const c = tr.cells[order[i]]; if (c !== -1) prof++; if (c > 0) alt++; }
-        return prof ? 100 * alt / prof : null;
+        return prof ? 100 * (alt / prof) : null;
       });
       out.push(seg);
       runStart = k;
@@ -269,7 +269,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     const y = header + ti * (rowH + rowGap);
     ctx.fillStyle = P.text; ctx.textAlign = "left";
     ctx.fillText(trackLabelText(t, S), 4, y + 14);
-    if (t.freqPct != null) {
+    if (t.freqPct !== undefined) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
       ctx.fillText(formatGutterPct(t, data.n), gutter - 8, y + 14);
       ctx.textAlign = "left";

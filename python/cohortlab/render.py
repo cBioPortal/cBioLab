@@ -184,7 +184,7 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
     for ti, t in enumerate(c.tracks):
         y = ti * (ROW_H + ROW_GAP) + ROW_H / 2
         ax.text(4, y, track_label_text(t, S), fontsize=8, color=P["text"], va="center")
-        if t.meta.get("freqPct") is not None:
+        if "freqPct" in t.meta:
             ax.text(gutter - 8, y, format_gutter_pct(t.meta, c.n), fontsize=7.5, color=P["muted"], va="center", ha="right")
     gene_cells = np.concatenate([np.asarray(t.cells) for t in c.tracks if t.kind == "gene"] or [np.zeros(0, dtype=np.int32)])
     present = glyph_presence(np.unique(gene_cells[gene_cells > 0]), S)

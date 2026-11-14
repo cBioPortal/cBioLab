@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32 } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -149,4 +149,16 @@ test("oncoprint tooltip numbers: toFixed(2), and a clinical value loses exactly 
   assert.equal(portalTipNumber(10, false), "10.00", "a heatmap value keeps its decimals");
   assert.equal(portalTipNumber(-0.004, false), "-0.00");
   assert.equal(portalTipNumber(3.0004, false), "3.00");
+});
+
+test("portalTrackPct: an oncoprint track's % as the portal's gutter shows it, rounded twice under 3% (OncoprintUtils percentAltered, oncoprinttrackinfoview)", () => {
+  const pct = (a: number, b: number) => portalTrackPct(100 * (a / b));
+  assert.equal(portalTrackPct(null), "N/P");
+  assert.equal(pct(0, 50), "0%");
+  assert.equal(pct(1, 2500), "<1%", "the portal prints 0%; ours never does above 0");
+  assert.equal(pct(24, 2500), "1%", "0.96: \"1.0\", then 1");
+  assert.equal(pct(73, 5000), "2%", "1.46: \"1.5\", then rounded again to 2");
+  assert.equal(pct(23, 40), "57%", "100 × (23 ÷ 40) is 57.4999… as a double");
+  assert.equal(pct(5, 11), "45%");
+  assert.equal(pct(40, 40), "100%");
 });

@@ -143,14 +143,20 @@ def format_pct(p: float | None) -> str:
     return (str(v) if p < 3 else str(int(v))) + "%"
 
 
+def _js_to_fixed(x: float, digits: int) -> str:
+    """JavaScript Number.prototype.toFixed for x >= 0: the double's exact decimal value, halves up."""
+    from decimal import ROUND_HALF_UP, Decimal
+    return str(Decimal(x).quantize(Decimal(1).scaleb(-digits), rounding=ROUND_HALF_UP))
+
+
 def format_label_pct(p: float | None) -> str:
-    """The portal's track-label percent: "0%", "<1%" above 0 and under 1, otherwise an integer; N/P when nothing was profiled."""
-    if p is None:
+    """The portal's track-label percent from 100 * (altered / profiled) (lib/chart/format.ts portalTrackPct): one decimal
+    below 3 %, else an integer, then rounded again to an integer, "<1%" above 0 and under 1; N/P when
+    nothing was profiled."""
+    if p is None or p != p:
         return "N/P"
-    if p == 0:
-        return "0%"
-    import math
-    return "<1%" if p < 1 else f"{math.floor(p + 0.5)}%"
+    shown = float(_js_to_fixed(p, 1) if p < 3 else _js_to_fixed(p, 0))
+    return "<1%" if shown < 1 and p > 0 else f"{math.floor(shown + 0.5)}%"
 
 
 def format_gutter_pct(t: dict[str, Any], columns: int | None = None) -> str:
@@ -158,7 +164,7 @@ def format_gutter_pct(t: dict[str, Any], columns: int | None = None) -> str:
     profiled = t.get("profiled")
 
     def pct(n: Any, p: Any) -> float | None:
-        return 100 * n / profiled if n is not None and profiled else p
+        return 100 * (n / profiled) if n is not None and profiled else p
 
     any_ = pct(t.get("altered"), t.get("freqPct"))
     if any_ is None:
