@@ -62,6 +62,16 @@ export const ExploreRequest = z.object({
   derived: z.array(z.object({ metric: z.string(), eventType: z.string().optional(), lineGap: z.number().optional() })).optional(),
   /** count only OncoKB drivers in the gene tables and gene charts */
   drivers: z.boolean().optional(),
+  /** each numeric chart's bins as its menu sets them, by attribute (lib/data-binner.ts BinSettings) */
+  bins: z.record(z.string().regex(/^[A-Za-z0-9_.:-]{1,200}$/), z.object({
+    bins: z.union([
+      z.object({ method: z.literal("custom"), edges: z.array(z.number().finite()).min(1).max(100, "at most 100 bin edges") }),
+      z.object({ method: z.literal("generate"), size: z.number().finite().positive("a bin size above 0"), anchor: z.number().finite() }),
+      z.object({ method: z.literal("median") }),
+      z.object({ method: z.literal("quartile") }),
+    ]).nullable().optional(),
+    disableLog: z.boolean().optional(),
+  })).refine((r) => Object.keys(r).length <= 60, "bin settings for at most 60 charts").optional(),
   ...customData,
 });
 

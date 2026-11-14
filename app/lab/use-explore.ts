@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CohortDef, DerivedRequest, ExploreResult } from "../../lib/types.ts";
 import { api } from "./api.ts";
+import type { BinSettings } from "../../lib/data-binner.ts";
 
 /** What decides Explore's answer — the query key. */
 export interface ExploreRequest {
@@ -31,6 +32,8 @@ export interface ExploreRequest {
   uploads: string;
   /** the gene tables and gene charts count OncoKB drivers only */
   drivers: boolean;
+  /** each numeric chart's bins as its menu sets them, by attribute */
+  bins: Record<string, BinSettings>;
 }
 
 /** A request asked for, plus whether its answer may define the full attribute vocabulary: only
@@ -75,6 +78,7 @@ export function useExplore(onError: (message: string) => void) {
         ...(r.assayCharts.length ? { assayCharts: r.assayCharts } : {}),
         ...(r.derived.length ? { derived: r.derived } : {}),
         ...(r.drivers ? { drivers: true } : {}),
+        ...(Object.keys(r.bins || {}).length ? { bins: r.bins } : {}),
       }, { signal });
       if (res.status === 499) throw new Superseded();
       const j = await res.json();

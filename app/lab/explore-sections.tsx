@@ -5,6 +5,8 @@
 import { useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
+import CustomBinsDialog from "./custom-bins-dialog";
+import { binsAfterEdit, logScaleOffered, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
 import { ANALYSIS_MAX_COHORTS, armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
@@ -219,7 +221,7 @@ function StudyActions({ id, ctx, onQuery }: { id: string; ctx: ExploreCtx; onQue
 }
 
 export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
-  const { addMode, applyOrSay, clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
+  const { addMode, applyOrSay, chartBins, setChartBins, clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
   return <>
     {(() => {
       const d = parseDraft();
@@ -260,7 +262,11 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
               if (!dr) return null;
               const names = new Map<string, string>();
               for (const f of explore?.clinical || []) if (f.displayName && !names.has(f.attribute)) names.set(f.attribute, f.displayName);
-              return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay}
+              const edited = (attribute: string, ends: number[]) => {
+                const f = explore?.clinical.find((x) => x.attribute === attribute && x.kind === "num");
+                if (f?.kind === "num" && f.bins && !oneValueBars(f.bins)) setChartBins(attribute, binsAfterEdit(chartBins(attribute), f.bins, ends), false);
+              };
+              return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay} onIntervalEdited={edited}
                 onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />;
             })()}
           </div>
@@ -690,8 +696,11 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, togglePieValue, toggleNaValue } = ctx;
+  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, togglePieValue, toggleNaValue } = ctx;
   const picks = usePicks();
+  const [binsOpen, setBinsOpen] = useState(false);
+  const binSet = c.kind === "num" ? chartBins(c.attribute) : undefined;
+  const showNa = !!binSet?.showNa && c.kind === "num" && !!c.naCount;
   return (
     <div data-attr={c.per + "|" + c.attribute}
       data-shape={c.kind === "cat" ? (PIE_ATTRIBUTES.has(c.attribute) ? "pie" : "list") : c.kind}
@@ -730,9 +739,21 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                   ...forBoth((t) => compareAction(c.values.map(valueArm), PIE_ATTRIBUTES.has(c.attribute) ? null : checked.map(valueArm), "value of " + label, (arms) => compareItems(chart, arms, t), t)),
                   ...selected]} />;
                 const bins = (c.bins || []).filter((b: any) => b.count > 0).map((b: any) => ({ name: armLabel(c.attribute + " " + binLabel(b)), where: binClause(c.attribute, b) as Leaf }));
-                return <ChartMenu label={label} actions={addMode ? [] : [
-                  ...forBoth((t) => compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label, t), bins, () => compareItems(chart, bins, t), t)),
-                  ...selected]} />;
+                const fixed = oneValueBars(c.bins);
+                return <ChartMenu label={label} actions={[
+                  ...(logScaleOffered(c.bins, binSet) ? [{ label: "Log Scale", checked: !binSet?.disableLog,
+                    title: binSet?.disableLog ? "draw the bars on a log scale again" : "draw the bars on a linear scale",
+                    onClick: () => setChartBins(c.attribute, { ...binSet, disableLog: !binSet?.disableLog }) }] : []),
+                  ...(addMode ? [] : [
+                    ...forBoth((t) => compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label, t), bins, () => compareItems(chart, bins, t), t)),
+                    ...selected]),
+                  { label: "Custom Bins…", disabled: fixed, onClick: () => setBinsOpen(true),
+                    title: fixed ? "every value of " + label + " already has a bar of its own (10 or fewer values), so bins don't apply"
+                      : binSet?.bins ? "change the bars (now " + binMethodName(binSet.bins) + "), or go back to the default" : "quartiles, a median split, bins of a size you pick, or your own edges" },
+                  ...(c.naCount ? [{ label: "Show NA", checked: !!binSet?.showNa,
+                    title: binSet?.showNa ? "show the cases with no " + label + " as a count beside the bars" : "draw the cases with no " + label + " as a bar of their own",
+                    onClick: () => setChartBins(c.attribute, { ...binSet, showNa: !binSet?.showNa }, false) }] : []),
+                ]} />;
               })()}
             </div>
           );
@@ -811,14 +832,14 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           );
         })()}
         {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
-          const maxN = Math.max(...c.bins.map((b: any) => b.count), 1);
+          const maxN = Math.max(...c.bins.map((b: any) => b.count), showNa ? c.naCount! : 0, 1);
           // a bar is a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end]
           const label = binLabel;
           const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
           const sel = chartSelection(parseDraft(), c.attribute);
           const unit = c.per === "sample" ? "samples" : "patients";
           return (
-            <Histogram ticks={c.bins.map(tick)} na={c.naCount ? "NA " + fmtInt(c.naCount) : null}>
+            <Histogram ticks={[...c.bins.map(tick), ...(showNa ? ["NA"] : [])]} na={c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null}>
               {c.bins.map((b: any, i: number) => {
                 const on = binSelected(sel, b);
                 const tip = label(b) + " · " + fmtInt(b.count) + " " + unit + " — click to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter");
@@ -829,6 +850,14 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                   </button>
                 );
               })}
+              {showNa && (() => {
+                const on = naSelected(parseDraft(), c.attribute);
+                const tip = "NA · " + fmtInt(c.naCount!) + " " + unit + " with no " + (c.displayName || c.attribute) + " — click to " + (on ? "take it out of the filter" : "filter to them");
+                return <button className={cn("hbar nabar", (sel.length > 0 || on) && (on ? "on" : "off"))} data-tip={tip} aria-label={tip} aria-pressed={on}
+                  onClick={() => toggleNaValue(c.attribute)}>
+                  <span className="hfill" style={{ height: Math.max(2, Math.round(100 * c.naCount! / maxN)) + "%" }} />
+                </button>;
+              })()}
             </Histogram>
           );
         })()}
@@ -837,6 +866,8 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 } })}>≥ median</Button>
           <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 } })}>&lt; median</Button>
         </div>}
+        {binsOpen && c.kind === "num" && <CustomBinsDialog label={c.displayName || c.attribute} bars={c.bins} current={binSet}
+          onApply={(b) => setChartBins(c.attribute, { ...binSet, bins: b })} onClose={() => setBinsOpen(false)} />}
     </div>
   );
 }

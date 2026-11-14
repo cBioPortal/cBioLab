@@ -1,9 +1,9 @@
 // The Study View's default charts (lib/study-view-config.ts), as cbioportal.org picks them
 // (STS-LY-7, STS-LY-8): its priority table replaces a database priority left at 1, the first 20
 // with a priority above 0 in priority then name order, less the charts with a single value.
-import { test } from "node:test";
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { chartPriority, chartOrder, defaultChartKeys, shouldShowChart, DEFAULT_CLINICAL_CHARTS } from "../lib/study-view-config.ts";
+import { chartBinSettings, chartPriority, chartOrder, defaultChartKeys, shouldShowChart, DEFAULT_CLINICAL_CHARTS } from "../lib/study-view-config.ts";
 
 test("the portal's table replaces a priority of exactly 1, and only that", () => {
   assert.equal(chartPriority("SEX", 1), 9);
@@ -50,4 +50,15 @@ test("coadread: the first 20 by priority, then the three one-value charts droppe
   assert.deepEqual(keys.slice(0, 4), ["CANCER_TYPE_DETAILED", "MUTATION_COUNT", "FRACTION_GENOME_ALTERED", "AGE"]);
   assert.ok(["SEX", "RACE", "ETHNICITY", "SUBTYPE", "PATH_T_STAGE", "ANEUPLOIDY_SCORE", "DAYS_TO_BIRTH"].every((k) => keys.includes(k)));
   assert.equal(defaultChartKeys(attrs, { filtered: true, totalSamples: 594 }).length, DEFAULT_CLINICAL_CHARTS, "filtered: every one of the 20");
+});
+
+describe("a chart's starting bins (initialBins)", () => {
+  test("the MSI scores start on the portal's edges; a reader's own setting, or null for the default bars, wins", () => {
+    assert.deepEqual(chartBinSettings(undefined, "MSI_SCORE_MANTIS"), { bins: { method: "custom", edges: [0.4, 0.6] } });
+    assert.deepEqual(chartBinSettings({}, "MSI_SENSOR_SCORE"), { bins: { method: "custom", edges: [4, 10] } });
+    assert.deepEqual(chartBinSettings({ MSI_SCORE: { disableLog: true } }, "MSI_SCORE"), { disableLog: true, bins: { method: "custom", edges: [4, 10] } });
+    assert.deepEqual(chartBinSettings({ MSI_SCORE: { bins: null } }, "MSI_SCORE"), { bins: null });
+    assert.deepEqual(chartBinSettings({ MSI_SCORE: { bins: { method: "median" } } }, "MSI_SCORE"), { bins: { method: "median" } });
+    assert.equal(chartBinSettings(undefined, "AGE"), undefined);
+  });
 });

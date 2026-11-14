@@ -213,11 +213,12 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
       - bin edges from the unfiltered distribution, cached per study set and attribute;
       - then one scan per connection, with each sample's bitmask of the filters it passes, counting every chart with `uniqExactIf`. That is exact (0 mismatches) and CPU-neutral, and estimated 1.5 → ~0.55 s on msk_chord_2024 at 4 filters.
       - Today's click is already 2–5× faster than cbioportal.org's on the same filters.
-  - [ ] The bar chart's menu: Custom Bins, Quartiles, Median, Generate, Log Scale, Show NA; the default MSI custom bins (MANTIS 468/22/67) (STS-BAR-1, STS-BAR-6…8, STS-HD-5)
+  - [x] The bar chart's menu: Custom Bins (Quartiles, Median split, Generate bins, Custom bins; an empty box the default bars), Log Scale, Show NA; the default MSI custom bins (MANTIS 468/22/67, MSIsensor 496/10/78). Each reader's own, kept by the browser rather than the URL or a saved cohort (STS-BAR-1, STS-BAR-6…8, STS-HD-5, STS-STM-4, STS-STM-10) (PR #203 open)
+    - [ ] Log Scale on a generic-assay or gene chart (ours clinical charts only); custom bins for a peer's studies (a remote peer bins by its defaults)
   - [ ] Gene tables: every gene (ours 500 of 18,275), column sort, "(N profiled samples)" in the title, the OncoKB cancer-gene icon and filter, MutSig / GISTIC q, gene-panel tooltip, a gene click queues a query; SV sorted by # SV (ours Union only, SV by # altered) (STS-GT-2, STS-GT-3, STS-GT-5…9)
   - [ ] Chart kinds: treatment tables, the GA frequency table (arm-level CNA by default), mutation-type counts, variant annotations, X-vs-Y density and violin, gene-specific violin, continuous gene bar (STS-OT-3…6, STS-VI-1…8, STS-GS-4, STS-SC-1)
   - [ ] Pie: for any attribute with few values (ours 9 allowlisted ids, else a list), slice labels, unselected slices greyed, a second click unselects (see bugs), the portal's colours (ours Okabe-Ito) (STS-LY-9, STS-PIE-3, STS-PIE-6…8)
-  - [ ] Survival: one KM tile per endpoint (ours one chart with an endpoint picker; numbers match) (STS-KM-1)
+  - [x] Survival: one card with an endpoint picker, kept on purpose in place of a KM tile per endpoint; the numbers match (STS-KM-1) (PR #203 open)
   - [ ] Density: x = FGA, y = mutation count, linear (ours x = log10(MC + 1)); 44×38 bins (ours 48×32); Pearson / Spearman text; Swap Axes and Log menu; a fuller tooltip (ours "n samples") (STS-SC-2…5, STS-STM-15)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
@@ -234,7 +235,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Custom Selection by sample or patient ids on the page (Analysis has it, signed-in only) (STV-CS-1…9)
   - [ ] Header: the study's name, description, PubMed link and download (ours id chips) (STV-HD-2, STV-HD-3)
   - [x] Filter pills named by chart ("Diagnosis Age : 50 < x ≤ 55 or 70 < x ≤ 75", "Sex : Female"), a value or range per pill with its ×, interval ends edited in place, "Clear All Filters" (STV-FB-1…5) (PR #191 open)
-    - [ ] An edited end makes custom bins on the chart (STV-FB-4): ours filters on the typed range, and only bars it encloses show selected, until the bar menu's Custom Bins (STS-BAR-6)
+    - [x] An edited end makes custom bins on the chart (STV-FB-4): its ends join the chart's edges, so the filter is drawn as bars (PR #203 open)
     - [ ] Gene-chart, generic-assay and gene-table pills named by chart and coloured by alteration (STV-FB-3 #5, #9, #13, #14): ours the generic clause pills
     - [ ] Several separate ranges of one chart show as one pill each; the portal merges them into one interval from the first bar's start to the last's end (which reads wider than the filter)
   - [ ] Add chart: the "% samples with data" column, Select all, the X vs Y and Genomic tabs; turning a chart off clears its filter (STV-AC-2, STV-AC-3, STV-AC-7, STV-STM-3)

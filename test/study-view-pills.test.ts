@@ -2,7 +2,7 @@
 // chart (STV-FB-3), the interval text (STV-FB-4), its editable ends, and each pill's ×.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { editInterval, filterGroups, intervalText, leafInterval, removePill } from "../lib/study-view-pills.ts";
+import { editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill } from "../lib/study-view-pills.ts";
 import { naClause } from "../lib/explore-selection.ts";
 import type { ClinicalLeaf, CohortDef } from "../lib/types.ts";
 
@@ -96,5 +96,16 @@ describe("editing an interval's end", () => {
       { kind: "clinical", attribute: "AGE", op: "=", value: 4 });
     const two: CohortDef = { all: [sex, { any: [age({ gt: 50, lte: 55 }), age({ gt: 70, lte: 75 })] }] };
     assert.deepEqual(ok(editInterval(two, 1, 1, "hi", "80")), { any: [age({ gt: 50, lte: 55 }), age({ gt: 70, lte: 80 })] });
+  });
+});
+
+describe("an interval's numbers after an edit", () => {
+  test("its ends, its one value, or none for a word", () => {
+    const d: CohortDef = { all: [sex, { any: [age({ gt: 50, lte: 55 }), age({ gte: 70 })] }, { kind: "clinical", attribute: "AGE", op: "=", value: 3 }] };
+    assert.deepEqual(intervalEnds(d, 1, 0), [50, 55]);
+    assert.deepEqual(intervalEnds(d, 1, 1), [70]);
+    assert.deepEqual(intervalEnds(d, 2, 0), [3]);
+    assert.deepEqual(intervalEnds(d, 0, 0), []);
+    assert.deepEqual(intervalEnds(d, 9, 0), []);
   });
 });

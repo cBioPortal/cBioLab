@@ -3,7 +3,7 @@
 // numeric intervals with editable ends; clauses of no clinical chart drawn as the generic pills.
 import { Fragment, useEffect, useState } from "react";
 import type { CohortDef } from "../../lib/types.ts";
-import { editInterval, filterGroups, intervalText, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
+import { editInterval, filterGroups, intervalEnds, intervalText, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
 import { ClausePill, CLINICAL_COLOR, type OnCustomData } from "./pills";
 
 type Result = { draft: CohortDef } | { why: string };
@@ -35,11 +35,13 @@ function IntervalBody({ iv, name, edit }: { iv: Interval; name: string; edit: (e
 
 const pillText = (p: SvPill) => p.kind === "na" ? "NA" : p.kind === "value" ? String(p.value) : intervalText(p.interval);
 
-export default function StudyViewPills({ draft, labelOf, apply, onRemoveClause, onCustomData }: {
+export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited, onRemoveClause, onCustomData }: {
   draft: CohortDef;
   labelOf: (attribute: string) => string | undefined;
   /** applies an edited draft, or says why it can't be; false when refused */
   apply: (r: Result) => boolean;
+  /** an interval's ends were typed: the numbers the chart's filter now runs between */
+  onIntervalEdited?: (attribute: string, ends: number[]) => void;
   onRemoveClause: (i: number) => void;
   onCustomData?: OnCustomData;
 }) {
@@ -57,7 +59,11 @@ export default function StudyViewPills({ draft, labelOf, apply, onRemoveClause, 
                 <span className="fpill svpill" style={{ borderLeftColor: CLINICAL_COLOR }} data-sv-pill={pillText(p)}>
                   {p.kind === "interval"
                     ? <IntervalBody iv={p.interval} name={g.label}
-                        edit={(end, raw) => apply(editInterval(draft, g.clause, p.leaf, end, raw))} />
+                        edit={(end, raw) => {
+                          const r = editInterval(draft, g.clause, p.leaf, end, raw);
+                          if ("draft" in r) onIntervalEdited?.(g.attribute, intervalEnds(r.draft, g.clause, p.leaf));
+                          return apply(r);
+                        }} />
                     : <span className="fval">{pillText(p)}</span>}
                   <button className="fx" aria-label={"remove " + g.label + " " + pillText(p)}
                     onClick={() => apply({ draft: removePill(draft, g.clause, p) })}>×</button>
