@@ -121,7 +121,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Beside the lollipop as the portal has it: each group's badge selector (the Results tab's, shared: Driver/VUS totals, clickable type names, "only"), its middle line on the protein's centre; the transcript and its ids; the Legend toggle and the SVG/PNG download (the last two on the Results tab's lollipop too)
   - [ ] The transcript drop-down offers only the canonical transcript: mutations are annotated on it alone, where the portal re-annotates them on a chosen one, live (Genome Nexus). The plan is a stored per-transcript table instead: [`TRANSCRIPT-ANNOTATION.md`](TRANSCRIPT-ANNOTATION.md)
   - [ ] The driver-settings menu (the sliders button above the badges: OncoKB, hotspots, custom drivers)
-  - [ ] Cancer Hotspots as putative drivers: the portal's default counts a hotspot mutation as a driver, cBioLab only OncoKB (e.g. TP53 D208G, D281E in brca_tcga_pan_can_atlas_2018 Basal-like vs Luminal A). Results → Mutations too: TP53 Driver/VUS 325/7 vs the portal's 329/3 ([05-mutations](legacy-spec/parity/05-mutations.md))
+  - [x] Cancer Hotspots as putative drivers, as the portal's default counts them, on this lollipop and the Results tab's (#PRNUM)
+  - [ ] Hotspot drivers for every study once the full Genome Nexus sync stores their hotspots (e.g. TP53 D208G, D281E in brca_tcga_pan_can_atlas_2018 Basal-like vs Luminal A; Results → Mutations TP53 Driver/VUS 325/7 vs the portal's 329/3) ([05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] The lollipop's tracks (Cancer Hotspots, OncoKB, PTM, exons, topology, PDB); the table's copy and download
   - [ ] The table's Co-occurrence Pattern column (a mini oncoprint of the groups' patients), and the Custom Driver, Custom Driver Tier and MS columns
   - [ ] Each group's badges filter that group alone; ours hide a class in both groups at once
@@ -365,6 +366,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] The Annotation column's OncoKB call for the sample's tumour type (gene, protein change, mutation type, tumour type, as the portal asks), not the highest level across types, synced offline to `annotation.oncokb_tumor_type` (#202)
   - [ ] Shown once the full sync puts both OncoKB tables at one release (they are read at the same pin; the test studies are at v7.7, the gene-level store at v7.5)
   - [ ] Resistance, diagnostic and prognostic levels, and OncoKB's answer for the card, are stored but not shown (the card is MUT-AN-1)
+  - [x] Cancer Hotspots as putative drivers, read from the stored Genome Nexus record (#PRNUM)
   - [ ] CIViC
   - [ ] The transcript dropdown, with the lollipop's transcripts and Pfam domains read from the store instead of Genome Nexus live
   - [ ] PTM tracks
@@ -373,7 +375,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [x] **Driver-annotation settings** — the view's `drivers` (OncoKB, the study's `cbp_driver` and `cbp_driver_tiers`, Show only drivers, Show only somatic) in the oncoprint's "mutations" menu, the germline stripe, Driver vs VUS and Driver/VUS mutation types on plots; one setting across the Results page's Oncoprint and Plots tabs (#168)
   - [ ] The other Results tabs following the settings: Cancer Types Summary, Mutual Exclusivity, the Mutations tab's lollipop and table, Comparison/Survival's Altered and Unaltered groups, Download, Pathways, the header's altered count (the portal's apply to every tab but Plots, Co-expression and CN Segments)
   - [ ] The menu as a page-level sliders button beside Modify query (ours sits in the oncoprint's toolbar, where the custom calls it lists are known)
-  - [ ] Hotspots as a source: no Cancer Hotspots data is loaded (offered disabled, refused in a document)
+  - [x] Hotspots as a source, on by default as the portal's: read from the offline Genome Nexus store, in the menu with the portal's tooltip text, in the oncoprint, Plots and the Mutations tab (#PRNUM)
+  - [ ] The Hotspots row's tooltip links and Cancer Hotspots logo, and its "Error loading Hotspots data" icon (ours: the view names the studies the store has not covered)
+  - [ ] Hotspot calls by genomic location: ours are by gene, protein change and mutation type, which agree with the location on every mutation of the test studies; a key at a hotspot in one sample and not in another would be called a driver in both
   - [ ] "Show only profiled" (`hide_unprofiled_samples`) with its all/any radios, its CaseFilterWarning, and the AlterationFilterWarning, on every Results tab (ONC-MD-3, CTS-MD-7, MEX-MD-6, PLT-MD-5, PLT-CH-3, MUT-MD-13, CNS-0.2) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md), [05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] OncoKB's germline rule (Pathogenic / Likely Pathogenic for a germline mutation): the store holds one call per alteration
   - [ ] A plot's menu lists no tiers (a plot does not report its data's tiers); the plot tooltip's OncoKB and hotspot icons

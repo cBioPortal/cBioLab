@@ -503,6 +503,7 @@ export function withDrivers(axes: Axes, drivers: DriverSettings | undefined): Ax
   resolveDrivers(drivers);
   const sources: DriverSettings = {};
   if (drivers?.oncokb === false) sources.oncokb = false;
+  if (drivers?.hotspots === false) sources.hotspots = false;
   if (drivers?.custom === false) sources.custom = false;
   if (drivers?.tiers) sources.tiers = drivers.tiers;
   const put = (a: PlotView["x"] | undefined) => a && drivers && drivenAxis(a) && !("drivers" in a && a.drivers)

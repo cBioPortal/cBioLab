@@ -1587,7 +1587,7 @@ leave out of the altered fraction). Unknown keys are rejected loudly.
 | \`oncokb\` | \`true\` | the version-pinned OncoKB store (Oncogenic, Likely Oncogenic, Resistance) |
 | \`custom\` | \`true\` | the study's own calls: \`cbp_driver\` = \`Putative_Driver\` (a \`Putative_Passenger\` call does not overrule another source) |
 | \`tiers\` | every tier | the \`cbp_driver_tiers\` values that count as driver; \`[]\` none |
-| \`hotspots\` | \`false\` | refused when \`true\`: Cancer Hotspots is not loaded in this warehouse |
+| \`hotspots\` | \`true\` | Cancer Hotspots, read from the offline Genome Nexus store: a mutation is a driver when its variant is a recurrent hotspot of its kind (a splice-site hotspot for a splice mutation, a single-residue or in-frame-indel one otherwise; 3D hotspots do not count), in the genes the portal asks about. A study the store has not covered gets no hotspot calls, and the view names it |
 | \`hideVus\` | \`false\` | leave out alterations no source calls a driver (the portal's "Show only drivers"); nothing to hide when every source is off |
 | \`hideGermline\` | \`false\` | leave out germline mutations, those whose mutation status says germline (the portal's "Show only somatic") |
 

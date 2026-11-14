@@ -8,11 +8,13 @@
 // grant is revoked (or the store is empty) this degrades to the rule-based MOCK below,
 // clearly labeled as such. Pin a specific release with ONCOKB_PIN; default is the
 // most recently synced version in the store.
-import { chQuery, isAbortError} from "./ch.ts";
+import { chQuery, isAbortError, DB } from "./ch.ts";
 import type { ChRow } from "./types.ts";
 import { isDriverEvent, driverSourceText, type DriverFields, type ResolvedDrivers } from "./driver-settings.ts";
 import { sq } from "./compiler.ts";
 import { ONCOKB_TABLE, syncedStudiesSql } from "./annotation-store.ts";
+import { hotspotKeysSql } from "./hotspots.ts";
+import { describePins, studiesWithoutVariantAnnotation, variantPins } from "./variant-annotation.ts";
 
 /**
  * The store's most recent release, or the ONCOKB_PIN override. Cached: it is asked for once
@@ -146,14 +148,50 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
 }
 
 /**
+ * Cancer Hotspots' calls for these studies' mutations of `genes` (lib/hotspots.ts), read from the
+ * offline Genome Nexus store at its pins: a mutation event is a hotspot when its (gene, protein
+ * change, mutation type) is. `source` names the release and any study the store has not covered;
+ * with no pin, or the store unreadable, nothing is a hotspot and `source` says so.
+ */
+export async function hotspotIndex(genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
+  const list = Array.isArray(study) ? study : study ? [study] : [];
+  const unread: AnnotationIndex = { isDriver: () => false, source: "Cancer Hotspots (not read: no Genome Nexus release is stored)" };
+  try {
+    const pins = await variantPins();
+    const sql = hotspotKeysSql(DB, list, genes, pins);
+    if (!sql) return describePins(pins) ? { isDriver: () => false, source: "Cancer Hotspots (" + describePins(pins) + ")" } : unread;
+    const rows = (await chQuery<{ hugo_gene_symbol: string; alteration: string; mutation_type: string }>(sql)).data;
+    const byGene = new Map<string, Set<string>>();
+    for (const r of rows) {
+      let set = byGene.get(r.hugo_gene_symbol);
+      if (!set) { set = new Set(); byGene.set(r.hugo_gene_symbol, set); }
+      set.add(r.alteration + " " + r.mutation_type);
+    }
+    const missing = await studiesWithoutVariantAnnotation(list);
+    const where = missing.length <= 2 ? missing.join(", ") : missing.length + " of " + list.length + " studies";
+    return {
+      isDriver: (r) => r.vt === "mutation" && !!byGene.get(r.gene as string)?.has((r.mv ?? "") + " " + (r.mt ?? "")),
+      source: "Cancer Hotspots (" + describePins(pins) + ")" + (missing.length ? " — " + where + " not synced; hotspot coverage may be partial" : "")
+    };
+  } catch (e) {
+    if (isAbortError(e)) throw e;
+    return unread;
+  }
+}
+
+/**
  * The driver call for each event under a view's driver settings (lib/driver-settings.ts): OncoKB
- * (or, when the store cannot be read, the labelled mock) only when that source is on, the study's
- * own calls and tiers from the event's columns. `source` says what the calls came from.
+ * (or, when the store cannot be read, the labelled mock) and Cancer Hotspots only when those sources
+ * are on, the study's own calls and tiers from the event's columns. `source` says what the calls
+ * came from.
  */
 export async function driverAnnotation(s: ResolvedDrivers, eventRows: (EvRow & DriverFields)[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
-  const oncokb = s.oncokb ? await buildAnnotationIndex(eventRows, genes, study) : null;
+  const [oncokb, hotspots] = await Promise.all([
+    s.oncokb ? buildAnnotationIndex(eventRows, genes, study) : null,
+    s.hotspots ? hotspotIndex(genes, study) : null
+  ]);
   return {
-    isDriver: (r) => isDriverEvent(r as DriverFields, s, () => !!oncokb && oncokb.isDriver(r)),
-    source: driverSourceText(s, oncokb ? oncokb.source : null),
+    isDriver: (r) => isDriverEvent(r as DriverFields, s, () => !!oncokb && oncokb.isDriver(r), () => !!hotspots && hotspots.isDriver(r)),
+    source: driverSourceText(s, oncokb ? oncokb.source : null, hotspots ? hotspots.source : null),
   };
 }

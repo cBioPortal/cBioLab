@@ -14,6 +14,11 @@ import { compactDrivers, forData, resolveDrivers, type DriverSettings } from "..
 /** what the drawn data carries of the study's own calls, as the contract reports it */
 interface CustomDriverReport { binary: boolean; tiers: string[] }
 
+/** the portal's tooltip (react-mutation-mapper HotspotInfo publication and link, recurrent and 3D), as text */
+const HOTSPOTS_TIP = "This mutated amino acid was identified as a recurrent hotspot (statistically significant) and a 3D clustered hotspot " +
+  "in a population-scale cohort of tumor samples of various cancer types using methodology based in part on Chang et al. 2016, " +
+  "Chang et al. 2018, Bandlamudi et al. 2026 and Gao et al. 2017 (3D). Explore all mutations at https://cancerhotspots.org/ and https://3dhotspots.org/.";
+
 const Tip = ({ text, label }: { text: string; label: string }) => <InfoButton aria-label={label} data-tip={text} className="text-sm" />;
 
 export function DriverSettingsMenu({ drivers, report, busy, onChange, filters = true, scope, menuId = "onco-drivers" }: {
@@ -34,7 +39,7 @@ export function DriverSettingsMenu({ drivers, report, busy, onChange, filters = 
   try { s = resolveDrivers(drivers); } catch { s = resolveDrivers(undefined); }
   // "every tier" is a source only where the data has a tier, as the engine reads it
   if (report) s = forData(s, report.tiers.length > 0);
-  const set = (patch: DriverSettings) => onChange(compactDrivers({ oncokb: s.oncokb, custom: s.custom, tiers: s.tiers ?? undefined,
+  const set = (patch: DriverSettings) => onChange(compactDrivers({ oncokb: s.oncokb, hotspots: s.hotspots, custom: s.custom, tiers: s.tiers ?? undefined,
     hideVus: s.hideVus, hideGermline: s.hideGermline, ...patch }));
   const tiers = report?.tiers || [];
   // a tier counts unless the settings name the tiers and leave it out
@@ -45,7 +50,7 @@ export function DriverSettingsMenu({ drivers, report, busy, onChange, filters = 
     // every tier the data has, ticked, is the default: write nothing
     set({ tiers: next.length === tiers.length ? undefined : next });
   };
-  const changed = Number(!s.oncokb) + Number(!s.custom) + Number(s.tiers !== null) + Number(s.hideVus) + Number(s.hideGermline);
+  const changed = Number(!s.oncokb) + Number(!s.hotspots) + Number(!s.custom) + Number(s.tiers !== null) + Number(s.hideVus) + Number(s.hideGermline);
   return (
     <GearMenu menuId={menuId} title="driver annotation: which sources call a putative driver, and whether VUS or germline mutations are left out — a change re-runs the view"
       ariaLabel="driver annotation settings" className="driversbtn" wide contentClassName="w-[300px] min-w-[300px] px-2.5 py-2"
@@ -59,9 +64,9 @@ export function DriverSettingsMenu({ drivers, report, busy, onChange, filters = 
           <label className="chk" data-test="annotateOncoKb"><Checkbox checked={s.oncokb} disabled={busy}
             onCheckedChange={(c) => set({ oncokb: c === true })} /> OncoKB
             <Tip label="about OncoKB" text="Oncogenicity from OncoKB™, the version-pinned store this instance reads (Oncogenic, Likely Oncogenic, Resistance)" /></label>
-          <label className="chk text-muted-foreground" data-test="annotateHotspots"
-            data-tip="Cancer Hotspots is not loaded in this warehouse, so no mutation can be called a hotspot">
-            <Checkbox checked={false} disabled /> Hotspots (not loaded here)</label>
+          <label className="chk" data-test="annotateHotspots"><Checkbox checked={s.hotspots} disabled={busy}
+            onCheckedChange={(c) => set({ hotspots: c === true })} /> Hotspots
+            <Tip label="about Cancer Hotspots" text={HOTSPOTS_TIP} /></label>
           {report?.binary && <label className="chk" data-test="annotateCustomBinary"><Checkbox checked={s.custom} disabled={busy}
             onCheckedChange={(c) => set({ custom: c === true })} /> Custom Driver
             <Tip label="about custom driver" text="Use driver annotations from source data (the study's cbp_driver column: Putative_Driver counts)" /></label>}

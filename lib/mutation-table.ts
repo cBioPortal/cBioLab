@@ -9,6 +9,7 @@ import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
+import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
 
@@ -127,7 +128,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     // a germline mutation has no protein-change call: the portal asks OncoKB about it by HGVSc
     // (StoreUtils queryOncoKbData), which this store does not hold
     (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n" +
-      "         toUInt8(NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,\n"
+      "         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0)))" + (gn && HOTSPOT_GENES.has(gene) ? " OR " + hotspotCondSql("m.mutationType", "ifNull(g.gd, '')") : "") + ") AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
     "         m.mutationType AS mutationType, m.variantType AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +

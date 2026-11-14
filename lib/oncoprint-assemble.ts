@@ -94,7 +94,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
     }
   }
   const older: DriverSettings = {
-    ...(oneOf("annotate", ANNOTATE_MODES, "oncokb") === "none" ? { oncokb: false, custom: false, tiers: [] } : {}),
+    ...(oneOf("annotate", ANNOTATE_MODES, "oncokb") === "none" ? { oncokb: false, hotspots: false, custom: false, tiers: [] } : {}),
     ...(bool("hideVUS", false) ? { hideVus: true } : {}),
   };
   resolveDrivers(driverSpec);   // the settings as given are checked on their own, so an error names their own key

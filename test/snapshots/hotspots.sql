@@ -26,7 +26,26 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
                   patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
-        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION'), 1, 0) AS driver
+        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION')
+        OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (SELECT DISTINCT mu.hugo_gene_symbol AS hugo_gene_symbol, mu.alteration AS alteration, mu.mutation_type AS mutation_type FROM (
+    SELECT m.`GENE.hugoGeneSymbol` AS hugo_gene_symbol, m.proteinChange AS alteration, ifNull(m.mutationType, '') AS mutation_type,
+      st.src AS src, assumeNotNull(m.chr) AS chr, m.startPosition AS start, m.endPosition AS end,
+      assumeNotNull(m.referenceAllele) AS ref, assumeNotNull(m.tumorSeqAllele) AS var
+    FROM snapshot_db.mutation_derived m
+    INNER JOIN (SELECT cs.cancer_study_identifier AS study, multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') AS src FROM snapshot_db.cancer_study cs
+      JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
+      WHERE cs.cancer_study_identifier IN ('msk_chord_2024')) st ON st.study = m.studyId
+    WHERE m.studyId IN ('msk_chord_2024') AND m.`GENE.hugoGeneSymbol` IN ('KRAS', 'BRAF', 'PIK3CA', 'TP53')
+      AND st.src != '' AND ifNull(m.chr, '') != '' AND ifNull(m.startPosition, 0) != 0 AND ifNull(m.endPosition, 0) != 0
+      AND ifNull(m.referenceAllele, '') != '' AND ifNull(m.tumorSeqAllele, '') != '' AND ifNull(m.proteinChange, '') != ''
+  ) mu
+  INNER JOIN (SELECT source, chr, start_position, end_position, reference_allele, variant_allele, any(data) AS d FROM annotation.variant
+    WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2'))
+      AND JSONLength(data, 'hotspots') > 0
+    GROUP BY source, chr, start_position, end_position, reference_allele, variant_allele) v
+  ON v.source = mu.src AND v.chr = mu.chr AND v.start_position = mu.start AND v.end_position = mu.end
+    AND v.reference_allele = mu.ref AND v.variant_allele = mu.var
+  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND `GENE.hugoGeneSymbol` IN ('KRAS','BRAF','PIK3CA','TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''
@@ -86,7 +105,26 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
                   patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
-        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION'), 1, 0) AS driver
+        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION')
+        OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (SELECT DISTINCT mu.hugo_gene_symbol AS hugo_gene_symbol, mu.alteration AS alteration, mu.mutation_type AS mutation_type FROM (
+    SELECT m.`GENE.hugoGeneSymbol` AS hugo_gene_symbol, m.proteinChange AS alteration, ifNull(m.mutationType, '') AS mutation_type,
+      st.src AS src, assumeNotNull(m.chr) AS chr, m.startPosition AS start, m.endPosition AS end,
+      assumeNotNull(m.referenceAllele) AS ref, assumeNotNull(m.tumorSeqAllele) AS var
+    FROM snapshot_db.mutation_derived m
+    INNER JOIN (SELECT cs.cancer_study_identifier AS study, multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') AS src FROM snapshot_db.cancer_study cs
+      JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
+      WHERE cs.cancer_study_identifier IN ('msk_chord_2024')) st ON st.study = m.studyId
+    WHERE m.studyId IN ('msk_chord_2024') AND m.`GENE.hugoGeneSymbol` IN ('KRAS', 'BRAF', 'PIK3CA', 'TP53')
+      AND st.src != '' AND ifNull(m.chr, '') != '' AND ifNull(m.startPosition, 0) != 0 AND ifNull(m.endPosition, 0) != 0
+      AND ifNull(m.referenceAllele, '') != '' AND ifNull(m.tumorSeqAllele, '') != '' AND ifNull(m.proteinChange, '') != ''
+  ) mu
+  INNER JOIN (SELECT source, chr, start_position, end_position, reference_allele, variant_allele, any(data) AS d FROM annotation.variant
+    WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2'))
+      AND JSONLength(data, 'hotspots') > 0
+    GROUP BY source, chr, start_position, end_position, reference_allele, variant_allele) v
+  ON v.source = mu.src AND v.chr = mu.chr AND v.start_position = mu.start AND v.end_position = mu.end
+    AND v.reference_allele = mu.ref AND v.variant_allele = mu.var
+  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND `GENE.hugoGeneSymbol` IN ('KRAS','BRAF','PIK3CA','TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''

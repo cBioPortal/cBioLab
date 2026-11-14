@@ -2250,7 +2250,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB oncogenic, pinned; the portal also counts hotspots and custom annotations). VUS and germline mutations are included, as they are by default on the portal. A suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,111 mutations."
+      "note": "Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations). VUS and germline mutations are included, as they are by default on the portal. A suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,111 mutations."
     }
   ]
 }

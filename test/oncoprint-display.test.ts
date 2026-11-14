@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { normalizeDisplay, normalizeSort } from "../lib/oncoprint-assemble.ts";
 
 test("display defaults", () => {
-  const drivers = { oncokb: true, custom: true, tiers: null, annotated: true, hideVus: false, hideGermline: false };
+  const drivers = { oncokb: true, hotspots: true, custom: true, tiers: null, annotated: true, hideVus: false, hideGermline: false };
   assert.deepEqual(normalizeDisplay(undefined), { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, colorByGermline: true,
     hideVUS: false, annotate: "oncokb", hideGermline: false, drivers, whiteBackground: false });
   assert.deepEqual(normalizeDisplay({ showUnaltered: false, gaps: "pct" }),
@@ -26,9 +26,9 @@ test("display: driver settings fold in, the older spellings read as their defaul
   assert.equal(normalizeDisplay({ annotate: "none" }, { custom: true }).annotate, "oncokb");
   assert.equal(normalizeDisplay({ hideVUS: true }, { hideVus: false }).hideVUS, false);
   const d = normalizeDisplay(undefined, { oncokb: false, custom: false, tiers: ["Tier 1"], hideGermline: true });
-  assert.deepEqual(d.drivers, { oncokb: false, custom: false, tiers: ["Tier 1"], annotated: true, hideVus: false, hideGermline: true });
+  assert.deepEqual(d.drivers, { oncokb: false, hotspots: true, custom: false, tiers: ["Tier 1"], annotated: true, hideVus: false, hideGermline: true });
   assert.equal(d.hideGermline, true);
-  assert.throws(() => normalizeDisplay(undefined, { hotspots: true }), /Cancer Hotspots is not loaded/);
+  assert.equal(normalizeDisplay(undefined, { hotspots: false }).drivers.hotspots, false);
   assert.throws(() => normalizeDisplay(undefined, { hideVUS: true } as never), /unknown setting 'hideVUS'.*hideVus/);
   assert.throws(() => normalizeDisplay(undefined, [] as never), /drivers must be an object/);
   assert.throws(() => normalizeDisplay({ colorByGermline: "no" } as never), /must be true or false/);

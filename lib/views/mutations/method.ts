@@ -7,6 +7,7 @@ export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin:
   const steps = tableSteps({ label: "mutations", what: t.gene + " mutation calls", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
     source: "every called " + t.gene + " mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" +
       (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") +
+      (t.oncokbPin && t.variantPins ? "; a driver when OncoKB calls it oncogenic or its genomic variant is a Cancer Hotspot of its kind in the stored " + t.variantPins + " annotation (a splice-site hotspot for a splice mutation, single-residue or in-frame indel otherwise)" : "") +
       (t.variantPins ? "; HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL from the stored " + t.variantPins + " annotation of its genomic variant" : "") +
       "; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads.",
     order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : "drivers first, then by codon") + ", then sample" });
