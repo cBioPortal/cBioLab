@@ -361,6 +361,14 @@ const MUTANTS: Mutant[] = [
     effect: "The server SVG writes a gutter \"<1%\" unescaped, so any figure with one is not valid XML.",
     find: "${esc(formatGutterPct(t, contract.columns.length))}",
     replace: "${formatGutterPct(t, contract.columns.length)}" },
+  { id: "mixed-takes-palette-slot", layer: "counts", guard: "unit", file: "lib/oncoprint-style.ts",
+    effect: "A patient's \"Mixed\" takes the next palette colour like a value of the study, where the portal draws it a darkened #3366cc.",
+    find: "  if (value === MIXED) {",
+    replace: "  if (value === MIXED + \"\u0000\") {" },
+  { id: "mixed-counted-in-palette", layer: "counts", guard: "unit", file: "lib/oncoprint-style.ts",
+    effect: "\"Mixed\" uses up a palette slot, so every value after it on the track takes the next colour along from the portal's.",
+    find: "if (!reservedColor(track.categories![i], S) && track.categories![i] !== MIXED) k++;",
+    replace: "if (!reservedColor(track.categories![i], S)) k++;" },
 ];
 
 /**

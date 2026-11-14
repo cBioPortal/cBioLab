@@ -538,8 +538,22 @@ def track_category_color(track: Any, code: int, S: dict[str, Any] = STYLE, color
     reserved = reserved_color(value, S)
     if reserved:
         return reserved
-    k = sum(1 for c in cats[:code] if not reserved_color(c, S))
+    if value == MIXED:
+        # the portal's oncoprint colours a patient's "Mixed" itself: the first colour, darkened while taken (lib/oncoprint-style.ts)
+        used = {track_category_color(track, i, S, colors).lower() for i, v in enumerate(cats) if v != MIXED}
+        c = S["palette"]["clinical"][0]
+        while c in used and _darken(c) != c:
+            c = _darken(c)
+        return c
+    k = sum(1 for c in cats[:code] if not reserved_color(c, S) and c != MIXED)
     return clinical_color(k, S)
+
+
+MIXED = "Mixed"
+
+
+def _darken(c: str) -> str:
+    return "#" + "".join(f"{math.floor(int(c[i:i + 2], 16) * 0.95 + 0.5):02x}" for i in (1, 3, 5))
 
 
 def clinical_color(k: int, S: dict[str, Any] = STYLE) -> str:
@@ -547,7 +561,7 @@ def clinical_color(k: int, S: dict[str, Any] = STYLE) -> str:
     lst = S["palette"]["clinical"]
     c = lst[k % len(lst)]
     for _ in range(k // len(lst)):
-        c = "#" + "".join(f"{math.floor(int(c[i:i + 2], 16) * 0.95 + 0.5):02x}" for i in (1, 3, 5))
+        c = _darken(c)
     return c
 
 
