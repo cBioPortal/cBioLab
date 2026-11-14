@@ -4,10 +4,9 @@
 // down only where they differ from the defaults, and changing them never re-runs the view.
 import { DEFAULT_FIGURE_DISPLAY, type FigureDisplay } from "./OncoprintFigure.tsx";
 import { sortKeyText } from "./track-edits.ts";
+import { FIGURE_KEYS, dataPart } from "./view-data.ts";
+export { FIGURE_KEYS, dataPart };
 
-/** the display keys the figure owns — written back without a re-run */
-export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground",
-  "sortByMutationType", "sortByDrivers", "sortIgnoreVUS"]);
 
 export const figureDisplayOf = (v: { display?: unknown }): FigureDisplay => ({ ...DEFAULT_FIGURE_DISPLAY, ...((v.display || {}) as object) });
 
@@ -34,28 +33,6 @@ export function withSortKeys<V extends { sort?: unknown }>(v: V, keys: string[])
   return next;
 }
 
-/** the view without what the figure applies in the browser — what decides whether a re-run is needed */
-export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
-  // the lollipop's alteration grid and its selected codons are applied in the browser, from the whole result
-  if (v.kind === "hotspots") { const { hide, codons, ...rest } = v; void hide; void codons; return rest; }
-  // the two-group lollipop's axis, alteration badges and selected codons likewise
-  if (v.kind === "mutcompare") { const { hide, positions, axis, ...rest } = v; void hide; void positions; void axis; return rest; }
-  // the timeline's folded tracks and its gap cuts are drawn in the browser, from the whole result
-  if (v.kind === "timeline") { const { collapsed, expandGaps, ...rest } = v; void collapsed; void expandGaps; return rest; }
-  // the risk model's volcano labels are chosen in the browser, from the whole result
-  // the expression volcano's picked gene is ringed in the browser, its box plot a request of its own
-  if (v.kind === "diffexpr") { const { gene, ...rest } = v; void gene; return rest; }
-  // the generic-assay tab's picked entity likewise: its box plot is a request of its own
-  if (v.kind === "assays") { const { entity, ...rest } = v; void entity; return rest; }
-  if (v.kind === "riskmodel") { const { labelAbove, ...rest } = v; void labelAbove; return rest; }
-  // the pathway map's pathway and ranking are applied in the browser, from every library gene's counts
-  if (v.kind === "pathwaymap") { const { pathway, rank, byFrequency, pancanOnly, ...rest } = v; void pathway; void rank; void byFrequency; void pancanOnly; return rest; }
-  if (v.kind !== "oncoprint") return v;
-  const { sort, display, ...rest } = v;
-  void sort;
-  const d = Object.fromEntries(Object.entries((display || {}) as Record<string, unknown>).filter(([k]) => !FIGURE_KEYS.has(k)));
-  return Object.keys(d).length ? { ...rest, display: d } : rest;
-}
 
 /** where the settings apply, for the menu's tip */
 export const DRIVER_SCOPE = "this oncoprint; on a Results page they apply to its Oncoprint and Plots tabs together, and the other tabs do not follow them yet";

@@ -29,7 +29,7 @@ import { oncokbPin, driverAnnotation } from "./annotation.ts";
 import { germlineCondSql } from "./driver-sql.ts";
 import { forData } from "./driver-settings.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
-import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
+import { clusterHeatmap } from "./oncoprint-cluster.ts";
 
 import { PROFILED_TYPES, SPECTRUM_TRACK, type ProfiledType } from "./profile-names.ts";
 import { inGeneticAlterationDerived } from "./profile-catalog.ts";
@@ -830,20 +830,19 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   }
 
   // ---- clustering: an order computed here, once, from the molecular values ----
-  // "cluster:<profileType>" orders columns by a Ward dendrogram over that profile's genes.
+  // "cluster:<profileType>" orders the columns, and that profile's rows, by the portal's
+  // clustering: average linkage on 1 − Spearman (lib/oncoprint-cluster.ts).
   // It runs where the values already are, so the SVG, the canvas, the CLI and Python all draw
   // the same order, and the order travels in the contract beside the numbers it describes.
   let clusterRank: Map<string, number> | undefined;
+  let clusterMethod: AssembleInput["clusterMethod"];
   const clusterKey = sort.find((k) => k.track.startsWith("cluster:"));
   if (clusterKey) {
     const profileType = clusterKey.track.slice("cluster:".length);
     const h = heatmapIn.find((x) => x.profileType === profileType);
     if (!h) throw new Error("sort: cluster needs '" + profileType + "' as a heatmap profile on this oncoprint" +
       (heatmapIn.length ? " (it has " + heatmapIn.map((x) => x.profileType).join(", ") + ")" : " (it has none)"));
-    if (allPids.length > CLUSTER_LIMIT)
-      throw new Error("clustering " + allPids.length.toLocaleString() + " columns is a quadratic computation; the limit is " +
-        CLUSTER_LIMIT.toLocaleString() + ". Narrow the cohort, or sort by one of the profile's gene tracks instead.");
-    const columns = h.genes.map((g) => {
+    const rows = h.genes.map((g) => {
       const col = new Float64Array(allPids.length);
       for (let i = 0; i < allPids.length; i++) {
         const v = h.values.get(allPids[i] + "|" + g);
@@ -851,9 +850,12 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
       }
       return col;
     });
-    const order = wardOrder({ columns, n: allPids.length });
+    const { order, rows: rowOrder, method } = clusterHeatmap({ rows, n: allPids.length });
     clusterRank = new Map<string, number>();
     order.forEach((idx, rank) => clusterRank!.set(allPids[idx], rank));
+    // the profile's rows take the clustered order too, as the portal reorders a clustered group
+    h.genes = rowOrder.map((d) => h.genes[d]);
+    clusterMethod = { profileType, ...method };
     clusterKey.track = "cluster";
   }
 
@@ -886,7 +888,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   const contract = assembleContract({
     genes: geneList, groups, studies, studyOf, events, coverage, profiled: { types: profiledTypes, masks: profiledMasks }, samples: samplesPer,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
-    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank
+    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank, clusterMethod
   });
   contract.stats.ms = Date.now() - t0;
   contract.stats.queryMs = queryMs;

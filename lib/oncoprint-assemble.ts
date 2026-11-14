@@ -12,7 +12,7 @@ import { finiteNumber } from "./sql-number.ts";
 import { STYLE, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
-import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec } from "./types.ts";
+import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec, ClusterMethod } from "./types.ts";
 import type { ZReference, SortKeySpec } from "./views/oncoprint/types.ts";
 
 // gene-track cell bitmask: one definition, the style's
@@ -181,6 +181,8 @@ export interface AssembleInput {
    * where the values are fetched rather than in this pure function.
    */
   clusterRank?: Map<string, number>;
+  /** how the clustering was done, echoed in the contract's conventions for the caption */
+  clusterMethod?: ClusterMethod;
 }
 
 /**
@@ -631,6 +633,7 @@ export function assembleContract(input: AssembleInput): Contract {
         : "one patient; a patient's samples are collapsed (clinical: a patient row wins, else for a NUMBER its samples' mean, MUTATION_COUNT their max, for anything else the value they agree on, otherwise \"Mixed\"; heatmap: the sample value furthest from 0; VAF: max)",
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
+      ...(input.clusterMethod ? { cluster: input.clusterMethod } : {}),
       ...customDriverReport(events) },
     display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false },
     stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}), ...(hideGerm ? { hiddenGermline: hiddenGerm } : {}), ...(offPanel ? { offPanel } : {}) }

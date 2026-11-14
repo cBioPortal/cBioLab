@@ -802,6 +802,9 @@ export interface PartitionResult {
 
 // ---------- oncoprint render contract ---------------------------------------
 export type TrackKind = "gene" | "clinical" | "derivedEvent" | "heatmap";
+/** what a clustered oncoprint did: its columns, those with no value (placed last), the distinct patterns clustered, and a sample when it was approximate */
+export interface ClusterMethod { profileType: string; columns: number; noData: number; patterns: number; approximate?: { sampled: number } }
+
 export interface Track {
   kind: TrackKind; label: string; cells: number[] | Int32Array;
   /** a heatmap row's colour ramp, the portal's for its profile (lib/oncoprint-style.ts ramps) */
@@ -857,6 +860,8 @@ export interface Contract {
     /** what one column is, and what was collapsed or expanded to make it */
     column?: string;
     annotation: string; lineGap: number; sort: string[];
+    /** a clustered sort: average linkage on 1 − Spearman over the profile's values, and how far it went */
+    cluster?: ClusterMethod;
     /** the study's own driver calls among the figure's alterations: any cbp_driver value, and the cbp_driver_tiers values */
     customDrivers?: { binary: boolean; tiers: string[] };
   };

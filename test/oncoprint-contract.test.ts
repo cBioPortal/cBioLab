@@ -230,6 +230,27 @@ describe("sort by cluster", () => {
     assert.equal(c.columns.length, 3);
     assert.ok(c.conventions.sort.some((s) => /cluster/.test(s)), c.conventions.sort.join());
   });
+  // #201 case table rows C11, C12, X4. The stand-in warehouse's mrna values: TP53 P1 2.5, P2 −2.5, P3 0.2; KRAS P2 1.
+  test("C11 the clustering's input is every heatmap row of the profile, not only the first", async () => {
+    const { clusterHeatmap } = await import("../lib/oncoprint-cluster.ts");
+    const c = await buildContract(spec({ sort: ["cluster:mrna"], heatmap: [{ profileType: "mrna", genes: ["TP53", "KRAS"] }] }));
+    const pids = ["P1", "P2", "P3"];
+    const both = clusterHeatmap({ rows: [Float64Array.from([2.5, -2.5, 0.2]), Float64Array.from([NaN, 1, NaN])], n: 3 });
+    assert.deepEqual(c.columns, both.order.map((i) => pids[i]));
+    assert.notDeepEqual(c.columns, ["P2", "P3", "P1"], "not TP53 alone (its ascending sort)");
+  });
+  test("C12 the clustered order is the column order: a later sort key changes nothing", async () => {
+    const heatmap = [{ profileType: "mrna", genes: ["TP53", "KRAS"] }];
+    const alone = (await buildContract(spec({ sort: ["cluster:mrna"], heatmap }))).columns;
+    for (const more of [["genomic"], ["-genomic"], ["SEX"], ["-SEX"], ["id"]]) {
+      const c = await buildContract(spec({ sort: ["cluster:mrna", ...more], heatmap, clinical: ["SEX"] }));
+      assert.deepEqual(c.columns, alone, more.join());
+    }
+  });
+  test("X4 the contract states the clustering: its profile, columns, those with no value, the patterns", async () => {
+    const c = await buildContract(spec({ sort: ["cluster:mrna"], heatmap: [{ profileType: "mrna", genes: ["TP53", "KRAS"] }] }));
+    assert.deepEqual(c.conventions.cluster, { profileType: "mrna", columns: 3, noData: 0, patterns: 2 });
+  });
 });
 
 describe("driver annotation and provenance", () => {

@@ -36,3 +36,11 @@ test("Tracks › Clinical: the portal's Freq text and row order (ONC-TR-1, ONC-S
   assert.deepEqual(rows.map((r) => [r.label, trackFreqText(r.pct), r.unit]),
     [["Sample Type", "100.0%", "samples"], ["Sex", "100.0%", "patients"], ["Metastatic Site", "43.7%", "samples"], ["ZERO", "0%", "samples"]]);
 });
+
+test("a clustered sort re-runs the view, other sort keys do not: only the engine can cluster", async () => {
+  const { dataPart } = await import("../app/_oncoprint/view-data.ts");
+  const v = { kind: "oncoprint", genes: ["KRAS"], heatmap: [{ profileType: "p" }] };
+  assert.deepEqual(dataPart({ ...v, sort: ["AGE"] }), dataPart(v), "a clinical sort is drawn in the browser");
+  assert.notDeepEqual(dataPart({ ...v, sort: ["cluster:p"] }), dataPart(v), "a cluster key changes what the engine is asked");
+  assert.deepEqual(dataPart({ ...v, sort: ["cluster:p"], display: { whitespace: false } }), { ...v, cluster: ["cluster:p"] });
+});
