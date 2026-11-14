@@ -17,11 +17,16 @@
  *   - any other datatype (BOOLEAN) as a STRING; the portal draws nothing for one;
  *   - with the query restricted to some samples, only those samples count.
  *
+ * And a heatmap's patient value (heatmapSql, assayHeatmapSql; the portal's fillHeatmapTrackDatum):
+ * its samples' value furthest from 0, sign kept, a positive one on a ± tie whatever order the rows
+ * arrive in, values that are not numbers left out. The fixture has no expression or generic-assay
+ * profile, so these run over scratch copies of the two value tables on the same connection.
+ *
  * Run: node --env-file=.env.local scripts/check-oncoprint-values.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines; scripts/gate.sh sets them).
  */
-import { chQuery, connById } from "../lib/ch.ts";
-import { clinicalSql } from "../lib/oncoprint.ts";
+import { chQuery, chWrite, connById } from "../lib/ch.ts";
+import { assayHeatmapSql, clinicalSql, heatmapSql } from "../lib/oncoprint.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 
@@ -104,6 +109,48 @@ const inQuery = "SELECT arrayJoin([" + QUERY_SAMPLES.map((s) => "'" + s + "'").j
 const restricted = (await chQuery<{ pid: string; k: string; v: string }>(clinicalSql(restrictedAttrs, STUDY, conn.db, "patient", inQuery), conn)).data;
 compare(restricted, EXPECTED_RESTRICTED, "samples " + QUERY_SAMPLES.join(",") + ": ");
 
-const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1;
+// ---- heatmaps -------------------------------------------------------------------------------
+/** [patient, its samples' values in arrival order, expected; null = no value] */
+const HEAT: [string, (string | null)[], number | null][] = [
+  ["H1", ["2", "-5"], -5],          // furthest from 0, sign kept (the portal's signed-vs-abs bug gives 2: docs/PORTAL-PARITY.md)
+  ["H2", ["-5", "2"], -5],
+  ["H3", ["-3", "3"], 3],           // a ± tie: the positive one, in either order
+  ["H4", ["3", "-3"], 3],
+  ["H5", ["NA", "2"], 2],           // not a number: left out
+  ["H6", ["NaN"], null],
+  ["H7", ["1.7"], 1.7],
+  ["H8", ["1", "3", "-2"], 3],
+  ["H9", ["", "-0.5"], -0.5]        // an empty value is no value
+];
+const scratch = "cbiolab_check_heatmaps";
+const run = (sql: string) => chWrite(sql, conn);
+await run("CREATE DATABASE IF NOT EXISTS " + scratch);
+for (const t of ["genetic_alteration_derived", "sample_derived", "generic_assay_data_derived"])
+  await run("CREATE OR REPLACE TABLE " + scratch + "." + t + " AS " + conn.db + "." + t);
+const sid = (p: string, i: number) => "hs_" + p + "-S" + (i + 1);
+const lit = (v: string | null) => v === null ? "NULL" : "'" + v + "'";
+for (const [p, vals] of HEAT) {
+  // one statement per sample, so the rows arrive in the order written
+  for (let i = 0; i < vals.length; i++) {
+    await run("INSERT INTO " + scratch + ".sample_derived (sample_unique_id, patient_unique_id) VALUES ('" + sid(p, i) + "', 'hs_" + p + "')");
+    await run("INSERT INTO " + scratch + ".genetic_alteration_derived (sample_unique_id, cancer_study_identifier, hugo_gene_symbol, profile_type, alteration_value) VALUES ('" +
+      sid(p, i) + "', 'hs', 'G1', 'mrna_z', " + lit(vals[i]) + ")");
+    await run("INSERT INTO " + scratch + ".generic_assay_data_derived (sample_unique_id, patient_unique_id, entity_stable_id, profile_type, profile_stable_id, value) VALUES ('" +
+      sid(p, i) + "', 'hs_" + p + "', 'E1', 'assay', 'hs_assay', " + lit(vals[i]) + ")");
+  }
+}
+type HeatRow = { pid: string; gene: string; v: number | string };
+const heat = (await chQuery<HeatRow>(heatmapSql("mrna_z", ["G1"], "hs", scratch, "patient"), conn)).data;
+const assay = (await chQuery<HeatRow>(assayHeatmapSql("assay", ["E1"], "hs", scratch, "patient"), conn)).data;
+for (const [tag, got] of [["heatmap", heat], ["generic assay", assay]] as const)
+  for (const [p, vals, want] of HEAT) {
+    const found = got.filter((r) => r.pid === p);
+    const v = found.length ? Number(found[0].v) : null;
+    ok(`${tag} ${p} [${vals.join(", ")}]`, found.length <= 1 && (want === null ? v === null : v !== null && Math.abs(v - want) <= 1e-9),
+      "ours " + JSON.stringify(v) + ", expected " + JSON.stringify(want));
+  }
+await run("DROP DATABASE IF EXISTS " + scratch);
+
+const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
