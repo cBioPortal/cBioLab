@@ -28,7 +28,7 @@ test("display: driver settings fold in, the older spellings read as their defaul
   const d = normalizeDisplay(undefined, { oncokb: false, custom: false, tiers: ["Tier 1"], hideGermline: true });
   assert.deepEqual(d.drivers, { oncokb: false, hotspots: true, custom: false, tiers: ["Tier 1"], annotated: true, hideVus: false, hideGermline: true });
   assert.equal(d.hideGermline, true);
-  assert.equal(normalizeDisplay(undefined, { hotspots: false }).drivers.hotspots, false);
+  assert.equal(normalizeDisplay(undefined, { hotspots: false }).drivers?.hotspots, false);
   assert.throws(() => normalizeDisplay(undefined, { hideVUS: true } as never), /unknown setting 'hideVUS'.*hideVus/);
   assert.throws(() => normalizeDisplay(undefined, [] as never), /drivers must be an object/);
   assert.throws(() => normalizeDisplay({ colorByGermline: "no" } as never), /must be true or false/);
