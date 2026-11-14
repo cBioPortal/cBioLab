@@ -101,13 +101,15 @@ test("a page of rows in the portal's columns, the annotation spelled out, number
     { cohort: "A", study: "s1", gene: "RET", samples: 10, profiled: 0, altered: 0, alteredProfiled: 0 },
   ]);
   assert.match(v.caveat!, /ALK: 2 samples with a call, 8 of 10 profiled \(1 of the samples with a call are on a panel that omits ALK: reported through the partner gene\); RET: 0 samples with a call, 0 of 10 profiled/);
-  assert.match(v.caveat!, /OncoKB v7\.5's gene-level fusion call/);
+  assert.match(v.caveat!, /OncoKB v7\.5's call for the pair of genes in the sample's tumour type/);
+  assert.match(v.caveat!, /not synced, the stronger of the two partners' gene-level fusion calls/);
   assert.ok(r.asked.includes("sv:profiled:A"), "the counts go through the view aggregates");
   assert.ok(v.method!.steps.some((s) => /profiled/.test(s.title)));
   // the row source reads both partners by Entrez id and the store's fusion calls at the pin
   const src = r.sql.find((s) => s.includes("structural_variant sv"))!;
   assert.match(src, /sv\.site1_entrez_gene_id IN \(SELECT entrez_gene_id FROM db1\.gene WHERE hugo_gene_symbol IN \('ALK', 'RET'\)\) OR sv\.site2_entrez_gene_id IN/);
   assert.match(src, /alteration_type = 'SV' AND alteration = 'Fusion'/);
+  assert.match(src, /FROM annotation\.oncokb_sv AS t WHERE oncokb_version = 'v7\.5'/);
 });
 
 test("several cohorts each get their own counts; a page or a column's values asks no counts", async () => {

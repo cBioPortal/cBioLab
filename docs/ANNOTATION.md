@@ -16,6 +16,7 @@ Every source's annotations live in one ClickHouse database, `annotation`, apart 
 |---|---|---|
 | `annotation.oncokb` | OncoKB, licensed: mutations by protein change, gene-level copy-number calls | those granted `SELECT` on this table — the licence |
 | `annotation.oncokb_tumor_type` | OncoKB by tumour type, licensed with `annotation.oncokb`: each somatic mutation as the portal's mutation table asks about it (gene, protein change, mutation type, the sample's tumour type), with its four highest levels and OncoKB's whole answer in `data`. Read by the mutation table at the OncoKB pin, falling back to `annotation.oncokb` | those granted `SELECT` on this table |
+| `annotation.oncokb_sv` | OncoKB for structural variants, licensed with `annotation.oncokb`: each structural variant as the portal asks about it (site 1 and site 2 genes, OncoKB's SV type, the sample's tumour type), with its four highest levels and OncoKB's whole answer in `data`. Read by the structural-variant table at the OncoKB pin, falling back to the partners' gene-level `Fusion` rows in `annotation.oncokb` | those granted `SELECT` on this table |
 | `annotation.variant` | every public source, one row per (source, release, genomic variant): the variant's coordinates as the warehouse spells them, the source's annotation as JSON in `data` | everyone with the app's read access |
 | `annotation.sync_run` | every source's sync runs, by `source` and `version` | everyone with the app's read access |
 
@@ -105,6 +106,7 @@ npm run annotate -- oncokb --all                    # every study, then the port
 npm run annotate -- oncokb --verify 300 --release v7.5   # re-ask the service for 300 keys stored for v7.5
 npm run annotate -- oncokb --all --create           # also create the store, as a user allowed to
 npm run annotate -- oncokb_tumor_type --all         # OncoKB by tumour type, every study's somatic mutations
+npm run annotate -- oncokb_sv --all                 # OncoKB for structural variants, by gene pair and tumour type
 npm run annotate -- genome_nexus --all              # every GRCh37 study's variants
 npm run annotate -- genome_nexus_grch38 --all       # every GRCh38 study's
 ```
@@ -143,8 +145,9 @@ GRANT SELECT ON <warehouse database>.* TO oncokb_writer;
 -- licensing a reader is a grant on the licensed table; revoking it is one statement
 GRANT SELECT ON annotation.oncokb TO cohort_lab_ro;
 -- REVOKE SELECT ON annotation.oncokb FROM cohort_lab_ro;
--- OncoKB by tumour type is the same licence: grant and revoke both tables together
--- (packages/annotation-sync/sql/004-oncokb-tumor-type.sql; the mutation table reads it whenever there is an OncoKB pin)
+-- OncoKB by tumour type and OncoKB for structural variants are the same licence: grant and revoke
+-- the three tables together (packages/annotation-sync/sql/004-oncokb-tumor-type.sql and
+-- 005-oncokb-sv.sql; the mutation and structural-variant tables read them whenever there is an OncoKB pin)
 ```
 
 A local instance (`npm run local`) creates the database and every table itself, empty.

@@ -46,15 +46,17 @@ mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(a
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
-k0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
-    anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
-    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
-mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,
+k0 AS (SELECT s.sid AS sid,
     if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
       WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
-  FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
+  FROM (SELECT DISTINCT sid FROM (SELECT sid FROM m0)) AS s
+  LEFT JOIN (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+      anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+      AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0)) GROUP BY sid) AS k ON k.sid = s.sid),
+mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,
+    k.tumorType AS tumorType FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
 g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allele AS ref, variant_allele AS var, any(data) AS gd
   FROM annotation.variant
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')
@@ -125,15 +127,17 @@ mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(a
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
-k0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
-    anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
-   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
-    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
-mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,
+k0 AS (SELECT s.sid AS sid,
     if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
       WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
-  FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
+  FROM (SELECT DISTINCT sid FROM (SELECT sid FROM m0)) AS s
+  LEFT JOIN (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+      anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+      AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0)) GROUP BY sid) AS k ON k.sid = s.sid),
+mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,
+    k.tumorType AS tumorType FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
 g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allele AS ref, variant_allele AS var, any(data) AS gd
   FROM annotation.variant
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')

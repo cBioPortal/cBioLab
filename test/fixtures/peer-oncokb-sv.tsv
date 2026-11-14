@@ -1,0 +1,16 @@
+site1_entrez	site2_entrez	sv_type	tumor_type	oncogenicity	mutation_effect	highest_sensitive_level	highest_resistance_level	highest_diagnostic_level	highest_prognostic_level	oncokb_version
+27436	238	FUSION	Lung Adenocarcinoma	Oncogenic	Gain-of-function	LEVEL_2		LEVEL_Dx1		
+27436	238	FUSION	Non-Small Cell Lung Cancer	Likely Oncogenic	Gain-of-function	LEVEL_3A			LEVEL_Px2	
+27436	238	FUSION		Oncogenic	Gain-of-function	LEVEL_4				
+27436	238	FUSION	Lung Squamous Cell Carcinoma	Likely Neutral	Inconclusive					
+2263	2263	FUSION	Lung Adenocarcinoma	Resistance	Gain-of-function		LEVEL_R2			
+675		DELETION	Lung Adenocarcinoma	Likely Oncogenic	Likely Loss-of-function					
+	4233	DUPLICATION	Lung Adenocarcinoma	Likely Oncogenic	Likely Gain-of-function	LEVEL_3B				
+6098		FUSION	Lung Adenocarcinoma	Oncogenic	Gain-of-function	LEVEL_1				
+5925		UNKNOWN	Lung Adenocarcinoma	Likely Oncogenic	Likely Loss-of-function					
+4089		UNKNOWN	Lung Adenocarcinoma	Inconclusive	Inconclusive					
+4851		UNKNOWN	Lung Adenocarcinoma	Unknown	Unknown					
+3799	5979	FUSION	Lung Adenocarcinoma	Oncogenic	Gain-of-function	LEVEL_1				
+7273	94025	FUSION	Lung Adenocarcinoma							
+7170	4914	FUSION	Lung Adenocarcinoma	Unknown	Unknown					
+7113	2078	FUSION	Lung Adenocarcinoma	Likely Neutral	Inconclusive					fixture-older

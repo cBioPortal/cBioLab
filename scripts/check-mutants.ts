@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -32,6 +32,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "oncoprint-values": ["node", "--env-file=.env.local", "scripts/check-oncoprint-values.ts"],
   "oncoprint-spectrum": ["node", "--env-file=.env.local", "scripts/check-oncoprint-spectrum.ts"],
   "oncokb-tumor-type": ["node", "--env-file=.env.local", "scripts/check-oncokb-tumor-type.ts"],
+  "oncokb-sv": ["node", "--env-file=.env.local", "scripts/check-oncokb-sv.ts"],
 };
 
 interface Mutant {
@@ -255,6 +256,18 @@ const MUTANTS: Mutant[] = [
   { id: "oncokb-tt-tumour-type-ignored", layer: "counts", guard: "oncokb-tumor-type", file: "lib/mutation-table.ts",
     effect: "The mutation table reads any tumour type's level for a mutation, so a sample can show another cancer's level of evidence.",
     find: " AND tt.tumor_type = m.tumorType", replace: "" },
+  { id: "oncokb-sv-one-gene-is-fusion", layer: "counts", guard: "oncokb-sv", file: "packages/annotation-sync/src/sources/oncokb-sv.ts",
+    effect: "A structural variant with one gene is asked about as a FUSION instead of by its class, so OncoKB answers for the wrong kind of event.",
+    find: "if(\" + genes + \" >= 2, 'FUSION'", replace: "if(\" + genes + \" >= 1, 'FUSION'" },
+  { id: "oncokb-sv-class-case-folded", layer: "counts", guard: "oncokb-sv", file: "packages/annotation-sync/src/sources/oncokb-sv.ts",
+    effect: "A class such as 'Deletion' or 'DEL' is matched to OncoKB's types without regard to case, where the portal sends UNKNOWN for anything but the exact names.",
+    find: "if(ifNull(sv.class, '') IN (", replace: "if(upper(ifNull(sv.class, '')) IN (" },
+  { id: "oncokb-sv-tumour-type-ignored", layer: "counts", guard: "oncokb-sv", file: "lib/sv-table.ts",
+    effect: "The SV table reads a pair's call for any tumour type, so a sample can show another cancer's level of evidence for its fusion.",
+    find: " AND pr.tumor_type = s.ttype", replace: "" },
+  { id: "oncokb-sv-gene-level-wins", layer: "counts", guard: "oncokb-sv", file: "lib/sv-table.ts",
+    effect: "A partner gene's gene-level fusion call makes a structural variant a driver even where OncoKB's call for the pair says it is not.",
+    find: "toUInt8(if(pr.found = 1, pr.driver, greatest(a1.driver, a2.driver)))", replace: "toUInt8(greatest(pr.driver, a1.driver, a2.driver))" },
   { id: "spectrum-strand-not-folded", layer: "counts", guard: "oncoprint-spectrum", file: "lib/oncoprint.ts",
     effect: "The mutation spectrum counts only substitutions written on the pyrimidine strand, so a G>T is not counted as a C>A and every spectrum is about half what it should be.",
     find: "+ \"') OR (me.reference_allele = '\" + ac + \"' AND me.tumor_seq_allele = '\" + bc + \"'))\";",

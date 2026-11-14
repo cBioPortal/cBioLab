@@ -15,17 +15,27 @@ import { oncokbFetch, oncokbSource } from "./oncokb.ts";
 
 export const ONCOKB_TUMOR_TYPE_TABLE = "annotation.oncokb_tumor_type";
 
+const only = (study: string | null, col: string) => (study == null ? "" : " AND " + col + " = " + sq(study));
+
+/**
+ * Per sample with any (non-blank) cancer-type value: `sample_unique_id`, `n_detailed` (has a
+ * CANCER_TYPE_DETAILED) and `detailed`. A sample absent here takes its study's type
+ * (studyTumorTypesSql); one present with n_detailed 0 has none.
+ */
+export const sampleTumorTypesSql = (portalDb: string, study: string | null): string =>
+  "SELECT sample_unique_id, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS n_detailed, " +
+  "anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS detailed FROM " + portalDb + ".clinical_data_derived" +
+  " WHERE type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED') AND attribute_value != ''" + only(study, "cancer_study_identifier") +
+  " GROUP BY sample_unique_id";
+
+/** each study's cancer type's name, as `study`, `name` */
+export const studyTumorTypesSql = (portalDb: string): string =>
+  "SELECT s.cancer_study_identifier AS study, t.name AS name FROM " + portalDb + ".cancer_study s INNER JOIN " +
+  portalDb + ".type_of_cancer t ON t.type_of_cancer_id = s.type_of_cancer_id";
+
 /** The key space's SQL: one row per distinct (gene, protein change, mutation type, tumour type) of a study's somatic mutations. */
 export function tumorTypeKeySpace(portalDb: string, study: string | null): string {
-  const only = (col: string) => (study == null ? "" : " AND " + col + " = " + sq(study));
-  const types =
-    "SELECT sample_unique_id, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS n_detailed, " +
-    "anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS detailed FROM " + portalDb + ".clinical_data_derived" +
-    " WHERE type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED') AND attribute_value != ''" + only("cancer_study_identifier") +
-    " GROUP BY sample_unique_id";
-  const studyType =
-    "SELECT s.cancer_study_identifier AS study, t.name AS name FROM " + portalDb + ".cancer_study s INNER JOIN " +
-    portalDb + ".type_of_cancer t ON t.type_of_cancer_id = s.type_of_cancer_id";
+  const types = sampleTumorTypesSql(portalDb, study), studyType = studyTumorTypesSql(portalDb);
   return (
     "SELECT 'MUTATION' AS alteration_type, hugo_gene_symbol, alteration, consequence, tumor_type, " +
     "toString(any(entrez)) AS entrez_gene_id, ifNull(toString(any(pstart)), '') AS protein_start, ifNull(toString(any(pend)), '') AS protein_end FROM (" +
@@ -36,7 +46,7 @@ export function tumorTypeKeySpace(portalDb: string, study: string | null): strin
     " LEFT JOIN (" + types + ") c ON c.sample_unique_id = concat(m.studyId, '_', m.sampleId)" +
     " LEFT JOIN (" + studyType + ") st ON st.study = m.studyId" +
     " WHERE ifNull(m.proteinChange, '') != '' AND ifNull(m.`GENE.hugoGeneSymbol`, '') != ''" +
-    " AND positionCaseInsensitive(ifNull(m.mutationStatus, ''), 'germline') = 0 AND ifNull(m.mutationType, '') != 'Fusion'" + only("m.studyId") +
+    " AND positionCaseInsensitive(ifNull(m.mutationStatus, ''), 'germline') = 0 AND ifNull(m.mutationType, '') != 'Fusion'" + only(study, "m.studyId") +
     ") GROUP BY hugo_gene_symbol, alteration, consequence, tumor_type"
   );
 }

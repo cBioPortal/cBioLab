@@ -157,15 +157,15 @@ Chromium it launches).
 ## The second database is a committed fixture study
 
 Every check that reads a second database (connection b, `CLICKHOUSE2_*`) reads
-**`test/fixtures/peer-study/`**, a small synthetic study (`cbiolab_peer_fixture`: 44 patients, 49
-samples, patient ids `FX-P01`…`FX-P44`) in cBioPortal's study-folder format, built to hold what those
+**`test/fixtures/peer-study/`**, a small synthetic study (`cbiolab_peer_fixture`: 53 patients, 59
+samples, patient ids `FX-P01`…`FX-P53`) in cBioPortal's study-folder format, built to hold what those
 checks assert rather than whatever a real warehouse happens to contain:
 
 - **KRAS-mutant patients** (`FX-P01`–`FX-P20`): the federation check's cohort is `KRAS: MUT` across
   msk_chord_2024 and the peer.
 - **`FX-P10`, the patient the federation check opens**: mid-list (so prev / next both step to peer
   patients), a dozen mutations with allele counts (so its table sorts by VAF and pages), timeline events.
-- **Timelines** (treatment and specimen events) for every patient, and TP53-mutant and wild-type
+- **Timelines** (treatment and specimen events) for every patient but the structural-variant ones (`FX-P45`–`FX-P53`), and TP53-mutant and wild-type
   patients both, for the timeline, plot and oncoprint checks.
 - **Two gene panels**: `FX-P31`–`FX-P40` are on `PEERFIX_NO_EGFR`, and `FX-P33`, `FX-P35`, `FX-P37` are
   EGFR-mutant there — mutated on no panel covering the gene, the case `check:genefacets` exists for.
@@ -191,6 +191,17 @@ checks assert rather than whatever a real warehouse happens to contain:
   with `Mutation_Status` `NA`. Their calls are `test/fixtures/peer-oncokb-tumor-type.tsv`, synthetic
   levels chosen so each tumour type's row is told apart from the gene-level call; a row with an
   `oncokb_version` of its own is stored under that release alone.
+- **OncoKB for structural variants** on `FX-P45`–`FX-P53` (`data_sv.txt`, the study's only SV
+  profile), for `check:oncokb-sv`: one SV per row of the case table — both genes (EML4-ALK, also on
+  the tumour-type shapes above: a detailed type, both cancer-type values blank, `CANCER_TYPE` only,
+  and a patient whose two samples differ), site1 = site2, one gene with a class OncoKB types and with
+  `DEL`, `Deletion` and `NA`, a partner OncoKB curates and a pair it does not, a pair with no stored
+  row (the gene-level `Fusion` fallback) and one whose pair row says Unknown against a partner's
+  Oncogenic. Their calls are `test/fixtures/peer-oncokb-sv.tsv` (synthetic levels, keyed by site1 and
+  site2 Entrez id, OncoKB SV type and tumour type) plus `SV`/`Fusion` rows in `peer-oncokb.tsv`; a
+  row with an `oncokb_version` is stored under that release alone. These samples are on every
+  profile (matrix `PEERFIX_FULL`, and `WGS` for SVs on all samples) with no mutations or copy-number
+  changes, so the mutation-count and profiled tracks read as before; they have no timeline events.
 
 `npm run peer-db` (`scripts/peer-db.ts`) starts a private ClickHouse for it (the pinned release
 `npm run local` uses, data in `CBIOLAB_PEER_DATA`, default `~/.cbiolab-peer/<port>`), imports the

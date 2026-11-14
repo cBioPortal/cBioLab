@@ -1,6 +1,7 @@
 // `npm run peer-db` — the second database the tests read (connection b, CLICKHOUSE2_*): a private
 // ClickHouse holding the committed fixture study (test/fixtures/peer-study) and the OncoKB calls
-// for its variants (test/fixtures/peer-oncokb.tsv, and by tumour type peer-oncokb-tumor-type.tsv).
+// for its variants (test/fixtures/peer-oncokb.tsv, by tumour type peer-oncokb-tumor-type.tsv, and for
+// its structural variants by gene pair and tumour type peer-oncokb-sv.tsv).
 // scripts/gate.sh starts it and points the gate's checks at it, so no test depends on a second
 // warehouse's contents.
 //
@@ -17,8 +18,8 @@
 // The OncoKB rows are stored under the version this app pins (ONCOKB_PIN, else the primary
 // warehouse's latest, read through CLICKHOUSE_*), since a peer annotates with its caller's pin
 // (lib/federation-api.ts), and under "fixture" so the table is never empty without a primary.
-// A tumour-type row whose oncokb_version column is filled is stored under that version alone (a
-// release other than the pin, which the mutation table must not read).
+// A tumour-type or structural-variant row whose oncokb_version column is filled is stored under that
+// version alone (a release other than the pin, which the mutation and SV tables must not read).
 // Logs go to stderr; stdout carries only the KEY=value lines.
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -35,6 +36,7 @@ const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..")
 const FIXTURE = path.join(repo, "test", "fixtures", "peer-study");
 const ONCOKB = path.join(repo, "test", "fixtures", "peer-oncokb.tsv");
 const ONCOKB_TUMOR_TYPE = path.join(repo, "test", "fixtures", "peer-oncokb-tumor-type.tsv");
+const ONCOKB_SV = path.join(repo, "test", "fixtures", "peer-oncokb-sv.tsv");
 const STUDY = "cbiolab_peer_fixture";
 const LABEL = "fixture peer";
 const httpPort = Number(opt("--port", process.env.PEER_DB_PORT || String(20000 + Number(process.env.GATE_PORT || 3100) % 10000)));
@@ -119,6 +121,22 @@ async function seedOncokbTumorType(conn: WriteConn, pin: string | null): Promise
   }
 }
 
+/** OncoKB's calls for structural variants by gene pair and tumour type, versioned as seedOncokbTumorType's. */
+async function seedOncokbSv(conn: WriteConn, pin: string | null): Promise<void> {
+  const rows = await readTsv(ONCOKB_SV);
+  const own = (v: string) => rows.filter((r) => r.oncokb_version === v || (!r.oncokb_version && (v === pin || v === "fixture")));
+  const versions = [...new Set([pin, "fixture", ...rows.map((r) => r.oncokb_version)].filter((v): v is string => !!v))];
+  const db = { ...conn, db: "annotation" };
+  for (const v of versions) {
+    const want = own(v);
+    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM oncokb_sv FINAL WHERE oncokb_version = " + sq(v));
+    if (Number(n[0]?.n) === want.length) continue;
+    await exec(db, "ALTER TABLE oncokb_sv DELETE WHERE oncokb_version = " + sq(v));
+    await insertAll(db, "oncokb_sv", want.map((r) => ({ ...r, oncokb_version: v, api_version: "fixture" })));
+    say("OncoKB calls for the fixture's structural variants stored under " + v);
+  }
+}
+
 async function main(): Promise<void> {
   if (args.includes("--stop")) return stop();
   const bin = await clickhouseBinary(path.join(shared, "bin"), say);
@@ -137,6 +155,7 @@ async function main(): Promise<void> {
   const pin = await appPin();
   await seedOncokb(conn, pin);
   await seedOncokbTumorType(conn, pin);
+  await seedOncokbSv(conn, pin);
   process.stdout.write(["CLICKHOUSE2_URL=" + conn.url, "CLICKHOUSE2_USER=" + conn.user, "CLICKHOUSE2_PASSWORD=" + password,
     "CLICKHOUSE2_DB=" + conn.db, "CLICKHOUSE2_LABEL=" + LABEL].join("\n") + "\n");
 }
