@@ -73,8 +73,10 @@ export const PORTAL_FULL_ZOOM = 9;
 
 /**
  * The portal's initial zoom (ONC-ZM-2, ONC-STM-13): the span from the leftmost to the rightmost
- * altered column fills the plot, at most the portal's 100 %, scrolled to the span's start. With
- * nothing altered, 100 %. Never below fitting every column, which is as far out as this figure zooms.
+ * altered column fills the plot, less the group gaps from the span's first column to its last
+ * (a gap before its first column included: oncoprintmodel getHorzZoomToFit), at most the portal's
+ * 100 %, scrolled to the start of the figure as the portal leaves it. With nothing altered, 100 %.
+ * Never below fitting every column, which is as far out as this figure zooms.
  */
 export function fitAlteredView(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], plotW: number, gap: Gap = GEOM.groupGap): { zoom: number; scrollX: number } {
   const genes = data.tracks.filter((t) => t.kind === "gene");
@@ -89,10 +91,9 @@ export function fitAlteredView(data: UnpackedContract, order: Uint32Array, group
   });
   const fit = fitZoom(groups, plotW, gap);
   if (lo < 0) return { zoom: Math.max(fit, PORTAL_FULL_ZOOM), scrollX: 0 };
-  const want = (plotW - (gHi - gLo) * gapOf(gap).px) / (hi - lo + 1);
-  const zoom = Math.max(fit, Math.min(PORTAL_FULL_ZOOM, want));
-  const x = groupOffsets(groups, zoom, gap)[gLo] + (lo - groups[gLo].start) * zoom;
-  return { zoom, scrollX: Math.max(0, Math.min(x, virtualWidth(groups, zoom, gap) - plotW)) };
+  const gaps = gHi - gLo + (gLo > 0 && lo === groups[gLo].start ? 1 : 0);
+  const want = (plotW - gaps * gapOf(gap).px) / (hi - lo + 1);
+  return { zoom: Math.max(fit, Math.min(PORTAL_FULL_ZOOM, want)), scrollX: 0 };
 }
 
 export { formatPct };
