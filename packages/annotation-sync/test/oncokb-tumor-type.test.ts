@@ -6,7 +6,7 @@
 // the fixture study by scripts/check-oncokb-tumor-type.ts. OncoKB is a stubbed fetch.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { oncokbTumorTypeSource as src, proteinChangeQuery, storeRow } from "../src/sources/oncokb-tumor-type.ts";
+import { oncokbTumorTypeSource as src, proteinChangeQuery, storeRow, tumorTypeKeySpace } from "../src/sources/oncokb-tumor-type.ts";
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });
@@ -154,4 +154,15 @@ test("an answer that does not match the queries one for one fails the batch rath
     return url.endsWith("/utils/cancerGeneList") ? Response.json([{ entrezGeneId: EGFR, oncokbAnnotated: true }]) : Response.json([]);
   }) as typeof fetch;
   await assert.rejects(src.annotate([L858R("Lung Adenocarcinoma")]));
+});
+
+// The key space's SQL is run against the fixture by scripts/check-oncokb-tumor-type.ts; here only how a
+// study reaches it: quoted by sq(), on both the clinical and the mutation table, and absent for every study.
+test("key space: the study is quoted and scopes both tables; no study, no filter", () => {
+  const one = tumorTypeKeySpace("cbioportal", "o'brien_2024");
+  assert.equal(one.split("cancer_study_identifier = 'o\\'brien_2024'").length - 1, 1);
+  assert.equal(one.split("m.studyId = 'o\\'brien_2024'").length - 1, 1);
+  const all = tumorTypeKeySpace("cbioportal", null);
+  assert.ok(!all.includes("o\\'brien") && !all.includes("m.studyId = "));
+  assert.ok(all.includes("FROM cbioportal.mutation_derived"));
 });
