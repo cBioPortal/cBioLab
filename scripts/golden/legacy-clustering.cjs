@@ -110,7 +110,7 @@ function legacyAverageLinkage(n, dist) {
 function legacyDistance(a, b) {
   const p = _prepareForDistanceFunction([{ orderedValueList: a }, { orderedValueList: b }]);
   const [x, y] = [p.notAllNaN.concat(p.allNaN)].flat();
-  return preRankedSpearmanDist(x.isAllNaNs !== undefined ? x : x, y);
+  return preRankedSpearmanDist(x, y);
 }
 /** UPGMA over every column in float64 with legacy's distance: true when some merge's best distance is tied (within eps) with another pair */
 function hasTie(cols, eps = 1e-9) {
