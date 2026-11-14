@@ -114,6 +114,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     hidden_germ = 0
     off_panel = 0
     vus_mut: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+    cna_calls: dict[int, tuple[np.ndarray, np.ndarray]] = {}  # per cell: driver amp, VUS amp, driver deep deletion, VUS deep deletion
     germ_drv: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     germ_vus: dict[int, tuple[np.ndarray, np.ndarray]] = {}
     for r in events:
@@ -156,10 +157,24 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 held = vus_mut.setdefault(id(cells), (cells, np.zeros(len(cells), dtype=np.uint16)))[1]
                 held[i] |= bit
             continue
+        if r["vt"] == "cna":
+            for cells in covered:
+                calls = cna_calls.setdefault(id(cells), (cells, np.zeros((len(cells), 4), dtype=np.int32)))[1]
+                calls[i, (0 if bit == BITS["AMP"] else 2) + (0 if driver else 1)] += 1
+            continue
         if driver:
-            bit |= BITS["DRIVER"] | (BITS["MUT_DRIVER"] if mut else BITS["SV_DRIVER"] if bit == BITS["SV"] else BITS["CNA_DRIVER"])
+            bit |= BITS["DRIVER"] | (BITS["MUT_DRIVER"] if mut else BITS["SV_DRIVER"])
         for cells in covered:
             cells[i] = int(cells[i]) | bit
+    # a cell's copy number: its kind with the most calls, ties a driver first, then amplification
+    # (lib/oncoprint-assemble.ts); a losing driver call still makes the column driver-altered
+    cna_keys = [BITS["AMP"] | BITS["CNA_DRIVER"], BITS["AMP"], BITS["HOMDEL"] | BITS["CNA_DRIVER"], BITS["HOMDEL"]]
+    tie = [0, 2, 1, 3]
+    for cells, calls in cna_calls.values():
+        for i in np.nonzero(calls.sum(axis=1))[0]:
+            best = max(range(4), key=lambda k: (calls[i, k], -tie[k]))
+            any_driver = calls[i, 0] + calls[i, 2] > 0
+            cells[i] = int(cells[i]) | cna_keys[best] | (BITS["DRIVER"] if any_driver else 0)
     for cells, held in vus_mut.values():
         free = (held > 0) & ((cells & BITS["MUT_DRIVER"]) == 0)
         cells[free] |= held[free].astype(cells.dtype)

@@ -261,6 +261,9 @@ export function assembleContract(input: AssembleInput): Contract {
   const hideVus = !!input.display?.hideVUS, hideGerm = !!input.display?.hideGermline;
   let hiddenVus = 0, hiddenGerm = 0, offPanel = 0;
   const vusMut = new Map<Int32Array, Uint16Array>();   // mutation class bits all sit below 1024
+  // per cell, its copy-number calls by kind: driver amp, VUS amp, driver deep deletion, VUS deep deletion
+  const cnaCalls = new Map<Int32Array, Uint16Array>();
+  const TIE = [0, 2, 1, 3];   // on equal counts: driver amp, driver deep deletion, VUS amp, VUS deep deletion
   const germDrv = new Map<Int32Array, Uint16Array>(), germVus = new Map<Int32Array, Uint16Array>();
   const mark = (m: Map<Int32Array, Uint16Array>, cells: Int32Array, i: number, bit: number): void => {
     let held = m.get(cells);
@@ -290,9 +293,31 @@ export function assembleContract(input: AssembleInput): Contract {
       for (const cells of covered) mark(vusMut, cells, i, bit);
       continue;
     }
-    if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : bit === BITS.SV ? BITS.SV_DRIVER : BITS.CNA_DRIVER);
+    if (r.vt === "cna") {
+      for (const cells of covered) {
+        let n = cnaCalls.get(cells);
+        if (!n) { n = new Uint16Array(cells.length * 4); cnaCalls.set(cells, n); }
+        n[i * 4 + (bit === BITS.AMP ? 0 : 2) + (driver ? 0 : 1)]++;
+      }
+      continue;
+    }
+    if (driver) bit |= BITS.DRIVER | (mut ? BITS.MUT_DRIVER : BITS.SV_DRIVER);
     for (const cells of covered) cells[i] |= bit;
   }
+  // A cell's copy number is its kind with the most calls, a driver amplification, a VUS one, a
+  // driver or a VUS deep deletion each counted apart (DataUtils fillGeneticTrackDatum,
+  // selectDisplayValue: their render priorities tie or are missing, so the count decides). On a
+  // tie the portal takes the first call's kind; ours a driver before a VUS, then amplification.
+  // A driver call that loses still makes the column driver-altered (the gutter's driver %).
+  const CNA_KEYS = [BITS.AMP | BITS.CNA_DRIVER, BITS.AMP, BITS.HOMDEL | BITS.CNA_DRIVER, BITS.HOMDEL];
+  for (const [cells, n] of cnaCalls)
+    for (let i = 0; i < cells.length; i++) {
+      let best = -1;
+      for (let k = 0; k < 4; k++) if (n[i * 4 + k] && (best < 0 || n[i * 4 + k] > n[i * 4 + best] || (n[i * 4 + k] === n[i * 4 + best] && TIE[k] < TIE[best]))) best = k;
+      if (best < 0) continue;
+      const anyDriver = n[i * 4] + n[i * 4 + 2] > 0;
+      cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | CNA_KEYS[best] | (anyDriver ? BITS.DRIVER : 0);
+    }
   for (const [cells, held] of vusMut)
     for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
   for (const cells of new Set([...germDrv.keys(), ...germVus.keys()])) {

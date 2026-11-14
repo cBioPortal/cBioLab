@@ -409,6 +409,18 @@ const MUTANTS: Mutant[] = [
     effect: "The opening fit scrolls to the first altered column, where the portal leaves the figure at its start.",
     find: "return { zoom: Math.max(fit, Math.min(PORTAL_FULL_ZOOM, want)), scrollX: 0 };",
     replace: "return { zoom: Math.max(fit, Math.min(PORTAL_FULL_ZOOM, want)), scrollX: lo };" },
+  { id: "cna-fewest-calls", layer: "counts", guard: "unit", file: "lib/oncoprint-assemble.ts",
+    effect: "A cell holding one amplification and two deep deletions shows the amplification, where the portal shows the kind with the most calls.",
+    find: "n[i * 4 + k] > n[i * 4 + best]",
+    replace: "n[i * 4 + k] < n[i * 4 + best]" },
+  { id: "cna-driver-and-vus-counted-together", layer: "counts", guard: "unit", file: "lib/oncoprint-assemble.ts",
+    effect: "A driver and a VUS amplification count as two of one kind, so they outvote two deep deletions where the portal counts them apart.",
+    find: "n[i * 4 + (bit === BITS.AMP ? 0 : 2) + (driver ? 0 : 1)]++;",
+    replace: "n[i * 4 + (bit === BITS.AMP ? 0 : 2) + (driver ? 0 : 0)]++;" },
+  { id: "cna-losing-driver-dropped", layer: "counts", guard: "unit", file: "lib/oncoprint-assemble.ts",
+    effect: "A driver amplification outvoted by deep deletions no longer counts toward the gene's driver %, though the column holds a driver alteration.",
+    find: "const anyDriver = n[i * 4] + n[i * 4 + 2] > 0;",
+    replace: "const anyDriver = best % 2 === 0;" },
 ];
 
 /**

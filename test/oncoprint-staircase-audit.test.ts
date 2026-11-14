@@ -146,13 +146,13 @@ each("D8: merged row, amp_rec x1 and homdel x2: amp_rec has no render priority, 
     cna("A", 2, true, "G1"), cna("A", -2, false, "G2"), cna("A", -2, false, "G3"),
     cna("B", 2, false, "G1"), cna("C", -2, false, "G1"), cna("D", 2, true, "G1")] };
   assert.deepEqual(sort(c), ["D", "B", ...tie("A", "C")]);
-}, { todo: "a merged or patient cell keeps every copy-number call it holds, not their counts; amp is shown (docs/PORTAL-PARITY.md, ONC-ST-2)" });
+});
 
 each("D9: merged row, VUS amp x1 and VUS homdel x2: same priority, count wins: homdel (DU 63-68)", (sort) => {
   const c: Case = { cols: ["A", "B", "C"], genes: MERGED, events: [
     cna("A", 2, false, "G1"), cna("A", -2, false, "G2"), cna("A", -2, false, "G3"), cna("B", 2, false, "G1"), cna("C", -2, false, "G1")] };
   assert.deepEqual(sort(c), ["B", ...tie("A", "C")]);
-}, { todo: "a merged or patient cell keeps every copy-number call it holds, not their counts; amp is shown (docs/PORTAL-PARITY.md, ONC-ST-2)" });
+});
 
 each("D10: merged row, sv_rec x1 and sv x5 shows sv_rec (DU 56-59)", (sort) => {
   const c: Case = { cols: ["C", "B", "A"], genes: MERGED, events: [
