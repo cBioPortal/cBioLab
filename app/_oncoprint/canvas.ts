@@ -10,7 +10,7 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -330,9 +330,10 @@ export function decodeGene(code: number): string {
 
 /** Rank per (gene, column), smaller first: the engine's staircaseRank, a cell not profiled after an unaltered one. */
 function staircaseRanks(data: UnpackedContract, opts: StaircaseOptions): Uint16Array[] {
+  const unaltered = staircaseRank(0, opts);
   return data.tracks.filter((t) => t.kind === "gene").map((t) => {
     const r = new Uint16Array(data.n);
-    for (let i = 0; i < data.n; i++) r[i] = t.cells[i] === -1 ? STAIRCASE_RADIX : staircaseRank(t.cells[i], opts);
+    for (let i = 0; i < data.n; i++) r[i] = t.cells[i] === -1 ? unaltered : staircaseRank(t.cells[i], opts);
     return r;
   });
 }
@@ -384,10 +385,14 @@ export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: 
     const rank = t.kind === "clinical" && t.categories?.length ? naturalRanks(t.categories) : null;
     return (a, b) => { const x = c[a], y = c[b]; if (x === y) return 0; if (x === -1) return 1; if (y === -1) return -1; return sign * (rank ? rank[x] - rank[y] : x - y); };
   });
-  // a tie on every key: the first track key's direction over the natural id, else the genetic id order
+  // a tie on every key: the first track key's direction over the natural id, else the first gene
+  // row's not profiled last (first under a descending genomic key), then the genetic id order
   const first = keys.find((k) => k.track !== "genomic" && k.track !== "id" && k.track !== "cluster");
   const sign = first?.dir === "desc" ? -1 : 1;
-  cmps.push(genomic, first ? (a, b) => sign * ids.natural(a, b) || byId(a, b) : byId);
+  const row = data.tracks.find((t) => t.kind === "gene")?.cells;
+  const naSign = keys.find((k) => k.track === "genomic")?.dir === "desc" ? -1 : 1;
+  cmps.push(genomic, first ? (a, b) => sign * ids.natural(a, b) || byId(a, b)
+    : (a, b) => (row ? naSign * (+(row[a] === -1) - +(row[b] === -1)) : 0) || byId(a, b));
   const out = new Uint32Array(order.length);
   for (const g of groups) {
     const idx = Array.from(order.subarray(g.start, g.start + g.count));

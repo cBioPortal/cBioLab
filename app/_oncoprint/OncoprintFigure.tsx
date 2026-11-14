@@ -271,7 +271,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     // The staircase switches re-sort here too: the engine's order was drawn with its own.
     const keys = sortKeys.length ? sortKeys : data.conventions.sort;
     const engineSorted = keys.some((k) => k.replace(/^-/, "").startsWith("cluster:"));
-    const switches = staircaseOptions(display), engineSwitches = staircaseOptions(data.display);
+    const switches = staircaseOptions({ ...display, annotate: data.display?.annotate }), engineSwitches = staircaseOptions(data.display);
     const switched = switches.byType !== engineSwitches.byType || switches.byDriver !== engineSwitches.byDriver || switches.ignoreVus !== engineSwitches.ignoreVus;
     if ((sortKeys.length || switched) && !engineSorted) {
       const t0 = performance.now();
@@ -288,7 +288,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     }
     return { order, groups };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, base, display.showUnaltered, sortKeys.join("\u0000"), gapMode, gapTrack, display.sortByMutationType, display.sortByDrivers, display.sortIgnoreVUS]);
+  }, [data, base, display.showUnaltered, sortKeys.join("\u0000"), gapMode, gapTrack, display.sortByMutationType, display.sortByDrivers, display.sortIgnoreVUS, display.colorByType]);
 
   // ---- sizing ---------------------------------------------------------------
   useEffect(() => {

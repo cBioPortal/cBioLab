@@ -171,6 +171,13 @@ def format_gutter_pct(t: dict[str, Any], columns: int | None = None) -> str:
 STAIRCASE_RADIX = 3 * 5 * 13 * 3 * 3 * 3
 
 
+def staircase_options(d: dict[str, Any]) -> dict[str, bool]:
+    """A display's Sort switches, each in effect only where the portal's menu enables it (lib/oncoprint-style.ts staircaseOptions)."""
+    by_driver = bool(d.get("sortByDrivers", True)) and d.get("annotate") != "none"
+    return {"byType": bool(d.get("sortByMutationType", True)) and bool(d.get("colorByType", True)),
+            "byDriver": by_driver, "ignoreVus": by_driver and bool(d.get("sortIgnoreVUS", False))}
+
+
 def staircase_rank(c: int, o: dict[str, Any] | None = None, S: dict[str, Any] = STYLE) -> int:
     """A gene row's cell, ranked as the portal's staircase ranks it, smaller first (lib/oncoprint-style.ts staircaseRank)."""
     o = o or {}
