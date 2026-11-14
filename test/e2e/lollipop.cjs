@@ -69,10 +69,17 @@ async function lollipop({ browser, ok, BASE }) {
       await clickStem(b.codon, true);
       const s2 = await tableCount();
       ok("lollipop: shift-click adds a second stem to the selection", await selected() === 2 && s2.kept === a.n + b.n, "codons " + a.codon + "+" + b.codon + ": " + JSON.stringify(s2));
-      const plot = await page.locator(".lp-plot svg").first().boundingBox();
-      await page.mouse.click(plot.x + plot.width - 30, plot.y + 40);
+      // the figure: the svg that draws the stems (the plot area also holds icons, which are svgs too)
+      const figure = page.locator(".lp-plot svg:has(g[data-codon])").first();
+      await figure.scrollIntoViewIfNeeded();
+      const plot = await figure.boundingBox();
+      const away = { x: plot.x + plot.width - 30, y: plot.y + 40 };
+      const under = await page.evaluate(({ x, y }) => { const e = document.elementFromPoint(x, y); return e ? e.tagName.toLowerCase() + "." + (e.getAttribute("class") || "") + " in svg: " + !!e.closest("svg") : "none"; }, away);
+      await page.mouse.click(away.x, away.y);
       await settle();
-      ok("lollipop: a click on the plot away from any stem clears the selection", await selected() === 0 && (await tableCount()).kept === t0.kept);
+      const s3 = await selected(), t3 = await tableCount();
+      ok("lollipop: a click on the plot away from any stem clears the selection", s3 === 0 && t3.kept === t0.kept,
+        "selected " + s3 + ", table " + JSON.stringify(t3) + " (all " + t0.kept + "), under the click: " + under + ", plot " + JSON.stringify(plot));
     } catch (e) {
       ok("lollipop: the alteration grid", false, String(e.message).split("\n")[0].slice(0, 200));
     }
