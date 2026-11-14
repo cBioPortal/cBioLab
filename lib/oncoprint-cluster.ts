@@ -189,9 +189,12 @@ export function clusterHeatmap({ rows, n }: ClusterInput, limits: { exact?: numb
   }
   order = [...patOrder.flatMap((p) => pat[p].cases), ...noData];
 
-  // the rows, by the same distance over every case
-  const rowUnits = rows.map((_, d) => { const v = new Float64Array(n); for (let i = 0; i < n; i++) v[i] = val(d, i); return unitRanks(v); });
-  const rowOrder = dims < 3 ? rows.map((_, d) => d) : averageLinkageOrder(dims, condensedDistances(rowUnits, n), () => 1);
+  // the rows, by the same distance over every case; a row with no value but 0 goes last, as the
+  // portal's (clustering-worker hclusterGeneticEntities: its all-NaN items follow the clustered ones)
+  const rowHas = rows.map((_, d) => { for (let i = 0; i < n; i++) if (val(d, i) !== 0) return true; return false; });
+  const live = rows.map((_, d) => d).filter((d) => rowHas[d]), empty = rows.map((_, d) => d).filter((d) => !rowHas[d]);
+  const rowUnits = live.map((d) => { const v = new Float64Array(n); for (let i = 0; i < n; i++) v[i] = val(d, i); return unitRanks(v); });
+  const rowOrder = [...(live.length < 3 ? live : averageLinkageOrder(live.length, condensedDistances(rowUnits, n), () => 1).map((k) => live[k])), ...empty];
 
   return { order, rows: rowOrder, method: { columns: n, noData: noData.length, patterns, ...(approximate ? { approximate } : {}) } };
 }
