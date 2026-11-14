@@ -50,6 +50,9 @@ export const oneValueBars = (bins: NumericBin[] | undefined): boolean => {
   return num.length > 0 && num.every((b) => b.start != null && b.start === b.end);
 };
 
+/** a number written in decimal, as the server reads it: no hex, no Infinity */
+const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
 /**
  * The Custom Bins box: numbers split on commas, sorted, each once. Empty restores the default bins
  * (STS-STM-10), so it reads as null; anything that is not a number is refused, named.
@@ -57,7 +60,7 @@ export const oneValueBars = (bins: NumericBin[] | undefined): boolean => {
 export function parseEdges(text: string): { edges: number[] | null } | { why: string } {
   const parts = text.split(",").map((p) => p.trim()).filter(Boolean);
   if (!parts.length) return { edges: null };
-  const bad = parts.filter((p) => !Number.isFinite(Number(p)));
+  const bad = parts.filter((p) => !DECIMAL.test(p) || !Number.isFinite(Number(p)));
   if (bad.length) return { why: "not a number: " + bad.slice(0, 3).join(", ") };
   if (parts.length > 100) return { why: "at most 100 bin edges" };
   return { edges: [...new Set(parts.map(Number))].sort((a, b) => a - b) };
@@ -66,8 +69,8 @@ export function parseEdges(text: string): { edges: number[] | null } | { why: st
 /** Generate bins: a size above 0 and a starting value, both numbers */
 export function parseGenerate(size: string, anchor: string): { bins: BinMethod } | { why: string } {
   const s = Number(size.trim()), a = Number(anchor.trim() || "0");
-  if (!size.trim() || !Number.isFinite(s) || s <= 0) return { why: "the bin size is a number above 0" };
-  if (!Number.isFinite(a)) return { why: "the starting value is a number" };
+  if (!DECIMAL.test(size.trim()) || !Number.isFinite(s) || s <= 0) return { why: "the bin size is a number above 0" };
+  if ((anchor.trim() && !DECIMAL.test(anchor.trim())) || !Number.isFinite(a)) return { why: "the starting value is a number" };
   return { bins: { method: "generate", size: s, anchor: a } };
 }
 

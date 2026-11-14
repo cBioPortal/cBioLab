@@ -172,6 +172,8 @@ export function dataBins(values: BinInput[], attributeId?: string, settings: Bin
     const plain = parseDec(value);
     if (plain) { entries.push({ d: plain, n: count }); continue; }
     const t = value.trim();
+    // NA spellings are the chart's NA count, never a bar of their own (DataBinHelper.isNA)
+    if (/^(na|nan|n\/a)$/i.test(t)) continue;
     const op = /^(<=|>=|<|>)/.exec(t)?.[1];
     // a number with space around it: the portal reads it as neither a number nor a word
     if (!op && parseDec(t)) continue;
