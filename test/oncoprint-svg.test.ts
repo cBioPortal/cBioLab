@@ -131,3 +131,14 @@ test("#199 D2: the six classes in the portal's colours, in class order C>A ... T
   const rects = spectrumRects(values, [0, 1, 2, 3, 4, 5]).filter((r) => r.h > 0).sort((a, b) => a.x - b.x);
   assert.deepEqual(rects.map((r) => r.fill), SPECTRUM_FILLS);
 });
+
+test("the gutter's \"<1%\" and \"N/P\" are escaped and drawn in the SVG (ONC-LY-4)", () => {
+  const c = fixture();
+  const genes = c.tracks.filter((t) => t.kind === "gene");
+  Object.assign(genes[0], { altered: 1, driverAltered: undefined, driverPct: undefined, profiled: 2500, freqPct: 0 });
+  Object.assign(genes[1], { altered: 0, driverAltered: undefined, driverPct: undefined, profiled: 0, freqPct: null });
+  const svg = contractToSvg(c, 800);
+  assert.ok(!/>[^<>]*<1%/.test(svg), "no raw < in a text node");
+  assert.match(svg, />&lt;1%\*?<\/text>/);
+  assert.match(svg, />N\/P<\/text>/);
+});

@@ -39,6 +39,20 @@ export function portalFreq(pct: number): string {
   return pct >= 0.1 ? pct.toFixed(1) + "%" : "<0.1%";
 }
 
+/**
+ * An oncoprint track's altered percent, `100 * (altered / profiled)` as the portal computes it, as
+ * its gutter and gap labels show it: OncoprintUtils percentAltered writes one decimal below 3%
+ * and an integer from there, and the track-info view parses that and
+ * rounds it again to an integer, "<1" between 0 and 1 (oncoprinttrackinfoview 80-97). Ours alone:
+ * a percent above 0 is never "0%" (the portal prints 1 of 2,500 as "0%"); it is "<1%". Nothing
+ * profiled (null) is "N/P".
+ */
+export function portalTrackPct(pct: number | null | undefined): string {
+  if (pct == null || Number.isNaN(pct)) return "N/P";
+  const shown = parseFloat(pct < 3 ? pct.toFixed(1) : pct.toFixed());
+  return shown < 1 && pct > 0 ? "<1%" : Math.round(shown) + "%";
+}
+
 /** a share given as 0–1, as a percentage */
 export const fmtShare = (f: number, decimals = 1): string => fmtPct(f * 100, decimals);
 

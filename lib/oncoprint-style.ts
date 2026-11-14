@@ -6,6 +6,8 @@
 // Changing a colour, a band, the mutation display priority or a legend label here changes it
 // everywhere at once. `npm run style:gen` regenerates the Python copy; a unit test fails on drift.
 
+import { portalTrackPct } from "./chart/format.ts";
+
 export const STYLE = {
   version: 3,
   bits: {
@@ -256,14 +258,10 @@ export function formatPct(p: number | null | undefined): string {
   return (p < 3 ? Math.round(p * 10) / 10 : Math.round(p)) + "%";
 }
 /**
- * The portal's track-label percent (ONC-LY-4): "0%", "<1%" above 0 and under 1, otherwise an
- * integer; N/P when nothing was profiled. Gap labels use it too (ONC-STM-3).
+ * The portal's track-label percent (ONC-LY-4), from `100 * (altered / profiled)`: its two
+ * roundings (portalTrackPct), N/P when nothing was profiled. Gap labels use it too (ONC-STM-3).
  */
-export function formatLabelPct(p: number | null | undefined): string {
-  if (p == null) return "N/P";
-  if (p === 0) return "0%";
-  return p < 1 ? "<1%" : Math.round(p) + "%";
-}
+export const formatLabelPct = portalTrackPct;
 export interface GutterCounts { altered?: number; driverAltered?: number; profiled?: number; freqPct?: number | null; driverPct?: number | null }
 /**
  * Gutter frequency: "driver% / any%", each in the portal's label format, from the counts when the
@@ -271,7 +269,7 @@ export interface GutterCounts { altered?: number; driverAltered?: number; profil
  * asterisk when the denominator is smaller than the number of columns.
  */
 export function formatGutterPct(t: GutterCounts, columns?: number): string {
-  const pct = (n: number | undefined, p: number | null | undefined) => n != null && t.profiled ? 100 * n / t.profiled : p;
+  const pct = (n: number | undefined, p: number | null | undefined) => n != null && t.profiled ? 100 * (n / t.profiled) : p;
   const any = pct(t.altered, t.freqPct);
   if (any == null) return "N/P";
   const driver = pct(t.driverAltered, t.driverPct);
