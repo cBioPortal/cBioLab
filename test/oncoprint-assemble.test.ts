@@ -356,7 +356,7 @@ test("germline: the stripe marks the mutation the cell shows when it is germline
   assert.equal(sv.tracks.find((x) => x.label === "TP53")!.cells[sv.columns.indexOf("P5")], BITS.SV | BITS.DRIVER | BITS.SV_DRIVER);
 });
 
-test("the portal's staircase: CNA then mutation per row, every driver before every VUS, not profiled last (ONC-ST-1, ONC-ST-2)", () => {
+test("the portal's staircase: CNA then mutation per row, every driver before every VUS, not profiled as unaltered (ONC-ST-1, ONC-ST-2; SortUtils 235-241)", () => {
   const pids = ["A", "B", "C", "D", "E", "F", "G"];
   const c = assembleContract({
     ...input(), genes: ["TP53", "KRAS"], groups: [{ name: "all", pids }], clinical: [], derived: [],
@@ -372,9 +372,9 @@ test("the portal's staircase: CNA then mutation per row, every driver before eve
     coverage: [...["A", "B", "C", "D", "E", "F"].map((pid) => ({ pid, genes: ["TP53", "KRAS"] })), { pid: "G", genes: ["KRAS"] }]
   });
   // a driver deep deletion before every VUS amplification; an amplification with a missense before
-  // one without; a driver missense before a VUS truncation; the column not profiled for TP53 after
-  // the unaltered one, though its KRAS row is altered
-  assert.deepEqual(c.columns, ["E", "D", "C", "B", "A", "F", "G"]);
+  // one without; a driver missense before a VUS truncation; the column not profiled for TP53 ranks
+  // there as unaltered, so its altered KRAS row puts it before the column unaltered in both
+  assert.deepEqual(c.columns, ["E", "D", "C", "B", "A", "G", "F"]);
 });
 
 test("the id tie-break is the portal's natural order of the bare case id", () => {

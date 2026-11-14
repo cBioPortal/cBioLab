@@ -104,7 +104,8 @@ test("the browser's genomic re-sort is the engine's staircase, ids in the portal
   const sorted = sortColumns(data, order, [{ name: "all", start: 0, count: data.n, patients: data.n }], [{ track: "genomic", dir: "asc" }]);
   const ids = data.columns();
   assert.deepEqual(Array.from(sorted, (i) => ids[i]), engine.columns);
-  assert.deepEqual(engine.columns, ["E", "D", "C", "B", "A", "P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864", "G"]);
+  // G, not profiled for TP53, ranks there as unaltered and its altered KRAS row puts it first of those
+  assert.deepEqual(engine.columns, ["E", "D", "C", "B", "A", "G", "P2", "P10", "TCGA-AA-A00N", "TCGA-AA-3864"]);
 });
 
 test("the browser re-sorts with the Sort switches as the engine does", () => {

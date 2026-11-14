@@ -14,7 +14,7 @@ import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 from .gene_tracks import normalize_gene_tracks
-from .style import STAIRCASE_RADIX, STYLE, encode_numeric, natural_ranks, natural_vector, staircase_rank
+from .style import STYLE, encode_numeric, natural_ranks, natural_vector, staircase_options, staircase_rank
 
 
 def _round(x: float) -> int:
@@ -34,6 +34,9 @@ def mut_class_bit(mt: str | None) -> int:
         return BITS["INFRAME"]
     if t.startswith("splice"):
         return BITS["SPLICE"]
+    # the portal calls these promoter mutations; the warehouse spells them 5'Flank
+    if t.startswith(("5'flank", "5_flank")) or "promoter" in t:
+        return BITS["PROMOTER"]
     return BITS["OTHER_MUT"]
 
 
@@ -275,10 +278,13 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
         dev.append(Track("derivedEvent", str(de.get("label") or "derived event")[:60], cells, {}))
 
     # ---- column sort within groups ------------------------------------------
-    # the portal's staircase: each gene row's staircase_rank, not profiled after unaltered; then the natural case id
-    d = display or {}
-    switches = {"byType": d.get("sortByMutationType", True), "byDriver": d.get("sortByDrivers", True), "ignoreVus": d.get("sortIgnoreVUS", False)}
-    gene_ranks = [[STAIRCASE_RADIX if int(c) == NOT_PROFILED else staircase_rank(int(c), switches) for c in gene_cells[t.label]] for t in gene_tracks]
+    # the portal's staircase: each gene row's staircase_rank, not profiled as unaltered; then, after
+    # every row, the first row's not profiled last; then the natural case id
+    switches = staircase_options(display or {})
+    unaltered = staircase_rank(0, switches)
+    gene_ranks = [[unaltered if int(c) == NOT_PROFILED else staircase_rank(int(c), switches) for c in gene_cells[t.label]] for t in gene_tracks]
+    first_row = gene_cells[gene_tracks[0].label] if gene_tracks else None
+    na_sign = -1 if next((s for s in sort if s["track"] == "genomic"), {}).get("dir") == "desc" else 1
 
     def bare(p: str) -> str:
         st = study_of.get(p)
@@ -340,9 +346,16 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     cmps.append(genomic_cmp)
 
     # a tie on every key: the first track key's direction over the bare id by naturalSort
-    # (SortUtils alphabeticalDefault); then, or with no track key, the genetic track's stringToVector order
+    # (SortUtils alphabeticalDefault); with no track key, the first gene row's not profiled last
+    # (first under a descending genomic key), then the genetic track's stringToVector order
     first = next((s for s in sort if s["track"] in sortable), None)
-    final = by_id
+
+    def final(x: int, y: int) -> int:
+        if first_row is not None:
+            na = int(first_row[x] == NOT_PROFILED) - int(first_row[y] == NOT_PROFILED)
+            if na:
+                return na_sign * na
+        return by_id(x, y)
     if first is not None:
         natural = natural_ranks([bare(p) for p in all_pids])
         tie_sign = -1 if first.get("dir") == "desc" else 1

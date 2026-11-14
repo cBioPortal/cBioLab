@@ -490,21 +490,23 @@ export function assembleContract(input: AssembleInput): Contract {
   // ---- column sort within groups ----------------------------------------
   // Default is the portal's genomic staircase (ONC-ST-1, ONC-ST-2): each gene row, top to
   // bottom, ranks its cell by structural variant, copy number, mutation, germline, mRNA and
-  // protein (staircaseRank), with a cell not profiled after an unaltered one; then the case id in
-  // the portal's order (below). sort can put clinical/derived tracks first ("-" = descending,
+  // protein (staircaseRank), a cell not profiled as an unaltered one; then, after every row, the
+  // first row's not-profiled columns last (SortUtils preferred vector); then the case id in the
+  // portal's order (below). sort can put clinical/derived tracks first ("-" = descending,
   // missing values always last); the staircase and the id remain the final tiebreakers, so every
   // sort is total. Comparing every row inside a comparator is the dominant cost of a 400k-column
   // sort, so the rows' ranks are packed, four to a double ((STAIRCASE_RADIX + 1)^4 < 2^53), and
   // compared as numbers.
   const PER_KEY = 4, RADIX = STAIRCASE_RADIX + 1;
   const switches = staircaseOptions(input.display);
+  const unalteredRank = staircaseRank(0, switches);
   const keys: Float64Array[] = [];
   for (let from = 0; from < geneTracks.length; from += PER_KEY) {
     const key = new Float64Array(allPids.length);
     const list = geneTracks.slice(from, from + PER_KEY).map((t) => geneCells.get(t.label)!);
     for (let i = 0; i < allPids.length; i++) {
       let k = 0;
-      for (const cells of list) k = k * RADIX + (cells[i] === NOT_PROFILED ? STAIRCASE_RADIX : staircaseRank(cells[i], switches));
+      for (const cells of list) k = k * RADIX + (cells[i] === NOT_PROFILED ? unalteredRank : staircaseRank(cells[i], switches));
       key[i] = k;
     }
     keys.push(key);
@@ -526,10 +528,14 @@ export function assembleContract(input: AssembleInput): Contract {
   }
   const sortableTracks = new Map<string, Track>([...clinTracks, ...devTracks, ...heatTracks].map((t) => [t.label, t]));
   // A tie on every key falls to the first track key's own tiebreak, the bare id by naturalSort in
-  // that key's direction (SortUtils alphabeticalDefault, flipped by PrecomputedComparator); then,
-  // or with no track key, to the genetic track's, the id by stringToVector ascending.
+  // that key's direction (SortUtils alphabeticalDefault, flipped by PrecomputedComparator). With
+  // no track key it falls to the first gene row's: not profiled last (first when the genomic key
+  // is descending), then the id by stringToVector ascending.
   const firstTrackKey = sort.find((s) => sortableTracks.has(s.track));
-  let finalCmp = (x: number, y: number): number => idRank[x] - idRank[y];
+  const firstRow = geneTracks.length ? geneCells.get(geneTracks[0].label)! : null;
+  const naSign = sort.find((s) => s.track === "genomic")?.dir === "desc" ? -1 : 1;
+  let finalCmp = (x: number, y: number): number =>
+    (firstRow ? naSign * (+(firstRow[x] === NOT_PROFILED) - +(firstRow[y] === NOT_PROFILED)) : 0) || idRank[x] - idRank[y];
   if (firstTrackKey) {
     const natural = naturalRanks(bareIds), sign = firstTrackKey.dir === "desc" ? -1 : 1;
     finalCmp = (x, y) => sign * (natural[x] - natural[y]) || idRank[x] - idRank[y];
