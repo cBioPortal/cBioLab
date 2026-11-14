@@ -14,7 +14,7 @@ import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 from .gene_tracks import normalize_gene_tracks
-from .style import STYLE, encode_numeric, natural_ranks, natural_vector, staircase_options, staircase_rank
+from .style import STYLE, assay_scale, encode_numeric, natural_ranks, natural_vector, staircase_options, staircase_rank
 
 
 def _round(x: float) -> int:
@@ -241,7 +241,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
     # ---- heatmap tracks ----------------------------------------------------
     heat: list[Track] = []
     for h in heatmap:
-        is_z = re.search(r"zscore", h["profileType"], re.I) is not None
+        assay = assay_scale(list(h["values"].values()), h.get("pivot"), h.get("sortOrder")) if h.get("assay") else None
         for gene in h["genes"]:
             label = _heatmap_label(gene, h["profileType"])
             ref = z_reference.get(h["profileType"] + "|" + gene)
@@ -254,17 +254,12 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 continue
             # the portal's fixed ranges and colours: VAF and methylation 0..1, other profiles -3..3
             ramp = None if h.get("assay") else "vaf" if h.get("isVaf") else "methylation" if re.search("methylation", h["profileType"], re.I) else "expression"
-            if ramp in ("vaf", "methylation"):
+            if assay:
+                lo, hi, center = assay["min"], assay["max"], None
+            elif ramp in ("vaf", "methylation"):
                 lo, hi, center = 0.0, 1.0, None
-            elif ramp == "expression" or is_z or using_ref:
-                lo, hi, center = -3.0, 3.0, 0.0
             else:
-                d_min, d_max = min(vals), max(vals)
-                if d_min < 0 < d_max:
-                    m = max(-d_min, d_max)
-                    lo, hi, center = -m, m, 0.0
-                else:
-                    lo, hi, center = d_min, d_max, None
+                lo, hi, center = -3.0, 3.0, 0.0
             span = (hi - lo) or 1
             cells = np.full(n, -1, dtype=np.int32)
             values = np.full(n, np.nan, dtype=np.float32)
@@ -282,8 +277,10 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             else:
                 note = "a patient's: its samples' value furthest from 0"
             heat.append(Track("heatmap", label, cells, {"numeric": True, **({"ramp": ramp} if ramp else {}), "gene": gene, "profileType": h["profileType"], "note": note,
-                                                        "min": _num(_round(lo * 100) / 100), "max": _num(_round(hi * 100) / 100),
-                                                        "center": None if center is None else _round(255 * (0 - lo) / span), "values": values}))
+                                                        # an assay's range is exact: its colour stops sit on it
+                                                        "min": _num(lo if assay else _round(lo * 100) / 100), "max": _num(hi if assay else _round(hi * 100) / 100),
+                                                        "center": None if center is None else _round(255 * (0 - lo) / span), "values": values,
+                                                        **({"stops": assay["stops"], "colors": assay["colors"]} if assay else {})}))
 
     # ---- derived-event tracks ---------------------------------------------
     dev: list[Track] = []

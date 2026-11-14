@@ -131,17 +131,14 @@ class Ramps(unittest.TestCase):
         self.assertEqual([heat_track(METH, [0.4, 0.6]).min, heat_track(METH, [0.4, 0.6]).max], [0, 1])
 
     # E. generic assay ranges (OU:378-413); colours (pivot/sortOrder, ONC-TT-8) left out in PR #200
-    @unittest.expectedFailure  # the generic-assay range comes with its pivot and sort order (docs/PORTAL-PARITY.md, ONC-TT-8)
     def test_e3_range_minus1_4(self):
         t = heat_track("sig", [-1, 4], assay=True)
         self.assertEqual([t.min, t.max], [-1, 4])
 
-    @unittest.expectedFailure  # the generic-assay range comes with its pivot and sort order (docs/PORTAL-PARITY.md, ONC-TT-8)
     def test_e4_nonnegative_range_includes_0(self):
         t = heat_track("sig", [1, 4], assay=True)
         self.assertEqual([t.min, t.max], [0, 4])
 
-    @unittest.expectedFailure  # the generic-assay range comes with its pivot and sort order (docs/PORTAL-PARITY.md, ONC-TT-8)
     def test_e4b_nonpositive_range_includes_0(self):
         t = heat_track("sig", [-4, -1], assay=True)
         self.assertEqual([t.min, t.max], [-4, 0])

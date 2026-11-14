@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, stackCompare, stackCellText, heatColor, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank, clinicalColor } from "../lib/oncoprint-style.ts";
+import { STYLE, stackCompare, stackCellText, heatColor, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank, clinicalColor, rampColor } from "../lib/oncoprint-style.ts";
 import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -322,4 +322,11 @@ test("a patient's \"Mixed\" is coloured as the portal's oncoprint colours a valu
   const t = { label: "X", categories: ["Mixed", "A", "B"] };
   assert.deepEqual([0, 1, 2].map((i) => trackCategoryColor(t, i)), ["#3061c2", "#3366cc", "#dc3912"]);
   assert.equal(trackCategoryColor({ label: "X", categories: ["Mixed", "Yes"] }, 0), "#3366cc", "nothing else has #3366cc");
+});
+
+test("a value on a repeated stop takes the colour after it, as oncoprintjs's binary search lands (oncoprintruleset makeColorFn)", () => {
+  const r = { stops: [-4, 1, 1, 3], colors: [[0, 114, 178], [204, 236, 255], [255, 226, 204], [213, 94, 0]] };
+  assert.equal(rampColor(r, 1), "rgb(255,226,204)");
+  assert.equal(rampColor(r, -4), "rgb(0,114,178)");
+  assert.equal(rampColor({ stops: [0, 0.35, 1], colors: [[0, 0, 255], [255, 255, 255], [255, 0, 0]] }, 0.35), "rgb(255,255,255)", "an ordinary stop is unchanged");
 });

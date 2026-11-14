@@ -809,6 +809,8 @@ export interface Track {
   kind: TrackKind; label: string; cells: number[] | Int32Array;
   /** a heatmap row's colour ramp, the portal's for its profile (lib/oncoprint-style.ts ramps) */
   ramp?: "expression" | "methylation" | "vaf";
+  /** a generic-assay heatmap row's own gradient: colours (r, g, b) at these values (assayScale) */
+  stops?: number[]; colors?: [number, number, number][];
   /**
    * A numeric track's exact values beside its 0–255 cells, NaN (null in JSON) where a cell has
    * none: what a tooltip, the TSV and a sort read. The cells stay the drawing code.

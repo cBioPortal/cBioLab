@@ -114,6 +114,9 @@ export const STYLE = {
     expression: { stops: [-3, 0, 3], colors: [[0, 0, 255], [0, 0, 0], [255, 0, 0]] },
     methylation: { stops: [0, 0.35, 1], colors: [[0, 0, 255], [255, 255, 255], [255, 0, 0]] },
     vaf: { stops: [0, 1], colors: [[241, 242, 181], [19, 80, 88]] },
+    // a generic assay's gradient colours (OncoprintUtils legendColor*), placed by assayScale
+    assay: { darkBlue: [0, 114, 178], lightBlue: [204, 236, 255], lightRed: [255, 226, 204], darkRed: [213, 94, 0], white: [255, 255, 255] } as
+      Record<"darkBlue" | "lightBlue" | "lightRed" | "darkRed" | "white", [number, number, number]>,
     // an altered % (0-100) on a pathway diagram's gene node: PathwayMapper's own scale (GenomicDataOverlayManager),
     // white to red on log(1 + %), reaching `reach` of the way at 100% so a frequent gene is never solid red
     frequency: { from: [255, 255, 255], to: [255, 0, 0], reach: 0.8 }
@@ -194,16 +197,43 @@ export function numericColor(v: number, center: number | null | undefined, S: St
 export function rampColor(ramp: { stops: number[]; colors: number[][] }, v: number): string {
   const { stops, colors } = ramp;
   if (v <= stops[0]) return rgb(colors[0]);
-  for (let i = 1; i < stops.length; i++) if (v <= stops[i]) {
-    const t = (v - stops[i - 1]) / (stops[i] - stops[i - 1] || 1), a = colors[i - 1], b = colors[i];
+  // a value on a repeated stop (an assay's pivot) takes the colour after it, as oncoprintjs's binary search lands
+  for (let i = 1; i < stops.length; i++) if (v < stops[i] || (v === stops[i] && stops[i + 1] !== v)) {
+    const t = stops[i] === stops[i - 1] ? 1 : (v - stops[i - 1]) / (stops[i] - stops[i - 1]), a = colors[i - 1], b = colors[i];
     return rgb([lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]);
   }
   return rgb(colors[colors.length - 1]);
 }
 
-/** A numeric cell's colour: its heatmap ramp when it has one, the generic ramps otherwise. */
-export function heatColor(t: NumericScale & { ramp?: "expression" | "methylation" | "vaf"; center?: number | null }, code: number, S: Style = STYLE): string {
-  return t.ramp ? rampColor(S.ramps[t.ramp], numericValue(t, code)) : numericColor(code, t.center, S);
+/** A numeric cell's colour: its heatmap ramp, or its own stops, when it has one; the generic ramps otherwise. */
+export function heatColor(t: NumericScale & { ramp?: "expression" | "methylation" | "vaf"; center?: number | null; stops?: number[]; colors?: number[][] },
+  code: number, S: Style = STYLE): string {
+  return t.ramp ? rampColor(S.ramps[t.ramp], numericValue(t, code))
+    : t.stops && t.colors ? rampColor({ stops: t.stops, colors: t.colors }, numericValue(t, code)) : numericColor(code, t.center, S);
+}
+
+/**
+ * A generic-assay heatmap's range and gradient, as the portal's getGenericAssayTrackRuleSetParams
+ * (OncoprintUtils 376-470): over every value of the profile drawn (DeltaUtils 720-749), widened
+ * to the pivot and to 0. With no negative value, white to dark red (light red at a pivot inside);
+ * otherwise dark to light blue, or light to dark red when the pivot is the minimum, or both with a
+ * jump at a pivot inside. A sort order of DESC reverses the colours.
+ */
+export function assayScale(values: number[], pivot?: number, sortOrder?: string, S: Style = STYLE): { min: number; max: number; stops: number[]; colors: [number, number, number][] } {
+  const A = S.ramps.assay;
+  let lo = Infinity, hi = -Infinity;
+  for (const v of values) if (Number.isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (pivot != null) { hi = Math.max(hi, pivot); lo = Math.min(lo, pivot); }
+  const left = Math.min(0, lo), right = Math.max(0, hi);
+  let stops = [left, right], colors: [number, number, number][];
+  if (left >= 0) {
+    if (pivot == null || pivot <= left || pivot >= right) colors = [A.white, A.darkRed];
+    else { colors = [A.white, A.lightRed, A.darkRed]; stops = [left, pivot, right]; }
+  } else if (pivot == null || hi === pivot) colors = [A.darkBlue, A.lightBlue];
+  else if (lo === pivot) colors = [A.lightRed, A.darkRed];
+  else { colors = [A.darkBlue, A.lightBlue, A.lightRed, A.darkRed]; stops = [left, pivot, pivot, right]; }
+  if (sortOrder === "DESC") colors = [...colors].reverse();
+  return { min: left, max: right, stops, colors };
 }
 
 /** Colour for an altered % (0..100) on a pathway diagram's gene node, as hex (so `textOn` can pick its ink). */
