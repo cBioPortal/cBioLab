@@ -301,13 +301,17 @@ export function vafSql(genes: string[], study: string = STUDY, db: string = DB, 
     "GROUP BY pid, gene";
 }
 
-// patient-level continuous values for heatmap tracks (columns are patients, so
-// multi-sample patients get the mean across their samples — stated in the label)
+/** a group's value furthest from 0, sign kept; of a ± tie the positive one */
+const furthestFromZero = (v: string): string => "argMax(" + v + ", (abs(" + v + "), " + v + "))";
+
+// Continuous values for heatmap tracks, one row per (column, gene): in patient mode a patient's
+// samples give the one furthest from 0, sign kept, as the portal aggregates a heatmap (ONC-STM-7).
+// Of two values equally far from 0 the positive one, so the answer does not depend on the order
+// rows arrive in; the portal takes its first sample's (docs/PORTAL-PARITY.md).
 export function heatmapSql(profileType: string, genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   // values are stored per sample; only patient mode has to combine them
   return "SELECT " + (unit === "sample" ? "replaceOne(ga.sample_unique_id, " + sq(study + "_") + ", '')" : "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')") + " AS pid,\n" +
-    // a patient's value is its samples' furthest from 0, sign kept, as the portal aggregates a heatmap (ONC-STM-7)
-    "       ga.hugo_gene_symbol AS gene, argMax(" + finiteSql("ga.alteration_value") + ", abs(" + finiteSql("ga.alteration_value") + ")) AS v\n" +
+    "       ga.hugo_gene_symbol AS gene, " + furthestFromZero(finiteSql("ga.alteration_value")) + " AS v\n" +
     "FROM " + db + ".genetic_alteration_derived ga\n" +
     (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n") +
     "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
@@ -316,15 +320,15 @@ export function heatmapSql(profileType: string, genes: string[], study: string =
     "GROUP BY pid, gene";
 }
 
-// A generic-assay profile's values for heatmap tracks, one row per (column, entity): a column's
-// samples averaged in patient mode, and a patient-level assay's value given to each of the
-// patient's samples in sample mode. Values that are not numbers are left out.
+// A generic-assay profile's values for heatmap tracks, one row per (column, entity): in patient
+// mode a patient's samples give the one furthest from 0, as heatmapSql, and a patient-level
+// assay's value goes to each of the patient's samples in sample mode. Values that are not
+// numbers are left out.
 export function assayHeatmapSql(profileType: string, entities: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", patientLevel = false, samples?: string | null): string {
   const strip = (col: string) => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
   const sampleLevel = unit === "sample" && patientLevel;
   return "SELECT " + (unit === "sample" ? strip(sampleLevel ? "sd.sample_unique_id" : "g.sample_unique_id") : strip("g.patient_unique_id")) + " AS pid,\n" +
-    // as the portal does for every heatmap, generic assays included: the value furthest from 0
-    "       g.entity_stable_id AS gene, argMax(" + finiteSql("g.value") + ", abs(" + finiteSql("g.value") + ")) AS v\n" +
+    "       g.entity_stable_id AS gene, " + furthestFromZero(finiteSql("g.value")) + " AS v\n" +
     "FROM " + db + ".generic_assay_data_derived g\n" +
     (sampleLevel ? "JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = g.patient_unique_id\n" : "") +
     "WHERE g.profile_type = " + sq(profileType) + " AND g.profile_stable_id = " + sq(study + "_" + profileType) + "\n" +

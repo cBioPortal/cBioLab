@@ -369,6 +369,14 @@ const MUTANTS: Mutant[] = [
     effect: "\"Mixed\" uses up a palette slot, so every value after it on the track takes the next colour along from the portal's.",
     find: "if (!reservedColor(track.categories![i], S) && track.categories![i] !== MIXED) k++;",
     replace: "if (!reservedColor(track.categories![i], S)) k++;" },
+  { id: "heatmap-tie-by-arrival", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "A patient whose samples are +3 and −3 shows whichever row the database reads first, so the same figure can draw red or blue on two runs.",
+    find: "\"argMax(\" + v + \", (abs(\" + v + \"), \" + v + \"))\"",
+    replace: "\"argMax(\" + v + \", abs(\" + v + \"))\"" },
+  { id: "heatmap-patient-mean", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
+    effect: "A heatmap's patient column shows its samples' mean instead of the one furthest from 0, so a patient with +2 and −5 draws −1.5.",
+    find: "\"argMax(\" + v + \", (abs(\" + v + \"), \" + v + \"))\"",
+    replace: "\"avg(\" + v + \")\"" },
 ];
 
 /**

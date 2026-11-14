@@ -265,7 +265,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             elif h.get("isVaf"):
                 note = "allele fraction, max across a patient's mutations in the gene"
             else:
-                note = "mean across a patient's samples"
+                note = "a patient's: its samples' value furthest from 0"
             heat.append(Track("heatmap", label, cells, {"numeric": True, **({"ramp": ramp} if ramp else {}), "gene": gene, "profileType": h["profileType"], "note": note,
                                                         "min": _num(_round(lo * 100) / 100), "max": _num(_round(hi * 100) / 100),
                                                         "center": None if center is None else _round(255 * (0 - lo) / span), "values": values}))
