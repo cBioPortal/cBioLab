@@ -43,3 +43,8 @@ FX-P37	-7		Sample Acquisition	FX-P37-T1
 FX-P38	-24		Sample Acquisition	FX-P38-T1
 FX-P39	-17		Sample Acquisition	FX-P39-T1
 FX-P40	-9		Sample Acquisition	FX-P40-T1
+FX-P41	-12		Sample Acquisition	FX-P41-T1
+FX-P42	-8		Sample Acquisition	FX-P42-T1
+FX-P43	-15		Sample Acquisition	FX-P43-T1
+FX-P43	190		Sample Acquisition	FX-P43-T2
+FX-P44	-10		Sample Acquisition	FX-P44-T1

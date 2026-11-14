@@ -5,7 +5,7 @@
 // writer. `data` is OncoKB's whole answer, for the annotation card.
 //
 // The tumour type is the sample's CANCER_TYPE_DETAILED; a sample with neither CANCER_TYPE nor
-// CANCER_TYPE_DETAILED takes its study's cancer type; a sample with CANCER_TYPE alone has none ('',
+// CANCER_TYPE_DETAILED (a blank value is none, as the portal's API never returns one) takes its study's cancer type; a sample with CANCER_TYPE alone has none ('',
 // sent as null). Only genes OncoKB curates are asked about; any other gene's keys are stored
 // unasked, with an empty oncogenicity, so the sync does not pick them up again.
 import type { Row } from "@cbiolab/clickhouse";
@@ -21,22 +21,22 @@ export function tumorTypeKeySpace(portalDb: string, study: string | null): strin
   const types =
     "SELECT sample_unique_id, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS n_detailed, " +
     "anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS detailed FROM " + portalDb + ".clinical_data_derived" +
-    " WHERE type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')" + only("cancer_study_identifier") +
+    " WHERE type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED') AND attribute_value != ''" + only("cancer_study_identifier") +
     " GROUP BY sample_unique_id";
   const studyType =
     "SELECT s.cancer_study_identifier AS study, t.name AS name FROM " + portalDb + ".cancer_study s INNER JOIN " +
     portalDb + ".type_of_cancer t ON t.type_of_cancer_id = s.type_of_cancer_id";
   return (
     "SELECT 'MUTATION' AS alteration_type, hugo_gene_symbol, alteration, consequence, tumor_type, " +
-    "toString(any(entrez)) AS entrez_gene_id, toString(any(pstart)) AS protein_start, toString(any(pend)) AS protein_end FROM (" +
+    "toString(any(entrez)) AS entrez_gene_id, ifNull(toString(any(pstart)), '') AS protein_start, ifNull(toString(any(pend)), '') AS protein_end FROM (" +
     "SELECT m.`GENE.hugoGeneSymbol` AS hugo_gene_symbol, m.entrezGeneId AS entrez, m.proteinChange AS alteration, " +
-    "ifNull(m.mutationType, '') AS consequence, ifNull(m.proteinPosStart, 0) AS pstart, ifNull(m.proteinPosEnd, 0) AS pend, " +
+    "ifNull(m.mutationType, '') AS consequence, m.proteinPosStart AS pstart, m.proteinPosEnd AS pend, " +
     "if(c.sample_unique_id = '', ifNull(st.name, ''), if(c.n_detailed > 0, c.detailed, '')) AS tumor_type" +
     " FROM " + portalDb + ".mutation_derived m" +
     " LEFT JOIN (" + types + ") c ON c.sample_unique_id = concat(m.studyId, '_', m.sampleId)" +
     " LEFT JOIN (" + studyType + ") st ON st.study = m.studyId" +
     " WHERE ifNull(m.proteinChange, '') != '' AND ifNull(m.`GENE.hugoGeneSymbol`, '') != ''" +
-    " AND lower(ifNull(m.mutationStatus, '')) != 'germline' AND ifNull(m.mutationType, '') != 'Fusion'" + only("m.studyId") +
+    " AND positionCaseInsensitive(ifNull(m.mutationStatus, ''), 'germline') = 0 AND ifNull(m.mutationType, '') != 'Fusion'" + only("m.studyId") +
     ") GROUP BY hugo_gene_symbol, alteration, consequence, tumor_type"
   );
 }
@@ -54,7 +54,8 @@ interface Annotation {
   highestSensitiveLevel?: string; highestResistanceLevel?: string; highestDiagnosticImplicationLevel?: string; highestPrognosticImplicationLevel?: string;
 }
 
-const num = (v: unknown) => (Number(v) > 0 ? Number(v) : undefined);
+/** a stored position as the portal sends it: absent when missing or 0, otherwise as stored (the importer's -1 included) */
+const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) || Number(v) === 0 ? undefined : Number(v));
 
 /** The portal's query for one key (oncokb-frontend-commons generateProteinChangeQuery). */
 export function proteinChangeQuery(k: Row) {

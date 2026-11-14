@@ -1,7 +1,8 @@
 // `npm run peer-db` — the second database the tests read (connection b, CLICKHOUSE2_*): a private
 // ClickHouse holding the committed fixture study (test/fixtures/peer-study) and the OncoKB calls
-// for its variants (test/fixtures/peer-oncokb.tsv). scripts/gate.sh starts it and points the gate's
-// checks at it, so no test depends on a second warehouse's contents.
+// for its variants (test/fixtures/peer-oncokb.tsv, and by tumour type peer-oncokb-tumor-type.tsv).
+// scripts/gate.sh starts it and points the gate's checks at it, so no test depends on a second
+// warehouse's contents.
 //
 //   node --env-file-if-exists=.env.local scripts/peer-db.ts            start it (or find it running); print CLICKHOUSE2_* lines
 //   node scripts/peer-db.ts --stop                                     stop the one on this port
@@ -16,6 +17,8 @@
 // The OncoKB rows are stored under the version this app pins (ONCOKB_PIN, else the primary
 // warehouse's latest, read through CLICKHOUSE_*), since a peer annotates with its caller's pin
 // (lib/federation-api.ts), and under "fixture" so the table is never empty without a primary.
+// A tumour-type row whose oncokb_version column is filled is stored under that version alone (a
+// release other than the pin, which the mutation table must not read).
 // Logs go to stderr; stdout carries only the KEY=value lines.
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -31,6 +34,7 @@ const opt = (name: string, dflt: string) => { const i = args.indexOf(name); retu
 const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const FIXTURE = path.join(repo, "test", "fixtures", "peer-study");
 const ONCOKB = path.join(repo, "test", "fixtures", "peer-oncokb.tsv");
+const ONCOKB_TUMOR_TYPE = path.join(repo, "test", "fixtures", "peer-oncokb-tumor-type.tsv");
 const STUDY = "cbiolab_peer_fixture";
 const LABEL = "fixture peer";
 const httpPort = Number(opt("--port", process.env.PEER_DB_PORT || String(20000 + Number(process.env.GATE_PORT || 3100) % 10000)));
@@ -79,11 +83,14 @@ async function appPin(): Promise<string | null> {
   return oncokbPin();
 }
 
-async function seedOncokb(conn: WriteConn): Promise<void> {
-  const [head, ...lines] = (await readFile(ONCOKB, "utf8")).split("\n").filter((l) => l.trim());
+async function readTsv(file: string): Promise<Record<string, string>[]> {
+  const [head, ...lines] = (await readFile(file, "utf8")).split("\n").filter((l) => l.trim());
   const cols = head.split("\t");
-  const rows = lines.map((l) => Object.fromEntries(l.split("\t").map((v, i) => [cols[i], v])));
-  const pin = await appPin();
+  return lines.map((l) => Object.fromEntries(cols.map((c, i) => [c, l.split("\t")[i] ?? ""])));
+}
+
+async function seedOncokb(conn: WriteConn, pin: string | null): Promise<void> {
+  const rows = await readTsv(ONCOKB);
   const versions = [...new Set([pin, "fixture"].filter((v): v is string => !!v))];
   const db = { ...conn, db: "annotation" };
   for (const v of versions) {
@@ -94,6 +101,22 @@ async function seedOncokb(conn: WriteConn): Promise<void> {
     say("OncoKB calls for the fixture's variants stored under " + v);
   }
   if (!pin) say("no primary warehouse to read the app's OncoKB pin from; its calls are stored under \"fixture\" only");
+}
+
+/** OncoKB's calls by tumour type: rows with no oncokb_version under the pin and "fixture", the others under theirs. */
+async function seedOncokbTumorType(conn: WriteConn, pin: string | null): Promise<void> {
+  const rows = await readTsv(ONCOKB_TUMOR_TYPE);
+  const own = (v: string) => rows.filter((r) => r.oncokb_version === v || (!r.oncokb_version && (v === pin || v === "fixture")));
+  const versions = [...new Set([pin, "fixture", ...rows.map((r) => r.oncokb_version)].filter((v): v is string => !!v))];
+  const db = { ...conn, db: "annotation" };
+  for (const v of versions) {
+    const want = own(v);
+    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM oncokb_tumor_type FINAL WHERE oncokb_version = " + sq(v));
+    if (Number(n[0]?.n) === want.length) continue;
+    await exec(db, "ALTER TABLE oncokb_tumor_type DELETE WHERE oncokb_version = " + sq(v));
+    await insertAll(db, "oncokb_tumor_type", want.map((r) => ({ ...r, oncokb_version: v, api_version: "fixture" })));
+    say("OncoKB calls by tumour type for the fixture's variants stored under " + v);
+  }
 }
 
 async function main(): Promise<void> {
@@ -111,7 +134,9 @@ async function main(): Promise<void> {
   await setupDatabase(conn, shared, say);
   await writeUsers(server.dir, password, true);
   await importFixture(conn);
-  await seedOncokb(conn);
+  const pin = await appPin();
+  await seedOncokb(conn, pin);
+  await seedOncokbTumorType(conn, pin);
   process.stdout.write(["CLICKHOUSE2_URL=" + conn.url, "CLICKHOUSE2_USER=" + conn.user, "CLICKHOUSE2_PASSWORD=" + password,
     "CLICKHOUSE2_DB=" + conn.db, "CLICKHOUSE2_LABEL=" + LABEL].join("\n") + "\n");
 }
