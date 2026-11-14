@@ -401,6 +401,14 @@ const MUTANTS: Mutant[] = [
     effect: "Explore stops returning the study's declared attributes, so the Tracks menu loses the 0% rows and its stored priorities.",
     find: "    clinical, derived, declaredAttributes,\n",
     replace: "    clinical, derived,\n" },
+  { id: "zoom-gap-before-span-ignored", layer: "counts", guard: "unit", file: "app/_oncoprint/canvas.ts",
+    effect: "An altered span starting at a group's first column ignores the gap before it, so the opening zoom is a little closer than the portal's.",
+    find: "const gaps = gHi - gLo + (gLo > 0 && lo === groups[gLo].start ? 1 : 0);",
+    replace: "const gaps = gHi - gLo;" },
+  { id: "zoom-scrolls-to-span", layer: "counts", guard: "unit", file: "app/_oncoprint/canvas.ts",
+    effect: "The opening fit scrolls to the first altered column, where the portal leaves the figure at its start.",
+    find: "return { zoom: Math.max(fit, Math.min(PORTAL_FULL_ZOOM, want)), scrollX: 0 };",
+    replace: "return { zoom: Math.max(fit, Math.min(PORTAL_FULL_ZOOM, want)), scrollX: lo };" },
 ];
 
 /**

@@ -79,12 +79,15 @@ test("the initial zoom fits the altered columns, at most the portal's 100 % (ONC
   assert.equal(fitAlteredView(none.data, none.order, none.vg, 1000).zoom, fitZoom(none.vg, 1000));
   const noneBig = view(5000, []);
   assert.equal(fitAlteredView(noneBig.data, noneBig.order, noneBig.vg, 1000).zoom, PORTAL_FULL_ZOOM);
-  // the altered span in a second group: scrolled to its start, the gap inside the span counted
+  // the altered span in a second group: the portal leaves the scroll where it is (oncoprint.ts setHorzZoomToFit)
   const ids = Array.from({ length: 400 }, (_, i) => "P" + String(i).padStart(4, "0"));
   const two = view(400, ["P0250", "P0300"], [ids.slice(0, 200), ids.slice(200)]);
   const z2 = fitAlteredView(two.data, two.order, two.vg, 600, 10);
   assert.equal(z2.zoom, PORTAL_FULL_ZOOM);
-  assert.ok(z2.scrollX > 200 * PORTAL_FULL_ZOOM, "starts at the first altered column, in the second group");
+  assert.equal(z2.scrollX, 0, "not scrolled to the span");
+  // a span from the second group's first column counts the gap before it (oncoprintmodel getHorzZoomToFit)
+  const edge = view(400, ids.slice(200), [ids.slice(0, 200), ids.slice(200)]);
+  assert.ok(Math.abs(fitAlteredView(edge.data, edge.order, edge.vg, 1000, 10).zoom - (1000 - 10) / 200) < 1e-9);
 });
 
 test("the browser's genomic re-sort is the engine's staircase, ids in the portal's natural order", () => {
