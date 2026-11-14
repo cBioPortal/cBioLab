@@ -140,8 +140,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Staircase sort per key, CNA then mutation, drivers before VUS, not profiled last, natural id order; over the portal's own cells our order is its order (Q1 594/594, Q3 10,336/10,336); over our cells Q1 449 of 594 positions agree, the rest from annotation differences (ONC-ST-1, ONC-ST-2) (#193)
   - [x] Sort menu: the Mutation Type, Driver and Ignore VUS toggles (ONC-SO-1, ONC-ST-3) (#195)
     - [ ] "Case list order" (ONC-SO-3): the portal offers it only for a query naming sample ids, which no Results query here can yet
-    - [ ] A tie on every sort key: the portal orders the tied columns by natural id in the direction of its first clinical track (SortUtils alphabeticalDefault, PrecomputedComparator); ours, ascending
-    - [ ] A text clinical track sorts by the natural order of its values ("x2" before "x10", SortUtils stringClinicalComparator); ours, by category order
+    - [x] A tie on every sort key: the case id by javascript-natural-sort in the direction of the first sorted clinical, heatmap or spectrum track, else the genetic track's id order (SortUtils alphabeticalDefault, PrecomputedComparator); Q1 sorted by Sex and by Stage each way, 480 and 379 tied pairs all as the portal's (#206)
+    - [x] A text clinical track sorts by javascript-natural-sort of its values (STAGE I, IA, II … IVB), its legend still most frequent first (SortUtils stringClinicalComparator) (#206)
+      - Known: the library is not a consistent comparator for hex-like values (none in the warehouse); the portal's order of those depends on its input order, ours on the values' ranks
   - [x] Tracks › Clinical: display names, Freq %, Select / Deselect all, applied by Update tracks, no cap of 8 (ONC-TR-1, ONC-STM-4) (#196)
     - [ ] A patient-level attribute's Freq in samples, as the portal counts it (ours its patients; msk_impact_2017 OS_MONTHS 73.3 % vs 74.4 %): needs a samples count in Explore's facet query
     - [ ] Mutation spectrum, Profiled-in and Study of origin listed first as rows of the tab

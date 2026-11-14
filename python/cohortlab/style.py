@@ -5,9 +5,11 @@ Python side of the same pure functions; the TypeScript module is the reference.
 """
 from __future__ import annotations
 
+import calendar
 import json
 import math
 import os
+import re
 from typing import Any
 
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "style.json"), encoding="utf-8") as _f:
@@ -212,6 +214,155 @@ def natural_vector(case_id: str) -> list[int]:
     if num >= 0:
         out.append(num)
     return out
+
+
+# javascript-natural-sort 0.7.1 (Jim Palmer, MIT), as lib/oncoprint-style.ts naturalSort ports it
+_NS_RE = re.compile(r"(\A([+\-]?(?:0|[1-9]\d*)(?:\.\d*)?(?:[eE][+\-]?\d+)?)?\Z|\A0x[0-9a-f]+\Z|\d+)", re.I | re.A)
+_NS_SRE = re.compile(r"(\A[ ]*|[ ]*\Z)")
+_NS_DRE = re.compile(r"(\A([\w ]+,?[\w ]+)?[\w ]+,?[\w ]+\d+:\d+(:\d+)?[\w ]?|\A\d{1,4}[\/\-]\d{1,4}[\/\-]\d{1,4}|\A\w+, \w+ \d+, \d{4})", re.A)
+_NS_HRE = re.compile(r"\A0x[0-9a-f]+\Z", re.I)
+_JS_FLOAT = re.compile(r"\A[\s\ufeff]*([+-]?(?:Infinity|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?))")
+_JS_NUMBER = re.compile(r"\A[+-]?(?:Infinity|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\Z")
+_MONTHS = {m.lower(): i for i, m in enumerate(calendar.month_abbr) if m}
+_TIME = r"(?: (\d{1,2}):(\d{2})(?::(\d{2}))?)?"
+_DATES = [
+    (re.compile(r"\A(\d{4})[-/](\d{1,2})[-/](\d{1,2})" + _TIME + r"\Z", re.A), (1, 2, 3)),
+    (re.compile(r"\A(\d{1,2})[-/](\d{1,2})[-/](\d{1,4})" + _TIME + r"\Z", re.A), (3, 1, 2)),
+]
+_DATE_WORDS = re.compile(r"\A(?:[A-Za-z]+, )?([A-Za-z]{3})[a-z]* (\d{1,2}),? (\d{4})" + _TIME + r"\Z")
+
+
+def _js_parse_float(s: str) -> float:
+    m = _JS_FLOAT.match(s)
+    return float(m.group(1).replace("Infinity", "inf")) if m else math.nan
+
+
+def _js_to_number(v: float | str) -> float:
+    """Number(v), as isNaN coerces a string"""
+    if not isinstance(v, str):
+        return float(v)
+    t = v.strip()
+    if t == "":
+        return 0.0
+    if re.fullmatch(r"0[xX][0-9a-fA-F]+", t):
+        return float(int(t[2:], 16))
+    return float(t.replace("Infinity", "inf")) if _JS_NUMBER.match(t) else math.nan
+
+
+def _js_str(v: float | str) -> str:
+    """String(v) for a number, as JavaScript writes it"""
+    if isinstance(v, str):
+        return v
+    if math.isnan(v):
+        return "NaN"
+    if math.isinf(v):
+        return "Infinity" if v > 0 else "-Infinity"
+    if v == int(v) and abs(v) < 1e21:
+        return str(int(v))
+    r = repr(float(v))
+    if "e" in r:
+        mant, ex = r.split("e")
+        e = int(ex)
+        if -7 < e < 21:
+            return format(float(v), "f").rstrip("0").rstrip(".")
+        return mant + "e" + ("+" if e > 0 else "-") + str(abs(e))
+    return r
+
+
+def _js_date_parse(s: str) -> float:
+    """Date.parse for the shapes the library hands it (V8, UTC); NaN for others"""
+    for rx, (yi, mi, di) in _DATES:
+        m = rx.match(s)
+        if m:
+            y, mo, d = int(m.group(yi)), int(m.group(mi)), int(m.group(di))
+            if len(m.group(yi)) <= 2:
+                y += 2000 if y < 50 else 1900
+            return _utc_ms(y, mo, d, m.group(4), m.group(5), m.group(6))
+    m = _DATE_WORDS.match(s)
+    if m and m.group(1).lower() in _MONTHS:
+        return _utc_ms(int(m.group(3)), _MONTHS[m.group(1).lower()], int(m.group(2)), m.group(4), m.group(5), m.group(6))
+    return math.nan
+
+
+def _utc_ms(y: int, mo: int, d: int, hh: str | None, mm: str | None, ss: str | None) -> float:
+    if not (1 <= mo <= 12 and 1 <= d <= 31):
+        return math.nan
+    h, mi, se = int(hh or 0), int(mm or 0), int(ss or 0)
+    days = (calendar.timegm((y, mo, 1, 0, 0, 0)) // 86400) + d - 1
+    return float((days * 86400 + h * 3600 + mi * 60 + se) * 1000)
+
+
+def _js_lt(a: float | str, b: float | str) -> bool:
+    if isinstance(a, str) and isinstance(b, str):
+        return a.encode("utf-16-be") < b.encode("utf-16-be")
+    return _js_to_number(a) < _js_to_number(b)
+
+
+def _ns_chunks(s: str) -> list[str]:
+    if s == "":
+        return [""]
+    t = _NS_RE.sub(lambda m: "\0" + m.group(1) + "\0", s)
+    t = re.sub(r"\x00\Z", "", t, count=1)
+    t = re.sub(r"\A\x00", "", t, count=1)
+    return t.split("\0")
+
+
+def natural_sort(a: str, b: str) -> int:
+    """javascript-natural-sort 0.7.1: the portal's order of a text track's values and of tied case ids."""
+    x = _NS_SRE.sub("", str(a)) or ""
+    y = _NS_SRE.sub("", str(b)) or ""
+    xn, yn = _ns_chunks(x), _ns_chunks(y)
+
+    def hexv(s: str) -> float:
+        return float(int(s[2:], 16)) if _NS_HRE.match(s) else math.nan
+
+    def truthy(v: Any) -> bool:
+        return bool(v) and not (isinstance(v, float) and math.isnan(v))
+
+    xd: Any = hexv(x)
+    if not truthy(xd):
+        xd = len(xn) != 1 and _NS_DRE.search(x) is not None and _js_date_parse(x)
+    yd: Any = hexv(y)
+    if not truthy(yd):
+        yd = (truthy(xd) and _NS_DRE.search(y) is not None and _js_date_parse(y)) or None
+        if not truthy(yd):
+            yd = None
+    if yd is not None:
+        xv = 0.0 if xd is False or xd is None else float(xd)
+        if xv < yd:
+            return -1
+        if xv > yd:
+            return 1
+    for c in range(max(len(xn), len(yn))):
+        xs = xn[c] if c < len(xn) else ""
+        ys = yn[c] if c < len(yn) else ""
+        p: Any = (not xs.startswith("0") and _js_parse_float(xs)) if c < len(xn) else math.nan
+        q: Any = (not ys.startswith("0") and _js_parse_float(ys)) if c < len(yn) else math.nan
+        p = p if truthy(p) else (xs if c < len(xn) and xs else 0.0)
+        q = q if truthy(q) else (ys if c < len(yn) and ys else 0.0)
+        pn, qn = math.isnan(_js_to_number(p)), math.isnan(_js_to_number(q))
+        if pn != qn:
+            return 1 if pn else -1
+        if isinstance(p, str) != isinstance(q, str):
+            p, q = _js_str(p), _js_str(q)
+        if _js_lt(p, q):
+            return -1
+        if _js_lt(q, p):
+            return 1
+    return 0
+
+
+def natural_ranks(values: list[str]) -> list[int]:
+    """each string's rank under natural_sort; strings it calls equal share a rank"""
+    from functools import cmp_to_key
+    idx = sorted(range(len(values)), key=cmp_to_key(lambda i, j: natural_sort(values[i], values[j])))
+    rank = [0] * len(values)
+    r = 0
+    for k, i in enumerate(idx):
+        if k and natural_sort(values[idx[k - 1]], values[i]) != 0:
+            r = k
+        rank[i] = r
+    return rank
 
 
 def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
