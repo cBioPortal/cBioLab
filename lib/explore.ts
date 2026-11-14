@@ -366,9 +366,12 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   const declared = new Set<string>([...meta.keys(), ...cls.data.map((r) => r.a), ...customAttributesFor(study).map((c) => c.attribute)].map(String));
   const unknownAttributes = meta.size ? clinicalAttrsOf(draft).filter((a) => !declared.has(a)) : [];
 
+  const declaredAttributes = metaRows.data.map((r) => ({ attribute: String(r.a), per: ["1", "true"].includes(String(r.patient_attribute).toLowerCase()) ? "patient" as const : "sample" as const,
+    ...(r.display_name ? { displayName: String(r.display_name) } : {}), priority: Number(r.priority) || 0 }));
+
   return {
     study, draftCount, studyBreakdown,
-    clinical, derived,
+    clinical, derived, declaredAttributes,
     ...(unknownAttributes.length ? { unknownAttributes } : {}),
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
     caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
@@ -1654,6 +1657,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     draftCount: draft ? parts.reduce((s, p) => s + (p.draftCount || 0), 0) : null,
     studyBreakdown: parts.flatMap((p) => p.studyBreakdown || []).sort((a, b) => b.n - a.n),
     clinical,
+    declaredAttributes: [...new Map(parts.flatMap((p) => p.declaredAttributes || []).reverse().map((d) => [d.attribute, d])).values()].reverse(),
     ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),

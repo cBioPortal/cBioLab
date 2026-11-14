@@ -1031,6 +1031,12 @@ export interface ExploreResult {
   drivers?: string;
   studyBreakdown?: StudyBreakdownRow[];
   clinical: ClinicalFacet[];
+  /**
+   * Every clinical attribute the studies declare (clinical_attribute_meta), whether or not the
+   * selection has a value for it, with its stored priority: what the oncoprint's Tracks menu lists.
+   * Across studies, the first study's name and priority.
+   */
+  declaredAttributes?: { attribute: string; per: "patient" | "sample"; displayName?: string; priority: number }[];
   events: { type: string; n: number }[];
   derived?: DerivedFacet[];
   /**
