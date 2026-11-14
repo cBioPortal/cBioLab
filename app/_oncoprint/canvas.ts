@@ -10,7 +10,7 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, STAIRCASE_RADIX, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -337,15 +337,25 @@ function staircaseRanks(data: UnpackedContract, opts: StaircaseOptions): Uint16A
   });
 }
 
-/** each column's case id as the engine orders it: natural order of the id without its study prefix, then the full id */
-function idOrder(data: UnpackedContract): (a: number, b: number) => number {
+/**
+ * The case-id orders the engine uses: `vector`, the genetic track's (stringToVector of the id
+ * without its study prefix, then the full id) and `natural`, a track key's (naturalSort of the
+ * bare id).
+ */
+function idOrder(data: UnpackedContract): { vector: (a: number, b: number) => number; natural: (a: number, b: number) => number } {
   const ids = data.columns();
   const study = data.tracks.find((t) => t.label === STUDY_TRACK);
-  const vec = Array.from(ids, (id, i) => {
+  const bare = Array.from(ids, (id, i) => {
     const st = study && study.cells[i] >= 0 ? study.categories?.[study.cells[i]] : undefined;
-    return naturalVector(st && id.startsWith(st + "_") ? id.slice(st.length + 1) : id);
+    return st && id.startsWith(st + "_") ? id.slice(st.length + 1) : id;
   });
-  return (a, b) => compareVectors(vec[a], vec[b]) || (ids[a] < ids[b] ? -1 : ids[a] > ids[b] ? 1 : 0);
+  const full = (a: number, b: number) => (ids[a] < ids[b] ? -1 : ids[a] > ids[b] ? 1 : 0);
+  const vec = bare.map(naturalVector);
+  let ranks: Int32Array | null = null;
+  return {
+    vector: (a, b) => compareVectors(vec[a], vec[b]) || full(a, b),
+    natural: (a, b) => { ranks ??= naturalRanks(bare); return ranks[a] - ranks[b]; },
+  };
 }
 
 export interface SortKey { track: string; dir: "asc" | "desc" }
@@ -358,7 +368,8 @@ export interface SortKey { track: string; dir: "asc" | "desc" }
 export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], keys: SortKey[], staircase: StaircaseOptions = {}): Uint32Array {
   const ranks = staircaseRanks(data, staircase);
   const genomic = (a: number, b: number): number => { for (const r of ranks) { const d = r[a] - r[b]; if (d) return d; } return 0; };
-  const byId = idOrder(data);
+  const ids = idOrder(data);
+  const byId = ids.vector;
   const cmps = keys.map((k): ((a: number, b: number) => number) => {
     const sign = k.dir === "desc" ? -1 : 1;
     if (k.track === "genomic") return (a, b) => sign * genomic(a, b);
@@ -369,9 +380,14 @@ export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: 
     const v = t.values;
     if (t.stack && v) return (a, b) => { const x = c[a], y = c[b]; if (x === -1 || y === -1) return x === y ? 0 : x === -1 ? 1 : -1; return sign * stackCompare(v, t.stack!.length, x, y); };
     if (v) return (a, b) => { const x = v[a], y = v[b], na = Number.isNaN(x), nb = Number.isNaN(y); if (na || nb) return na === nb ? 0 : na ? 1 : -1; return sign * (x - y); };
-    return (a, b) => { const x = c[a], y = c[b]; if (x === y) return 0; if (x === -1) return 1; if (y === -1) return -1; return sign * (x - y); };
+    // a text clinical track by naturalSort of its values, as the engine
+    const rank = t.kind === "clinical" && t.categories?.length ? naturalRanks(t.categories) : null;
+    return (a, b) => { const x = c[a], y = c[b]; if (x === y) return 0; if (x === -1) return 1; if (y === -1) return -1; return sign * (rank ? rank[x] - rank[y] : x - y); };
   });
-  cmps.push(genomic, byId);
+  // a tie on every key: the first track key's direction over the natural id, else the genetic id order
+  const first = keys.find((k) => k.track !== "genomic" && k.track !== "id" && k.track !== "cluster");
+  const sign = first?.dir === "desc" ? -1 : 1;
+  cmps.push(genomic, first ? (a, b) => sign * ids.natural(a, b) || byId(a, b) : byId);
   const out = new Uint32Array(order.length);
   for (const g of groups) {
     const idx = Array.from(order.subarray(g.start, g.start + g.count));

@@ -14,7 +14,7 @@ import numpy as np
 
 from .contract import BITS, DEFAULT_DISPLAY, NOT_PROFILED, Contract, Track
 from .gene_tracks import normalize_gene_tracks
-from .style import STAIRCASE_RADIX, STYLE, encode_numeric, natural_vector, staircase_rank
+from .style import STAIRCASE_RADIX, STYLE, encode_numeric, natural_ranks, natural_vector, staircase_rank
 
 
 def _round(x: float) -> int:
@@ -308,6 +308,10 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 return sign * ((a > b) - (a < b))
             return vcmp
 
+        # a text clinical track by naturalSort of its values (SortUtils stringClinicalComparator)
+        cats = t.meta.get("categories")
+        rank = natural_ranks(list(cats)) if t.kind == "clinical" and cats else None
+
         def cmp(x: int, y: int) -> int:
             a, b = int(cells[x]), int(cells[y])
             if a == b:
@@ -316,7 +320,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 return 1
             if b == -1:
                 return -1
-            return sign * (a - b)
+            return sign * (rank[a] - rank[b] if rank else a - b)
         return cmp
 
     cmps = []
@@ -335,12 +339,23 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
         cmps.append(track_cmp(t, sign))
     cmps.append(genomic_cmp)
 
+    # a tie on every key: the first track key's direction over the bare id by naturalSort
+    # (SortUtils alphabeticalDefault); then, or with no track key, the genetic track's stringToVector order
+    first = next((s for s in sort if s["track"] in sortable), None)
+    final = by_id
+    if first is not None:
+        natural = natural_ranks([bare(p) for p in all_pids])
+        tie_sign = -1 if first.get("dir") == "desc" else 1
+
+        def final(x: int, y: int) -> int:
+            return tie_sign * (natural[x] - natural[y]) or by_id(x, y)
+
     def column_cmp(x: int, y: int) -> int:
         for c in cmps:
             r = c(x, y)
             if r:
                 return r
-        return by_id(x, y)
+        return final(x, y)
 
     order: list[int] = []
     ranges = []

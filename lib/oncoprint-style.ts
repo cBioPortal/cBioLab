@@ -355,6 +355,50 @@ export function compareVectors(a: number[], b: number[]): number {
   return a.length - b.length;
 }
 
+/**
+ * javascript-natural-sort 0.7.1 (Jim Palmer, MIT), as the portal's oncoprint compares a text
+ * track's values and, on a tie on every key, the case ids (SortUtils stringClinicalComparator,
+ * alphabeticalDefault): numbers inside the strings by value, hex and dates by value, surrounding
+ * spaces ignored, case-sensitive.
+ */
+export function naturalSort(a: string, b: string): number {
+  const re = /(^([+-]?(?:0|[1-9]\d*)(?:\.\d*)?(?:e[+-]?\d+)?)?$|^0x[0-9a-f]+$|\d+)/gi;
+  const sre = /(^ *| *$)/g;
+  const dre = /(^([\w ]+,?[\w ]+)?[\w ]+,?[\w ]+\d+:\d+(:\d+)?[\w ]?|^\d{1,4}[/-]\d{1,4}[/-]\d{1,4}|^\w+, \w+ \d+, \d{4})/;
+  const hre = /^0x[0-9a-f]+$/i;
+  const ore = /^0/;
+  const x = String(a).replace(sre, "") || "", y = String(b).replace(sre, "") || "";
+  const xN = x.replace(re, "\0$1\0").replace(/\0$/, "").replace(/^\0/, "").split("\0");
+  const yN = y.replace(re, "\0$1\0").replace(/\0$/, "").replace(/^\0/, "").split("\0");
+  const hex = (s: string) => { const m = s.match(hre); return m ? parseInt(m[0], 16) : NaN; };
+  const xD: number | false | null = hex(x) || (xN.length !== 1 && dre.test(x) && Date.parse(x));
+  const yD: number | false | null = hex(y) || (xD && dre.test(y) && Date.parse(y)) || null;
+  if (yD) {
+    if ((xD as number) < yD) return -1;
+    if ((xD as number) > yD) return 1;
+  }
+  for (let c = 0, numS = Math.max(xN.length, yN.length); c < numS; c++) {
+    let p: number | string = (!ore.test(xN[c] || "") && parseFloat(xN[c])) || xN[c] || 0;
+    let q: number | string = (!ore.test(yN[c] || "") && parseFloat(yN[c])) || yN[c] || 0;
+    if (isNaN(p as number) !== isNaN(q as number)) return isNaN(p as number) ? 1 : -1;
+    if (typeof p !== typeof q) { p += ""; q += ""; }
+    if (p < q) return -1;
+    if (p > q) return 1;
+  }
+  return 0;
+}
+
+/** each string's rank under naturalSort; strings it calls equal share a rank */
+export function naturalRanks(values: readonly string[]): Int32Array {
+  const idx = Array.from(values.keys()).sort((i, j) => naturalSort(values[i], values[j]));
+  const rank = new Int32Array(values.length);
+  for (let k = 0, r = 0; k < idx.length; k++) {
+    if (k && naturalSort(values[idx[k - 1]], values[idx[k]]) !== 0) r = k;
+    rank[idx[k]] = r;
+  }
+  return rank;
+}
+
 export function truncateLabel(label: string, S: Style = STYLE): string {
   const n = S.geometry.labelMaxChars;
   return label.length > n ? label.slice(0, n - 1) + "…" : label;

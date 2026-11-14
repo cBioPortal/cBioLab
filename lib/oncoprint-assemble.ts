@@ -9,7 +9,7 @@
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, SPECTRUM_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
-import { STYLE, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors } from "./oncoprint-style.ts";
+import { STYLE, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec, ClusterMethod } from "./types.ts";
@@ -491,7 +491,7 @@ export function assembleContract(input: AssembleInput): Contract {
   // Default is the portal's genomic staircase (ONC-ST-1, ONC-ST-2): each gene row, top to
   // bottom, ranks its cell by structural variant, copy number, mutation, germline, mRNA and
   // protein (staircaseRank), with a cell not profiled after an unaltered one; then the case id in
-  // the portal's natural order. sort can put clinical/derived tracks first ("-" = descending,
+  // the portal's order (below). sort can put clinical/derived tracks first ("-" = descending,
   // missing values always last); the staircase and the id remain the final tiebreakers, so every
   // sort is total. Comparing every row inside a comparator is the dominant cost of a 400k-column
   // sort, so the rows' ranks are packed, four to a double ((STAIRCASE_RADIX + 1)^4 < 2^53), and
@@ -514,15 +514,29 @@ export function assembleContract(input: AssembleInput): Contract {
     return 0;
   };
   // the id tiebreaker compares integers: rank the ids once instead of on every comparison
+  const bareIds = allPids.map((p) => { const st = studyOf.get(p); return st && p.startsWith(st + "_") ? p.slice(st.length + 1) : p; });
+  const byFullId = (a: number, b: number) => (allPids[a] < allPids[b] ? -1 : allPids[a] > allPids[b] ? 1 : 0);
   const idRank = new Int32Array(allPids.length);
   {
     // the portal's natural order of the bare case id (oncoprintjs stringToVector), then the full id
-    const vec = allPids.map((p) => { const st = studyOf.get(p); return naturalVector(st && p.startsWith(st + "_") ? p.slice(st.length + 1) : p); });
+    const vec = bareIds.map(naturalVector);
     const idx = Array.from(allPids.keys());
-    idx.sort((a, b) => compareVectors(vec[a], vec[b]) || (allPids[a] < allPids[b] ? -1 : allPids[a] > allPids[b] ? 1 : 0));
+    idx.sort((a, b) => compareVectors(vec[a], vec[b]) || byFullId(a, b));
     for (let r = 0; r < idx.length; r++) idRank[idx[r]] = r;
   }
   const sortableTracks = new Map<string, Track>([...clinTracks, ...devTracks, ...heatTracks].map((t) => [t.label, t]));
+  // A tie on every key falls to the first track key's own tiebreak, the bare id by naturalSort in
+  // that key's direction (SortUtils alphabeticalDefault, flipped by PrecomputedComparator); then,
+  // or with no track key, to the genetic track's, the id by stringToVector ascending.
+  const firstTrackKey = sort.find((s) => sortableTracks.has(s.track));
+  let finalCmp = (x: number, y: number): number => idRank[x] - idRank[y];
+  if (firstTrackKey) {
+    const natural = naturalRanks(bareIds), sign = firstTrackKey.dir === "desc" ? -1 : 1;
+    finalCmp = (x, y) => sign * (natural[x] - natural[y]) || idRank[x] - idRank[y];
+  }
+  // a text clinical track sorts by naturalSort of its values (SortUtils stringClinicalComparator)
+  const textRank = (t: Track): Int32Array | null =>
+    t.kind === "clinical" && !t.values && !t.stack && t.categories?.length ? naturalRanks(t.categories) : null;
   const trackCmp = (t: Track, sign: number) => t.stack ? (x: number, y: number): number => {
     const a = (t.cells as number[])[x], b = (t.cells as number[])[y];
     if (a === -1 || b === -1) return a === b ? 0 : a === -1 ? 1 : -1;
@@ -532,13 +546,13 @@ export function assembleContract(input: AssembleInput): Contract {
     const a = t.values![x], b = t.values![y], na = Number.isNaN(a), nb = Number.isNaN(b);
     if (na || nb) return na === nb ? 0 : na ? 1 : -1;
     return sign * (a - b);
-  } : (x: number, y: number): number => {
+  } : ((rank) => (x: number, y: number): number => {
     const a = (t.cells as number[])[x], b = (t.cells as number[])[y];
     if (a === b) return 0;
     if (a === -1) return 1;
     if (b === -1) return -1;
-    return sign * (a - b);
-  };
+    return sign * (rank ? rank[a] - rank[b] : a - b);
+  })(textRank(t));
   const byId = (x: number, y: number): number => idRank[x] - idRank[y];
   const cmps: ((x: number, y: number) => number)[] = sort.map((s) => {
     const sign = s.dir === "desc" ? -1 : 1;
@@ -564,7 +578,7 @@ export function assembleContract(input: AssembleInput): Contract {
     const idxs = g.pids.map((p) => pidIndex.get(p)!);
     idxs.sort((x, y) => {
       for (const c of cmps) { const r = c(x, y); if (r) return r; }
-      return idRank[x] - idRank[y];
+      return finalCmp(x, y);
     });
     for (const i of idxs) order.push(i); // not push(...idxs): spreads over ~100k args overflow the stack
     groupRanges.push({ name: g.name, start: cursor, count: idxs.length });
