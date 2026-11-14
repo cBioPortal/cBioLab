@@ -21,12 +21,18 @@
  * its samples' value furthest from 0, sign kept, a positive one on a ± tie whatever order the rows
  * arrive in, values that are not numbers left out. The fixture has no expression or generic-assay
  * profile, so these run over scratch copies of the two value tables on the same connection.
+ * And the oncoprint's Tracks › Clinical rows for the fixture (Explore's facets through trackAttrs
+ * and clinicalTrackRows, as the Results page builds them): every declared attribute listed, at 0%
+ * where the selection has no value; a sample attribute's Freq over the queried samples; ties by
+ * stored priority, then name.
  *
  * Run: node --env-file=.env.local scripts/check-oncoprint-values.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines; scripts/gate.sh sets them).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { assayHeatmapSql, clinicalSql, heatmapSql } from "../lib/oncoprint.ts";
+import { buildExplore } from "../lib/explore.ts";
+import { clinicalTrackRows, trackAttrs, trackFreqText } from "../app/_oncoprint/track-edits.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 
@@ -151,6 +157,25 @@ for (const [tag, got] of [["heatmap", heat], ["generic assay", assay]] as const)
   }
 await run("DROP DATABASE IF EXISTS " + scratch);
 
-const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length;
+// ---- the Tracks › Clinical rows ----------------------------------------------------------------
+const menu = async (draft?: unknown) => {
+  const r = await buildExplore({ study: STUDY, conn, skipGenes: true, skipBins: true, ...(draft ? { draft: draft as never } : {}) } as never);
+  return clinicalTrackRows(trackAttrs(r), r.totals);
+};
+const whole = await menu(), female = await menu({ all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] });
+const freq = (rows: typeof whole, a: string) => { const x = rows.find((r) => r.attribute === a); return x ? trackFreqText(x.pct) : "(not listed)"; };
+/** [selection, rows, attribute, Freq], counted by hand from the fixture's data_clinical_*.txt (44 samples; 26 of the women's) */
+const MENU: [string, typeof whole, string, string][] = [
+  ["all", whole, "PARSE_PROBE", "27.3%"], ["all", whole, "TUMOR_GRADE", "9.1%"], ["all", whole, "FLAG_BOOL", "11.4%"],
+  ["SEX = Female", female, "PARSE_PROBE", "26.9%"], ["SEX = Female", female, "FLAG_BOOL", "11.5%"],
+  ["SEX = Female", female, "PATIENT_FLAG", "0%"]          // no woman has a value: listed, at 0%
+];
+for (const [tag, rows, a, want] of MENU) ok(`tracks menu (${tag}) ${a}`, freq(rows, a) === want, "ours " + freq(rows, a) + ", expected " + want);
+ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(whole.length));
+// at 100%: MUTATION_COUNT first (stored priority 30, the rest 1), then by display name
+const top = whole.slice(0, 3).map((r) => r.attribute).join(", ");
+ok("tracks menu order: stored priority, then name", top === "MUTATION_COUNT, AGE, CANCER_TYPE", top);
+
+const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

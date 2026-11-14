@@ -13,7 +13,7 @@ import { driversOf, withDrivers } from "../../lib/driver-settings.ts";
 import { assayTrackLabel, SPECTRUM_TRACK } from "../../lib/profile-names.ts";
 import { STYLE } from "../../lib/oncoprint-style.ts";
 import { CLINICAL_TRACK_LIMIT } from "../../lib/views/oncoprint/types.ts";
-import { clinicalTrackRows, trackFreqText, type TrackAttr, geneRowCount, withClinical, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack } from "./track-edits.ts";
+import { clinicalTrackRows, selectAll, trackFreqText, type TrackAttr, geneRowCount, withClinical, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack } from "./track-edits.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
@@ -90,6 +90,7 @@ export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], cli
     : tab === "heatmap" ? heatOptions : cohorts).filter((n) => match(n) || match(attributeLabel(n)));
   const cap = isClin ? CLINICAL_TRACK_LIMIT : tab === "heatmap" ? 4 : 3;
   const rowOf = (name: string) => rows.find((r) => r.attribute === name);
+  const all = selectAll(shown, clinical, (n) => rowOf(n)?.pct, cap);
   const toggle = (name: string) => {
     if (isClin) setStaged(pending.includes(name) ? pending.filter((x) => x !== name) : pending.length < cap ? [...pending, name] : pending);
     else if (tab === "heatmap") {
@@ -125,9 +126,8 @@ export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], cli
         </div>
         {isClin && <div className="flex flex-wrap items-center gap-1.5">
           {/* Select all / Deselect all apply at once, as the portal's do; single ticks wait for Update tracks */}
-          <Button variant="outline" size="xs" disabled={busy || !shown.length} onClick={() => { setStaged(null);
-            onClinical([...clinical, ...shown.filter((n) => !clinical.includes(n) && (rowOf(n)?.pct ?? 1) > 0)].slice(0, cap)); }}>
-            Select all ({shown.filter((n) => (rowOf(n)?.pct ?? 1) > 0).length})</Button>
+          {all.offered && <Button variant="outline" size="xs" disabled={busy} onClick={() => { setStaged(null); onClinical(all.next); }}>
+            Select all ({all.n})</Button>}
           <Button variant="outline" size="xs" disabled={busy || !clinical.some((n) => shown.includes(n))}
             onClick={() => { setStaged(null); onClinical(clinical.filter((n) => !shown.includes(n))); }}>Deselect all</Button>
           {changed && <Button size="xs" className="ml-auto" disabled={busy} onClick={() => { onClinical(pending); setStaged(null); closeGearMenu("onco-tracks"); }}>Update tracks</Button>}

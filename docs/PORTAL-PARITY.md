@@ -162,6 +162,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Tracks › Clinical: display names, Freq %, Select / Deselect all, applied by Update tracks, no cap of 8 (ONC-TR-1, ONC-STM-4) (#196)
     - [ ] A patient-level attribute's Freq in samples, as the portal counts it (ours its patients; msk_impact_2017 OS_MONTHS 73.3 % vs 74.4 %): needs a samples count in Explore's facet query
     - [ ] Mutation spectrum, Profiled-in and Study of origin listed first as rows of the tab
+    - [x] Every attribute the studies declare is listed, at 0% where the selection has no value; ties broken by the attribute's stored priority (not the Study View's chart priority: SAMPLE_COUNT is stored 1 in all 552 studies, charted 40), then by name in code-unit order; "Select all (N)" counts every listed row, adds those with data and is not offered once all are on (ResultsViewPageStore clinicalAttributes, TracksMenu, FixedHeaderTable) (audit of #196)
+    - [ ] Cosmetic: the Freq column's header tooltip ("% samples with data") and the loading text ("Calculating data availability...")
   - [ ] Clinical tracks (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
     - [x] Every value its own colour, the portal's list and reserved colours (ONC-TT-1) (#197)
       - [x] A patient's "Mixed" is none of the study's values, so the portal's oncoprint colours it itself: the list's first colour, darkened while another value has it (#3061c2 beside any other value), and it takes no slot from the values after it (oncoprintruleset makeUniqueColorGetter). 191,488 patient–attribute pairs in 231 studies have samples that disagree (audit of #197)

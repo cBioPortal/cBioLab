@@ -81,19 +81,55 @@ export const splitGeneTrack = (v: V, label: string): V => {
 /** a clinical attribute as the Tracks menu lists it: `n` is counted at its own level (`per`) */
 export interface TrackAttr { attribute: string; kind: string; patients: number; displayName?: string; per?: "patient" | "sample"; priority?: number }
 
+/**
+ * The Tracks menu's attributes from an Explore result: every attribute the studies declare, as
+ * the portal lists them (ResultsViewPageStore clinicalAttributes), with the selection's count
+ * (0 where it has no value) and the attribute's stored priority; then any the facets hold that
+ * no study declares.
+ */
+export function trackAttrs(r: {
+  clinical: { attribute: string; kind?: string; patients?: number; displayName?: string; per?: "patient" | "sample"; priority?: number }[];
+  declaredAttributes?: { attribute: string; per: "patient" | "sample"; displayName?: string; priority: number }[];
+}): TrackAttr[] {
+  const facet = new Map(r.clinical.map((c) => [c.attribute, c]));
+  const declared = (r.declaredAttributes || []).map((d): TrackAttr => {
+    const f = facet.get(d.attribute);
+    return { attribute: d.attribute, kind: f?.kind || "cat", patients: f?.patients || 0, per: f?.per || d.per, priority: d.priority,
+      ...(d.displayName || f?.displayName ? { displayName: d.displayName || f?.displayName } : {}) };
+  });
+  const known = new Set(declared.map((d) => d.attribute));
+  return [...declared, ...r.clinical.filter((c) => !known.has(c.attribute)).map((c): TrackAttr => ({ attribute: c.attribute, kind: c.kind || "cat",
+    patients: c.patients || 0, ...(c.displayName ? { displayName: c.displayName } : {}), ...(c.per ? { per: c.per } : {}),
+    ...(c.priority != null ? { priority: c.priority } : {}) }))];
+}
+
+/**
+ * The Clinical tab's "Select all (N)" as the portal's (FixedHeaderTable): N counts every row the
+ * search leaves listed; it adds those not on yet that have data (a 0% row cannot be ticked), up to
+ * `cap`; and it is not offered once every listed row is on.
+ */
+export function selectAll(listed: string[], on: string[], pct: (name: string) => number | null | undefined, cap: number) {
+  return { n: listed.length, offered: listed.some((x) => !on.includes(x)),
+    next: [...on, ...listed.filter((x) => !on.includes(x) && (pct(x) ?? 1) > 0)].slice(0, cap) };
+}
+
 /** the portal's Tracks-menu frequency: its Study View getFrequencyStr, "NA" with no denominator */
 export const trackFreqText = (pct: number | null): string => pct == null ? "NA" : portalFreq(pct);
 
 /**
  * The Clinical tab's rows (ONC-TR-1, ONC-STM-4): each attribute's share of the queried cases with
  * a value — a sample-level one over the queried samples, as the portal counts it; a patient-level
- * one over the queried patients (the portal counts its samples) — most first, then by priority,
- * then by name.
+ * one over the queried patients (the portal counts its samples) — most first, then by stored
+ * priority, then by name (TracksMenu, lodash sortBy).
  */
 export function clinicalTrackRows(attrs: TrackAttr[], totals?: { patients: number; samples: number }) {
   return attrs.map((a) => {
     const of = !totals ? 0 : a.per === "sample" ? totals.samples : totals.patients;
     const pct = of ? Math.min(100, 100 * a.patients / of) : null;
     return { ...a, label: a.displayName || a.attribute, pct, unit: a.per === "sample" ? "samples" as const : "patients" as const };
-  }).sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1) || (y.priority ?? 0) - (x.priority ?? 0) || x.label.localeCompare(y.label));
+  }).sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1) || (y.priority ?? 0) - (x.priority ?? 0) || byCodeUnit(x.label.toLowerCase(), y.label.toLowerCase()));
+}
+/** lodash sortBy's order of strings: by UTF-16 code unit, not locale */
+function byCodeUnit(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
 }

@@ -8,6 +8,7 @@ import { api } from "../lab/api.ts";
 import type { Clause } from "../../lib/types";
 import { profileGroup, type ProfileInfo } from "../../lib/profile-catalog.ts";
 import type { PortalHold } from "../../lib/legacy-link.ts";
+import { trackAttrs } from "../_oncoprint/track-edits.ts";
 
 type ProfileType = "MUTATION" | "CNA" | "SV";
 
@@ -84,8 +85,7 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
           profiles: (j.profiles || []).filter((p: string) => p !== "cna"), gaProfiles: j.gaProfiles || [],
           profileCatalog: j.profileCatalog || [],
           clinical: sorted.map((c) => c.attribute),
-          attrs: sorted.map((c) => ({ attribute: c.attribute, kind: c.kind || "cat", patients: c.patients || 0,
-            ...(c.displayName ? { displayName: c.displayName } : {}), ...(c.per ? { per: c.per } : {}), ...(c.priority != null ? { priority: c.priority } : {}) })),
+          attrs: trackAttrs(j),
           patients: j.totals?.patients || 0, samples: j.totals?.samples || 0,
         });
       })
