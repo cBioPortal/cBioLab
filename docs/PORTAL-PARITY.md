@@ -174,7 +174,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Every value its own colour, the portal's list and reserved colours (ONC-TT-1) (#197)
       - [x] A patient's "Mixed" is none of the study's values, so the portal's oncoprint colours it itself: the list's first colour, darkened while another value has it (#3061c2 beside any other value), and it takes no slot from the values after it (oncoprintruleset makeUniqueColorGetter). 191,488 patient–attribute pairs in 231 studies have samples that disagree (audit of #197)
       - Ours alone: a reserved value matches ignoring case and spaces ("0:DiseaseFree", " Yes", "yEs"); the portal reserves only its own spellings (ClinicalTrackColors 131-150) and gives the rest a palette colour. 17 values, 33,162 rows in the warehouse, "0:DiseaseFree" 20,753 of them
-      - [ ] The legend: values alphabetical (localeCompare) with "No data" last; a numeric track's range green to red (oncoprintjs legend, ONC-ST-4)
+      - [x] The legend: the drawn columns' values alphabetical (localeCompare) with "No data" last when a drawn column has none; a numeric track's key green above 0, red below, both when its range spans 0, its ends to 2 decimals (oncoprintlegendrenderer 103-157, 257-305; oncoprintruleset 700-709, 866-876) (ONC-ST-4)
+        - Ours alone: at most 8 values, then "+N more" (the portal lists all)
     - [x] A patient's value as the portal's, by the attribute's declared datatype (a NUMBER's mean, MUTATION_COUNT max; otherwise the shared value or "Mixed"); exact tooltip values; a numeric sort by exact value, no value last (ONC-TT-12, ONC-TP-3, ONC-STM-5) (#198)
       - Not as the portal, on purpose:
         - a NUMBER's value is a number only when its whole text is one. The portal's parseFloat reads Gleason "4+3" as 4, "9-10" as 9 and "1801082_2" as 1801082 (85 values in the warehouse). Reading a prefix is a silent approximation (invariant 1).

@@ -605,6 +605,35 @@ export function trackCategoryColor(track: { label: string; categories?: string[]
   return clinicalColor(k, S);
 }
 
+/** a clinical track's key: its drawn values or its number range, as the portal's legend shows them */
+export type ClinicalLegend =
+  | { kind: "categories"; entries: { label: string; color: string; noData?: boolean }[]; more: number }
+  | { kind: "number"; min: string; max: string; fill: "positive" | "negative" | "split" };
+
+/**
+ * A clinical track's legend, as oncoprintjs draws it. Categories: the values of the drawn columns
+ * (only rules some datum uses are shown), by localeCompare, then "No data" last when a drawn
+ * column has none (oncoprintlegendrenderer 103-157; oncoprintruleset 700-709); at most 8 here, the
+ * rest counted in `more` (ours: the portal lists all). A value keeps its own colour. A bar track:
+ * its range to 2 decimals, green when it is not negative, red when not positive, else both
+ * (oncoprintruleset getValueRangeType 866-876, oncoprintlegendrenderer 257-305).
+ */
+export function clinicalLegend(t: { label: string; categories?: string[]; cells: ArrayLike<number>; bar?: boolean; min?: number; max?: number; profiledFor?: string },
+  S: Style = STYLE, colors?: Record<string, Record<string, string>>, shown?: ArrayLike<number>): ClinicalLegend {
+  if (t.bar) {
+    const lo = t.min ?? 0, hi = t.max ?? 0, two = (x: number) => String(Math.round(x * 100) / 100);
+    return { kind: "number", min: two(lo), max: two(hi), fill: lo < 0 && hi <= 0 ? "negative" : lo >= 0 && hi > 0 ? "positive" : "split" };
+  }
+  const used = new Set<number>();
+  const n = shown ? shown.length : t.cells.length;
+  for (let k = 0; k < n; k++) used.add(t.cells[shown ? shown[k] : k]);
+  const values = [...used].filter((c) => c >= 0).sort((a, b) => t.categories![a].localeCompare(t.categories![b]));
+  const entries: { label: string; color: string; noData?: boolean }[] = values.slice(0, 8)
+    .map((c) => ({ label: t.categories![c], color: trackCategoryColor(t, c, S, colors) }));
+  if (used.has(-1) && !t.profiledFor) entries.push({ label: "No data", color: S.glyph.notProfiled.fill, noData: true });
+  return { kind: "categories", entries, more: Math.max(0, values.length - 8) };
+}
+
 /** a patient's clinical value when its samples disagree (lib/oncoprint.ts) */
 export const MIXED = "Mixed";
 const darken = (c: string): string =>

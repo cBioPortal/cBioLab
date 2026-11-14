@@ -421,6 +421,22 @@ const MUTANTS: Mutant[] = [
     effect: "A driver amplification outvoted by deep deletions no longer counts toward the gene's driver %, though the column holds a driver alteration.",
     find: "const anyDriver = n[i * 4] + n[i * 4 + 2] > 0;",
     replace: "const anyDriver = best % 2 === 0;" },
+  { id: "legend-frequency-order", layer: "counts", guard: "unit", file: "lib/oncoprint-style.ts",
+    effect: "A clinical track's legend lists its values most frequent first instead of the portal's alphabetical order.",
+    find: ".sort((a, b) => t.categories![a].localeCompare(t.categories![b]));",
+    replace: ".sort((a, b) => a - b);" },
+  { id: "legend-no-data-missing", layer: "counts", guard: "unit", file: "lib/oncoprint-style.ts",
+    effect: "A clinical track with missing values has no \"No data\" entry in its legend, so its empty cells are unexplained.",
+    find: "if (used.has(-1) && !t.profiledFor)",
+    replace: "if (used.has(-2) && !t.profiledFor)" },
+  { id: "legend-hidden-values", layer: "counts", guard: "unit", file: "lib/oncoprint-style.ts",
+    effect: "The legend lists values only hidden columns have, which the portal's legend leaves out.",
+    find: "for (let k = 0; k < n; k++) used.add(t.cells[shown ? shown[k] : k]);",
+    replace: "for (let k = 0; k < t.cells.length; k++) used.add(t.cells[k]);" },
+  { id: "legend-number-one-colour", layer: "counts", guard: "unit", file: "lib/oncoprint-style.ts",
+    effect: "A numeric track's legend is green whatever its range, where the portal's is red for negative values.",
+    find: "fill: lo < 0 && hi <= 0 ? \"negative\" : lo >= 0 && hi > 0 ? \"positive\" : \"split\" };",
+    replace: "fill: \"positive\" };" },
 ];
 
 /**
