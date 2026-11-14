@@ -110,13 +110,11 @@ class DisplayValues(unittest.TestCase):
     def test_d7_same_priority_count_decides(self):
         pass
 
-    @unittest.expectedFailure  # a merged or patient cell keeps every copy-number call, not their counts (docs/PORTAL-PARITY.md, ONC-ST-2)
     def test_d8_merged_amp_rec_x1_homdel_x2_count_wins_homdel_vus(self):
         # DU 63-68, 134-148: amp_rec has no render priority, NaN diff, larger count shown (gain not loaded, homdel used)
         ev = [cna("A", 2, True, "G1"), cna("A", -2, False, "G2"), cna("A", -2, False, "G3"), cna("B", 2, False, "G1"), cna("C", -2, False, "G1"), cna("D", 2, True, "G1")]
         self.assertEqual(order(["A", "B", "C", "D"], events=ev, genes=MERGED), ["D", "B", *tie("A", "C")])
 
-    @unittest.expectedFailure  # a merged or patient cell keeps every copy-number call, not their counts (docs/PORTAL-PARITY.md, ONC-ST-2)
     def test_d9_merged_vus_amp_x1_homdel_x2_count_wins_homdel(self):
         ev = [cna("A", 2, False, "G1"), cna("A", -2, False, "G2"), cna("A", -2, False, "G3"), cna("B", 2, False, "G1"), cna("C", -2, False, "G1")]
         self.assertEqual(order(["A", "B", "C"], events=ev, genes=MERGED), ["B", *tie("A", "C")])
