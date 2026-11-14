@@ -40,6 +40,7 @@ import { finiteSql } from "./sql-number.ts";
 import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
 import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
 import { CLINICAL_TRACK_LIMIT } from "./views/oncoprint/types.ts";
+import { fmtFloat32 } from "./chart/format.ts";
 export { normalizeDisplay, normalizeSort } from "./oncoprint-assemble.ts";
 
 const GENE_RE = /^[A-Z0-9][A-Z0-9.-]{0,19}$/;
@@ -267,14 +268,22 @@ async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = 
 }
 
 // per-study generic-assay profiles, by profile type: their datatype and whether a value is a patient's
-const _assayCache = new Map<string, Map<string, { datatype: string; patientLevel: boolean }>>();
-async function studyAssayProfiles(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Map<string, { datatype: string; patientLevel: boolean }>> {
+type AssayProfile = { datatype: string; patientLevel: boolean; pivot?: number; sortOrder?: "ASC" | "DESC" };
+const _assayCache = new Map<string, Map<string, AssayProfile>>();
+async function studyAssayProfiles(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Map<string, AssayProfile>> {
   const key = conn.id + "." + db + "." + study;
   if (_assayCache.has(key) && !studiesChangeWhileRunning()) return _assayCache.get(key)!;
-  const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.datatype AS datatype, toInt32OrZero(ifNull(toString(gp.patient_level), '')) AS pl\n" +
+  const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.datatype AS datatype, toInt32OrZero(ifNull(toString(gp.patient_level), '')) AS pl,\n" +
+    "       toString(gp.pivot_threshold) AS pivot, upper(ifNull(toString(gp.sort_order), '')) AS so\n" +
     "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'GENERIC_ASSAY'", conn);
-  const m = new Map((r.data as ChRow[]).map((x) => [String(x.pt), { datatype: String(x.datatype), patientLevel: Number(x.pl) === 1 }] as const));
+  // the profile's pivot threshold and sort order shape its heatmap's colours (assayScale)
+  const m = new Map((r.data as ChRow[]).map((x): [string, AssayProfile] => {
+    // stored as a float32: 0.001 reads back as 0.0010000000474974513, the portal's API sends 0.001
+    const pivot = x.pivot == null || x.pivot === "" ? NaN : Number(fmtFloat32(Number(x.pivot)));
+    return [String(x.pt), { datatype: String(x.datatype), patientLevel: Number(x.pl) === 1,
+      ...(Number.isFinite(pivot) ? { pivot } : {}), ...(x.so === "ASC" || x.so === "DESC" ? { sortOrder: x.so } : {}) }];
+  }));
   _assayCache.set(key, m);
   return m;
 }
@@ -444,7 +453,7 @@ export interface StudyInputs {
    * per heatmap spec: the study's generic assay of that profile type, if it has one; whether it has
    * the profile as a gene profile (or, for VAF, allele counts); and the values a track would draw
    */
-  heatmap: { assay: { datatype: string; patientLevel: boolean } | null; available: boolean; values: unknown[][] }[];
+  heatmap: { assay: AssayProfile | null; available: boolean; values: unknown[][] }[];
   /** per overlay spec: whether the study has the profile, and its values */
   overlays: { available: boolean; values: unknown[][] }[];
   /** the study's molecular profile types and numeric generic-assay profiles: what a missing profile is named against */
@@ -519,7 +528,7 @@ export function studyOncoprintInputs(study: string, conn: ChConn, req: StudyInpu
       const isVaf = /^vaf$/i.test(h.profileType);
       const a = isVaf ? undefined : assayProfiles.get(h.profileType);
       if (a) {
-        heat.push({ assay: { datatype: a.datatype, patientLevel: a.patientLevel }, available: false,
+        heat.push({ assay: { datatype: a.datatype, patientLevel: a.patientLevel, ...(a.pivot != null ? { pivot: a.pivot } : {}), ...(a.sortOrder ? { sortOrder: a.sortOrder } : {}) }, available: false,
           values: h.assay && !isCategoricalAssay(a.datatype)
             ? await rows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, study, db, unit, a.patientLevel, samples)) : [] });
         continue;
@@ -554,7 +563,9 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
   const groups = Array.isArray(r.groups) && r.groups.length === nGroups ? r.groups.map(ids) : bad("column groups");
   const heatmap = (Array.isArray(r.heatmap) ? r.heatmap : bad("heatmap tracks")).map((h: Record<string, unknown>) => {
     const a = h?.assay as Record<string, unknown> | null;
-    return { assay: a ? { datatype: String(a.datatype), patientLevel: a.patientLevel === true } : null,
+    return { assay: a ? { datatype: String(a.datatype), patientLevel: a.patientLevel === true,
+      ...(typeof a.pivot === "number" && Number.isFinite(a.pivot) ? { pivot: a.pivot } : {}),
+      ...(a.sortOrder === "ASC" || a.sortOrder === "DESC" ? { sortOrder: a.sortOrder as "ASC" | "DESC" } : {}) } : null,
       available: h?.available === true, values: table(h?.values, 3, "heatmap values") };
   });
   const overlays = (Array.isArray(r.overlays) ? r.overlays : bad("overlays")).map((o: Record<string, unknown>) =>
@@ -810,7 +821,10 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
           : await lqRows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, s, dbOf(s), unit, !!assays[studies.indexOf(s)]!.patientLevel, samplesOf(s)), s) })));
       for (const { s, r } of fetched)
         for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
-      heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values });
+      // the profile's pivot and sort order, as the first study holding it declares them
+      const meta = assays.find((a) => a);
+      heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values,
+        ...(meta?.pivot != null ? { pivot: meta.pivot } : {}), ...(meta?.sortOrder ? { sortOrder: meta.sortOrder } : {}) });
       continue;
     }
     if (h.assay) throw new Error("heatmap: entities name a generic assay's tracks; '" + h.profileType + "' is not a generic-assay profile of " + studies.join("/"));

@@ -9,7 +9,7 @@
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, SPECTRUM_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
-import { STYLE, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
+import { STYLE, assayScale, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import type { Contract, Track, GroupRange, ResolvedDisplay, DisplaySpec, ClusterMethod } from "./types.ts";
@@ -158,7 +158,9 @@ export interface AssembleInput {
   clinical: { attr: string; values: Map<string, string> }[];
   /** continuous per-gene values per profile, keyed "<columnId>|<gene>" */
   /** `assay`: a generic-assay profile, whose `genes` are its entities */
-  heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, number> }[];
+  heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, number>;
+    /** a generic assay's profile: its pivot threshold and sort order (genetic_profile) */
+    pivot?: number; sortOrder?: "ASC" | "DESC" }[];
   /** "<profileType>|<gene>" -> pooled reference (federated z-scoring) */
   zReference?: Record<string, ZReference>;
   /**
@@ -455,10 +457,10 @@ export function assembleContract(input: AssembleInput): Contract {
   // ---- heatmap tracks (continuous molecular-profile values per gene) ----
   // The portal's ramps, fixed so colours compare across oncoprints: a molecular profile on
   // -3..3, blue-black-red; methylation 0..1, white at 0.35; VAF 0..1, yellow to teal. A generic
-  // assay is scaled to its data: diverging when it spans zero, sequential otherwise.
+  // assay is scaled to its profile's values and pivot (assayScale).
   const heatTracks: Track[] = [];
   for (const h of heatmap) {
-    const isZ = /zscore/i.test(h.profileType);
+    const assay = h.assay ? assayScale([...h.values.values()], h.pivot, h.sortOrder) : null;
     for (const gene of h.genes) {
       const label = h.assay ? assayTrackLabel(gene, h.profileType) : heatmapTrackLabel(gene, h.profileType);
       // A federation reference re-scores the drawn values against a distribution
@@ -478,13 +480,9 @@ export function assembleContract(input: AssembleInput): Contract {
       // assay keeps its own range.
       const ramp: Track["ramp"] = h.assay ? undefined : h.isVaf ? "vaf" : /methylation/i.test(h.profileType) ? "methylation" : "expression";
       let min: number, max: number, center: number | null;
-      if (ramp === "vaf" || ramp === "methylation") { min = 0; max = 1; center = null; }
-      else if (ramp === "expression" || isZ || usingRef) { min = -3; max = 3; center = 0; }
-      else {
-        const dMin = Math.min(...vals), dMax = Math.max(...vals);
-        if (dMin < 0 && dMax > 0) { const m = Math.max(-dMin, dMax); min = -m; max = m; center = 0; }
-        else { min = dMin; max = dMax; center = null; }
-      }
+      if (assay) { min = assay.min; max = assay.max; center = null; }
+      else if (ramp === "vaf" || ramp === "methylation") { min = 0; max = 1; center = null; }
+      else { min = -3; max = 3; center = 0; }
       const span = max - min || 1;
       const cells = new Int32Array(allPids.length).fill(-1), values = new Float32Array(allPids.length).fill(NaN);
       allPids.forEach((p, i) => {
@@ -497,8 +495,10 @@ export function assembleContract(input: AssembleInput): Contract {
             " stud" + (ref!.studies.length === 1 ? "y" : "ies") + " (" + ref!.studies.join(", ") + ") — " +
             "the reference is federated even where the columns are not"
           : h.isVaf ? "allele fraction, max across a patient's mutations in the gene" : "a patient's: its samples' value furthest from 0",
-        min: Math.round(min * 100) / 100, max: Math.round(max * 100) / 100,
-        center: center == null ? null : Math.round(255 * (0 - min) / span), cells, values });
+        // an assay's range is exact: its colour stops sit on it
+        min: assay ? min : Math.round(min * 100) / 100, max: assay ? max : Math.round(max * 100) / 100,
+        center: center == null ? null : Math.round(255 * (0 - min) / span), cells, values,
+        ...(assay ? { stops: assay.stops, colors: assay.colors } : {}) });
     }
   }
 

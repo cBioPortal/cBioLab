@@ -73,8 +73,9 @@ def ramp_rgb(ramp: dict[str, Any], v: float) -> tuple[int, int, int]:
     if v <= stops[0]:
         return tuple(colors[0])  # type: ignore[return-value]
     for i in range(1, len(stops)):
-        if v <= stops[i]:
-            t = (v - stops[i - 1]) / ((stops[i] - stops[i - 1]) or 1)
+        # a value on a repeated stop takes the colour after it (lib/oncoprint-style.ts rampColor)
+        if v < stops[i] or (v == stops[i] and (i + 1 >= len(stops) or stops[i + 1] != v)):
+            t = 1.0 if stops[i] == stops[i - 1] else (v - stops[i - 1]) / (stops[i] - stops[i - 1])
             a, b = colors[i - 1], colors[i]
             return (_lerp(a[0], b[0], t), _lerp(a[1], b[1], t), _lerp(a[2], b[2], t))
     return tuple(colors[-1])  # type: ignore[return-value]
@@ -84,7 +85,34 @@ def heat_rgb(meta: dict[str, Any], code: int, S: dict[str, Any] = STYLE) -> tupl
     """A numeric cell's colour: its heatmap ramp when it has one (port of heatColor)."""
     if meta.get("ramp"):
         return ramp_rgb(S["ramps"][meta["ramp"]], numeric_value(meta, code))
+    if meta.get("stops") and meta.get("colors"):
+        return ramp_rgb({"stops": meta["stops"], "colors": meta["colors"]}, numeric_value(meta, code))
     return numeric_rgb(code, meta.get("center"), S)
+
+
+def assay_scale(values: list[float], pivot: float | None = None, sort_order: str | None = None, S: dict[str, Any] = STYLE) -> dict[str, Any]:
+    """A generic-assay heatmap's range and gradient (port of assayScale, lib/oncoprint-style.ts)."""
+    A = S["ramps"]["assay"]
+    finite = [v for v in values if v == v and abs(v) != math.inf]
+    lo, hi = (min(finite), max(finite)) if finite else (math.inf, -math.inf)
+    if pivot is not None:
+        hi, lo = max(hi, pivot), min(lo, pivot)
+    left, right = min(0.0, lo), max(0.0, hi)
+    stops = [left, right]
+    if left >= 0:
+        if pivot is None or pivot <= left or pivot >= right:
+            colors = [A["white"], A["darkRed"]]
+        else:
+            colors, stops = [A["white"], A["lightRed"], A["darkRed"]], [left, pivot, right]
+    elif pivot is None or hi == pivot:
+        colors = [A["darkBlue"], A["lightBlue"]]
+    elif lo == pivot:
+        colors = [A["lightRed"], A["darkRed"]]
+    else:
+        colors, stops = [A["darkBlue"], A["lightBlue"], A["lightRed"], A["darkRed"]], [left, pivot, pivot, right]
+    if sort_order == "DESC":
+        colors = list(reversed(colors))
+    return {"min": left, "max": right, "stops": stops, "colors": [list(c) for c in colors]}
 
 
 def numeric_color(v: float, center: float | None, S: dict[str, Any] = STYLE) -> str:

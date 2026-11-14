@@ -423,19 +423,19 @@ test("D18: degenerate generic-assay range [0,0] -> t = NaN (RS:863-866)", { skip
 test("E1: showAsBar, data [-2, 5] -> BAR, range [-2,5] (OU:322-344)", { skip: "generic-assay bar (ONC-TT-9) left out in PR #200" }, () => {});
 test("E2: showAsBar, data [2, 5] -> range [0,5] (OU:337-343)", { skip: "generic-assay bar (ONC-TT-9) left out in PR #200" }, () => {});
 
-test("E3: generic assay, data [-1, 4], no pivot -> range [-1,4] (OU:378-399)", { todo: "the generic-assay range and colours come with its pivot and sort order (docs/PORTAL-PARITY.md, ONC-TT-8)" }, () => {
+test("E3: generic assay, data [-1, 4], no pivot -> range [-1,4] (OU:378-399)", () => {
   const t = heatTrack(heatContract("sig", [-1, 4], { assay: true }));
   assert.deepEqual([t.min, t.max], [-1, 4]);
   // colours #0072b2 -> #ccecff are ONC-TT-8, left out in PR #200
 });
 
-test("E4: generic assay, data [1, 4] (all non-negative), no pivot -> range [0,4] (OU:394-399, 404-413)", { todo: "the generic-assay range and colours come with its pivot and sort order (docs/PORTAL-PARITY.md, ONC-TT-8)" }, () => {
+test("E4: generic assay, data [1, 4] (all non-negative), no pivot -> range [0,4] (OU:394-399, 404-413)", () => {
   const t = heatTrack(heatContract("sig", [1, 4], { assay: true }));
   assert.deepEqual([t.min, t.max], [0, 4], "the range always includes 0");
   // colours #ffffff -> #d55e00 are ONC-TT-8, left out in PR #200
 });
 
-test("E4b: generic assay, data [-4, -1] -> range [-4,0] (OU:394-399)", { todo: "the generic-assay range and colours come with its pivot and sort order (docs/PORTAL-PARITY.md, ONC-TT-8)" }, () => {
+test("E4b: generic assay, data [-4, -1] -> range [-4,0] (OU:394-399)", () => {
   const t = heatTrack(heatContract("sig", [-4, -1], { assay: true }));
   assert.deepEqual([t.min, t.max], [-4, 0], "the range always includes 0");
 });
