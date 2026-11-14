@@ -19,7 +19,7 @@ import { STYLE } from "./oncoprint-style.ts";
 const B = STYLE.bits;
 const MUT = B.MISSENSE | B.TRUNCATING | B.INFRAME | B.SPLICE | B.OTHER_MUT | B.PROMOTER;
 
-export type TrackShape = Pick<Track, "kind" | "numeric" | "categories" | "peak" | "profiledFor">;
+export type TrackShape = Pick<Track, "kind" | "numeric" | "categories" | "peak" | "profiledFor" | "stack">;
 
 /** Column index boundaries for `buckets` buckets over `n` columns; edges[b]..edges[b+1] is bucket b. */
 export function bucketEdges(n: number, buckets: number): number[] {
@@ -36,6 +36,12 @@ export function bucketEdges(n: number, buckets: number): number[] {
  * cells[order[k]]; without it, cells[k]. `scratch` must hold at least categories+1 ints.
  */
 export function aggregate(t: TrackShape, cells: ArrayLike<number>, order: ArrayLike<number> | null, k0: number, k1: number, scratch: Int32Array): number {
+  if (t.stack) {
+    // a stacked row cannot be averaged into one bar: a pixel shows its first column with data,
+    // as the portal's tooltip shows the first case under the cursor
+    for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c !== -1) return c; }
+    return -1;
+  }
   if (t.profiledFor) {
     for (let k = k0; k < k1; k++) if (cells[order ? order[k] : k] === -1) return -1;
     return k1 > k0 ? 0 : -1;

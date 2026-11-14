@@ -35,6 +35,14 @@ def bucket_edges(n: int, buckets: int) -> np.ndarray:
 def aggregate(track: Track, cells: np.ndarray, edges: np.ndarray) -> np.ndarray:
     """One display code per bucket, per track kind (mirrors lod.aggregate)."""
     starts = np.asarray(edges[:-1], dtype=np.intp)  # reduceat wants platform-width indices (32-bit under WebAssembly)
+    if track.meta.get("stack"):
+        # a stacked row shows its first column with data (mirrors lod.aggregate)
+        out = []
+        for a, b in zip(edges[:-1], edges[1:]):
+            seg = cells[int(a):int(b)]
+            hit = seg[seg != -1]
+            out.append(int(hit[0]) if hit.size else -1)
+        return np.asarray(out, dtype=np.int64)
     if track.meta.get("profiledFor"):
         # the exception wins: "No" (-1) when any column is unprofiled
         return np.where(np.minimum.reduceat(cells.astype(np.int64), starts) == -1, -1, 0)
@@ -129,6 +137,16 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                     # the portal's no-data glyph: the not-profiled cell's white and midline
                     img[y0:y0 + ROW_H, x0:x1] = npfill
                     img[y0 + int(ROW_H * npband[0]):y0 + int(ROW_H * npband[1]), x0:x1] = npstripe
+                elif t.meta.get("stack"):
+                    # the column's counts, each a share of the cell, the first category on top
+                    st, v = t.meta["stack"], t.meta.get("values") or []
+                    counts = [v[code * len(st) + j] or 0 for j in range(len(st))]
+                    total, acc = sum(counts), 0.0
+                    for j, n in enumerate(counts):
+                        if total:
+                            ya, yb = y0 + int(round(ROW_H * acc / total)), y0 + int(round(ROW_H * (acc + n) / total))
+                            img[ya:yb, x0:x1] = _rgb(S["glyph"]["spectrum"]["colors"][j])
+                        acc += n
                 elif t.meta.get("bar"):
                     (b0, b1), negative = bar_band(t.meta, code)
                     img[y0 + int(round(ROW_H * b0)):y0 + int(round(ROW_H * b1)), x0:x1] = _rgb(S["glyph"]["bar"]["negative" if negative else "color"])

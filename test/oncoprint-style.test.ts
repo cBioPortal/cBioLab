@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { STYLE, heatColor, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank, clinicalColor } from "../lib/oncoprint-style.ts";
+import { STYLE, stackCompare, stackCellText, heatColor, barBand, cellLayers, encodeNumeric, numericValue, formatPct, formatLabelPct, formatGutterPct, geneLegend, glyphPresence, numericColor, resolveStyle, styleForDisplay, trackCategoryColor, trackLabelText, trackTooltipLines, STAIRCASE_RADIX, staircaseRank, clinicalColor } from "../lib/oncoprint-style.ts";
 import { assembleContract, mutClassBit, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE_JSON } from "../scripts/gen-style.ts";
 import { bucketCodes, bucketEdges } from "../lib/oncoprint-lod.ts";
@@ -285,4 +285,33 @@ test("categorical tracks take the portal's colours: its D3 list in order, reserv
   assert.equal(clinicalColor(31), "#3061c2", "#3366cc × 0.95 per channel, past the list's end");
   assert.equal(clinicalColor(62), "#2e5cb8", "twice darkened on the second pass");
   assert.equal(new Set(Array.from({ length: 200 }, (_, k) => clinicalColor(k))).size, 200, "every value its own colour");
+});
+
+// #199 S2: two columns of the mutation spectrum, as makeCountsMapClinicalComparator orders them (SortUtils 280-327)
+test("#199 S2: stackCompare orders by the largest class (the first on a tie), then by that class's share, ascending", () => {
+  const cols = [
+    [5, 0, 5, 0, 0, 0],   // 0: C>A and C>T tie: C>A, share 0.5
+    [9, 0, 1, 0, 0, 0],   // 1: C>A, 0.9
+    [0, 3, 1, 0, 0, 0],   // 2: C>G, 0.75
+    [0, 0, 9, 0, 0, 1],   // 3: C>T, 0.9
+    [1, 0, 0, 0, 0, 9],   // 4: T>G, 0.9
+    [2, 0, 2, 0, 0, 0],   // 5: same as 0
+    [0, 0, 1, 0, 0, 0]    // 6: C>T, 1.0
+  ];
+  const v = cols.flat(), cmp = (x: number, y: number) => Math.sign(stackCompare(v, 6, x, y));
+  assert.equal(cmp(0, 1), -1, "same class C>A: the smaller share first");
+  assert.equal(cmp(1, 2), -1, "C>A before C>G whatever the share");
+  assert.equal(cmp(2, 3), -1, "C>G before C>T");
+  assert.equal(cmp(3, 4), -1, "C>T before T>G");
+  assert.equal(cmp(0, 3), -1, "a tie between C>A and C>T counts as C>A, not C>T");
+  assert.equal(cmp(3, 6), -1, "C>T 0.9 before C>T 1.0");
+  assert.equal(cmp(4, 0), 1, "antisymmetric");
+  assert.equal(cmp(0, 5), 0, "equal class and share: equal, for the next key");
+});
+
+test("#199 T1: a spectrum cell's tooltip gives each class's count, not its share, and says when there is none (TooltipUtils 208-219)", () => {
+  const t = { label: "Mutation spectrum", stack: ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"], values: [3, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2] };
+  assert.equal(stackCellText(t, 0), "Mutation spectrum: C>A 3 · C>G 0 · C>T 1 · T>A 0 · T>C 0 · T>G 0");
+  assert.equal(stackCellText(t, 1), "Mutation spectrum: C>A 0 · C>G 0 · C>T 0 · T>A 0 · T>C 0 · T>G 2", "the second column's six");
+  assert.equal(stackCellText(t, -1), "Mutation spectrum: no data");
 });

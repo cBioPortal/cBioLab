@@ -28,6 +28,13 @@ export function contractToTsv(contract: Contract): string {
   const lines: string[] = ["track_name\ttrack_type\t" + contract.columns.join("\t")];
   for (const t of contract.tracks) {
     const cells = t.cells as ArrayLike<number>;
+    if (t.stack && t.values) {
+      // one row per category, as the portal writes its mutation spectrum: "<label> (C>A)", the counts
+      const k = t.stack.length, v = t.values;
+      t.stack.forEach((c, j) => lines.push(t.label + " (" + c + ")\tCLINICAL\t" +
+        Array.from(cells, (code) => code === -1 ? "" : String(v[code * k + j])).join("\t")));
+      continue;
+    }
     const vals: string[] = new Array(cells.length);
     for (let i = 0; i < cells.length; i++) {
       const c = cells[i];

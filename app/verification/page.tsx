@@ -46,6 +46,7 @@ const PARITY_GROUPS: Record<string, string> = {
 const GUARD_LABEL: Record<string, string> = {
   unit: "statistics checks", "cohort-logic": "cohort-logic checks", "portal-parity": "cBioPortal comparison",
   "oncoprint-values": "oncoprint value checks",
+  "oncoprint-spectrum": "mutation spectrum checks",
 };
 
 function Verdict({ ok }: { ok: boolean }) {

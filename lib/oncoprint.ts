@@ -31,7 +31,7 @@ import { forData } from "./driver-settings.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { wardOrder, CLUSTER_LIMIT } from "./oncoprint-cluster.ts";
 
-import { PROFILED_TYPES, type ProfiledType } from "./profile-names.ts";
+import { PROFILED_TYPES, SPECTRUM_TRACK, type ProfiledType } from "./profile-names.ts";
 import { inGeneticAlterationDerived } from "./profile-catalog.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
@@ -182,7 +182,37 @@ export function columnFactsSql(study: string = STUDY, db: string = DB, unit: Uni
     "GROUP BY pid";
 }
 
+/**
+ * The mutation spectrum row as clinical rows (pid, MUTATION_SPECTRUM, "C>A,C>G,C>T,T>A,T>C,T>G"
+ * counts): every single-base substitution of the study's mutation profiles, all genes, folded to
+ * the pyrimidine strand (C>A includes G>T, ...), as the portal's MutationSpectrumService counts
+ * them (ONC-STM-6); a patient's, its samples' summed.
+ */
+export function spectrumSql(study: string, db: string, unit: Unit, samples?: string | null): string {
+  const pre = sq(study + "_");
+  const pair = (a: string, b: string, ac: string, bc: string) =>
+    "countIf((me.reference_allele = '" + a + "' AND me.tumor_seq_allele = '" + b + "') OR (me.reference_allele = '" + ac + "' AND me.tumor_seq_allele = '" + bc + "'))";
+  const counts = [pair("C", "A", "G", "T"), pair("C", "G", "G", "C"), pair("C", "T", "G", "A"), pair("T", "A", "A", "T"), pair("T", "C", "A", "G"), pair("T", "G", "A", "C")];
+  return "SELECT replaceOne(" + (unit === "sample" ? "sd.sample_unique_id" : "sd.patient_unique_id") + ", " + pre + ", '') AS pid, " + sq(SPECTRUM_TRACK) + " AS k,\n" +
+    "       arrayStringConcat([" + counts.map((c) => "toString(" + c + ")").join(", ") + "], ',') AS v\n" +
+    "FROM " + db + ".mutation m\n" +
+    "JOIN " + db + ".mutation_event me ON me.mutation_event_id = m.mutation_event_id\n" +
+    "JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = m.genetic_profile_id\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "JOIN " + db + ".sample_derived sd ON sd.internal_id = m.sample_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'MUTATION_EXTENDED'" +
+    (samples ? "\n  AND replaceOne(sd.sample_unique_id, " + pre + ", '') IN (" + samples + ")" : "") + "\n" +
+    "GROUP BY pid\n" +
+    // a case none of whose mutations is a single-base substitution has no spectrum, as the portal's
+    // (MutationSpectrumServiceImpl groups only the snpOnly mutations by sample)
+    "HAVING " + counts.join(" + ") + " > 0";
+}
+
 export function clinicalSql(attrs: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
+  if (attrs.includes(SPECTRUM_TRACK)) {
+    const rest = attrs.filter((a) => a !== SPECTRUM_TRACK);
+    return rest.length ? clinicalSql(rest, study, db, unit, samples) + "\nUNION ALL\n" + spectrumSql(study, db, unit, samples) : spectrumSql(study, db, unit, samples);
+  }
   const puidPrefix = study + "_";
   const inAttrs = "attribute_name IN (" + attrs.map(sq).join(",") + ") AND attribute_value != ''";
   if (unit === "sample")

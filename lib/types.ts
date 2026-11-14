@@ -811,6 +811,11 @@ export interface Track {
    * none: what a tooltip, the TSV and a sort read. The cells stay the drawing code.
    */
   values?: number[] | Float32Array;
+  /**
+   * A stacked row (the mutation spectrum): `values` holds `stack.length` counts per column, column
+   * after column, and a cell is its column's index into them (-1 with none).
+   */
+  stack?: string[];
   /** gene tracks */
   altered?: number; profiled?: number; driverAltered?: number;
   /** a merged gene row: the symbols it pools, in order. Absent on a single-gene row. */

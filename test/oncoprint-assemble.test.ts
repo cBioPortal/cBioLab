@@ -495,3 +495,72 @@ test("a numeric clinical value is a number only when its whole text is one (the 
   const at = (i: number) => t.values![c.columns.indexOf(pids[i])];
   assert.deepEqual(raw.map((_, i) => at(i)), [null, null, 1000, null, 0.5, null], "12abc, 0x10, 1e3, >90, .5, 1,5");
 });
+
+test("the mutation spectrum row: six counts per column, sorted by its largest share, carried with its column (ONC-TT-3, ONC-STM-6)", () => {
+  const pids = ["A", "B", "C", "D"];
+  const spec = new Map([["A", "1,0,9,0,0,0"], ["B", "8,0,2,0,0,0"], ["C", "0,0,0,0,0,0"], ["D", "0,0,6,0,0,0"]]);
+  const c = assembleContract({ ...input(), genes: ["TP53"], groups: [{ name: "all", pids }], derived: [], events: [],
+    coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })), clinical: [{ attr: "MUTATION_SPECTRUM", values: spec }],
+    sort: [{ track: "MUTATION_SPECTRUM", dir: "asc" }] });
+  const t = c.tracks.find((x) => x.label === "MUTATION_SPECTRUM")!;
+  assert.deepEqual(t.stack, ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"]);
+  // B's largest is C>A (the first category); A (90 % C>T) before D (100 % C>T); C, all zero, has no data and goes last
+  assert.deepEqual(c.columns, ["B", "A", "D", "C"]);
+  assert.deepEqual(Array.from(t.cells), [0, 1, 2, -1], "a cell names its own column");
+  assert.deepEqual(Array.from(t.values!).slice(0, 12), [8, 0, 2, 0, 0, 0, 1, 0, 9, 0, 0, 0], "each column's counts moved with it");
+});
+
+// #199 case table, the mutation spectrum (legacy: DataUtils 726-745, SortUtils 280-327, 333-345)
+const SPECTRUM_CASES: [string, string][] = [
+  ["S1", "5,0,5,0,0,0"],     // C>A and C>T tie for the largest: the first, C>A, share 0.5
+  ["S2", "2,0,2,0,0,0"],     // the same: C>A, share 0.5 (equal to S1 on this key)
+  ["S3", "9,0,1,0,0,0"],     // C>A, share 0.9
+  ["S4", "0,3,1,0,0,0"],     // C>G, share 0.75
+  ["S5", "0,0,9,0,0,1"],     // C>T, share 0.9
+  ["S6", "1,0,0,0,0,9"],     // T>G, share 0.9
+  ["S7", "0,0,0,0,0,0"]      // all 0: no data
+];                           // S8: no spectrum row at all
+const SPECTRUM_PIDS = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"];
+const spectrumContract = (sort: { track: string; dir: "asc" | "desc" }[], extra: { attr: string; values: Map<string, string> }[] = [], pids = SPECTRUM_PIDS) =>
+  assembleContract({ ...input(), genes: ["TP53"], groups: [{ name: "all", pids }], derived: [], events: [],
+    coverage: pids.map((pid) => ({ pid, genes: ["TP53"] })),
+    clinical: [{ attr: "MUTATION_SPECTRUM", values: new Map(SPECTRUM_CASES) }, ...extra], sort });
+
+test("#199 V2: a column whose six counts are all 0 has no data, as one with no spectrum row", () => {
+  const c = spectrumContract([{ track: "id", dir: "asc" }]);
+  const t = c.tracks.find((x) => x.label === "MUTATION_SPECTRUM")!;
+  assert.equal(t.cells[c.columns.indexOf("S7")], -1, "all 0: no data (fillNoDataValue)");
+  assert.equal(t.cells[c.columns.indexOf("S8")], -1, "no row: no data");
+  const s3 = t.cells[c.columns.indexOf("S3")];
+  assert.ok(s3 >= 0);
+  assert.deepEqual(Array.from(t.values!).slice(s3 * 6, s3 * 6 + 6), [9, 0, 1, 0, 0, 0], "a column with data carries its six counts");
+});
+
+test("#199 S1/S2: the engine sorts the spectrum by its largest class (first on a tie), then that class's share; no data last both ways", () => {
+  const asc = spectrumContract([{ track: "MUTATION_SPECTRUM", dir: "asc" }]).columns;
+  assert.deepEqual([...asc.slice(0, 2)].sort(), ["S1", "S2"], "asc: C>A at 0.5 first (S1's tie between C>A and C>T goes to C>A)");
+  assert.deepEqual(asc.slice(2, 6), ["S3", "S4", "S5", "S6"], "asc: C>A 0.9, then C>G, C>T, T>G");
+  assert.deepEqual([...asc.slice(6)].sort(), ["S7", "S8"], "asc: no data last");
+  const desc = spectrumContract([{ track: "MUTATION_SPECTRUM", dir: "desc" }]).columns;
+  assert.deepEqual(desc.slice(0, 4), ["S6", "S5", "S4", "S3"], "desc: class and share both flip");
+  assert.deepEqual([...desc.slice(4, 6)].sort(), ["S1", "S2"]);
+  assert.deepEqual([...desc.slice(6)].sort(), ["S7", "S8"], "desc: no data still last");
+});
+
+test("#199 S3: two columns equal on the spectrum go to the next sort key", () => {
+  // NEXT: a number for each of 12 columns (S2 below S1), enough that it is a numeric track
+  const pids = [...SPECTRUM_PIDS, "S9", "S10", "S11", "S12"];
+  const next = { attr: "NEXT", values: new Map(pids.map((p, i): [string, string] => [p, p === "S2" ? "0.5" : String(10 + i * 3.25)])) };
+  const alone = spectrumContract([{ track: "NEXT", dir: "asc" }], [next], pids);
+  assert.ok(alone.tracks.find((t) => t.label === "NEXT")!.numeric && alone.columns[0] === "S2", "NEXT alone sorts S2 first");
+  for (const dir of ["asc", "desc"] as const) {
+    const cols = spectrumContract([{ track: "MUTATION_SPECTRUM", dir }, { track: "NEXT", dir: "asc" }], [next], pids).columns;
+    const pick = cols.filter((p) => p === "S1" || p === "S2");
+    assert.deepEqual(pick, ["S2", "S1"], dir + ": S1 and S2 tie on the spectrum; NEXT asc puts S2 first");
+  }
+});
+
+test("#199 F1: the Tracks menu's Freq for the mutation spectrum counts samples sequenced, not samples with a spectrum (ResultsViewPageStore 1306-1312)",
+  { todo: "known missing: no Freq for the spectrum in the Tracks menu" }, () => {
+    assert.fail("not implemented");
+  });

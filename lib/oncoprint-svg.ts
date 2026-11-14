@@ -28,7 +28,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   const { rowH: ROW_H, rowGap: ROW_GAP, gutter: GUTTER, groupGap: GROUP_GAP, header: HEADER_H } = G;
   const nTracks = contract.tracks.length;
   const catTracks = contract.display?.clinicalLegends === "none" ? [] : contract.tracks.filter((t) =>
-    (t.kind === "clinical" && ((t.categories && t.categories.length) || t.numeric)) || t.kind === "heatmap");
+    (t.kind === "clinical" && ((t.categories && t.categories.length) || t.numeric || t.stack)) || t.kind === "heatmap");
   // gene legend, wrapped to the available width; each row is 16 px
   // only the alterations these cells actually carry
   const items: { label: string; color: string; kind: string }[] = geneLegend(S, glyphPresence(contract.tracks as { kind: string; cells: ArrayLike<number> }[], S));
@@ -99,6 +99,13 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
         if (t.kind === "gene") geneCell(code, x, y, w);
         else if (t.kind === "derivedEvent") parts.push(rect(x, y, w, ROW_H, code > 0 ? P.derived : P.unaltered));
         else if (code === -1) noData(x, y, w);
+        else if (t.stack && t.values) {
+          // the column's counts, each a share of the cell, the first category on top
+          const k = t.stack.length, v = t.values;
+          let total = 0; for (let j = 0; j < k; j++) total += v[code * k + j] ?? 0;
+          let y0 = y;
+          for (let j = 0; j < k; j++) { const hj = total ? ROW_H * (v[code * k + j] ?? 0) / total : 0; parts.push(rect(x, y0, w, hj, S.glyph.spectrum.colors[j])); y0 += hj; }
+        }
         else if (t.bar) { const { band, negative } = barBand(t, code); parts.push(rect(x, y + ROW_H * band[0], w, ROW_H * (band[1] - band[0]), negative ? S.glyph.bar.negative : S.glyph.bar.color)); }
         else if (t.numeric) parts.push(rect(x, y, w, ROW_H, heatColor(t, code, S)));
         else parts.push(rect(x, y, w, ROW_H, trackCategoryColor(t, code, S, colors)));
@@ -153,6 +160,14 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     if (t.bar) {
       for (let i = 0; i < 4; i++) parts.push(rect(cx + i * 6, cy - 1 - 2.5 * (i + 1), 4, 2.5 * (i + 1), S.glyph.bar.color));
       parts.push(`<text x="${cx + 4 * 6 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.logScale ? " (log scale)" : ""}</text>`);
+      continue;
+    }
+    if (t.stack) {
+      t.stack.forEach((c, i) => {
+        parts.push(rect(cx, cy - 9, 10, 10, S.glyph.spectrum.colors[i]));
+        parts.push(`<text x="${cx + 14}" y="${cy}" fill="${P.muted}">${esc(c)}</text>`);
+        cx += 14 + c.length * 6.2 + 16;
+      });
       continue;
     }
     if (t.numeric) {

@@ -103,6 +103,12 @@ class Contract:
             elif t.kind == "derivedEvent":
                 vals = ["yes" if c > 0 else "no" for c in t.cells]
                 kind = "DERIVED"
+            elif t.meta.get("stack"):
+                # one row per category, as the portal writes its mutation spectrum
+                st, v = t.meta["stack"], t.meta.get("values") or []
+                for j, cat in enumerate(st):
+                    yield [f"{t.label} ({cat})", "CLINICAL", *["" if c == -1 else _float32_text(v[int(c) * len(st) + j]) for c in t.cells]]
+                continue
             elif t.meta.get("numeric"):
                 exact = t.meta.get("values")
                 vals = ["" if c == -1 else _float32_text(exact[i]) if exact is not None and exact[i] is not None
@@ -180,7 +186,8 @@ def read_opb1(data: bytes | bytearray | memoryview) -> Contract:
         cells = np.frombuffer(buf, dtype=dtype, count=m["length"], offset=base + m["offset"])
         meta = {k: v for k, v in m.items() if k not in ("kind", "label", "dtype", "offset", "length", "valuesOffset")}
         if "valuesOffset" in m:
-            vals = np.frombuffer(buf, dtype="<f4", count=m["length"], offset=base + m["valuesOffset"])
+            # a stacked row (the mutation spectrum) holds len(stack) values per column
+            vals = np.frombuffer(buf, dtype="<f4", count=m["length"] * len(m.get("stack") or [0]), offset=base + m["valuesOffset"])
             meta["values"] = [None if math.isnan(x) else float(x) for x in vals]
         tracks.append(Track(m["kind"], m["label"], cells, meta))
     co, cb = header["columnsOffset"], header["columnsBytes"]

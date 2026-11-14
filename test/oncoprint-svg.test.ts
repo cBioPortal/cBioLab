@@ -84,3 +84,50 @@ test("zoomed out, a track with more than 63 values still draws its commonest one
     tracks: [{ kind: "clinical", label: "X", categories: cats, cells: new Array(n).fill(70) }] } as unknown as Contract;
   assert.ok(contractToSvg(c, 800).includes(clinicalColor(70)), "value v70's colour, past the old 64-slot vote");
 });
+
+test("the server SVG draws a stacked row as shares in the portal's colours, and lists them in the legend", () => {
+  const c = { study: "s", studies: ["s"], groups: [{ name: "all", start: 0, count: 2 }], columns: ["A", "B"], unit: "patient",
+    conventions: { sort: [] }, stats: { nColumns: 2 }, display: {},
+    tracks: [{ kind: "clinical", label: "MUTATION_SPECTRUM", stack: ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"], cells: [0, -1],
+      values: [3, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0] }] } as unknown as Contract;
+  const svg = contractToSvg(c, 400);
+  assert.ok(svg.includes('fill="#3D6EB1"') && svg.includes('fill="#DFF1F8"'), "C>A and C>T drawn, in the portal's colours");
+  assert.ok(svg.includes(">T>G<") || svg.includes(">T&gt;G<"), "the legend names every substitution");
+});
+
+// #199 D1, D2: the mutation spectrum's stacked bar (oncoprintjs StackedBarRuleSet 1203-1290, ClinicalDataCache 32-48)
+const SPECTRUM_FILLS = ["#3D6EB1", "#8EBFDC", "#DFF1F8", "#FCE08E", "#F78F5E", "#D62B23"];
+function spectrumRects(values: number[], cells: number[]) {
+  const n = cells.length;
+  const c = { study: "s", studies: ["s"], groups: [{ name: "all", start: 0, count: n }], columns: cells.map((_, i) => "C" + i), unit: "patient",
+    conventions: { sort: [] }, stats: { nColumns: n }, display: {},
+    tracks: [{ kind: "clinical", label: "MUTATION_SPECTRUM", stack: ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"], cells, values }] } as unknown as Contract;
+  const svg = contractToSvg(c, 600);
+  // the figure's cells: rects inside the drawing group, in one of the six fills
+  const body = svg.slice(svg.indexOf("<g"), svg.indexOf("</g>"));
+  return [...body.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="(#[0-9A-Fa-f]{6})"/g)]
+    .map((m) => ({ x: +m[1], y: +m[2], w: +m[3], h: +m[4], fill: m[5].toUpperCase() }))
+    .filter((r) => SPECTRUM_FILLS.includes(r.fill));
+}
+
+test("#199 D1: each class is its share of the column's total, stacked to the full cell height whatever the total", () => {
+  // column 0: 3 C>A, 1 C>T; column 1: 300 T>G and 100 C>G; column 2: no data
+  const rects = spectrumRects([3, 0, 1, 0, 0, 0, 0, 100, 0, 0, 0, 300], [0, 1, -1]);
+  const xs = [...new Set(rects.map((r) => r.x))].sort((a, b) => a - b);
+  const col = (i: number) => rects.filter((r) => r.x === xs[i] && r.h > 0);
+  assert.equal(xs.length, 2, "two columns drawn, the one with no data not at all");
+  const h0 = col(0).reduce((s, r) => s + r.h, 0), h1 = col(1).reduce((s, r) => s + r.h, 0);
+  assert.ok(h0 > 0 && Math.abs(h0 - h1) < 0.01, "a total of 4 and of 400 both fill the cell: " + h0 + " vs " + h1);
+  const ca = col(0).find((r) => r.fill === "#3D6EB1")!, ct = col(0).find((r) => r.fill === "#DFF1F8")!;
+  assert.ok(Math.abs(ca.h / h0 - 0.75) < 0.01 && Math.abs(ct.h / h0 - 0.25) < 0.01, "C>A 3/4, C>T 1/4");
+  assert.ok(ca.y < ct.y, "C>A, the first class, at the top");
+  const tg = col(1).find((r) => r.fill === "#D62B23")!, cg = col(1).find((r) => r.fill === "#8EBFDC")!;
+  assert.ok(Math.abs(tg.h / h1 - 0.75) < 0.01 && cg.y < tg.y, "T>G 3/4, below C>G");
+});
+
+test("#199 D2: the six classes in the portal's colours, in class order C>A ... T>G", () => {
+  // column i holds class i only
+  const values = Array.from({ length: 36 }, (_, j) => (j % 7 === 0 ? 2 : 0));
+  const rects = spectrumRects(values, [0, 1, 2, 3, 4, 5]).filter((r) => r.h > 0).sort((a, b) => a.x - b.x);
+  assert.deepEqual(rects.map((r) => r.fill), SPECTRUM_FILLS);
+});

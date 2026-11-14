@@ -23,13 +23,14 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
   "portal-parity": ["node", "--env-file=.env.local", "scripts/check-portal-parity.ts"],
   // reads the fixture study on connection b (CLICKHOUSE2_*, from scripts/peer-db.ts)
   "oncoprint-values": ["node", "--env-file=.env.local", "scripts/check-oncoprint-values.ts"],
+  "oncoprint-spectrum": ["node", "--env-file=.env.local", "scripts/check-oncoprint-spectrum.ts"],
 };
 
 interface Mutant {
@@ -205,6 +206,22 @@ const MUTANTS: Mutant[] = [
     history: "Shipped in #198 before review: numbers were told from words by parsing the values.",
     find: "attribute_name IN (\" + declaredNumbers + \") AS declared_number",
     replace: "countIf(\" + smp + \" AND \" + num + \" IS NULL) = 0 AS declared_number" },
+  { id: "spectrum-strand-not-folded", layer: "counts", guard: "oncoprint-spectrum", file: "lib/oncoprint.ts",
+    effect: "The mutation spectrum counts only substitutions written on the pyrimidine strand, so a G>T is not counted as a C>A and every spectrum is about half what it should be.",
+    find: "+ \"') OR (me.reference_allele = '\" + ac + \"' AND me.tumor_seq_allele = '\" + bc + \"'))\";",
+    replace: "+ \"') OR 0)\";" },
+  { id: "spectrum-wrong-complement", layer: "counts", guard: "oncoprint-spectrum", file: "lib/oncoprint.ts",
+    effect: "G>A is counted as C>A instead of C>T, so one signature reads as another.",
+    find: "pair(\"C\", \"A\", \"G\", \"T\")",
+    replace: "pair(\"C\", \"A\", \"G\", \"A\")" },
+  { id: "spectrum-indel-only-case-drawn", layer: "counts", guard: "oncoprint-spectrum", file: "lib/oncoprint.ts",
+    effect: "A case with mutations but no single-base substitution gets a spectrum of six zeros instead of none.",
+    find: "\"HAVING \" + counts.join(\" + \") + \" > 0\"",
+    replace: "\"HAVING 1\"" },
+  { id: "spectrum-patient-not-summed", layer: "counts", guard: "oncoprint-spectrum", file: "lib/oncoprint.ts",
+    effect: "A patient column's spectrum is keyed by sample, so a patient with several samples shows none of them.",
+    find: "(unit === \"sample\" ? \"sd.sample_unique_id\" : \"sd.patient_unique_id\")",
+    replace: "\"sd.sample_unique_id\"" },
 ];
 
 /**
