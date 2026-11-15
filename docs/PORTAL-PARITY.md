@@ -315,7 +315,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Every altered gene tested (ours `minAltered: 5`, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested, DYNC2H1 q 0.0503 vs 0.239; CNA 6,512 vs 6,156 significant; G5 mutation 145 vs 336; see bugs) (CMM-STM-7, CMM-AL-4) (PR #228 open)
   - [ ] Every row (ours ≤300, and the frequency scatter and bar plot are built from those 300; the expression tabs' cap is under them) (CMM-AL-5, CMM-FS, CMM-BP-2, CMM-GN, CMM-EX-5)
   - [ ] Patient-level enrichment: the Sample / Patient select (CMM-AL-4, CMM-MD-5)
-  - [x] Formats: p and q "< 10^-10" (ours "1.1e-82"), altered % to 2 dp (ours 1), the volcano's y capped at 10 (ours to 82) (CMM-STM-9, CMM-STM-3, CMM-AL-5, CMM-VO-1) (PR #PR8 open)
+  - [x] Formats: p and q "< 10^-10" (ours "1.1e-82"), altered % to 2 dp (ours 1), the volcano's y capped at 10 (ours to 82) (CMM-STM-9, CMM-STM-3, CMM-AL-5, CMM-VO-1) (PR #236 open)
     - [ ] Group headers "(A) Basal": the ordinals come with the group selector's (CMP-GS-7)
   - [ ] The Co-occurrence Pattern column (listed for the Mutations tab) (CMM-AL-6, CMM-MU-5)
   - [ ] The bar plot's options and Select genes (ours a fixed 10; see bugs) (CMM-BP-1, CMM-BP-2)
