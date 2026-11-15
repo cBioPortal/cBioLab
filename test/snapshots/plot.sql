@@ -20,10 +20,13 @@ JOIN snapshot_db.sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id
 WHERE ga.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND ga.profile_type = 'gistic' AND ga.hugo_gene_symbol = 'ERBB2'
   AND if(isFinite(ifNull(toFloat64OrNull(ga.alteration_value), nan)), toFloat64OrNull(ga.alteration_value), NULL) IS NOT NULL AND replaceOne(ga.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort))
 GROUP BY id)
-SELECT gs.v AS g, count() AS n, min(vs.v) AS lo, max(vs.v) AS hi,
-       quantilesExact(0.25, 0.5, 0.75)(vs.v) AS q
-FROM vs INNER JOIN gs ON gs.id = vs.id
-GROUP BY g ORDER BY n DESC LIMIT 151
+SELECT g, n, s[1] AS lo, s[n] AS hi,
+       [s[greatest(1, intDiv(n + 2, 4))],
+        if(n % 2 = 1, s[intDiv(n + 1, 2)], (s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2),
+        s[greatest(1, intDiv(3 * n + 2, 4))]] AS q
+FROM (SELECT gs.v AS g, count() AS n, arraySort(groupArray(vs.v)) AS s
+      FROM vs INNER JOIN gs ON gs.id = vs.id GROUP BY g)
+ORDER BY n DESC LIMIT 151
 
 -- view 0 plot: plot:coverage · brca_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -64,8 +67,8 @@ WHERE ga.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND ga.profile
 GROUP BY id)
 SELECT vs.id AS id, gs.v AS g, vs.v AS v, count() OVER () AS total
 FROM vs INNER JOIN gs ON gs.id = vs.id
-WHERE indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v) > 0 AND (vs.v < arrayElement([-1.7658, -1.2746, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) OR vs.v > arrayElement([0.351, 1.0078, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)))
-ORDER BY if(vs.v > arrayElement([0.351, 1.0078, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), vs.v - arrayElement([0.351, 1.0078, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), arrayElement([-1.7658, -1.2746, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) - vs.v) / if(arrayElement([0.351, 1.0078, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) > arrayElement([-1.7658, -1.2746, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), arrayElement([0.351, 1.0078, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) - arrayElement([-1.7658, -1.2746, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), 1) DESC, id
+WHERE indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v) > 0 AND (vs.v < arrayElement([-1.7458, -1.2744, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) OR vs.v > arrayElement([0.351, 1.0064000000000002, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)))
+ORDER BY if(vs.v > arrayElement([0.351, 1.0064000000000002, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), vs.v - arrayElement([0.351, 1.0064000000000002, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), arrayElement([-1.7458, -1.2744, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) - vs.v) / if(arrayElement([0.351, 1.0064000000000002, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) > arrayElement([-1.7458, -1.2744, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), arrayElement([0.351, 1.0064000000000002, 1.3825, 3.7214], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)) - arrayElement([-1.7458, -1.2744, -1.1975, -0.5985500000000004], indexOf(['Shallow deletion', 'Diploid', 'Gain', 'Amplification'], gs.v)), 1) DESC, id
 LIMIT 10000
 
 -- view 0 plot: plot:points · brca_tcga_pan_can_atlas_2018
@@ -145,10 +148,13 @@ LEFT JOIN (
 ) g ON g.sample_unique_id = sd.sample_unique_id
 WHERE sd.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND replaceOne(sd.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 GROUP BY alt_case))
-SELECT gs.v AS g, count() AS n, min(vs.v) AS lo, max(vs.v) AS hi,
-       quantilesExact(0.25, 0.5, 0.75)(vs.v) AS q
-FROM vs INNER JOIN gs ON gs.id = vs.id
-GROUP BY g ORDER BY n DESC LIMIT 151
+SELECT g, n, s[1] AS lo, s[n] AS hi,
+       [s[greatest(1, intDiv(n + 2, 4))],
+        if(n % 2 = 1, s[intDiv(n + 1, 2)], (s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2),
+        s[greatest(1, intDiv(3 * n + 2, 4))]] AS q
+FROM (SELECT gs.v AS g, count() AS n, arraySort(groupArray(vs.v)) AS s
+      FROM vs INNER JOIN gs ON gs.id = vs.id GROUP BY g)
+ORDER BY n DESC LIMIT 151
 
 -- view 1 plot: plot:coverage · brca_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -223,8 +229,8 @@ WHERE sd.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND replaceOne
 GROUP BY alt_case))
 SELECT vs.id AS id, gs.v AS g, vs.v AS v, count() OVER () AS total
 FROM vs INNER JOIN gs ON gs.id = vs.id
-WHERE indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v) > 0 AND (vs.v < arrayElement([0, 0.2493, 0.0002, 0.0027, 0.17855000000000004, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) OR vs.v > arrayElement([0.9122, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)))
-ORDER BY if(vs.v > arrayElement([0.9122, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), vs.v - arrayElement([0.9122, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), arrayElement([0, 0.2493, 0.0002, 0.0027, 0.17855000000000004, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) - vs.v) / if(arrayElement([0.9122, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) > arrayElement([0, 0.2493, 0.0002, 0.0027, 0.17855000000000004, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), arrayElement([0.9122, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) - arrayElement([0, 0.2493, 0.0002, 0.0027, 0.17855000000000004, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), 1) DESC, id
+WHERE indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v) > 0 AND (vs.v < arrayElement([0, 0.2493, 0.0002, 0.0027, 0.1011, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) OR vs.v > arrayElement([0.91475, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)))
+ORDER BY if(vs.v > arrayElement([0.91475, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), vs.v - arrayElement([0.91475, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), arrayElement([0, 0.2493, 0.0002, 0.0027, 0.1011, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) - vs.v) / if(arrayElement([0.91475, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) > arrayElement([0, 0.2493, 0.0002, 0.0027, 0.1011, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), arrayElement([0.91475, 0.5605, 0.947, 0.8331, 0.6513, 0.7076499999999999, 0.41095000000000004], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)) - arrayElement([0, 0.2493, 0.0002, 0.0027, 0.1011, 0, 0], indexOf(['Missense', 'Inframe', 'Truncating', 'Splice', 'Multiple', 'Not mutated', 'Not profiled'], gs.v)), 1) DESC, id
 LIMIT 10000
 
 -- view 1 plot: plot:points · brca_tcga_pan_can_atlas_2018
