@@ -9,6 +9,7 @@ import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, 
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
 import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
+import { OQL_NOT_PROFILED } from "../../plot-oql.ts";
 import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
 import { resolveDrivers, type DriverSettings } from "../../driver-settings.ts";
@@ -63,14 +64,48 @@ function poolViolin(parts: ViolinBin[][]): ViolinBin[] {
   return [...byKey.values()];
 }
 
-/** copy-number levels in their own order, as the portal draws them; anything else keeps its place after them */
+/** copy-number levels in their own order, as the portal draws them */
 const CNA_LEVELS = ["Deep deletion", "Shallow deletion", "Diploid", "Gain", "Amplification"];
-/** a box grouped by a discrete copy-number profile runs from deep deletion to amplification, not by size */
+/** mutation classes in the portal's order (PlotsTabUtils.tsx mutTypeCategoryOrder), then the cases without one */
+const MUT_TYPES = ["Missense", "Inframe", "Truncating", "Splice", "Promoter", "Other", "Multiple"];
+const NO_MUTATION = ["Not mutated", OQL_NOT_PROFILED];
+
+/**
+ * The order an axis's categories are drawn in, as the portal's makeBoxScatterPlotData orders a
+ * box plot's (PLT-BX-1): a data type with an order of its own keeps it — copy-number levels deep
+ * deletion to amplification, mutation classes (Missense, Inframe, Truncating, Splice, Promoter,
+ * Other, Multiple, then no mutation and not profiled; each class's Driver before its VUS),
+ * Mutated / Not mutated / Not profiled, Driver / VUS / … — and any other is alphabetical, by code
+ * unit as lodash's sortBy compares strings. A category outside a type's order follows it,
+ * alphabetically (the portal puts it first, an artefact of indexOf). An OQL axis, which the portal
+ * does not have, keeps its groups by size; null leaves the order as it is.
+ */
+export function categoryOrder(cat: PlotRequest["x"]): ((labels: string[]) => string[]) | null {
+  const listed = (order: string[]) => (labels: string[]) => {
+    const rank = (g: string) => { const i = order.indexOf(g); return i < 0 ? order.length : i; };
+    return [...labels].sort((a, b) => rank(a) - rank(b) || alpha(a, b));
+  };
+  if (cat.source === "molecular" && cat.discrete) return listed(CNA_LEVELS);
+  if (cat.source === "alteration" && "gene" in cat) {
+    if (cat.by === "mutationType") return listed([...MUT_TYPES.flatMap((t) => [t, t + " (Driver)", t + " (VUS)"]), ...NO_MUTATION]);
+    if (cat.by === "driver") return listed(["Driver", "VUS", ...NO_MUTATION]);
+    if (cat.by === "cna") return listed(["Deep deletion", "Neutral", "Amplification", OQL_NOT_PROFILED]);
+    if (cat.by === "sv") return listed(["Structural variant", "No structural variant", OQL_NOT_PROFILED]);
+    return listed(["Mutated", ...NO_MUTATION]);
+  }
+  if (cat.source === "alteration") return "oql" in cat ? null : listed(["Mutated", ...NO_MUTATION]);
+  return (labels: string[]) => [...labels].sort(alpha);
+}
+const alpha = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
+
+/** a box plot's groups in their axis's category order */
 function orderLevels(data: PlotData, spec: PlotRequest): void {
   const cat = data.x.kind === "cat" ? spec.x : spec.y;
-  if (data.shape !== "box" || !data.groups || cat.source !== "molecular" || !cat.discrete) return;
-  const rank = (g: string) => { const i = CNA_LEVELS.indexOf(g); return i < 0 ? CNA_LEVELS.length : i; };
-  data.groups = [...data.groups].sort((a, b) => rank(a.g) - rank(b.g));
+  if (data.shape !== "box" || !data.groups) return;
+  const order = categoryOrder(cat);
+  if (!order) return;
+  const at = new Map(order(data.groups.map((g) => g.g)).map((g, i) => [g, i]));
+  data.groups = [...data.groups].sort((a, b) => at.get(a.g)! - at.get(b.g)!);
 }
 const TABLE_WHY = "a contingency table counts cases and has no points to mark";
 const fmt = (n: number) => n.toLocaleString("en-US");
