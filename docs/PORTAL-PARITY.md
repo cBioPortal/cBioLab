@@ -221,6 +221,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The Y-Axis Max slider; axis "# patients" (ours "# KRAS Mutations"); top tick at the data, "≥" when capped (142; ours niced to 150) (MUT-LP-2, MUT-LP-6, MUT-STM-17)
   - [ ] Stem tooltip "142 mutated of 594 profiled patients / AA Change: G12D/V/C/A/S/R" (ours a native SVG title); hover highlights the table's rows (MUT-LP-10, MUT-LP-11)
   - [ ] Columns: Gene, Cancer Type, Copy #, ASCN (5), VS, Center, Allele Freq (N), normal reads, Exon, clinical attributes, namespace; the annotation sources are under *Mutation annotation breadth* (MUT-COL-2…37)
+    - [x] Gene, Study of Origin, Cancer Type, Copy #, VS, Center, Allele Freq (N), the normal read counts, Exon; the portal's Mutation Type labels and upper-cased Variant Type (#245)
+    - [ ] The per-query clinical-attribute and namespace columns; the Exon header's "(N in total)"; ASCN (six columns)
   - [ ] Table chrome: Show more (ours a numbered pager and per-page select), a Columns menu with a Clinical tab and Freq, TSV of every row (ours CSV of the filtered rows), Copy, an annotation filter (MUT-TB-2, MUT-TB-4, MUT-TB-5, MUT-TB-7, MUT-TB-8)
   - [ ] Several samples a patient: the "includes N duplicate mutations" suffix, "n samples / m patients" in the banners (MUT-TB-1, MUT-MD-5, MUT-STM-14, MUT-STM-16, MUT-FM-5)
   - [ ] A gene with no mutations: chip greyed, "no mutations", 0 % and 0 badges (MUT-GT-2, MUT-MD-1; see bugs)
