@@ -12,6 +12,7 @@ import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } f
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
 import { oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
+import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
 
@@ -109,7 +110,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
   const attr = (name: string, as: string) =>
     as + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, any(attribute_value) AS v FROM " + clinicalTable(db, [name]) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = 'sample' AND attribute_name = " + sq(name) + "\n" +
-    "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM m" + i + ") GROUP BY sid)";
+    "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM (SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i + ")) GROUP BY sid)";
   const ctes =
     "c" + i + " AS (" + p.cohortSql + "),\n" +
     "m" + i + " AS (\n" +
@@ -119,6 +120,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "  WHERE " + mutationStudySql(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n" +
     "),\n" +
+    fusionCtes(p, i, db, gene, pin) +
     attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n" +
     (pin ? tumorTypeCtes(p, i, db) : "");
@@ -143,7 +145,61 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
       "  LEFT JOIN att AS tt ON tt.alteration = m.proteinChange AND tt.consequence = m.consequence AND tt.tumor_type = m.tumorType\n" : "") +
     (gn ? "  LEFT JOIN g" + i + " AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var\n" : "") +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n";
-  return { ctes: ctes + (gn ? gn + ",\n" : ""), rows };
+  return { ctes: ctes + (gn ? gn + ",\n" : ""), rows: rows + "  UNION ALL\n" + fusionRows(p, i, db, gene, pin) };
+}
+
+/**
+ * `v<i>`: the part's structural variants whose site 1 or site 2 is the gene (by Entrez id, as the portal
+ * fetches them), in the cohort's samples, each as the Mutations tab lists it (ResultsViewPageStore
+ * mutationsByGene): its sites' genes, class and event info, site 1's chromosome and position, its status
+ * and, at a pin, its OncoKB SV store keys (lib/sv-oncokb.ts) and its sample's tumour type (`vk<i>`).
+ */
+function fusionCtes(p: TablePart, i: number, db: string, gene: string, pin: string | null): string {
+  return "v" + i + " AS (\n" +
+    "  SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
+    "         sv.class AS class, sv.event_info AS eventInfo, sv.site1_chromosome AS chr, sv.site1_position AS start, sv.sv_status AS status,\n" +
+    "         " + siteKey("sv.site1_entrez_gene_id") + " AS k1, " + siteKey("sv.site2_entrez_gene_id") + " AS k2\n" +
+    "  FROM " + db + ".structural_variant sv\n" +
+    "  JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id\n" +
+    "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "  JOIN " + db + ".sample smp ON smp.internal_id = sv.sample_id\n" +
+    "  JOIN " + db + ".patient pt ON pt.internal_id = smp.patient_id\n" +
+    "  LEFT JOIN " + db + ".gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id\n" +
+    "  LEFT JOIN " + db + ".gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id\n" +
+    "  WHERE cs.cancer_study_identifier = " + sq(p.study) + " AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'\n" +
+    "    AND (sv.site1_entrez_gene_id IN (" + entrezOf(db, [gene]) + ") OR sv.site2_entrez_gene_id IN (" + entrezOf(db, [gene]) + "))\n" +
+    "    AND " + inCohortSamples("smp.stable_id", "c" + i) + "\n" +
+    "),\n" +
+    (pin ? sampleTumorTypeCte("vk" + i, p.study, db, "SELECT sid FROM v" + i) + ",\n" : "");
+}
+
+/**
+ * The part's fusion rows, column for column as partRows' mutation rows: the protein change as the
+ * portal builds it, mutation type Fusion, the variant class upper-cased as the portal's Variant Type
+ * shows it, no allele counts, codon or genomic change (so no Genome Nexus annotation). At a pin, the
+ * Annotation cell is the pair's call for the sample's tumour type and the driver status the pair's call
+ * with none, as the portal asks each (lib/sv-oncokb.ts, with its gene-level fallback); a structural
+ * variant is never germline for the driver call (ResultsViewPageStoreUtils, isGermline false).
+ */
+function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: string | null): string {
+  return "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
+    "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
+    "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
+    "         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
+    (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level, " +
+        svDriverSql("vn", "va1", "va2") + " AS drv,\n"
+      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
+    "         'Fusion' AS mutationType, upper(v.class) AS variantType,\n" +
+    "         NULL AS vaf, NULL AS altCount, NULL AS refCount,\n" +
+    "         toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,\n" +
+    "         '' AS hgvsg,\n" +
+    "         " + variantColumnsSql("''", gene) + "\n" +
+    "  FROM v" + i + " AS v\n" +
+    (pin ? "  LEFT JOIN vk" + i + " AS vk ON vk.sid = v.sid\n" +
+      "  LEFT JOIN sva AS va1 ON va1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS va2 ON va2.gene = v.gene2 AND v.gene2 != ''\n" +
+      "  LEFT JOIN svp AS vp ON vp.site1_entrez = v.k1 AND vp.site2_entrez = v.k2 AND vp.sv_type = " + svTypeSql("v.") + " AND vp.tumor_type = vk.tumorType\n" +
+      "  LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''\n" : "") +
+    "  LEFT JOIN ct" + i + " AS ct ON ct.sid = v.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = v.sid\n";
 }
 
 /**
@@ -184,7 +240,9 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
         "att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,\n" +
         "    max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found\n" +
         "  FROM " + ONCOKB_TUMOR_TYPE_TABLE + " AS t WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
-        "  GROUP BY alteration, consequence, tumor_type),\n"
+        "  GROUP BY alteration, consequence, tumor_type),\n" +
+        // the gene's structural variants' calls, for its fusion rows
+        svCallCtes(db, [gene], pin, { gene: "sva", pair: "svp" })
       : "") +
     built.map((b) => b.ctes).join("") +
     "rows AS (\n" + built.map((b) => b.rows).join("  UNION ALL\n") + ")\n";

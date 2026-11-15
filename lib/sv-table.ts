@@ -8,7 +8,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import { sampleTumorTypeCte, type TablePart } from "./mutation-table.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
-import { ONCOKB_SV_TABLE, ONCOKB_TABLE } from "./annotation-store.ts";
+import { entrezOf, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
 const str = (x: string) => "ifNull(toString(" + x + "), '')";
 const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
@@ -43,21 +43,6 @@ export const SV_COLUMNS: QueryColumn[] = [
 
 /** Shown unless the view names its columns: the portal's own default set, in the order its tab shows them. */
 export const SV_DEFAULT_COLUMNS = ["sample", "cancerType", "gene1", "gene2", "annotation", "connectionType", "eventInfo", "class"];
-
-/** The queried genes' Entrez ids, as the portal asks for structural variants (fetchStructuralVariantsUsingPOST's entrezGeneIds). */
-const entrezOf = (db: string, genes: string[]) =>
-  "SELECT entrez_gene_id FROM " + db + ".gene WHERE hugo_gene_symbol IN (" + genes.map(sq).join(", ") + ")";
-
-/** the SV types OncoKB takes for a one-gene variant, matched exactly (oncokb-frontend-commons deriveStructuralVariantType) */
-const ONE_GENE_TYPES = ["DELETION", "TRANSLOCATION", "DUPLICATION", "INSERTION", "INVERSION", "FUSION"];
-/** a site's Entrez id as the OncoKB SV store keys it: '' where the site names no gene */
-const siteKey = (col: string) => "if(ifNull(" + col + ", 0) = 0, '', toString(" + col + "))";
-/**
- * a row's OncoKB SV type, as the portal derives it: FUSION when both sites name a gene, else the
- * variant's class when it is exactly one of OncoKB's types, else UNKNOWN
- */
-const svTypeSql = (s: string) =>
-  "if((" + s + "gene1 != '') + (" + s + "gene2 != '') >= 2, 'FUSION', if(ifNull(" + s + "class, '') IN (" + ONE_GENE_TYPES.map(sq).join(", ") + "), " + s + "class, 'UNKNOWN'))";
 
 /** A part's rows, every column the table has, labelled with its cohort, study and document order. */
 function partRows(p: TablePart, i: number, db: string, genes: string[], pin: string | null): { ctes: string; rows: string } {
@@ -97,12 +82,11 @@ function partRows(p: TablePart, i: number, db: string, genes: string[], pin: str
       "sk" + i + " AS (SELECT s.*, tt.tumorType AS ttype, " + siteKey("s.site1Entrez") + " AS k1, " + siteKey("s.site2Entrez") + " AS k2, " + svTypeSql("s.") + " AS ktype\n" +
       "  FROM s" + i + " AS s LEFT JOIN tt" + i + " AS tt ON tt.sid = s.sid),\n" : "");
   // the pair's call for the sample's tumour type; where the store holds none (a study not synced),
-  // the stronger of the two partners' gene-level calls: a driver before a non-driver, gene 1 when they tie
-  const pick = (f: string) => "if(pr.found = 1, pr." + f + ", if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2." + f + ", a1." + f + "))";
+  // the stronger of the two partners' gene-level calls (lib/sv-oncokb.ts)
   const rows =
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         s.pid AS patient, s.sid AS sid, ifNull(ct.v, '') AS cancerType,\n" +
-    (pin ? "         " + pick("oncogenicity") + " AS oncogenicity, " + pick("level") + " AS level, toUInt8(if(pr.found = 1, pr.driver, greatest(a1.driver, a2.driver))) AS drv,\n"
+    (pin ? "         " + svCellSql("oncogenicity") + " AS oncogenicity, " + svCellSql("level") + " AS level, " + svDriverSql("pr") + " AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
     "         s.* EXCEPT (" + (pin ? "pid, sid, ttype, k1, k2, ktype" : "pid, sid") + ")\n" +
     "  FROM " + (pin ? "sk" : "s") + i + " AS s\n" +
@@ -116,16 +100,9 @@ function allRows(parts: TablePart[], db: string, genes: string[], pin: string | 
   const built = parts.map((p, i) => partRows(p, i, db, genes, pin));
   return "WITH " +
     (pin
-      // the store keys a structural variant by gene, as alteration 'Fusion' (lib/oql.ts's storeAlteration)
-      ? "ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver\n" +
-        "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'SV' AND alteration = 'Fusion'\n" +
-        "  GROUP BY gene),\n" +
-        // the per-pair calls (packages/annotation-sync oncokb-sv), for the pairs involving a queried gene
-        "asv AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,\n" +
-        "    toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found\n" +
-        "  FROM " + ONCOKB_SV_TABLE + " AS t WHERE oncokb_version = " + sq(pin) + "\n" +
-        "    AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (" + entrezOf(db, genes) + ")) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (" + entrezOf(db, genes) + ")))\n" +
-        "  GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),\n"
+      // the store keys a structural variant by gene, as alteration 'Fusion' (lib/oql.ts's storeAlteration),
+      // and by pair (packages/annotation-sync oncokb-sv)
+      ? svCallCtes(db, genes, pin, { gene: "ann", pair: "asv" })
       : "") +
     built.map((b) => b.ctes).join("") +
     "rows AS (\n" + built.map((b) => b.rows).join("  UNION ALL\n") + ")\n";

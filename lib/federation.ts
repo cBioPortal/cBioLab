@@ -73,6 +73,7 @@ import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
+import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 import { variantPins, type VariantPins } from "./variant-annotation.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
@@ -561,6 +562,12 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
  * the change string — whose height is the number of distinct (patient, protein change) pairs
  * there, from the cohort's own samples only. The four builders below share this CTE. The suppression floor applies to a
  * (codon, change) pair's patient count, at the data holder, before anything leaves.
+ *
+ * The study's structural variants join as the portal's Mutations tab lists them (ResultsViewPageStore
+ * mutationsByGene; `sv` 1): one row under each queried gene that is a partner, its change the
+ * protein change the portal builds, type Fusion, no codon, labelled with site 1's gene (`rgene`), a
+ * driver by the pair's no-tumour-type OncoKB call (lib/sv-oncokb.ts). They count in the badges and,
+ * under site 1's gene, in the somatic frequency, but draw no stem.
  */
 /** per gene, the condition on its mutation_derived rows the query's OQL keeps (lib/oql.ts oqlMutationFilterSql) */
 export type MutationFilters = Record<string, string>;
@@ -579,14 +586,36 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
       "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION')" +
       (hotspotKeys ? "\n        OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (" + hotspotKeys + ")" : "") + ", 1, 0)"
     : "1";
+  const list = genes.map(sq).join(",");
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
+    (pin ? svCallCtes(db, genes, pin, { gene: "sva", pair: "svp" }) : "") +
+    "     v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
+    "                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,\n" +
+    "                  " + siteKey("sv.site1_entrez_gene_id") + " AS k1, " + siteKey("sv.site2_entrez_gene_id") + " AS k2\n" +
+    "           FROM " + db + ".structural_variant sv\n" +
+    "           JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id\n" +
+    "           JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "           JOIN " + db + ".sample smp ON smp.internal_id = sv.sample_id\n" +
+    "           JOIN " + db + ".patient pt ON pt.internal_id = smp.patient_id\n" +
+    "           LEFT JOIN " + db + ".gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id\n" +
+    "           LEFT JOIN " + db + ".gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id\n" +
+    "           WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'\n" +
+    "             AND (sv.site1_entrez_gene_id IN (" + entrezOf(db, genes) + ") OR sv.site2_entrez_gene_id IN (" + entrezOf(db, genes) + "))\n" +
+    "             AND " + inCohortSamples("smp.stable_id") + "),\n" +
     "     m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
-    "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver\n" +
+    "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver, toUInt8(0) AS sv, gene AS rgene\n" +
     "           FROM " + db + ".mutation_derived\n" +
-    "           WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
+    "           WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ")\n" +
     "             AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
-    "             AND " + inCohortSamples("sampleId") + filteredGenesSql(genes, filters) + "),\n" +
+    "             AND " + inCohortSamples("sampleId") + filteredGenesSql(genes, filters) + "\n" +
+    "           UNION ALL\n" +
+    "           SELECT arrayJoin(arrayFilter(x -> x IN (" + list + "), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,\n" +
+    "                  " + fusionProteinChangeSql("v.") + " AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,\n" +
+    "                  " + (pin ? svDriverSql("vn") : "toUInt8(1)") + " AS driver, toUInt8(1) AS sv, v.gene1 AS rgene\n" +
+    "           FROM v" +
+    (pin ? "\n           LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''\n" +
+      "           LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''" : "") + "),\n" +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
@@ -595,7 +624,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
 export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null, filters?: MutationFilters): AggregateSql {
   return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters) +
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
-    "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
+    "FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
 }
 /**
  * Per (codon, mutation type, driver): raw rows — a codon's colour is decided from these, and the
@@ -608,11 +637,16 @@ export function lollipopTypesSql(cohortSql: string, genes: string[], study: stri
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
     "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
-/** Per gene: mutated patients, distinct (patient, change) pairs, and samples with a somatic one. */
+/**
+ * Per gene: mutated patients and distinct (patient, change) pairs (mutations only: a fusion has no
+ * stem), and samples with a somatic mutation or fusion — a fusion under site 1's gene only, as the
+ * portal counts its rows by their gene (MutationUtils somaticMutationRate), and germline when its
+ * status says so without regard to case.
+ */
 export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB, filters?: MutationFilters): AggregateSql {
   return aggregateSql(lollipopCte(cohortSql, genes, study, 1, null, db, null, filters) +
-    "SELECT gene, uniqExact(pid) AS patients, uniqExact((pid, change)) AS pairs,\n" +
-    "       uniqExactIf(sid, status != 'GERMLINE') AS somatic_samples\n" +
+    "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
+    "       uniqExactIf(sid, if(sv = 1, rgene = gene AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0, status != 'GERMLINE')) AS somatic_samples\n" +
     "FROM m GROUP BY gene");
 }
 /** A compiled cohort's size: its patients (the owners of its samples) and its samples. */
