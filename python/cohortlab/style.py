@@ -411,6 +411,26 @@ def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
     return label[: n - 1] + "…" if len(label) > n else label
 
 
+def track_sublabel_text(meta: dict[str, Any], display: dict[str, Any] | None = None) -> str:
+    """A row's OQL line as the gutter prints it (port of trackSublabelText): past 18 characters, its first 15 and "..."."""
+    s = meta.get("sublabel") or ""
+    if not s or (display or {}).get("showOql") is False:
+        return ""
+    return s[:15] + "..." if len(s) > 18 else s
+
+
+def fit_sublabel(sub: str, room: float, measure: Any) -> str:
+    """A sublabel cut to the room before the row's % (port of fitSublabel): whole, or a prefix and "...", or nothing."""
+    if not sub or measure(sub) <= room:
+        return sub
+    base = sub[:-3] if sub.endswith("...") else sub
+    for n in range(len(base) - 1, 0, -1):
+        cut = base[:n].rstrip() + "..."
+        if measure(cut) <= room:
+            return cut
+    return ""
+
+
 def track_label_text(track: Any, S: dict[str, Any] = STYLE) -> str:
     """What the gutter prints: a merged gene row wears the brackets that spell it in a query."""
     members = (track.meta.get("members") if hasattr(track, "meta") else track.get("members")) or []

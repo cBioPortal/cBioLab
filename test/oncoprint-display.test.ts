@@ -8,10 +8,10 @@ import { normalizeDisplay, normalizeSort } from "../lib/oncoprint-assemble.ts";
 test("display defaults", () => {
   const drivers = { oncokb: true, hotspots: true, custom: true, tiers: null, annotated: true, hideVus: false, hideGermline: false };
   assert.deepEqual(normalizeDisplay(undefined), { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, colorByGermline: true,
-    hideVUS: false, annotate: "oncokb", hideGermline: false, drivers, whiteBackground: false });
+    hideVUS: false, annotate: "oncokb", hideGermline: false, drivers, whiteBackground: false, showOql: true });
   assert.deepEqual(normalizeDisplay({ showUnaltered: false, gaps: "pct" }),
     { showUnaltered: false, whitespace: true, gaps: "pct", clinicalLegends: "all", colorByType: true, colorByGermline: true,
-      hideVUS: false, annotate: "oncokb", hideGermline: false, drivers, whiteBackground: false });
+      hideVUS: false, annotate: "oncokb", hideGermline: false, drivers, whiteBackground: false, showOql: true });
   assert.equal(normalizeDisplay({ annotate: "none" }).annotate, "none");
   assert.throws(() => normalizeDisplay({ annotate: "hotspots" } as never), /annotate.*oncokb, none/);
 });

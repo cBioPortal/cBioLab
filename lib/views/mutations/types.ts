@@ -8,10 +8,19 @@ import type { VariantPins } from "../../variant-annotation.ts";
  * cohort, a row per call with the portal's columns; searchable, filterable, sortable, paged, and
  * downloadable whole. Its rows name samples, so only a patient-level participant contributes them.
  */
+import type { DriverSettings } from "../../driver-settings.ts";
 export interface MutationsView extends TableQuery {
   note?: string;
   kind: "mutations"; cohorts?: string[];
   gene: string;
+  /**
+   * The query's OQL, one line per entry (the Results page's): when it narrows mutations, the tab
+   * holds only the mutations a line of their gene wants, as the portal's Mutations tab; `useOql:
+   * false` shows every one (the portal's "Do not filter by OQL")
+   */
+  oql?: string[]; useOql?: boolean;
+  /** how a line's DRIVER reads: the page's driver settings */
+  drivers?: DriverSettings;
   /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
   rows?: number;
 }

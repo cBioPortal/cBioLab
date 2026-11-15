@@ -6,15 +6,28 @@ import { overLimit, ATTR_NAME, answering, askEachSite, plural, refuse } from "..
 import type { CancertypesView, CancertypesGroup, CancertypesPanel } from "./types.ts";
 import { cancerTypesSql, cancerTypeSamplesSql } from "./sql.ts";
 import { cancertypesMethod } from "./method.ts";
+import { parseOql } from "../../oql-parse.ts";
+import { resolveDrivers } from "../../driver-settings.ts";
+import { variantPins } from "../../variant-annotation.ts";
 
 const zeroGroup = (key: string, label: string): CancertypesGroup =>
-  ({ key, label, samples: 0, profiled: 0, altered: 0, mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0 });
+  ({ key, label, samples: 0, profiled: 0, altered: 0, mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0, mrnaHigh: 0, mrnaLow: 0, protHigh: 0, protLow: 0 });
 
 export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promise<ViewResult> {
   const { doc, vNames, pin } = ctx;
   { const e = overLimit("a cancertypes view", 2, vNames.length); if (e) return refuse("cancertypes", ctx, e.replace("at most 2", "at most 2 cohorts")); }
   let genes: string[];
-  try { genes = geneSymbols(view.genes || []); } catch (e) { return refuse("cancertypes", ctx, (e as Error).message); }
+  let lines: string[] | null = null;
+  if (view.oql !== undefined) {
+    if (!Array.isArray(view.oql) || !view.oql.length) return refuse("cancertypes", ctx, "oql is a list of OQL lines, one gene each");
+    if (view.measure === "driver") return refuse("cancertypes", ctx, "with oql, DRIVER belongs in the OQL (\"KRAS: MUT_DRIVER\"), not in measure: \"driver\"");
+    try {
+      const parsed = view.oql.map((l) => { const e = parseOql(String(l)); if (e.length !== 1) throw new Error("'" + String(l).slice(0, 40) + "' names " + e.length + " genes; give each its own line"); return e[0]; });
+      lines = view.oql.map(String);
+      genes = [...new Set(parsed.map((e) => e.gene))];
+      if (view.drivers !== undefined) resolveDrivers(view.drivers);
+    } catch (e) { return refuse("cancertypes", ctx, "oql: " + (e as Error).message); }
+  } else try { genes = geneSymbols(view.genes || []); } catch (e) { return refuse("cancertypes", ctx, (e as Error).message); }
   if (!genes.length) return refuse("cancertypes", ctx, "a cancertypes view needs genes");
   { const e = overLimit("a cancertypes view", 30, genes.length); if (e) return refuse("cancertypes", ctx, e.replace("at most 30", "at most 30 genes")); }
   const groupBy = String(view.groupBy || "CANCER_TYPE").trim();
@@ -31,7 +44,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   if (!Object.keys(ok).length) return refuse("cancertypes", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const perSite: { cohort: string; study: string; groups: number; profiled: number }[] = [];
   const panels: CancertypesPanel[] = [];
-  const COUNTS = ["samples", "profiled", "altered", "mutation", "amp", "homdel", "sv", "multiple"] as const;
+  const COUNTS = ["samples", "profiled", "altered", "mutation", "amp", "homdel", "sv", "multiple", "mrnaHigh", "mrnaLow", "protHigh", "protLow"] as const;
   const ALL_KEY = "\x01all";
   const cohortTotal = new Map<string, { profiled: number; altered: number; samples: number }>();
   // groups at or over the floor, highest bar first (by share, or by count when counts are drawn); the
@@ -46,17 +59,22 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
       const p = zeroGroup("__pooled__", small.length + " smaller group" + (small.length === 1 ? "" : "s"));
       p.profiledFor = { mutation: 0, cna: 0, sv: 0 };
       for (const g of small) {
-        for (const k of COUNTS) p[k] += g[k];
+        for (const k of COUNTS) p[k] = (p[k] || 0) + (g[k] || 0);
         for (const k of ["mutation", "cna", "sv"] as const) p.profiledFor[k] += g.profiledFor?.[k] || 0;
       }
       pooled = { ...p, count: small.length };
     }
     return { groups: keep, ...(pooled ? { pooled } : {}) };
   };
-  const answers = await askEachSite(ctx, ok, (n, _st, r) => Promise.all([
-    r.viewAggregate("cancertypes:" + n, doc.cohorts[n], (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit)),
+  const levelPins = { ...(view.exp ? { EXP: view.exp } : {}), ...(view.prot ? { PROT: view.prot } : {}), ...(view.ifHeld ? { ifHeld: true } : {}) };
+  const hotspotPins = lines && view.drivers !== undefined ? await variantPins() : undefined;
+  const answers = await askEachSite(ctx, ok, async (n, st, r) => {
+    const oql = lines ? { lines, profiles: (await ctx.studyProfiles(st)).profiles, pins: levelPins,
+      ...(view.drivers !== undefined ? { drivers: view.drivers, hotspotPins } : {}) } : undefined;
+    return Promise.all([
+    r.viewAggregate("cancertypes:" + n, doc.cohorts[n], (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit, oql)),
     r.viewAggregate("cancertypes:samples:" + n, doc.cohorts[n], (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute, unit))
-  ]));
+  ]); });
   for (const n of vNames) {
     // gene "*" is the genes together; every other key one gene
     const byGene = new Map<string, Map<string, CancertypesGroup>>();
@@ -76,6 +94,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
         const g = get(String(r.gene), String(r.grp), String(r.label || r.grp));
         g.profiled += Number(r.profiled); g.altered += Number(r.altered); if (r.gene === "*") profiled += Number(r.profiled);
         g.mutation += Number(r.mutation); g.amp += Number(r.amp); g.homdel += Number(r.homdel); g.sv += Number(r.sv); g.multiple += Number(r.multiple);
+        for (const k of ["mrnaHigh", "mrnaLow", "protHigh", "protLow"] as const) g[k] = (g[k] || 0) + Number(r[k] ?? 0);
       }
       for (const r of tot) {
         if (r.grp === ALL_KEY) { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.samples += Number(r.samples); cohortTotal.set(n, t); continue; }
@@ -104,14 +123,15 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   return {
     kind: "cancertypes", cohorts: vNames,
     cancertypes: { groupBy: groupWord, measure, genes, minSamples, show, unit, panels, ...(excluded.length ? { excluded } : {}) },
-    method: cancertypesMethod({ genes, groupBy: groupWord, measure, oncokbPin: pin, minSamples, unit, perSite,
+    method: cancertypesMethod({ genes, groupBy: groupWord, measure, oncokbPin: pin, minSamples, unit, perSite, ...(lines ? { oql: lines } : {}),
       panels: panels.map((p) => ({ cohort: p.cohort, groups: p.groups.length, pooled: p.pooled ? p.pooled.count : 0, profiled: p.profiled, altered: p.altered })) }),
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: (unit === "patient" ? "Patients" : "Samples") + " altered in at least one of " + (genes.length === 1 ? genes[0] : genes.length + " genes") + " per " + groupWord + " group, over the " + unit + "s profiled for at least one of them" +
       " (the union of their panels, as an oncoprint's merged row counts it). " +
-      (measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. ") +
-      "A " + unit + " with more than one kind of alteration across the genes counts once, under \"multiple\". " +
+      (lines ? "What the query's OQL lines match counts, each line under its gene" + (view.drivers !== undefined ? ", DRIVER by the page's driver settings" : "") + ". "
+        : measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. ") +
+      "A " + unit + " with more than one kind of alteration across the genes counts once, under \"multiple\"; an amplification and a deep deletion are one kind (copy number), shown as the amplification. " +
       (unit === "patient" ? "A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. " : "Samples are counted, not patients: a patient with two samples counts twice. ") +
       (attribute ? attribute + " is read per sample and folded on case and whitespace; samples with no value form their own group. " : "") +
       "Groups with fewer than " + plural(minSamples, "profiled " + unit) + " are pooled into one bar rather than dropped. " +

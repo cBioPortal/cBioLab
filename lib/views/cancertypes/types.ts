@@ -1,5 +1,6 @@
 // The cancertypes view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type {  } from "../../types.ts";
+import type { DriverSettings } from "../../driver-settings.ts";
 import type { GeneTrackSpec } from "../../gene-tracks.ts";
 
 /**
@@ -22,6 +23,13 @@ export interface CancertypesView {
   show?: "frequency" | "count";
   /** count patients (default, as the portal does — a patient counts in each group a sample of theirs is in) or samples */
   unit?: "patient" | "sample";
+  /**
+   * The query's OQL, one line per entry, one gene each: what counts as altered is what the lines
+   * match, each under its gene (the portal's OQL-filtered data); `genes` are then the lines' genes.
+   */
+  oql?: string[];
+  /** how a line's DRIVER reads (the page's driver settings), and the profiles its EXP / PROT read, as an oql clause's */
+  drivers?: DriverSettings; exp?: string; prot?: string; ifHeld?: boolean;
 }
 export interface CancertypesGroup {
   key: string; label: string;
@@ -29,6 +37,8 @@ export interface CancertypesGroup {
   samples: number;
   profiled: number; altered: number;
   mutation: number; amp: number; homdel: number; sv: number; multiple: number;
+  /** a line's EXP / PROT: mRNA and protein high and low */
+  mrnaHigh?: number; mrnaLow?: number; protHigh?: number; protLow?: number;
   /** units profiled for each data type at all (any gene) — the portal's "+" rows */
   profiledFor?: { mutation: number; cna: number; sv: number };
 }

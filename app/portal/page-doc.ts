@@ -16,6 +16,12 @@ import { linkParams, writeSearch } from "../_links/link-state.ts";
  * every view in the tab follows. It reads the current choice from the tab's own views and writes a
  * new one into them, so the choice is part of the document (and the link) like any setting.
  */
+/** a line said above a tab's views, with an optional switch beside it (the portal's OQL status banner) */
+export interface TabBanner {
+  text: (views: View[]) => string | null;
+  toggle?: { label: (views: View[]) => string | null; apply: (views: View[]) => View[] };
+}
+
 export interface TabChooser {
   label: string; options: string[]; value: (views: View[]) => string; apply: (views: View[], value: string) => View[];
   /** the view settings the chooser sets, which the views' own settings bars therefore leave out */
@@ -30,7 +36,7 @@ export interface TabChooser {
 export type TabLink = (views: View[], changed: number) => View[];
 
 export interface PageTab {
-  title: string; views?: number[]; sub?: { title: string; views: number[] }[]; chooser?: TabChooser; link?: TabLink;
+  title: string; views?: number[]; sub?: { title: string; views: number[] }[]; chooser?: TabChooser; link?: TabLink; banner?: TabBanner;
   /** a tab whose view is not built yet: what it will show, which the page says in its place */
   pending?: string;
   /** view settings the portal's own tab does not offer, which the views' settings bars therefore leave out */
@@ -89,7 +95,7 @@ export function syncUrl(params: Record<string, string | null>) {
 }
 
 /** A page as written: its tabs, each with titled views (or sub-tabs of them). */
-export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser; link?: TabLink; pending?: string; locks?: string[] };
+export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser; link?: TabLink; banner?: TabBanner; pending?: string; locks?: string[] };
 
 /** The page's one document and the tabs' index maps, from the tabs as written. */
 export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left: string[], opts: { partial?: boolean } = {}): PageLayout {
@@ -103,7 +109,7 @@ export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left:
   });
   const tabs: PageTab[] = spec.map((t) => t.sub
     ? { title: t.title, sub: t.sub.map((s) => ({ title: s.title, views: place(t.title + " › " + s.title, s.views) })) }
-    : { title: t.title, views: place(t.title, t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.pending ? { pending: t.pending } : {}), ...(t.locks ? { locks: t.locks } : {}) });
+    : { title: t.title, views: place(t.title, t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.banner ? { banner: t.banner } : {}), ...(t.pending ? { pending: t.pending } : {}), ...(t.locks ? { locks: t.locks } : {}) });
   return { doc: { ...base, views }, tabs, titles, names, left, ...(opts.partial ? { partial: true } : {}) };
 }
 

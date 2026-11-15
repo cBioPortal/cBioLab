@@ -54,12 +54,12 @@ export function checkGeneQuery(text: string, mode: GeneQueryMode): QueryCheck {
     try {
       const tracks = parseGeneList(text);
       const entries: QueryEntry[] = tracks.map((t) => typeof t === "string"
-        ? { text: t, genes: [t.toUpperCase()], meaning: "its own row" }
+        ? rowEntry(t)
         : { text: "[" + (t.label ? '"' + t.label + '" ' : "") + t.genes.join(" ") + "]", genes: t.genes.map((g) => g.toUpperCase()), meaning: "one merged row" });
       let error: string | undefined;
       try { normalizeGeneTracks(tracks); } catch (e) { error = String((e as Error).message || e); }
       if (!error && tracks.length > MAX_GENE_TRACKS) error = "a gene list takes at most " + MAX_GENE_TRACKS + " rows; this has " + tracks.length;
-      return { entries, genes: geneSymbols(tracks).map((g) => g.toUpperCase()), tracks, error };
+      return { entries, genes: geneSymbols(tracks, { oql: true }).map((g) => g.toUpperCase()), tracks, error };
     } catch (e) {
       return { entries: [], genes: [], error: String((e as Error).message || e) };
     }
@@ -77,6 +77,18 @@ export function checkGeneQuery(text: string, mode: GeneQueryMode): QueryCheck {
   const genes = [...new Set(entries.flatMap((e) => e.genes))];
   const error = parts.length > MAX_OQL_ENTRIES ? "a query takes at most " + MAX_OQL_ENTRIES + " entries; this has " + parts.length : undefined;
   return { entries, genes, error };
+}
+
+/** a gene list's single-gene row, with what its OQL line draws */
+function rowEntry(t: string): QueryEntry {
+  const gene = t.split(":")[0].trim().toUpperCase();
+  if (!t.includes(":")) return { text: t, genes: [gene], meaning: "its own row" };
+  try {
+    const [e] = parseOql(t);
+    return { text: t, genes: [e.gene], meaning: "its own row, drawing " + e.specs.map(describeSpec).join(" or ") };
+  } catch (err) {
+    return { text: t, genes: [gene], error: String((err as Error).message || err).replace(/^OQL:?\s*/, "") };
+  }
 }
 
 /**

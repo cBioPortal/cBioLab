@@ -22,26 +22,13 @@ import type { OqlRange, OqlSpec } from "./oql-parse.ts";
 import { parseOql } from "./oql-parse.ts";
 import { finiteSql } from "./sql-number.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
+import { PORTAL_TYPE_CLASS, oqlHasMutationOql } from "./oql-match.ts";
+export { oqlHasMutationOql };
+import { driverCondSql } from "./driver-sql.ts";
+import { hotspotKeysSql } from "./hotspots.ts";
+import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
+import type { VariantPins } from "./variant-annotation.ts";
 
-/**
- * A mutation's class as cBioPortal's OQL sees it — cbioportal-frontend's getMutationSubType and
- * getSimplifiedMutationType (src/shared/lib/oql/AccessorsForOqlFilter.ts), case for case: a
- * protein change of "Promoter" is a promoter mutation whatever its type, a listed type maps to
- * its class, and anything unlisted (5'Flank, Silent, Targeted_Region, ...) is "other". The
- * portal's Fusion has no class; "none" stands for it.
- */
-const PORTAL_TYPE_CLASS: [string, string[]][] = [
-  ["missense", ["missense_mutation", "missense", "missense_variant"]],
-  ["frameshift", ["frame_shift_ins", "frame_shift_del", "frameshift", "frameshift_deletion", "frameshift_insertion",
-    "de_novo_start_outofframe", "frameshift_variant"]],
-  ["nonsense", ["nonsense_mutation", "nonsense", "stopgain_snv"]],
-  ["splice", ["splice_site", "splice", "splice site", "splicing", "splice_site_snp", "splice_site_del", "splice_site_indel",
-    "splice_region"]],
-  ["nonstart", ["translation_start_site", "start_codon_snp", "start_codon_del"]],
-  ["nonstop", ["nonstop_mutation"]],
-  ["inframe", ["in_frame_del", "in_frame_ins", "in_frame_deletion", "in_frame_insertion", "indel", "nonframeshift_deletion",
-    "nonframeshift", "nonframeshift insertion", "nonframeshift_insertion"]],
-];
 const mutClassSql = (type: string, change: string): string =>
   "multiIf(lower(" + type + ") = 'fusion', 'none', lower(" + change + ") = 'promoter', 'promoter', " +
   PORTAL_TYPE_CLASS.map(([cls, types]) => "lower(" + type + ") IN (" + types.map(sq).join(", ") + "), " + sq(cls)).join(", ") +
@@ -56,10 +43,12 @@ function specCond(spec: OqlSpec): string {
   const conds: string[] = [CALLED];
   if (spec.type === "MUT") {
     conds.push("g.variant_type = 'mutation'");
+    // a mutation typed Fusion has no class in the portal, so no mutation command addresses it
+    conds.push("lower(g.mutation_type) != 'fusion'");
     // The portal's TRUNC is every class but missense and in-frame (oqlfilter.ts), not a list of types.
     if (spec.cls === "trunc") conds.push(mutClassSql("g.mutation_type", "g.mutation_variant") + " NOT IN ('missense', 'inframe')");
     else if (spec.cls) conds.push(mutClassSql("g.mutation_type", "g.mutation_variant") + " = " + sq(spec.cls));
-    if (spec.pchange) conds.push("g.mutation_variant = " + sq(spec.pchange));
+    if (spec.pchange) conds.push("lower(g.mutation_variant) = " + sq(spec.pchange.toLowerCase()));
     if (spec.range) conds.push(rangeCond(spec.range));
   } else if (spec.type === "CNA") {
     conds.push("g.variant_type = 'cna'");
@@ -98,6 +87,7 @@ function rangeCond(r: OqlRange): string {
 const mutationsWithPositions = (db: string, study: string, gene: string): string =>
   "(SELECT concat(studyId, '_', sampleId) AS sample_unique_id, concat(studyId, '_', patientId) AS patient_unique_id,\n" +
   "          studyId AS cancer_study_identifier, `GENE.hugoGeneSymbol` AS hugo_gene_symbol, 'mutation' AS variant_type,\n" +
+  "          ifNull(driverFilter, '') AS driver_filter, ifNull(driverTiersFilter, '') AS driver_tiers_filter,\n" +
   "          proteinChange AS mutation_variant, mutationType AS mutation_type, proteinPosStart AS pos_start, proteinPosEnd AS pos_end,\n" +
   "          CAST(NULL AS Nullable(Int8)) AS cna_alteration, ifNull(mutationStatus, '') AS mutation_status\n" +
   "     FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + ") g\n";
@@ -141,6 +131,36 @@ export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): strin
 
 const DRIVER_JOIN = (pin: string): string => driverAnnotationJoin(pin, "INNER");
 
+/**
+ * The Mutations tab's filter for one gene: a condition over mutation_derived's own columns
+ * keeping the mutations some line of the gene wants, as the portal filters the tab's data by the
+ * whole query (ResultsViewPageStore 3644-3680) — or null when nothing is filtered: the query
+ * narrows no mutation, or a line of the gene wants every one (a bare gene, a plain MUT). A gene
+ * whose lines want no mutation (only AMP, FUSION, EXP …) keeps none.
+ */
+export function oqlMutationFilterSql(lines: string[], gene: string, { study, db, oncokbPin, drivers, hotspotPins }:
+  { study: string; db: string; oncokbPin?: string | null } & OqlDriverOpts): string | null {
+  if (!oqlHasMutationOql(lines)) return null;
+  const specs = lines.flatMap((l) => parseOql(l)).filter((e) => e.gene === gene).flatMap((e) => e.specs);
+  if (specs.some((x) => (x.type === "ANY" && !x.driver) || (x.type === "MUT" && !x.cls && !x.pchange && !x.range && !x.driver))) return null;
+  const wanting = specs.filter((x) => x.type === "MUT" || (x.type === "ANY" && x.driver));
+  if (!wanting.length) return "0";
+  const rule = drivers === undefined ? undefined : resolveDrivers(drivers);
+  const driver = (): string => {
+    if (rule) {
+      if (rule.hotspots && !hotspotPins) throw new Error("OQL DRIVER with Cancer Hotspots on needs the Genome Nexus pins the hotspots are read at; none were given");
+      return driverCondSql(rule, oncokbPin, "g", rule.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null);
+    }
+    if (!oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
+    return driverEventSql(oncokbPin, "g");
+  };
+  const conds = wanting.map((x) => "(" + specCond(x.type === "ANY" ? { type: "MUT" } : x) + (x.driver ? " AND " + driver() : "") + ")");
+  return "(concat(studyId, '_', sampleId), ifNull(proteinChange, ''), ifNull(mutationType, ''), ifNull(proteinPosStart, -99), ifNull(proteinPosEnd, -99)) IN (\n" +
+    "  SELECT g.sample_unique_id, ifNull(g.mutation_variant, ''), ifNull(g.mutation_type, ''), ifNull(g.pos_start, -99), ifNull(g.pos_end, -99)\n" +
+    "  FROM " + mutationsWithPositions(db, study, gene) +
+    "  WHERE " + conds.join("\n     OR ") + ")";
+}
+
 /** the profile EXP and PROT read, by id without the study prefix, where the query names one */
 /**
  * The profiles EXP and PROT read (ids without the study prefix). `ifHeld`: a study without the
@@ -159,9 +179,9 @@ export function oqlLeafSql(q: string, opts: { oncokbPin?: string | null; profile
  * (that sample matches), each stripped of the study prefix. The cohort leaf asks for patients; a
  * plot axis asks in the plot's own unit.
  */
-export function oqlCasesSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB, unit }:
-  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string; unit: "patient" | "sample" }): string {
-  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: unit === "sample" ? "sample_unique_id" : "patient_unique_id", events: false });
+export function oqlCasesSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB, unit, drivers, hotspotPins }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string; unit: "patient" | "sample" } & OqlDriverOpts): string {
+  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: unit === "sample" ? "sample_unique_id" : "patient_unique_id", events: false, drivers, hotspotPins });
 }
 
 /** an event row's label as the portal's download tab spells it: protein change, AMP / HOMDEL, the structural variant's event */
@@ -176,9 +196,9 @@ const EVENT_ORDER = "multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'c
  * info, or EXP / PROT HIGH or LOW). The same conditions as oqlCasesSql, row by row: a sample is in
  * oqlCasesSql's samples exactly when it has a row here. The rows name samples: patient-level SQL.
  */
-export function oqlEventsSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB }:
-  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string }): string {
-  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: "sample_unique_id", events: true });
+export function oqlEventsSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB, drivers, hotspotPins }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string } & OqlDriverOpts): string {
+  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: "sample_unique_id", events: true, drivers, hotspotPins });
 }
 
 /**
@@ -203,9 +223,23 @@ export function expressionProfileFor(type: "EXP" | "PROT", profiles: string[] | 
   return prof;
 }
 
-function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol, events }:
-  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study: string; db: string; caseCol: string; events: boolean }): string {
+/**
+ * How DRIVER reads: `drivers`, the page's driver settings (the portal's putativeDriver: OncoKB at
+ * the pin, Cancer Hotspots at the Genome Nexus pins, the study's own calls); without them, OncoKB
+ * at the pin alone.
+ */
+export interface OqlDriverOpts { drivers?: DriverSettings; hotspotPins?: VariantPins }
+
+function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol, events, drivers, hotspotPins }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study: string; db: string; caseCol: string; events: boolean } & OqlDriverOpts): string {
   const parsed = parseOql(q);
+  const settings = drivers === undefined ? undefined : resolveDrivers(drivers);
+  // the driver rule of the settings, as a condition on the event `g` of `gene`
+  const driverCond = (gene: string): string => {
+    if (settings!.oncokb && !oncokbPin) throw new Error("OQL DRIVER with OncoKB on requires the OncoKB annotation store");
+    if (settings!.hotspots && !hotspotPins) throw new Error("OQL DRIVER with Cancer Hotspots on needs the Genome Nexus pins the hotspots are read at; none were given");
+    return driverCondSql(settings!, oncokbPin, "g", settings!.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null);
+  };
   const parts: string[] = [];
   // what each part selects: the case alone, distinct; or, for events, the case with the event's order and label
   const head = (t: "g" | "sd", order: string, label: string) => events
@@ -216,7 +250,7 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
   const plain: { gene: string; cond: string }[] = [];
   for (const { gene, specs } of parsed) {
     for (const spec of specs) {
-      if (spec.driver && !oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
+      if (spec.driver && !settings && !oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
       if (spec.type === "EXP" || spec.type === "PROT") {
         const prof = expressionProfileFor(spec.type, profiles, pins);
         parts.push(
@@ -231,10 +265,11 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
       parts.push(
         head("g", spec.range ? "1" : EVENT_ORDER, spec.range ? "g.mutation_variant" : EVENT_LABEL) +
         "  FROM " + (spec.range ? mutationsWithPositions(db, study, gene) : db + ".genomic_event_derived g\n") +
-        (spec.driver ? DRIVER_JOIN(oncokbPin!) : "") +
+        (spec.driver && !settings ? DRIVER_JOIN(oncokbPin!) : "") +
         "  WHERE " + (spec.range ? "g.cancer_study_identifier = " + sq(study) : genomicStudySql(study, "g")) + "\n" +
         "    AND g.hugo_gene_symbol = " + sq(gene) + "\n" +
-        "    AND " + specCond(spec)
+        "    AND " + specCond(spec) +
+        (spec.driver && settings ? "\n    AND " + driverCond(gene) : "")
       );
     }
   }

@@ -11,8 +11,8 @@ test("a plain list is one track per gene, in order", () => {
 
 test("a group is one track, labelled by its members unless it says otherwise", () => {
   const { tracks } = normalizeGeneTracks([{ genes: ["TP53", "MDM2"] }, { label: "RTK", genes: ["EGFR", "MET"] }]);
-  assert.deepEqual(tracks[0], { label: "TP53 / MDM2", members: ["TP53", "MDM2"] });
-  assert.deepEqual(tracks[1], { label: "RTK", members: ["EGFR", "MET"] });
+  assert.deepEqual(tracks[0], { label: "TP53 / MDM2", members: ["TP53", "MDM2"], key: "TP53 / MDM2" });
+  assert.deepEqual(tracks[1], { label: "RTK", members: ["EGFR", "MET"], key: "RTK" });
 });
 
 test("symbols are the deduplicated union in first-appearance order — the mask bit order", () => {
@@ -32,7 +32,8 @@ test("unusable symbols are dropped, structural nonsense throws", () => {
   assert.throws(() => normalizeGeneTracks([{ genes: ["!!"] }]), /no valid gene symbols/);
   assert.throws(() => normalizeGeneTracks([{ genes: [{ genes: ["TP53"] }] }]), /do not nest/);
   assert.throws(() => normalizeGeneTracks([42 as unknown as string, null]), /must be a gene symbol/);
-  assert.throws(() => normalizeGeneTracks([{ label: "X", genes: ["TP53"] }, { label: "X", genes: ["KRAS"] }]), /both labelled/);
+  // two rows may share a label, as the portal's tracks may; their keys tell them apart
+  assert.deepEqual(normalizeGeneTracks([{ label: "X", genes: ["TP53"] }, { label: "X", genes: ["KRAS"] }]).tracks.map((t) => t.key), ["X", "X #2"]);
 });
 
 test("the caps are the mask width and the number of rows", () => {
@@ -64,9 +65,9 @@ test("bad bracket text is refused with the reason", () => {
   assert.throws(() => parseGeneList('["unclosed TP53]'), /closing quote/);
 });
 
-test("per-track OQL is refused rather than silently drawn as the whole gene", () => {
-  assert.throws(() => parseGeneList("TP53: MUT"), /per-track OQL/);
-  assert.throws(() => parseGeneList("[TP53:MUT MDM2:AMP]"), /per-track OQL/);
+test("a row may carry its OQL line; OQL inside a merged row is refused", () => {
+  assert.deepEqual(parseGeneList("TP53: MUT"), ["TP53: MUT"]);
+  assert.throws(() => parseGeneList("[TP53:MUT MDM2:AMP]"), /inside a merged row/);
 });
 
 test("normalizing is idempotent through the canonical form", () => {

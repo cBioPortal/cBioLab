@@ -17,7 +17,8 @@ import numpy as np
 from .style import BITS, STYLE, numeric_value  # the one bit definition, generated from lib/oncoprint-style.ts
 
 DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all",
-                                   "colorByType": True, "colorByGermline": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
+                                   "colorByType": True, "colorByGermline": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False,
+                                   "showOql": True}
 NOT_PROFILED = -1
 _MAGIC = 0x4F504231  # "OPB1"
 
@@ -193,7 +194,9 @@ def genetic_text(code: int, group: str, annotated: bool) -> str:
         return text + _DRIVER if text and annotated and code & BITS["CNA_DRIVER"] else text
     if group == "STRUCTURAL_VARIANT":
         return "Structural Variant" + (_DRIVER if annotated and code & BITS["SV_DRIVER"] else "") if code & BITS["SV"] else ""
-    return ""
+    if group == "MRNA":
+        return "mRNA High" if code & BITS["MRNA_HIGH"] else "mRNA Low" if code & BITS["MRNA_LOW"] else ""
+    return "Protein High" if code & BITS["PROT_HIGH"] else "Protein Low" if code & BITS["PROT_LOW"] else ""
 
 
 def _clinical_text(t: Track, i: int) -> str:
