@@ -65,6 +65,7 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
   const gsea = d.gsea && d.gsea.sets.length ? (width: number) => diffexprGseaSvg(v, { width }) : null;
   return (
     <div className="pb" data-test="diffexpr-body">
+      {d.dropped?.length ? <p className="note" data-test="diffexpr-dropped">{d.dropped.join(", ")} {d.dropped.length === 1 ? "has" : "have"} no {d.profileName || d.profileType} data, so {d.dropped.length === 1 ? "it is" : "they are"} left out and {d.groups.join(", ")} compared.</p> : null}
       <div className="pb-row">
         {two && <div className="pb-plot">
           <PickVolcano draw={(width) => diffexprVolcanoSvg(v, { width }, { selected, picked: pickedGene })} deps={[v, selected, pickedGene]}
