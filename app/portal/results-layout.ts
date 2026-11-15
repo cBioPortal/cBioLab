@@ -331,7 +331,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     { title: "Comparison/Survival", sub: [
       { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },
       { title: "Survival", views: [v("Survival", { kind: "survival", cohorts: both })] },
-      ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, cohorts: both })] }] : []),
+      ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true, cohorts: both })] }] : []),
       { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),
         v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] },
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))

@@ -313,3 +313,46 @@ describe("clinical: every attribute the study declares (allAttributes, CMP-CL-2)
     assert.equal((await runAll(c)).error, "the studies declare no clinical attribute to compare");
   });
 });
+
+describe("clinical: numeric attributes by rank, as the portal (rankTests, CMP-STM-7)", () => {
+  // A 1,2,3 vs B 4,5,6: rank sums 6 and 15, N 6, no ties; H = 12/(6·7)·(6²/3 + 15²/3) − 3·7 = 27/7 ≈ 3.8571,
+  // p = P(χ²₁ > 27/7) ≈ 0.049535 — the portal's Wilcoxon (normal approximation, no continuity correction): z = −4.5/√5.25
+  const view = (attrs: string[], c: ViewRun, extra: object = {}) => runClinical({ kind: "clinical", attributes: attrs, rankTests: true, ...extra } as never, c);
+  const rowOf = async (attrs: string[], c: ViewRun) => { const r = await view(attrs, c); return rowsOf(r instanceof Untimed ? r.result : r)[0]; };
+  test("two groups: the Wilcoxon rank-sum as Kruskal-Wallis, its p the row's p and q", async () => {
+    const r = await rowOf(["W"], ctx({ A: ["s1"], B: ["s1"] }, { s1: { A: [num("W", [1, 2, 3])], B: [num("W", [4, 5, 6])] } }).c);
+    assert.equal(r.test, "Wilcoxon");
+    near(r.statistic, 27 / 7, 1e-4);
+    near(r.p, 0.0495346, 1e-6);
+    assert.equal(r.q, r.p);
+    assert.equal(r.rankP, undefined, "the rank test is the test, not a second one beside it");
+  });
+  test("ties are corrected: A 1,1,2 vs B 2,3,3", async () => {
+    // ranks: 1,1 → 1.5; 2,2 → 3.5; 3,3 → 5.5. R_A = 6.5, R_B = 14.5; raw H = 12/42·(6.5²/3 + 14.5²/3) − 21 = 3.0476;
+    // ties t = 2,2,2: correction 1 − 3·6/210 = 0.9143 → H = 3.3333, p = 0.067889
+    const r = await rowOf(["W"], ctx({ A: ["s1"], B: ["s1"] }, { s1: { A: [num("W", [1, 1, 2])], B: [num("W", [2, 3, 3])] } }).c);
+    near(r.statistic, 10 / 3, 1e-4);
+    near(r.p, 0.0678892, 1e-6);
+  });
+  test("three groups: Kruskal-Wallis; a group with no values is left out of it", async () => {
+    const empty: AttrStats = { attribute: "W", per: "patient", kind: "num", n: 0 };
+    const three = await rowOf(["W"], ctx({ A: ["s1"], B: ["s1"], C: ["s1"] }, { s1: { A: [num("W", [1, 2, 3])], B: [num("W", [4, 5, 6])], C: [num("W", [7, 8, 9])] } }).c);
+    assert.equal(three.test, "Kruskal-Wallis");
+    assert.equal(three.df, 2);
+    const two = await rowOf(["W"], ctx({ A: ["s1"], B: ["s1"], C: ["s1"] }, { s1: { A: [num("W", [1, 2, 3])], B: [num("W", [4, 5, 6])], C: [empty] } }).c);
+    assert.equal(two.test, "Kruskal-Wallis", "named by the groups compared, as the portal names it");
+    near(two.p, 0.0495346, 1e-6);
+  });
+  test("across studies there is no whole distribution: Welch's test, as without rankTests", async () => {
+    const { c } = ctx({ A: ["s1", "s2"], B: ["s1", "s2"] }, { s1: { A: [num("W", [1, 2])], B: [num("W", [5, 6])] }, s2: { A: [num("W", [3])], B: [num("W", [4])] } });
+    assert.equal((await rowOf(["W"], c)).test, "Welch t");
+  });
+  test("the note and the method record say so, and the script recomputes it by scipy's kruskal", async () => {
+    const r = await view(["W"], ctx({ A: ["s1"], B: ["s1"] }, { s1: { A: [num("W", [1, 2, 3])], B: [num("W", [4, 5, 6])] } }).c);
+    const v = r instanceof Untimed ? r.result : r;
+    assert.match(v.note!, /numeric ones by rank, as cBioPortal's Comparison page tests them: Kruskal-Wallis, tie-corrected/);
+    assert.ok(v.method!.steps.some((s) => /^Kruskal–Wallis for each numeric attribute/.test(s.title)));
+    assert.match(v.method!.python!, /ranked = \["W"\]/);
+    assert.match(v.method!.python!, /p_values\[attr\] = kruskal\(\*values\)\.pvalue/);
+  });
+});

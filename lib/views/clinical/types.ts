@@ -10,6 +10,12 @@ export interface ClinicalView {
    * AGE_LAST_FU_YEARS and BIRTH_YEAR, which the portal leaves out
    */
   allAttributes?: boolean;
+  /**
+   * single study: test numeric attributes by rank, as cBioPortal's Comparison page does — Kruskal-Wallis
+   * (tie-corrected; with two groups the same as its two-sided Wilcoxon rank-sum, normal approximation, no
+   * continuity correction) as the reported p and the q basis, in place of Welch's test
+   */
+  rankTests?: boolean;
 }
 /** One clinical attribute compared across cohorts. */
 export interface ClinicalCell {
