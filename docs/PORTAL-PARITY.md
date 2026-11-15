@@ -311,7 +311,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Hazard ratios: the checkbox, control group, HR in the legend, HR matrix (CMP-KM-1, CMP-KM-8, CMP-STM-5)
   - [ ] KM controls: X-Axis Max slider, landmarks, point tooltips, censor "+" marks, SVG/PNG/PDF/Data download (CMP-KM-1, CMP-KM-3, CMP-KM-4, CMP-KM-7, CMP-KM-10)
     - [x] The axis to the last follow-up, each curve to its own, the censored tail's at-risk counts (G1 OS to 148 mo, as the portal's) (CMP-KM-3, CMP-KM-6) (PR #223 open)
-  - [x] Median with its 95 % CI ("62.79 (56.25 - NA)"; ours "62.8 mo"), p to 3 digits ("0.684"; ours "0.68") (CMP-KM-9, CMP-STM-2, CMP-STM-10) (PR #PR7 open)
+  - [x] Median with its 95 % CI ("62.79 (56.25 - NA)"; ours "62.8 mo"), p to 3 digits ("0.684"; ours "0.68") (CMP-KM-9, CMP-STM-2, CMP-STM-10) (PR #235 open)
     - [ ] The summary table under the chart (Number of Cases, Total · Number of Events · Median Months (95% CI)); ours in the legend (CMP-KM-9)
   - [ ] Log-rank at any group size (ours refuses when a curve has under 10 patients) (CMP-MD-10, CMP-STM-3)
   - [x] Overlap: Exclude by default on every tab, the enrichment tabs too (`?overlap=include` for Include) (CMP-PG-3, CMM-MD-6, CMM-TAB-8; [21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md)) (PR #223 open)
