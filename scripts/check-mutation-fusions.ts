@@ -494,5 +494,16 @@ for (const [genes, lines, extra, want, why] of LOLLIPOP_OQL) {
   ok(tag + " ([driver, VUS, somatic samples, mutations] per gene)", JSON.stringify(got) === JSON.stringify(want), "ours " + JSON.stringify(got) + ", expected " + JSON.stringify(want));
 }
 
+// the report's own totals, below the figure (which drops a gene left with nothing to draw): under DRIVER
+// the somatic frequency reads the pin's driver call, so KIF5B's VUS KIF5B-RET leaves it no sample
+{
+  const tag = "lollipopCounts totals [KIF5B: DRIVER; TMPRSS2: DRIVER]: F6 the somatic samples follow the driver call (KIF5B 0, TMPRSS2 1)";
+  try {
+    const r = await resolver(PIN).lollipopCounts(WHOLE, ["KIF5B", "TMPRSS2"], 1, { lines: ["KIF5B: DRIVER", "TMPRSS2: DRIVER"] });
+    const som = (g: string) => r.totals.find((t) => t.gene === g)?.somaticSamples ?? 0;
+    ok(tag, som("KIF5B") === 0 && som("TMPRSS2") === 1, "KIF5B " + som("KIF5B") + ", TMPRSS2 " + som("TMPRSS2"));
+  } catch (e) { ok(tag, false, "threw: " + String((e as Error).message).slice(0, 200)); }
+}
+
 console.log(`\n${checks - failures}/${checks} mutation fusion checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

@@ -10,7 +10,7 @@ import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
-import { oqlMutationFilterSql } from "./oql.ts";
+import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
 import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
@@ -145,7 +145,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
       "  LEFT JOIN att AS tt ON tt.alteration = m.proteinChange AND tt.consequence = m.consequence AND tt.tumor_type = m.tumorType\n" : "") +
     (gn ? "  LEFT JOIN g" + i + " AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var\n" : "") +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n";
-  return { ctes: ctes + (gn ? gn + ",\n" : ""), rows: rows + "  UNION ALL\n" + fusionRows(p, i, db, gene, pin) };
+  return { ctes: ctes + (gn ? gn + ",\n" : ""), rows: rows + "  UNION ALL\n" + fusionRows(p, i, db, gene, pin, oql) };
 }
 
 /**
@@ -179,15 +179,18 @@ function fusionCtes(p: TablePart, i: number, db: string, gene: string, pin: stri
  * shows it, no allele counts, codon or genomic change (so no Genome Nexus annotation). At a pin, the
  * Annotation cell is the pair's call for the sample's tumour type and the driver status the pair's call
  * with none, as the portal asks each (lib/sv-oncokb.ts, with its gene-level fallback); a structural
- * variant is never germline for the driver call (ResultsViewPageStoreUtils, isGermline false).
+ * variant is never germline for the driver call (ResultsViewPageStoreUtils, isGermline false). Under
+ * the query's OQL, the fusions a line of either partner wants (lib/oql.ts oqlFusionFilterSql).
  */
-function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: string | null): string {
+function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, oql?: LollipopOql): string {
+  const drv = pin ? svDriverSql("vn", "va1", "va2") : "toUInt8(0)";
+  const filter = oql ? oqlFusionFilterSql(oql.lines, "v.gene1", "v.gene2", drv) : null;
   return "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
     "         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
     (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level, " +
-        svDriverSql("vn", "va1", "va2") + " AS drv,\n"
+        drv + " AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
     "         'Fusion' AS mutationType, upper(v.class) AS variantType,\n" +
     "         NULL AS vaf, NULL AS altCount, NULL AS refCount,\n" +
@@ -199,7 +202,8 @@ function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: stri
       "  LEFT JOIN sva AS va1 ON va1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS va2 ON va2.gene = v.gene2 AND v.gene2 != ''\n" +
       "  LEFT JOIN svp AS vp ON vp.site1_entrez = v.k1 AND vp.site2_entrez = v.k2 AND vp.sv_type = " + svTypeSql("v.") + " AND vp.tumor_type = vk.tumorType\n" +
       "  LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''\n" : "") +
-    "  LEFT JOIN ct" + i + " AS ct ON ct.sid = v.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = v.sid\n";
+    "  LEFT JOIN ct" + i + " AS ct ON ct.sid = v.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = v.sid\n" +
+    (filter ? "  WHERE " + filter + "\n" : "");
 }
 
 /**

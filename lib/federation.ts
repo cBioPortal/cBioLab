@@ -67,7 +67,7 @@ import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 import { finiteSql } from "./sql-number.ts";
 import type { DriverSettings } from "./driver-settings.ts";
-import { driverAnnotationJoin, oqlEventsSql, oqlMutationFilterSql, parseOql, type OqlPins, type OqlDriverOpts } from "./oql.ts";
+import { driverAnnotationJoin, oqlEventsSql, oqlFusionFilterSql, oqlMutationFilterSql, parseOql, type OqlPins, type OqlDriverOpts } from "./oql.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
@@ -575,8 +575,11 @@ const filteredGenesSql = (genes: string[], filters?: MutationFilters): string =>
   !filters || !Object.keys(filters).length ? ""
     : "\n             AND (" + genes.map((g) => "(`GENE.hugoGeneSymbol` = " + sq(g) + (filters[g] ? " AND " + filters[g] : "") + ")").join("\n               OR ") + ")";
 
-function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string, hotspotPins: VariantPins | null = null, filters?: MutationFilters): string {
+function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string, hotspotPins: VariantPins | null = null,
+  filters?: MutationFilters, fusionLines?: string[]): string {
   const floor = Math.max(1, Math.floor(minCount));
+  const fusionDriver = pin ? svDriverSql("vn") : "toUInt8(1)";
+  const fusionFilter = fusionLines ? oqlFusionFilterSql(fusionLines, "v.gene1", "v.gene2", fusionDriver) : null;
   // a driver by OncoKB or as a Cancer Hotspot, the portal's default sources. With no pin there is no
   // annotation to split drivers from VUS, and cBioPortal then colours everything as a driver; the
   // report says which happened
@@ -612,17 +615,19 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "           UNION ALL\n" +
     "           SELECT arrayJoin(arrayFilter(x -> x IN (" + list + "), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,\n" +
     "                  " + fusionProteinChangeSql("v.") + " AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,\n" +
-    "                  " + (pin ? svDriverSql("vn") : "toUInt8(1)") + " AS driver, toUInt8(1) AS sv, v.gene1 AS rgene\n" +
+    "                  " + fusionDriver + " AS driver, toUInt8(1) AS sv, v.gene1 AS rgene\n" +
     "           FROM v" +
     (pin ? "\n           LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''\n" +
-      "           LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''" : "") + "),\n" +
+      "           LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''" : "") +
+    (fusionFilter ? "\n           WHERE " + fusionFilter : "") + "),\n" +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
 /** Per (codon, change): distinct patients (the height), raw rows (the label's ordering), and the change's
  * driver status and protein impact class (its commonest), so the plot can be filtered by class in the browser. */
-export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null, filters?: MutationFilters): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters) +
+export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null,
+  filters?: MutationFilters, fusionLines?: string[]): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines) +
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
     "FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
 }
@@ -632,8 +637,9 @@ export function lollipopChangesSql(cohortSql: string, genes: string[], study: st
  * counts toward the tally (the portal's badges count every mutation row), so the floor's
  * membership test compares pos through ifNull rather than letting NULL fail the tuple match.
  */
-export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null, filters?: MutationFilters): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters) +
+export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null,
+  filters?: MutationFilters, fusionLines?: string[]): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines) +
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
     "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
@@ -643,8 +649,9 @@ export function lollipopTypesSql(cohortSql: string, genes: string[], study: stri
  * portal counts its rows by their gene (MutationUtils somaticMutationRate), and germline when its
  * status says so without regard to case.
  */
-export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB, filters?: MutationFilters): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, 1, null, db, null, filters) +
+export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB, filters?: MutationFilters,
+  fusions?: { lines: string[]; pin: string | null }): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, 1, fusions?.pin ?? null, db, null, filters, fusions?.lines) +
     "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
     "       uniqExactIf(sid, if(sv = 1, rgene = gene AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0, status != 'GERMLINE')) AS somatic_samples\n" +
     "FROM m GROUP BY gene");
@@ -1625,10 +1632,11 @@ abstract class BaseResolver implements AggregateCapable {
     const pos = (x: unknown) => x == null || x === "" ? null : Number(x);
     const hotspotPins = await variantPins();
     const filters = oql ? mutationFilters(oql, genes, { study: this.study, db, oncokbPin: pin, hotspotPins }) : undefined;
+    const fusionLines = oql?.lines;
     const [c, t, tot, cs] = await Promise.all([
-      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters), conn),
-      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters), conn),
-      this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters), conn),
+      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines), conn),
+      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines), conn),
+      this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters, fusionLines ? { lines: fusionLines, pin } : undefined), conn),
       this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
     ]);
     return {
