@@ -6,7 +6,7 @@
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
 -- combined at the analysis layer: each study is evaluated separately against its own
 -- instance and the counts are ADDED; patient and sample overlap across studies is not deduplicated.
@@ -18,7 +18,7 @@
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
 -- cohort TP53 wt
 -- msk_chord_2024
@@ -135,7 +135,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 altered AS (
   SELECT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS sid, g.variant_type AS vtype,
          max(ann.is_driver) AS is_driver
@@ -252,7 +252,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 altered AS (
   SELECT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS sid, g.variant_type AS vtype,
          max(ann.is_driver) AS is_driver
@@ -339,7 +339,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
@@ -396,7 +396,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid,
          anyIf(attribute_value, attribute_name='OS_MONTHS') AS months,
@@ -453,7 +453,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
@@ -510,7 +510,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 os AS (
   SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid,
          anyIf(attribute_value, attribute_name = 'OS_MONTHS') AS months,
@@ -565,7 +565,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))
 SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx
 FROM (
   SELECT attribute_name AS a, type AS per, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS x
@@ -618,7 +618,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))
 SELECT a, per, count() AS n, sum(x) AS sx, sum(x * x) AS sxx, min(x) AS mn, max(x) AS mx
 FROM (
   SELECT attribute_name AS a, type AS per, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS x
@@ -639,7 +639,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 altered AS (
   SELECT DISTINCT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS sid
   FROM snapshot_db.genomic_event_derived g
@@ -677,7 +677,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pi
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 altered AS (
   SELECT DISTINCT g.hugo_gene_symbol AS gene, replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS sid
   FROM snapshot_db.genomic_event_derived g

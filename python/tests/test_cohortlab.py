@@ -398,7 +398,8 @@ class StyleOverrides(unittest.TestCase):
         from cohortlab import normalize_display
         drivers = {"oncokb": True, "hotspots": True, "custom": True, "tiers": None, "annotated": True, "hideVus": False, "hideGermline": False}
         self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all", "colorByType": True, "colorByGermline": True,
-                                                   "hideVUS": False, "annotate": "oncokb", "hideGermline": False, "drivers": drivers, "whiteBackground": False})
+                                                   "hideVUS": False, "annotate": "oncokb", "hideGermline": False, "drivers": drivers, "whiteBackground": False,
+                                                          "showOql": True})
         self.assertEqual(normalize_display({"annotate": "none", "hideVUS": True})["hideVUS"], False, "with no source on there is nothing to hide")
         self.assertEqual(normalize_display(None, {"tiers": ["Tier 1"], "oncokb": False, "custom": False})["drivers"]["tiers"], ["Tier 1"])
         self.assertEqual(normalize_display(None, {"hotspots": False})["drivers"]["hotspots"], False)
@@ -473,7 +474,7 @@ class GeneTracks(unittest.TestCase):
 
     def test_refusals_match_the_typescript(self):
         from cohortlab.gene_tracks import normalize_gene_tracks, parse_gene_list
-        for bad in ("[TP53", "TP53]", "[[TP53]]", "[]", "TP53: MUT"):
+        for bad in ("[TP53", "TP53]", "[[TP53]]", "[]"):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 parse_gene_list(bad)
         with self.assertRaises(ValueError):

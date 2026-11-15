@@ -161,6 +161,7 @@ export function GeneQueryEditor({ mode, value, onChange, onSubmit, min = 1, max 
   const problems = [
     check.error,
     mode === "genes" && !groups && check.tracks?.some((t) => typeof t !== "string") ? "merged rows ([A B]) are the oncoprint's; list each gene on its own here" : null,
+    mode === "genes" && !groups && check.tracks?.some((t) => typeof t === "string" && t.includes(":")) ? "a row's OQL (KRAS: AMP) is the oncoprint's; this view draws every alteration of its genes" : null,
     ...entryErrors.map((e) => e.text + " — " + e.error),
     ...unknown.map((c) => c.symbol + " is not a gene symbol"),
     ...aliases.map((c) => c.symbol + " is an alias of " + c.hugo!.join(" / ")),
@@ -293,7 +294,7 @@ export function GeneQueryEditor({ mode, value, onChange, onSubmit, min = 1, max 
                 <div className="flex flex-col gap-2 text-sm text-muted-foreground">
                   <p className="m-0">Symbols separated by spaces, commas or new lines: <code className="font-mono">TP53 KRAS PIK3CA</code>.</p>
                   {groups && <p className="m-0"><code className="font-mono">[EGFR ERBB2]</code> draws both as one merged row; a label goes first in quotes: <code className="font-mono">[&quot;RTK&quot; EGFR ERBB2 MET]</code>.</p>}
-                  <p className="m-0">Per-gene OQL (<code className="font-mono">TP53: MUT</code>) is not taken here — a row draws every alteration type its gene has. To restrict the patients, give the view a cohort with an OQL clause.</p>
+                  {groups && <p className="m-0">A gene&apos;s row may carry OQL to the next “;” or new line: <code className="font-mono">KRAS: AMP MUT=G12D</code> draws only those alterations. Not inside a merged row, and not EXP or PROT yet.</p>}
                 </div>
               )}
             </TabsContent>

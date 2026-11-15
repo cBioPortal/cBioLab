@@ -80,9 +80,11 @@ export interface FigureDisplay {
   whiteBackground?: boolean;
   /** the genomic staircase's switches, the portal's Sort › Mutation Type / Driver / Ignore VUS */
   sortByMutationType: boolean; sortByDrivers: boolean; sortIgnoreVUS: boolean;
+  /** each gene row's OQL line after its label, the portal's "Show OQL filters" */
+  showOql: boolean;
 }
 export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true, colorByGermline: true,
-  sortByMutationType: true, sortByDrivers: true, sortIgnoreVUS: false };
+  sortByMutationType: true, sortByDrivers: true, sortIgnoreVUS: false, showOql: true };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
   cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number;
@@ -335,11 +337,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const S = figureStyle(data, display);
     const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) },
-      cssW, paletteOf(S), { gap: gapPx, pctLabels: pctMode, style: S, colors: display.colors ?? data.display?.colors });
+      cssW, paletteOf(S), { gap: gapPx, pctLabels: pctMode, style: S, colors: display.colors ?? data.display?.colors, showOql: display.showOql });
     const mem = (performance as any).memory;
     bump({ drawMs: r.ms, cellsDrawn: r.cellsDrawn, bucketsDrawn: r.bucketsDrawn, frames: perfRef.current.frames + 1, heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, visible, view, cssW, maxScroll, gapPx, gapMode, display.colorByType, display.colorByGermline, display.colors]);
+  }, [data, visible, view, cssW, maxScroll, gapPx, gapMode, display.colorByType, display.colorByGermline, display.colors, display.showOql]);
 
   // ---- minimap: the whole figure at two pixels a row, with the viewport on it -----
   const MINI_ROW = 3;
@@ -682,7 +684,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
     Number(display.colorByGermline !== DEFAULT_FIGURE_DISPLAY.colorByGermline) +
-    Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
+    Number(!!display.whiteBackground) + Number(display.gaps !== "none") + Number(!display.showOql)) || 0;
   // the staircase switches, as the portal's Sort menu offers them: Mutation Type needs colour by
   // type, Driver an annotation, Ignore VUS the driver switch and VUS not already hidden
   const staircaseOff = Number(!display.sortByMutationType) + Number(!display.sortByDrivers) + Number(display.sortIgnoreVUS);
@@ -792,6 +794,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <label className="chk" data-tip="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
                   <Checkbox checked={!!display.whiteBackground} disabled={busy}
                     onCheckedChange={(c) => set({ whiteBackground: (c === true) || undefined })} /> white background (for print)</label>
+                {data.tracks.some((t) => t.sublabel) && (
+                  <label className="chk" data-tip="each gene row's OQL line, in grey after its name — the portal's Show OQL filters">
+                    <Checkbox checked={display.showOql} disabled={busy}
+                      onCheckedChange={(c) => set({ showOql: (c === true) })} /> show OQL filters</label>
+                )}
                 <label className="setrow" data-tip={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>
                   <span className="meta">gaps</span>
                   <OptionSelect value={display.gaps} disabled={busy || !gapTrack} onValueChange={(v) => set({ gaps: v as FigureDisplay["gaps"] })}>

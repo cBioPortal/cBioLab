@@ -38,6 +38,7 @@ def normalize_gene_tracks(genes: Any) -> tuple[list[GeneTrack], list[str]]:
 
     for raw in genes or []:
         if isinstance(raw, (str, int, float)) and not isinstance(raw, bool):
+            _reject_per_gene_oql(str(raw))
             g = _clean(raw)
             if not GENE_RE.match(g):
                 continue
@@ -158,8 +159,8 @@ def parse_gene_list(text: str) -> list[Any]:
 
 def _reject_per_gene_oql(w: str) -> None:
     if ":" in w:
-        raise ValueError("gene list: per-track OQL ('%s') is not supported — an oncoprint track here draws every "
-                         "alteration type for its gene." % w[:24])
+        raise ValueError("gene list: per-track OQL ('%s') is not supported by local tables — a row here draws every "
+                         "alteration of its gene." % w[:24])
 
 
 def format_gene_list(genes: Any) -> str:

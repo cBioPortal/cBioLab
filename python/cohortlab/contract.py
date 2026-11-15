@@ -17,7 +17,8 @@ import numpy as np
 from .style import BITS, STYLE, numeric_value  # the one bit definition, generated from lib/oncoprint-style.ts
 
 DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all",
-                                   "colorByType": True, "colorByGermline": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
+                                   "colorByType": True, "colorByGermline": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False,
+                                   "showOql": True}
 NOT_PROFILED = -1
 _MAGIC = 0x4F504231  # "OPB1"
 

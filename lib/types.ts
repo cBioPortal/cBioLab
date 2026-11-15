@@ -455,6 +455,8 @@ export interface DisplaySpec {
   annotate?: "oncokb" | "none";
   /** unaltered cells drawn white rather than grey, for print (default false) */
   whiteBackground?: boolean;
+  /** a gene row's OQL line drawn after its label (default true) — the portal's "Show OQL filters" */
+  showOql?: boolean;
   /** the genomic staircase ranks mutations by class (default true) — the portal's Sort › Mutation Type */
   sortByMutationType?: boolean;
   /** the genomic staircase ranks every driver before every VUS (default true) — the portal's Sort › Driver */
@@ -472,7 +474,7 @@ export interface DisplaySpec {
  * `drivers` the settings in full.
  */
 export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate" | "whiteBackground">>
-  & Pick<DisplaySpec, "style" | "colors" | "colorByGermline" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS"> & { hideGermline?: boolean; drivers?: ResolvedDrivers };
+  & Pick<DisplaySpec, "style" | "colors" | "colorByGermline" | "showOql" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS"> & { hideGermline?: boolean; drivers?: ResolvedDrivers };
 export interface IncidenceCurve {
   cohort: string;
   n: number; events: number; competing: number; censored: number;
@@ -854,6 +856,8 @@ export interface Track {
   name?: string;
   /** a heatmap track's profile: its alteration type and datatype ("MRNA_EXPRESSION Z-SCORE") */
   profileKind?: string;
+  /** a gene row's OQL line less the gene (": AMP MUT=G12D"), drawn after its label */
+  sublabel?: string;
 }
 export interface GroupRange { name: string; start: number; count: number; patients?: number }
 export interface Contract {

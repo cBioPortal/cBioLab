@@ -164,7 +164,7 @@ describe("oncoprint: the server-drawn figure", () => {
   const URL_ = "http://peer.invalid/api/federation/v1";
   const SHARE = {
     study: "p1", genes: ["TP53", "KRAS"], groups: [["P1", "P2", "P3"]],
-    events: [["P1", "TP53", "mutation", "Missense_Mutation", "R175H", ""], ["P2", "KRAS", "cna", "", "", "2"]],
+    events: [["P1", "TP53", "mutation", "Missense_Mutation", "R175H", "", "", "", 0, null, null], ["P2", "KRAS", "cna", "", "", "2", "", "", 0, null, null]],
     coverage: [["P1", 3], ["P2", 3], ["P3", 3]], facts: [["P1", 1, 7], ["P2", 2, 7], ["P3", 1, 1]],
     clinical: [], heatmap: [], overlays: [], profileTypes: ["mutations"], assays: [],
     queries: [{ label: "oncoprint:columns", sql: "SELECT 1", ms: 3 }],

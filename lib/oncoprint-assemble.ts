@@ -9,6 +9,8 @@
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, SPECTRUM_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
+import { eventWanted, oqlSublabel } from "./oql-match.ts";
+import type { OqlSpec } from "./oql-parse.ts";
 import { STYLE, assayScale, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
@@ -41,7 +43,9 @@ export function mutClassBit(mt: string | undefined): number {
  * cbp_driver_tiers) and `germ` marks a germline mutation; rows from an older peer or a local file
  * may lack them, which reads as no call and somatic.
  */
-export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number; df?: string | null; dt?: string | null; germ?: boolean | number | null }
+export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number; df?: string | null; dt?: string | null; germ?: boolean | number | null;
+  /** a mutation's own protein start and end, read where a row's OQL has a position range */
+  ps?: number | null; pe?: number | null }
 
 export interface SortKey { track: string; dir: "asc" | "desc" }
 
@@ -54,7 +58,7 @@ export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string;
   });
 }
 
-const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground",
+const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "showOql",
   "sortByMutationType", "sortByDrivers", "sortIgnoreVUS", "style", "colors"] as const;
 const GAP_MODES = ["none", "gaps", "pct", "pct-left"] as const;
 const LEGEND_MODES = ["all", "none"] as const;
@@ -70,7 +74,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
   for (const k of Object.keys(src))
     if (!(DISPLAY_KEYS as readonly string[]).includes(k))
       throw new Error("display: unknown option '" + k + "' (accepted: " + DISPLAY_KEYS.join(", ") + ")");
-  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "colorByGermline" | "hideVUS" | "whiteBackground" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS", dflt: boolean): boolean => {
+  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "colorByGermline" | "hideVUS" | "whiteBackground" | "showOql" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS", dflt: boolean): boolean => {
     const v = src[k];
     if (v === undefined) return dflt;
     if (typeof v !== "boolean") throw new Error("display." + k + " must be true or false");
@@ -111,6 +115,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
     hideGermline: drivers.hideGermline,
     drivers,
     whiteBackground: bool("whiteBackground", false),
+    showOql: bool("showOql", true),
     // the staircase switches, echoed only when off the portal's defaults
     ...(!bool("sortByMutationType", true) ? { sortByMutationType: false } : {}),
     ...(!bool("sortByDrivers", true) ? { sortByDrivers: false } : {}),
@@ -228,6 +233,9 @@ export function assembleContract(input: AssembleInput): Contract {
   // appear in several rows (merged, and again on its own), so one symbol maps to a LIST.
   const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.label, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
   const rowsOfGene = new Map<string, Int32Array[]>();
+  // a row with an OQL line draws only the alterations the line wants (lib/oql-match.ts)
+  const oqlOf = new Map<Int32Array, OqlSpec[]>();
+  for (const t of geneTracks) if (t.oql) oqlOf.set(geneCells.get(t.label)!, t.oql);
   for (const t of geneTracks) for (const m of t.members) {
     const list = rowsOfGene.get(m);
     if (list) list.push(geneCells.get(t.label)!); else rowsOfGene.set(m, [geneCells.get(t.label)!]);
@@ -287,12 +295,14 @@ export function assembleContract(input: AssembleInput): Contract {
     else if (r.vt === "structural_variant") bit = BITS.SV;
     else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
     if (!bit) continue;
-    const covered = rows.filter((cells) => cells[i] !== NOT_PROFILED);
-    if (covered.length < rows.length) offPanel++;
+    const driver = isDriver(r);
+    const wanted = oqlOf.size ? rows.filter((cells) => eventWanted(oqlOf.get(cells), r, driver)) : rows;
+    if (!wanted.length) continue;
+    const covered = wanted.filter((cells) => cells[i] !== NOT_PROFILED);
+    if (covered.length < wanted.length) offPanel++;
     if (!covered.length) continue;
     const germ = mut && !!r.germ;
     if (germ && hideGerm) { hiddenGerm++; continue; }
-    const driver = isDriver(r);
     if (hideVus && !driver) { hiddenVus++; continue; }
     if (germ) for (const cells of covered) mark(driver ? germDrv : germVus, cells, i, bit);
     if (mut && !driver) {
@@ -659,6 +669,7 @@ export function assembleContract(input: AssembleInput): Contract {
     tracks.push({
       kind: "gene", label: gt.label, cells,
       ...(gt.members.length > 1 ? { members: gt.members } : {}),
+      ...(gt.oql ? { sublabel: oqlSublabel(gt.oql) } : {}),
       altered, profiled, driverAltered, freqPct, driverPct,
       // Pooled is enough on its own with one group; with several, the figure already
       // draws a boundary between them, so the text/provenance side gets the same split
@@ -686,7 +697,7 @@ export function assembleContract(input: AssembleInput): Contract {
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
       ...(input.clusterMethod ? { cluster: input.clusterMethod } : {}),
       ...customDriverReport(events) },
-    display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false },
+    display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false, showOql: true },
     stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}), ...(hideGerm ? { hiddenGermline: hiddenGerm } : {}), ...(offPanel ? { offPanel } : {}) }
   };
 }

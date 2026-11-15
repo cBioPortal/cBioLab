@@ -1,0 +1,107 @@
+// One alteration against one OQL line, as cBioPortal's Results view decides which data a gene's
+// row draws (oqlfilter.ts isDatumWantedByOQLLine and its commands), and the line written back as
+// the row's sublabel (parsedOQLAlterationToSourceOQL). Pure and browser-safe; lib/oql.ts compiles
+// the same rules to SQL for the cohorts, from the same class table.
+import type { OqlSpec, OqlRange } from "./oql-parse.ts";
+
+/**
+ * A mutation's class as cBioPortal's OQL sees it — cbioportal-frontend's getMutationSubType and
+ * getSimplifiedMutationType (src/shared/lib/oql/AccessorsForOqlFilter.ts), case for case: a
+ * protein change of "Promoter" is a promoter mutation whatever its type, a listed type maps to
+ * its class, and anything unlisted (5'Flank, Silent, Targeted_Region, ...) is "other". The
+ * portal's Fusion has no class; "none" stands for it.
+ */
+export const PORTAL_TYPE_CLASS: [string, string[]][] = [
+  ["missense", ["missense_mutation", "missense", "missense_variant"]],
+  ["frameshift", ["frame_shift_ins", "frame_shift_del", "frameshift", "frameshift_deletion", "frameshift_insertion",
+    "de_novo_start_outofframe", "frameshift_variant"]],
+  ["nonsense", ["nonsense_mutation", "nonsense", "stopgain_snv"]],
+  ["splice", ["splice_site", "splice", "splice site", "splicing", "splice_site_snp", "splice_site_del", "splice_site_indel",
+    "splice_region"]],
+  ["nonstart", ["translation_start_site", "start_codon_snp", "start_codon_del"]],
+  ["nonstop", ["nonstop_mutation"]],
+  ["inframe", ["in_frame_del", "in_frame_ins", "in_frame_deletion", "in_frame_insertion", "indel", "nonframeshift_deletion",
+    "nonframeshift", "nonframeshift insertion", "nonframeshift_insertion"]],
+];
+const CLASS_OF = new Map<string, string>(PORTAL_TYPE_CLASS.flatMap(([cls, types]) => types.map((t) => [t, cls] as [string, string])));
+
+/** a mutation's portal class from its type and protein change */
+export function mutationClass(type: string | null | undefined, change: string | null | undefined): string {
+  const t = (type || "").toLowerCase();
+  if (t === "fusion") return "none";
+  if ((change || "").toLowerCase() === "promoter") return "promoter";
+  return CLASS_OF.get(t) || "other";
+}
+
+/** what an alteration is to OQL: its kind, and for a mutation its type, change and own protein positions */
+export interface OqlEvent {
+  vt: string; mt?: string | null; mv?: string | null; cna?: string | number | null;
+  ps?: number | null; pe?: number | null;
+}
+
+/** the portal's RANGE test against the mutation's own [start, end]: a position only when both are known, neither -1, start <= end */
+function inRange(r: OqlRange, ps: number | null | undefined, pe: number | null | undefined): boolean {
+  if (ps == null || pe == null || ps === -1 || pe === -1 || ps > pe) return false;
+  const lo = r.start ?? -Infinity, hi = r.end ?? Infinity;
+  return r.contained ? lo <= ps && pe <= hi : lo <= pe && ps <= hi;
+}
+
+function specWants(s: OqlSpec, ev: OqlEvent, driver: boolean): boolean {
+  if (s.driver && !driver) return false;
+  switch (s.type) {
+    case "ANY": return true;
+    case "MUT": {
+      if (ev.vt !== "mutation") return false;
+      const cls = mutationClass(ev.mt, ev.mv);
+      if (cls === "none") return false;
+      if (s.cls && (s.cls === "trunc" ? cls === "missense" || cls === "inframe" : cls !== s.cls)) return false;
+      if (s.pchange && (!ev.mv || ev.mv.toLowerCase() !== s.pchange.toLowerCase())) return false;
+      return !s.range || inRange(s.range, ev.ps, ev.pe);
+    }
+    case "CNA": {
+      if (ev.vt !== "cna") return false;
+      const v = Number(ev.cna);
+      return s.cna === 2 ? v >= 2 : s.cna === -2 ? v <= -2 : Math.abs(v) >= 2;
+    }
+    case "SV": return ev.vt === "structural_variant";
+    default: return false;   // EXP / PROT are not alterations of a gene row's cells
+  }
+}
+
+/**
+ * Does a row whose OQL line is `specs` draw this alteration? No line (or a bare gene's) draws
+ * every one. Otherwise the alteration is drawn when some command of the line wants it — OR between
+ * commands, AND within one (its class, change, range and DRIVER). `driver` is the alteration's
+ * driver call under the page's driver settings, the portal's putativeDriver.
+ */
+export function eventWanted(specs: readonly OqlSpec[] | null | undefined, ev: OqlEvent, driver: boolean): boolean {
+  if (!specs || !specs.length) return true;
+  return specs.some((s) => specWants(s, ev, driver));
+}
+
+/** a line with something to filter: not empty, and not a bare gene's "any alteration" */
+export const hasOql = (specs: readonly OqlSpec[] | null | undefined): boolean =>
+  !!specs && specs.some((s) => s.type !== "ANY" || !!s.driver);
+
+const range = (r: OqlRange): string => "(" + (r.start ?? "") + "-" + (r.end ?? "") + (r.contained ? "*" : "") + ")";
+/** one command as the portal writes it back */
+function specText(s: OqlSpec): string {
+  const drv = s.driver ? "_DRIVER" : "";
+  switch (s.type) {
+    case "ANY": return s.driver ? "DRIVER" : "";
+    case "MUT": {
+      const head = s.pchange ? "MUT=" + s.pchange : s.cls ? "MUT=" + s.cls.toUpperCase() : "MUT";
+      return head + (s.range ? "_" + range(s.range) : "") + drv;
+    }
+    case "CNA": return (s.cna === 2 ? "AMP" : s.cna === -2 ? "HOMDEL" : "CNA") + drv;
+    case "SV": return "FUSION" + drv;
+    default: return s.type + (s.op || "") + (s.z ?? "");
+  }
+}
+
+/** the row's sublabel: its line written back less the gene (": AMP MUT=G12D"), "" with no OQL */
+export function oqlSublabel(specs: readonly OqlSpec[] | null | undefined): string {
+  if (!hasOql(specs)) return "";
+  const parts = specs!.map(specText).filter(Boolean);
+  return parts.length ? ": " + parts.join(" ") : "";
+}

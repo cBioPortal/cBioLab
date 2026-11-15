@@ -18,7 +18,7 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
 -- combined at the analysis layer: each study is evaluated separately against its own
 -- instance and the counts are ADDED; patient and sample overlap across studies is not deduplicated.
@@ -30,7 +30,7 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
 -- cohort TP53 mut
 -- luad_tcga_pan_can_atlas_2018
@@ -40,7 +40,7 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
 -- combined at the analysis layer: each study is evaluated separately against its own
 -- instance and the counts are ADDED; patient and sample overlap across studies is not deduplicated.
@@ -52,7 +52,7 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
 -- view 0 plot: plot:bins · luad_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -264,7 +264,7 @@ SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SEL
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))))
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))))
 
 -- view 0 plot: plot:highlight:count · luad_tcga_pan_can_atlas_2018
 SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -274,7 +274,7 @@ SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SEL
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))))
 
 -- view 0 plot: plot:highlight:count · lusc_tcga_pan_can_atlas_2018
 SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -284,7 +284,7 @@ SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SEL
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))))
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))))
 
 -- view 0 plot: plot:highlight:count · lusc_tcga_pan_can_atlas_2018
 SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -294,7 +294,7 @@ SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SEL
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))))
 
 -- view 0 plot: plot:highlight:points · luad_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -304,7 +304,7 @@ WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'luad
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))))),
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
      xs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
@@ -343,7 +343,7 @@ WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'luad
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
      xs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
@@ -382,7 +382,7 @@ WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))))),
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
      xs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
@@ -421,7 +421,7 @@ WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
      xs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
@@ -660,7 +660,7 @@ SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SEL
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))))
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))))
 
 -- view 1 plot: plot:highlight:count · lusc_tcga_pan_can_atlas_2018
 SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -670,7 +670,7 @@ SELECT uniqExact(pid) AS n, uniqExact(sid) AS ns FROM (SELECT pid, sid FROM (SEL
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))))
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))))
 
 -- view 1 plot: plot:highlight:points · luad_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -680,7 +680,7 @@ WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'luad
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))))),
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
      vs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
@@ -719,7 +719,7 @@ WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
-    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))))),
+    AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
      vs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type

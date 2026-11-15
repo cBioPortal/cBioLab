@@ -24,6 +24,8 @@ export const STYLE = {
   palette: {
     paper: "#ffffff", unaltered: "#bebebe", derived: "#0f86a1",
     text: "#1f2933", muted: "#5b6b76", groupLine: "#c9d2d8",
+    // a gene row's OQL line after its label: the portal's rgb(166,166,166) (oncoprintlabelview 343-356)
+    sublabel: "#a6a6a6",
     categorical: ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#999999"],
     /**
      * A categorical oncoprint track's values: the portal's list (oncoprintjs makeUniqueColorGetter,
@@ -443,6 +445,28 @@ export function truncateLabel(label: string, S: Style = STYLE): string {
  * ones that spell the row in a query. The brackets are outside the truncation, so a long label
  * still ends in a closing bracket rather than losing it to the ellipsis.
  */
+/**
+ * A row's sublabel as the gutter prints it, when the display shows OQL: past 18 characters, its
+ * first 15 and "..." (oncoprintlabelview shortenLabelIfNecessary, getMaximumLabelLength).
+ */
+export function trackSublabelText(track: { sublabel?: string }, display?: { showOql?: boolean } | null): string {
+  const s = track.sublabel || "";
+  if (!s || display?.showOql === false) return "";
+  return s.length > 18 ? s.slice(0, 15) + "..." : s;
+}
+
+/**
+ * A sublabel cut to the `room` (px) between its label and the row's percentage, as `measure`
+ * measures text: whole when it fits, else as many characters as fit and "...", nothing when not
+ * even "..." does. The gutter is fixed here, where the portal widens its label column instead.
+ */
+export function fitSublabel(sub: string, room: number, measure: (s: string) => number): string {
+  if (!sub || measure(sub) <= room) return sub;
+  const base = sub.endsWith("...") ? sub.slice(0, -3) : sub;
+  for (let n = base.length - 1; n > 0; n--) if (measure(base.slice(0, n).trimEnd() + "...") <= room) return base.slice(0, n).trimEnd() + "...";
+  return "";
+}
+
 export function trackLabelText(track: { label: string; members?: string[] }, S: Style = STYLE): string {
   const [open, close] = S.geometry.mergedBrackets;
   if (!track.members || track.members.length < 2) return truncateLabel(track.label, S);
@@ -462,10 +486,13 @@ export interface TrackSummary {
   /** same shape, sliced to one column group — see Track.byGroup */
   byGroup?: { group: string; altered: number; profiled: number; freqPct: number | null; driverPct: number | null }[];
   min?: number; max?: number; profileType?: string; note?: string;
+  /** a gene row's OQL line less the gene */
+  sublabel?: string;
 }
 export function trackTooltipLines(t: TrackSummary, columns: number, unit = "patient"): string[] {
   const n = (x: number) => x.toLocaleString("en-US");
-  const lines = [t.label];
+  const lines = [t.label + (t.sublabel || "")];
+  if (t.sublabel) lines.push("draws only the alterations its OQL line wants");
   if (t.members && t.members.length > 1) lines.push("one row over " + t.members.length + " genes: " + t.members.join(" · "));
   if (t.freqPct != null && t.profiled != null && t.altered != null) {
     lines.push(n(t.altered) + " of " + n(t.profiled) + " profiled " + unit + "s altered (" + t.freqPct + "%)");

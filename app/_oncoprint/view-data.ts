@@ -3,7 +3,7 @@
 import { sortKeyText } from "./track-edits.ts";
 
 /** the display keys the figure owns — written back without a re-run */
-export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground",
+export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground", "showOql",
   "sortByMutationType", "sortByDrivers", "sortIgnoreVUS"]);
 
 /** the view without what the figure applies in the browser — what decides whether a re-run is needed */
