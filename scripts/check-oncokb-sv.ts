@@ -65,7 +65,25 @@ const KEYS: [string, string][] = [
   [`3799|5979|FUSION|${LUAD}`, "Y9 KIF5B-RET on FX-P52-T1, class INVERSION: two genes, FUSION (a key whatever the curation)"],
   [`7273|94025|FUSION|${LUAD}`, "Y8 TTN-MUC16 on FX-P52-T1, class TRANSLOCATION: a key; the sync stores it unasked"],
   [`7113|2078|FUSION|${LUAD}`, "S4 TMPRSS2-ERG on FX-P53-T1, class DELETION: two genes, FUSION"],
-  [`7170|4914|FUSION|${LUAD}`, "S6 TPM3-NTRK1 on FX-P53-T1"]
+  [`7170|4914|FUSION|${LUAD}`, "S6 TPM3-NTRK1 on FX-P53-T1"],
+  [`23184|7113|FUSION|${LUAD}`, "P10 MESD-TMPRSS2 on FX-P52-T1 (the file's MESDC2, by its Entrez id)"],
+  [`57670|673|FUSION|${LUAD}`, "KIAA1549-BRAF on FX-P53-T1"],
+  // X1 (PR E): every (site1, site2, SV type) is also a key with no tumour type, the portal's
+  // driver query (cancerTypeForOncoKb(key, {}) is null: ResultsViewPageStore.ts 5467-5490); EML4-ALK's
+  // is already one by FX-P48-T1's own tumour type, and stays one row (Y10)
+  [`2263|2263|FUSION|`, "X1 FGFR2-FGFR2 with no tumour type"],
+  [`675||DELETION|`, "X1 BRCA2 (FX-P50-T1 somatic, FX-P51-T1 germline: a germline SV is a key too) with no tumour type"],
+  [`|4233|DUPLICATION|`, "X1 MET, site1 '', with no tumour type"],
+  [`6098||FUSION|`, "X1 ROS1 with no tumour type"],
+  [`5925||UNKNOWN|`, "X1 RB1 (DEL on FX-P51-T1, Intergenic on FX-P50-T1: both UNKNOWN) with no tumour type"],
+  [`4089||UNKNOWN|`, "X1 SMAD4 (Deletion, NA) with no tumour type"],
+  [`4851||UNKNOWN|`, "X1 NOTCH1 with no tumour type"],
+  [`3799|5979|FUSION|`, "X1 KIF5B-RET with no tumour type"],
+  [`7273|94025|FUSION|`, "X1 TTN-MUC16 with no tumour type: a key whatever the curation"],
+  [`7113|2078|FUSION|`, "X1 TMPRSS2-ERG with no tumour type"],
+  [`7170|4914|FUSION|`, "X1 TPM3-NTRK1 with no tumour type"],
+  [`23184|7113|FUSION|`, "X1 MESD-TMPRSS2 with no tumour type"],
+  [`57670|673|FUSION|`, "X1 KIAA1549-BRAF with no tumour type"]
 ];
 
 const keys = await keysOf(STUDY);
@@ -88,7 +106,7 @@ ok("another study's key space has none of the fixture's", (await keysOf("no_such
 
 /** the cohort: these samples, with their patients */
 const SAMPLES = ["FX-P45-T1", "FX-P46-T1", "FX-P47-T1", "FX-P48-T1", "FX-P49-T1", "FX-P49-T2", "FX-P50-T1", "FX-P51-T1", "FX-P52-T1", "FX-P53-T1"];
-const GENES = ["EML4", "ALK", "FGFR2", "BRCA2", "MET", "ROS1", "RB1", "SMAD4", "NOTCH1", "KIF5B", "RET", "TTN", "MUC16", "TMPRSS2", "ERG", "TPM3", "NTRK1"];
+const GENES = ["EML4", "ALK", "FGFR2", "BRCA2", "MET", "ROS1", "RB1", "SMAD4", "NOTCH1", "KIF5B", "RET", "TTN", "MUC16", "TMPRSS2", "ERG", "TPM3", "NTRK1", "MESD", "KIAA1549", "BRAF"];
 const cohortSql = "SELECT tupleElement(t, 1) AS pid, tupleElement(t, 2) AS sid FROM (SELECT arrayJoin([" +
   SAMPLES.map((s) => `('${s.replace(/-T\d$/, "")}', '${s}')`).join(", ") + "]) AS t)";
 const annotationText = SV_COLUMNS.find((c) => c.id === "annotation")!.text;
@@ -116,7 +134,12 @@ const AT_PIN: Want[] = [
   ["FX-P52-T1", "KIF5B", "RET", "Oncogenic · Level 1", "Oncogenic", "LEVEL_1", 1, "Y9 one partner curated: its stored answer"],
   ["FX-P52-T1", "TTN", "MUC16", "", "", "", 0, "Y8 S7 an uncurated pair stored empty: blank, no driver, not TTN's gene-level Unknown"],
   ["FX-P53-T1", "TMPRSS2", "ERG", "Oncogenic · Level 4", "Oncogenic", "LEVEL_4", 1, "S4 S3 no pair row at the pin: the partner ERG's gene-level Fusion row"],
-  ["FX-P53-T1", "TPM3", "NTRK1", "Unknown", "Unknown", "", 0, "S6 the pair row says Unknown: it wins over NTRK1's gene-level Oncogenic"]
+  ["FX-P53-T1", "TPM3", "NTRK1", "Unknown", "Unknown", "", 0, "S6 the pair row says Unknown: it wins over NTRK1's gene-level Oncogenic"],
+  ["FX-P51-T1", "BRCA2", "", "Likely Oncogenic", "Likely Oncogenic", "", 1, "a GERMLINE SV is read like any other (the portal asks it by pair; legacy RVU 249)"],
+  ["FX-P50-T1", "RB1", "", "Likely Oncogenic", "Likely Oncogenic", "", 1, "Y5 class Intergenic read as UNKNOWN"],
+  ["FX-P50-T1", "SMAD4", "", "Inconclusive", "Inconclusive", "", 0, "Y5 class NA read as UNKNOWN, whatever the event info"],
+  ["FX-P52-T1", "MESD", "TMPRSS2", "", "", "", 0, "S4 no pair row and neither partner has a gene-level Fusion row: blank"],
+  ["FX-P53-T1", "KIAA1549", "BRAF", "Likely Oncogenic · Level 3B", "Likely Oncogenic", "LEVEL_3B", 1, "S2 the pair's tumour-type row, not its no-tumour-type row"]
 ];
 
 const compare = (got: Row[], wants: Want[], tag: string) => {

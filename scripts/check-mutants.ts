@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "plot-stats";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "plot-stats" | "mutation-fusions";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -38,6 +38,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   // the density chart's bins, run on the fixture study's connection b
   "density": ["node", "--env-file=.env.local", "scripts/check-density.ts"],
   "plot-stats": ["node", "--env-file=.env.local", "scripts/check-plot-stats.ts"],
+  "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
 };
 
 interface Mutant {

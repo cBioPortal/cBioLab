@@ -202,6 +202,16 @@ checks assert rather than whatever a real warehouse happens to contain:
   row with an `oncokb_version` is stored under that release alone. These samples are on every
   profile (matrix `PEERFIX_FULL`, and `WGS` for SVs on all samples) with no mutations or copy-number
   changes, so the mutation-count and profiled tracks read as before; they have no timeline events.
+  Five more SVs on the same samples serve `check:mutation-fusions` (fusions on the Mutations tab and
+  its lollipop): a `GERMLINE` BRCA2 deletion (FX-P51-T1), one-gene SVs whose Protein Change reads
+  "intergenic" (RB1 class `Intergenic`, SMAD4 class `NA` with event info `smad4-Intergenic`, on
+  FX-P50-T1), a renamed partner (`MESDC2`, stored as MESD) with TMPRSS2 as site 2 and no OncoKB row
+  of any kind (FX-P52-T1), and KIAA1549-BRAF, a fusion on site 2 of a gene with mutations (FX-P53-T1).
+  `peer-oncokb-sv.tsv` also holds no-tumour-type (`''`) rows, the driver call's: EML4-ALK's, BRCA2's
+  (both samples), FGFR2-FGFR2's Resistance, KIAA1549-BRAF's (Oncogenic against its Likely Oncogenic Lung Adenocarcinoma row) and
+  KIF5B-RET's Likely Neutral against its Oncogenic tumour-type row, so a VUS row can show an Oncogenic
+  cell and the reverse. The other genes of these SVs have no mutations, so each is a gene with
+  fusions only.
 - **Cancer Hotspots cases** on `FX-P29-T1` (`test/fixtures/peer-hotspots.tsv`, Genome Nexus's
   `hotspots` list per variant, stored in `annotation.variant` under the app's Genome Nexus pin and
   `fixture`), one mutation per case of the hotspot rule, for `check:hotspot-drivers`: a gene off the
