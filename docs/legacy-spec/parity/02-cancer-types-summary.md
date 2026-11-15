@@ -22,17 +22,17 @@ Legacy per-group numbers read from the chart component's React props (`countsByG
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 11 |
+| ✅ match | 12 |
 | 🟡 partial | 15 |
 | 🔶 different | 14 |
-| ❌ missing | 15 |
+| ❌ missing | 14 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 0 |
 | **Total IDs** | **59** |
 
-**Overall: 25.4 %** (✅ 11 + 🐞ok 1 + N/A 3 = 15 of 59). Counting 🟡 as half: 38.1 %.
+**Overall: 27.1 %** (✅ 12 + 🐞ok 1 + N/A 3 = 16 of 59). Counting 🟡 as half: 39.8 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
@@ -52,7 +52,7 @@ Legacy per-group numbers read from the chart component's React props (`countsByG
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **OQL ignored**: the tab draws every alteration of the genes. Q4 legacy `KRAS: MUT=G12D` + `TP53: HOMDEL` → NSCLC 64 / 1567, Pancreatic 150 / 487; cBioLab KRAS alone 454 / 1567, 369 / 487. No OQL banner | MD-5, GT-6, 0.3 | (tracked) "the oncoprint and gene tabs still draw every alteration" |
+| 1 | ~~**OQL ignored**~~ — fixed: the tab counts what the query's lines match (Q4: 64 / 1567, 150 / 487, 125 / 982, as legacy). Was: the tab draws every alteration of the genes. Q4 legacy `KRAS: MUT=G12D` + `TP53: HOMDEL` → NSCLC 64 / 1567, Pancreatic 150 / 487; cBioLab KRAS alone 454 / 1567, 369 / 487. No OQL banner | MD-5, GT-6, 0.3 | (tracked) "the oncoprint and gene tabs still draw every alteration" |
 | 2 | **Default category always Cancer Type**: coadread (one cancer type) shows one bar "Colorectal Cancer" instead of 3 Cancer Type Detailed bars; multi-study shows cancer types instead of studies | CT-2, MD-2, MD-3 | not tracked |
 | 3 | **Small groups pooled, not filtered**: "18 smaller groups" bar (24 / 76) instead of the alert "40 of 58 categories (Cancer Type) are shown based on filtering."; no Min. # Total slider/text box, only a "min group" select (1/10/50/100/200/500) | CT-3, CH-1, STM-6 | not tracked |
 | 4 | **No Min. % / # Altered filter, no Sort X-Axis (Alphabetically)** | CT-4, CT-5, SO-3 | not tracked |
@@ -96,7 +96,7 @@ Groups compared on every count: profiled (denominator), altered, Mutation / Ampl
 | Q3 coadread Cancer Type Detailed | STM-1/3/4 | Colon 139/378, Mucinous 27/61, Rectal 56/155 (Amp 3, Del 1, Multi 1) | identical (with `groupBy:"CANCER_TYPE_DETAILED"`) | ✅ |
 | Q3 profiled per data type (scatter) | CH-5 | Colon mutation 338, CNA 376, SV 338 (+ not-profiled 40/2/40) | `profiledFor` 338 / 376 / 338 | ✅ counts; 🔶 drawing |
 | Q3 default category | CT-2 | Cancer Type Detailed (3 bars) | Cancer Type (1 bar) | 🔶 |
-| Q4 OQL NSCLC / CRC / Pancreatic | MD-5 | 64/1567, 125/982, 150/487; Σ 530 | not expressible (OQL dropped; KRAS alone 454, 438, 369) | ❌ |
+| Q4 OQL NSCLC / CRC / Pancreatic | MD-5 | 64/1567, 125/982, 150/487; Σ 530 | 64/1567, 125/982, 150/487 | ✅ |
 | Tooltip % | STM-5 | `_.round(x, 2)` "92.77%" | `fmtPct` 1 dp "92.8%" | 🟡 |
 
 Data version: every denominator and every altered count matches in all 65 group comparisons; the only differences are the type bucket for patients/samples with an amplification in one gene and a deep deletion in another. Warehouse and cbioportal.org hold the same data for these studies.
@@ -111,7 +111,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 |---|---|---|---|
 | CTS-0.1 | 🟡 | B | Results header as in `01-oncoprint.md` RV-1..3 (same gaps) |
 | CTS-0.2 | ✅ | BC | Tab "Cancer Types Summary", `?tab=Cancer+Types+Summary`, always laid out (`results-layout.ts:213`); Open in cBioPortal → `cancerTypesSummary` (`legacy-link.ts:34`) |
-| CTS-0.3 | 🔶 | B | No OqlStatusBanner (OQL not applied; header note "the gene tabs draw every alteration"), no AlterationFilterWarning / CaseFilterWarning |
+| CTS-0.3 | 🔶 | B | No OqlStatusBanner (the page's note says Cancer Types Summary follows the OQL), no AlterationFilterWarning / CaseFilterWarning |
 | CTS-0.4 | 🟡 | B | Generic card wait state; on error the engine's refusal text, not nothing |
 
 ### §1 Gene tabs
@@ -123,7 +123,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-GT-3 | ✅ | C | First active; component state, no URL |
 | CTS-GT-4 | ❌ | C | No grey label for a gene with 0 alterations |
 | CTS-GT-5 | N/A | C | Invariant 9: the view's settings live in the document and are shared by every gene pill, so nothing resets on switch |
-| CTS-GT-6 | 🟡 | C | One tab per distinct gene (`geneSymbols`) ✅; OQL not applied, so nothing is "pooled" |
+| CTS-GT-6 | ✅ | C | One tab per distinct gene; two lines of one gene counted together under it |
 
 ### §2 Controls — Category
 
@@ -189,7 +189,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-MD-2 | 🔶 | BC | Default Cancer Type (not Study); study ids as labels; no link / Query this study; counts per study identical |
 | CTS-MD-3 | 🔶 | B | Default Cancer Type → 1 bar for coadread |
 | CTS-MD-4 | ✅ | B | Single gene: no "All Queried Genes" |
-| CTS-MD-5 | ❌ | BC | OQL dropped (`results-layout.ts:213` passes `genes`); OQL entries refused by the engine ("a cancertypes view needs genes"); no OQL banner, no EXP/PROT segments (tracked) |
+| CTS-MD-5 | 🟡 | BC | The query's OQL applied (the view's `oql`), EXP/PROT as mRNA / protein high and low segments; the OQL banner is the page's note (tracked) |
 | CTS-MD-6 | 🟡 | BC | Own "count: drivers" (OncoKB only) toggle, not the page's settings; no VUS/germline/hotspot; no warning (tracked: Driver-annotation settings) |
 | CTS-MD-7 | ❌ | C | No Show only profiled |
 | CTS-MD-8 | 🟡 | BC | Denominator excludes cases whose panels lack the genes ✅ (all denominators identical); profiled strip lacks "−" |

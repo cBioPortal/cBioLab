@@ -105,6 +105,8 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"], driver
   };
 }
 
+/** the view kinds that read the query's lines (`oql`) with the page's driver settings */
+const OQL_DRIVER_KINDS = new Set(["cancertypes"]);
 /** does an OQL query name DRIVER anywhere (DRIVER, MUT_DRIVER, AMP_DRIVER, a range's _DRIVER)? */
 const asksDriver = (q: string): boolean => { try { return parseOql(q).some((e) => e.specs.some((sp) => sp.driver)); } catch { return false; } };
 /** the driver sources of the page's settings: what DRIVER reads in an oql clause (what is hidden is not the clause's) */
@@ -125,13 +127,19 @@ export function syncDriverCohorts<D extends { cohorts?: Record<string, CohortDef
     if (x.kind !== "oql" || !asksDriver(String(x.q || ""))) return c;
     return JSON.stringify((c as { drivers?: unknown }).drivers) === JSON.stringify(sources) ? c : { ...c, drivers: sources } as Clause;
   };
-  let changed = false;
+  // a view that reads the query's OQL itself (`oql`, its lines) and takes driver settings follows them
+  const views = (doc.views || []).map((v) => {
+    const x = v as unknown as { oql?: unknown; drivers?: unknown };
+    if (!OQL_DRIVER_KINDS.has(v.kind) || !Array.isArray(x.oql) || !asksDriver(x.oql.join("; "))) return v;
+    return JSON.stringify(x.drivers) === JSON.stringify(sources) ? v : { ...v, drivers: sources } as View;
+  });
+  let changed = views.some((v, i) => v !== (doc.views || [])[i]);
   const cohorts = Object.fromEntries(Object.entries(doc.cohorts || {}).map(([k, def]) => {
     const all = (def.all || []).map(fix);
     if (all.some((c, i) => c !== (def.all || [])[i])) { changed = true; return [k, { ...def, all }]; }
     return [k, def];
   }));
-  return changed ? { ...doc, cohorts } : doc;
+  return changed ? { ...doc, cohorts, ...(doc.views ? { views } : {}) } : doc;
 }
 
 /** the query's EXP / PROT profile choice, as an oql clause and the Download tab carry it */
@@ -281,7 +289,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   ].filter(Boolean) as string[];
   return arrange({ study: q.studies[0], cohorts }, [
     { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), ...pinsOf(q), cohorts: queried })] },
-    { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, cohorts: queried })] },
+    { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, oql: q.entries, ...pinsOf(q),
+      ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] },
     ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: queried })] }] : []),
     ...(plotY ? [{ title: "Plots", views: [v("Plot", { kind: "plot",
       x: expr ? (data.cna ? { source: "profile", profile: data.cna, gene: genes[0] } : { source: "alteration", gene: genes[0], by: "cna" }) : { source: "alteration", gene: genes[0], by: "mutationType" },

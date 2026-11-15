@@ -43,13 +43,17 @@ u AS (
   GROUP BY k, g, gene
 ),
 uall AS (SELECT k, '\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types FROM u GROUP BY k, gene),
-uu AS (SELECT k, g, label, gene, types FROM u UNION ALL SELECT k, g, label, gene, types FROM uall)
-SELECT g AS grp, gene, any(label) AS label, count() AS profiled,
+uu AS (SELECT k, g, label, gene, types FROM u UNION ALL SELECT k, g, label, gene, types FROM uall),
+uk AS (SELECT grp_, gene, label, types, arrayDistinct(arrayMap((t) -> multiIf(t IN ('amp', 'homdel'), 'cna', t IN ('mrnaHigh', 'mrnaLow'), 'mrna',
+         t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds FROM (SELECT g AS grp_, gene, label, types FROM uu))
+SELECT grp_ AS grp, gene, any(label) AS label, count() AS profiled,
        countIf(length(types) > 0) AS altered,
-       countIf(types = ['mutation']) AS mutation, countIf(types = ['amp']) AS amp,
-       countIf(types = ['homdel']) AS homdel, countIf(types = ['sv']) AS sv,
-       countIf(length(types) > 1) AS multiple
-FROM uu GROUP BY grp, gene
+       countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND has(types, 'amp')) AS amp,
+       countIf(kinds = ['cna'] AND NOT has(types, 'amp')) AS homdel, countIf(kinds = ['sv']) AS sv,
+       countIf(kinds = ['mrna'] AND has(types, 'mrnaHigh')) AS mrnaHigh, countIf(kinds = ['mrna'] AND NOT has(types, 'mrnaHigh')) AS mrnaLow,
+       countIf(kinds = ['prot'] AND has(types, 'protHigh')) AS protHigh, countIf(kinds = ['prot'] AND NOT has(types, 'protHigh')) AS protLow,
+       countIf(length(kinds) > 1) AS multiple
+FROM uk GROUP BY grp, gene
 
 -- view 0 cancertypes: cancertypes:samples:all patients · msk_impact_50k_2026
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
