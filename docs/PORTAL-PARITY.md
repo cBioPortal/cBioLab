@@ -238,7 +238,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Downloads: SVG, PNG, PDF, Data (`plot.txt`) (PLT-DL-1, PLT-DL-2)
   - [ ] Search Case(s) and Search Mutation(s); scatter drag-select with "Selected: N samples" → Study View; legend click to highlight (PLT-UT-1, PLT-UT-2, PLT-UT-8, PLT-SC-5, PLT-HL-1…5)
   - [ ] Log scale as log2(max(v, 0) + 1), on by default for `rna_seq` mRNA, axis "(log2(value + 1))" (ours log10(v + 1), negatives dropped) (PLT-AX-4, PLT-STM-11, PLT-MD-11)
-  - [x] The "Show Regression Line" toggle (off by default, as the portal) and the "y = mx + b", R² label, rounded as the portal rounds them (was: the line always drawn, unlabelled) (PLT-UT-7, PLT-SC-3, PLT-STM-7) (#PR)
+  - [x] The "Show Regression Line" toggle (off by default, as the portal) and the "y = mx + b", R² label, rounded as the portal rounds them (was: the line always drawn, unlabelled) (PLT-UT-7, PLT-SC-3, PLT-STM-7) (#238)
     - [ ] The line's colour and its label in the right gutter (the portal's red `#c43a31`; ours the series colour, under the plot)
   - [ ] Category order: boxes alphabetical (Q5 Colon, Mucinous, Rectal; ours by count), mutation types before "No mutation" and "Not profiled", table rows likewise; Filter categories, Sort by Median (PLT-BX-1, PLT-TB-3, PLT-DT-3, PLT-AX-9, PLT-AX-10, PLT-STM-9)
     - [x] Boxes in the portal's order: a data type's own (copy number, mutation class, mutated, Driver/VUS), else alphabetical (PLT-BX-1, PLT-DT-3) (#240)
