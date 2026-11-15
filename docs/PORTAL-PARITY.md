@@ -301,7 +301,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Every attribute, by display name, in the portal's table (Clinical Attribute, Attribute Type, Statistical Test, p, q; sorted by q, bold below 0.05, 20 a page, search, "Significant only"); untested ones listed with their reason and left out of q; the Results page's Clinical sub-tab too (CMP-CL-2, CMP-STM-6, CMP-STM-8) (PR #224 open)
     - [ ] A categorical attribute with more than 200 values is refused, not tested (coadread OTHER_PATIENT_ID: ours 44 tested, the portal 45)
     - [ ] The table's download and column menu; the row click's plot and its controls (CMP-CL-2, CMP-CL-3, CMP-CL-4)
-  - [x] Numeric clinical attributes by Wilcoxon / Kruskal-Wallis (ours report Welch t / Welch ANOVA: G1 Weight 2.80e-7 vs the portal's 3.86e-8, MSI MANTIS 0.0745 vs 0.798; ours computes the rank p, matching, but does not show it) (CMP-STM-7) (PR #PR6 open)
+  - [x] Numeric clinical attributes by Wilcoxon / Kruskal-Wallis (ours report Welch t / Welch ANOVA: G1 Weight 2.80e-7 vs the portal's 3.86e-8, MSI MANTIS 0.0745 vs 0.798; ours computes the rank p, matching, but does not show it) (CMP-STM-7) (PR #233 open)
     - [ ] q over the same n as the portal's: it counts its 8 hidden survival attributes and OTHER_PATIENT_ID (G1 Weight q 1.022e-6; ours 8.49e-7 over 44; p identical)
   - [ ] Survival: the survival-type table (PFS, DFS, DSS with p and q, the Min. # patients slider) and a way to pick the endpoint on the tab (ours OS only) (CMP-SV-1, CMP-SV-5, CMP-SV-6, CMP-STM-4)
   - [ ] Hazard ratios: the checkbox, control group, HR in the legend, HR matrix (CMP-KM-1, CMP-KM-8, CMP-STM-5)
