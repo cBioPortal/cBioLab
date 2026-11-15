@@ -17,9 +17,10 @@ async function drivers({ browser, ok, BASE }) {
     const menu = page.locator("[data-test=GlobalSettingsDropdown]");
     await menu.waitFor({ timeout: 30000 });
     const text = (await menu.innerText()).replace(/\s+/g, " ");
-    ok("drivers: the menu has the portal's sections; a source this warehouse lacks is offered disabled with its reason",
+    const hotspots = page.locator("[data-test=annotateHotspots] button[role=checkbox]");
+    ok("drivers: the menu has the portal's sections; OncoKB and Hotspots are offered, on by default as the portal's",
       /Annotate Data/.test(text) && /Filter Data/.test(text) && /Show only drivers/.test(text) && /Show only somatic/.test(text) &&
-      await page.locator("[data-test=annotateHotspots] button[role=checkbox]").isDisabled(), text);
+      /OncoKB/.test(text) && /Hotspots/.test(text) && !(await hotspots.isDisabled()) && (await hotspots.getAttribute("aria-checked")) === "true", text);
     ok("drivers: custom driver calls are offered only where the data has them", await page.locator("[data-test=annotateCustomBinary]").count() === 0);
     await page.locator("[data-test=HideGermline] button[role=checkbox]").click();
     await page.keyboard.press("Escape");

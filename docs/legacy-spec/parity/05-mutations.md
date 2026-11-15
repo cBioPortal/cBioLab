@@ -165,7 +165,7 @@ Data version: mutation rows, VAFs, mutation counts and OncoKB oncogenicity are i
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-BF-1 | 🟡 | B | Driver `#000` / VUS `#696969` totals, class rows, colours, "Other" hidden at 0 ✅; KRAS counts identical, TP53 differs by 4 hotspot rows (tracked); no ⚙ button (tracked) |
+| MUT-BF-1 | 🟡 | B | Driver `#000` / VUS `#696969` totals, class rows, colours, "Other" hidden at 0 ✅; KRAS counts identical, TP53 differs by 4 hotspot rows: hotspots count as drivers since #211 (equal on the synced test studies), brca awaits the full Genome Nexus sync; no ⚙ button (tracked) |
 | MUT-BF-2 | 🔶 | C | No pin → every mutation a driver, grid still shows Driver/VUS columns (`federation.ts:530`) |
 | MUT-BF-3 | ✅ | B | Badge, row and column toggles; "only" (always visible, not on hover); everything selected removes the filter; Driver off → 2 of 223 |
 | MUT-BF-4 | 🟡 | B | Filter reaches lollipop and table (Alteration column) ✅; no tracks/3D; counts see STM-4 |
@@ -284,7 +284,7 @@ Data version: mutation rows, VAFs, mutation counts and OncoKB oncogenicity are i
 | MUT-STM-1 | 🟡 | BC | KRAS 36.7 %, TP53 52.9 % identical; Q2 TMPRSS2 0.8 % vs 41.5 % (fusions); germline test is `status != 'GERMLINE'` (case-sensitive, `federation.ts:566`); "<0.1%" / "100%" vs "< 0.1" / "100.0%" |
 | MUT-STM-2 | ✅ | B | Distinct patient + change per codon; 125/125 stems identical |
 | MUT-STM-3 | 🐞 ok | BC | No mislabelled "profiled" denominator; but no denominator at all |
-| MUT-STM-4 | 🔶 | B | KRAS ✅; TP53 4 hotspot rows VUS (tracked); TMPRSS2 Fusion 0/0 vs 207/29; tally ignores search/filters |
+| MUT-STM-4 | 🔶 | B | KRAS ✅; TP53 4 hotspot rows VUS until the full Genome Nexus sync (hotspot drivers since #211); TMPRSS2 Fusion 0/0 vs 207/29; tally ignores search/filters |
 | MUT-STM-5 | 🟡 | BC | Values identical; display `toFixed(2)` always (`mutations.tsx:18`), no 4 decimals below 0.01 |
 | MUT-STM-6 | 🟡 | BC | Raw ✅; 0 shown as "0" (legacy blank) |
 | MUT-STM-7 | ✅ | BC | `MUTATION_COUNT`, identical 555/555 |

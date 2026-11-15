@@ -1,7 +1,8 @@
 // `npm run peer-db` — the second database the tests read (connection b, CLICKHOUSE2_*): a private
 // ClickHouse holding the committed fixture study (test/fixtures/peer-study) and the OncoKB calls
 // for its variants (test/fixtures/peer-oncokb.tsv, by tumour type peer-oncokb-tumor-type.tsv, and for
-// its structural variants by gene pair and tumour type peer-oncokb-sv.tsv).
+// its structural variants by gene pair and tumour type peer-oncokb-sv.tsv) and Genome Nexus's Cancer
+// Hotspots for its variants (test/fixtures/peer-hotspots.tsv).
 // scripts/gate.sh starts it and points the gate's checks at it, so no test depends on a second
 // warehouse's contents.
 //
@@ -37,6 +38,7 @@ const FIXTURE = path.join(repo, "test", "fixtures", "peer-study");
 const ONCOKB = path.join(repo, "test", "fixtures", "peer-oncokb.tsv");
 const ONCOKB_TUMOR_TYPE = path.join(repo, "test", "fixtures", "peer-oncokb-tumor-type.tsv");
 const ONCOKB_SV = path.join(repo, "test", "fixtures", "peer-oncokb-sv.tsv");
+const HOTSPOTS = path.join(repo, "test", "fixtures", "peer-hotspots.tsv");
 const STUDY = "cbiolab_peer_fixture";
 const LABEL = "fixture peer";
 const httpPort = Number(opt("--port", process.env.PEER_DB_PORT || String(20000 + Number(process.env.GATE_PORT || 3100) % 10000)));
@@ -137,6 +139,44 @@ async function seedOncokbSv(conn: WriteConn, pin: string | null): Promise<void> 
   }
 }
 
+/** The GRCh37 Genome Nexus release the app reads: GENOME_NEXUS_PIN, else the primary warehouse's, if it has one. */
+async function appVariantPin(): Promise<string | null> {
+  if (process.env.GENOME_NEXUS_PIN) return process.env.GENOME_NEXUS_PIN;
+  if (!process.env.CLICKHOUSE_URL) return null;
+  const { variantPins } = await import("../lib/variant-annotation.ts");
+  return (await variantPins()).hg19;
+}
+
+/**
+ * Cancer Hotspots for the fixture's variants (the study is GRCh37): one `annotation.variant` row per
+ * variant of the TSV, its `hotspots` list as Genome Nexus's record holds it, under the release the
+ * app reads and under "fixture", with a sync_run row so the study counts as synced. Replaced whole
+ * when the TSV changes.
+ */
+async function seedHotspots(conn: WriteConn): Promise<void> {
+  if (!(await exists(HOTSPOTS))) return;
+  const [head, ...lines] = (await readFile(HOTSPOTS, "utf8")).split("\n").filter((l) => l.trim() && !l.startsWith("#"));
+  const cols = head.split("\t");
+  const rows = lines.map((l) => Object.fromEntries(l.split("\t").map((v, i) => [cols[i], v])));
+  const pin = await appVariantPin();
+  const versions = [...new Set([pin, "fixture"].filter((v): v is string => !!v))];
+  const db = { ...conn, db: "annotation" };
+  const digest = createHash("sha256").update(await readFile(HOTSPOTS)).digest("hex").slice(0, 16);
+  for (const v of versions) {
+    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM sync_run WHERE source = 'genome_nexus' AND version = " + sq(v) + " AND study = " + sq(STUDY) + " AND note = " + sq("fixture " + digest));
+    if (Number(n[0]?.n) > 0) continue;
+    await exec(db, "ALTER TABLE variant DELETE WHERE source = 'genome_nexus' AND version = " + sq(v) + " SETTINGS mutations_sync = 1");
+    await insertAll(db, "variant", rows.map((r) => ({
+      source: "genome_nexus", version: v, chr: r.chr, start_position: Number(r.start_position), end_position: Number(r.end_position),
+      reference_allele: r.reference_allele, variant_allele: r.variant_allele, data: JSON.stringify({ hotspots: JSON.parse(r.hotspots || "[]") })
+    })));
+    await insertAll(db, "sync_run", [{ run_id: "fixture_" + digest, started_at: new Date().toISOString().replace("T", " ").slice(0, 19), source: "genome_nexus",
+      version: v, study: STUDY, variants_total: rows.length, already_stored: 0, annotated_new: rows.length, failed: 0, note: "fixture " + digest }]);
+    say("Cancer Hotspots for the fixture's variants stored under Genome Nexus " + v);
+  }
+  if (!pin) say("no primary warehouse to read the app's Genome Nexus pin from; its hotspots are stored under \"fixture\" only");
+}
+
 async function main(): Promise<void> {
   if (args.includes("--stop")) return stop();
   const bin = await clickhouseBinary(path.join(shared, "bin"), say);
@@ -156,6 +196,7 @@ async function main(): Promise<void> {
   await seedOncokb(conn, pin);
   await seedOncokbTumorType(conn, pin);
   await seedOncokbSv(conn, pin);
+  await seedHotspots(conn);
   process.stdout.write(["CLICKHOUSE2_URL=" + conn.url, "CLICKHOUSE2_USER=" + conn.user, "CLICKHOUSE2_PASSWORD=" + password,
     "CLICKHOUSE2_DB=" + conn.db, "CLICKHOUSE2_LABEL=" + LABEL].join("\n") + "\n");
 }

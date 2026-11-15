@@ -11,7 +11,7 @@
 export interface DriverSettings {
   /** the version-pinned OncoKB store (default true) */
   oncokb?: boolean;
-  /** Cancer Hotspots (default false): no hotspot data is loaded in this warehouse, so true is refused */
+  /** Cancer Hotspots, read from the offline Genome Nexus store (default true, as the portal's server config sets it) */
   hotspots?: boolean;
   /** the study's own driver calls, `cbp_driver` = "Putative_Driver" (default true) */
   custom?: boolean;
@@ -25,7 +25,7 @@ export interface DriverSettings {
 
 /** The settings with every default filled in. */
 export interface ResolvedDrivers {
-  oncokb: boolean; custom: boolean;
+  oncokb: boolean; hotspots: boolean; custom: boolean;
   /** null: every tier counts */
   tiers: string[] | null;
   /** some source is on, so alterations are told apart as driver or VUS */
@@ -41,9 +41,6 @@ export const PUTATIVE_DRIVER = "Putative_Driver";
 const KEYS = ["oncokb", "hotspots", "custom", "tiers", "hideVus", "hideGermline"] as const;
 const TIER_CAP = 50;
 
-const HOTSPOTS_REFUSAL = "drivers.hotspots: Cancer Hotspots is not loaded in this warehouse, so no mutation can be called a hotspot. " +
-  "The driver sources available are oncokb (the version-pinned OncoKB store), custom (the study's cbp_driver column) and tiers (its cbp_driver_tiers column)";
-
 /** Defaults filled in; an unknown key or a value of the wrong type is refused, never ignored. */
 export function resolveDrivers(d: DriverSettings | undefined | null): ResolvedDrivers {
   if (d != null && (typeof d !== "object" || Array.isArray(d))) throw new Error("drivers must be an object like {oncokb: true, hideVus: false}");
@@ -56,7 +53,6 @@ export function resolveDrivers(d: DriverSettings | undefined | null): ResolvedDr
     if (typeof v !== "boolean") throw new Error("drivers." + k + " must be true or false");
     return v;
   };
-  if (bool("hotspots", false)) throw new Error(HOTSPOTS_REFUSAL);
   let tiers: string[] | null = null;
   if (src.tiers !== undefined) {
     if (!Array.isArray(src.tiers) || src.tiers.some((t) => typeof t !== "string" || !t || t.length > 100))
@@ -64,9 +60,9 @@ export function resolveDrivers(d: DriverSettings | undefined | null): ResolvedDr
     if (src.tiers.length > TIER_CAP) throw new Error("drivers.tiers takes at most " + TIER_CAP + " tiers; this names " + src.tiers.length);
     tiers = [...new Set(src.tiers as string[])];
   }
-  const oncokb = bool("oncokb", true), custom = bool("custom", true);
-  const annotated = oncokb || custom || tiers === null || tiers.length > 0;
-  return { oncokb, custom, tiers, annotated, hideVus: annotated && bool("hideVus", false), hideGermline: bool("hideGermline", false) };
+  const oncokb = bool("oncokb", true), hotspots = bool("hotspots", true), custom = bool("custom", true);
+  const annotated = oncokb || hotspots || custom || tiers === null || tiers.length > 0;
+  return { oncokb, hotspots, custom, tiers, annotated, hideVus: annotated && bool("hideVus", false), hideGermline: bool("hideGermline", false) };
 }
 
 /**
@@ -75,7 +71,7 @@ export function resolveDrivers(d: DriverSettings | undefined | null): ResolvedDr
  * custom calls off, and no tier in the data, nothing is told apart and there is nothing to hide.
  */
 export function forData(s: ResolvedDrivers, hasTiers: boolean): ResolvedDrivers {
-  if (s.tiers !== null || hasTiers || s.oncokb || s.custom) return s;
+  if (s.tiers !== null || hasTiers || s.oncokb || s.hotspots || s.custom) return s;
   return { ...s, annotated: false, hideVus: false };
 }
 
@@ -83,6 +79,7 @@ export function forData(s: ResolvedDrivers, hasTiers: boolean): ResolvedDrivers 
 export function compactDrivers(r: DriverSettings): DriverSettings | undefined {
   const out: DriverSettings = {};
   if (r.oncokb === false) out.oncokb = false;
+  if (r.hotspots === false) out.hotspots = false;
   if (r.custom === false) out.custom = false;
   if (r.tiers) out.tiers = r.tiers;
   if (r.hideVus) out.hideVus = true;
@@ -104,21 +101,24 @@ export interface DriverFields {
 export const isGermlineStatus = (status: string | null | undefined): boolean => /germline/i.test(status || "");
 
 /**
- * The one rule: a putative driver when ANY switched-on source says so — OncoKB, the study's own
- * Putative_Driver call, or a tier that counts. A Putative_Passenger call does not overrule OncoKB,
- * as it does not in the portal (evaluatePutativeDriverInfo).
+ * The one rule: a putative driver when ANY switched-on source says so — OncoKB, Cancer Hotspots
+ * (a mutation only; the caller's `hotspot` answers for the event), the study's own Putative_Driver
+ * call, or a tier that counts. A Putative_Passenger call does not overrule OncoKB, as it does not in
+ * the portal (annotateMutationPutativeDriver).
  */
-export function isDriverEvent(r: DriverFields, s: ResolvedDrivers, oncokb: () => boolean): boolean {
+export function isDriverEvent(r: DriverFields, s: ResolvedDrivers, oncokb: () => boolean, hotspot: () => boolean = () => false): boolean {
   if (s.custom && r.df === PUTATIVE_DRIVER) return true;
   if (r.dt && (s.tiers === null || s.tiers.includes(r.dt))) return true;
-  return s.oncokb && oncokb();
+  if (s.oncokb && oncokb()) return true;
+  return s.hotspots && hotspot();
 }
 
 /** What a caption or a result says the calls came from. */
-export function driverSourceText(s: ResolvedDrivers, oncokbSource: string | null): string {
+export function driverSourceText(s: ResolvedDrivers, oncokbSource: string | null, hotspotSource?: string | null): string {
   if (!s.annotated) return "none — no driver source is switched on, so nothing is called a driver";
   const parts: string[] = [];
   if (s.oncokb) parts.push(oncokbSource || "OncoKB");
+  if (s.hotspots) parts.push(hotspotSource || "Cancer Hotspots");
   if (s.custom) parts.push("the study's custom driver calls (cbp_driver = " + PUTATIVE_DRIVER + ")");
   if (s.tiers === null) parts.push("every custom driver tier (cbp_driver_tiers)");
   else if (s.tiers.length) parts.push("custom driver tiers " + s.tiers.join(", "));
@@ -131,7 +131,7 @@ export function driverSourceText(s: ResolvedDrivers, oncokbSource: string | null
  */
 export const driversOf = (v: { display?: unknown; drivers?: unknown }): DriverSettings | undefined => {
   const d = (v.display || {}) as { annotate?: string; hideVUS?: boolean };
-  const older: DriverSettings = { ...(d.annotate === "none" ? { oncokb: false, custom: false, tiers: [] } : {}), ...(d.hideVUS ? { hideVus: true } : {}) };
+  const older: DriverSettings = { ...(d.annotate === "none" ? { oncokb: false, hotspots: false, custom: false, tiers: [] } : {}), ...(d.hideVUS ? { hideVus: true } : {}) };
   return compactDrivers({ ...older, ...((v.drivers || {}) as DriverSettings) });
 };
 

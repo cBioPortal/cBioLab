@@ -396,13 +396,13 @@ class StyleOverrides(unittest.TestCase):
 
     def test_display_validation_matches_typescript(self):
         from cohortlab import normalize_display
-        drivers = {"oncokb": True, "custom": True, "tiers": None, "annotated": True, "hideVus": False, "hideGermline": False}
+        drivers = {"oncokb": True, "hotspots": True, "custom": True, "tiers": None, "annotated": True, "hideVus": False, "hideGermline": False}
         self.assertEqual(normalize_display(None), {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all", "colorByType": True, "colorByGermline": True,
                                                    "hideVUS": False, "annotate": "oncokb", "hideGermline": False, "drivers": drivers, "whiteBackground": False})
         self.assertEqual(normalize_display({"annotate": "none", "hideVUS": True})["hideVUS"], False, "with no source on there is nothing to hide")
         self.assertEqual(normalize_display(None, {"tiers": ["Tier 1"], "oncokb": False, "custom": False})["drivers"]["tiers"], ["Tier 1"])
-        with self.assertRaisesRegex(ValueError, "Cancer Hotspots is not loaded"):
-            normalize_display(None, {"hotspots": True})
+        self.assertEqual(normalize_display(None, {"hotspots": False})["drivers"]["hotspots"], False)
+        self.assertEqual(normalize_display({"annotate": "none"})["drivers"]["hotspots"], False, "the older 'none' turns every source off")
         with self.assertRaisesRegex(ValueError, "unknown option 'showUnalterd'"):
             normalize_display({"showUnalterd": True})
         with self.assertRaisesRegex(ValueError, "is not one of none, gaps, pct, pct-left"):

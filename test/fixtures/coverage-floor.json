@@ -1,18 +1,18 @@
 {
   "lib": {
-    "branches": 87.14,
-    "functions": 96.29
+    "branches": 87.87,
+    "functions": 96.41
   },
   "app": {
-    "branches": 70.25,
-    "functions": 45.25
+    "branches": 71.56,
+    "functions": 47.21
   },
   "mcp": {
-    "branches": 94.2,
+    "branches": 94.33,
     "functions": 94.87
   },
   "packages": {
     "branches": 91.8,
-    "functions": 97.94
+    "functions": 97.99
   }
 }

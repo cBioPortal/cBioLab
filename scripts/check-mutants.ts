@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -33,6 +33,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "oncoprint-spectrum": ["node", "--env-file=.env.local", "scripts/check-oncoprint-spectrum.ts"],
   "oncokb-tumor-type": ["node", "--env-file=.env.local", "scripts/check-oncokb-tumor-type.ts"],
   "oncokb-sv": ["node", "--env-file=.env.local", "scripts/check-oncokb-sv.ts"],
+  "hotspot-drivers": ["node", "--env-file=.env.local", "scripts/check-hotspot-drivers.ts"],
 };
 
 interface Mutant {
@@ -268,6 +269,24 @@ const MUTANTS: Mutant[] = [
   { id: "oncokb-sv-gene-level-wins", layer: "counts", guard: "oncokb-sv", file: "lib/sv-table.ts",
     effect: "A partner gene's gene-level fusion call makes a structural variant a driver even where OncoKB's call for the pair says it is not.",
     find: "toUInt8(if(pr.found = 1, pr.driver, greatest(a1.driver, a2.driver)))", replace: "toUInt8(greatest(pr.driver, a1.driver, a2.driver))" },
+  { id: "hotspot-3d-counted", layer: "counts", guard: "hotspot-drivers", file: "lib/hotspots.ts",
+    effect: "A mutation at a 3D-clustered hotspot alone is called a putative driver, which cBioPortal never does, so driver counts rise.",
+    find: "has([\"single\", \"indel\"])", replace: "has([\"single\", \"indel\", \"3d\"])" },
+  { id: "hotspot-splice-case-sensitive", layer: "counts", guard: "hotspot-drivers", file: "lib/hotspots.ts",
+    effect: "Splice_Site and Splice_Region mutations are not recognised as splice mutations, so they are matched against residue hotspots instead of splice-site ones.",
+    find: "\"if(positionCaseInsensitive(ifNull(\" + mutationType", replace: "\"if(position(ifNull(\" + mutationType" },
+  { id: "hotspot-no-gene-list", layer: "counts", guard: "hotspot-drivers", file: "lib/hotspots.ts",
+    effect: "Genes cBioPortal never asks Cancer Hotspots about (H3-3A) are called drivers at their stored hotspots.",
+    find: "genes.filter((g) => HOTSPOT_GENES.has(g))", replace: "genes" },
+  { id: "hotspot-empty-allele-matched", layer: "counts", guard: "hotspot-drivers", file: "lib/hotspots.ts",
+    effect: "A mutation with no variant allele, which has no genomic location to look up, is matched to a record stored under an empty allele.",
+    find: " AND ifNull(m.tumorSeqAllele, '') != ''", replace: "" },
+  { id: "hotspot-setting-ignored-sql", layer: "counts", guard: "hotspot-drivers", file: "lib/driver-sql.ts",
+    effect: "Switching Cancer Hotspots off in the driver settings leaves hotspot mutations called drivers on the Plots tab.",
+    find: "if (s.hotspots && hotspotKeys)", replace: "if (hotspotKeys)" },
+  { id: "hotspot-setting-ignored", layer: "counts", guard: "unit", file: "lib/driver-settings.ts",
+    effect: "Switching Cancer Hotspots off in the driver settings leaves hotspot mutations called drivers in the oncoprint.",
+    find: "return s.hotspots && hotspot();", replace: "return hotspot();" },
   { id: "spectrum-strand-not-folded", layer: "counts", guard: "oncoprint-spectrum", file: "lib/oncoprint.ts",
     effect: "The mutation spectrum counts only substitutions written on the pyrimidine strand, so a G>T is not counted as a C>A and every spectrum is about half what it should be.",
     find: "+ \"') OR (me.reference_allele = '\" + ac + \"' AND me.tumor_seq_allele = '\" + bc + \"'))\";",

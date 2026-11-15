@@ -143,7 +143,7 @@ describe("a column's detail", () => {
       // Tier 3 is not among the tiers that count
       { gene: "TP53", kind: "Missense_Mutation", alteration: "A1V", driver: false, tier: { tier: "Tier 3", annotation: "" } },
     ]);
-    assert.match(d.annotation, /OncoKB v-test \(pinned\) \+ the study's custom driver calls \(cbp_driver = Putative_Driver\) \+ custom driver tiers Tier 1/);
+    assert.match(d.annotation, /OncoKB v-test \(pinned\) \+ Cancer Hotspots \(not read: no Genome Nexus release is stored\) \+ the study's custom driver calls \(cbp_driver = Putative_Driver\) \+ custom driver tiers Tier 1/);
     // OncoKB off, germline and VUS hidden: the germline Q100* goes, and R175H has no source left to call it
     const off = await columnDetail({ study: "s1", genes: ["TP53"], drivers: { oncokb: false, hideGermline: true, hideVus: true } } as never, "P1");
     assert.deepEqual(off.alterations.map((a) => a.alteration), ["A1V"], "every tier counts by default, so A1V (Tier 3) is a driver; R175H has no source left");

@@ -23,7 +23,7 @@ from cohortlab.assemble import assemble_contract  # noqa: E402
 from cohortlab.local import normalize_display  # noqa: E402
 
 TRUNC, MIS = "Nonsense_Mutation", "Missense_Mutation"
-NO_DRIVERS = {"oncokb": False, "custom": False, "tiers": []}
+NO_DRIVERS = {"oncokb": False, "hotspots": False, "custom": False, "tiers": []}
 
 
 def mut(mt, driver=False, germ=False):

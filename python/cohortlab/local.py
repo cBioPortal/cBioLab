@@ -137,8 +137,6 @@ def resolve_drivers(d: dict[str, Any] | None) -> dict[str, Any]:
             raise ValueError(f"drivers.{k} must be true or false")
         return v
 
-    if boolean("hotspots", False):
-        raise ValueError("drivers.hotspots: Cancer Hotspots is not loaded in this warehouse, so no mutation can be called a hotspot")
     tiers = src.get("tiers")
     if tiers is not None:
         if not isinstance(tiers, list) or any(not isinstance(t, str) or not t or len(t) > 100 for t in tiers):
@@ -146,9 +144,9 @@ def resolve_drivers(d: dict[str, Any] | None) -> dict[str, Any]:
         if len(tiers) > 50:
             raise ValueError(f"drivers.tiers takes at most 50 tiers; this names {len(tiers)}")
         tiers = list(dict.fromkeys(tiers))
-    oncokb, custom = boolean("oncokb", True), boolean("custom", True)
-    annotated = oncokb or custom or tiers is None or len(tiers) > 0
-    return {"oncokb": oncokb, "custom": custom, "tiers": tiers, "annotated": annotated,
+    oncokb, hotspots, custom = boolean("oncokb", True), boolean("hotspots", True), boolean("custom", True)
+    annotated = oncokb or hotspots or custom or tiers is None or len(tiers) > 0
+    return {"oncokb": oncokb, "hotspots": hotspots, "custom": custom, "tiers": tiers, "annotated": annotated,
             "hideVus": annotated and boolean("hideVus", False), "hideGermline": boolean("hideGermline", False)}
 
 
@@ -190,7 +188,7 @@ def normalize_display(d: dict[str, Any] | None, drivers: dict[str, Any] | None =
                     raise ValueError(f"display.colors['{track}']['{value}']: '{color}' is not a #rrggbb colour")
     older: dict[str, Any] = {}
     if one_of("annotate", _ANNOTATE_MODES, "oncokb") == "none":
-        older.update({"oncokb": False, "custom": False, "tiers": []})
+        older.update({"oncokb": False, "hotspots": False, "custom": False, "tiers": []})
     if boolean("hideVUS", False):
         older["hideVus"] = True
     resolve_drivers(drivers)  # the settings as given are checked on their own, so an error names their own key

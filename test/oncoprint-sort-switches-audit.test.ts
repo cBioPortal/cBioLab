@@ -38,7 +38,7 @@ const TRUNC = "Nonsense_Mutation", MIS = "Missense_Mutation";
 const mut = (mt: string, driver = false, germ = false): Ev => ({ vt: "mutation", mt, driver, ...(germ ? { germ } : {}) });
 const cna = (v: number, driver = false): Ev => ({ vt: "cna", cna: v, driver });
 const sv = (driver = false): Ev => ({ vt: "structural_variant", driver });
-const NO_DRIVERS: DriverSettings = { oncokb: false, custom: false, tiers: [] };
+const NO_DRIVERS: DriverSettings = { oncokb: false, hotspots: false, custom: false, tiers: [] };
 
 function ids(f: Fixture, m: Mapping): Map<string, string> {
   const letters = Object.keys(f.cols);

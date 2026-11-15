@@ -40,7 +40,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
       "Mutations in “" + cn + "” by protein position, as cBioPortal's mutation tab draws them: one stem per codon" +
       " (the stored protein start position), its height the number of distinct patient + protein change pairs there." +
       " Colour is the codon's dominant mutation type, putative drivers before VUS" +
-      (annotated ? " (driver = OncoKB oncogenic, pinned; the portal also counts hotspots and custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
+      (annotated ? " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
       (unpositioned ? " " + f(unpositioned) + " mutation" + (unpositioned === 1 ? " has" : "s have") + " no protein position (or one past the protein) and " +
         (unpositioned === 1 ? "is" : "are") + " not drawn; the portal drops these without saying so." : "") +

@@ -202,6 +202,14 @@ checks assert rather than whatever a real warehouse happens to contain:
   row with an `oncokb_version` is stored under that release alone. These samples are on every
   profile (matrix `PEERFIX_FULL`, and `WGS` for SVs on all samples) with no mutations or copy-number
   changes, so the mutation-count and profiled tracks read as before; they have no timeline events.
+- **Cancer Hotspots cases** on `FX-P29-T1` (`test/fixtures/peer-hotspots.tsv`, Genome Nexus's
+  `hotspots` list per variant, stored in `annotation.variant` under the app's Genome Nexus pin and
+  `fixture`), one mutation per case of the hotspot rule, for `check:hotspot-drivers`: a gene off the
+  hotspot gene list (H3-3A, added to `PEERFIX_FULL`), each hotspot type against splice and non-splice
+  mutation types (`Splice_Site`, `Splice_Region`, a lowercase `splice`, an empty type), an empty list,
+  no record, an empty variant allele, a `chr10` chromosome, a germline hotspot, a hotspot OncoKB calls
+  Likely Neutral, and a hotspot in a gene the sample is also deeply deleted in. No other fixture
+  variant has a record, so hotspots call nothing outside `FX-P29`.
 
 `npm run peer-db` (`scripts/peer-db.ts`) starts a private ClickHouse for it (the pinned release
 `npm run local` uses, data in `CBIOLAB_PEER_DATA`, default `~/.cbiolab-peer/<port>`), imports the

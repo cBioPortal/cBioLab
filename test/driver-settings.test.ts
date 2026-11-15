@@ -13,19 +13,32 @@ import { syncDrivers } from "../app/portal/results-layout.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 import type { View } from "../lib/types.ts";
 
-test("defaults: OncoKB, custom calls and every tier count; nothing is hidden", () => {
-  assert.deepEqual(resolveDrivers(undefined), { oncokb: true, custom: true, tiers: null, annotated: true, hideVus: false, hideGermline: false });
+test("defaults: OncoKB, Cancer Hotspots, custom calls and every tier count; nothing is hidden", () => {
+  // D3: hotspots on by default (serverConfigDefaults oncoprint_hotspots_default: true)
+  assert.deepEqual(resolveDrivers(undefined), { oncokb: true, hotspots: true, custom: true, tiers: null, annotated: true, hideVus: false, hideGermline: false });
+  assert.equal(resolveDrivers({}).hotspots, true);
+  assert.equal(resolveDrivers({ oncokb: false }).hotspots, true, "D3: another setting given leaves hotspots on");
   assert.deepEqual(resolveDrivers({ tiers: ["Tier 2", "Tier 1", "Tier 2"] }).tiers, ["Tier 2", "Tier 1"]);
   // no source on: nothing is told apart, so there is nothing to hide (the portal disables the box)
-  const off = resolveDrivers({ oncokb: false, custom: false, tiers: [], hideVus: true });
+  const off = resolveDrivers({ oncokb: false, hotspots: false, custom: false, tiers: [], hideVus: true });
   assert.equal(off.annotated, false);
   assert.equal(off.hideVus, false);
-  assert.equal(resolveDrivers({ oncokb: false, custom: false }).annotated, true, "tiers omitted: every tier still counts");
+  assert.equal(resolveDrivers({ oncokb: false, hotspots: false, custom: false }).annotated, true, "tiers omitted: every tier still counts");
+});
+
+test("D4: Cancer Hotspots alone tells drivers from VUS, and Show only drivers applies", () => {
+  const only = resolveDrivers({ oncokb: false, custom: false, tiers: [], hideVus: true });
+  assert.equal(only.hotspots, true);
+  assert.equal(only.annotated, true);
+  assert.equal(only.hideVus, true);
+  const off = resolveDrivers({ oncokb: false, hotspots: false, custom: false, tiers: [], hideVus: true });
+  assert.equal(off.hotspots, false);
+  assert.equal(off.annotated, false, "every source off, hotspots too: nothing is told apart");
 });
 
 test("what this warehouse cannot answer, or a misspelt setting, is refused by name", () => {
-  assert.throws(() => resolveDrivers({ hotspots: true }), /Cancer Hotspots is not loaded.*oncokb.*custom.*tiers/s);
   assert.equal(resolveDrivers({ hotspots: false }).oncokb, true);
+  assert.throws(() => resolveDrivers({ hotspots: "yes" } as never), /drivers.hotspots must be true or false/);
   assert.throws(() => resolveDrivers({ hideVUS: true } as never), /unknown setting 'hideVUS' \(accepted: oncokb, hotspots, custom, tiers, hideVus, hideGermline\)/);
   assert.throws(() => resolveDrivers({ oncokb: "yes" } as never), /drivers.oncokb must be true or false/);
   assert.throws(() => resolveDrivers({ tiers: "Tier 1" } as never), /list of cbp_driver_tiers values/);
@@ -34,19 +47,33 @@ test("what this warehouse cannot answer, or a misspelt setting, is refused by na
   assert.throws(() => resolveDrivers("x" as never), /drivers must be an object/);
 });
 
+test("Cancer Hotspots is a setting like the others: accepted on or off", () => {
+  assert.equal(resolveDrivers({ hotspots: true }).hotspots, true);
+  assert.equal(resolveDrivers({ hotspots: false }).hotspots, false);
+});
+
 test("every tier is a source only where the data has a tier", () => {
-  const offBoth = resolveDrivers({ oncokb: false, custom: false, hideVus: true });
+  const offBoth = resolveDrivers({ oncokb: false, hotspots: false, custom: false, hideVus: true });
   assert.deepEqual(forData(offBoth, false), { ...offBoth, annotated: false, hideVus: false });
   assert.equal(forData(offBoth, true), offBoth, "with tiers in the data they count");
   const some = resolveDrivers(undefined);
   assert.equal(forData(some, false), some, "another source is on");
   const named = resolveDrivers({ oncokb: false, custom: false, tiers: ["A"] });
   assert.equal(forData(named, false), named, "named tiers are the reader's choice");
+  // D4: hotspots on is a source whatever tiers the data has
+  const hot = resolveDrivers({ oncokb: false, custom: false, hideVus: true });
+  assert.deepEqual(forData(hot, false), hot);
+  assert.equal(forData(hot, false).annotated, true);
 });
 
 test("compactDrivers writes only what differs from the defaults", () => {
   assert.equal(compactDrivers({ oncokb: true, custom: true, hideVus: false }), undefined);
   assert.deepEqual(compactDrivers({ oncokb: false, tiers: [], hideGermline: true }), { oncokb: false, tiers: [], hideGermline: true });
+  // D3: hotspots on is the default and is not written; off is
+  assert.equal(compactDrivers({ oncokb: true, hotspots: true, custom: true, hideVus: false }), undefined);
+  assert.deepEqual(compactDrivers({ hotspots: false }), { hotspots: false });
+  assert.deepEqual(compactDrivers({ oncokb: false, hotspots: true }), { oncokb: false });
+  assert.deepEqual(compactDrivers({ hotspots: false, hideVus: true }), { hotspots: false, hideVus: true });
 });
 
 test("the rule: any source on that calls it; a passenger call does not overrule OncoKB", () => {
@@ -68,6 +95,32 @@ test("the rule: any source on that calls it; a passenger call does not overrule 
   assert.equal(isDriverEvent({ df: "Putative_Driver" }, resolveDrivers({ custom: false }), no), false);
 });
 
+test("the rule with Cancer Hotspots: a hotspot is a driver when the setting is on", () => {
+  const yes = () => true, no = () => false;
+  const all = resolveDrivers(undefined);
+  // D1: a hotspot that OncoKB does not call oncogenic, with no custom call
+  assert.equal(isDriverEvent({}, all, no, yes), true, "D1");
+  assert.equal(isDriverEvent({ df: "Unknown" }, all, no, yes), true, "D1 with a non-driver custom call");
+  // D8: OncoKB's VUS that is a hotspot is kept as a driver
+  assert.equal(isDriverEvent({ df: "Putative_Passenger" }, all, no, yes), true, "D8");
+  assert.equal(isDriverEvent({}, all, no, no), false, "neither source calls it");
+  assert.equal(isDriverEvent({}, all, no), false, "no hotspot callback: not a hotspot");
+  // D7: germline status does not enter the call
+  assert.equal(isDriverEvent({ germ: true }, all, no, yes), true, "D7");
+  assert.equal(isDriverEvent({ germ: 1 }, resolveDrivers({ oncokb: false, custom: false, tiers: [] }), no, yes), true, "D7, hotspots alone");
+  // hotspots alone
+  const only = resolveDrivers({ oncokb: false, custom: false, tiers: [] });
+  assert.equal(isDriverEvent({}, only, no, yes), true, "D4: hotspots alone");
+  assert.equal(isDriverEvent({ dt: "Tier 1", df: "Putative_Driver" }, only, yes, no), false, "the sources switched off say nothing");
+  // D2: hotspots off: a hotspot is not a driver by it, and the callback is not consulted
+  const off = resolveDrivers({ hotspots: false });
+  let asked = false;
+  assert.equal(isDriverEvent({}, off, no, () => (asked = true)), false, "D2");
+  assert.equal(asked, false, "D2: Cancer Hotspots is not consulted when it is off");
+  assert.equal(isDriverEvent({}, off, yes, yes), true, "D2: other sources still apply");
+  assert.equal(isDriverEvent({ df: "Putative_Driver" }, off, no, yes), true, "D2: custom still applies");
+});
+
 test("germline is the portal's /Germline/i on the mutation status", () => {
   for (const s of ["Germline", "GERMLINE", "germline", "likely germline"]) assert.equal(isGermlineStatus(s), true, s);
   for (const s of ["Somatic", "", null, "Unknown", "SOMATIC_VS_POOL"]) assert.equal(isGermlineStatus(s), false, String(s));
@@ -81,12 +134,26 @@ test("the rule as SQL: the sources that are on, OR'd; none is 0", () => {
   assert.match(sql, /oncokb_version = 'v7\.5' AND is_driver/);
   assert.match(driverCondSql(resolveDrivers(undefined), "v"), /driver_tiers_filter != ''/);
   assert.doesNotMatch(driverCondSql(resolveDrivers(undefined), null), /oncokb_annotation/, "no pin: OncoKB adds nothing, and the caller says so");
-  assert.equal(driverCondSql(resolveDrivers({ oncokb: false, custom: false, tiers: [] }), "v"), "0");
+  assert.equal(driverCondSql(resolveDrivers({ oncokb: false, hotspots: false, custom: false, tiers: [] }), "v"), "0");
 });
 
 test("the source a caption names", () => {
-  assert.equal(driverSourceText(resolveDrivers({ oncokb: false, custom: false, tiers: [] }), null), "none — no driver source is switched on, so nothing is called a driver");
-  assert.equal(driverSourceText(resolveDrivers({ custom: false, tiers: ["A"] }), "OncoKB v1 (pinned)"), "OncoKB v1 (pinned) + custom driver tiers A");
+  assert.equal(driverSourceText(resolveDrivers({ oncokb: false, hotspots: false, custom: false, tiers: [] }), null), "none — no driver source is switched on, so nothing is called a driver");
+  assert.equal(driverSourceText(resolveDrivers({ custom: false, hotspots: false, tiers: ["A"] }), "OncoKB v1 (pinned)"), "OncoKB v1 (pinned) + custom driver tiers A");
+});
+
+test("W5: the source a caption names includes Cancer Hotspots and its Genome Nexus pin when on", () => {
+  const hs = "Cancer Hotspots (Genome Nexus 2.2.3+f2)";
+  const only = driverSourceText(resolveDrivers({ oncokb: false, custom: false, tiers: [] }), null, hs);
+  assert.match(only, /Cancer Hotspots/);
+  assert.match(only, /2\.2\.3\+f2/, "the pin is named");
+  assert.doesNotMatch(only, /^none/, "hotspots alone is a source");
+  const both = driverSourceText(resolveDrivers({ custom: false, tiers: [] }), "OncoKB v1 (pinned)", hs);
+  assert.match(both, /OncoKB v1 \(pinned\)/);
+  assert.match(both, /Cancer Hotspots/);
+  const off = driverSourceText(resolveDrivers({ hotspots: false, custom: false, tiers: [] }), "OncoKB v1 (pinned)", hs);
+  assert.doesNotMatch(off, /Cancer Hotspots/, "D2: off, it is not named");
+  assert.equal(off, "OncoKB v1 (pinned)");
 });
 
 const ctx = { study: "s", db: "db", unit: "sample" as const, cohortSql: "SELECT pid, sid FROM c", oncokbPin: "v7.5" };
@@ -110,7 +177,7 @@ test("plot: a mutation type splits into (Driver) and (VUS) only when the axis ho
   const split = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType", drivers: {} }, ctx, "cat");
   assert.match(split, /' \(Driver\)'/);
   assert.match(split, /' \(VUS\)'/);
-  const none = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType", drivers: { oncokb: false, custom: false, tiers: [] } }, ctx, "cat");
+  const none = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType", drivers: { oncokb: false, hotspots: false, custom: false, tiers: [] } }, ctx, "cat");
   assert.doesNotMatch(none, /\(Driver\)/, "no source on: nothing to split by");
 });
 
@@ -132,14 +199,16 @@ test("the plot runner puts the view's sources on each mutation axis, never its f
   assert.deepEqual(r.x, { ...x, drivers: { oncokb: false } });
   assert.deepEqual(r.y, y);
   assert.deepEqual(r.colorBy, { source: "alteration", gene: "KRAS", by: "driver", drivers: { oncokb: false } });
-  assert.throws(() => plotWithDrivers({ x, y }, { hotspots: true }), /Cancer Hotspots/);
+  // W3: Cancer Hotspots is a source the axes take
+  assert.doesNotThrow(() => plotWithDrivers({ x, y }, { hotspots: true }));
+  assert.equal((plotWithDrivers({ x, y }, { hotspots: false }).x as { drivers?: { hotspots?: boolean } }).drivers?.hotspots, false);
   // an axis that names its own settings keeps them
   const own = { ...x, drivers: { custom: false } };
   assert.deepEqual(plotWithDrivers({ x: own, y }, { oncokb: false }).x, own);
 });
 
 test("an oncoprint view's settings: the older display spellings read, and dropped on write", () => {
-  assert.deepEqual(driversOf({ display: { annotate: "none", hideVUS: true } }), { oncokb: false, custom: false, tiers: [], hideVus: true });
+  assert.deepEqual(driversOf({ display: { annotate: "none", hideVUS: true } }), { oncokb: false, hotspots: false, custom: false, tiers: [], hideVus: true }); // D10
   assert.deepEqual(driversOf({ display: { hideVUS: true }, drivers: { hideVus: false } }), undefined);
   const v = withDrivers({ kind: "oncoprint", display: { annotate: "none", gaps: "pct" } }, { hideGermline: true });
   assert.deepEqual(v, { kind: "oncoprint", display: { gaps: "pct" }, drivers: { hideGermline: true } });

@@ -65,6 +65,8 @@ import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type Cohor
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
+import { hotspotKeysSql } from "./hotspots.ts";
+import { variantPins, type VariantPins } from "./variant-annotation.ts";
 
 export type InstanceMode = "patient-level" | "aggregate-only";
 
@@ -523,13 +525,16 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
  * there, from the cohort's own samples only. The four builders below share this CTE. The suppression floor applies to a
  * (codon, change) pair's patient count, at the data holder, before anything leaves.
  */
-function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string): string {
+function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string, hotspotPins: VariantPins | null = null): string {
   const floor = Math.max(1, Math.floor(minCount));
-  // with no pin there is no annotation to split drivers from VUS, and cBioPortal then colours
-  // everything as a driver; the report says which happened
+  // a driver by OncoKB or as a Cancer Hotspot, the portal's default sources. With no pin there is no
+  // annotation to split drivers from VUS, and cBioPortal then colours everything as a driver; the
+  // report says which happened
+  const hotspotKeys = pin && hotspotPins ? hotspotKeysSql(db, [study], genes, hotspotPins) : null;
   const driver = pin
     ? "if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM " + ONCOKB_TABLE + "\n" +
-      "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION'), 1, 0)"
+      "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION')" +
+      (hotspotKeys ? "\n        OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (" + hotspotKeys + ")" : "") + ", 1, 0)"
     : "1";
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
@@ -544,8 +549,8 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
 }
 /** Per (codon, change): distinct patients (the height), raw rows (the label's ordering), and the change's
  * driver status and protein impact class (its commonest), so the plot can be filtered by class in the browser. */
-export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db) +
+export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins) +
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
     "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
 }
@@ -555,8 +560,8 @@ export function lollipopChangesSql(cohortSql: string, genes: string[], study: st
  * counts toward the tally (the portal's badges count every mutation row), so the floor's
  * membership test compares pos through ifNull rather than letting NULL fail the tuple match.
  */
-export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db) +
+export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins) +
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
     "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
@@ -1540,9 +1545,10 @@ abstract class BaseResolver implements AggregateCapable {
     if (!genes.length) return empty;
     const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
     const pos = (x: unknown) => x == null || x === "" ? null : Number(x);
+    const hotspotPins = await variantPins();
     const [c, t, tot, cs] = await Promise.all([
-      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db), conn),
-      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db), conn),
+      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins), conn),
+      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins), conn),
       this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db), conn),
       this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
     ]);
@@ -1676,7 +1682,7 @@ abstract class BaseResolver implements AggregateCapable {
     validateAxis(spec.x, "x", { cohort: true });
     validateAxis(spec.y, "y");
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
 
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const kindOf = (attr: string) => kinds.get(attr);
@@ -1777,16 +1783,18 @@ abstract class BaseResolver implements AggregateCapable {
 
   /** what an OQL axis needs from this participant: its pinned OncoKB version and its profiles */
   protected oqlCtx() { return { oncokbPin: this.ctx.oncokbPin, profiles: this.ctx.profiles }; }
+  /** a plot axis's context: the OQL pins, and the Genome Nexus releases a driver axis reads Cancer Hotspots at */
+  protected async axisCtx() { return { ...this.oqlCtx(), variantPins: await variantPins() }; }
 
-  protected plotCtx(def: CohortDef | null | undefined, spec: PlotRequest) {
+  protected async plotCtx(def: CohortDef | null | undefined, spec: PlotRequest) {
     return { study: this.study, db: this.instance.conn.db,
-      unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
+      unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
   }
 
   /** This site's cases, and how many carry each axis — summed across sites by lib/views/plot/run.ts. */
   async plotCoverage(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<NonNullable<PlotData["coverage"]>> {
-    const ctx = this.plotCtx(def, spec);
+    const ctx = (await this.plotCtx(def, spec));
     const r = await this.runLogged<ChRow>("plot:coverage",
       plotCoverageSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx), this.instance.conn);
     return coverageOf(r.data[0] || {});
@@ -1795,7 +1803,7 @@ abstract class BaseResolver implements AggregateCapable {
   /** Pass 1 of a federated numeric pair: this site's count and extent (plotBinsSql's `extent` arg). */
   async plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }> {
-    const ctx = this.plotCtx(def, spec);
+    const ctx = (await this.plotCtx(def, spec));
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const r = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), this.instance.conn);
     const row = r.data[0] || {};
@@ -1805,10 +1813,10 @@ abstract class BaseResolver implements AggregateCapable {
   /** Pass 2: this site's bin counts against the shared extent every participant was given. */
   async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
-    return this.binCountsIn("plot:bins", this.plotCtx(def, spec), spec, xk, yk, bins, extent);
+    return this.binCountsIn("plot:bins", (await this.plotCtx(def, spec)), spec, xk, yk, bins, extent);
   }
 
-  private async binCountsIn(label: string, ctx: ReturnType<BaseResolver["plotCtx"]>, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
+  private async binCountsIn(label: string, ctx: Awaited<ReturnType<BaseResolver["plotCtx"]>>, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const r = await this.runLogged<ChRow>(label, plotBinsSql(xSel, ySel, ctx.cohortSql, bins, extent), this.instance.conn);
@@ -1817,7 +1825,7 @@ abstract class BaseResolver implements AggregateCapable {
 
   /** This site's six sums for the pair — sufficient for a federated Pearson/regression (lib/stats.ts). */
   async plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments> {
-    const ctx = this.plotCtx(def, spec);
+    const ctx = (await this.plotCtx(def, spec));
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const r = await this.runLogged<ChRow>("plot:moments", plotMomentsSql(xSel, ySel, ctx.cohortSql), this.instance.conn);
     const row = r.data[0] || {};
@@ -1828,7 +1836,7 @@ abstract class BaseResolver implements AggregateCapable {
   /** This site's contingency cells for a categorical pair — exact sums, no shared-scale issue at all. */
   async plotTableCells(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ cx: string; cy: string; n: number }[]> {
-    const ctx = this.plotCtx(def, spec);
+    const ctx = (await this.plotCtx(def, spec));
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const r = await this.runLogged<ChRow>("plot:cells", plotTableSql(xSel, ySel, ctx.cohortSql), this.instance.conn);
     return r.data.map((row) => ({ cx: String(row.cx), cy: String(row.cy), n: Number(row.n) }));
@@ -1842,13 +1850,13 @@ abstract class BaseResolver implements AggregateCapable {
    */
   async plotBoxRows(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
-    return this.boxRowsIn("plot:box", this.plotCtx(def, spec), spec, xk, yk);
+    return this.boxRowsIn("plot:box", (await this.plotCtx(def, spec)), spec, xk, yk);
   }
 
   /** Pass 2 of a federated box's density: this site's bins against the range every participant was given. */
   async plotViolinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     bins: number, range: [number, number]): Promise<ViolinBin[]> {
-    const ctx = this.plotCtx(def, spec);
+    const ctx = (await this.plotCtx(def, spec));
     const numFirst = xk === "num";
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
@@ -1858,7 +1866,7 @@ abstract class BaseResolver implements AggregateCapable {
       ...(spec.colorBy ? { c: String(row.c ?? "") } : {}) }));
   }
 
-  private async boxRowsIn(label: string, ctx: ReturnType<BaseResolver["plotCtx"]>, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
+  private async boxRowsIn(label: string, ctx: Awaited<ReturnType<BaseResolver["plotCtx"]>>, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
     const numFirst = xk === "num";
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
@@ -1877,8 +1885,8 @@ abstract class BaseResolver implements AggregateCapable {
   // highlight are case-level and live on PatientLevelResolver alone (plotHighlightPoints).
 
   /** the plotted cohort narrowed to a highlight, as a plot context */
-  protected highlightCtx(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest) {
-    const ctx = this.plotCtx(def, spec);
+  protected async highlightCtx(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest) {
+    const ctx = (await this.plotCtx(def, spec));
     return { ...ctx, cohortSql: highlightCohortSql(ctx.cohortSql, this.cohortSql(highlight)) };
   }
 
@@ -1890,12 +1898,12 @@ abstract class BaseResolver implements AggregateCapable {
 
   async plotHighlightBins(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
-    return this.binCountsIn("plot:highlight:bins", this.highlightCtx(def, highlight, spec), spec, xk, yk, bins, extent);
+    return this.binCountsIn("plot:highlight:bins", (await this.highlightCtx(def, highlight, spec)), spec, xk, yk, bins, extent);
   }
 
   async plotHighlightBoxRows(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
-    return this.boxRowsIn("plot:highlight:box", this.highlightCtx(def, highlight, spec), spec, xk, yk);
+    return this.boxRowsIn("plot:highlight:box", (await this.highlightCtx(def, highlight, spec)), spec, xk, yk);
   }
 
   /**
@@ -2042,7 +2050,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   private async boxSelects(def: CohortDef | null | undefined, spec: PlotRequest) {
     const db = this.instance.conn.db;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "box") return null;
@@ -2059,7 +2067,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   async plotScatterPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP, sparse?: SparseCells): Promise<PlotXYPoint[] | null> {
     const db = this.instance.conn.db, conn = this.instance.conn;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "scatter") return [];
@@ -2075,7 +2083,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * and nowhere else, for the reason plotPoints is; bounded by the rank's `n`.
    */
   async plotRankedPoints(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind, rank: PointRank): Promise<HighlightPoint[]> {
-    const ctx = this.plotCtx(def, spec);
+    const ctx = (await this.plotCtx(def, spec));
     const shape = plotShape(xk, yk);
     if (shape !== "scatter" && shape !== "box") return [];
     const r = await this.runPatientRows<ChRow>("plot:layer:" + rank.by,
@@ -2093,7 +2101,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    */
   async plotHighlightPoints(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     cap = POINTS_CAP): Promise<HighlightPoint[] | null> {
-    const ctx = this.highlightCtx(def, highlight, spec);
+    const ctx = (await this.highlightCtx(def, highlight, spec));
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const shape = plotShape(xk, yk);
     if (shape === "scatter") {
@@ -2150,7 +2158,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const db = this.instance.conn.db, conn = this.instance.conn;
     const kindsMap = await this.clinicalKinds(covariates);
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     // a patient not profiled for a covariate's gene has no value to fit, so the fit leaves them
     // out (in the query the method record re-runs) and counts them, rather than coding "unknown"
@@ -2240,7 +2248,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kindsMap = await this.clinicalKinds([outcome, ...covariates]);
     const outcomeKind = axisKind(outcome, (a) => kindsMap.get(a));
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...this.oqlCtx() };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
     const outcomeSel = { label: "y0", sel: axisSelect(outcome, ctx, outcomeKind) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     // as for Cox: not profiled for the outcome's or a covariate's gene is left out and counted

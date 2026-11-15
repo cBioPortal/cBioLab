@@ -17,6 +17,8 @@ import { DB } from "./ch.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import { driverCondSql } from "./driver-sql.ts";
+import { hotspotKeysSql } from "./hotspots.ts";
+import type { VariantPins } from "./variant-annotation.ts";
 import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { parseOql, oqlCasesSql } from "./oql.ts";
 import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP, ALTERATION_GENE_SET_CAP } from "./plot-oql.ts";
@@ -155,6 +157,8 @@ export interface AxisCtx {
   study: string; db?: string; unit: "patient" | "sample"; cohortSql: string;
   /** what an OQL axis's DRIVER and EXP/PROT terms need, as a cohort's OQL leaf does */
   oncokbPin?: string | null; profiles?: string[];
+  /** the Genome Nexus releases a driver axis reads Cancer Hotspots at (lib/variant-annotation.ts) */
+  variantPins?: VariantPins;
 }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
@@ -418,7 +422,8 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     if (drivers && drivers.oncokb && !ctx.oncokbPin)
       throw new Error("calling drivers from OncoKB needs the version-pinned OncoKB store, which this instance cannot read; " +
         "switch drivers.oncokb off to use the study's own driver calls (cbp_driver, cbp_driver_tiers)");
-    const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin) + ") AS drv" : "";
+    const hotspotKeys = drivers && drivers.hotspots && ctx.variantPins ? hotspotKeysSql(db, [study], genes, ctx.variantPins) : null;
+    const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin, "", hotspotKeys) + ") AS drv" : "";
     // every case in the cohort appears, because "no alteration" is an answer and not a missing value
     const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration" + drv + "\n" +
       "     FROM " + db + ".genomic_event_derived\n" +
