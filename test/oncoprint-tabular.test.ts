@@ -2,7 +2,7 @@
 // type, then one column per case in the oncoprint's order — and one text label per cell.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { contractToTsv, geneCellLabel } from "../lib/oncoprint-tabular.ts";
+import { contractToTsv, geneticText } from "../lib/oncoprint-tabular.ts";
 import { BITS, NOT_PROFILED, assembleContract } from "../lib/oncoprint-assemble.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 import type { Contract, Track } from "../lib/types.ts";
@@ -12,24 +12,26 @@ const contract = (columns: string[], tracks: Track[]): Contract =>
 
 const table = (tsv: string) => tsv.split("\n").filter((l) => l !== "").map((l) => l.split("\t"));
 
-test("a gene cell says not profiled, nothing for unaltered, and names each alteration it holds", () => {
-  assert.equal(geneCellLabel(NOT_PROFILED), "not profiled");
-  assert.equal(geneCellLabel(0), "");
-  assert.equal(geneCellLabel(BITS.AMP), "Amplification");
-  assert.equal(geneCellLabel(BITS.HOMDEL), "Deep Deletion");
-  assert.equal(geneCellLabel(BITS.MISSENSE), "Missense Mutation (unknown significance)");
-  assert.equal(geneCellLabel(BITS.TRUNCATING | BITS.MUT_DRIVER), "Truncating Mutation (putative driver)");
-  for (const [bit, name] of [[BITS.INFRAME, "Inframe"], [BITS.SPLICE, "Splice"], [BITS.PROMOTER, "Promoter"], [BITS.OTHER_MUT, "Other"]] as const)
-    assert.equal(geneCellLabel(bit), name + " Mutation (unknown significance)");
+test("a gene cell's text in each genetic group: nothing when not profiled or unaltered", () => {
+  for (const g of ["CNA", "MUTATIONS", "MRNA", "PROTEIN", "STRUCTURAL_VARIANT"] as const) {
+    assert.equal(geneticText(NOT_PROFILED, g, true), "");
+    assert.equal(geneticText(0, g, true), "");
+  }
+  assert.equal(geneticText(BITS.AMP, "CNA", true), "Amplification");
+  assert.equal(geneticText(BITS.HOMDEL, "CNA", false), "Deep Deletion");
+  assert.equal(geneticText(BITS.MISSENSE, "MUTATIONS", true), "Missense Mutation (putative passenger)");
+  assert.equal(geneticText(BITS.TRUNCATING | BITS.MUT_DRIVER, "MUTATIONS", true), "Truncating mutation (putative driver)");
+  assert.equal(geneticText(BITS.AMP, "MUTATIONS", true), "", "a copy number is not a mutation");
+  assert.equal(geneticText(BITS.AMP | BITS.MISSENSE, "MRNA", true), "", "mRNA and protein calls are not loaded");
 });
 
-test("driver status is per glyph: a mutation's driver bit does not make the cell's SV a driver", () => {
-  const label = geneCellLabel(BITS.MISSENSE | BITS.MUT_DRIVER | BITS.SV | BITS.AMP);
-  const parts = label.split(", ");
-  assert.ok(parts.includes("Missense Mutation (putative driver)"), label);
-  assert.ok(parts.includes("Structural Variant (unknown significance)"), label);
-  assert.ok(parts.includes("Amplification"), label);
-  assert.equal(geneCellLabel(BITS.SV | BITS.SV_DRIVER), "Structural Variant (putative driver)");
+test("driver status is per glyph: a mutation's driver bit does not make the cell's SV or copy number a driver", () => {
+  const code = BITS.MISSENSE | BITS.MUT_DRIVER | BITS.SV | BITS.AMP;
+  assert.equal(geneticText(code, "MUTATIONS", true), "Missense Mutation (putative driver)");
+  assert.equal(geneticText(code, "STRUCTURAL_VARIANT", true), "Structural Variant");
+  assert.equal(geneticText(code, "CNA", true), "Amplification");
+  assert.equal(geneticText(BITS.SV | BITS.SV_DRIVER, "STRUCTURAL_VARIANT", true), "Structural Variant (putative driver)");
+  assert.equal(geneticText(BITS.SV | BITS.SV_DRIVER, "STRUCTURAL_VARIANT", false), "Structural Variant");
 });
 
 test("the header names the cases in oncoprint order, and every row has a cell for each", () => {
@@ -39,7 +41,8 @@ test("the header names the cases in oncoprint order, and every row has a cell fo
   assert.ok(tsv.endsWith("\n"));
   const rows = table(tsv);
   assert.deepEqual(rows[0], ["track_name", "track_type", "P3", "P1", "P2"]);
-  assert.deepEqual(rows[1], ["TP53", "GENE", "Missense Mutation (unknown significance)", "", "not profiled"]);
+  assert.deepEqual(rows[1], ["TP53", "CNA", "", "", ""]);
+  assert.deepEqual(rows[2], ["TP53", "MUTATIONS", "Missense Mutation", "", ""], "annotation off: no driver call");
 });
 
 test("each track kind gets its type and its cells' text", () => {
@@ -49,7 +52,7 @@ test("each track kind gets its type and its cells' text", () => {
     { kind: "clinical", label: "Stage", cells: [5, 0, -1], categories: ["I"] } as Track,
     { kind: "clinical", label: "Profiled for mutations", cells: [0, -1, 0], categories: ["Yes"], profiledFor: "mutations" } as Track,
     { kind: "clinical", label: "Age", cells: [0, 255, -1], numeric: true, min: 20, max: 80 } as Track,
-    { kind: "heatmap", label: "EGFR mRNA", cells: [0, 255, -1], numeric: true, min: -2, max: 2, profileType: "MRNA_EXPRESSION" } as Track,
+    { kind: "heatmap", label: "EGFR mRNA", gene: "EGFR", cells: [0, 255, -1], numeric: true, min: -2, max: 2, values: [-2, 2, NaN], profileType: "mrna_zscores", profileKind: "MRNA_EXPRESSION Z-SCORE" } as Track,
     { kind: "heatmap", label: "untyped", cells: [-1, -1, -1], numeric: true } as Track,
   ])));
   const byName = Object.fromEntries(rows.slice(1).map((r) => [r[0], r.slice(1)]));
@@ -58,7 +61,7 @@ test("each track kind gets its type and its cells' text", () => {
   assert.deepEqual(byName.Stage, ["CLINICAL", "Other", "I", ""], "a code with no category is Other");
   assert.deepEqual(byName["Profiled for mutations"], ["CLINICAL", "Yes", STYLE.glyph.profiled.no, "Yes"], "an empty profiled-for cell means No");
   assert.deepEqual(byName.Age, ["CLINICAL", "20", "80", ""], "numeric cells are values on the track's scale");
-  assert.deepEqual(byName["EGFR mRNA"], ["HEATMAP MRNA_EXPRESSION", "-2", "2", ""]);
+  assert.deepEqual(byName.EGFR, ["HEATMAP MRNA_EXPRESSION Z-SCORE", "-2", "2", ""], "named by the gene, typed by the profile's kind");
   assert.deepEqual(byName.untyped, ["HEATMAP ", "", "", ""]);
 });
 
@@ -77,8 +80,8 @@ test("typed-array cells are read the same as plain ones", () => {
   assert.equal(typed, plain);
 });
 
-test("a germline mutation is named in the tabular download", () => {
-  assert.equal(geneCellLabel(BITS.MISSENSE | BITS.GERMLINE), "Missense Mutation (unknown significance), Germline Mutation");
+test("a germline mutation reads as the somatic one: the file has no germline mark (tabularDownload reads no disp_germ)", () => {
+  assert.equal(geneticText(BITS.MISSENSE | BITS.GERMLINE, "MUTATIONS", false), "Missense Mutation");
 });
 
 test("a numeric row gives the exact value where the contract carries one, and the drawing code's value where it does not", () => {
@@ -124,4 +127,14 @@ test("#199 W1: no spectrum row, or an all-zero one, writes blank (the portal wri
   assert.equal(row[cols.indexOf("D")], "1");
   assert.equal(row[cols.indexOf("N")], "", "no spectrum row: blank");
   assert.equal(row[cols.indexOf("Z")], "", "all-zero spectrum: blank, as no data");
+});
+
+test("without the page's order, Show unaltered off leaves out the columns no gene track alters (the server's and the CLI's download)", () => {
+  const c = { ...contract(["A", "B", "C"], [
+    { kind: "gene", label: "TP53", cells: [BITS.MISSENSE, 0, NOT_PROFILED] },
+    { kind: "gene", label: "KRAS", cells: [0, 0, BITS.AMP] },
+  ]), display: { showUnaltered: false } } as unknown as Contract;
+  assert.deepEqual(table(contractToTsv(c))[0], ["track_name", "track_type", "A", "C"]);
+  assert.deepEqual(table(contractToTsv({ ...c, display: { showUnaltered: true } } as unknown as Contract))[0], ["track_name", "track_type", "A", "B", "C"]);
+  assert.deepEqual(table(contractToTsv(c, [1, 0]))[0], ["track_name", "track_type", "B", "A"], "the page's order is the columns drawn, as given");
 });

@@ -185,7 +185,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] ONC-TT-2's numeric typing by the attribute's datatype (ours: ≥90 % parse and >10 distinct values); "(average of n values)" zoomed out (ONC-STM-8)
   - [x] The mutation spectrum track (ONC-TT-3, ONC-STM-6) (#199)
     - [ ] Its Freq in Tracks › Clinical (the portal's % of samples sequenced) and Edit Colors
-    - [ ] The Tabular download names clinical rows by attribute id (`MUTATION_SPECTRUM (C>A)`, `AGE`); the portal by display name (`Mutation spectrum (C>A)`): with the downloads (ONC-DL-4)
+    - [x] The Tabular download names clinical rows by display name (`Mutation spectrum (C>A)`, `Diagnosis Age`), as the portal (ONC-DL-4)
     - Not as the portal, on purpose: a case whose substitutions are all ref = alt (one row in the warehouse) has no spectrum here; the portal keeps six zeros, draws no data, and writes 0 in its TSV
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
     - [ ] VAF's "Not mutated/no VAF data" state; the #e0e0e0 null colour
@@ -377,8 +377,16 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] "Show only profiled" (`hide_unprofiled_samples`) with its all/any radios, its CaseFilterWarning, and the AlterationFilterWarning, on every Results tab (ONC-MD-3, CTS-MD-7, MEX-MD-6, PLT-MD-5, PLT-CH-3, MUT-MD-13, CNS-0.2) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md), [05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] OncoKB's germline rule (Pathogenic / Likely Pathogenic for a germline mutation): the store holds one call per alteration
   - [ ] A plot's menu lists no tiers (a plot does not report its data's tiers); the plot tooltip's OncoKB and hotspot icons
-- [ ] **Oncoprint export** — PDF and tabular
-  - [ ] Open in Oncoprinter; the TSV in the portal's rows per alteration type (CNA, MUTATIONS, …; ours one row per track) (ONC-DL-4, ONC-DL-5) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
+- [ ] **Oncoprint export** — PDF and tabular ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
+  - [x] The Tabular download as the portal writes it, `PATIENT_DATA_oncoprint.tsv` / `SAMPLE_DATA_oncoprint.tsv` (tabularDownload.ts): CLINICAL rows by display name (the mutation spectrum one row per substitution, "Mutation spectrum (C>A)"); then each gene's CNA, MUTATIONS, MRNA, PROTEIN and STRUCTURAL_VARIANT rows, every gene in every group; then a group per heatmap profile, `HEATMAP MRNA_EXPRESSION Z-SCORE`, `HEATMAP GENERIC_ASSAY LIMIT-VALUE`, rows named by gene or entity; the columns as drawn (the page's sort, Show unaltered). A mutation cell is the one class drawn, "Truncating mutation (putative driver)", "(putative passenger)" with annotation on, no suffix with it off, Promoter never; a cell not profiled is empty. The server's, the CLI's and the Python package's TSV are the same file, without the page's order (ONC-DL-4)
+    - Ours alone: splice and other mutations as "Splice Mutation" / "Other Mutation", a driver copy number "Amplification (putative driver)", a structural variant "Structural Variant" (and "(putative driver)"); the portal writes its internal codes `splice_rec`, `amp_rec`, `sv_rec`
+    - Ours alone: a merged row is named as drawn (`RAS`); the portal names it by its genes (`KRAS / NRAS`) whatever its label
+    - Ours alone: across studies, columns are `<study>_<id>`, unique; the portal writes the bare id
+    - Ours alone: numbers as float32 holds them (7 significant digits); the VAF heatmap is `HEATMAP MUTATION_EXTENDED VAF`; derived-event rows come last, typed `DERIVED`, `yes`/`no`
+    - Several studies naming one attribute differently (AGE: "Age", "Diagnosis Age", … in 14 forms): the first study's name
+  - [x] The order file as the portal's: "Patient order in the Oncoprint is:" then the ids as drawn, `OncoPrintPatients.txt` / `OncoPrintSamples.txt` (ONC-DL-3)
+  - [ ] PDF (ONC-DL-2)
+  - [ ] **After the initial release:** Open in Oncoprinter (ONC-DL-5)
 
 ## Lower — resources, tools and niche features
 

@@ -16,6 +16,7 @@ import { portalTipNumber } from "../../lib/chart/format.ts";
 import { STYLE, clinicalLegend, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
+import { contractToTsv, orderFileName, orderFileText, tabularFileName } from "../../lib/oncoprint-tabular.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
 import { api } from "../lab/api.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
@@ -712,8 +713,12 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     try {
       const stem = "oncoprint-" + (data.studies || [data.study]).join("+").slice(0, 40);
       if (what === "ids") {
-        const ids = visible.order.length === data.n ? data.columns() : Array.from(visible.order, (i) => data.columns()[i]);
-        save(new Blob([data.unit + " order in the oncoprint is:\n" + ids.join("\n") + "\n"], { type: "text/plain" }), stem + "-" + data.unit + "-order.txt");
+        const cols = data.columns();
+        const ids = Array.from(visible.order, (i) => cols[i]);
+        save(new Blob([orderFileText(data.unit, ids)], { type: "text/plain" }), orderFileName(data.unit));
+      } else if (what === "tsv") {
+        // the columns as drawn: the page's sort and Show unaltered
+        save(new Blob([contractToTsv(data, visible.order)], { type: "text/tab-separated-values" }), tabularFileName(data.unit));
       } else if (what === "png") {
         // the layout is computed at the reference density, then supersampled to the chosen DPI —
         // so 8.5in looks like a page at any resolution, and the pixel count is exactly widthIn*dpi
@@ -739,10 +744,6 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
           endpoint: props.endpoint, pins: props.uploads });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
         save(await res.blob(), stem + "-" + exportWidthIn + "in.svg");
-      } else {
-        const res = await api.oncoprint(specOnScreen() as OncoprintBody, { query: "?format=" + what, endpoint: props.endpoint, pins: props.uploads });
-        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
-        save(await res.blob(), stem + "." + what);
       }
     } catch (e) { setError(String((e as Error).message || e)); }
     setSaving(null);
@@ -842,8 +843,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               {(close) => <>
                 <span className="meta px-2">download figures</span>
                 <MenuItem onClick={() => { close(); openExport(); }}><ImageDown />Export image (PNG or SVG)… — choose a page width</MenuItem>
-                <MenuItem onClick={() => { close(); void download("tsv"); }}><Sheet />Tabular TSV — one row per track, one column per {data.unit}</MenuItem>
-                <MenuItem onClick={() => { close(); void download("ids"); }}><ListOrdered />{data.unit} order — the ids as drawn</MenuItem>
+                <MenuItem onClick={() => { close(); void download("tsv"); }}><Sheet />Tabular — rows by data type, one column per {data.unit} as drawn</MenuItem>
+                <MenuItem onClick={() => { close(); void download("ids"); }}><ListOrdered />{data.unit === "sample" ? "Sample" : "Patient"} order — the ids as drawn</MenuItem>
                 {/* Not a download: the same spec, opened where it can be run rather than looked at.
                     Nothing is exported — the link carries the definition, and the lab page re-runs it. */}
                 <div className="menu-aside">

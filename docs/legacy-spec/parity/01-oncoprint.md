@@ -23,9 +23,9 @@ Legacy values read from `window.frontendOnc.model` (track info, id order) and `r
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 19 |
+| ✅ match | 20 |
 | 🟡 partial | 41 |
-| 🔶 different | 24 |
+| 🔶 different | 23 |
 | ❌ missing | 17 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
@@ -33,7 +33,7 @@ Legacy values read from `window.frontendOnc.model` (track info, id order) and `r
 | ? | 0 |
 | **Total IDs** | **104** |
 
-**Overall: 21.2 %** (✅ 19 + 🐞ok 1 + N/A 2 = 22 of 104). Counting 🟡 as half: 40.9 %.
+**Overall: 22.1 %** (✅ 20 + 🐞ok 1 + N/A 2 = 23 of 104). Counting 🟡 as half: 41.8 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
@@ -168,9 +168,9 @@ Data version: counts match exactly in every query, so the warehouse and cbioport
 |---|---|---|---|
 | ONC-DL-1 | ❌ | C | No hide-download switch (tracked: Data-governance switches) |
 | ONC-DL-2 | 🟡 | BC | PNG/SVG via "Export image…" dialog (page width, DPI); no PDF (tracked); names `oncoprint-<study>-<w>in.png` |
-| ONC-DL-3 | 🟡 | BC | "patient order in the oncoprint is:" + ids; file `oncoprint-<study>-patient-order.txt` |
-| ONC-DL-4 | 🔶 | C | TSV one row per track; gene row merges mutation/CNA/SV labels; type `GENE`/`CLINICAL`/`HEATMAP <profile>` (`oncoprint-tabular.ts`); no splice/sv raw-code quirk (tracked: Oncoprint export) |
-| ONC-DL-5 | ❌ | B | No Open in Oncoprinter; offers CLI emulator / Python notebook links instead |
+| ONC-DL-3 | ✅ | BC | "Patient order in the Oncoprint is:" + the ids as drawn; file `OncoPrintPatients.txt` / `OncoPrintSamples.txt` |
+| ONC-DL-4 | 🟡 | BC | The portal's rows: CLINICAL by display name, each gene's CNA/MUTATIONS/MRNA/PROTEIN/STRUCTURAL_VARIANT, `HEATMAP <type> <datatype>`; the columns as drawn (`oncoprint-tabular.ts`). Readable text where the portal writes raw codes (`splice_rec`, `amp_rec`, `sv_rec`); a merged row by its label |
+| ONC-DL-5 | ❌ | B | No Open in Oncoprinter, deferred to after the initial release; offers CLI emulator / Python notebook links instead |
 | ONC-DL-6 | 🔶 | B | "export to Jupyter (.ipynb)" embeds the contract + package, not a mutations CSV |
 
 ### §1 Toolbar — Zoom, Minimap

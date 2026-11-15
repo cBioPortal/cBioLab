@@ -850,6 +850,10 @@ export interface Track {
   /** zoomed out, a bucket shows its largest value rather than the mean: the row points at exceptions */
   peak?: boolean;
   gene?: string; profileType?: string; note?: string;
+  /** a clinical track's attribute display name, where it differs from `label` (the attribute id) */
+  name?: string;
+  /** a heatmap track's profile: its alteration type and datatype ("MRNA_EXPRESSION Z-SCORE") */
+  profileKind?: string;
 }
 export interface GroupRange { name: string; start: number; count: number; patients?: number }
 export interface Contract {

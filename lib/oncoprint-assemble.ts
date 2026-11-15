@@ -155,12 +155,16 @@ export interface AssembleInput {
   isDriver: (r: EventRow) => boolean;
   annotationSource: string;
   /** clinical attributes in track order, each with its per-column value */
-  clinical: { attr: string; values: Map<string, string> }[];
+  clinical: { attr: string; values: Map<string, string>;
+    /** the attribute's display name, when it has one: the Tabular download's row name */
+    name?: string }[];
   /** continuous per-gene values per profile, keyed "<columnId>|<gene>" */
   /** `assay`: a generic-assay profile, whose `genes` are its entities */
   heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, number>;
     /** a generic assay's profile: its pivot threshold and sort order (genetic_profile) */
-    pivot?: number; sortOrder?: "ASC" | "DESC" }[];
+    pivot?: number; sortOrder?: "ASC" | "DESC";
+    /** the profile's alteration type and datatype, "MRNA_EXPRESSION Z-SCORE": the Tabular download's row type */
+    profileKind?: string }[];
   /** "<profileType>|<gene>" -> pooled reference (federated z-scoring) */
   zReference?: Record<string, ZReference>;
   /**
@@ -385,7 +389,8 @@ export function assembleContract(input: AssembleInput): Contract {
     }
     clinTracks.push(...rows.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })));
   }
-  for (const { attr, values: valByPid } of clinical) {
+  for (const { attr, values: valByPid, name } of clinical) {
+    const named = name && name !== attr ? { name } : {};
     if (attr === SPECTRUM_TRACK) {
       // each column's six substitution counts, as the engine's rows carry them ("a,b,c,d,e,f");
       // a column with none is no data, as in the portal
@@ -398,7 +403,7 @@ export function assembleContract(input: AssembleInput): Contract {
         if (n.length !== k || !n.some((x) => x > 0)) continue;
         values.set(n, i * k); cells[i] = i;
       }
-      clinTracks.push({ kind: "clinical", label: attr, stack: STYLE.glyph.spectrum.categories.slice(), cells, values });
+      clinTracks.push({ kind: "clinical", label: attr, ...named, stack: STYLE.glyph.spectrum.categories.slice(), cells, values });
       continue;
     }
     // One string-keyed lookup per column, then three passes over a positional array. The map
@@ -440,7 +445,7 @@ export function assembleContract(input: AssembleInput): Contract {
         const x = finiteNumber(v);
         if (Number.isFinite(x)) { cells[i] = encodeNumeric(x, min, max, logScale); values[i] = x; }
       }
-      clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, min, max, cells, values });
+      clinTracks.push({ kind: "clinical", numeric: true, bar: true, ...(logScale ? { logScale } : {}), label: attr, ...named, min, max, cells, values });
       continue;
     }
     const counts = new Map<string, number>();
@@ -450,7 +455,7 @@ export function assembleContract(input: AssembleInput): Contract {
     const catIdx = new Map<string, number>(categories.map((c, i) => [c, i]));
     const cells = new Int32Array(allPids.length).fill(-1);
     for (let i = 0; i < val.length; i++) { const v = val[i]; if (v != null) cells[i] = catIdx.get(v)!; }
-    clinTracks.push({ kind: "clinical", label: attr, categories, cells });
+    clinTracks.push({ kind: "clinical", label: attr, ...named, categories, cells });
   }
 
   phase("clinical");
@@ -490,6 +495,7 @@ export function assembleContract(input: AssembleInput): Contract {
         if (v !== undefined) { cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span); values[i] = tx(v); }
       });
       heatTracks.push({ kind: "heatmap", numeric: true, ...(ramp ? { ramp } : {}), label, gene, profileType: h.profileType,
+        ...(h.profileKind ? { profileKind: h.profileKind } : h.isVaf ? { profileKind: "MUTATION_EXTENDED VAF" } : {}),
         note: usingRef
           ? "z-scored against " + ref!.n.toLocaleString() + " patients pooled from " + ref!.studies.length +
             " stud" + (ref!.studies.length === 1 ? "y" : "ies") + " (" + ref!.studies.join(", ") + ") — " +

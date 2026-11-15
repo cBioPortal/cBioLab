@@ -31,7 +31,7 @@ import { forData } from "./driver-settings.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { clusterHeatmap } from "./oncoprint-cluster.ts";
 
-import { PROFILED_TYPES, SPECTRUM_TRACK, type ProfiledType } from "./profile-names.ts";
+import { PROFILED_TYPES, SPECTRUM_TRACK, SPECTRUM_NAME, type ProfiledType } from "./profile-names.ts";
 import { inGeneticAlterationDerived } from "./profile-catalog.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
@@ -254,17 +254,39 @@ export function clinicalSql(attrs: string[], study: string = STUDY, db: string =
     ") WHERE v IS NOT NULL";
 }
 
-// per-study molecular-profile inventory (validation for heatmap tracks)
+/** the study's molecular profiles: profile type (its stable id less the study), alteration type, datatype */
+export function profileInventorySql(study: string = STUDY, db: string = DB): string {
+  return "SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.genetic_alteration_type AS type, gp.datatype AS datatype\n" +
+    "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study);
+}
+
+/** each attribute's display name in the study (attr, name): what the Tabular download names a row */
+export function clinicalNamesSql(attrs: string[], study: string = STUDY, db: string = DB): string | null {
+  attrs = attrs.filter((a) => a !== SPECTRUM_TRACK);
+  if (!attrs.length) return null;
+  return "SELECT cam.attr_id AS a, any(cam.display_name) AS n FROM " + clinicalMetaTable(db) + " cam\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ") AND cam.display_name != ''\n" +
+    "GROUP BY a";
+}
+
+// per-study molecular-profile inventory (validation for heatmap tracks), and each profile's
+// alteration type and datatype ("MRNA_EXPRESSION Z-SCORE"), which names its rows in the Tabular download
 const _profCache = new Map<string, Set<string>>();
+const _kindCache = new Map<string, Map<string, string>>();
 async function studyProfileTypes(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Set<string>> {
   const key = conn.id + "." + db + "." + study;
   if (_profCache.has(key) && !studiesChangeWhileRunning()) return _profCache.get(key)!;
-  const r = await chQuery("SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') AS pt, gp.genetic_alteration_type AS type\n" +
-    "FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study), conn);
+  const r = await chQuery(profileInventorySql(study, db), conn);
   const set = new Set((r.data as ChRow[]).filter((x) => inGeneticAlterationDerived(String(x.type))).map((x) => String(x.pt)));
   _profCache.set(key, set);
+  _kindCache.set(key, new Map((r.data as ChRow[]).map((x) => [String(x.pt), String(x.type) + " " + String(x.datatype)])));
   return set;
+}
+async function studyProfileKinds(study: string, db: string = DB, conn: ChConn = PRIMARY): Promise<Map<string, string>> {
+  await studyProfileTypes(study, db, conn);
+  return _kindCache.get(conn.id + "." + db + "." + study) ?? new Map();
 }
 
 // per-study generic-assay profiles, by profile type: their datatype and whether a value is a patient's
@@ -449,11 +471,15 @@ export interface StudyInputs {
   facts: unknown[][];
   /** pid, attribute, value */
   clinical: unknown[][];
+  /** attribute, display name (absent from an older peer) */
+  clinicalNames?: unknown[][];
   /**
    * per heatmap spec: the study's generic assay of that profile type, if it has one; whether it has
    * the profile as a gene profile (or, for VAF, allele counts); and the values a track would draw
    */
-  heatmap: { assay: AssayProfile | null; available: boolean; values: unknown[][] }[];
+  heatmap: { assay: AssayProfile | null; available: boolean; values: unknown[][];
+    /** a gene profile's alteration type and datatype, "MRNA_EXPRESSION Z-SCORE" (absent from an older peer) */
+    kind?: string }[];
   /** per overlay spec: whether the study has the profile, and its values */
   overlays: { available: boolean; values: unknown[][] }[];
   /** the study's molecular profile types and numeric generic-assay profiles: what a missing profile is named against */
@@ -513,13 +539,15 @@ export function studyOncoprintInputs(study: string, conn: ChConn, req: StudyInpu
       }
     } else groups.push((await rows("oncoprint:columns", cohortColumnsSql(null, study, db, unit, pin))).map((x) => x[0] as string));
     const samples = unit === "patient" && groupRows.length ? columnSamplesIn(study, colSamples, groupRows) : null;
-    const [events, coverage, facts, clinicalRows] = await Promise.all([
+    const [events, coverage, facts, clinicalRows, clinicalNames] = await Promise.all([
       rows("oncoprint:alterations", genomicEventsSql(genes, study, db, unit, samples)),
       rows("oncoprint:coverage", coverageSql(genes, study, db, unit, samples)),
       rows("oncoprint:profiledTypes", columnFactsSql(study, db, unit, samples)),
-      clinical.length ? rows("oncoprint:clinicalTracks", clinicalSql(clinical, study, db, unit, samples)) : Promise.resolve([])
+      clinical.length ? rows("oncoprint:clinicalTracks", clinicalSql(clinical, study, db, unit, samples)) : Promise.resolve([]),
+      ((q) => q ? rows("oncoprint:clinicalNames", q) : Promise.resolve([]))(clinicalNamesSql(clinical, study, db))
     ]);
     const types = await studyProfileTypes(study, db, conn);
+    const kinds = await studyProfileKinds(study, db, conn);
     const assayProfiles = await studyAssayProfiles(study, db, conn);
     // each heatmap's values as the contract would take them from this study: an assay's when the
     // spec names entities and the assay is numeric, a gene profile's (or VAF) otherwise
@@ -534,7 +562,8 @@ export function studyOncoprintInputs(study: string, conn: ChConn, req: StudyInpu
         continue;
       }
       const available = isVaf ? await vafAvailable(study, db, conn) : types.has(h.profileType);
-      heat.push({ assay: null, available, values: available && !h.assay
+      const kind = isVaf ? undefined : kinds.get(h.profileType);
+      heat.push({ assay: null, available, ...(kind ? { kind } : {}), values: available && !h.assay
         ? await rows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, study, db, unit, samples) : heatmapSql(h.profileType, h.genes, study, db, unit, samples))
         : [] });
     }
@@ -543,7 +572,7 @@ export function studyOncoprintInputs(study: string, conn: ChConn, req: StudyInpu
       const available = types.has(ov.profileType);
       over.push({ available, values: available ? await rows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, study, db, unit, samples)) : [] });
     }
-    return { genes, groups, events, coverage, facts, clinical: clinicalRows, heatmap: heat, overlays: over,
+    return { genes, groups, events, coverage, facts, clinical: clinicalRows, clinicalNames, heatmap: heat, overlays: over,
       profileTypes: [...types], assays: [...assayProfiles].filter(([, a]) => !isCategoricalAssay(a.datatype)).map(([pt]) => pt), queries };
   });
 }
@@ -566,12 +595,14 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
     return { assay: a ? { datatype: String(a.datatype), patientLevel: a.patientLevel === true,
       ...(typeof a.pivot === "number" && Number.isFinite(a.pivot) ? { pivot: a.pivot } : {}),
       ...(a.sortOrder === "ASC" || a.sortOrder === "DESC" ? { sortOrder: a.sortOrder as "ASC" | "DESC" } : {}) } : null,
-      available: h?.available === true, values: table(h?.values, 3, "heatmap values") };
+      available: h?.available === true, values: table(h?.values, 3, "heatmap values"),
+      ...(typeof h?.kind === "string" && /^[A-Z_]{1,40} [A-Z0-9_-]{1,40}$/.test(h.kind) ? { kind: h.kind } : {}) };
   });
   const overlays = (Array.isArray(r.overlays) ? r.overlays : bad("overlays")).map((o: Record<string, unknown>) =>
     ({ available: o?.available === true, values: table(o?.values, 3, "overlay values") }));
   return { genes: strings(r.genes, "genes"), groups, events: table(r.events, [6, 9], "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
-    facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"), heatmap, overlays,
+    facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"),
+    ...(r.clinicalNames === undefined ? {} : { clinicalNames: table(r.clinicalNames, 2, "clinical display names") }), heatmap, overlays,
     profileTypes: strings(r.profileTypes, "profile types"), assays: strings(r.assays, "assay profiles") };
 }
 
@@ -794,7 +825,12 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
       const pref = multi ? s + "_" : "";
       for (const x of r.rows) { const m = byAttr.get(x[1] as string); if (m) m.set(pref + (x[0] as string), x[2] as string); }
     }
-    for (const attr of clinical) clinicalIn.push({ attr, values: byAttr.get(attr)! });
+    // each attribute's display name, as the first study that declares one names it
+    const named = await Promise.all(studies.map(async (s) => peers.has(s) ? (await peerShare(s)).clinicalNames ?? []
+      : await ((q) => q ? lqRows("oncoprint:clinicalNames", q, s).then((r) => r.rows) : [])(clinicalNamesSql(clinical, s, dbOf(s)))));
+    const nameOf = new Map<string, string>([[SPECTRUM_TRACK, SPECTRUM_NAME]]);
+    for (const rs of named) for (const x of rs) if (!nameOf.has(x[0] as string) && x[1]) nameOf.set(x[0] as string, String(x[1]));
+    for (const attr of clinical) clinicalIn.push({ attr, values: byAttr.get(attr)!, ...(nameOf.has(attr) ? { name: nameOf.get(attr)! } : {}) });
   }
 
   // ---- heatmap values per profile (validated against each study's inventory) ----
@@ -823,7 +859,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
         for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
       // the profile's pivot and sort order, as the first study holding it declares them
       const meta = assays.find((a) => a);
-      heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values,
+      heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values, profileKind: "GENERIC_ASSAY " + meta!.datatype,
         ...(meta?.pivot != null ? { pivot: meta.pivot } : {}), ...(meta?.sortOrder ? { sortOrder: meta.sortOrder } : {}) });
       continue;
     }
@@ -844,7 +880,10 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
         : await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit, samplesOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit, samplesOf(s)), s) })));
     for (const { s, r } of hFetched)
       for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
-    heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf, values });
+    const kinds = await Promise.all(okStudies.map(async (s) => peers.has(s) ? (await peerShare(s)).heatmap[hi].kind
+      : isVaf ? undefined : (await studyProfileKinds(s, dbOf(s), connOf(s))).get(h.profileType)));
+    const profileKind = kinds.find((k) => k);
+    heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf, values, ...(profileKind ? { profileKind } : {}) });
   }
 
   // ---- clustering: an order computed here, once, from the molecular values ----
