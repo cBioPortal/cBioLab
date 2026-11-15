@@ -36,6 +36,11 @@
  * line alters, the CTE the counts, the lists, the matrix and the case table all read — with the view's
  * driver settings, over every sample of the study.
  *
+ * The Mutations section (U*, PR 9) runs lib/oql.ts oqlMutationFilterSql — the condition on a gene's
+ * mutation_derived rows that the Mutations tab's lollipop and table keep — ANDed into a SELECT of that
+ * gene's rows of the study, and compares the rows kept (sample and protein change) with the rows written
+ * down from data_mutations.txt.
+ *
  * Run: node --env-file=.env.local scripts/check-results-oql.ts (connection b must be the fixture:
  * `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
@@ -43,7 +48,9 @@ import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql } from "../lib/views/cancertypes/sql.ts";
 import { lineCtes, type StudyOpts } from "../lib/views/datafiles/sql.ts";
-import { pairCountsSql, geneCountsSql } from "../lib/federation.ts";
+import { pairCountsSql, geneCountsSql, lollipopChangesSql } from "../lib/federation.ts";
+import { oqlMutationFilterSql } from "../lib/oql.ts";
+import { mutationStudySql, sq } from "../lib/compiler.ts";
 import type { DriverSettings } from "../lib/driver-settings.ts";
 
 const STUDY = "cbiolab_peer_fixture";
@@ -499,6 +506,116 @@ async function dlAltered(tag: string, line: string, extra: Partial<StudyOpts> & 
     const got = await dlAltered(tag, LINE, extra);
     if (got) ok("Download " + tag + " [" + LINE + "]: " + (want.join(", ") || "none"), JSON.stringify(got) === JSON.stringify(want), "ours " + (got.join(", ") || "none"));
   }
+}
+
+// ==== Mutations: oqlMutationFilterSql (U*, PR 9 of the OQL series) ===============================
+// Legacy: cbioportal-frontend cd8c6df src/pages/resultsView/ResultsViewPageStore.ts 3644-3680 — with useOql and mutation
+// OQL in the query, the tab's mutations of a gene are those some line of that gene wants (src/shared/lib/oql/oqlfilter.ts
+// isDatumWantedByOQL 498-518, isDatumWantedByOQLLine 520-578, isDatumWantedByOQLMUTCommand 870-948 — the change
+// compared lower-case, TRUNC every class but missense and in-frame, RANGE overlapping, or contained with `*`, and never
+// matching a mutation without a position; standalone DRIVER isDatumWantedByAnyTypeWithModifiersCommand 629-667).
+// Rows from data_mutations.txt (and mutation_derived's positions, read from the protein change):
+//   KRAS (24, all missense): G12C P01-T1, P01-T2, P06, P10, P11, P16; G12D P02-T1, P02-T2, P07, P12, P17;
+//     G12V P03-T1, P03-T2, P08, P13, P18; G13D P04-T1, P04-T2, P09, P14, P19; Q61H P05, P15, P20.
+//   TP53 R175H: P03, P09, P15, P21, P30.
+//   STK11: Q37* (nonsense, 37) P10, P12, P16, P18, P27, P31, P37, P39; SP8 (missense, 8-9) P27; F354L (missense) P29;
+//     X200_splice twice on P29 (Splice_Region and Splice_Site, both the splice class, 200).
+//   EGFR: SP3 (3-4) and SP4 (4-5) P21, SP7 (7-8) P27, SP11 (11-12) P25, SP12 (12-13, germline) P28; E746_A750del (in-frame,
+//     746-750) P22, P24, P26, P28; T790M P22; S768I (germline) and V769M and C797S and G719A (719) and A289V P44;
+//     L858R on 12 samples; SP10fs, P44's Splice_Region row and P44's EGFR-SEPT14 (type Fusion) have no position (-1).
+//   PIK3CA: E545K (OncoKB Oncogenic, not a hotspot here) P02-T1, P10, P16, P18; H1047R (missense) and E110del (in-frame),
+//     both Cancer Hotspots and not in peer-oncokb.tsv, on P29. STK11 Q37* is OncoKB Likely Oncogenic; SP8 is not listed.
+type MutFilterOpts = { study: string; db: string; oncokbPin?: string | null; drivers?: DriverSettings; hotspotPins?: { hg19: string | null; hg38: string | null } };
+let mutFilterSql: ((lines: string[], gene: string, o: MutFilterOpts) => string | null) | null = null, mutFilterMissing = "";
+try { mutFilterSql = (await import("../lib/oql.ts" as string)).oqlMutationFilterSql as never; if (typeof mutFilterSql !== "function") throw new Error("no export oqlMutationFilterSql"); }
+catch (e) { mutFilterSql = null; mutFilterMissing = (e as Error).message.slice(0, 200); }
+/** "sample change" of each of the gene's rows the filter keeps, sorted; null when it gives no filter; undefined when it failed (reported) */
+async function keptBy(tag: string, lines: string[], gene: string, extra: Partial<MutFilterOpts> = {}): Promise<string[] | null | undefined> {
+  if (!mutFilterSql) { ok("Mutations " + tag + " runs", false, "oqlMutationFilterSql: " + mutFilterMissing); return undefined; }
+  try {
+    const cond = mutFilterSql(lines, gene, { study: STUDY, db: conn!.db, ...extra });
+    if (cond === null) return null;
+    const sql = "SELECT sampleId, proteinChange FROM " + conn!.db + ".mutation_derived\n" +
+      "WHERE " + mutationStudySql(STUDY) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n  AND (" + cond + ")";
+    return (await chQuery<Row>(sql, conn!)).data.map((r) => String(r.sampleId) + " " + String(r.proteinChange)).sort();
+  } catch (e) {
+    ok("Mutations " + tag + " runs", false, (e as Error).message.slice(0, 300));
+    return undefined;
+  }
+}
+/** the rows kept against the rows written down (a filter that keeps them, never null) */
+async function expectKept(tag: string, lines: string[], gene: string, want: string[], extra: Partial<MutFilterOpts> = {}) {
+  const got = await keptBy(tag, lines, gene, extra);
+  if (got === undefined) return;
+  const w = [...want].sort();
+  ok("Mutations " + tag + " [" + lines.join("; ") + "] " + gene + ": " + (w.length ? w.length + " rows" : "no row"),
+    got !== null && JSON.stringify(got) === JSON.stringify(w), got === null ? "ours: null (no filter, every mutation)" : "ours " + (got.join(", ") || "none"));
+}
+async function expectNoFilter(tag: string, lines: string[], gene: string) {
+  const got = await keptBy(tag, lines, gene);
+  if (got === undefined) return;
+  ok("Mutations " + tag + " [" + lines.join("; ") + "] " + gene + ": no filter (null)", got === null, "ours " + (got ? got.length + " rows" : ""));
+}
+const rowsOfChange = (change: string, samples: string[]) => samples.map((s) => "FX-" + s + " " + change);
+{
+  const G12D = rowsOfChange("G12D", ["P02-T1", "P02-T2", "P07-T1", "P12-T1", "P17-T1"]);
+  const G13D = rowsOfChange("G13D", ["P04-T1", "P04-T2", "P09-T1", "P14-T1", "P19-T1"]);
+  const R175H = rowsOfChange("R175H", ["P03-T1", "P09-T1", "P15-T1", "P21-T1", "P30-T1"]);
+  const Q37 = rowsOfChange("Q37*", ["P10-T1", "P12-T1", "P16-T1", "P18-T1", "P27-T1", "P31-T1", "P37-T1", "P39-T1"]);
+  const E545K = rowsOfChange("E545K", ["P02-T1", "P10-T1", "P16-T1", "P18-T1"]);
+  const P29HOT = ["FX-P29-T1 E110del", "FX-P29-T1 H1047R"];
+  const OFF: DriverSettings = { oncokb: false, hotspots: false, custom: false, tiers: [] };
+
+  // U1: a change; compared lower-case (OF 917-925)
+  await expectKept("U1", ["KRAS: MUT=G12D"], "KRAS", G12D);
+  await expectKept("U1 (lower-case change)", ["KRAS: MUT=g12d"], "KRAS", G12D);
+  // U2: AMP wants no mutation; the line's MUT=G12D does
+  await expectKept("U2", ["KRAS: AMP MUT=G12D"], "KRAS", G12D);
+  // U3: a class, truncating, a range, drivers by the settings
+  await expectKept("U3 class", ["STK11: MISSENSE"], "STK11", ["FX-P27-T1 SP8", "FX-P29-T1 F354L"]);
+  await expectKept("U3 class", ["STK11: NONSENSE"], "STK11", Q37);
+  await expectKept("U3 TRUNC (every class but missense and in-frame)", ["STK11: TRUNC"], "STK11", [...Q37, "FX-P29-T1 X200_splice", "FX-P29-T1 X200_splice"]);
+  await expectKept("U3 class (all KRAS calls are missense)", ["KRAS: MISSENSE"], "KRAS",
+    [...rowsOfChange("G12C", ["P01-T1", "P01-T2", "P06-T1", "P10-T1", "P11-T1", "P16-T1"]), ...G12D,
+      ...rowsOfChange("G12V", ["P03-T1", "P03-T2", "P08-T1", "P13-T1", "P18-T1"]), ...G13D, ...rowsOfChange("Q61H", ["P05-T1", "P15-T1", "P20-T1"])]);
+  await expectKept("U3 range, overlapping", ["EGFR: MUT_(748-800)"], "EGFR",
+    [...rowsOfChange("E746_A750del", ["P22-T1", "P24-T1", "P26-T1", "P28-T1"]), "FX-P22-T1 T790M", "FX-P44-T1 S768I", "FX-P44-T1 V769M", "FX-P44-T1 C797S"]);
+  await expectKept("U3 range, contained (*)", ["EGFR: MUT_(748-800*)"], "EGFR", ["FX-P22-T1 T790M", "FX-P44-T1 S768I", "FX-P44-T1 V769M", "FX-P44-T1 C797S"]);
+  await expectKept("U3 open range (no position, -1, never matches)", ["EGFR: MUT_(-10)"], "EGFR", ["FX-P21-T1 SP3", "FX-P21-T1 SP4", "FX-P27-T1 SP7"]);
+  await expectKept("U3 range", ["KRAS: MUT_(10-12)"], "KRAS",
+    [...rowsOfChange("G12C", ["P01-T1", "P01-T2", "P06-T1", "P10-T1", "P11-T1", "P16-T1"]), ...G12D, ...rowsOfChange("G12V", ["P03-T1", "P03-T2", "P08-T1", "P13-T1", "P18-T1"])]);
+  await expectKept("U3 MUT_DRIVER, no settings: OncoKB at the pin", ["PIK3CA: MUT_DRIVER"], "PIK3CA", E545K, { oncokbPin: ONCOKB });
+  await expectKept("U3 MUT_DRIVER, OncoKB or a hotspot", ["PIK3CA: MUT_DRIVER"], "PIK3CA", [...E545K, ...P29HOT], { oncokbPin: ONCOKB, drivers: {}, hotspotPins: HOTSPOT_PINS });
+  await expectKept("U3 MUT_DRIVER, OncoKB off", ["PIK3CA: MUT_DRIVER"], "PIK3CA", P29HOT, { oncokbPin: ONCOKB, drivers: { oncokb: false }, hotspotPins: HOTSPOT_PINS });
+  await expectKept("U3 MUT_DRIVER, hotspots off", ["PIK3CA: MUT_DRIVER"], "PIK3CA", E545K, { oncokbPin: ONCOKB, drivers: { hotspots: false }, hotspotPins: HOTSPOT_PINS });
+  await expectKept("U3 MUT_DRIVER, every source off", ["PIK3CA: MUT_DRIVER"], "PIK3CA", [], { oncokbPin: ONCOKB, drivers: OFF, hotspotPins: HOTSPOT_PINS });
+  await expectKept("U3 MUT_DRIVER (P27's SP8 is no driver)", ["STK11: MUT_DRIVER"], "STK11", Q37, { oncokbPin: ONCOKB, drivers: { hotspots: false } });
+  await expectKept("U3 class and DRIVER (E110del is in-frame)", ["PIK3CA: MISSENSE_DRIVER"], "PIK3CA", [...E545K, "FX-P29-T1 H1047R"], { oncokbPin: ONCOKB, drivers: {}, hotspotPins: HOTSPOT_PINS });
+  await expectKept("U3/U9 standalone DRIVER", ["PIK3CA: DRIVER"], "PIK3CA", [...E545K, ...P29HOT], { oncokbPin: ONCOKB, drivers: {}, hotspotPins: HOTSPOT_PINS });
+  // U4: KRAS's line is MUT (or bare): every KRAS mutation, so no filter; TP53's line filters TP53
+  await expectNoFilter("U4", ["KRAS: MUT", "TP53: MUT=R175H"], "KRAS");
+  await expectNoFilter("U4 (bare)", ["KRAS", "TP53: MUT=R175H"], "KRAS");
+  await expectKept("U4", ["KRAS: MUT", "TP53: MUT=R175H"], "TP53", R175H);
+  // U5: the gene's only line wants no mutation, or the gene has no line: a filter that keeps nothing
+  await expectKept("U5", ["KRAS: AMP", "TP53: MUT=R175H"], "KRAS", []);
+  await expectKept("U5 (FUSION)", ["KRAS: FUSION", "TP53: MUT=R175H"], "KRAS", []);
+  await expectKept("U5 (no line of the gene)", ["TP53: MUT=R175H"], "KRAS", []);
+  // U8: any line of the gene
+  await expectKept("U8", ["KRAS: MUT=G12D", "KRAS: MUT=G13D"], "KRAS", [...G12D, ...G13D]);
+  await expectKept("U8 (a line wanting none beside one wanting G12D)", ["KRAS: MUT=G12D", "KRAS: AMP"], "KRAS", G12D);
+}
+
+// U1/U10: the lollipop draws the filtered mutations — KRAS: MUT=G12D's stems are G12D only (5 samples, 4
+// patients: FX-P02 has it in two samples), where unfiltered KRAS has G12C (P01 P06 P10 P11 P16), G12D, G12V (P03 P08 P13 P18),
+// G13D (P04 P09 P14 P19) and Q61H (P05 P15 P20), in patients
+{
+  const cohort = compileCohortDef(null, { study: STUDY, db: conn!.db });
+  const filter = oqlMutationFilterSql(["KRAS: MUT=G12D"], "KRAS", { study: STUDY, db: conn!.db })!;
+  const stems = async (filters?: Record<string, string>) => (await chQuery<{ change: string; n: string }>(
+    lollipopChangesSql(cohort, ["KRAS"], STUDY, 1, null, conn!.db, null, filters) as unknown as string, conn!)).data.map((r) => r.change + ":" + r.n).sort().join(" ");
+  const on = await stems({ KRAS: filter }), off = await stems();
+  ok("Mutations U1/U10 the lollipop's stems under KRAS: MUT=G12D", on === "G12D:4", "ours " + JSON.stringify(on));
+  ok("Mutations U6 the lollipop without a filter keeps every KRAS change", off === "G12C:5 G12D:4 G12V:4 G13D:4 Q61H:3", "ours " + JSON.stringify(off));
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);

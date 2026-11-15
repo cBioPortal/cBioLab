@@ -1,9 +1,18 @@
 // The hotspots view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type {  } from "../../types.ts";
 
+import type { DriverSettings } from "../../driver-settings.ts";
 export interface HotspotsView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number;
+  /**
+   * The query's OQL, one line per entry (the Results page's): when it narrows mutations, the tab
+   * holds only the mutations a line of their gene wants, as the portal's Mutations tab; `useOql:
+   * false` shows every one (the portal's "Do not filter by OQL")
+   */
+  oql?: string[]; useOql?: boolean;
+  /** how a line's DRIVER reads: the page's driver settings */
+  drivers?: DriverSettings;
   /**
    * The cells of the Driver/VUS × alteration class grid left out of the plot ("missense.vus",
    * "truncating.driver", …): the grid beside it selects them. Applied where the figure is drawn,

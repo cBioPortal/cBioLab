@@ -10,6 +10,8 @@ import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
+import { oqlMutationFilterSql } from "./oql.ts";
+import type { LollipopOql } from "./federation.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
 
@@ -101,7 +103,8 @@ const SIGNAL_TEXT = "if(signalFreq IS NULL, NULL, if(signalFreq = 0, '0', " +
 export interface TablePart { cohort: string; study: string; cohortSql: string }
 
 /** A part's rows, every column the table has, labelled with its cohort, study and document order. */
-function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins): { ctes: string; rows: string } {
+function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql): { ctes: string; rows: string } {
+  const filter = oql ? oqlMutationFilterSql(oql.lines, gene, { study: p.study, db, oncokbPin: pin, ...(oql.drivers !== undefined ? { drivers: oql.drivers, hotspotPins: pins } : {}) }) : null;
   const pre = sq(p.study + "_");
   const attr = (name: string, as: string) =>
     as + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, any(attribute_value) AS v FROM " + clinicalTable(db, [name]) + "\n" +
@@ -114,7 +117,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos\n" +
     "  FROM " + db + ".mutation_derived\n" +
     "  WHERE " + mutationStudySql(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
-    "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + "\n" +
+    "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n" +
     "),\n" +
     attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n" +
@@ -171,8 +174,8 @@ function tumorTypeCtes(p: TablePart, i: number, db: string): string {
     "    k.tumorType AS tumorType FROM m" + i + " AS m LEFT JOIN k" + i + " AS k ON k.sid = m.sid),\n";
 }
 
-function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins): string {
-  const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins));
+function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql): string {
+  const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins, oql));
   return "WITH " +
     (pin
       ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
@@ -196,10 +199,10 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
  * and SIGNAL at the pin of the study's reference genome (`pins`), when it has one. With no sort,
  * drivers come first, then by codon. All parts must live in the database this runs in.
  */
-export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins): RowSource {
+export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql): RowSource {
   if (!parts.length) throw new Error("mutationRowSource needs at least one part");
   return {
-    with: allRows(parts, db, gene, pin, pins),
+    with: allRows(parts, db, gene, pin, pins, oql),
     columns: MUTATION_COLUMNS.map((c) => queryColumn(c, pin)),
     select: "*",
     defaultOrder: "drv DESC, pos ASC NULLS LAST",
