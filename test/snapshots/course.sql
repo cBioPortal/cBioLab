@@ -6,7 +6,7 @@
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
 -- cohort TP53 wt
 -- msk_chord_2024
@@ -116,7 +116,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))),
 anch AS (
   SELECT p.stable_id AS pid, min(ce.start_date) AS day
   FROM snapshot_db.clinical_event ce
@@ -185,7 +185,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation'))))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion'))))))
 SELECT ce.event_type AS et,
        uniqExact(p.stable_id) AS pts,
        count() AS events,

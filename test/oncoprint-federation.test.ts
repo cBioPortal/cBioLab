@@ -35,7 +35,7 @@ const withFetch = async (answer: (op: string, body: Record<string, unknown>) => 
 const SHARE: StudyInputs = {
   genes: ["TP53", "KRAS"],
   groups: [["P1", "P2", "P3"]],
-  events: [["P1", "TP53", "mutation", "Missense_Mutation", "R175H", ""], ["P2", "KRAS", "cna", "", "", "2"]],
+  events: [["P1", "TP53", "mutation", "Missense_Mutation", "R175H", "", "", "", 0, null, null], ["P2", "KRAS", "cna", "", "", "2", "", "", 0, null, null]],
   coverage: [["P1", 3], ["P2", 3], ["P3", 1]],
   facts: [["P1", 1, 7], ["P2", 2, 7], ["P3", 1, 1]],
   clinical: [], heatmap: [], overlays: [], profileTypes: ["mutations"], assays: [],

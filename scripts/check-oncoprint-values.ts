@@ -28,12 +28,19 @@
  * And the Tabular download's names: each clinical row's display name (clinicalNamesSql: the
  * meta header's first line; none for an unknown attribute or the computed mutation spectrum), and
  * each profile's alteration type and datatype (profileInventorySql: its meta file's).
+ * And a gene row's OQL (lib/oql-match.ts over genomicEventsSql's rows): a row with a position range
+ * reads its gene's mutations with their own protein positions, the same rows as without, and its
+ * range picks the patients written down from the fixture's MAF; the cohort's OQL SQL (oqlCasesSql)
+ * picks the same patients; a protein change matches whatever its case; a mutation typed Fusion is
+ * no mutation to MUT (FX-P44's EGFR-SEPT14).
  *
  * Run: node --env-file=.env.local scripts/check-oncoprint-values.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines; scripts/gate.sh sets them).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
-import { assayHeatmapSql, clinicalNamesSql, clinicalSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
+import { assayHeatmapSql, clinicalNamesSql, clinicalSql, genomicEventsSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
+import { oqlCasesSql, oqlEventsSql, parseOql } from "../lib/oql.ts";
+import { eventWanted } from "../lib/oql-match.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { clinicalTrackRows, trackAttrs, trackFreqText } from "../app/_oncoprint/track-edits.ts";
 
@@ -194,6 +201,47 @@ const KINDS: [string, string][] = [["mutations", "MUTATION_EXTENDED MAF"], ["cna
 const kinds = new Map((await chQuery<{ pt: string; type: string; datatype: string }>(profileInventorySql(STUDY, conn.db), conn)).data.map((r) => [r.pt, r.type + " " + r.datatype]));
 for (const [pt, want] of KINDS) ok(`profile kind ${pt}`, kinds.get(pt) === want, "ours " + kinds.get(pt) + ", expected " + want);
 
-const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
+// ---- a gene row's OQL ----------------------------------------------------------------------------
+type Ev = { pid: string; gene: string; vt: string; mt: string; mv: string; cna: string; ps: number | null; pe: number | null };
+const evRows = async (genes: string[], unit: "patient" | "sample", ranged: string[]): Promise<Ev[]> =>
+  (await chQuery<Record<string, unknown>>(genomicEventsSql(genes, STUDY, conn.db, unit, null, ranged), conn)).data.map((r) =>
+    ({ pid: String(r.pid), gene: String(r.gene), vt: String(r.vt), mt: String(r.mt ?? ""), mv: String(r.mv ?? ""), cna: String(r.cna ?? ""),
+      ps: r.ps == null ? null : Number(r.ps), pe: r.pe == null ? null : Number(r.pe) }));
+let oqlChecks = 0;
+const oqlOk = (name: string, pass: boolean, detail: string) => { oqlChecks++; ok(name, pass, detail); };
+for (const unit of ["patient", "sample"] as const) {
+  const plain = await evRows(["KRAS", "EGFR"], unit, []), ranged = await evRows(["KRAS", "EGFR"], unit, ["EGFR"]);
+  const key = (e: Ev) => [e.pid, e.gene, e.vt, e.mt, e.mv, e.cna].join("|");
+  oqlOk(`ranged events, ${unit} columns: the same rows`, JSON.stringify(plain.map(key).sort()) === JSON.stringify(ranged.map(key).sort()), plain.length + " and " + ranged.length + " rows");
+  const egfr = ranged.filter((e) => e.gene === "EGFR" && e.vt === "mutation");
+  oqlOk(`ranged events, ${unit} columns: every EGFR mutation has its positions`, egfr.length > 0 && egfr.every((e) => e.ps != null && e.pe != null), egfr.length + " rows");
+}
+const egfrEvents = await evRows(["EGFR"], "patient", ["EGFR"]);
+const drawn = (line: string) => [...new Set(egfrEvents.filter((e) => eventWanted(parseOql(line)[0].specs, e, false)).map((e) => e.pid))].sort().join(" ");
+const casesOf = async (line: string) => (await chQuery<{ pid: string }>(oqlCasesSql(line, { study: STUDY, db: conn.db, unit: "patient" }), conn)).data.map((r) => r.pid).sort().join(" ");
+/** [line, the patients its row draws, from the MAF: E746_A750del 746-750 (P22 P24 P26 P28), SP3 3-4 and SP4 4-5 (P21), SP7 7-8 (P27), SP11 11-12 (P25), SP12 12-13 (P28), SP10fs no position (P24)] */
+const RANGES: [string, string][] = [
+  ["EGFR: MUT_(747-747)", "FX-P22 FX-P24 FX-P26 FX-P28"],
+  ["EGFR: MUT_(745-751*)", "FX-P22 FX-P24 FX-P26 FX-P28"],
+  ["EGFR: MUT_(747-751*)", ""],
+  ["EGFR: MUT_(1-12)", "FX-P21 FX-P25 FX-P27 FX-P28"],
+  ["EGFR: MUT_(1-12*)", "FX-P21 FX-P25 FX-P27"],
+];
+for (const [line, want] of RANGES) {
+  oqlOk(`oncoprint row ${line}`, drawn(line) === want, "ours " + JSON.stringify(drawn(line)) + ", expected " + JSON.stringify(want));
+  const cases = await casesOf(line);
+  oqlOk(`cohort ${line} picks the row's patients`, cases === want, "ours " + JSON.stringify(cases) + ", expected " + JSON.stringify(want));
+}
+const g12c = "FX-P01 FX-P06 FX-P10 FX-P11 FX-P16";
+for (const line of ["KRAS: MUT=G12C", "KRAS: MUT=g12c", "KRAS: g12c"])
+  oqlOk(`cohort ${line}`, await casesOf(line) === g12c, "ours " + JSON.stringify(await casesOf(line)));
+const p44 = egfrEvents.filter((e) => e.pid === "FX-P44" && e.vt === "mutation");
+const wantedP44 = p44.filter((e) => eventWanted(parseOql("EGFR: MUT")[0].specs, e, false)).map((e) => e.mv);
+oqlOk("oncoprint row EGFR: MUT leaves out the Fusion-typed mutation", p44.length === 9 && wantedP44.length === 8 && !wantedP44.includes("EGFR-SEPT14"), JSON.stringify(wantedP44));
+const evLabels = async (line: string) => (await chQuery<{ ev: string }>(oqlEventsSql(line, { study: STUDY, db: conn.db }), conn)).data.map((r) => r.ev);
+oqlOk("cohort events EGFR: MUT leave out the Fusion-typed mutation; a bare EGFR keeps it",
+  !(await evLabels("EGFR: MUT")).includes("EGFR-SEPT14") && (await evLabels("EGFR")).includes("EGFR-SEPT14"), "");
+
+const total = oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

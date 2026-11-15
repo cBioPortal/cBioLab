@@ -3,7 +3,8 @@
 // patients; Comparison/Survival alone compares those the gene query alters with the profiled rest. Pure: the page builds it, and so
 // can a script that checks the views run.
 import type { Clause, CohortDef, View } from "../../lib/types.ts";
-import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
+import { parseOql, OQL_PROFILE, type OqlSpec } from "../../lib/oql-parse.ts";
+import { oqlSublabel } from "../../lib/oql-match.ts";
 import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
 import { arrange, type PageLayout } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
@@ -210,6 +211,35 @@ const cnSegmentsTab = (genes: string[], queried: string[]) => ({
     apply: (vs: View[], g: string) => [{ ...vs[0], gene: g === WHOLE_GENOME ? undefined : g, region: undefined } as View, ...vs.slice(1)] },
 });
 
+/**
+ * The Oncoprint tab's rows: each gene with its line of the query, as the portal's oncoprint draws
+ * it (OncoprintUtils makeGeneticTrackWith), a gene without OQL bare. Two lines of one gene are one
+ * row wanting what either wants, and a line's EXP / PROT terms are left out: the oncoprint draws
+ * neither yet (`oncoprintAside` says so).
+ */
+export function oncoprintRows(entries: string[]): string[] {
+  const specsOf = new Map<string, OqlSpec[]>();
+  for (const x of entries)
+    for (const { gene, specs } of parseOql(x))
+      specsOf.set(gene, [...(specsOf.get(gene) || []), ...specs.filter((sp) => sp.type !== "EXP" && sp.type !== "PROT")]);
+  return [...specsOf].map(([gene, specs]) => {
+    const any = specs.find((sp) => sp.type === "ANY" && !sp.driver);
+    return any || !specs.length ? gene : gene + oqlSublabel(specs);
+  });
+}
+
+/** what the Oncoprint tab leaves out of the query's lines, in words, or null */
+export function oncoprintAside(entries: string[]): string | null {
+  const parsed = entries.flatMap((x) => { try { return parseOql(x); } catch { return []; } });
+  const exp = [...new Set(parsed.filter((e) => e.specs.some((sp) => sp.type === "EXP" || sp.type === "PROT")).map((e) => e.gene))];
+  const genes = parsed.map((e) => e.gene);
+  const twice = [...new Set(genes.filter((g, i) => genes.indexOf(g) !== i))];
+  return [
+    exp.length ? "the oncoprint does not draw " + exp.join(", ") + "'s EXP / PROT terms" : null,
+    twice.length ? "the oncoprint draws " + twice.join(", ") + "'s lines as one row" : null,
+  ].filter(Boolean).join("; ") || null;
+}
+
 /** The Results page as the portal has it, for this query. */
 export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   const { genes } = q;
@@ -240,7 +270,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     partly.length ? "Unaltered is not checked for " + partly.map((t) => TYPE_WORD[t]).join(" or ") + " profiling, which only some of the selected studies hold" : null,
   ].filter(Boolean) as string[];
   return arrange({ study: q.studies[0], cohorts }, [
-    { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes, cohorts: queried })] },
+    { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), cohorts: queried })] },
     { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, cohorts: queried })] },
     ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: queried })] }] : []),
     ...(plotY ? [{ title: "Plots", views: [v("Plot", { kind: "plot",

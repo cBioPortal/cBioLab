@@ -64,9 +64,9 @@ test("bad bracket text is refused with the reason", () => {
   assert.throws(() => parseGeneList('["unclosed TP53]'), /closing quote/);
 });
 
-test("per-track OQL is refused rather than silently drawn as the whole gene", () => {
-  assert.throws(() => parseGeneList("TP53: MUT"), /per-track OQL/);
-  assert.throws(() => parseGeneList("[TP53:MUT MDM2:AMP]"), /per-track OQL/);
+test("a row may carry its OQL line; OQL inside a merged row is refused", () => {
+  assert.deepEqual(parseGeneList("TP53: MUT"), ["TP53: MUT"]);
+  assert.throws(() => parseGeneList("[TP53:MUT MDM2:AMP]"), /inside a merged row/);
 });
 
 test("normalizing is idempotent through the canonical form", () => {

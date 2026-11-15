@@ -22,26 +22,8 @@ import type { OqlRange, OqlSpec } from "./oql-parse.ts";
 import { parseOql } from "./oql-parse.ts";
 import { finiteSql } from "./sql-number.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
+import { PORTAL_TYPE_CLASS } from "./oql-match.ts";
 
-/**
- * A mutation's class as cBioPortal's OQL sees it — cbioportal-frontend's getMutationSubType and
- * getSimplifiedMutationType (src/shared/lib/oql/AccessorsForOqlFilter.ts), case for case: a
- * protein change of "Promoter" is a promoter mutation whatever its type, a listed type maps to
- * its class, and anything unlisted (5'Flank, Silent, Targeted_Region, ...) is "other". The
- * portal's Fusion has no class; "none" stands for it.
- */
-const PORTAL_TYPE_CLASS: [string, string[]][] = [
-  ["missense", ["missense_mutation", "missense", "missense_variant"]],
-  ["frameshift", ["frame_shift_ins", "frame_shift_del", "frameshift", "frameshift_deletion", "frameshift_insertion",
-    "de_novo_start_outofframe", "frameshift_variant"]],
-  ["nonsense", ["nonsense_mutation", "nonsense", "stopgain_snv"]],
-  ["splice", ["splice_site", "splice", "splice site", "splicing", "splice_site_snp", "splice_site_del", "splice_site_indel",
-    "splice_region"]],
-  ["nonstart", ["translation_start_site", "start_codon_snp", "start_codon_del"]],
-  ["nonstop", ["nonstop_mutation"]],
-  ["inframe", ["in_frame_del", "in_frame_ins", "in_frame_deletion", "in_frame_insertion", "indel", "nonframeshift_deletion",
-    "nonframeshift", "nonframeshift insertion", "nonframeshift_insertion"]],
-];
 const mutClassSql = (type: string, change: string): string =>
   "multiIf(lower(" + type + ") = 'fusion', 'none', lower(" + change + ") = 'promoter', 'promoter', " +
   PORTAL_TYPE_CLASS.map(([cls, types]) => "lower(" + type + ") IN (" + types.map(sq).join(", ") + "), " + sq(cls)).join(", ") +
@@ -56,10 +38,12 @@ function specCond(spec: OqlSpec): string {
   const conds: string[] = [CALLED];
   if (spec.type === "MUT") {
     conds.push("g.variant_type = 'mutation'");
+    // a mutation typed Fusion has no class in the portal, so no mutation command addresses it
+    conds.push("lower(g.mutation_type) != 'fusion'");
     // The portal's TRUNC is every class but missense and in-frame (oqlfilter.ts), not a list of types.
     if (spec.cls === "trunc") conds.push(mutClassSql("g.mutation_type", "g.mutation_variant") + " NOT IN ('missense', 'inframe')");
     else if (spec.cls) conds.push(mutClassSql("g.mutation_type", "g.mutation_variant") + " = " + sq(spec.cls));
-    if (spec.pchange) conds.push("g.mutation_variant = " + sq(spec.pchange));
+    if (spec.pchange) conds.push("lower(g.mutation_variant) = " + sq(spec.pchange.toLowerCase()));
     if (spec.range) conds.push(rangeCond(spec.range));
   } else if (spec.type === "CNA") {
     conds.push("g.variant_type = 'cna'");

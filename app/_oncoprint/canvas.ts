@@ -10,14 +10,15 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, trackSublabelText, fitSublabel, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
 export const BITS = STYLE.bits;
 export const PALETTE = {
   paper: STYLE.palette.paper, unaltered: STYLE.palette.unaltered, np: STYLE.glyph.notProfiled.fill, npStripe: STYLE.glyph.notProfiled.stripe.color,
-  derived: STYLE.palette.derived, text: STYLE.palette.text, muted: STYLE.palette.muted, groupLine: STYLE.palette.groupLine
+  derived: STYLE.palette.derived, text: STYLE.palette.text, muted: STYLE.palette.muted, groupLine: STYLE.palette.groupLine,
+  sublabel: STYLE.palette.sublabel
 };
 export type Palette = typeof PALETTE;
 
@@ -183,12 +184,14 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
 /** The palette a contract draws with: defaults, or its own `display.style` override. */
 export function paletteOf(S: Style): Palette {
   return { paper: S.palette.paper, unaltered: S.palette.unaltered, np: S.glyph.notProfiled.fill, npStripe: S.glyph.notProfiled.stripe.color,
-    derived: S.palette.derived, text: S.palette.text, muted: S.palette.muted, groupLine: S.palette.groupLine };
+    derived: S.palette.derived, text: S.palette.text, muted: S.palette.muted, groupLine: S.palette.groupLine, sublabel: S.palette.sublabel };
 }
 
 export interface DrawResult { ms: number; cellsDrawn: number; bucketsDrawn: number }
 
-export interface DrawOpts { gap?: Gap; pctLabels?: boolean; style?: Style; colors?: Record<string, Record<string, string>> }
+export interface DrawOpts { gap?: Gap; pctLabels?: boolean; style?: Style; colors?: Record<string, Record<string, string>>;
+  /** draw each row's OQL line after its label; the contract's own display when absent */
+  showOql?: boolean }
 
 export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[],
   view: View, cssW: number, P: Palette = PALETTE, opts: DrawOpts = {}): DrawResult {
@@ -269,7 +272,12 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   data.tracks.forEach((t, ti) => {
     const y = header + ti * (rowH + rowGap);
     ctx.fillStyle = P.text; ctx.textAlign = "left";
-    ctx.fillText(trackLabelText(t, S), 4, y + 14);
+    const label = trackLabelText(t, S);
+    ctx.fillText(label, 4, y + 14);
+    const subX = 4 + ctx.measureText(label).width;
+    const pctW = t.freqPct !== undefined ? ctx.measureText(formatGutterPct(t, data.n)).width + 6 : 0;
+    const sub = fitSublabel(trackSublabelText(t, opts.showOql === undefined ? data.display : { showOql: opts.showOql }), gutter - 8 - pctW - subX, (s) => ctx.measureText(s).width);
+    if (sub) { ctx.fillStyle = P.sublabel; ctx.fillText(sub, subX, y + 14); }
     if (t.freqPct !== undefined) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
       ctx.fillText(formatGutterPct(t, data.n), gutter - 8, y + 14);

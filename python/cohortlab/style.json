@@ -27,6 +27,7 @@
     "text": "#1f2933",
     "muted": "#5b6b76",
     "groupLine": "#c9d2d8",
+    "sublabel": "#a6a6a6",
     "categorical": [
       "#0072B2",
       "#E69F00",

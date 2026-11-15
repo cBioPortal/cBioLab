@@ -1611,9 +1611,17 @@ where any member is altered and profiled where any member was profiled, so its p
 the **union** of the members' panels. Without a label the row is named by its members
 (\`TP53 / MDM2 / MDM4\`). Groups do not nest, a gene may appear both in a group and on its own, and
 the caps are 12 rows and 32 distinct genes (coverage is one bit per gene in a 32-bit mask). Merged
-rows are an oncoprint idea: every other view flattens a group to its members. Per-track OQL inside a
-group (\`[TP53: MUT MDM2: AMP]\`) is **refused**, not approximated — a track here draws every
-alteration type its genes have.
+rows are an oncoprint idea: every other view flattens a group to its members. OQL inside a group
+(\`[TP53: MUT MDM2: AMP]\`) is **refused**, not approximated — a merged row draws every alteration
+type its genes have.
+
+**Oncoprint rows with OQL**: a single gene's entry may carry cBioPortal's OQL line — \`"KRAS: AMP
+MUT=G12D"\` — and its row then draws only the alterations the line wants, as the portal's Results
+oncoprint does: an alteration is drawn when any of the line's commands wants it, and \`DRIVER\`
+follows the view's driver settings. The row keeps the gene as its label and its percentage's
+denominator (the patients profiled for the gene), and shows the line after the label in grey
+(\`display.showOql: false\` hides it). \`EXP\` / \`PROT\` in a row are refused for now, and so are
+two rows of one gene.
 
 **Oncoprint clinical tracks**: any attribute name; patient-level rows win, sample-level attributes
 fall back to one sample value per patient. Numeric attributes (≥90% parseable, >10 distinct) render

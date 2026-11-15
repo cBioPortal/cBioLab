@@ -3,16 +3,20 @@
 // A gene list entry is either a symbol, drawn as its own row, or a GROUP of symbols drawn as
 // one merged row — cBioPortal's `[TP53 MDM2 MDM4]`. A merged row is altered where any member
 // is altered, and profiled where any member was profiled, so its denominator is the union of
-// the members' panels. Groups do not nest.
+// the members' panels. Groups do not nest. A symbol's row may carry the portal's OQL line,
+// "KRAS: AMP MUT=G12D": it is still the gene's row, drawing only the alterations the line wants.
 //
 // Everything that needs the flat set of symbols (SQL, the coverage bitmask, every non-oncoprint
 // view) goes through `geneSymbols` / `normalizeGeneTracks` rather than reading the list itself,
 // so the order the mask bits are assigned in has exactly one definition.
 
-/** a gene list entry: a symbol, or a merged group of them */
+import { parseOql, type OqlSpec } from "./oql-parse.ts";
+import { hasOql, oqlSublabel } from "./oql-match.ts";
+
+/** a gene list entry: a symbol (with its OQL line, "KRAS: AMP"), or a merged group of symbols */
 export type GeneTrackSpec = string | { label?: string; genes: string[] };
-/** one drawn row */
-export interface GeneTrack { label: string; members: string[] }
+/** one drawn row; `oql`, a single gene's line, the alterations it draws */
+export interface GeneTrack { label: string; members: string[]; oql?: OqlSpec[] }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 
@@ -25,6 +29,22 @@ export const MAX_GENE_TRACKS = 12;
 export const MAX_GENE_SYMBOLS = 32;
 
 const clean = (g: unknown): string => String(g ?? "").toUpperCase().trim();
+/** the symbol of an entry, less any OQL line */
+const symbolOf = (g: unknown): string => clean(String(g ?? "").split(":")[0]);
+
+/** a symbol's row from its entry: its OQL line parsed, refused where this figure cannot draw it */
+function geneRow(raw: string): GeneTrack | null {
+  if (!raw.includes(":")) {
+    const g = clean(raw);
+    return GENE_RE.test(g) ? { label: g, members: [g] } : null;
+  }
+  const entries = parseOql(raw);
+  if (entries.length !== 1) throw new Error("gene list: '" + raw.slice(0, 40) + "' is more than one row; give each its own entry");
+  const { gene, specs } = entries[0];
+  const exp = specs.find((x) => x.type === "EXP" || x.type === "PROT");
+  if (exp) throw new Error("gene list: a row's " + exp.type + " ('" + raw.slice(0, 40) + "') is not drawn on the oncoprint yet");
+  return hasOql(specs) ? { label: gene, members: [gene], oql: specs } : { label: gene, members: [gene] };
+}
 
 /**
  * The drawn rows and the flat symbol list, from an authored gene list.
@@ -43,10 +63,10 @@ export function normalizeGeneTracks(list: unknown): { tracks: GeneTrack[]; symbo
 
   for (const raw of entries) {
     if (typeof raw === "string" || typeof raw === "number") {
-      const g = clean(raw);
-      if (!GENE_RE.test(g)) continue;
-      tracks.push({ label: g, members: [g] });
-      take(g);
+      const t = geneRow(String(raw));
+      if (!t) continue;
+      tracks.push(t);
+      take(t.members[0]);
       continue;
     }
     if (!raw || typeof raw !== "object" || !Array.isArray((raw as { genes?: unknown }).genes))
@@ -54,6 +74,7 @@ export function normalizeGeneTracks(list: unknown): { tracks: GeneTrack[]; symbo
     const g = raw as { label?: unknown; genes: unknown[] };
     if (g.genes.some((m) => m && typeof m === "object"))
       throw new Error("gene list: merged tracks do not nest — flatten " + JSON.stringify(g.genes).slice(0, 60));
+    for (const m of g.genes) rejectMergedOql(String(m ?? ""));
     const members = g.genes.map(clean).filter((m) => GENE_RE.test(m)).filter((m, i, a) => a.indexOf(m) === i);
     if (!members.length) throw new Error("gene list: merged track " + JSON.stringify(g.label ?? g.genes).slice(0, 60) + " has no valid gene symbols");
     const label = clean(g.label) ? String(g.label).trim() : members.join(" / ");
@@ -74,11 +95,14 @@ export function normalizeGeneTracks(list: unknown): { tracks: GeneTrack[]; symbo
 }
 
 /** just the symbols, flattened and deduplicated — for SQL and for views that do not merge */
-export function geneSymbols(list: unknown): string[] {
+export function geneSymbols(list: unknown, opts: { oql?: boolean } = {}): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const raw of Array.isArray(list) ? list : []) {
-    const members = typeof raw === "string" || typeof raw === "number" ? [clean(raw)]
+    // a row's OQL line is the oncoprint's: any other view would draw the whole gene under it
+    if (!opts.oql && typeof raw === "string" && raw.includes(":") && raw.split(":")[1].trim())
+      throw new Error("genes: '" + raw.slice(0, 40) + "' carries OQL, which only the oncoprint draws; this view draws every alteration of its genes — give the gene alone");
+    const members = typeof raw === "string" || typeof raw === "number" ? [symbolOf(raw)]
       : raw && typeof raw === "object" && Array.isArray((raw as { genes?: unknown[] }).genes)
         ? (raw as { genes: unknown[] }).genes.map(clean) : [];
     for (const g of members) if (GENE_RE.test(g) && !seen.has(g)) { seen.add(g); out.push(g); }
@@ -108,6 +132,22 @@ export function parseGeneList(text: string): GeneTrackSpec[] {
     while (i < src.length && !isSep(src[i]) && src[i] !== "[" && src[i] !== "]") i++;
     return src.slice(start, i);
   };
+  // a symbol followed by ":" carries its OQL line, to the next ";" or newline ("TP53:" is bare)
+  const withLine = (w: string): string => {
+    let gene = w, rest = "";
+    if (w.includes(":")) { gene = w.slice(0, w.indexOf(":")); rest = w.slice(w.indexOf(":") + 1); }
+    else {
+      let j = i;
+      while (j < src.length && (src[j] === " " || src[j] === "\t")) j++;
+      if (src[j] !== ":") return w;
+      i = j + 1;
+    }
+    const end = src.slice(i).search(/[;\n]/);
+    const stop = end < 0 ? src.length : i + end;
+    rest = (rest + src.slice(i, stop)).trim();
+    i = stop;
+    return rest ? gene + ": " + rest : gene;
+  };
   while (i < src.length) {
     const c = src[i];
     if (isSep(c)) { i++; continue; }
@@ -134,42 +174,42 @@ export function parseGeneList(text: string): GeneTrackSpec[] {
       }
       if (!closed) throw new Error("gene list: a '[' with no closing ']'");
       if (!genes.length) throw new Error("gene list: an empty merged track '[]'");
-      for (const g of genes) rejectPerGeneOql(g);
+      for (const g of genes) rejectMergedOql(g);
       out.push(label ? { label, genes } : { genes });
       continue;
     }
     const w = word();
     if (!w) { i++; continue; }
-    rejectPerGeneOql(w);
-    out.push(w);
+    out.push(withLine(w));
   }
   return out;
 }
 
-/**
- * The portal lets a track carry its own OQL (`TP53: MUT`). This oncoprint draws every alteration
- * type a gene has, so accepting the syntax would quietly mean something weaker than it says.
- */
-function rejectPerGeneOql(w: string): void {
+/** The portal lets a merged row's genes carry OQL (`[KRAS: AMP NRAS]`); a merged row here draws every alteration of its genes. */
+function rejectMergedOql(w: string): void {
   if (w.includes(":"))
-    throw new Error("gene list: per-track OQL ('" + w.slice(0, 24) + "') is not supported — an oncoprint track here draws " +
-      "every alteration type for its gene. Use a cohort with an OQL clause to restrict the columns instead.");
+    throw new Error("gene list: OQL inside a merged row ('" + w.slice(0, 24) + "') is not supported — a merged row draws " +
+      "every alteration of its genes. Give the gene its own row, 'KRAS: AMP'.");
 }
 
 /** the inverse of parseGeneList, for an editor that shows the list as text */
 export function formatGeneList(list: unknown): string {
-  return (Array.isArray(list) ? list : []).map((e) => {
-    if (typeof e === "string" || typeof e === "number") return clean(e);
+  const parts = (Array.isArray(list) ? list : []).map((e) => {
+    if (typeof e === "string" || typeof e === "number") {
+      const [g, ...line] = String(e).split(":");
+      return line.length ? clean(g) + ": " + line.join(":").trim() + ";" : clean(e);
+    }
     const g = e as { label?: unknown; genes?: unknown[] };
     const members = (g.genes || []).map(clean);
     const auto = members.join(" / ");
     const label = clean(g.label) && String(g.label).trim() !== auto ? '"' + String(g.label).trim() + '" ' : "";
     return "[" + label + members.join(" ") + "]";
-  }).join(" ");
+  });
+  return parts.join(" ").replace(/;$/, "");
 }
 
 /** the canonical authored form of a normalized list, so re-normalizing is a no-op */
 export function toGeneList(tracks: GeneTrack[]): GeneTrackSpec[] {
-  return tracks.map((t) => t.members.length === 1 && t.label === t.members[0]
-    ? t.members[0] : { label: t.label, genes: t.members });
+  return tracks.map((t) => t.oql ? t.members[0] + oqlSublabel(t.oql)
+    : t.members.length === 1 && t.label === t.members[0] ? t.members[0] : { label: t.label, genes: t.members });
 }

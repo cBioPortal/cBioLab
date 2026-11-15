@@ -47,8 +47,14 @@ describe("gene query: gene list", () => {
     assert.deepEqual(c.genes, ["TP53", "EGFR", "ERBB2"]);
     assert.equal(c.tracks!.length, 2);
   });
-  test("per-gene OQL is refused in a gene list, saying why", () => {
-    assert.match(checkGeneQuery("TP53: MUT", "genes").error!, /per-track OQL/);
+  test("a row's OQL line is read, and said in words", () => {
+    const c = checkGeneQuery("TP53: MUT; KRAS", "genes");
+    assert.equal(c.error, undefined);
+    assert.deepEqual(c.entries.map((e) => e.meaning), ["its own row, drawing mutations", "its own row"]);
+    assert.deepEqual(c.genes, ["TP53", "KRAS"]);
+  });
+  test("OQL inside a merged row is refused, saying why", () => {
+    assert.match(checkGeneQuery("[TP53:MUT MDM2]", "genes").error!, /inside a merged row/);
   });
 });
 

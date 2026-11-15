@@ -2,8 +2,9 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { heatColor, barBand, cellLayers, clinicalLegend, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { heatColor, barBand, cellLayers, clinicalLegend, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackSublabelText, fitSublabel, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
+import { textWidth } from "./chart/text.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const r2 = (x: number): number => Math.round(x * 100) / 100;
@@ -86,6 +87,10 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   contract.tracks.forEach((t, ti: number) => {
     const y = HEADER_H + ti * (ROW_H + ROW_GAP);
     parts.push(`<text x="4" y="${y + 14}" fill="${P.text}"><title>${esc(trackTooltipLines(t, contract.columns.length, contract.unit).join("\n"))}</title>${esc(trackLabelText(t, S))}</text>`);
+    const subX = 4 + textWidth(trackLabelText(t, S), 11);
+    const pctW = t.freqPct !== undefined ? textWidth(formatGutterPct(t, contract.columns.length), 11) + 6 : 0;
+    const sub = fitSublabel(trackSublabelText(t, contract.display), GUTTER - 8 - pctW - subX, (s) => textWidth(s, 11));
+    if (sub) parts.push(`<text x="${Math.round(subX * 10) / 10}" y="${y + 14}" fill="${P.sublabel}">${esc(sub)}</text>`);
     if (t.freqPct !== undefined) parts.push(`<text x="${GUTTER - 8}" y="${y + 14}" fill="${P.muted}" text-anchor="end">${esc(formatGutterPct(t, contract.columns.length))}</text>`);
     contract.groups.forEach((g, gi: number) => {
       const x0 = groupX[gi], pxW = g.count * colW;
