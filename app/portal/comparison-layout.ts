@@ -4,7 +4,6 @@ import type { AnalysisDoc, View } from "../../lib/types.ts";
 import { arrange, type PageLayout } from "./page-doc.ts";
 import { mrnaComparisonProfile, proteinProfile, methylationProfile, probeMethylation, assayComparisonProfiles, type StudyKnown } from "./study-known.ts";
 
-const CLINICAL_SHOWN = 8;
 /** the most groups an expression tab compares (the diffexpr view's limit) */
 const EXPRESSION_MAX_GROUPS = 10;
 
@@ -37,7 +36,8 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
   return arrange({ study, cohorts: linked.cohorts }, [
     { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
     { title: "Survival", views: [v("Survival", { kind: "survival" })] },
-    ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: clinical.slice(0, CLINICAL_SHOWN) })] }] : []),
+    // every attribute, as the portal's tab tests them
+    ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true })] }] : []),
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),
       v("Structural variants", { kind: "enrichment", alteration: "sv", measure })] },
     ...(mutationsOk ? [{ title: "Mutations", views: [v("Mutations", { kind: "mutcompare" })] }] : []),

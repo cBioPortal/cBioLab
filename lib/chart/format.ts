@@ -67,6 +67,12 @@ export function portalP(p: number): string {
 }
 
 /**
+ * A p- or q-value as cBioPortal's Comparison tables write it, toConditionalPrecisionWithMinimum(x, 3,
+ * 0.01, -10) (FormatUtils.tsx:102): "< 10^-10" for 0 or anything below 1e-10, else as portalP.
+ */
+export const portalPMin = (p: number): string => p === 0 || (p > 0 && Math.log10(p) < -10) ? "< 10^-10" : portalP(p);
+
+/**
  * A value at two significant digits, as cBioPortal's FormatUtils.formatNumberValueInSignificantDigits(x, 2)
  * writes it for the mutation table's SIGNAL and gnomAD frequencies: no exponent, no separators,
  * 0 as "0" (0.0000583 → "0.000058", 0.125 → "0.13", 1234 → "1200").

@@ -221,3 +221,95 @@ test("a numeric attribute with no mean and no spread", () => {
   const [t] = kindText(clinicalKind, { clinical: [{ attribute: "AGE", per: "patient", kind: "num", cells: [{ cohort: "A", mean: null, sd: null, n: 0 }] }] });
   assert.ok(t.includes("AGE [patient, num]: A mean — (n=0)"), t);
 });
+
+describe("clinical: the portal's rule for what can be tested (CMP-STM-6, CMP-STM-7, CMP-CL-2)", () => {
+  // ClinicalDataEnrichmentUtil: a categorical test needs ≥2 values over all groups and ≥2 groups holding any;
+  // a numeric one ≥2 groups with values and ≥2 distinct values. The rest are listed as not tested, outside q.
+  const one = async (a: AttrStats, b: AttrStats) => rowsOf(await run([a.attribute], ctx({ A: ["s1"], B: ["s1"] }, { s1: { A: [a], B: [b] } }).c))[0];
+  test("a categorical attribute with one value in every group", async () => {
+    const r = await one(cat("SAMPLE_TYPE", { Primary: 10 }, "sample"), cat("SAMPLE_TYPE", { Primary: 8 }, "sample"));
+    assert.equal(r.skipped, "one value in every group (Primary)");
+    assert.equal(r.p, undefined); assert.equal(r.q, undefined);
+    assert.deepEqual(r.cells.map((c) => c.n), [10, 8], "its counts are still shown");
+  });
+  test("a categorical attribute only one group holds", async () => {
+    const r = await one(cat("SUBTYPE", { x: 3, y: 2 }), cat("SUBTYPE", {}));
+    assert.equal(r.skipped, "only one group has a value");
+  });
+  test("a numeric attribute with one value everywhere (DAYS_TO_INITIAL_PATHOLOGIC_DIAGNOSIS, all 0)", async () => {
+    const r = await one(num("DAYS", [0, 0, 0]), num("DAYS", [0, 0]));
+    assert.equal(r.skipped, "one value in every group (0)");
+    assert.equal(r.p, undefined);
+  });
+  test("a numeric attribute only one group holds", async () => {
+    const r = await one(num("W", [1, 2]), { attribute: "W", per: "patient", kind: "num", n: 0 });
+    assert.equal(r.skipped, "only one group has a value");
+  });
+  test("two values or two groups are enough", async () => {
+    assert.ok((await one(cat("S", { a: 1 }), cat("S", { b: 1 }))).p != null);
+    assert.ok((await one(num("N", [1, 1]), num("N", [2]))).p != null);
+  });
+  test("an untested attribute takes no part in the q-values", async () => {
+    // AGE p ≈ 0.0213 and CT p = 0.1573 as above; with SAMPLE_TYPE constant, BH is over 2, so q(AGE) = 2p, not 3p
+    const { c } = ctx({ A: ["s1"], B: ["s1"] }, { s1: {
+      A: [cat("CT", { Lung: 3, Breast: 1 }), num("AGE", [1, 2, 3]), cat("SAMPLE_TYPE", { Primary: 4 })],
+      B: [cat("CT", { Lung: 1, Breast: 3 }), num("AGE", [4, 5, 6]), cat("SAMPLE_TYPE", { Primary: 4 })],
+    } });
+    const v = await run(["CT", "AGE", "SAMPLE_TYPE"], c);
+    const rows = rowsOf(v);
+    assert.deepEqual(rows.map((r) => r.attribute), ["AGE", "CT", "SAMPLE_TYPE"]);
+    near(rows[0].q, 2 * rows[0].p!, 1e-9);
+    assert.match(v.note!, /across the 2 tested attributes/);
+    assert.match(v.note!, /1 attribute is listed as not tested/);
+  });
+});
+
+describe("clinical: every attribute the study declares (allAttributes, CMP-CL-2)", () => {
+  /** a site that lists `declared` (id → display name) and describes every attribute as two-valued categorical */
+  function listing(declared: Record<string, string>, opts: { remote?: string } = {}) {
+    const { c, asked } = ctx({ A: ["s1", ...(opts.remote ? [opts.remote] : [])], B: ["s1"] }, { s1: {}, ...(opts.remote ? { [opts.remote]: {} } : {}) });
+    const batches: string[][] = [];
+    const statsOf = (name: string, attrs: string[]) => attrs.map((a) => cat(a, name === "A" ? { x: 3, y: 1 } : { x: 1, y: 3 }));
+    for (const [st, r] of Object.entries(c.resolvers as Record<string, any>)) {
+      r.attributeStats = async (def: { name: string }, attrs: string[]) => { batches.push(attrs); return st === "s1" ? statsOf(def.name, attrs) : []; };
+      if (st !== opts.remote) {
+        r.viewAggregate = async () => [];
+        r.viewMeta = async (label: string, build: (s: string, d: string) => string) => {
+          assert.equal(label, "clinicalAttributes");
+          assert.match(build(st, "db"), /FROM db\.clinical_attribute_meta cam[\s\S]*cancer_study_identifier = 's1'/);
+          return Object.entries(declared).map(([a, label]) => ({ a, label }));
+        };
+      }
+    }
+    return { c, asked, batches };
+  }
+  const runAll = async (c: ViewRun) => { const r = await runClinical({ kind: "clinical", allAttributes: true } as never, c); return r instanceof Untimed ? r.result : r; };
+  test("leaves out the survival endpoints' pairs, AGE_LAST_FU_YEARS and BIRTH_YEAR, as the portal; keeps a lone _STATUS", async () => {
+    const { c } = listing({ SEX: "Sex", OS_MONTHS: "Overall Survival (Months)", OS_STATUS: "Overall Survival Status", PFS_STATUS: "Progression Status",
+      BIRTH_YEAR: "Birth year", AGE_LAST_FU_YEARS: "Age at last follow-up", WEIGHT: "Patient Weight" });
+    const v = await runAll(c);
+    const rows = rowsOf(v);
+    assert.deepEqual(rows.map((r) => r.attribute).sort(), ["PFS_STATUS", "SEX", "WEIGHT"]);
+    assert.deepEqual(rows.map((r) => r.label).sort(), ["Patient Weight", "Progression Status", "Sex"]);
+    assert.match(v.note!, /Every clinical attribute the study declares is compared \(3\), but each survival endpoint's _MONTHS \/ _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR, as on cBioPortal\./);
+  });
+  test("45 attributes are asked for in batches of at most 20, and all tested", async () => {
+    const { c, batches } = listing(Object.fromEntries(Array.from({ length: 45 }, (_, i) => ["ATTR_" + String(i).padStart(2, "0"), "Attr " + i])));
+    const rows = rowsOf(await runAll(c));
+    assert.equal(rows.length, 45);
+    assert.ok(rows.every((r) => r.p != null && r.q != null));
+    assert.deepEqual(batches.map((b) => b.length).sort((x, y) => x - y), [5, 5, 20, 20, 20, 20], "two cohorts × (20, 20, 5)");
+  });
+  test("past 300 attributes it is refused, the limit named", async () => {
+    const { c } = listing(Object.fromEntries(Array.from({ length: 301 }, (_, i) => ["A" + i, "A" + i])));
+    assert.match((await runAll(c)).error!, /every attribute means 301 here, and a clinical view tests at most 300/);
+  });
+  test("a participant that cannot list its attributes is named", async () => {
+    const { c } = listing({ SEX: "Sex" }, { remote: "peer" });
+    assert.match((await runAll(c)).note!, /; peer could not list its attributes, so only those the others declare are asked of it\./);
+  });
+  test("no attribute declared", async () => {
+    const { c } = listing({ OS_MONTHS: "m", OS_STATUS: "s" });
+    assert.equal((await runAll(c)).error, "the studies declare no clinical attribute to compare");
+  });
+});
