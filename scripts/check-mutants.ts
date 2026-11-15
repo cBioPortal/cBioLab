@@ -190,6 +190,10 @@ const MUTANTS: Mutant[] = [
     find: "    S.exclude(arm.where);\n",
     replace: "\n" },
 
+  { id: "enrichment-threshold-drops-from-q", layer: "statistics", guard: "unit", file: "lib/views/enrichment/run.ts",
+    effect: "The Genomic Alterations tab leaves rarely altered genes out of the test, so Benjamini–Hochberg divides by fewer genes and calls genes significant that the portal does not (PUM1 q 0.0425 for 0.533).",
+    find: "if (!total || cells.some((c) => !c.profiled)) { untested++; continue; }",
+    replace: "if (total < minAltered || cells.some((c) => !c.profiled)) { untested++; continue; }" },
   { id: "denominator-ignores-panel", layer: "counts", guard: "portal-parity", file: "lib/explore.ts",
     effect: "A gene's frequency is divided by samples on the largest panel instead of samples whose panel actually covers that gene, so genes on smaller panels look rarer than they are.",
     find: "const profiled = (panelMap.get(r.g) || 0) + wesN - (surplusOf.get(r.g) || 0);",
