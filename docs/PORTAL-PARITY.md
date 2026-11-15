@@ -47,7 +47,6 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] Plots: a box for n = 1 is drawn as a flat box with a whisker ([04-plots](legacy-spec/parity/04-plots.md))
 - [ ] Plots: Swap on a box plot with its categories on the vertical axis is not drawn; the sidebar says "Swap to make them agree" instead ([04-plots](legacy-spec/parity/04-plots.md))
 - [x] Mutations: a gene with no mutations (Q2 ERG) has no empty state: it is dropped from the result (`lib/views/hotspots/run.ts:28`), and the card shows only the method caption, `note` being always set (`app/_lollipop/HotspotsBody.tsx:87`) ([05-mutations](legacy-spec/parity/05-mutations.md)) (#246)
-  - [ ] The gene's pill greyed (`color:#bbb`) in the tab's gene chooser (MUT-GT-2): the chooser does not know each gene's count
 - [ ] Mutations: the germline test is case-sensitive (`status != 'GERMLINE'`, `lib/federation.ts:566`), so a study's "Germline" calls count as somatic ([05-mutations](legacy-spec/parity/05-mutations.md))
 - [ ] Mutations: the Ensembl link is always GRCh37 (`app/_lollipop/TranscriptSummary.tsx:25`), wrong for a GRCh38 study ([05-mutations](legacy-spec/parity/05-mutations.md))
 - [ ] Mutations: the legend lists "Splice site" under Truncating, while splice stems are drawn orange as Splice (copied from the portal, MUT-LP-5) ([05-mutations](legacy-spec/parity/05-mutations.md))
