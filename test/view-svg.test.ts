@@ -150,6 +150,18 @@ describe("survival: the axis runs to the last follow-up, each curve to its own (
   });
 });
 
+describe("survival: the median with its 95% interval and p as cBioPortal writes them (CMP-KM-9, CMP-STM-2, CMP-STM-10)", () => {
+  test("legend \"median 62.79 (56.25 - NA) mo\", test line \"p = 0.684\"", () => {
+    const svg = viewToSvg({ kind: "survival", cohorts: ["Female", "Male"], curves: [
+      { cohort: "Female", points: [{ t: 0, s: 1 }, { t: 30, s: 0.7 }], median: null, n: 280, events: 56, medianCi: { lo: null, hi: null } },
+      { cohort: "Male", points: [{ t: 0, s: 1 }, { t: 62.79, s: 0.45 }], median: 62.79, n: 310, events: 64, medianCi: { lo: 56.25, hi: null } }],
+      logrank: { chi2: 0.166, p: 0.6838, df: 1, strata: 1, observed: [], expected: [], variance: 0 } } as any, { width: 900 })!;
+    assert.match(svg, /median 62\.79 \(56\.25 - NA\) mo · n = 310/);
+    assert.match(svg, /median not reached · n = 280/);
+    assert.match(svg, /log-rank χ² = 0\.166 \(1 df\) · p = 0\.684/);
+  });
+});
+
 describe("survival: the number at risk under each tick", () => {
   const withRisk = (): DrawnResultOf<"survival"> => ({ kind: "survival", cohorts: ["A", "B"], curves: [
     { cohort: "A", points: [{ t: 0, s: 1 }, { t: 6, s: 0.5 }, { t: 25, s: 0.3 }], median: 6, n: 1200, events: 600, atRisk: Array.from({ length: 30 }, (_, m) => 1200 - m * 40) },

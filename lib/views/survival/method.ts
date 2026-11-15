@@ -55,7 +55,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
       (t.anchor ? ", with delayed entry: re-anchored to " + t.anchor + ", a patient is at risk only from the time the study could first observe them" : "") +
       (t.cohorts.some((c) => c.unobserved) ? ". A patient whose follow-up ends at or before their entry was never at risk and is left out: " +
         t.cohorts.filter((c) => c.unobserved).map((c) => c.name + " " + c.unobserved!.toLocaleString("en-US")).join(", ") : "") +
-      ". The median is the first time the curve is at or below 0.5" +
+      ". The median is the first time the curve is at or below 0.5; its 95% interval runs from the first time the pointwise band's lower edge reaches 0.5 to the first time its upper edge does (Greenwood variance on the log scale, R survfit's default and cBioPortal's), an end never reached shown as NA" +
       (t.display === "incidence" ? ". The figure shows cumulative incidence, 1 − S(t)" : "") + ".",
     params: t.cohorts.map((c) => [c.name, c.n.toLocaleString() + " patients, " + c.events.toLocaleString() + " events, median " +
       (c.median == null ? "not reached" : c.median.toFixed(1) + " months")] as [string, string]),

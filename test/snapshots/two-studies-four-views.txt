@@ -27,8 +27,8 @@ Compare (driver%/any%, panel-aware denominators; annotation OncoKB v7.5 (pinned)
     Fisher's exact test matches scipy 1.18.1 fisher_exact and Benjamini–Hochberg matches statsmodels 0.15.0 multipletests(method="fdr_bh"), to a relative 1e-6 (test/tables-golden.test.ts).
 
 Survival (KM, OS):
-  TP53 mut: median 30.6 mo (n=25498, 12607 events, 57 missing OS)
-  TP53 wt: median 68.4 mo (n=24618, 8609 events, 57 missing OS)
+  TP53 mut: median 30.6 mo (95% CI 29.95 - 31.44) (n=25498, 12607 events, 57 missing OS)
+  TP53 wt: median 68.4 mo (95% CI 65.95 - 71.41) (n=24618, 8609 events, 57 missing OS)
   log-rank p=<1e-300 (stratified by study)
 CAVEAT (tell the user): Left out of the survival analysis (OS_MONTHS / OS_STATUS), as on cBioPortal — a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored: “TP53 mut”: 57 patients with a status but no usable time; “TP53 wt”: 57 patients with a status but no usable time. OS from each study's own baseline (left truncation applies; baselines are NOT harmonized across studies) Status '0:...' treated as censored. 47 patients are in more than one cohort, so in more than one curve; the log-rank test assumes the groups share no one, so its p is approximate. The log-rank test is STRATIFIED by study (2 strata contributed events): each study is compared only against itself, so a difference in case mix between studies cannot masquerade as a difference between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer. Every site contributes only (months, event, n) counts; no patient-level survival time crosses an instance boundary.
   METHOD:
@@ -40,7 +40,7 @@ CAVEAT (tell the user): Left out of the survival analysis (OS_MONTHS / OS_STATUS
         count rows: 4,441
     - Count patients by time and status [TP53 wt · msk_met_2021] (13,033 → 12,976 rows): The survivalCounts:OS query above: patients grouped by identical OS_MONTHS, event, returned as counts — no patient identifier leaves the database. Event: OS_STATUS starting with “1”; any other value is censored. 57 cohort patients had no OS_MONTHS value.
         count rows: 3,444
-    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5.
+    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5; its 95% interval runs from the first time the pointwise band's lower edge reaches 0.5 to the first time its upper edge does (Greenwood variance on the log scale, R survfit's default and cBioPortal's), an end never reached shown as NA.
         TP53 mut: 25,498 patients, 12,607 events, median 30.6 months
         TP53 wt: 24,618 patients, 8,609 events, median 68.4 months
     - Two-group log-rank test, stratified by study: At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df. Each study is its own stratum — compared only against itself — and the strata are summed, so a difference in case mix between studies cannot pass for a difference between cohorts.
