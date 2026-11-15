@@ -26,11 +26,16 @@
  *   L/X8  no stem, not in "N mutated" or the no-protein-position disclosure; the caption says so.
  *   X7  a gene with fusions only is still drawn. X9 the suppression floor by (gene, change). X10
  *      both partners queried: under each.
+ *   F1-F14  the query's OQL on the fusion rows (lib/oql.ts oqlFusionFilterSql; spec-e-oql): a line
+ *      addresses a fusion when its gene is either partner; only FUSION (FUSION_DRIVER: drivers only),
+ *      a standalone DRIVER (drivers only) or a bare line wants it, never MUT / CNA / EXP / PROT; any
+ *      line of the whole query will do (oqlfilter.ts 498-693, ResultsViewPageStore.ts 3686-3712).
  *
  * Run: node --env-file=.env.local scripts/check-mutation-fusions.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
-import { connById } from "../lib/ch.ts";
+import { chQuery, connById } from "../lib/ch.ts";
+import * as oqlLib from "../lib/oql.ts";
 import { PatientLevelResolver, type LollipopReport } from "../lib/federation.ts";
 import { MUTATION_COLUMNS } from "../lib/mutation-table.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
@@ -325,6 +330,169 @@ ok("X7 F1 EML4 alone: drawn, somatic frequency 6 of 59", !!eml4 && eml4.somaticS
   eml4 ? JSON.stringify({ somatic: eml4.somaticSamples, mutated: eml4.mutated, unpositioned: eml4.unpositioned }) : "not listed");
 ok("X8 the caption says fusions count in the badges and frequency but have no stem", /fusion/i.test(hv.note || ""), (hv.note || "").slice(0, 300));
 ok("X8 the no-protein-position disclosure does not count fusions (nothing unpositioned here)", !/no protein position/i.test(hv.note || ""), (hv.note || "").slice(0, 300));
+
+// ---- the query's OQL on the fusion rows (F1-F14) ----------------------------------------------
+//
+// The driver calls are the ones asserted above at pin "fixture": drivers EML4-ALK, FGFR2 intragenic,
+// BRCA2 intragenic (both, the germline one too), TMPRSS2-ERG, TPM3-NTRK1, KIAA1549-BRAF; VUS MET
+// intragenic (site1 empty), ROS1, RB1, SMAD4, NOTCH1 intragenic, KIF5B-RET, TTN-MUC16, MESD-TMPRSS2.
+// TMPRSS2, ERG, ALK, EML4, KIF5B, MET, ROS1, BRCA2, FGFR2 have no mutation rows; BRAF has four
+// (FX-P10 V600E; FX-P29 D594G, G469A, V600E) and KRAS many (data_mutations.txt). V5I is no change of
+// any of these genes: a MUT=V5I line keeps none of its gene's mutations.
+
+const TM_ERG = "FX-P53-T1 TMPRSS2-ERG Fusion", MESD_TM = "FX-P52-T1 MESD-TMPRSS2 Fusion", KIF5B_RET = "FX-P52-T1 KIF5B-RET Fusion";
+const MET_I = "FX-P50-T1 MET intragenic", FGFR2_I = "FX-P46-T1 FGFR2 intragenic", TPM3_NTRK1 = "FX-P53-T1 TPM3-NTRK1 Fusion";
+const BRCA2_I = ["FX-P50-T1 BRCA2 intragenic", "FX-P51-T1 BRCA2 intragenic"];
+const BRAF_MUTS = ["FX-P10-T1 V600E", "FX-P29-T1 D594G", "FX-P29-T1 G469A", "FX-P29-T1 V600E"];
+
+// 1. the condition itself, over the fixture's distinct fusion pairs (site 1, site 2, driver call)
+const PAIRS: [string, string, number][] = [
+  ["EML4", "ALK", 1], ["FGFR2", "FGFR2", 1], ["BRCA2", "", 1], ["", "MET", 0], ["ROS1", "", 0], ["RB1", "", 0], ["SMAD4", "", 0],
+  ["NOTCH1", "", 0], ["KIF5B", "RET", 0], ["TTN", "MUC16", 0], ["MESD", "TMPRSS2", 0], ["TMPRSS2", "ERG", 1], ["TPM3", "NTRK1", 1],
+  ["KIAA1549", "BRAF", 1]
+];
+const pk = (a: string, b: string) => a + "|" + b;
+const fusionFilter = (lines: string[], s1: string, s2: string, drv: string): string | null => {
+  const f = (oqlLib as Record<string, unknown>).oqlFusionFilterSql;
+  if (typeof f !== "function") throw new Error("lib/oql.ts exports no oqlFusionFilterSql");
+  return (f as (l: string[], a: string, b: string, d: string) => string | null)(lines, s1, s2, drv);
+};
+/** [lines, the pairs kept, spec row and why] */
+const DIRECT: [string[], string[], string][] = [
+  [["TMPRSS2: MUT=V5I"], [], "F2 MUT never addresses a fusion"],
+  [["TMPRSS2: MUT=V5I FUSION"], [pk("TMPRSS2", "ERG"), pk("MESD", "TMPRSS2")], "F3 FUSION wants TMPRSS2's fusions, as site 1 or site 2"],
+  [["tmprss2: MUT=V5I FUSION"], [pk("TMPRSS2", "ERG"), pk("MESD", "TMPRSS2")], "F3 the line's gene upper-cased by the parser"],
+  [["TMPRSS2: MUT=V5I", "ERG"], [pk("TMPRSS2", "ERG")], "F4 a bare ERG line wants the fusion ERG is a partner of"],
+  [["TMPRSS2: FUSION_DRIVER MUT=V5I"], [pk("TMPRSS2", "ERG")], "F5 FUSION_DRIVER: the driver TMPRSS2-ERG, not the VUS MESD-TMPRSS2"],
+  [["TMPRSS2: DRIVER"], [pk("TMPRSS2", "ERG")], "F6 standalone DRIVER: drivers only"],
+  [["KRAS: MUT=G12D", "TMPRSS2: MUT"], [], "F7 plain MUT does not address a fusion"],
+  [["KRAS: MUT=G12D", "TMPRSS2: AMP"], [], "F8 AMP does not"],
+  [["KRAS: MUT=G12D"], [], "F9 no line of either partner"],
+  [["TMPRSS2: MUT=V5I", "ERG: FUSION"], [pk("TMPRSS2", "ERG")], "F10 ERG: FUSION wants TMPRSS2-ERG, not MESD-TMPRSS2"],
+  [["ERG: MUT=V5I", "TMPRSS2: FUSION"], [pk("TMPRSS2", "ERG"), pk("MESD", "TMPRSS2")], "F11 any line of the query"],
+  [["ALK: MUT_DRIVER"], [], "F12 MUT_DRIVER is still MUT"],
+  [["ALK: FUSION MUT_DRIVER", "EML4: MUT=V5I", "KRAS: MUT=G12D"], [pk("EML4", "ALK")], "F13 ALK's FUSION keeps EML4-ALK whatever EML4's line says"],
+  [["KRAS: MUT=G12D", "KIF5B", "MET: FUSION", "ROS1: FUSION_DRIVER", "BRCA2: DRIVER", "NTRK1: DRIVER", "RB1: DRIVER"],
+    [pk("KIF5B", "RET"), pk("", "MET"), pk("BRCA2", ""), pk("TPM3", "NTRK1")],
+    "F14 a VUS kept by a bare line (KIF5B-RET) or FUSION (MET, site 1 empty), never by FUSION_DRIVER (ROS1) or DRIVER (RB1); drivers by DRIVER (BRCA2, one-sided; TPM3-NTRK1 by its site 2)"],
+  [[...new Set(PAIRS.flatMap(([a, b]) => [a, b]).filter(Boolean))].map((g) => g + ": DRIVER"),
+    PAIRS.filter((p) => p[2] === 1).map(([a, b]) => pk(a, b)), "F6 F14 DRIVER on every partner: exactly the six driver pairs"]
+];
+const pairsSql = "SELECT * FROM values('s1 String, s2 String, d UInt8', " + PAIRS.map(([a, b, d]) => "('" + a + "', '" + b + "', " + d + ")").join(", ") + ")";
+for (const [lines, want, why] of DIRECT) {
+  const tag = `${why} [${lines.join("; ")}]`;
+  try {
+    const cond = fusionFilter(lines, "s1", "s2", "d = 1");
+    if (cond === null) { ok(`oqlFusionFilterSql over the fixture's pairs: ${tag}`, false, "null: no filter"); continue; }
+    const r = await chQuery<{ s1: string; s2: string }>("SELECT s1, s2 FROM (" + pairsSql + ") WHERE " + cond, conn);
+    const got = r.data.map((x) => pk(x.s1, x.s2));
+    ok(`oqlFusionFilterSql over the fixture's pairs: ${tag}`, sameRows(got, want), "got " + JSON.stringify(got) + ", expected " + JSON.stringify(want));
+  } catch (e) { ok(`oqlFusionFilterSql over the fixture's pairs: ${tag}`, false, "threw: " + String((e as Error).message).slice(0, 200)); }
+}
+
+// 2. the mutations table: which fusion rows a gene's tab lists under the query's lines
+const tableOql = async (gene: string, oql: string[], extra: Record<string, unknown> = {}): Promise<TableRow[] | string> => {
+  try {
+    const res = await runMutations({ kind: "mutations", gene, cohorts: ["c"], rows: 1000, oql, ...extra } as never, ctxFor(PIN, WHOLE)) as { mutations?: { rows: TableRow[] }; error?: string };
+    if (!res.mutations) return "refused: " + String(res.error || JSON.stringify(res).slice(0, 200));
+    return res.mutations.rows;
+  } catch (e) { return "threw: " + String((e as Error).message).slice(0, 200); }
+};
+/** [gene's tab, lines, view options, every row the tab lists (fusions and mutations), spec row and why] */
+const TABLE_OQL: [string, string[], Record<string, unknown>, string[], string][] = [
+  ["TMPRSS2", ["TMPRSS2"], {}, [TM_ERG, MESD_TM], "F1 a bare line: no mutation OQL, nothing filtered"],
+  ["TMPRSS2", ["TMPRSS2: FUSION"], {}, [TM_ERG, MESD_TM], "F1 FUSION alone is no mutation OQL"],
+  ["TMPRSS2", ["TMPRSS2: MUT"], {}, [TM_ERG, MESD_TM], "F1 plain MUT is no mutation OQL"],
+  ["TMPRSS2", ["TMPRSS2: AMP"], {}, [TM_ERG, MESD_TM], "F1 AMP is no mutation OQL"],
+  ["TMPRSS2", ["TMPRSS2: MUT=V5I"], { useOql: false }, [TM_ERG, MESD_TM], "useOql false: nothing filtered"],
+  ["TMPRSS2", ["TMPRSS2: MUT=V5I"], {}, [], "F2 MUT=V5I keeps neither of TMPRSS2's fusions"],
+  ["ERG", ["TMPRSS2: MUT=V5I"], {}, [], "F2 nor TMPRSS2-ERG on its site 2's tab"],
+  ["TMPRSS2", ["TMPRSS2: MUT=V5I FUSION"], {}, [TM_ERG, MESD_TM], "F3 FUSION keeps both"],
+  ["ERG", ["TMPRSS2: MUT=V5I FUSION"], {}, [TM_ERG], "F3 and TMPRSS2-ERG on ERG's tab"],
+  ["TMPRSS2", ["TMPRSS2: MUT=V5I", "ERG"], {}, [TM_ERG], "F4 the bare ERG line keeps TMPRSS2-ERG; MESD-TMPRSS2 is no partner of ERG"],
+  ["ERG", ["TMPRSS2: MUT=V5I", "ERG"], {}, [TM_ERG], "F4 on ERG's tab"],
+  ["TMPRSS2", ["TMPRSS2: FUSION_DRIVER MUT=V5I"], {}, [TM_ERG], "F5 the driver TMPRSS2-ERG kept, the VUS MESD-TMPRSS2 not"],
+  ["KIF5B", ["KIF5B: FUSION_DRIVER MUT=V5I"], {}, [], "F5 F14 the VUS KIF5B-RET not kept by FUSION_DRIVER"],
+  ["ALK", ["EML4: FUSION_DRIVER MUT=V5I"], {}, EML4_ALK, "F5 the six driver EML4-ALK rows, on the other partner's tab"],
+  ["TMPRSS2", ["TMPRSS2: DRIVER"], {}, [TM_ERG], "F6 standalone DRIVER: the driver only"],
+  ["KIF5B", ["KIF5B: DRIVER"], {}, [], "F6 F14 the VUS KIF5B-RET not kept by DRIVER"],
+  ["RET", ["KIF5B: DRIVER"], {}, [], "F6 F14 nor on RET's tab"],
+  ["TMPRSS2", ["KRAS: MUT=G12D", "TMPRSS2: MUT"], {}, [], "F7 plain MUT does not address a fusion"],
+  ["BRAF", ["KRAS: MUT=G12D", "BRAF: MUT"], {}, BRAF_MUTS, "F7 BRAF: MUT keeps its four mutations (no mutation filter) and drops KIAA1549-BRAF"],
+  ["BRAF", ["BRAF: MUT=V600E FUSION"], {}, ["FX-P10-T1 V600E", "FX-P29-T1 V600E", "FX-P53-T1 KIAA1549-BRAF Fusion"],
+    "F3 MUT=V600E keeps the two V600E rows, FUSION the fusion BRAF is site 2 of"],
+  ["TMPRSS2", ["KRAS: MUT=G12D", "TMPRSS2: AMP"], {}, [], "F8 AMP does not address a fusion"],
+  ["TMPRSS2", ["KRAS: MUT=G12D"], {}, [], "F9 TMPRSS2 has no line"],
+  ["ERG", ["KRAS: MUT=G12D"], {}, [], "F9 nor ERG"],
+  ["TMPRSS2", ["TMPRSS2: MUT=V5I", "ERG: FUSION"], {}, [TM_ERG], "F10 ERG: FUSION keeps TMPRSS2-ERG under TMPRSS2, not MESD-TMPRSS2"],
+  ["ERG", ["TMPRSS2: MUT=V5I", "ERG: FUSION"], {}, [TM_ERG], "F10 on ERG's tab"],
+  ["ERG", ["ERG: MUT=V5I", "TMPRSS2: FUSION"], {}, [TM_ERG], "F11 the whole query, not the tab's gene's line"],
+  ["TMPRSS2", ["ERG: MUT=V5I", "TMPRSS2: FUSION"], {}, [TM_ERG, MESD_TM], "F11 on TMPRSS2's tab: both"],
+  ["ALK", ["ALK: MUT_DRIVER"], {}, [], "F12 MUT_DRIVER is MUT: no EML4-ALK row"],
+  ["EML4", ["ALK: MUT_DRIVER"], {}, [], "F12 on EML4's tab"],
+  ["ALK", ["ALK: FUSION MUT_DRIVER", "EML4: MUT=V5I", "KRAS: MUT=G12D"], {}, EML4_ALK, "F13 ALK's FUSION keeps all six"],
+  ["EML4", ["ALK: FUSION MUT_DRIVER", "EML4: MUT=V5I", "KRAS: MUT=G12D"], {}, EML4_ALK, "F13 on EML4's tab, whose own line wants none"],
+  ["KIF5B", ["KIF5B: FUSION", "KRAS: MUT=G12D"], {}, [KIF5B_RET], "F14 a VUS kept by FUSION"],
+  ["KIF5B", ["KIF5B", "KRAS: MUT=G12D"], {}, [KIF5B_RET], "F14 a VUS kept by a bare line"],
+  ["KIF5B", ["KIF5B: FUSION_DRIVER", "KRAS: MUT=G12D"], {}, [], "F14 not by FUSION_DRIVER"],
+  ["MET", ["MET: FUSION", "KRAS: MUT=G12D"], {}, [MET_I], "F14 one-sided (site 1 empty) VUS kept by FUSION"],
+  ["MET", ["MET: DRIVER"], {}, [], "F14 not by DRIVER"],
+  ["ROS1", ["ROS1: DRIVER"], {}, [], "F14 one-sided VUS, not by DRIVER"],
+  ["BRCA2", ["BRCA2: DRIVER"], {}, BRCA2_I, "F6 one-sided drivers kept by DRIVER, the germline one too"],
+  ["FGFR2", ["FGFR2: FUSION_DRIVER", "KRAS: MUT=G12D"], {}, [FGFR2_I], "F5 an intragenic driver kept by FUSION_DRIVER"],
+  ["TPM3", ["TPM3: MUT=V5I", "NTRK1: FUSION_DRIVER"], {}, [TPM3_NTRK1], "F5 F10 FUSION_DRIVER on site 2 keeps the driver on site 1's tab"]
+];
+for (const [gene, lines, extra, want, why] of TABLE_OQL) {
+  const rows = await tableOql(gene, lines, extra);
+  const tag = `table ${gene} [${lines.join("; ")}${extra.useOql === false ? "; useOql false" : ""}]: ${why}`;
+  if (typeof rows === "string") { ok(tag, false, rows); continue; }
+  const got = rows.map(key);
+  ok(tag, sameRows(got, want), "got " + JSON.stringify(got) + ", expected " + JSON.stringify(want));
+}
+
+// 3. the lollipop: the Fusion badge and the somatic frequency follow the kept rows. A gene left with
+// no mutation and no fusion is not drawn (runHotspots): read as no badge and a frequency of 0
+const hotOql = async (genes: string[], oql: string[], extra: Record<string, unknown> = {}) => {
+  try { return await runHotspots({ kind: "hotspots", genes, cohorts: ["c"], oql, ...extra } as never, ctxFor(PIN, WHOLE)) as { hotspots?: HotspotGene[]; error?: string; result?: { error?: string } }; }
+  catch (e) { return { error: "threw: " + String((e as Error).message).slice(0, 200) }; }
+};
+/** [genes, lines, view options, per gene [Fusion driver, VUS, somatic samples, mutation rows], spec row and why] */
+type Want = Record<string, [number, number, number, number]>;
+const LOLLIPOP_OQL: [string[], string[], Record<string, unknown>, Want, string][] = [
+  [["TMPRSS2", "ERG"], ["TMPRSS2: FUSION"], {}, { TMPRSS2: [1, 1, 1, 0], ERG: [1, 0, 0, 0] }, "F1 no mutation OQL: as unfiltered"],
+  [["TMPRSS2", "ERG"], ["TMPRSS2: MUT=V5I"], { useOql: false }, { TMPRSS2: [1, 1, 1, 0], ERG: [1, 0, 0, 0] }, "useOql false: as unfiltered"],
+  [["TMPRSS2", "ERG"], ["TMPRSS2: MUT=V5I"], {}, { TMPRSS2: [0, 0, 0, 0], ERG: [0, 0, 0, 0] }, "F2 no fusion kept: no badge, frequency 0"],
+  [["TMPRSS2", "ERG"], ["TMPRSS2: MUT=V5I FUSION"], {}, { TMPRSS2: [1, 1, 1, 0], ERG: [1, 0, 0, 0] }, "F3 both kept"],
+  [["TMPRSS2", "ERG"], ["TMPRSS2: MUT=V5I", "ERG"], {}, { TMPRSS2: [1, 0, 1, 0], ERG: [1, 0, 0, 0] }, "F4 TMPRSS2-ERG kept, MESD-TMPRSS2 not"],
+  [["TMPRSS2", "KIF5B", "EML4"], ["TMPRSS2: FUSION_DRIVER MUT=V5I", "KIF5B: FUSION_DRIVER MUT=V5I", "EML4: FUSION_DRIVER MUT=V5I"], {},
+    { TMPRSS2: [1, 0, 1, 0], KIF5B: [0, 0, 0, 0], EML4: [6, 0, 6, 0] }, "F5 drivers only; KIF5B's frequency drops to 0 with its VUS"],
+  [["TMPRSS2", "KIF5B", "RET"], ["TMPRSS2: DRIVER", "KIF5B: DRIVER"], {},
+    { TMPRSS2: [1, 0, 1, 0], KIF5B: [0, 0, 0, 0], RET: [0, 0, 0, 0] }, "F6 drivers only, in the badge and the somatic frequency"],
+  [["TMPRSS2", "BRAF", "KIAA1549"], ["KRAS: MUT=G12D", "TMPRSS2: MUT", "BRAF: MUT"], {},
+    { TMPRSS2: [0, 0, 0, 0], BRAF: [0, 0, 2, 4], KIAA1549: [0, 0, 0, 0] }, "F7 MUT keeps BRAF's four mutations (two samples), no fusion"],
+  [["TMPRSS2"], ["KRAS: MUT=G12D", "TMPRSS2: AMP"], {}, { TMPRSS2: [0, 0, 0, 0] }, "F8"],
+  [["EML4", "ALK", "TMPRSS2"], ["KRAS: MUT=G12D"], {}, { EML4: [0, 0, 0, 0], ALK: [0, 0, 0, 0], TMPRSS2: [0, 0, 0, 0] }, "F9 no line of a partner"],
+  [["TMPRSS2", "ERG"], ["TMPRSS2: MUT=V5I", "ERG: FUSION"], {}, { TMPRSS2: [1, 0, 1, 0], ERG: [1, 0, 0, 0] }, "F10 either partner"],
+  [["TMPRSS2", "ERG"], ["ERG: MUT=V5I", "TMPRSS2: FUSION"], {}, { TMPRSS2: [1, 1, 1, 0], ERG: [1, 0, 0, 0] }, "F11 the whole query"],
+  [["EML4", "ALK"], ["ALK: MUT_DRIVER"], {}, { EML4: [0, 0, 0, 0], ALK: [0, 0, 0, 0] }, "F12 MUT_DRIVER is MUT"],
+  [["EML4", "ALK"], ["ALK: FUSION MUT_DRIVER", "EML4: MUT=V5I", "KRAS: MUT=G12D"], {}, { EML4: [6, 0, 6, 0], ALK: [6, 0, 0, 0] }, "F13"],
+  [["KIF5B", "MET", "ROS1", "BRCA2", "FGFR2"], ["KIF5B: FUSION", "MET", "ROS1: DRIVER", "BRCA2: DRIVER", "FGFR2: FUSION_DRIVER", "KRAS: MUT=G12D"], {},
+    { KIF5B: [0, 1, 1, 0], MET: [0, 1, 0, 0], ROS1: [0, 0, 0, 0], BRCA2: [2, 0, 1, 0], FGFR2: [1, 0, 1, 0] },
+    "F14 VUS kept by FUSION / bare, not by DRIVER; BRCA2's germline row in the badge, not the frequency"],
+  [["KIF5B", "MET"], ["KIF5B: FUSION_DRIVER", "MET: DRIVER", "KRAS: MUT=G12D"], {}, { KIF5B: [0, 0, 0, 0], MET: [0, 0, 0, 0] }, "F14 VUS not kept by FUSION_DRIVER or DRIVER"]
+];
+for (const [genes, lines, extra, want, why] of LOLLIPOP_OQL) {
+  const res = await hotOql(genes, lines, extra);
+  const tag = `lollipop [${lines.join("; ")}${extra.useOql === false ? "; useOql false" : ""}]: ${why}`;
+  const e = res.error || res.result?.error;
+  if (e || !res.hotspots) { ok(tag, false, e || "no hotspots"); continue; }
+  const got: Want = {};
+  for (const g of genes) {
+    const h = res.hotspots.find((x) => x.gene === g);
+    got[g] = h ? [h.tally.fusion.driver, h.tally.fusion.vus, h.somaticSamples, h.mutations] : [0, 0, 0, 0];
+  }
+  ok(tag + " ([driver, VUS, somatic samples, mutations] per gene)", JSON.stringify(got) === JSON.stringify(want), "ours " + JSON.stringify(got) + ", expected " + JSON.stringify(want));
+}
 
 console.log(`\n${checks - failures}/${checks} mutation fusion checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
