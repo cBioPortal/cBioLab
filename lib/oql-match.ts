@@ -140,3 +140,13 @@ export function oqlSublabel(specs: readonly OqlSpec[] | null | undefined): strin
   const parts = specs!.map(specText).filter(Boolean);
   return parts.length ? ": " + parts.join(" ") : "";
 }
+
+/**
+ * Does the query narrow mutations? cBioPortal's doesQueryContainMutationOQL (oqlfilter.ts
+ * 260-290): a MUT command with a class, change or range, or with DRIVER; or a standalone DRIVER.
+ * A bare gene, a plain MUT, AMP / HOMDEL / FUSION (even with _DRIVER) and EXP / PROT do not.
+ */
+export function oqlHasMutationOql(lines: string[]): boolean {
+  return lines.some((l) => parseOql(l).some((e) => e.specs.some((x) =>
+    (x.type === "MUT" && !!(x.cls || x.pchange || x.range || x.driver)) || (x.type === "ANY" && !!x.driver))));
+}

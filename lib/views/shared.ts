@@ -11,6 +11,10 @@ import type { PlotAxis } from "../plot.ts";
 import { assayEntitySearchSql } from "../generic-assay.ts";
 
 /** 12 genes = 66 pairs; beyond this the multiplicity correction eats the signal */
+import { parseOql } from "../oql-parse.ts";
+import { oqlHasMutationOql } from "../oql.ts";
+import { resolveDrivers, type DriverSettings } from "../driver-settings.ts";
+import type { LollipopOql } from "../federation.ts";
 export const COOCCUR_GENE_LIMIT = 12;
 /**
  * A request past a view's limit is refused, naming the limit, rather than cut to its first N:
@@ -54,6 +58,23 @@ export function answering(ctx: ViewRun): { ok: Record<string, ViewResolver>; exc
 }
 
 export const plural = (n: number, one: string, many = one + "s") => n.toLocaleString("en-US") + " " + (n === 1 ? one : many);
+
+/**
+ * A view's `oql` (the query's lines, as the Results page passes them) and `drivers`, checked:
+ * each line one gene, parsed, and the settings resolved; the lines and settings to follow, or an
+ * error. `useOql: false` follows none.
+ */
+export function viewOql(v: { oql?: unknown; useOql?: unknown; drivers?: DriverSettings }): { oql?: LollipopOql } | { error: string } {
+  if (v.oql === undefined) return {};
+  if (!Array.isArray(v.oql) || !v.oql.length || v.oql.some((l) => typeof l !== "string" || !l.trim())) return { error: "oql is a list of OQL lines, one gene each" };
+  if (v.useOql !== undefined && typeof v.useOql !== "boolean") return { error: "useOql is true or false" };
+  try {
+    for (const l of v.oql as string[]) { const e = parseOql(l); if (e.length !== 1) throw new Error("'" + l.slice(0, 40) + "' names " + e.length + " genes; give each its own line"); }
+    if (v.drivers !== undefined) resolveDrivers(v.drivers);
+  } catch (e) { return { error: "oql: " + (e as Error).message }; }
+  // only a query that narrows mutations filters them (the portal's queryContainsMutationOql)
+  return v.useOql === false || !oqlHasMutationOql(v.oql as string[]) ? {} : { oql: { lines: v.oql as string[], ...(v.drivers !== undefined ? { drivers: v.drivers } : {}) } };
+}
 
 /** A view-level refusal: past a limit, or nothing that can answer. */
 export const refuse = (kind: ViewKind, ctx: ViewRun, error: string): ViewResult => plainResult(kind, { cohorts: ctx.vNames, error });

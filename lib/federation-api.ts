@@ -14,7 +14,7 @@
 // authentication yet: anyone who can reach this endpoint can read what it discloses.
 import { z } from "zod";
 import { resolveStudy, studyProfiles } from "./analysis.ts";
-import { resolverFor, carriesPatientIds, studyRouting, routeStudy, PatientLevelResolver, PEER_TABLES, hasFederatedPlot, type PeerTable, type CourseOpts, type SequenceOpts, type PairOql } from "./federation.ts";
+import { resolverFor, carriesPatientIds, studyRouting, routeStudy, PatientLevelResolver, PEER_TABLES, hasFederatedPlot, type PeerTable, type CourseOpts, type SequenceOpts, type PairOql, type LollipopOql } from "./federation.ts";
 import { timelinePatientRowSource, TIMELINE_COLUMNS, PATIENT_ID } from "./patient-timeline.ts";
 import { ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, PATIENT_SAMPLE_COLUMNS, alterationPatientRowSource, alterationSource, patientSamplesSource } from "./patient-alterations.ts";
 import { loopbackConnId, servingAsLoopbackPeer } from "./loopback-peer.ts";
@@ -119,6 +119,8 @@ const aggregates: FederationOp = {
     momentGenes: z.array(z.string()).max(12).nullish(),
     variantGenes: z.array(z.string()).max(12).nullish(),
     lollipopGenes: z.array(z.string()).max(12).nullish(),
+    // with `lollipopGenes`: the query's lines the Mutations tab follows, and how their DRIVER reads
+    lollipopOql: z.object({ lines: z.array(z.string().max(1000)).max(30), drivers: z.record(z.string(), z.unknown()).optional() }).nullish(),
     // suppression floor applied HERE before returning variant counts
     minCount: z.number().int().min(1).max(1000).nullish(),
     timelineSpan: z.boolean().nullish(),
@@ -138,7 +140,7 @@ const aggregates: FederationOp = {
     // with `pairs` or `momentGenes`, a continuous molecular profile (e.g. mRNA z-scores)
     profileType: z.string().max(120).nullish()
   }),
-  async run({ study, cohort, genes, survival, pairs, pairOql, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor, timelineSpan, course, sequence, sequenceKeys }: { timelineSpan?: boolean | null; course?: CourseOpts | null; sequence?: SequenceOpts | null; sequenceKeys?: string | null; study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; pairOql?: PairOql | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) {
+  async run({ study, cohort, genes, survival, pairs, pairOql, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, lollipopOql, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor, timelineSpan, course, sequence, sequenceKeys }: { timelineSpan?: boolean | null; course?: CourseOpts | null; sequence?: SequenceOpts | null; sequenceKeys?: string | null; study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; pairOql?: PairOql | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; lollipopOql?: LollipopOql | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) {
     // Refused here, by the peer, whatever the caller checked: an explicit list compiles to the
     // ids themselves, and beside a clinical attribute a count of 0 or 1 reads one patient's value.
     if (carriesPatientIds(cohort)) throw new Error(ID_LIST);
@@ -159,7 +161,7 @@ const aggregates: FederationOp = {
       momentGenes && momentGenes.length && profileType
         ? res.profileMoments(cohort, momentGenes, profileType) : Promise.resolve([]),
       survivalEndpoints ? res.survivalEndpoints() : Promise.resolve([] as string[]),
-      lollipopGenes && lollipopGenes.length ? res.lollipopCounts(cohort, lollipopGenes, minCount || 1) : Promise.resolve(null)
+      lollipopGenes && lollipopGenes.length ? res.lollipopCounts(cohort, lollipopGenes, minCount || 1, lollipopOql ?? undefined) : Promise.resolve(null)
     ]);
     const [spans, courseCounts, flows, keys] = await Promise.all([
       timelineSpan ? res.timelineSpan(cohort) : Promise.resolve(null),

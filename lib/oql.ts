@@ -22,7 +22,8 @@ import type { OqlRange, OqlSpec } from "./oql-parse.ts";
 import { parseOql } from "./oql-parse.ts";
 import { finiteSql } from "./sql-number.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
-import { PORTAL_TYPE_CLASS } from "./oql-match.ts";
+import { PORTAL_TYPE_CLASS, oqlHasMutationOql } from "./oql-match.ts";
+export { oqlHasMutationOql };
 import { driverCondSql } from "./driver-sql.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
@@ -129,6 +130,36 @@ export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): strin
   "    ON " + annotationMatchSql("ann", "g");
 
 const DRIVER_JOIN = (pin: string): string => driverAnnotationJoin(pin, "INNER");
+
+/**
+ * The Mutations tab's filter for one gene: a condition over mutation_derived's own columns
+ * keeping the mutations some line of the gene wants, as the portal filters the tab's data by the
+ * whole query (ResultsViewPageStore 3644-3680) — or null when nothing is filtered: the query
+ * narrows no mutation, or a line of the gene wants every one (a bare gene, a plain MUT). A gene
+ * whose lines want no mutation (only AMP, FUSION, EXP …) keeps none.
+ */
+export function oqlMutationFilterSql(lines: string[], gene: string, { study, db, oncokbPin, drivers, hotspotPins }:
+  { study: string; db: string; oncokbPin?: string | null } & OqlDriverOpts): string | null {
+  if (!oqlHasMutationOql(lines)) return null;
+  const specs = lines.flatMap((l) => parseOql(l)).filter((e) => e.gene === gene).flatMap((e) => e.specs);
+  if (specs.some((x) => (x.type === "ANY" && !x.driver) || (x.type === "MUT" && !x.cls && !x.pchange && !x.range && !x.driver))) return null;
+  const wanting = specs.filter((x) => x.type === "MUT" || (x.type === "ANY" && x.driver));
+  if (!wanting.length) return "0";
+  const rule = drivers === undefined ? undefined : resolveDrivers(drivers);
+  const driver = (): string => {
+    if (rule) {
+      if (rule.hotspots && !hotspotPins) throw new Error("OQL DRIVER with Cancer Hotspots on needs the Genome Nexus pins the hotspots are read at; none were given");
+      return driverCondSql(rule, oncokbPin, "g", rule.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null);
+    }
+    if (!oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
+    return driverEventSql(oncokbPin, "g");
+  };
+  const conds = wanting.map((x) => "(" + specCond(x.type === "ANY" ? { type: "MUT" } : x) + (x.driver ? " AND " + driver() : "") + ")");
+  return "(concat(studyId, '_', sampleId), ifNull(proteinChange, ''), ifNull(mutationType, ''), ifNull(proteinPosStart, -99), ifNull(proteinPosEnd, -99)) IN (\n" +
+    "  SELECT g.sample_unique_id, ifNull(g.mutation_variant, ''), ifNull(g.mutation_type, ''), ifNull(g.pos_start, -99), ifNull(g.pos_end, -99)\n" +
+    "  FROM " + mutationsWithPositions(db, study, gene) +
+    "  WHERE " + conds.join("\n     OR ") + ")";
+}
 
 /** the profile EXP and PROT read, by id without the study prefix, where the query names one */
 /**

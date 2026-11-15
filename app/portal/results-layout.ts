@@ -4,9 +4,9 @@
 // can a script that checks the views run.
 import type { Clause, CohortDef, View } from "../../lib/types.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
-import { oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
+import { hasOql, oqlHasMutationOql, oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
 import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
-import { arrange, type PageLayout } from "./page-doc.ts";
+import { arrange, type PageLayout, type TabBanner } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 
@@ -106,7 +106,24 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"], driver
 }
 
 /** the view kinds that read the query's lines (`oql`) with the page's driver settings */
-const OQL_DRIVER_KINDS = new Set(["cancertypes", "cooccurrence", "pathwaymap", "datafiles"]);
+const OQL_DRIVER_KINDS = new Set(["cancertypes", "cooccurrence", "pathwaymap", "datafiles", "hotspots", "mutations"]);
+
+/**
+ * The Mutations tab's OQL status, as the portal's OqlStatusBanner says it (Mutations.tsx 185-197):
+ * filtered, with "Do not filter by OQL"; not filtered, with "Filter by OQL"; or unaffected when the
+ * query narrows no mutation. The switch is the views' `useOql`.
+ */
+function mutationsBanner(narrows: boolean): TabBanner {
+  const on = (vs: View[]) => (vs[0] as unknown as { useOql?: boolean }).useOql !== false;
+  if (!narrows) return { text: () => "Your OQL specification does not affect the results below because you have not specified any filters for mutations in this gene." };
+  return {
+    text: (vs) => on(vs) ? "The results below are filtered by the OQL specification from your query." : "The results below are not filtered by the OQL specification from your query.",
+    toggle: {
+      label: (vs) => on(vs) ? "Do not filter by OQL" : "Filter by OQL",
+      apply: (vs) => vs.map((v) => { const n = { ...v } as Record<string, unknown>; if (on(vs)) n.useOql = false; else delete n.useOql; return n as unknown as View; }),
+    },
+  };
+}
 /** does an OQL query name DRIVER anywhere (DRIVER, MUT_DRIVER, AMP_DRIVER, a range's _DRIVER)? */
 const asksDriver = (q: string): boolean => { try { return parseOql(q).some((e) => e.specs.some((sp) => sp.driver)); } catch { return false; } };
 /** the driver sources of the page's settings: what DRIVER reads in an oql clause (what is hidden is not the clause's) */
@@ -272,6 +289,9 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   // every tab draws the queried patients, as cBioPortal's do; only Comparison/Survival compares groups
   const queried = ["Queried"], both = ["Altered", "Unaltered"];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
+  // the Mutations tab follows the query's lines where they narrow mutations, as the portal's
+  const mutOql = { oql: q.entries, ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}) };
+  const queryHasOql = q.entries.some((x) => { try { return parseOql(x).some((e) => hasOql(e.specs)); } catch { return false; } });
   // Mutual Exclusivity's tracks are the query's lines, named as the portal names them (2 or more to pair)
   const meTracks = new Set(q.entries.map((x) => { try { return oqlTrackName(x); } catch { return x; } })).size;
   const left = [
@@ -299,8 +319,9 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       x: expr ? (data.cna ? { source: "profile", profile: data.cna, gene: genes[0] } : { source: "alteration", gene: genes[0], by: "cna" }) : { source: "alteration", gene: genes[0], by: "mutationType" },
       y: plotY, cohorts: queried, points: [{ cohort: "Altered" }, { rule: "outliers" }], drivers: {} })] }] : []),
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
-    { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: queried }),
-        v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: queried })],
+    { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], ...mutOql, cohorts: queried }),
+        v("Mutation table", { kind: "mutations", gene: genes[0], ...mutOql, cohorts: queried })],
+      ...(queryHasOql ? { banner: mutationsBanner(oqlHasMutationOql(q.entries)) } : {}),
       chooser: { label: "gene", options: genes, locks: ["gene", "genes"],
         value: (vs: View[]) => String(((vs[1] as unknown as { gene?: string }).gene) || genes[0]),
         // a new gene keeps the grid's selection (it is about classes, not this gene) and starts the table's own query over

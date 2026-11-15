@@ -23,6 +23,7 @@ import { PlotControls } from "../lab/plot-controls.tsx";
 import { cn } from "../../lib/cn";
 import { legacyLink, type LegacyPage, type PortalHold } from "../../lib/legacy-link.ts";
 import { LegacyLinkButton } from "./portal-chrome.tsx";
+import { Button } from "../_ui/button.tsx";
 import { LegacyComparisonButton } from "./legacy-comparison-button.tsx";
 
 type Patch = Record<string, unknown>;
@@ -101,6 +102,15 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
     const next = chooser!.apply(idx.map((i) => views[i]), o);
     onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) });
   };
+  // the tab's status line and its switch (the Mutations tab's OQL banner)
+  const banner = tab && !sub ? tab.banner : undefined;
+  const mine = idx.map((i) => views[i]);
+  const bannerText = banner ? banner.text(mine) : null;
+  const bannerToggle = banner?.toggle ? banner.toggle.label(mine) : null;
+  const toggleBanner = () => {
+    const next = banner!.toggle!.apply(mine);
+    onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) });
+  };
   const link = legacy.held ? legacyLink(legacy.page, { tab: tab?.title ?? mainTitle, sub: sub?.title ?? subTitle, gene: chooser?.value(idx.map((i) => views[i])) }, legacy.held) : null;
   return (
     <div className="portal">
@@ -143,6 +153,12 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
             </div>
           )}
         </div>
+      )}
+      {banner && bannerText && (
+        <p className="note mb-3 flex flex-wrap items-center gap-2" data-test="oqlStatusBanner">
+          <span>{bannerText}</span>
+          {banner.toggle && bannerToggle && <Button variant="outline" size="sm" onClick={toggleBanner}>{bannerToggle}</Button>}
+        </p>
       )}
       {tab?.pending && !sub && (
         <section className="card viewcard" aria-label={tab.title + " (not built yet)"}>

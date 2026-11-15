@@ -20,17 +20,17 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 14 |
+| ✅ match | 15 |
 | 🟡 partial | 34 |
 | 🔶 different | 22 |
-| ❌ missing | 58 |
+| ❌ missing | 57 |
 | 🐞 ok | 3 |
 | 🐞 copied | 1 |
 | N/A | 7 |
 | ? | 0 |
 | **Total IDs** | **139** |
 
-**Overall: 17.3 %** (✅ 14 + 🐞ok 3 + N/A 7 = 24 of 139). Counting 🟡 as half: 29.5 %.
+**Overall: 18.0 %** (✅ 15 + 🐞ok 3 + N/A 7 = 25 of 139). Counting 🟡 as half: 30.2 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | 🐞cp | N/A | One line |
 |---|---|---|---|---|---|---|---|---|---|
@@ -57,7 +57,7 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 | 3 | **Annotation column** is one text badge "Oncogenic · Level 1": no icons/cards/header; level is the highest across tumour types (KRAS 206/223 rows differ: G12D "Level 1" vs legacy `level_3b`); no hotspot/CIViC/reVUE | COL-7, AN-1…AN-6 | partly (hotspots, CIViC under Mutation annotation breadth) |
 | 4 | **Cancer Hotspots not counted as drivers**: TP53 Driver/VUS 325/7 vs 329/3 (R175C ×3, T125M) | BF-1, STM-4 | (tracked) "Cancer Hotspots as putative drivers" |
 | 5 | **Table search and column filters do not reach the lollipop or badges** (search "G12D": table 59 rows, lollipop still 14 stems / 223); the link is grid + codon selection only | TB-3, FM-1, FM-3, STM-4 | not tracked |
-| 6 | **OQL not applied** to lollipop/table; no OQL banner or toggle | MUT-0-4, 0-5, MD-12 | (tracked) "gene tabs still draw every alteration" |
+| 6 | ~~**OQL not applied**~~ — fixed: the lollipop and table follow the query's mutation OQL, with the banner and its toggle (coadread KRAS: MUT=G12D 58, as legacy) | MUT-0-4, 0-5, MD-12 | (tracked) "gene tabs still draw every alteration" |
 | 7 | **No Y-Axis Max slider**; y axis titled "# KRAS Mutations" (legacy "# patients"), ticks niced to 150 (legacy top tick 142, "≥" when capped) | LP-2, LP-6, STM-17 | not tracked (Comparison's sliders are) |
 | 8 | **Lollipop tooltip** is the native SVG title "codon 12: 142 mutations / G12D 58…", not "142 mutated of 594 profiled patients / AA Change: G12D/V/C/A/S/R"; no hover → table highlight | LP-10, LP-11 | not tracked |
 | 9 | **Missing columns**: Gene, Cancer Type, Copy #, ASCN (5), VS, Center, Allele Freq (N), normal reads, Exon, clinical attributes, namespace | COL-2…COL-37 | partly (HGVS, gnomAD, ClinVar, dbSNP, SIGNAL, Functional Impact, custom driver tracked; Copy #, ASCN, clinical not) |
@@ -270,7 +270,7 @@ Data version: mutation rows, VAFs, mutation counts and OncoKB oncogenicity are i
 | MUT-MD-9 | 🐞 ok | C | Draws without domains |
 | MUT-MD-10 | ❌ | C | No 3D at all (tracked) |
 | MUT-MD-11 | ❌ | B | No fusion mutations (Q2 TMPRSS2 4 vs 240 rows; Fusion badges 0 vs 207/29) |
-| MUT-MD-12 | ❌ | C | (tracked: OQL in gene tabs) |
+| MUT-MD-12 | ✅ | C | The query's mutation OQL filters the lollipop and table; "Do not filter by OQL" turns it off |
 | MUT-MD-13 | ❌ | C | No Show only profiled |
 | MUT-MD-14 | N/A | C | No such deployment switch and no GN-based columns |
 | MUT-MD-15 | N/A | C | Pinned licensed OncoKB store with levels (invariant 2) |
