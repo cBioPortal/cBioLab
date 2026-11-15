@@ -1,6 +1,6 @@
 // Survival view: Kaplan-Meier curves pooled exactly from each participant's id-free
 // (months, event, n) counts, with log-rank tests, all computed from those grouped rows directly.
-import { kaplanMeierCounts, logRankCounts, logRankKCounts, applyCutoffCounts, survSubjects, toIncidence, benjaminiHochberg, type SurvCount } from "../../stats.ts";
+import { kaplanMeierCounts, kmMedianCiCounts, logRankCounts, logRankKCounts, applyCutoffCounts, survSubjects, toIncidence, benjaminiHochberg, type SurvCount } from "../../stats.ts";
 import type { ViewResult, LogRank, LogRankK } from "../../types.ts";
 import type { SurvivalCount, EndpointColumns } from "../../federation.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
@@ -115,7 +115,8 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   };
   const curvesRaw = vNames.map((n) => {
     const rows = countsFor(n);
-    return { cohort: n, ...kaplanMeierCounts(rows), missing: cohorts[n].count - survSubjects(rows) };
+    const ci = kmMedianCiCounts(rows);
+    return { cohort: n, ...kaplanMeierCounts(rows), medianCi: { lo: ci.lo, hi: ci.hi }, missing: cohorts[n].count - survSubjects(rows) };
   });
   const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
   // Two cohorts is the case the 2-arm log-rank test is defined for, matching the compare

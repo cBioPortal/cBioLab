@@ -13,7 +13,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   kaplanMeier, logRank, logRankK, applyCutoff, seededRandom,
-  kaplanMeierCounts, logRankCounts, logRankKCounts, applyCutoffCounts, survSubjects,
+  kaplanMeierCounts, logRankCounts, logRankKCounts, applyCutoffCounts, survSubjects, kmMedianCiCounts, kmMedianCi,
   type SurvRecord, type SurvCount,
 } from "../lib/stats.ts";
 
@@ -23,6 +23,7 @@ const expand = (rows: SurvCount[]): SurvRecord[] =>
 
 function sameKm(rows: SurvCount[]) {
   assert.deepStrictEqual(kaplanMeierCounts(rows), kaplanMeier(expand(rows)));
+  assert.deepStrictEqual(kmMedianCiCounts(rows), kmMedianCi(expand(rows)));
 }
 function sameLogRank(strata: SurvCount[][][]) {
   if (strata[0].length === 2)
@@ -121,4 +122,9 @@ describe("grouped rows: real study data", () => {
         assert.deepStrictEqual(kaplanMeierCounts(applyCutoffCounts(g, 24)), kaplanMeier(applyCutoff(expand(g), 24)));
     });
   }
+});
+
+test("kmMedianCiCounts: ten events at 1..10 months as rows, median 5, lower end 3, no upper end (R survfit, conf.type log)", () => {
+  assert.deepEqual(kmMedianCiCounts(Array.from({ length: 10 }, (_, i) => r(i + 1, 1, 1))), { median: 5, lo: 3, hi: null });
+  assert.deepEqual(kmMedianCiCounts([r(1, 1, 5), r(2, 1, 5)]), kmMedianCi(expand([r(1, 1, 5), r(2, 1, 5)])));
 });

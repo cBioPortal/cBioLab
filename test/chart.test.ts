@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -76,6 +76,9 @@ test("the portal's own number spellings, where a table must read as cBioPortal's
   assert.deepEqual([0.0001234, 0.0123, 1.23e-12, 0].map(portalP), ["1.234e-4", "0.0123", "1.23e-12", "0.00"]);
   // the Genomic Alterations table's altered share: MUC16 21 / 171 in Basal
   assert.deepEqual([21 / 171, 0, 1, 0.123456].map(portalAlteredPct), ["12.28%", "0.00%", "100.00%", "12.35%"]);
+  // SurvivalUtil.getMedian: the KM median and its 95% interval, 2 decimals, an unreached end "NA"
+  assert.deepEqual([[62.79, 56.25, null], [65.85, 51.48, 80.2], [null, null, null], [12, null, null], [30.1, null, 44]].map(([m, l, h]) => portalMedianCi(m, l, h)),
+    ["62.79 (56.25 - NA)", "65.85 (51.48 - 80.20)", "NA", "12.00", "30.10 (NA - 44.00)"]);
   // toConditionalPrecisionWithMinimum(x, 3, 0.01, -10): the Comparison page's clinical and survival-type tables
   assert.deepEqual([3.86e-8, 1.022e-6, 0.245, 1e-10, 9.9e-11, 0, 0.0123].map(portalPMin), ["3.86e-8", "1.022e-6", "0.245", "1.00e-10", "< 10^-10", "< 10^-10", "0.0123"]);
   // ScatterPlot.tsx correlationInfo: toFixed(2) — audit Q4 Spearman −0.05509 shown "-0.06", Pearson −0.03816 "-0.04"

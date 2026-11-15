@@ -147,6 +147,8 @@ describe("survival: Kaplan–Meier and the log-rank test", () => {
     assert.deepEqual(seen.map((s) => s.slice(0, 5)), [["A", "s1", "OS", null, undefined], ["B", "s1", "OS", null, undefined]]);
     const [a, b] = v.curves;
     assert.equal(a.n, 10); assert.equal(a.events, 10); assert.equal(a.median, 1); assert.equal(a.missing, 2);
+    // all ten die at month 1: S = 0, so the log band is undefined and neither end is reached (R reports NA)
+    assert.deepEqual((a as { medianCi?: unknown }).medianCi, { lo: null, hi: null });
     assert.equal(b.n, 10); assert.equal(b.events, 0); assert.equal(b.median, null); assert.equal(b.missing, 0);
     assert.equal(v.logrank!.df, 1);
     close(v.logrank!.chi2, 19);

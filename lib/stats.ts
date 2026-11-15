@@ -713,6 +713,28 @@ export function kaplanMeierCounts(rows: SurvCount[]): Omit<KmCurve, "cohort"> {
   return { points, median, n: n0, events, atRisk, ...(clean.length ? { tLast: clean[clean.length - 1].t } : {}), ...(unobserved ? { unobserved } : {}) };
 }
 
+/** kmMedianCi over rows. */
+export function kmMedianCiCounts(rows: SurvCount[]): { median: number | null; lo: number | null; hi: number | null } {
+  const clean = observableCounts(rows.filter(r => Number.isFinite(r.t) && r.t >= 0));
+  const atRiskAt = riskSweepCounts(clean);
+  let s = 1, v = 0;
+  let median: number | null = null, lo: number | null = null, hi: number | null = null;
+  for (const { t, d } of deathsByTime(clean)) {
+    const n = atRiskAt(t);
+    if (d > 0 && n > 0) {
+      s *= 1 - d / n;
+      v += n > d ? d / (n * (n - d)) : Infinity;
+      if (median === null && s <= 0.5) median = t;
+      const half = Z_975 * Math.sqrt(v);
+      if (s > 0 && Number.isFinite(half)) {
+        if (lo === null && s * Math.exp(-half) <= 0.5) lo = t;
+        if (hi === null && s * Math.exp(half) <= 0.5) hi = t;
+      }
+    }
+  }
+  return { median, lo, hi };
+}
+
 /** Every group's deaths and number at risk at each distinct time any of the groups has, in order. */
 function* jointTimes(groups: SurvCount[][]): Generator<{ d: number[]; n: number[] }> {
   const k = groups.length;
