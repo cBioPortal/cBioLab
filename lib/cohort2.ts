@@ -20,6 +20,7 @@
 import { DB, STUDY } from "./ch.ts";
 import { compileCohort, mutationStudySql, sq, genomicStudySql, LINE_TYPE } from "./compiler.ts";
 import { oqlCasesSql, type OqlPins } from "./oql.ts";
+import type { DriverSettings } from "./driver-settings.ts";
 import { clinicalValueFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, DEFAULT_LINE_GAP } from "./treatment-lines.ts";
 import { activeCustomData, clinicalTable } from "./custom-data.ts";
@@ -584,7 +585,8 @@ function leafSql(leaf: Leaf, ctx: Ctx): string {
 
 function leafIds(leaf: Leaf, ctx: Ctx): LeafIds {
   // an alteration is called per sample
-  const oql = (q: string, pins?: OqlPins) => ofSamples(oqlCasesSql(q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, pins, study: ctx.study, db: dbOf(ctx), unit: "sample" }));
+  const oql = (q: string, pins?: OqlPins, drivers?: DriverSettings) => ofSamples(oqlCasesSql(q, { oncokbPin: ctx.oncokbPin, profiles: ctx.profiles, pins, study: ctx.study, db: dbOf(ctx), unit: "sample",
+    ...(drivers ? { drivers, ...(ctx.hotspotPins ? { hotspotPins: ctx.hotspotPins } : {}) } : {}) }));
   // v1 flat event shape without kind
   if (!("kind" in leaf)) {
     if (leaf.a && leaf.rel) return eventLeafSql(leaf, ctx);
@@ -592,7 +594,7 @@ function leafIds(leaf: Leaf, ctx: Ctx): LeafIds {
   }
   // one case per Leaf kind: a kind added to the Leaf union without a case here is a type error
   switch (leaf.kind) {
-    case "oql": return oql(leaf.q, oqlPins(leaf));
+    case "oql": return oql(leaf.q, oqlPins(leaf), leaf.drivers);
     case "alteration": return oql(alterationToOql(leaf)); // deprecated alias
     case "clinical": return clinicalLeafSql(leaf, ctx);
     case "profiled": return profiledLeafSql(leaf, ctx);
@@ -649,7 +651,7 @@ function normalizeSugar(def: CohortDef): CohortDef {
 }
 
 // def -> SQL producing the cohort's samples, one row each: (pid, sid), bare stable ids
-export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin, profiles, gaProfiles, study = STUDY, db }: Partial<CompileCtx> = {}): string {
+export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin, hotspotPins, profiles, gaProfiles, study = STUDY, db }: Partial<CompileCtx> = {}): string {
   if (!def) return baseSamplesSql(study, db || DB);
   // a locked cohort is its frozen patients wherever it is compiled, not only inside runAnalysis
   // (which has already made it so, lib/cohort-lock.ts): Explore, an oncoprint spec, a link
@@ -662,7 +664,7 @@ export function compileCohortDef(def: CohortDef | null | undefined, { oncokbPin,
   // study" so it can never be mistaken for a filter that silently did nothing.
   if (Array.isArray(clauses) && clauses.length === 0) return baseSamplesSql(study, db || DB);
   if (!Array.isArray(clauses) || clauses.length > 8) throw new Error("cohort def needs all: [0-8 clauses]");
-  const ctx: Ctx = { oncokbPin, profiles, gaProfiles, study, db: db || DB, lineGap: d.lineGap ?? 90 };
+  const ctx: Ctx = { oncokbPin, hotspotPins, profiles, gaProfiles, study, db: db || DB, lineGap: d.lineGap ?? 90 };
   return clauses.map((c) => "(" + clauseSql(c, ctx) + ")").join("\nINTERSECT DISTINCT\n");
 }
 

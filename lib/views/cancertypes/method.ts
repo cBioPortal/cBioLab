@@ -4,6 +4,8 @@ import { BUILD_COMMIT } from "../../build-info.ts";
 
 export interface CancertypesTrace {
   genes: string[]; groupBy: string; measure: "driver" | "any"; oncokbPin: string | null; minSamples: number;
+  /** the query's OQL lines, when the view follows them */
+  oql?: string[];
   unit: "patient" | "sample";
   perSite: { cohort: string; study: string; groups: number; profiled: number }[];
   panels: { cohort: string; groups: number; pooled: number; profiled: number; altered: number }[];
@@ -13,8 +15,9 @@ export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
   const steps: MethodStep[] = t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Count " + t.unit + "s per " + t.groupBy + " group",
     detail: "The cancertypes queries above. Per group, for the genes together and for each gene: the " + t.unit + "s profiled for it, and of those the " + t.unit + "s with " +
-      (t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ")" : "any mutation, amplification, deep deletion or structural variant") +
-      ", split by kind (one kind only, or more than one); and the whole cohort's, each " + t.unit + " once." +
+      (t.oql ? "an alteration one of the query's OQL lines matches, each line under its gene (" + t.oql.join("; ") + ")"
+        : t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ")" : "any mutation, amplification, deep deletion or structural variant") +
+      ", split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each " + t.unit + " once." +
       (t.unit === "patient" ? " A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is." : "") +
       " Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
     scope: s.cohort + " · " + s.study, rowsOut: s.groups,

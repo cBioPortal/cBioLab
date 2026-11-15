@@ -1,6 +1,7 @@
 // The datafiles view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type { TableRows } from "../../types.ts";
 import type { TableQuery } from "../../table-query.ts";
+import type { DriverSettings } from "../../driver-settings.ts";
 
 /**
  * cBioPortal's Results-page Download tab: for one cohort and a gene query (OQL, one entry per line),
@@ -20,6 +21,8 @@ export interface DatafilesView extends TableQuery {
   prot?: string;
   /** as an `oql` clause's: a study without the exp / prot profile has no EXP / PROT alterations */
   ifHeld?: boolean;
+  /** how a line's DRIVER reads: the page's driver settings (OncoKB, hotspots, the study's calls); OncoKB alone without */
+  drivers?: DriverSettings;
   /** rows per page of the case table (default 25, at most 1000) */
   rows?: number;
 }

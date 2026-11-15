@@ -318,7 +318,7 @@ test("a scatter's sparse cells are binned exactly as its density is", () => {
   const pts = plotScatterPointsSql(x, y, "SELECT '' AS pid", 5000, { grid: [240, 160], extent, cellMax: 3 });
   // the same cell expression on both sides, so a point is in a cell the density did not shade
   for (const axis of ["x", "y"]) {
-    const expr = bins.match(new RegExp("least\\(\\d+, toUInt32\\(floor\\(\\(" + axis + " - [^\\n]*?\\)\\)\\)"))![0];
+    const expr = bins.match(new RegExp("toUInt32\\(least\\(\\d+, greatest\\(0, if\\(" + axis + "1 > " + axis + "0, [^\\n]*?, 0\\)\\)\\)\\)"))![0];
     assert.ok(pts.includes(expr), axis + ": " + expr);
   }
   assert.match(pts, /HAVING count\(\) <= 3/);

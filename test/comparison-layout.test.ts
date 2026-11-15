@@ -121,3 +121,7 @@ test("the Mutations tab: the two-group lollipop after Genomic Alterations, for e
   assert.ok(none.left.includes("Mutations (no mutation profile)"));
   assert.ok(!layout(2, null).tabs.some((t) => t.title === "Mutations"), "not before the study's profiles are known");
 });
+
+test("the Clinical tab tests every attribute the study declares, not the 8 best covered (CMP-CL-2)", () => {
+  assert.deepEqual(tabOf(layout(2, BRCA_TCGA), "Clinical"), { kind: "clinical", allAttributes: true });
+});

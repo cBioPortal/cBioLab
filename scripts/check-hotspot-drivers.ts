@@ -168,5 +168,52 @@ const study = (await chQuery<{ n: number }>(
   "WHERE g.cancer_study_identifier = '" + STUDY + "' AND g.sample_unique_id != '" + STUDY + "_" + SAMPLE + "'", conn)).data;
 ok("hotspots alone: no other sample's row is a hotspot driver", Number(study[0]?.n) === 0, String(study[0]?.n));
 
+// ---- OQL DRIVER under the page's driver settings: oqlCasesSql with `drivers` (case table
+// "OQL DRIVER in the cohorts follows the page's driver settings", rows D1-D9). The patients are
+// written down by hand from the fixture files: PIK3CA is mutated in FX-P02/P10/P16/P18 (E545K,
+// OncoKB Oncogenic in peer-oncokb.tsv, no hotspot record) and in FX-P29 (H1047R at 1047, E110del at
+// 110: hotspots in peer-hotspots.tsv, not in peer-oncokb.tsv); no PIK3CA copy-number change. CDKN2A:
+// R80* (OncoKB Oncogenic) in FX-P19/P22/P27, D84Y (a hotspot, not in OncoKB) in
+// FX-P29, deep deletions (OncoKB CNA DELETION Oncogenic) in FX-P05/P16/P29/P38. The portal's rule:
+// DRIVER is the datum's putativeDriver (oqlfilter.ts 992-1003), oncoKb || hotspots || custom calls,
+// each only when its switch is on (ResultsViewPageStoreUtils.ts 134-152, cbioportal-frontend cd8c6df).
+import { oqlCasesSql } from "../lib/oql.ts";
+type OqlOpts = Parameters<typeof oqlCasesSql>[1];
+const pidsOf = async (q: string, drivers?: NonNullable<OqlOpts["drivers"]>): Promise<string[] | string> => {
+  try {
+    const opts: OqlOpts = { oncokbPin: ONCOKB, study: STUDY, db, unit: "patient", ...(drivers !== undefined ? { drivers, hotspotPins: PINS } : {}) };
+    const rows = (await chQuery<{ pid: string }>(oqlCasesSql(q, opts), conn)).data;
+    return [...new Set(rows.map((r) => r.pid))].sort();
+  } catch (e) { return "error: " + String((e as Error).message).slice(0, 200); }
+};
+const oqlCase = async (tag: string, q: string, drivers: NonNullable<OqlOpts["drivers"]> | undefined, want: string[]) => {
+  const got = await pidsOf(q, drivers);
+  const w = [...want].sort();
+  ok(`${tag} '${q}' drivers ${drivers === undefined ? "(none)" : JSON.stringify(drivers)}: ${w.join(", ") || "no one"}`,
+    Array.isArray(got) && got.join(",") === w.join(","), Array.isArray(got) ? "got " + (got.join(", ") || "no one") : got);
+};
+const OFF = { oncokb: false, hotspots: false, custom: false, tiers: [] };
+const PIK_ONCOKB = ["FX-P02", "FX-P10", "FX-P16", "FX-P18"], PIK_HOT = ["FX-P29"];
+await oqlCase("D9 no drivers, OncoKB only", "PIK3CA: MUT_DRIVER", undefined, PIK_ONCOKB);
+await oqlCase("D1 defaults: OncoKB or hotspot", "PIK3CA: MUT_DRIVER", {}, [...PIK_ONCOKB, ...PIK_HOT]);
+await oqlCase("D2 OncoKB off: hotspots alone", "PIK3CA: MUT_DRIVER", { oncokb: false }, PIK_HOT);
+await oqlCase("D3 hotspots off: OncoKB alone", "PIK3CA: MUT_DRIVER", { hotspots: false }, PIK_ONCOKB);
+await oqlCase("D4 every source off: no one", "PIK3CA: MUT_DRIVER", OFF, []);
+const CDK_ALL = ["FX-P05", "FX-P16", "FX-P19", "FX-P22", "FX-P27", "FX-P29", "FX-P38"];
+await oqlCase("D9 standalone DRIVER, no drivers: OncoKB's mutations and deletions", "CDKN2A: DRIVER", undefined, CDK_ALL);
+await oqlCase("D7 standalone DRIVER, defaults", "CDKN2A: DRIVER", {}, CDK_ALL);
+await oqlCase("D7 standalone DRIVER, OncoKB off: the hotspot mutation only (a deletion is never a hotspot)", "CDKN2A: DRIVER", { oncokb: false }, ["FX-P29"]);
+await oqlCase("D7 standalone DRIVER, every source off: no one", "CDKN2A: DRIVER", OFF, []);
+await oqlCase("D9 a range with DRIVER, no drivers: E545K is outside, H1047R not OncoKB", "PIK3CA: MUT_(1000-1100)_DRIVER", undefined, []);
+await oqlCase("D8 a range with DRIVER, defaults: H1047R (1047) a hotspot", "PIK3CA: MUT_(1000-1100)_DRIVER", {}, PIK_HOT);
+await oqlCase("D8 a range with DRIVER, hotspots off", "PIK3CA: MUT_(1000-1100)_DRIVER", { hotspots: false }, []);
+await oqlCase("D8 a range with DRIVER, OncoKB off: E545K (545) not a hotspot", "PIK3CA: MUT_(500-600)_DRIVER", { oncokb: false }, []);
+await oqlCase("D8 a range with DRIVER, defaults: E545K (545) OncoKB", "PIK3CA: MUT_(500-600)_DRIVER", {}, PIK_ONCOKB);
+// D5 / D6 (custom calls and tiers) need driver_filter / driver_tiers_filter values the fixture may not hold
+const custom = (await chQuery<{ n: number }>("SELECT countIf(driver_filter != '' OR driver_tiers_filter != '') AS n FROM " + db +
+  ".genomic_event_derived WHERE cancer_study_identifier = '" + STUDY + "'", conn)).data;
+if (Number(custom[0]?.n) === 0) console.log("SKIP D5/D6: the fixture holds no driver_filter or driver_tiers_filter value, so custom calls and tiers select no one here");
+else console.log("NOTE D5/D6: the fixture now holds " + custom[0].n + " custom-called rows; add their cases here");
+
 console.log(`\n${checks - failures}/${checks} hotspot driver checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

@@ -46,10 +46,10 @@ pp AS (
   GROUP BY sid
 )
 SELECT ga, gb,
-       countIf(has(cov, ga) AND has(cov, gb)) AS profiled,
-       countIf(has(cov, ga) AND has(cov, gb) AND has(alt, ga) AND has(alt, gb)) AS both,
-       countIf(has(cov, ga) AND has(cov, gb) AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,
-       countIf(has(cov, ga) AND has(cov, gb) AND NOT has(alt, ga) AND has(alt, gb)) AS only_b
+       countIf(has(cov, gna) AND has(cov, gnb)) AS profiled,
+       countIf(has(cov, gna) AND has(cov, gnb) AND has(alt, ga) AND has(alt, gb)) AS both,
+       countIf(has(cov, gna) AND has(cov, gnb) AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,
+       countIf(has(cov, gna) AND has(cov, gnb) AND NOT has(alt, ga) AND has(alt, gb)) AS only_b
 FROM pp
-ARRAY JOIN ['EGFR','EGFR','EGFR','EGFR','EGFR','KRAS','KRAS','KRAS','KRAS','TP53','TP53','TP53','STK11','STK11','KEAP1'] AS ga, ['KRAS','TP53','STK11','KEAP1','ALK','TP53','STK11','KEAP1','ALK','STK11','KEAP1','ALK','KEAP1','ALK','ALK'] AS gb
+ARRAY JOIN ['EGFR','EGFR','EGFR','EGFR','EGFR','KRAS','KRAS','KRAS','KRAS','TP53','TP53','TP53','STK11','STK11','KEAP1'] AS ga, ['KRAS','TP53','STK11','KEAP1','ALK','TP53','STK11','KEAP1','ALK','STK11','KEAP1','ALK','KEAP1','ALK','ALK'] AS gb, ['EGFR','EGFR','EGFR','EGFR','EGFR','KRAS','KRAS','KRAS','KRAS','TP53','TP53','TP53','STK11','STK11','KEAP1'] AS gna, ['KRAS','TP53','STK11','KEAP1','ALK','TP53','STK11','KEAP1','ALK','STK11','KEAP1','ALK','KEAP1','ALK','ALK'] AS gnb
 GROUP BY ga, gb

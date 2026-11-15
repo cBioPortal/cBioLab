@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalPMin, portalAlteredPct, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -74,6 +74,10 @@ test("the portal's own number spellings, where a table must read as cBioPortal's
   assert.deepEqual([0.0234, 0.0004, 0, 1, null, NaN].map(portalPct), ["2.3", "< 0.1", "0.0", "100.0", "-", "-"]);
   // toConditionalPrecision(x, 3, 0.01)
   assert.deepEqual([0.0001234, 0.0123, 1.23e-12, 0].map(portalP), ["1.234e-4", "0.0123", "1.23e-12", "0.00"]);
+  // the Genomic Alterations table's altered share: MUC16 21 / 171 in Basal
+  assert.deepEqual([21 / 171, 0, 1, 0.123456].map(portalAlteredPct), ["12.28%", "0.00%", "100.00%", "12.35%"]);
+  // toConditionalPrecisionWithMinimum(x, 3, 0.01, -10): the Comparison page's clinical and survival-type tables
+  assert.deepEqual([3.86e-8, 1.022e-6, 0.245, 1e-10, 9.9e-11, 0, 0.0123].map(portalPMin), ["3.86e-8", "1.022e-6", "0.245", "1.00e-10", "< 10^-10", "< 10^-10", "0.0123"]);
 });
 
 test("linear ticks are round steps; log ticks are powers of ten", () => {
@@ -161,4 +165,10 @@ test("portalTrackPct: an oncoprint track's % as the portal's gutter shows it, ro
   assert.equal(pct(23, 40), "57%", "100 × (23 ÷ 40) is 57.4999… as a double");
   assert.equal(pct(5, 11), "45%");
   assert.equal(pct(40, 40), "100%");
+});
+
+test("portalFixed, portalLocale, portalRange: the density chart's numbers as the portal writes them", () => {
+  assert.equal(portalFixed(-0.33174, 4), "-0.3317"); assert.equal(portalFixed(1.0e-16, 2), "0.00"); assert.equal(portalFixed(3, 2), "3.00");
+  assert.equal(portalLocale(1234), "1,234"); assert.equal(portalLocale(1234.5678), "1,234.568"); assert.equal(portalLocale(Math.log(5)), "1.609");
+  assert.equal(portalRange(1234, 1234), "1,234"); assert.equal(portalRange(3, 4), "(3, 4]"); assert.equal(portalRange(Math.log(5), Math.log(6)), "(1.609, 1.792]");
 });

@@ -19,7 +19,7 @@ import { contractToTsv, type TabularSource } from "../lib/oncoprint-tabular.ts";
 import { trackTooltipLines } from "../lib/oncoprint-style.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
 import { removeTrack, moveTrack, canRemoveTrack } from "../app/_oncoprint/track-edits.ts";
-import { oncoprintRows, oncoprintAside, resultsLayout } from "../app/portal/results-layout.ts";
+import { oncoprintRows, resultsLayout } from "../app/portal/results-layout.ts";
 import type { Contract, Track } from "../lib/types.ts";
 
 const specs = (entry: string): OqlSpec[] => parseOql(entry)[0].specs;
@@ -320,13 +320,7 @@ test("R15: 'KRAS: AMP; KRAS: MUT; TP53' — each line its own row, in query orde
   assert.deepEqual(oncoprintRows(["KRAS: AMP", "KRAS: MUT", "TP53"]), ["KRAS: AMP", "KRAS: MUT", "TP53"]);
   assert.deepEqual(oncoprintGenes(["KRAS: AMP", "KRAS: MUT", "TP53"]), ["KRAS: AMP", "KRAS: MUT", "TP53"]);
   assert.deepEqual(oncoprintRows(["KRAS: MUT", "TP53", "KRAS: AMP"]), ["KRAS: MUT", "TP53", "KRAS: AMP"], "not gathered by gene");
-  assert.deepEqual(oncoprintRows(["KRAS: AMP EXP>2", "KRAS: MUT"]), ["KRAS: AMP", "KRAS: MUT"], "EXP / PROT still left out (PR 4)");
-});
-
-test("R15: the page note no longer says two lines are drawn as one row; it still names EXP / PROT", () => {
-  assert.equal(oncoprintAside(["KRAS: AMP", "KRAS: MUT", "TP53"]), null);
-  const exp = oncoprintAside(["KRAS: AMP EXP>2", "KRAS: MUT"]);
-  assert.ok(exp && /EXP \/ PROT/.test(exp) && !/one row/.test(exp), String(exp));
+  assert.deepEqual(oncoprintRows(["KRAS: AMP EXP>2", "KRAS: MUT"]), ["KRAS: AMP EXP>2", "KRAS: MUT"], "EXP / PROT drawn too (PR 4)");
 });
 
 test("R16: 'KRAS; KRAS: AMP' — the bare row, then the line (OU)", () => {

@@ -31,7 +31,7 @@ import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validate
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
-  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank, type ViolinBin } from "./plot.ts";
+  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank, type ViolinBin, type PlotCell, plotExtent } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export * from "./federation-views.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
@@ -50,6 +50,12 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 }
 
 const num = (v: unknown): number | null => { if (v == null || v === "") return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
+/** a density cell as plotBinsSql answers it */
+const binOf = (b: ChRow): PlotCell => {
+  const cell: PlotCell = { bx: Number(b.bx), by: Number(b.by), n: Number(b.n) };
+  for (const k of ["minX", "maxX", "minY", "maxY"] as const) { const v = num(b[k]); if (v != null) cell[k] = v; }
+  return cell;
+};
 /** a plot's coverage row: the cohort's cases, each axis's, and (patient mode) the patients with several samples */
 const coverageOf = (row: Record<string, unknown>): NonNullable<PlotData["coverage"]> =>
   ({ total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0), ...(row.multi != null ? { multi: Number(row.multi) } : {}) });
@@ -60,7 +66,8 @@ import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } 
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 import { finiteSql } from "./sql-number.ts";
-import { driverAnnotationJoin } from "./oql.ts";
+import type { DriverSettings } from "./driver-settings.ts";
+import { driverAnnotationJoin, oqlEventsSql, oqlMutationFilterSql, parseOql, type OqlPins, type OqlDriverOpts } from "./oql.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
@@ -408,22 +415,52 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * only this instance knows what its panels cover. That is also why a federated
  * co-occurrence is more correct than one computed from pooled exports.
  */
-export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB): AggregateSql {
-  const genes = [...new Set(pairs.flat())];
+/** the query's lines a Mutations tab follows, and how their DRIVER reads */
+export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
+/** each gene's mutation filter under the query's lines, where one applies */
+export function mutationFilters(oql: LollipopOql, genes: string[], o: { study: string; db: string; oncokbPin: string | null; hotspotPins: VariantPins | null }): MutationFilters {
+  const out: MutationFilters = {};
+  for (const g of genes) {
+    const f = oqlMutationFilterSql(oql.lines, g, { study: o.study, db: o.db, oncokbPin: o.oncokbPin,
+      ...(oql.drivers !== undefined ? { drivers: oql.drivers, hotspotPins: o.hotspotPins ?? undefined } : {}) });
+    if (f !== null) out[g] = f;
+  }
+  return out;
+}
+
+/** how a pair's query lines read: the page's driver settings and the profiles its EXP / PROT read */
+export interface PairOql { drivers?: DriverSettings; exp?: string; prot?: string; ifHeld?: boolean }
+
+/** what a line's track is matched with: the study's pins and profiles, the page's driver settings and EXP / PROT profiles */
+export interface PairOqlSql extends OqlDriverOpts { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins }
+
+export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB, oql?: PairOqlSql): AggregateSql {
+  // a pair names two TRACKS: a gene, or (with `oql`) a query line written back, "KRAS: AMP"
+  const tracks = [...new Set(pairs.flat())];
+  const lineOf = new Map<string, string>();
+  if (oql) for (const t of tracks) if (t.includes(":")) lineOf.set(t, parseOql(t)[0].gene);
+  const geneOf = (t: string): string => lineOf.get(t) ?? t;
+  const genes = [...new Set(tracks.map(geneOf))];
+  const bare = tracks.filter((t) => !lineOf.has(t));
   const geneList = genes.map(sq).join(",");
   const sid = bareSampleId("g.sample_unique_id", study);
   const covSid = bareSampleId("sp.sample_unique_id", study);
-  const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
-  const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
-  const bothCov = "has(cov, ga) AND has(cov, gb)";
+  const arr = (f: (p: [string, string]) => string) => "[" + pairs.map((p) => sq(f(p))).join(",") + "]";
+  const bothCov = "has(cov, gna) AND has(cov, gnb)";
+  const altered = [
+    ...(bare.length ? ["  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + sid + " AS sid\n" +
+      "  FROM " + db + ".genomic_event_derived g\n" +
+      "  WHERE " + genomicStudySql(study, "g") + "\n" +
+      "    AND g.hugo_gene_symbol IN (" + bare.map(sq).join(",") + ") AND " + ALTERED_COND + "\n" +
+      "    AND " + inCohortSamples(sid)] : []),
+    // a line's track: the samples its OQL matches (lib/oql.ts), as the portal's OQL-filtered data
+    ...[...lineOf.keys()].map((t) => "  SELECT DISTINCT " + sq(t) + " AS gene, e.sid AS sid\n" +
+      "  FROM (" + oqlEventsSql(t, { ...oql, study, db }) + ") e\n" +
+      "  WHERE " + inCohortSamples("e.sid"))
+  ];
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
-    "altered AS (\n" +
-    "  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + sid + " AS sid\n" +
-    "  FROM " + db + ".genomic_event_derived g\n" +
-    "  WHERE " + genomicStudySql(study, "g") + "\n" +
-    "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
-    "    AND " + inCohortSamples(sid) + "\n" +
+    "altered AS (\n" + altered.join("\n  UNION ALL\n") + "\n" +
     "),\n" +
     "covered AS (\n" +
     "  SELECT DISTINCT pg.gene AS gene, " + covSid + " AS sid\n" +
@@ -446,7 +483,7 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
     "       countIf(" + bothCov + " AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,\n" +
     "       countIf(" + bothCov + " AND NOT has(alt, ga) AND has(alt, gb)) AS only_b\n" +
     "FROM pp\n" +
-    "ARRAY JOIN " + arrA + " AS ga, " + arrB + " AS gb\n" +
+    "ARRAY JOIN " + arr((p) => p[0]) + " AS ga, " + arr((p) => p[1]) + " AS gb, " + arr((p) => geneOf(p[0])) + " AS gna, " + arr((p) => geneOf(p[1])) + " AS gnb\n" +
     "GROUP BY ga, gb"
   ));
 }
@@ -525,7 +562,13 @@ export function variantCountsSql(cohortSql: string, genes: string[], study: stri
  * there, from the cohort's own samples only. The four builders below share this CTE. The suppression floor applies to a
  * (codon, change) pair's patient count, at the data holder, before anything leaves.
  */
-function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string, hotspotPins: VariantPins | null = null): string {
+/** per gene, the condition on its mutation_derived rows the query's OQL keeps (lib/oql.ts oqlMutationFilterSql) */
+export type MutationFilters = Record<string, string>;
+const filteredGenesSql = (genes: string[], filters?: MutationFilters): string =>
+  !filters || !Object.keys(filters).length ? ""
+    : "\n             AND (" + genes.map((g) => "(`GENE.hugoGeneSymbol` = " + sq(g) + (filters[g] ? " AND " + filters[g] : "") + ")").join("\n               OR ") + ")";
+
+function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string, hotspotPins: VariantPins | null = null, filters?: MutationFilters): string {
   const floor = Math.max(1, Math.floor(minCount));
   // a driver by OncoKB or as a Cancer Hotspot, the portal's default sources. With no pin there is no
   // annotation to split drivers from VUS, and cBioPortal then colours everything as a driver; the
@@ -543,14 +586,14 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "           FROM " + db + ".mutation_derived\n" +
     "           WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
     "             AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
-    "             AND " + inCohortSamples("sampleId") + "),\n" +
+    "             AND " + inCohortSamples("sampleId") + filteredGenesSql(genes, filters) + "),\n" +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
 /** Per (codon, change): distinct patients (the height), raw rows (the label's ordering), and the change's
  * driver status and protein impact class (its commonest), so the plot can be filtered by class in the browser. */
-export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins) +
+export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null, filters?: MutationFilters): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters) +
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
     "FROM m GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
 }
@@ -560,14 +603,14 @@ export function lollipopChangesSql(cohortSql: string, genes: string[], study: st
  * counts toward the tally (the portal's badges count every mutation row), so the floor's
  * membership test compares pos through ifNull rather than letting NULL fail the tuple match.
  */
-export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins) +
+export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null, filters?: MutationFilters): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters) +
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
     "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
 /** Per gene: mutated patients, distinct (patient, change) pairs, and samples with a somatic one. */
-export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, 1, null, db) +
+export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB, filters?: MutationFilters): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, 1, null, db, null, filters) +
     "SELECT gene, uniqExact(pid) AS patients, uniqExact((pid, change)) AS pairs,\n" +
     "       uniqExactIf(sid, status != 'GERMLINE') AS somatic_samples\n" +
     "FROM m GROUP BY gene");
@@ -1182,7 +1225,8 @@ export interface AggregateCapable {
   treatmentSequence(def: CohortDef | null | undefined, opts: SequenceOpts): Promise<SequenceFlow[]>;
   /** which attribute keys could label a therapy line here */
   sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]>;
-  pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
+  /** pairs of tracks: genes, or with `oql` query lines written back ("KRAS: AMP"), read with the page's settings */
+  pairCounts(def: CohortDef | null | undefined, pairs: [string, string][], oql?: PairOql): Promise<PairCounts[]>;
   /** a plot's aggregated contract: bins, groups or cells — never points */
   plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean; topValues?: number }): Promise<AttrStats[]>;
@@ -1192,7 +1236,7 @@ export interface AggregateCapable {
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
-  lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<LollipopReport>;
+  lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number, oql?: LollipopOql): Promise<LollipopReport>;
   profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): CohortSql;
@@ -1364,7 +1408,7 @@ export interface FederatedPlotCapable {
   plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }>;
   plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]>;
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]>;
   plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments>;
   plotTableCells(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ cx: string; cy: string; n: number }[]>;
@@ -1539,17 +1583,18 @@ abstract class BaseResolver implements AggregateCapable {
     };
   }
 
-  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<LollipopReport> {
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql): Promise<LollipopReport> {
     const pin = this.ctx.oncokbPin ?? null;
     const empty: LollipopReport = { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: !!pin };
     if (!genes.length) return empty;
     const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
     const pos = (x: unknown) => x == null || x === "" ? null : Number(x);
     const hotspotPins = await variantPins();
+    const filters = oql ? mutationFilters(oql, genes, { study: this.study, db, oncokbPin: pin, hotspotPins }) : undefined;
     const [c, t, tot, cs] = await Promise.all([
-      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins), conn),
-      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins), conn),
-      this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db), conn),
+      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters), conn),
+      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters), conn),
+      this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters), conn),
       this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
     ]);
     return {
@@ -1702,17 +1747,18 @@ abstract class BaseResolver implements AggregateCapable {
       const c = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), conn);
       const n = Number(c.data[0]?.n || 0);
       if (!n) return done({ shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" });
+      const extent = plotExtent({ x0: Number(c.data[0].x0), x1: Number(c.data[0].x1), y0: Number(c.data[0].y0), y1: Number(c.data[0].y1) },
+        spec.range, { x: !!logOf(spec.x).log, y: !!logOf(spec.y).log });
       const [st, bins] = await Promise.all([
         this.runLogged<ChRow>("plot:stats", plotStatsSql(xSel, ySel, ctx.cohortSql), conn),
-        this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins), conn)
+        this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins, spec.range ? extent : undefined), conn)
       ]);
       const r = st.data[0] || {};
       const pearson = num(r.pearson), spearman = num(r.spearman);
       return done({
-        shape, n, ...label,
-        extent: { x0: Number(c.data[0].x0), x1: Number(c.data[0].x1), y0: Number(c.data[0].y0), y1: Number(c.data[0].y1) },
+        shape, n, ...label, extent,
         grid: [spec.bins?.[0] ?? DEFAULT_BINS[0], spec.bins?.[1] ?? DEFAULT_BINS[1]],
-        bins: bins.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) })),
+        bins: bins.data.map(binOf),
         stats: { pearson, spearman, slope: num(r.slope), intercept: num(r.intercept),
           pPearson: corrPValue(pearson, n), pSpearman: corrPValue(spearman, n) }
       });
@@ -1812,15 +1858,15 @@ abstract class BaseResolver implements AggregateCapable {
 
   /** Pass 2: this site's bin counts against the shared extent every participant was given. */
   async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]> {
     return this.binCountsIn("plot:bins", (await this.plotCtx(def, spec)), spec, xk, yk, bins, extent);
   }
 
   private async binCountsIn(label: string, ctx: Awaited<ReturnType<BaseResolver["plotCtx"]>>, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]> {
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const r = await this.runLogged<ChRow>(label, plotBinsSql(xSel, ySel, ctx.cohortSql, bins, extent), this.instance.conn);
-    return r.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) }));
+    return r.data.map(binOf);
   }
 
   /** This site's six sums for the pair — sufficient for a federated Pearson/regression (lib/stats.ts). */
@@ -1929,10 +1975,13 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await this.runLogged<ChRow>(label, build(this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
-  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
+  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][], oql?: PairOql): Promise<PairCounts[]> {
     if (!pairs.length) return [];
+    const lines = oql ? { oncokbPin: this.ctx.oncokbPin, profiles: this.ctx.profiles, hotspotPins: this.ctx.hotspotPins,
+      pins: { ...(oql.exp ? { EXP: oql.exp } : {}), ...(oql.prot ? { PROT: oql.prot } : {}), ...(oql.ifHeld ? { ifHeld: true } : {}) },
+      ...(oql.drivers !== undefined ? { drivers: oql.drivers } : {}) } : undefined;
     const r = await this.runLogged<ChRow>("pairCounts",
-      pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db), this.instance.conn);
+      pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db, lines), this.instance.conn);
     return r.data.map((x) => {
       const profiled = Number(x.profiled), both = Number(x.both), onlyA = Number(x.only_a), onlyB = Number(x.only_b);
       return { a: x.ga, b: x.gb, both, onlyA, onlyB, profiled, neither: profiled - both - onlyA - onlyB };
@@ -2299,9 +2348,11 @@ export async function resolverFor(study: string, ctx: Partial<CompileCtx>): Prom
     return kinds.has("timeline") ? new RemoteTimelineResolver(study, peer.url, shared, kinds) : new RemotePatientResolver(study, peer.url, shared, kinds);
   }
   const inst = await instanceForStudy(study);
+  // the Genome Nexus releases an OQL clause's Cancer Hotspots are read at, as the lollipop's
+  const full = ctx.hotspotPins ? ctx : { ...ctx, hotspotPins: await variantPins() };
   return inst.mode === "patient-level"
-    ? new PatientLevelResolver(study, ctx, inst)
-    : new AggregateResolver(study, ctx, inst);
+    ? new PatientLevelResolver(study, full, inst)
+    : new AggregateResolver(study, full, inst);
 }
 
 /** Expand pooled (months, event, n) triples into KM input records. */

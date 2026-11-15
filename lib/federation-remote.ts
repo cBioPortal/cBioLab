@@ -13,8 +13,8 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, CohortSizes, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
-import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers } from "./plot.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, PairOql, LollipopOql, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
+import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers, PlotCell } from "./plot.ts";
 import type { Moments } from "./stats.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 import { carriesPatientIds, studyRouting } from "./federation.ts";
@@ -184,9 +184,10 @@ export async function remoteFacets(study: string, url: string, draft: CohortDef 
   };
 }
 
-/** a plot request as it travels to a peer: the axes, unit and grid, nothing else */
+/** a plot request as it travels to a peer: the axes, unit, grid and axis ends, nothing else */
 const plotSpecOut = (spec: PlotRequest) => ({ x: spec.x, y: spec.y, unit: spec.unit,
-  ...(spec.colorBy ? { colorBy: spec.colorBy } : {}), ...(spec.ringBy ? { ringBy: spec.ringBy } : {}), ...(spec.bins ? { bins: spec.bins } : {}) });
+  ...(spec.colorBy ? { colorBy: spec.colorBy } : {}), ...(spec.ringBy ? { ringBy: spec.ringBy } : {}), ...(spec.bins ? { bins: spec.bins } : {}),
+  ...(spec.range ? { range: spec.range } : {}) });
 
 export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotCapable {
   readonly instance: Instance;
@@ -326,7 +327,7 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     return this.plotOp("extent", def, spec, { kinds: { xk, yk } });
   }
   async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]> {
     return this.plotOp("bins", def, spec, { kinds: { xk, yk }, bins, extent });
   }
   async plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments> {
@@ -364,10 +365,10 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
       "and this needs its own federation op rather than guessing at one");
   }
 
-  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
+  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][], oql?: PairOql): Promise<PairCounts[]> {
     this.guard(def);
     if (!pairs.length) return [];
-    const r = await this.call("aggregates", { study: this.study, cohort: def || {}, pairs });
+    const r = await this.call("aggregates", { study: this.study, cohort: def || {}, pairs, ...(oql ? { pairOql: oql } : {}) });
     this.remember(r);
     return r.pairCounts || [];
   }
@@ -396,11 +397,11 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     this.remember(r);
     return r.variantCounts || { variants: [], totals: [], minCount };
   }
-  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1): Promise<LollipopReport> {
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql): Promise<LollipopReport> {
     this.guard(def);
     if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: false };
     const r = await this.call("aggregates",
-      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount });
+      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}) });
     this.remember(r);
     // a peer on an older build answers without these; refuse by name rather than draw nothing
     if (!r.lollipopCounts)

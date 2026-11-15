@@ -3,7 +3,7 @@ import { geneSymbols } from "../../gene-tracks.ts";
 import { buildLollipopGene, fetchProteinInfo, checkHide, checkCodons, pruneCodons } from "../../lollipop.ts";
 import type { ViewResult } from "../../types.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
-import { overLimit } from "../shared.ts";
+import { overLimit, viewOql } from "../shared.ts";
 import type { HotspotsView, HotspotGene } from "./types.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
@@ -12,6 +12,8 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const uniq = geneSymbols(hv.genes);
   if (!uniq.length) return untimed({ kind: "hotspots", error: "hotspots view needs genes" });
   { const e = overLimit("a hotspots view", 12, uniq.length); if (e) return untimed({ kind: "hotspots", error: e.replace("at most 12", "at most 12 genes") }); }
+  const lines = viewOql(hv);
+  if ("error" in lines) return untimed({ kind: "hotspots", error: lines.error });
   const minCount = Math.max(1, Math.min(1000, Math.floor(Number(hv.minCount) || 1)));
   { const e = checkHide(hv.hide); if (e) return untimed({ kind: "hotspots", error: e }); }
   const hide = [...new Set(hv.hide || [])];
@@ -21,7 +23,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const studies = cohorts[cn].studies;
   // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
   const [reports, proteins] = await Promise.all([
-    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount))),
+    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql))),
     Promise.all(uniq.map((g) => fetchProteinInfo(g)))
   ]);
   const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]))

@@ -3,6 +3,8 @@
 // (tables.ts) so the frequencies and the files can never disagree; and the counts themselves.
 import { profiledCasesSql } from "../../cohort2.ts";
 import { oqlEventsSql, type OqlPins } from "../../oql.ts";
+import type { DriverSettings } from "../../driver-settings.ts";
+import type { VariantPins } from "../../variant-annotation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 
 export type DataType = "MUTATION" | "CNA" | "SV";
@@ -15,7 +17,9 @@ export interface LinePlan {
   types: DataType[];
 }
 /** What a study's SQL needs besides the lines: the OncoKB version (DRIVER) and its profiles (EXP / PROT). */
-export interface StudyOpts { study: string; db: string; pin: string | null; profiles: string[]; pins?: OqlPins }
+export interface StudyOpts { study: string; db: string; pin: string | null; profiles: string[]; pins?: OqlPins;
+  /** how a line's DRIVER reads (the page's driver settings) and the Genome Nexus pins its hotspots are read at */
+  drivers?: DriverSettings; hotspotPins?: VariantPins }
 
 /** The CTE name for one gene and data type's profiled samples, under prefix `p`. */
 const profiledName = (p: string, gene: string, type: DataType) => p + "_prof_" + gene.replace(/[^A-Za-z0-9]/g, "_") + "_" + type;
@@ -32,7 +36,8 @@ export function lineCtes(p: string, cohort: string, lines: LinePlan[], o: StudyO
   lines.forEach((l, k) => {
     out.push(p + "_e" + k + " AS (\n" +
       "  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev\n" +
-      "  FROM (" + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, pins: o.pins, study: o.study, db: o.db }) + ")\n" +
+      "  FROM (" + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, pins: o.pins, study: o.study, db: o.db,
+        ...(o.drivers !== undefined ? { drivers: o.drivers, hotspotPins: o.hotspotPins } : {}) }) + ")\n" +
       "  WHERE sid IN (SELECT sid FROM " + cohort + ")\n" +
       "  GROUP BY sid)");
   });

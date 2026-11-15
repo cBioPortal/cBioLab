@@ -25,7 +25,9 @@ export type ClinicalOp = "=" | "!=" | ">" | ">=" | "<" | "<=";
  * prefix) that the query's EXP / PROT alterations read — the query page's mRNA and protein profile
  * choice; without them, the study's z-score profile of that kind.
  */
-export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string; ifHeld?: boolean }
+export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string; ifHeld?: boolean;
+  /** how DRIVER reads: the page's driver settings (lib/driver-settings.ts); without them, OncoKB at the pin alone */
+  drivers?: DriverSettings }
 export interface ClinicalLeaf {
   kind: "clinical";
   /** matched at the level the study records it: a sample attribute selects the matching samples,
@@ -402,13 +404,15 @@ export interface CompileCtx {
   /** database (schema) holding this study — per instance, so never a constant */
   db?: string;
   oncokbPin?: string | null;
+  /** the Genome Nexus releases Cancer Hotspots are read at, for an OQL clause whose driver settings use them */
+  hotspotPins?: { hg19: string | null; hg38: string | null };
   profiles?: string[];
   gaProfiles?: string[];
   lineGap?: number;
 }
 
 // ---------- analysis document ----------------------------------------------
-import type { ResolvedDrivers } from "./driver-settings.ts";
+import type { ResolvedDrivers, DriverSettings } from "./driver-settings.ts";
 import type { GeneTrackSpec } from "./gene-tracks.ts";
 import type { TableQuery, ColumnValues } from "./table-query.ts";
 export type { TableQuery, ColumnValues, ColumnFilter, TextFilterOp } from "./table-query.ts";

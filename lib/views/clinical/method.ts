@@ -17,18 +17,24 @@ export interface ClinicalTrace {
   histograms: { cohort: string; attribute: string; value: number; n: number }[];
   /** the medians and quartiles the view reported — for the script check */
   medians: { attribute: string; cohort: string; median: number | null; q1: number | null; q3: number | null }[];
+  /** allAttributes: how many attributes the studies declare, and those left out as the portal leaves them out */
+  listed?: { declared: number; leftOut: string[] };
 }
 
 export function clinicalMethod(t: ClinicalTrace): MethodRecord {
   const k = t.cohorts.length;
-  const steps: MethodStep[] = t.perSite.map((s) => ({
+  const listing: MethodStep[] = t.listed ? [{ kind: "fetch", title: "List the studies' clinical attributes",
+    detail: "Every attribute the studies declare in their clinical attribute metadata: " + t.listed.declared + ". Left out, as cBioPortal's Comparison page leaves them out: each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR" +
+      (t.listed.leftOut.length ? " (" + t.listed.leftOut.join(", ") + ")" : "") + ". The rest are each described and tested below.",
+    rowsIn: t.listed.declared, rowsOut: t.listed.declared - t.listed.leftOut.length }] : [];
+  const steps: MethodStep[] = [...listing, ...t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Describe each attribute",
     detail: "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies)" +
       (t.singleStudy ? ", plus its complete value distribution as (value, count) pairs for the median, IQR and rank tests" : "") +
       ". Patients for a patient-level attribute, samples for a sample-level one. No individual value leaves the database" +
       (t.singleStudy ? " except as a count of how many share it" : "") + ".",
     scope: s.cohort + " · " + s.study, rowsIn: s.cohortPatients,
-  }));
+  }))];
   if (!t.singleStudy) {
     steps.push({ kind: "transform", title: "Add each cohort's counts and moments across its studies",
       detail: "Value counts, n, Σx and Σx² add exactly. Vocabularies are not harmonized: the same value spelled differently in two studies stays two values. Medians and rank tests need each study's full distribution in one place, so they are not computed for a view that spans studies." });
@@ -36,7 +42,7 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
   const skipped = t.attributes.filter((a) => a.skipped);
   if (skipped.length) {
     steps.push({ kind: "transform", title: "Set aside attributes that cannot be tested",
-      detail: "Each is named with its reason rather than dropped.",
+      detail: "Each is named with its reason rather than dropped. As cBioPortal's rule: a test needs two values among the groups and two groups holding any. They take no part in the q-values.",
       params: skipped.map((a) => [a.attribute, a.skipped!] as [string, string]) });
   }
   const fmtP = (p?: number) => p == null ? "—" : pFmt(p);

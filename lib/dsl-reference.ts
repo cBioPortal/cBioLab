@@ -1259,7 +1259,7 @@ A patient matches if **any** entry matches (portal "altered in query" semantics)
 - Mutations: \`MUT\`, \`MUT=<protein change>\` (e.g. \`MUT=G12C\`), classes \`MISSENSE NONSENSE FRAMESHIFT NONSTART NONSTOP INFRAME SPLICE PROMOTER TRUNC\`; bare \`G12C\` is protein-change shorthand. Classes are cBioPortal's, case for case: each stored mutation type maps to one class exactly as the portal's OQL maps it (e.g. \`Splice_Region\` is SPLICE, \`Translation_Start_Site\` NONSTART; a protein change of \`Promoter\` is PROMOTER whatever its type; an unlisted type such as \`5'Flank\` or \`Silent\` is in no class). **\`TRUNC\` is the portal's: every mutation that is not missense or in-frame** — nonsense, frameshift, nonstop, splice, start-loss, promoter and unclassified types alike — not just nonsense and frameshift.
 - Copy number: \`AMP\`, \`HOMDEL\`, \`CNA\` (either, high-level ±2 only).
 - Structural variants: \`FUSION\`.
-- Drivers: \`DRIVER\` alone (any driver alteration) or as modifier (\`MUT_DRIVER\`, \`DRIVER_G12D\`, \`TRUNC_DRIVER\`). Requires the version-pinned OncoKB annotation store; the pin is reported in every result.
+- Drivers: \`DRIVER\` alone (any driver alteration) or as modifier (\`MUT_DRIVER\`, \`DRIVER_G12D\`, \`TRUNC_DRIVER\`). Requires the version-pinned OncoKB annotation store; the pin is reported in every result. By default DRIVER is OncoKB's call alone; a leaf with \`"drivers"\` (the views' driver settings, e.g. \`{"kind":"oql","q":"KRAS: MUT_DRIVER","drivers":{}}\` for the portal's defaults) reads it as the portal does: OncoKB, Cancer Hotspots and the study's own driver calls, each where its setting is on. The Results page's Altered group carries its page's settings this way.
 - Protein position range, on a mutation (cBioPortal's \`(a-b)\` modifier): \`TRUNC_(1400-)\`, \`MUT_(-500)\`, \`MUT_(12-13)\`, \`MUT=(712-979)_DRIVER\`, or a range alone (\`(1400-)\`, any mutation there). By default a mutation matches when its protein range (start-end) **overlaps** the range; with \`*\` (\`(1-100*)\`) it must lie entirely inside it. A mutation with no usable position (missing, -1, or start after end) never matches, as in the portal. The range and the class are tested on the **same** mutation, so \`APC: TRUNC_(1400-)\` is a truncation at or after codon 1400 — unlike ANDing an \`APC: TRUNC\` leaf with a \`proteinPosition\` leaf, which can be satisfied by two different mutations. On anything but a mutation (\`AMP_(1-100)\`) it is refused.
 - Expression: \`EXP>z EXP<z PROT>z\` — only in studies with mRNA/protein profiles (errors otherwise, listing available profiles). They read the study's z-score profile of that kind, or the one the leaf names: \`{"kind":"oql","q":"TP53: EXP>=2","exp":"rna_seq_v2_mrna_median_Zscores","prot":"rppa_Zscores"}\` (ids without the study prefix — the query page's mRNA and protein profile choice); a profile the study does not have is refused, listing those it has — unless the leaf says \`"ifHeld":true\`: then a study without it simply has no EXP / PROT alterations (the query page's choice across several studies, as the portal applies it to each study holding that profile).
 - **Rejected loudly** (never silently approximated): \`GAIN HETLOSS GERMLINE SOMATIC\`.
@@ -1621,7 +1621,12 @@ oncoprint does: an alteration is drawn when any of the line's commands wants it,
 follows the view's driver settings. The row keeps the gene as its label and its percentage's
 denominator (the patients profiled for the gene), and shows the line after the label in grey
 (\`display.showOql: false\` hides it). Two lines of one gene are two rows, both labelled by the gene,
-as the portal draws them (\`["KRAS: AMP", "KRAS: MUT"]\`). \`EXP\` / \`PROT\` in a row are refused for now.
+as the portal draws them (\`["KRAS: AMP", "KRAS: MUT"]\`). A row's \`EXP>=2\` / \`PROT<=-1.5\` draws the
+gene's mRNA (protein) level high or low in its cells, each sample's value against the line (the
+last command it meets sets high or low; a patient shows the level more of its samples have, high on
+a tie) and counts those columns as altered; it reads the view's \`exp\` / \`prot\` profile (ids
+without the study prefix, as an oql clause's, with \`ifHeld\`), else the study's z-score profile of
+that kind.
 
 **Oncoprint clinical tracks**: any attribute name; patient-level rows win, sample-level attributes
 fall back to one sample value per patient. Numeric attributes (≥90% parseable, >10 distinct) render

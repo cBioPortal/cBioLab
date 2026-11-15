@@ -3,6 +3,7 @@
 import type { ViewResult } from "../../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
+import { plotExtent, plotRangeOf, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
 import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
@@ -572,14 +573,16 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   const unit = pv.unit === "patient" ? "patient" as const : "sample" as const;
   // a profile axis is read as the studies describe the profile
   let axes: Axes;
+  let range: PlotRange | undefined;
   try {
     const catalogs = await Promise.all(sites.map(async (st) => ({ study: st, catalog: (await c.studyProfiles(st)).catalog || [] })));
     axes = resolveAxes({ x: pv.x, y: pv.y, colorBy: pv.colorBy, ringBy: pv.ringBy }, catalogs);
     axes = await assayEntitiesKnown(c, axes, sites) as typeof axes;
     axes = withDrivers(axes, pv.drivers);
+    range = plotRangeOf(pv.range, axisLogs(axes));
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   const spec = { x: axes.x, y: axes.y, unit,
-    ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}) };
+    ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}), ...(range ? { range } : {}) };
   const bins: [number, number] = Array.isArray(pv.bins) && pv.bins.length === 2
     ? [Number(pv.bins[0]), Number(pv.bins[1])] : DEFAULT_BINS;
   const problem = layersProblem(pv, c, cn);
@@ -627,25 +630,23 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           // The shared scale every site's bin counts get re-queried against — see
           // plotBinsSql's `extent` parameter. Pooled exactly (min of mins, max of maxes),
           // unlike a quartile, an extent has no approximation to caveat.
-          const extent = { x0: Math.min(...have.map((e) => e.x0)), x1: Math.max(...have.map((e) => e.x1)),
-            y0: Math.min(...have.map((e) => e.y0)), y1: Math.max(...have.map((e) => e.y1)) };
+          const extent = plotExtent({ x0: Math.min(...have.map((e) => e.x0)), x1: Math.max(...have.map((e) => e.x1)),
+            y0: Math.min(...have.map((e) => e.y0)), y1: Math.max(...have.map((e) => e.y1)) }, spec.range, axisLogs(spec));
           const [binParts, momentParts] = await Promise.all([
             Promise.all(sites.map((s) => fr[s].plotBinCounts(doc.cohorts[cn], spec, xk, yk, bins, extent))),
             Promise.all(sites.map((s) => fr[s].plotMoments(doc.cohorts[cn], spec, xk, yk)))
           ]);
-          const cellCounts = new Map<string, number>();
+          const cells = new Map<string, PlotCell>();
           for (const part of binParts) for (const c of part) {
-            const key = c.bx + "," + c.by;
-            cellCounts.set(key, (cellCounts.get(key) || 0) + c.n);
+            const key = c.bx + "," + c.by, had = cells.get(key);
+            cells.set(key, had ? poolCells(had, c) : { ...c });
           }
           const pooledM = momentParts.reduce((a, m) => ({ n: a.n + m.n, sx: a.sx + m.sx, sy: a.sy + m.sy,
             sxy: a.sxy + m.sxy, sxx: a.sxx + m.sxx, syy: a.syy + m.syy }),
             { n: 0, sx: 0, sy: 0, sxy: 0, sxx: 0, syy: 0 } as Moments);
           const corr = pearsonFromMoments(pooledM), reg = regressionFromMoments(pooledM);
           data = { shape, n, ...label, extent, grid: bins,
-            bins: [...cellCounts.entries()].map(([k, cn2]) => {
-              const [bx, by] = k.split(",").map(Number); return { bx, by, n: cn2 };
-            }),
+            bins: [...cells.values()],
             stats: { pearson: corr.r, spearman: null, slope: reg.slope, intercept: reg.intercept,
               pPearson: corr.r != null ? corr.p : null, pSpearman: null },
             note: scaleNote + ". Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for" +
@@ -730,4 +731,16 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   } catch (e) {
     return { kind: "plot", error: String((e as Error).message || e) };
   }
+}
+
+/** whether each axis reads log10(v + 1) */
+function axisLogs(spec: { x: PlotAxis; y: PlotAxis }): { x: boolean; y: boolean } {
+  return { x: "log" in spec.x && !!spec.x.log, y: "log" in spec.y && !!spec.y.log };
+}
+
+/** one density cell from two sites: the counts add, the extremes are the outer ones */
+function poolCells(a: PlotCell, b: PlotCell): PlotCell {
+  const lo = (u?: number, v?: number) => u == null ? v : v == null ? u : Math.min(u, v);
+  const hi = (u?: number, v?: number) => u == null ? v : v == null ? u : Math.max(u, v);
+  return { bx: a.bx, by: a.by, n: a.n + b.n, minX: lo(a.minX, b.minX), maxX: hi(a.maxX, b.maxX), minY: lo(a.minY, b.minY), maxY: hi(a.maxY, b.maxY) };
 }

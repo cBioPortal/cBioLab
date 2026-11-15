@@ -9,6 +9,8 @@ export interface CooccurrenceTrace {
   counts: { study: string; a: string; b: string; both: number; onlyA: number; onlyB: number; neither: number }[];
   pairs: number;
   assessable: number;
+  /** the query's OQL lines, when the tracks are lines rather than genes */
+  oql?: string[];
   /** what the view reported per assessable pair — for the script check */
   results: { a: string; b: string; p: number; q: number; pStratified?: number }[];
 }
@@ -18,6 +20,7 @@ export function cooccurrenceMethod(t: CooccurrenceTrace): MethodRecord {
   const steps: MethodStep[] = t.cohortSamples.map((s) => ({
     kind: "fetch" as const, title: "Count each gene pair's 2×2 table",
     detail: "The pairCounts query above. Of the samples on a mutation panel covering both genes: how many are altered in both, only the first, only the second, or neither (" +
+      (t.oql ? "each track a line of the query's OQL (" + t.oql.join("; ") + "), altered where its line matches; a bare gene: " : "") +
       ALTERED_MEANING + "). Four counts per pair, nothing else.",
     scope: t.cohort + " · " + s.study, rowsIn: s.samples,
     params: [["pairs", String(t.pairs)]],

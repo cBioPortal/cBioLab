@@ -44,8 +44,10 @@ export interface DiffexprResult {
   profileName?: string; profileKind?: string;
   /** what `effect` is: a difference of means on the compared scale (two cohorts) */
   effectLabel: string;
-  /** cohorts in order; with two, effect = first − second */
+  /** cohorts compared, in order; with two, effect = first − second */
   groups: string[];
+  /** cohorts of the view left out for holding no data in the profile (no gene with 3 samples with a value) */
+  dropped?: string[];
   /** "Welch's t-test" (two cohorts) or "one-way ANOVA" */
   test: string;
   tested: number;

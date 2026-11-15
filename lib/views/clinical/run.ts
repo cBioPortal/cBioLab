@@ -5,17 +5,48 @@ import type { ViewResult } from "../../types.ts";
 import type { AttrStats } from "../../federation.ts";
 import { ATTR_NAME_RE } from "../../custom-data.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
-import { overLimit } from "../shared.ts";
+import { overLimit, answering } from "../shared.ts";
 import type { ClinicalView, ClinicalRow } from "./types.ts";
 import { clinicalMethod } from "./method.ts";
+import { clinicalAttributeListSql } from "./sql.ts";
+
+/** attributes the resolver describes in one request */
+const STATS_BATCH = 20;
+/** the most attributes allAttributes tests; a study declaring more is refused with the limit named */
+const CLINICAL_ALL_LIMIT = 300;
+/** attributes cBioPortal's Comparison page leaves out of its clinical table, beside the survival endpoints */
+const PORTAL_LEFT_OUT = new Set(["AGE_LAST_FU_YEARS", "BIRTH_YEAR"]);
+
+/**
+ * Every attribute the studies declare, by id, with its display name: the portal's Clinical tab's
+ * list, which leaves out each survival endpoint's <X>_MONTHS / <X>_STATUS pair, AGE_LAST_FU_YEARS
+ * and BIRTH_YEAR. A participant that cannot list its attributes is named.
+ */
+async function studyAttributes(c: ViewRun): Promise<{ attrs: string[]; labels: Map<string, string>; unlisted: string[]; declared: number; leftOut: string[] }> {
+  const { ok, excluded } = answering(c);
+  const lists = await Promise.all(Object.values(ok).map((r) => r.viewMeta("clinicalAttributes", (study, db) => clinicalAttributeListSql(study, db))));
+  const labels = new Map<string, string>();
+  for (const rows of lists) for (const r of rows) if (!labels.has(String(r.a))) labels.set(String(r.a), String(r.label || r.a));
+  const ids = new Set(labels.keys());
+  const survival = (a: string) => {
+    const m = /^(.*)_(MONTHS|STATUS)$/.exec(a);
+    return !!m && ids.has(m[1] + "_MONTHS") && ids.has(m[1] + "_STATUS");
+  };
+  const attrs = [...ids].filter((a) => ATTR_NAME_RE.test(a) && !survival(a) && !PORTAL_LEFT_OUT.has(a)).sort();
+  return { attrs, labels, unlisted: excluded.map((e) => e.study), declared: ids.size, leftOut: [...ids].filter((a) => survival(a) || PORTAL_LEFT_OUT.has(a)).sort() };
+}
 
 export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
-  const attrs = ((view as ClinicalView).attributes || [])
-    .map((a) => String(a).trim()).filter((a) => ATTR_NAME_RE.test(a));
-  if (!attrs.length) return untimed({ kind: "clinical", error: "clinical view needs attributes" });
-  { const e = overLimit("a clinical view", 20, attrs.length); if (e) return untimed({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); }
   if (vNames.length < 2) return untimed({ kind: "clinical", error: "clinical comparison needs at least 2 cohorts" });
+  const all = (view as ClinicalView).allAttributes === true;
+  const listed = all ? await studyAttributes(c) : null;
+  const attrs = listed ? listed.attrs : ((view as ClinicalView).attributes || [])
+    .map((a) => String(a).trim()).filter((a) => ATTR_NAME_RE.test(a));
+  if (!attrs.length) return untimed({ kind: "clinical", error: all ? "the studies declare no clinical attribute to compare" : "clinical view needs attributes" });
+  if (listed && attrs.length > CLINICAL_ALL_LIMIT) return untimed({ kind: "clinical",
+    error: "every attribute means " + attrs.length + " here, and a clinical view tests at most " + CLINICAL_ALL_LIMIT + "; name the attributes instead" });
+  if (!listed) { const e = overLimit("a clinical view", 20, attrs.length); if (e) return untimed({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); }
   // cohort -> study -> that site's description of each attribute
   // A median or a rank sum is not additive the way (n, sum, sumsq) is — there is no honest
   // way to combine two sites' histograms into one — so the complete per-value histogram is
@@ -25,7 +56,8 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
   const stats = new Map<string, AttrStats[]>();  // "cohort|study"
   await Promise.all(vNames.flatMap((n) =>
     cohorts[n].studies.map(async (st) => {
-      stats.set(n + "|" + st, await resolvers[st].attributeStats(doc.cohorts[n], attrs, { histograms: singleStudy }));
+      const batches = Array.from({ length: Math.ceil(attrs.length / STATS_BATCH) }, (_, i) => attrs.slice(i * STATS_BATCH, (i + 1) * STATS_BATCH));
+      stats.set(n + "|" + st, (await Promise.all(batches.map((b) => resolvers[st].attributeStats(doc.cohorts[n], b, { histograms: singleStudy })))).flat());
     })));
   const rows: ClinicalRow[] = [];
   for (const attribute of attrs) {
@@ -53,6 +85,10 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
         return { cohort: n, n: values.reduce((s, x) => s + x.n, 0), top: values.slice(0, 5), values };
       });
       const vocab = [...new Set(cells.flatMap((c) => c.values.map((v) => v.v)))];
+      // the portal's rule: a test needs two values and two groups holding any
+      const untestable = vocab.length < 2 ? (vocab.length ? "one value in every group (" + vocab[0] + ")" : "no value in any group")
+        : cells.filter((x) => x.n > 0).length < 2 ? "only one group has a value" : null;
+      if (untestable) { rows.push({ attribute, per, kind, cells: cells.map(({ cohort, n, top }) => ({ cohort, n, top })), distinct: vocab.length, skipped: untestable }); continue; }
       const table = cells.map((c) => vocab.map((v) => c.values.find((x) => x.v === v)?.n || 0));
       const t = chiSquareTest(table);
       rows.push({ attribute, per, kind, test: "chi-squared",
@@ -78,8 +114,14 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
           min: Number.isFinite(mn) ? mn : null, max: Number.isFinite(mx) ? mx : null, variance,
           median, q1, q3, histogramTruncated, valueCounts };
       });
-      const row: ClinicalRow = { attribute, per, kind, q: 1,
-        cells: cells.map(({ variance, valueCounts, exactMean, ...c }) => c) };
+      const shown = cells.map(({ variance, valueCounts, exactMean, ...c }) => c);
+      // the portal's rule: a test needs two groups with values and two distinct values among them
+      const held = cells.filter((x) => x.n > 0);
+      const lo = Math.min(...held.map((x) => x.min!)), hi = Math.max(...held.map((x) => x.max!));
+      const untestable = !held.length ? "no value in any group" : held.length < 2 ? "only one group has a value"
+        : lo === hi ? "one value in every group (" + lo + ")" : null;
+      if (untestable) { rows.push({ attribute, per, kind, cells: shown, skipped: untestable }); continue; }
+      const row: ClinicalRow = { attribute, per, kind, q: 1, cells: shown };
       if (vNames.length === 2) {
         const [x, y] = cells;
         const w = welchT(x.n, x.exactMean, x.variance, y.n, y.exactMean, y.variance);
@@ -102,16 +144,18 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
       rows.push(row);
     }
   }
+  if (listed) for (const r of rows) { const l = listed.labels.get(r.attribute); if (l && l !== r.attribute) r.label = l; }
   const tested = rows.filter((r) => r.p != null);
   benjaminiHochberg(tested.map((r) => r.p!)).forEach((q, i) => { tested[i].q = q; });
   rows.sort((a, b) => (a.p ?? 2) - (b.p ?? 2));
+  const untested = rows.length - tested.length;
   const siteKeys = vNames.flatMap((n) => [...cohorts[n].studies].sort().map((st) => ({ cohort: n, study: st })));
   const testedAttrs = new Set(rows.filter((r) => !r.skipped).map((r) => r.attribute));
   const siteStats = siteKeys.flatMap(({ cohort, study }) =>
     (stats.get(cohort + "|" + study) || []).filter((x) => testedAttrs.has(x.attribute)).map((x) => ({ cohort, study, x })));
   return { kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
     method: clinicalMethod({
-      cohorts: vNames, singleStudy,
+      cohorts: vNames, singleStudy, ...(listed ? { listed: { declared: listed.declared, leftOut: listed.leftOut } } : {}),
       perSite: siteKeys.map(({ cohort, study }) => ({ cohort, study, cohortPatients: cohorts[cohort].perStudy[study]?.count || 0 })),
       attributes: attrs.map((a) => rows.find((r) => r.attribute === a)!).map((r) => ({
         attribute: r.attribute, per: r.per, kind: r.kind, ...(r.skipped ? { skipped: r.skipped } : {}),
@@ -135,6 +179,10 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
       " exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the" +
       " attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across" +
       " the " + tested.length + " tested attributes." +
+      (listed ? " Every clinical attribute the stud" + (vStudies.length === 1 ? "y declares" : "ies declare") + " is compared (" + attrs.length +
+        "), but each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR, as on cBioPortal" +
+        (listed.unlisted.length ? "; " + listed.unlisted.join(", ") + " could not list its attributes, so only those the others declare are asked of it" : "") + "." : "") +
+      (untested ? " " + untested + " attribute" + (untested === 1 ? " is" : "s are") + " listed as not tested, each with its reason (a test needs two values and two groups holding any), and left out of the q-values." : "") +
       (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
         " Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a" +
         " Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) —" +

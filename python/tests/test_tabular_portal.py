@@ -226,3 +226,16 @@ class TabularPortal(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExpressionText(unittest.TestCase):
+    """X17 of the EXP / PROT case table: the MRNA and PROTEIN rows' texts (TD 70-77), as the TypeScript's geneticText."""
+
+    def test_mrna_and_protein_text(self):
+        from cohortlab.contract import genetic_text
+        from cohortlab.style import BITS
+        self.assertEqual(genetic_text(BITS["MRNA_HIGH"], "MRNA", True), "mRNA High")
+        self.assertEqual(genetic_text(BITS["MRNA_LOW"], "MRNA", False), "mRNA Low")
+        self.assertEqual(genetic_text(BITS["PROT_HIGH"], "PROTEIN", True), "Protein High")
+        self.assertEqual(genetic_text(BITS["PROT_LOW"], "PROTEIN", False), "Protein Low")
+        self.assertEqual(genetic_text(BITS["AMP"], "MRNA", True), "", "a cell without the bit has no text")

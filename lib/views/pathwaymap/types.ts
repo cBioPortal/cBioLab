@@ -9,6 +9,8 @@ import type { RankedPathway, RankSettings } from "./rank.ts";
  * `byFrequency`, `pancanOnly`), applied in the browser from the whole result: every library gene's
  * counts come back with it, so choosing another pathway re-runs nothing.
  */
+import type { DriverSettings } from "../../driver-settings.ts";
+
 export interface PathwayMapView {
   note?: string;
   kind: "pathwaymap"; cohorts?: string[];
@@ -22,6 +24,13 @@ export interface PathwayMapView {
   byFrequency?: boolean;
   /** list only the ten TCGA PanCanAtlas pathways (default true) */
   pancanOnly?: boolean;
+  /**
+   * The query's OQL, one line per entry, one gene each: the query genes are the lines' genes, and a
+   * gene whose line carries OQL is altered where its lines match (the portal's query-gene nodes)
+   */
+  oql?: string[];
+  /** how a line's DRIVER reads (the page's driver settings), and the profiles its EXP / PROT read */
+  drivers?: DriverSettings; exp?: string; prot?: string; ifHeld?: boolean;
 }
 
 export interface PathwayMapCell { cohort: string; profiled: number; altered: number; pct: number | null }

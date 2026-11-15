@@ -493,7 +493,7 @@ const pairCte = (x: string, y: string, cohortSql: string) =>
   "WITH cohort AS (" + cohortSql + "),\n" +
   "     xs AS (" + x + "),\n" +
   "     ys AS (" + y + "),\n" +
-  "     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)\n";
+  "     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)\n";
 
 /**
  * How many cases have BOTH axes, and the extremes — one cheap query, run before any binning so
@@ -584,16 +584,16 @@ export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): A
  * still bins over its own range exactly as before.
  */
 export function plotBinsSql(xSel: string, ySel: string, cohortSql: string, bins: [number, number] = DEFAULT_BINS,
-  extent?: { x0: number; x1: number; y0: number; y1: number }): AggregateSql {
+  extent?: { x0?: number; x1?: number; y0?: number; y1?: number }): AggregateSql {
   const [bx, by] = clampGrid(bins);
-  const eCte = extent
-    ? ",    e AS (SELECT " + num(extent.x0) + " AS x0, " + num(extent.x1) + " AS x1, " +
-        num(extent.y0) + " AS y0, " + num(extent.y1) + " AS y1)\n"
-    : ",    e AS (SELECT min(x) x0, max(x) x1, min(y) y0, max(y) y1 FROM pair)\n";
+  // one row whichever ends are fixed: an end the request leaves open is the data's own
+  const end = (k: "x0" | "x1" | "y0" | "y1", agg: string) => (extent && extent[k] != null ? "any(" + num(extent[k]!) + ")" : agg) + " " + k;
+  const eCte = ",    e AS (SELECT " + end("x0", "min(x)") + ", " + end("x1", "max(x)") + ", " +
+    end("y0", "min(y)") + ", " + end("y1", "max(y)") + " FROM pair)\n";
   return aggregateSql(pairCte(xSel, ySel, cohortSql) + eCte +
     "SELECT " + binIndex("x", bx) + " AS bx,\n" +
     "       " + binIndex("y", by) + " AS by,\n" +
-    "       count() AS n\n" +
+    "       count() AS n, min(x) AS minX, max(x) AS maxX, min(y) AS minY, max(y) AS maxY\n" +
     "FROM pair, e GROUP BY bx, by");
 }
 
@@ -605,10 +605,13 @@ function clampGrid(bins: [number, number]): [number, number] {
 /**
  * Which of `n` cells a value falls in, against the extent CTE `e`. One expression for the
  * density and for the sparse-cell points, so a point is never assigned a cell the density did
- * not count it in.
+ * not count it in. As the portal cuts its density (ClinicalDataDensityPlotServiceImpl.java:116-140):
+ * the offset divided by the cell's width, the width rounded first; the end in the last cell; every
+ * value in the first when the axis has no length. A value outside a fixed extent is held to its edge cell.
  */
 function binIndex(col: "x" | "y", n: number): string {
-  return "least(" + (n - 1) + ", toUInt32(floor((" + col + " - " + col + "0) / if(" + col + "1 > " + col + "0, " + col + "1 - " + col + "0, 1) * " + n + ")))";
+  const lo = col + "0", hi = col + "1";
+  return "toUInt32(least(" + (n - 1) + ", greatest(0, if(" + hi + " > " + lo + ", floor((" + col + " - " + lo + ") / ((" + hi + " - " + lo + ") / " + n + ")), 0))))";
 }
 
 /**
@@ -949,8 +952,16 @@ export interface PlotLayer {
   trimmed?: boolean;
 }
 
+/** one cell of a scatter's density: its place, count, and the extremes of the values in it */
+export type PlotCell = { bx: number; by: number; n: number; minX?: number; maxX?: number; minY?: number; maxY?: number };
+
+/** where a scatter's axes start and end, in the attributes' own units; an end left out is the data's */
+export interface PlotRange { x?: { min?: number; max?: number }; y?: { min?: number; max?: number } }
+
 export interface PlotRequest {
   x: PlotAxis; y: PlotAxis; unit?: "patient" | "sample"; bins?: [number, number];
+  /** a scatter's axis ends, which its bins are cut between (the data's own extremes otherwise) */
+  range?: PlotRange;
   /** colour the values by a category: the fill, and optionally a ring, as the portal does */
   colorBy?: PlotAxis; ringBy?: PlotAxis;
 }
@@ -968,7 +979,8 @@ export interface PlotData {
   y: { label: string; kind: AxisKind; log?: boolean };
   extent?: { x0: number; x1: number; y0: number; y1: number };
   grid?: [number, number];
-  bins?: { bx: number; by: number; n: number }[];
+  /** each cell's count and the smallest and largest value in it on each axis, in the axes' units */
+  bins?: PlotCell[];
   stats?: { pearson: number | null; spearman: number | null; slope: number | null; intercept: number | null;
             pPearson: number | null; pSpearman: number | null };
   groups?: PlotGroup[];
@@ -996,4 +1008,37 @@ export interface PlotData {
   coverage?: { total: number; nx: number; ny: number; multi?: number };
   /** the point layers drawn over the plot, in the view's order (the first holds a case two share) */
   layers?: PlotLayer[];
+}
+
+/**
+ * The extent a scatter is binned over: the data's own, with each end the request fixes put in its
+ * place, in the axis's units (log10(v + 1) on a log axis).
+ */
+export function plotExtent(data: { x0: number; x1: number; y0: number; y1: number }, range: PlotRange | undefined,
+  log: { x: boolean; y: boolean }): { x0: number; x1: number; y0: number; y1: number } {
+  const at = (v: number | undefined, isLog: boolean, own: number) => v == null ? own : isLog ? Math.log10(v + 1) : v;
+  return { x0: at(range?.x?.min, log.x, data.x0), x1: at(range?.x?.max, log.x, data.x1),
+    y0: at(range?.y?.min, log.y, data.y0), y1: at(range?.y?.max, log.y, data.y1) };
+}
+
+/** a view's `range` checked: finite ends, the start below the end, and nothing below 0 on a log axis */
+export function plotRangeOf(raw: unknown, log: { x: boolean; y: boolean }): PlotRange | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw !== "object") throw new Error("range: give {x: {min, max}, y: {min, max}}, each end optional");
+  const out: PlotRange = {};
+  const extra = Object.keys(raw).filter((k) => k !== "x" && k !== "y");
+  if (extra.length) throw new Error("range: no axis " + extra.join(", ") + "; give x and/or y");
+  for (const k of ["x", "y"] as const) {
+    if (!(k in raw)) continue;
+    const a = (raw as Record<string, unknown>)[k];
+    if (a === null || typeof a !== "object" || Array.isArray(a)) throw new Error("range." + k + ": give {min, max}, each end optional");
+    const { min, max } = a as { min?: unknown; max?: unknown };
+    for (const [name, v] of [["min", min], ["max", max]] as const)
+      if (v != null && (typeof v !== "number" || !Number.isFinite(v))) throw new Error("range." + k + "." + name + " must be a finite number");
+    if (typeof min === "number" && typeof max === "number" && !(min < max)) throw new Error("range." + k + ": min must be below max");
+    if (log[k] && ((typeof min === "number" && min < 0) || (typeof max === "number" && max < 0)))
+      throw new Error("range." + k + ": a log axis reads log10(v + 1), which has no value below 0");
+    out[k] = { ...(typeof min === "number" ? { min } : {}), ...(typeof max === "number" ? { max } : {}) };
+  }
+  return out;
 }
