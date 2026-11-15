@@ -1,7 +1,7 @@
 // The lollipop figure: the plot alone, one panel per gene, and its caption's words for what the app
 // shows beside it as controls. Imports only the drawing kit and lib/lollipop.ts, so the app draws
 // it in the browser (app/_lollipop/HotspotsBody.tsx) from the same code the server uses for MCP.
-import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, type AlterationCell, type CodonSelection } from "./lollipop.ts";
+import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, lollipopGeneEmpty, type AlterationCell, type CodonSelection } from "./lollipop.ts";
 
 import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, legend, label, textWidth, textOn,
@@ -16,6 +16,8 @@ import type { HotspotGene } from "./views/hotspots/types.ts";
  */
 export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[], codons?: CodonSelection): string {
   const parts = genes.map((g) => {
+    // the portal hides an empty gene's frequency (ResultsViewMutationMapper, no mutation data)
+    if (lollipopGeneEmpty(g)) return g.gene + ": no mutations in the cohort.";
     const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
     const cells = IMPACT_TYPES.filter((k) => g.tally[k].driver || g.tally[k].vus)
       .map((k) => IMPACT_COLORS[k].label.toLowerCase() + " " + fmtInt(g.tally[k].driver) + " driver / " + fmtInt(g.tally[k].vus) + " VUS");
@@ -95,6 +97,7 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
         `<line x1="${r1(cx)}" y1="${yBase}" x2="${r1(cx)}" y2="${r1(cy)}" stroke="${STICK}" stroke-width="${SW.line}"/>` +
         `<circle class="lollipop-head" cx="${r1(cx)}" cy="${r1(cy)}" r="${on ? 5 : 2.8}" fill="${q.color}"${on ? ` stroke="${p.ink}" stroke-width="1"` : ""}/></g>`);
     }
+    if (lollipopGeneEmpty(g)) out.push(label(L + plotW / 2, yTop + STEM / 2, "No " + g.gene + " mutations in this cohort", { size: FS.small, fill: p.muted, anchor: "middle", maxW: plotW }));
     if (g.label) {
       const lq = g.positions.find((q) => q.pos === g.label!.pos);
       if (lq) {

@@ -9,6 +9,22 @@ export function hgvsgUrl(hgvsg: string, grch38: boolean): string {
   return (grch38 ? "https://grch38.genomenexus.org" : "https://www.genomenexus.org") + "/variant/" + encodeURIComponent(hgvsg);
 }
 
+/**
+ * The Ensembl page of a transcript, as the portal's GeneSummary links it: the GRCh38 site for a
+ * GRCh38 query, else the GRCh37 archive; the id's version left out of t=.
+ */
+export function ensemblTranscriptUrl(id: string, grch38: boolean): string {
+  return (grch38 ? "https://www.ensembl.org" : "https://grch37.ensembl.org") + "/homo_sapiens/Transcript/Summary?t=" + id.replace(/\.\d+$/, "");
+}
+
+/**
+ * Whether a query is on GRCh38, as the portal decides which Genome Nexus to ask (StoreUtils
+ * getGenomeBuildFromStudies): only when every study's reference genome is GRCh38 or hg38.
+ */
+export function isGrch38(builds: string[]): boolean {
+  return builds.length > 0 && builds.every((b) => /grch38|hg38/i.test(b));
+}
+
 /** cBioPortal's TruncatedText: past 32 characters, the first 30 and "..." */
 export function truncate(text: string, max = 30, buffer = 2): string {
   return text.length > max + buffer ? text.substring(0, max) + "..." : text;

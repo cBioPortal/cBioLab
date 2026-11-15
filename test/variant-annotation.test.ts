@@ -2,6 +2,7 @@
 // from the service (docs/ANNOTATION.md), and spelled as cBioPortal's mutation table spells them.
 // lib/ch.ts reads its connection when it loads, so the environment is set before it is imported.
 import { test, after, beforeEach } from "node:test";
+import * as cellTextModule from "../lib/mutation-cell-text.ts";
 import assert from "node:assert/strict";
 
 Object.assign(process.env, { CLICKHOUSE_URL: "http://warehouse.test:8123", CLICKHOUSE_USER: "app", CLICKHOUSE_PASSWORD: "pw", CLICKHOUSE_DB: "cbio" });
@@ -195,7 +196,7 @@ test("each predictor's call has the portal's colour; an unknown call is not draw
 // is the GRCh38 one, which StoreUtils.ts getGenomeBuildFromStudies (1490-1520) chooses only when
 // EVERY study's referenceGenome matches /GRCh38/i or /hg38/i; GeneSummary.tsx 74-80 puts the
 // unversioned id in t=. cBioLab links over https (spec-j LX1), the GRCh38 host www.ensembl.org.
-const cellText = await import("../lib/mutation-cell-text.ts") as unknown as {
+const cellText = cellTextModule as unknown as {
   ensemblTranscriptUrl?: (id: string, grch38: boolean) => string; isGrch38?: (builds: string[]) => boolean };
 const ensemblTranscriptUrl = (id: string, grch38: boolean) => {
   assert.equal(typeof cellText.ensemblTranscriptUrl, "function", "lib/mutation-cell-text.ts exports ensemblTranscriptUrl(id, grch38)");
