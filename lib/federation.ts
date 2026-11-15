@@ -2299,9 +2299,11 @@ export async function resolverFor(study: string, ctx: Partial<CompileCtx>): Prom
     return kinds.has("timeline") ? new RemoteTimelineResolver(study, peer.url, shared, kinds) : new RemotePatientResolver(study, peer.url, shared, kinds);
   }
   const inst = await instanceForStudy(study);
+  // the Genome Nexus releases an OQL clause's Cancer Hotspots are read at, as the lollipop's
+  const full = ctx.hotspotPins ? ctx : { ...ctx, hotspotPins: await variantPins() };
   return inst.mode === "patient-level"
-    ? new PatientLevelResolver(study, ctx, inst)
-    : new AggregateResolver(study, ctx, inst);
+    ? new PatientLevelResolver(study, full, inst)
+    : new AggregateResolver(study, full, inst);
 }
 
 /** Expand pooled (months, event, n) triples into KM input records. */
