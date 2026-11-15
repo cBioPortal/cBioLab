@@ -5,6 +5,8 @@ import assert from "node:assert/strict";
 import { buildLollipopGene, canonicalType, impactType, labelledPosition, lollipopColor, lollipopLabelText, IMPACT_COLORS,
   impactSql, filterHotspotGene, checkHide, ALTERATION_CELLS, cellLabel, clickCodon, checkCodons, pruneCodons } from "../lib/lollipop.ts";
 import { lollipopPanelsSvg, lollipopSummaryText } from "../lib/lollipop-svg.ts";
+// read through the namespace so the file loads before PR J adds lollipopLegend (spec-j KX1)
+import * as lollipopLib from "../lib/lollipop.ts";
 
 test("mutation types map the way getCanonicalMutationType / getProteinImpactType map them", () => {
   assert.equal(impactType(canonicalType("Missense_Mutation")), "missense");
@@ -174,4 +176,130 @@ test("selecting stems by clicking them (updatePositionSelectionFilters)", async 
     assert.match(lollipopSummaryText([g], ["missense.driver"], { G: [12] }), /G 12 \(0 mutations drawn there\)/, "counts what is drawn, after the grid's selection");
     assert.doesNotMatch(lollipopSummaryText([g], []), /Selected/);
   });
+});
+
+// ---- PR J: a queried gene with no mutations and no fusions (spec-j E, EX1/EX2/EX8) -----------
+// Legacy keeps every queried gene's tab and draws its plot empty (ResultsViewPageStore.ts
+// 3479-3496, 3630-3660; MutationMapper.tsx 422-460, 584-615); the somatic frequency is hidden
+// when the gene has no mutation (ResultsViewMutationMapper.tsx 171). The message in the plot area
+// is cBioLab's own (spec-j EX2): "No <GENE> mutations in this cohort".
+
+test("PR J: an empty gene", async (t) => {
+  // a site's report for KRAS alone: BRCA1 has no change, type or totals row in it
+  const kras = {
+    changes: [{ gene: "KRAS", pos: 12, change: "G12D", n: 3, rows: 3, driver: true, impact: "missense" }],
+    types: [{ gene: "KRAS", pos: 12, mtype: "Missense_Mutation", driver: true, rows: 3 }],
+    totals: [{ gene: "KRAS", patients: 3, pairs: 3, somaticSamples: 3 }], cohortSamples: 40, minCount: 1, annotated: true,
+  };
+  const brcaProtein = { proteinLength: 1863, transcriptId: "ENST00000357654", domains: [{ accession: "PF00533", name: "BRCT", start: 1650, end: 1736 }],
+    ids: { refseq: "NM_007294", ensembl: "ENST00000357654.3" } };
+  const empty = () => buildLollipopGene("BRCA1", [kras], brcaProtein);
+  const withMuts = () => buildLollipopGene("KRAS", [kras], { proteinLength: 189, transcriptId: "ENST00000311936", domains: [] });
+  const zero = { driver: 0, vus: 0 };
+
+  await t.test("EX1 buildLollipopGene: a gene missing from every report is a well-formed all-zero gene", () => {
+    const g = empty();
+    assert.equal(g.gene, "BRCA1");
+    assert.deepEqual({ mutated: g.mutated, mutations: g.mutations, positions: g.positions, somaticSamples: g.somaticSamples, unpositioned: g.unpositioned, withheld: g.withheld, topChanges: g.topChanges },
+      { mutated: 0, mutations: 0, positions: [], somaticSamples: 0, unpositioned: 0, withheld: 0, topChanges: [] });
+    assert.deepEqual(g.tally, { missense: zero, truncating: zero, inframe: zero, splice: zero, fusion: zero, other: zero });
+    assert.equal(g.cohortSamples, 40, "the denominator is the cohort's, whatever the gene");
+    assert.equal(g.label, undefined, "no stem, so no label");
+  });
+  await t.test("EX1 E13: the protein and its transcript ids are kept for an empty gene (domains, length, ids)", () => {
+    const g = empty();
+    assert.equal(g.proteinLength, 1863); assert.equal(g.lengthSource, "genome-nexus");
+    assert.deepEqual(g.domains.map((d) => d.name), ["BRCT"]);
+    assert.deepEqual(g.ids, brcaProtein.ids);
+  });
+  await t.test("EX1: with no report at all (no site answered for the gene) still all zeros", () => {
+    const g = buildLollipopGene("BRCA1", [], null);
+    assert.deepEqual([g.mutated, g.mutations, g.positions.length, g.somaticSamples, g.cohortSamples, g.unpositioned, g.withheld], [0, 0, 0, 0, 0, 0, 0]);
+  });
+  await t.test("EX2 E5: the empty gene's plot is drawn — axis, protein bar, domains — with no stem and the one-line message", () => {
+    const svg = lollipopPanelsSvg([empty()], { width: 720 }, "");
+    assert.match(svg, /No BRCA1 mutations in this cohort/);
+    assert.match(svg, /# BRCA1 Mutations/, "the y axis is drawn");
+    assert.match(svg, /BRCT \(PF00533\): 1650–1736/, "the domain is drawn");
+    assert.match(svg, /1,863aa/, "the x axis runs to the protein's length");
+    assert.doesNotMatch(svg, /data-codon=/, "no stem");
+  });
+  await t.test("EX2: a gene with mutations gets no such message; beside an empty gene, only the empty one does", () => {
+    assert.doesNotMatch(lollipopPanelsSvg([withMuts()], { width: 720 }, ""), /mutations in this cohort/);
+    const both = lollipopPanelsSvg([withMuts(), empty()], { width: 720 }, "");
+    assert.equal((both.match(/No BRCA1 mutations in this cohort/g) || []).length, 1);
+    assert.doesNotMatch(both, /No KRAS mutations/);
+    assert.match(both, /data-gene="KRAS" data-codon="12"/, "the other gene's stems are drawn as before");
+  });
+  await t.test("EX8 E7: the figure's words name the empty gene as having no mutations, and state no frequency for it", () => {
+    const text = lollipopSummaryText([withMuts(), empty()], []);
+    const brca = text.slice(text.indexOf("BRCA1"));
+    assert.ok(text.includes("BRCA1"), "the empty gene is not left out: " + text);
+    assert.match(brca, /^BRCA1[^.]*\bno\b[^.]*mutations?/i, "says it has no mutations: " + text);
+    assert.doesNotMatch(brca.split(".")[0], /frequency/i, "the frequency is hidden for a gene with no mutation (U1 decided, E7): " + text);
+    assert.match(text, /KRAS: somatic mutation frequency 7\.5%/, "a gene with mutations still states its frequency (3 of 40)");
+  });
+});
+
+// ---- PR J: the Color Codes legend as data (spec-j K, KX1/KX2) --------------------------------
+// Legacy LegendColorCodes.tsx 27-186 lists "Splice site" under Truncating although
+// getProteinImpactTypeFromCanonical (MutationTypeUtils.ts 145-148) colours splice sites as Splice,
+// orange: the plot, the badges and the table disagree with the legend. PR J fixes the legend.
+
+type LegendEntry = { label: string; color?: string; items: string[] };
+const legend = (o: { drivers: boolean; fusions: boolean }): LegendEntry[] => {
+  const f = (lollipopLib as unknown as { lollipopLegend?: (o: { drivers: boolean; fusions: boolean }) => LegendEntry[] }).lollipopLegend;
+  assert.equal(typeof f, "function", "lib/lollipop.ts exports lollipopLegend({ drivers, fusions })");
+  return f!(o);
+};
+const flat = (es: LegendEntry[]) => es.map((e) => [e.label, (e.color || "").toLowerCase(), e.items]);
+const TRUNC = ["Nonsense", "Nonstop", "Frameshift deletion", "Frameshift insertion"];
+const INFRAME = ["Inframe deletion", "Inframe insertion"];
+const OTHER = ["All other types of mutations"];
+
+test("PR J K2 KX1: drivers annotated — a driver and a VUS line per type, Splice its own entry, no Splice site under Truncating", () => {
+  assert.deepEqual(flat(legend({ drivers: true, fusions: true })), [
+    ["Missense Mutations (putative driver)", "#008000", []],
+    ["Missense Mutations (unknown significance)", "#53d400", []],
+    ["Truncating Mutations (putative driver)", "#000000", TRUNC],
+    ["Truncating Mutations (unknown significance)", "#708090", TRUNC],
+    ["Inframe Mutations (putative driver)", "#993404", INFRAME],
+    ["Inframe Mutations (unknown significance)", "#a68028", INFRAME],
+    ["Splice Mutations (putative driver)", "#e5802b", []],
+    ["Splice Mutations (unknown significance)", "#f0b87b", []],
+    ["Fusion Mutations", "#8b00c9", []],
+    ["Other Mutations (putative driver)", "#cf58bc", OTHER],
+    ["Other Mutations (unknown significance)", "#f96ae3", OTHER],
+  ]);
+});
+
+test("PR J K3 KX2: drivers not annotated — one entry per type in the driver colour, no suffix", () => {
+  assert.deepEqual(flat(legend({ drivers: false, fusions: true })), [
+    ["Missense Mutations", "#008000", []],
+    ["Truncating Mutations", "#000000", TRUNC],
+    ["Inframe Mutations", "#993404", INFRAME],
+    ["Splice Mutations", "#e5802b", []],
+    ["Fusion Mutations", "#8b00c9", []],
+    ["Other Mutations", "#cf58bc", OTHER],
+  ]);
+});
+
+test("PR J K4: fusions hidden — the Fusion entry left out, nothing else changed", () => {
+  for (const drivers of [true, false]) {
+    const all = flat(legend({ drivers, fusions: true })), some = flat(legend({ drivers, fusions: false }));
+    assert.deepEqual(some, all.filter((e) => e[0] !== "Fusion Mutations"), "drivers " + drivers);
+  }
+});
+
+test("PR J K5 KX1: no entry lists a splice site under a type other than Splice, and the Splice colours are the stems'", () => {
+  for (const drivers of [true, false]) for (const fusions of [true, false]) {
+    const es = legend({ drivers, fusions });
+    for (const e of es) assert.ok(!e.items.some((i) => /splice/i.test(i)), e.label + " lists " + JSON.stringify(e.items));
+  }
+  const es = flat(legend({ drivers: true, fusions: true }));
+  const color = (label: string) => es.find((e) => e[0] === label)![1];
+  // a Splice_Site row's stem colour (getColorForProteinImpactType), driver and VUS
+  assert.equal(color("Splice Mutations (putative driver)"), lollipopColor([{ mtype: "Splice_Site", driver: true, rows: 1 }]).color.toLowerCase());
+  assert.equal(color("Splice Mutations (unknown significance)"), lollipopColor([{ mtype: "Splice_Site", driver: false, rows: 1 }]).color.toLowerCase());
+  assert.equal(color("Truncating Mutations (putative driver)"), lollipopColor([{ mtype: "Nonsense_Mutation", driver: true, rows: 1 }]).color.toLowerCase());
 });

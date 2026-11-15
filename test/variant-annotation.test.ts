@@ -189,3 +189,42 @@ test("each predictor's call has the portal's colour; an unknown call is not draw
     view: "https://projects.sanderlab.org/av/?url=https://genome-nexus-static-data.s3.us-east-1.amazonaws.com/mutationassessor-v4-multiple-sequence-alignment-files-uncompressed/P01116.2_full.fa",
     download: "https://genome-nexus-static-data.s3.us-east-1.amazonaws.com/mutationassessor-v4-multiple-sequence-alignment-files-uncompressed/P01116.2_full.fa" });
 });
+
+// ---- PR J: the Ensembl transcript link by reference genome (spec-j L, LX1/LX2) ----------------
+// Legacy: AnalysisStore.ts 363-368 picks ensembl_transcript_grch38_url when the Genome Nexus in use
+// is the GRCh38 one, which StoreUtils.ts getGenomeBuildFromStudies (1490-1520) chooses only when
+// EVERY study's referenceGenome matches /GRCh38/i or /hg38/i; GeneSummary.tsx 74-80 puts the
+// unversioned id in t=. cBioLab links over https (spec-j LX1), the GRCh38 host www.ensembl.org.
+const cellText = await import("../lib/mutation-cell-text.ts") as unknown as {
+  ensemblTranscriptUrl?: (id: string, grch38: boolean) => string; isGrch38?: (builds: string[]) => boolean };
+const ensemblTranscriptUrl = (id: string, grch38: boolean) => {
+  assert.equal(typeof cellText.ensemblTranscriptUrl, "function", "lib/mutation-cell-text.ts exports ensemblTranscriptUrl(id, grch38)");
+  return cellText.ensemblTranscriptUrl!(id, grch38);
+};
+const isGrch38 = (builds: string[]) => {
+  assert.equal(typeof cellText.isGrch38, "function", "lib/mutation-cell-text.ts exports isGrch38(builds)");
+  return cellText.isGrch38!(builds);
+};
+
+test("PR J L1 L2 L8: the transcript link — GRCh37 or GRCh38 Ensembl, the id's version stripped from t=", () => {
+  assert.equal(ensemblTranscriptUrl("ENST00000311936.3", false), "https://grch37.ensembl.org/homo_sapiens/Transcript/Summary?t=ENST00000311936");
+  assert.equal(ensemblTranscriptUrl("ENST00000311936.3", true), "https://www.ensembl.org/homo_sapiens/Transcript/Summary?t=ENST00000311936");
+  // N6: the GRCh38 Genome Nexus gives no transcriptIdVersion, so an unversioned id is passed as is
+  assert.equal(ensemblTranscriptUrl("ENST00000311936", true), "https://www.ensembl.org/homo_sapiens/Transcript/Summary?t=ENST00000311936");
+  assert.equal(ensemblTranscriptUrl("ENST00000311936", false), "https://grch37.ensembl.org/homo_sapiens/Transcript/Summary?t=ENST00000311936");
+});
+
+test("PR J L4-L7: GRCh38 only when every study's genome is GRCh38 / hg38 (case-insensitive)", () => {
+  assert.equal(isGrch38(["hg38"]), true, "L5 one hg38 study");
+  assert.equal(isGrch38(["hg38", "hg38"]), true, "two hg38 studies");
+  assert.equal(isGrch38(["GRCh38"]), true, "L4 the NCBI name");
+  assert.equal(isGrch38(["HG38"]), true, "L4 matched case-insensitively");
+  assert.equal(isGrch38(["grch38"]), true, "L4 matched case-insensitively");
+  assert.equal(isGrch38(["hg19"]), false, "L6 one hg19 study");
+  assert.equal(isGrch38(["GRCh37"]), false, "L6 the NCBI name");
+  assert.equal(isGrch38(["hg38", "hg19"]), false, "L7 not every study is hg38");
+  assert.equal(isGrch38(["hg19", "hg38"]), false, "L7 in either order");
+  assert.equal(isGrch38(["mm10"]), false, "a mouse genome");
+  assert.equal(isGrch38([""]), false, "a study with no genome stored");
+  assert.equal(isGrch38([]), false, "no study: the GRCh37 default (spec-j LX2)");
+});

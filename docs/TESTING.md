@@ -233,6 +233,12 @@ checks assert rather than whatever a real warehouse happens to contain:
   FX-P21 with Variant_Type `snp` (lower case); and STK11 Q37* on FX-P39 typed `nonsense` (lower case),
   so sorting by the label differs from sorting by the raw type. Copy # reads the existing
   `data_cna.txt` values (Amp, Gain, Diploid, ShallowDel, DeepDel and `NA` all occur on mutated rows).
+- **Germline spellings, one gene at a time**, for `check:mutation-tab-states` (the Mutations tab's
+  somatic frequency): PTEN p.D92N on `FX-P12`, `FX-P13`, `FX-P14`, `FX-P15` and `FX-P17`, each that
+  sample's only PTEN row, with `Mutation_Status` `Germline`, `germline`, `GERMLINE`, `Germline_LOH`
+  and blank (stored `NA` by the importer, so no row has a NULL status). Each sample already had other
+  mutations, so the samples with any mutation are as before. The same check runs the lollipop with
+  BRCA1, a gene with no mutation, SV or panel row anywhere in the fixture: the empty-gene state.
 
 `npm run peer-db` (`scripts/peer-db.ts`) starts a private ClickHouse for it (the pinned release
 `npm run local` uses, data in `CBIOLAB_PEER_DATA`, default `~/.cbiolab-peer/<port>`), imports the
