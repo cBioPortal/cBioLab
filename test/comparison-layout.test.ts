@@ -123,7 +123,7 @@ test("the Mutations tab: the two-group lollipop after Genomic Alterations, for e
 });
 
 test("the Clinical tab tests every attribute the study declares, not the 8 best covered (CMP-CL-2)", () => {
-  assert.deepEqual(tabOf(layout(2, BRCA_TCGA), "Clinical"), { kind: "clinical", allAttributes: true });
+  assert.deepEqual(tabOf(layout(2, BRCA_TCGA), "Clinical"), { kind: "clinical", allAttributes: true, rankTests: true });
 });
 
 test("the Survival tab gives no log-rank p when the groups share patients (Include mode, CMP-SV-4)", () => {

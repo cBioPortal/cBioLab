@@ -9,8 +9,9 @@ import { portalPMin } from "../../../lib/chart/format.ts";
 import type { ClinicalRow } from "../../../lib/views/clinical/types.ts";
 import type { DrawnResultOf } from "../../../lib/types.ts";
 
-/** a test's name as the table writes it: the portal's for chi-squared, ours for the moment tests */
-const TEST_NAME: Record<string, string> = { "chi-squared": "Chi-squared Test", "Welch t": "Welch's t-test", "Welch ANOVA": "Welch's ANOVA" };
+/** a test's name as the table writes it: the portal's, and ours for the moment tests */
+const TEST_NAME: Record<string, string> = { "chi-squared": "Chi-squared Test", "Wilcoxon": "Wilcoxon Test", "Kruskal-Wallis": "Kruskal Wallis Test",
+  "Welch t": "Welch's t-test", "Welch ANOVA": "Welch's ANOVA" };
 
 /**
  * The Comparison page's Clinical tab, as the portal's enrichments table: every attribute with its
@@ -27,7 +28,7 @@ function ClinicalTableBody({ v }: { v: DrawnResultOf<"clinical"> }) {
     { key: "test", label: "Statistical Test", value: (r) => r.skipped ? "not tested" : TEST_NAME[r.test || ""] || r.test || "",
       render: (r) => r.skipped ? <span className="muted italic">not tested: {r.skipped}</span> : TEST_NAME[r.test || ""] || r.test },
     { key: "p", label: "p-Value", num: true, value: (r) => r.p ?? null, render: (r) => r.p == null ? "" : bold(r, portalPMin(r.p)),
-      title: "p-value of the null hypothesis, from the chi-squared test (categorical) or Welch's test (numeric)" },
+      title: "p-value of null Hypothesis, derived from Chi-Squared test or Kruskal-Wallis test" },
     { key: "q", label: "q-Value", num: true, value: (r) => r.p == null ? null : r.q ?? null, render: (r) => r.p == null || r.q == null ? "" : bold(r, portalPMin(r.q)),
       title: "Derived from Benjamini-Hochberg FDR correction procedure." },
   ];

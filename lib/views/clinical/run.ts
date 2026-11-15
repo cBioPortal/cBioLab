@@ -40,6 +40,7 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
   if (vNames.length < 2) return untimed({ kind: "clinical", error: "clinical comparison needs at least 2 cohorts" });
   const all = (view as ClinicalView).allAttributes === true;
+  const rank = (view as ClinicalView).rankTests === true && vStudies.length === 1;
   const listed = all ? await studyAttributes(c) : null;
   const attrs = listed ? listed.attrs : ((view as ClinicalView).attributes || [])
     .map((a) => String(a).trim()).filter((a) => ATTR_NAME_RE.test(a));
@@ -122,6 +123,14 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
         : lo === hi ? "one value in every group (" + lo + ")" : null;
       if (untestable) { rows.push({ attribute, per, kind, cells: shown, skipped: untestable }); continue; }
       const row: ClinicalRow = { attribute, per, kind, q: 1, cells: shown };
+      // the portal's test (ClinicalDataEnrichmentUtil): Kruskal-Wallis over the groups holding values,
+      // named "Wilcoxon" when two groups are compared; needs every such group's whole distribution
+      if (rank && held.every((x) => x.valueCounts)) {
+        const kw = kruskalWallis(held.map((x) => x.valueCounts!));
+        row.test = vNames.length === 2 ? "Wilcoxon" : "Kruskal-Wallis"; row.statistic = kw.h; row.df = kw.df; row.p = kw.p;
+        rows.push(row);
+        continue;
+      }
       if (vNames.length === 2) {
         const [x, y] = cells;
         const w = welchT(x.n, x.exactMean, x.variance, y.n, y.exactMean, y.variance);
@@ -155,7 +164,7 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
     (stats.get(cohort + "|" + study) || []).filter((x) => testedAttrs.has(x.attribute)).map((x) => ({ cohort, study, x })));
   return { kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
     method: clinicalMethod({
-      cohorts: vNames, singleStudy, ...(listed ? { listed: { declared: listed.declared, leftOut: listed.leftOut } } : {}),
+      cohorts: vNames, singleStudy, rankTests: rank, ...(listed ? { listed: { declared: listed.declared, leftOut: listed.leftOut } } : {}),
       perSite: siteKeys.map(({ cohort, study }) => ({ cohort, study, cohortPatients: cohorts[cohort].perStudy[study]?.count || 0 })),
       attributes: attrs.map((a) => rows.find((r) => r.attribute === a)!).map((r) => ({
         attribute: r.attribute, per: r.per, kind: r.kind, ...(r.skipped ? { skipped: r.skipped } : {}),
@@ -174,16 +183,21 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
     }),
     participation: participationFor(vStudies, false),
     note: "Categorical attributes are compared with a Pearson chi-squared over the full value vocabulary;" +
-      " numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from" +
-      " (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are" +
-      " exact from per-site aggregates and no individual value is ever transmitted. Counting unit follows the" +
-      " attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across" +
+      (rank
+        ? " numeric ones by rank, as cBioPortal's Comparison page tests them: Kruskal-Wallis, tie-corrected, over the groups holding values" +
+          " (with two groups the two-sided Wilcoxon rank-sum, normal approximation, no continuity correction), from each group's complete value" +
+          " distribution in the study; one whose distribution is too large to send whole is tested by Welch's test instead, its test named in its row."
+        : " numeric ones with Welch's unequal-variance t-test (2 cohorts) or Welch's ANOVA (3+) computed from" +
+          " (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are" +
+          " exact from per-site aggregates and no individual value is ever transmitted.") +
+      " Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across" +
       " the " + tested.length + " tested attributes." +
       (listed ? " Every clinical attribute the stud" + (vStudies.length === 1 ? "y declares" : "ies declare") + " is compared (" + attrs.length +
         "), but each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR, as on cBioPortal" +
         (listed.unlisted.length ? "; " + listed.unlisted.join(", ") + " could not list its attributes, so only those the others declare are asked of it" : "") + "." : "") +
       (untested ? " " + untested + " attribute" + (untested === 1 ? " is" : "s are") + " listed as not tested, each with its reason (a test needs two values and two groups holding any), and left out of the q-values." : "") +
       (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
+        rank ? " Numeric attributes also show median/IQR, from the same distributions." :
         " Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a" +
         " Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) —" +
         " computed from the attribute's complete value distribution, which is only exact and only requested" +
