@@ -47,3 +47,12 @@ FX-P41	Female	64	False	0:LIVING	22.1	Never
 FX-P42	Male	58	False	0:LIVING	31.6	Former		
 FX-P43	Female	69	True	1:DECEASED	14.2	Current		
 FX-P44	Male	61	False	0:LIVING	40.3	Former		
+FX-P45	Male	66	False	0:LIVING	28.4	Never		
+FX-P46	Female	59	False	0:LIVING	35.0	Never		
+FX-P47	Male	71	True	1:DECEASED	11.8	Former		
+FX-P48	Female	62	False	0:LIVING	19.3	Never		
+FX-P49	Male	55	True	1:DECEASED	16.7	Current		
+FX-P50	Female	68	False	0:LIVING	42.1	Former		
+FX-P51	Male	73	False	0:LIVING	25.5	Former		
+FX-P52	Female	47	False	0:LIVING	30.9	Never		
+FX-P53	Male	60	False	0:LIVING	21.2	Current		

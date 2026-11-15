@@ -102,7 +102,7 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
       ", one row per call as the portal lists them (a patient with several samples carrying the same event has a row for each" +
       (genes.length > 1 ? "; a call between two of the genes is listed once" : "") + "). " +
       (profiled.length ? "Profiling, panel-aware — " + profiledText(profiled, genes, vNames) + ". A sample not profiled for a gene's structural variants has no row and is not counted as without one. " : "") +
-      (pin ? "Annotation is OncoKB " + pin + "'s gene-level fusion call (its 'Fusion' entry) for the stronger of the two partners, where its store holds one — not the portal's per-pair fusion annotation; a blank means no call for either gene. "
+      (pin ? "Annotation is OncoKB " + pin + "'s call for the pair of genes in the sample's tumour type, as the portal asks it; for a study whose structural variants are not synced, the stronger of the two partners' gene-level fusion calls. A blank means OncoKB curates neither gene. "
         : "No OncoKB version is pinned here, so the annotation column is empty. ") +
       "Genes 1 and 2 are as the study records the breakpoints (site 1, site 2), not reordered. " +
       tableTail(r, q, columns, "structural variant", (pin ? "drivers first, then " : "") + "by gene 1, then gene 2", excluded, vNames.length > 1),

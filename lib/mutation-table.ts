@@ -143,22 +143,31 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
 }
 
 /**
- * A part's mutations with the tumour type the portal asks OncoKB with (StoreUtils
- * generateUniqueSampleKeyToTumorTypeMap): the sample's CANCER_TYPE_DETAILED; for a sample with
- * neither CANCER_TYPE nor CANCER_TYPE_DETAILED, its study's cancer type; for one with CANCER_TYPE
- * alone, none (''). The same rule as the sync's key space (packages/annotation-sync, oncokb-tumor-type).
+ * `name` AS (sid, tumorType): the tumour type the portal asks OncoKB with (StoreUtils
+ * generateUniqueSampleKeyToTumorTypeMap) for each of a study's samples `sids` (SQL selecting a
+ * column `sid`, bare sample ids): the sample's CANCER_TYPE_DETAILED; for a sample with neither
+ * CANCER_TYPE nor CANCER_TYPE_DETAILED, its study's cancer type; for one with CANCER_TYPE alone,
+ * none (''). The same rule as the sync's key spaces (packages/annotation-sync, oncokb-tumor-type and
+ * oncokb-sv). The mutation and structural-variant tables both read it.
  */
-function tumorTypeCtes(p: TablePart, i: number, db: string): string {
-  const pre = sq(p.study + "_");
+export function sampleTumorTypeCte(name: string, study: string, db: string, sids: string): string {
+  const pre = sq(study + "_");
   const types = ["CANCER_TYPE", "CANCER_TYPE_DETAILED"];
-  return "k" + i + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,\n" +
-    "    anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM " + clinicalTable(db, types) + "\n" +
-    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')\n" +
-    "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM m" + i + ") GROUP BY sid),\n" +
-    "mt" + i + " AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,\n" +
+  return name + " AS (SELECT s.sid AS sid,\n" +
     "    if(ifNull(k.sid, '') = '', (SELECT t.name FROM " + db + ".cancer_study cs JOIN " + db + ".type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id\n" +
-    "      WHERE cs.cancer_study_identifier = " + sq(p.study) + "), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType\n" +
-    "  FROM m" + i + " AS m LEFT JOIN k" + i + " AS k ON k.sid = m.sid),\n";
+    "      WHERE cs.cancer_study_identifier = " + sq(study) + "), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType\n" +
+    "  FROM (SELECT DISTINCT sid FROM (" + sids + ")) AS s\n" +
+    "  LEFT JOIN (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,\n" +
+    "      anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM " + clinicalTable(db, types) + "\n" +
+    "    WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')\n" +
+    "      AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM (" + sids + ")) GROUP BY sid) AS k ON k.sid = s.sid)";
+}
+
+/** A part's mutations with the tumour type the portal asks OncoKB with (sampleTumorTypeCte), and whether each is germline. */
+function tumorTypeCtes(p: TablePart, i: number, db: string): string {
+  return sampleTumorTypeCte("k" + i, p.study, db, "SELECT sid FROM m" + i) + ",\n" +
+    "mt" + i + " AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,\n" +
+    "    k.tumorType AS tumorType FROM m" + i + " AS m LEFT JOIN k" + i + " AS k ON k.sid = m.sid),\n";
 }
 
 function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins): string {

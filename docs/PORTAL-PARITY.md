@@ -87,7 +87,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Query and Virtual Study actions on the altered and unaltered lists ("Open as cohort" stands in) (RDL-1.6, RDL-1.7, RDL-1.13) ([10-results-download](legacy-spec/parity/10-results-download.md))
   - [ ] Generic-assay rows for tracks added on the oncoprint; the view's README calls their absence deliberate (RDL-1.10, RDL-STM-6, RDL-MD-4) ([10-results-download](legacy-spec/parity/10-results-download.md))
 - [x] **Results → Structural Variants tab** — the `sv` table view (#154)
-  - [ ] The Annotation column: our OncoKB store has no structural-variant entries
+  - [x] The Annotation column: OncoKB per gene pair and tumour type, `annotation.oncokb_sv` (#219)
   - [ ] Default sort Annotation ↓ (TMPRSS2-BRAF first; ours "drivers, then gene 1, gene 2", AFF3-TMPRSS2 first) (SV-TB-4, SV-STM-3) ([06-structural-variants](legacy-spec/parity/06-structural-variants.md))
   - [ ] The "includes 2 duplicate structural variants in patients with multiple samples" suffix (SV-TB-1, SV-MD-7, SV-STM-1) ([06-structural-variants](legacy-spec/parity/06-structural-variants.md))
   - [ ] The experimental-feature alert and the "Beta!" label (SV-1, SV-5) ([06-structural-variants](legacy-spec/parity/06-structural-variants.md))

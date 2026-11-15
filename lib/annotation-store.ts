@@ -9,6 +9,11 @@ export const ONCOKB_TABLE = "annotation.oncokb";
  * type, tumour type) of a synced study, with the levels of evidence for that tumour type
  */
 export const ONCOKB_TUMOR_TYPE_TABLE = "annotation.oncokb_tumor_type";
+/**
+ * OncoKB for structural variants, licensed with ONCOKB_TABLE: one row per (site 1 Entrez id, site 2
+ * Entrez id, OncoKB SV type, tumour type) of a synced study, each id '' where its site names no gene
+ */
+export const ONCOKB_SV_TABLE = "annotation.oncokb_sv";
 /** every public source's annotations, one row per (source, release, variant), the source's JSON in `data` */
 export const VARIANT_TABLE = "annotation.variant";
 /** Genome Nexus's source in VARIANT_TABLE for each reference genome (one service, and one release line, per genome) */

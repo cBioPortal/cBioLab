@@ -167,10 +167,10 @@ const menu = async (draft?: unknown) => {
 };
 const whole = await menu(), female = await menu({ all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] });
 const freq = (rows: typeof whole, a: string) => { const x = rows.find((r) => r.attribute === a); return x ? trackFreqText(x.pct) : "(not listed)"; };
-/** [selection, rows, attribute, Freq], counted by hand from the fixture's data_clinical_*.txt (49 samples; 29 of the women's) */
+/** [selection, rows, attribute, Freq], counted by hand from the fixture's data_clinical_*.txt (59 samples; 33 of the women's; FX-P45–FX-P53, the structural-variant samples, hold none of these values) */
 const MENU: [string, typeof whole, string, string][] = [
-  ["all", whole, "PARSE_PROBE", "24.5%"], ["all", whole, "TUMOR_GRADE", "8.2%"], ["all", whole, "FLAG_BOOL", "10.2%"],
-  ["SEX = Female", female, "PARSE_PROBE", "24.1%"], ["SEX = Female", female, "FLAG_BOOL", "10.3%"],
+  ["all", whole, "PARSE_PROBE", "20.3%"], ["all", whole, "TUMOR_GRADE", "6.8%"], ["all", whole, "FLAG_BOOL", "8.5%"],
+  ["SEX = Female", female, "PARSE_PROBE", "21.2%"], ["SEX = Female", female, "FLAG_BOOL", "9.1%"],
   ["SEX = Female", female, "PATIENT_FLAG", "0%"]          // no woman has a value: listed, at 0%
 ];
 for (const [tag, rows, a, want] of MENU) ok(`tracks menu (${tag}) ${a}`, freq(rows, a) === want, "ours " + freq(rows, a) + ", expected " + want);
