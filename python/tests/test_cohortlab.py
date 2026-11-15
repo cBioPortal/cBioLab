@@ -479,5 +479,9 @@ class GeneTracks(unittest.TestCase):
                 parse_gene_list(bad)
         with self.assertRaises(ValueError):
             normalize_gene_tracks([{"genes": ["!!"]}])
+
+    def test_local_tables_refuse_two_rows_with_one_label(self):
+        # the TypeScript draws them as two rows (keys "X", "X #2"); the local-tables port refuses them
+        from cohortlab.gene_tracks import normalize_gene_tracks
         with self.assertRaises(ValueError):
             normalize_gene_tracks([{"label": "X", "genes": ["TP53"]}, {"label": "X", "genes": ["KRAS"]}])

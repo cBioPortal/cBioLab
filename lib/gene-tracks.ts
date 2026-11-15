@@ -15,8 +15,12 @@ import { hasOql, oqlSublabel } from "./oql-match.ts";
 
 /** a gene list entry: a symbol (with its OQL line, "KRAS: AMP"), or a merged group of symbols */
 export type GeneTrackSpec = string | { label?: string; genes: string[] };
-/** one drawn row; `oql`, a single gene's line, the alterations it draws */
-export interface GeneTrack { label: string; members: string[]; oql?: OqlSpec[] }
+/**
+ * One drawn row; `oql`, a single gene's line, the alterations it draws. `key` names the row
+ * uniquely, where two rows may share a label (two lines of one gene, as the portal draws them):
+ * its entry written back ("KRAS: AMP", "KRAS", a merged row's label), " #2", " #3" for a repeat.
+ */
+export interface GeneTrack { label: string; members: string[]; oql?: OqlSpec[]; key: string }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
 
@@ -36,14 +40,14 @@ const symbolOf = (g: unknown): string => clean(String(g ?? "").split(":")[0]);
 function geneRow(raw: string): GeneTrack | null {
   if (!raw.includes(":")) {
     const g = clean(raw);
-    return GENE_RE.test(g) ? { label: g, members: [g] } : null;
+    return GENE_RE.test(g) ? { label: g, members: [g], key: g } : null;
   }
   const entries = parseOql(raw);
   if (entries.length !== 1) throw new Error("gene list: '" + raw.slice(0, 40) + "' is more than one row; give each its own entry");
   const { gene, specs } = entries[0];
   const exp = specs.find((x) => x.type === "EXP" || x.type === "PROT");
   if (exp) throw new Error("gene list: a row's " + exp.type + " ('" + raw.slice(0, 40) + "') is not drawn on the oncoprint yet");
-  return hasOql(specs) ? { label: gene, members: [gene], oql: specs } : { label: gene, members: [gene] };
+  return hasOql(specs) ? { label: gene, members: [gene], oql: specs, key: gene + oqlSublabel(specs) } : { label: gene, members: [gene], key: gene };
 }
 
 /**
@@ -54,18 +58,31 @@ function geneRow(raw: string): GeneTrack | null {
  * because there is no honest way to guess what was meant.
  */
 export function normalizeGeneTracks(list: unknown): { tracks: GeneTrack[]; symbols: string[] } {
+  const { tracks, symbols } = geneRows(list);
+  return { tracks, symbols };
+}
+
+/** each entry's row key, by the entry's position in the list; null for an entry that draws no row */
+export function geneRowKeys(list: unknown): (string | null)[] {
+  const { tracks, entryOf } = geneRows(list);
+  const keys: (string | null)[] = (Array.isArray(list) ? list : []).map(() => null);
+  tracks.forEach((t, i) => { keys[entryOf[i]] = t.key; });
+  return keys;
+}
+
+function geneRows(list: unknown): { tracks: GeneTrack[]; symbols: string[]; entryOf: number[] } {
   const entries = Array.isArray(list) ? list : [];
   const tracks: GeneTrack[] = [];
+  const entryOf: number[] = [];
   const symbols: string[] = [];
   const seenSymbol = new Set<string>();
-  const seenLabel = new Set<string>();
   const take = (g: string) => { if (!seenSymbol.has(g)) { seenSymbol.add(g); symbols.push(g); } };
 
-  for (const raw of entries) {
+  for (const [at, raw] of entries.entries()) {
     if (typeof raw === "string" || typeof raw === "number") {
       const t = geneRow(String(raw));
       if (!t) continue;
-      tracks.push(t);
+      tracks.push(t); entryOf.push(at);
       take(t.members[0]);
       continue;
     }
@@ -78,20 +95,23 @@ export function normalizeGeneTracks(list: unknown): { tracks: GeneTrack[]; symbo
     const members = g.genes.map(clean).filter((m) => GENE_RE.test(m)).filter((m, i, a) => a.indexOf(m) === i);
     if (!members.length) throw new Error("gene list: merged track " + JSON.stringify(g.label ?? g.genes).slice(0, 60) + " has no valid gene symbols");
     const label = clean(g.label) ? String(g.label).trim() : members.join(" / ");
-    tracks.push({ label, members });
+    tracks.push({ label, members, key: label }); entryOf.push(at);
     for (const m of members) take(m);
   }
 
+  // a repeated row is drawn again, as the portal draws each line of its query
+  const seen = new Map<string, number>();
   for (const t of tracks) {
-    if (seenLabel.has(t.label)) throw new Error("gene list: two tracks are both labelled '" + t.label + "'");
-    seenLabel.add(t.label);
+    const n = (seen.get(t.key) || 0) + 1;
+    seen.set(t.key, n);
+    if (n > 1) t.key += " #" + n;
   }
   if (tracks.length > MAX_GENE_TRACKS)
     throw new Error("gene list: " + tracks.length + " tracks, and " + MAX_GENE_TRACKS + " is the most this draws — merge some into one row or drop them");
   if (symbols.length > MAX_GENE_SYMBOLS)
     throw new Error("gene list: " + symbols.length + " distinct genes, and " + MAX_GENE_SYMBOLS +
       " is the most panel coverage can be tracked for (one bit per gene in a 32-bit mask)");
-  return { tracks, symbols };
+  return { tracks, symbols, entryOf };
 }
 
 /** just the symbols, flattened and deduplicated — for SQL and for views that do not merge */

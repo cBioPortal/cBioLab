@@ -858,6 +858,8 @@ export interface Track {
   profileKind?: string;
   /** a gene row's OQL line less the gene (": AMP MUT=G12D"), drawn after its label */
   sublabel?: string;
+  /** a gene row's name where its label is not unique: its line ("KRAS: AMP"), what track edits name it by */
+  key?: string;
 }
 export interface GroupRange { name: string; start: number; count: number; patients?: number }
 export interface Contract {

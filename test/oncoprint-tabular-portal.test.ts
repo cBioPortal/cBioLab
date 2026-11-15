@@ -34,7 +34,7 @@ interface Fixture {
 }
 
 const members = (genes: AssembleInput["genes"]): string[] =>
-  genes.flatMap((g) => (typeof g === "string" ? [g] : (g as { genes: string[] }).genes));
+  genes.flatMap((g) => (typeof g === "string" ? [g.split(":")[0].trim()] : (g as { genes: string[] }).genes));
 
 function build(f: Fixture): Contract {
   const cols = f.cols ?? ["A", "B"], genes = f.genes ?? ["TP53"], all = members(genes);
@@ -241,8 +241,14 @@ test("T14: a cell not profiled for the gene is empty in every genetic group (DU;
   assert.equal(cellOf(tsv, "MUTATIONS", "TP53", "A"), "Missense Mutation (putative driver)");
 });
 
-test("T15: two gene tracks with the same label: one row per group, values joined ', ' (TD 104-141)",
-  { skip: "the engine refuses two gene tracks with one label ('gene list: two tracks are both labelled …'), so the case cannot arise" }, () => {});
+test("T15: two gene tracks with the same label: one row per group, values joined ', ' (TD 104-141)", () => {
+  // two lines of one gene: KRAS: AMP and KRAS: MUT, both labelled KRAS
+  const c = build({ cols: ["A", "B"], genes: ["KRAS: AMP", "KRAS: MUT"],
+    events: [mut("A", "Missense_Mutation", false, "KRAS"), cna("A", 2, false, "KRAS"), cna("B", 2, false, "KRAS")] });
+  const tsv = toTsv(c);
+  assert.deepEqual(rowOf(tsv, "CNA", "KRAS"), { A: "Amplification", B: "Amplification" });
+  assert.deepEqual(rowOf(tsv, "MUTATIONS", "KRAS"), { A: "Missense Mutation (putative passenger)", B: "" });
+});
 
 // ---- T16-T19: clinical rows --------------------------------------------------------------------
 

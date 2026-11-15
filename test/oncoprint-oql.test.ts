@@ -350,9 +350,9 @@ test("O30: OQL inside a merged row is refused", () => {
   assert.throws(() => parseGeneList("[KRAS: AMP NRAS]"), "the text form too, as today");
 });
 
-test("O31: two rows of one gene are refused, as today", () => {
-  assert.throws(() => normalizeGeneTracks(["KRAS: AMP", "KRAS: MUT"]), /two tracks are both labelled 'KRAS'/);
-  assert.throws(() => normalizeGeneTracks(["KRAS: AMP", "KRAS"]), /two tracks are both labelled 'KRAS'/);
+test("O31: two rows of one gene are drawn as two rows (PR 2; test/oncoprint-oql-rows.test.ts)", () => {
+  assert.deepEqual(normalizeGeneTracks(["KRAS: AMP", "KRAS: MUT"]).tracks.map((t) => t.key), ["KRAS: AMP", "KRAS: MUT"]);
+  assert.deepEqual(normalizeGeneTracks(["KRAS: AMP", "KRAS"]).tracks.map((t) => t.label), ["KRAS", "KRAS"]);
 });
 
 test("O32: unsupported OQL in a row is the parser's own error", () => {

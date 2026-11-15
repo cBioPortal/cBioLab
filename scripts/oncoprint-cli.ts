@@ -64,7 +64,7 @@ try {
   if (a.lod) {
     const buckets = Number(a.lod);
     const lod = contract.groups.map((g) => ({ name: g.name, edges: bucketEdges(g.count, buckets),
-      tracks: Object.fromEntries(contract.tracks.map((t) => [t.label, bucketCodes(t, t.cells, g.start, g.count, buckets)])) }));
+      tracks: Object.fromEntries(contract.tracks.map((t) => [t.key ?? t.label, bucketCodes(t, t.cells, g.start, g.count, buckets)])) }));
     process.stdout.write(JSON.stringify(lod) + "\n");
     process.exit(0);
   }
