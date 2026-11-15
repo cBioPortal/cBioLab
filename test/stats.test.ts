@@ -75,6 +75,15 @@ describe("log-rank", () => {
       "doubling the strata should double chi2: " + two.chi2 + " vs " + 2 * one.chi2);
   });
 
+  test("swapping the groups gives the identical χ², even on a rounding tie (fast-check seed 247861415)", () => {
+    const r = (t: number, event: number) => ({ t, event });
+    const a = [r(1, 0), r(0, 0), r(0, 0), r(2, 1), r(1, 1), r(0, 1), r(2, 0)], b = [r(1, 0), r(1, 0)];
+    // (O1 - E1)^2 / V = 0.6^2 / 0.4608 = 0.78125 exactly, half way between 0.7812 and 0.7813
+    const ab = logRank([{ a, b }]), ba = logRank([{ a: b, b: a }]);
+    assert.equal(ab.chi2, ba.chi2);
+    assert.equal(ab.p, ba.p);
+  });
+
   test("no events anywhere is not significant", () => {
     const censored = [{ t: 5, event: 0 }, { t: 9, event: 0 }];
     const r = logRank([{ a: censored, b: censored }]);
