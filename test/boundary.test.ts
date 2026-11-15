@@ -518,6 +518,9 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "cancerTypesSql": () => aggregates.cancerTypesSql(cohortSql, "x", "db", ["KRAS", "NRAS"], "CANCER_TYPE", "v7.5", "driver"),
     "cancerTypesSql:by-study-any": () => aggregates.cancerTypesSql(cohortSql, "x", "db", ["KRAS"], null, null, "any"),
     "cancerTypeSamplesSql": () => aggregates.cancerTypeSamplesSql(cohortSql, "x", "db", "CANCER_TYPE"),
+    // pathwaymap: `matched`/`covered` hold samples; the outer SELECT counts them per gene
+    "lineCountsSql": () => aggregates.lineCountsSql(cohortSql, "x", "db", ["KRAS: AMP MUT=G12D", "TP53"], { oncokbPin: "v7.5" }),
+    "lineCountsSql:no-oql": () => aggregates.lineCountsSql(cohortSql, "x", "db", ["TP53"], {}),
     "cancerTypeSamplesSql:by-study": () => aggregates.cancerTypeSamplesSql(cohortSql, "x", "db", null),
     // overlap: per-patient membership bits stay inside; one count per bitmask leaves
     "overlapCountsSql": () => aggregates.overlapCountsSql([cohortSql, cohortSql, cohortSql], "x", "db"),

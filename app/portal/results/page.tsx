@@ -132,7 +132,7 @@ export default function ResultsPage() {
       {chosen.notes.map((n) => <p key={n} className="mt-2.5 mb-0 text-sm text-muted-foreground">{n}</p>)}
       {oqlNarrows && (
         <p className="mt-2.5 mb-0 text-sm text-muted-foreground">
-          The query&apos;s OQL decides who is Altered and what the oncoprint, Cancer Types Summary and Mutual Exclusivity draw; the other gene tabs draw every alteration of {genes.length === 1 ? "its gene." : "its genes."}
+          The query&apos;s OQL decides who is Altered and what the oncoprint, Cancer Types Summary, Mutual Exclusivity and Pathways draw; the other gene tabs draw every alteration of {genes.length === 1 ? "its gene." : "its genes."}
         </p>
       )}
     </PortalSummary>

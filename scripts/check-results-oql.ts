@@ -27,13 +27,18 @@
  * alteration; its counts are written down from the same files, and its EXP / PROT rows (M7) read the
  * scratch copies before they are dropped.
  *
+ * The Pathways section (P*, PR 7) runs lib/views/pathwaymap/sql.ts lineCountsSql over the query's
+ * lines: one row per gene of the lines that carry OQL, its samples the gene's lines (together) match
+ * AND profiled for the gene on a mutation, copy-number or structural-variant panel, as
+ * lib/federation.ts geneCountsSql's 'any' row counts profiled (run beside it for that comparison).
+ *
  * Run: node --env-file=.env.local scripts/check-results-oql.ts (connection b must be the fixture:
  * `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql } from "../lib/views/cancertypes/sql.ts";
-import { pairCountsSql } from "../lib/federation.ts";
+import { pairCountsSql, geneCountsSql } from "../lib/federation.ts";
 import type { DriverSettings } from "../lib/driver-settings.ts";
 
 const STUDY = "cbiolab_peer_fixture";
@@ -338,6 +343,121 @@ function expectPair(tag: string, rows: Row[], a: string, b: string, want: Cells)
   // the profile pinned by name reads the same values
   const pinned = await pairsOf("M7 pinned", [["KRAS: EXP>=2", "TP53"]], { ...oql, pins: { EXP: EXP_PROFILE } }, scratch);
   expectPair("M7 (EXP pinned):", pinned, "KRAS: EXP>=2", "TP53", { profiled: 59, both: 2, onlyA: 1, onlyB: 15, neither: 41 });
+}
+
+// ==== Pathways: lineCountsSql over the query's lines (P*, PR 7 of the OQL series) ================
+// Legacy: cbioportal-frontend cd8c6df src/pages/resultsView/pathwayMapper/ResultsViewPathwayMapper.tsx
+// 113-137 (per query line, getAlterationData over the line's OQL-filtered data) and
+// src/shared/components/oncoprint/OncoprintUtils.ts 928-958 (altered AND sequenced for the gene, over
+// those sequenced for it in any selected profile); 139-172 the other pathway genes, any alteration
+// (geneCountsSql, unchanged). Ours counts samples, as the view does today.
+// Profiled, on connection b: every sample's structural-variant panel is WES, which lists every gene
+// here, so all 59 samples are profiled for KRAS, TP53, EGFR, FAT1, STK11 (geneCountsSql: 59 each).
+// In the scratch copies (no structural-variant panel), EGFR is profiled on PEERFIX_FULL only: 49.
+// The per-gene sample sets are the ones written down above (C*, M*), and:
+//   EGFR mutated: P21…P28 (8), P33, P35, P37 (L858R, called off their PEERFIX_NO_EGFR mutation panel,
+//     genomic_event_derived.off_panel; profiled for EGFR by WES), P41, P42, P43-T1, P43-T2, P44 (5) — 16.
+//   geneCountsSql's EGFR altered is 13: its ALTERED_COND leaves out off-panel calls.
+type LineOql = { oncokbPin?: string | null; profiles?: string[]; pins?: { EXP?: string; PROT?: string; ifHeld?: boolean };
+  drivers?: DriverSettings; hotspotPins?: { hg19: string | null; hg38: string | null } };
+let lineCountsSql: ((c: string, study: string, db: string, lines: string[], oql: LineOql) => string) | null = null, lineCountsMissing = "";
+try { lineCountsSql = (await import("../lib/views/pathwaymap/sql.ts" as string)).lineCountsSql as never; if (typeof lineCountsSql !== "function") throw new Error("no export lineCountsSql"); }
+catch (e) { lineCountsSql = null; lineCountsMissing = (e as Error).message.slice(0, 200); }
+/** lineCountsSql over every sample of the study */
+async function linesOf(tag: string, lines: string[], oql: LineOql, db = conn!.db): Promise<Row[]> {
+  if (!lineCountsSql) { ok(tag + " runs", false, "lineCountsSql: " + lineCountsMissing); return []; }
+  const cohort = compileCohortDef(null, { study: STUDY, db });
+  try {
+    return (await chQuery<Row>(lineCountsSql(cohort, STUDY, db, lines, oql), conn!)).data;
+  } catch (e) {
+    ok(tag + " runs", false, (e as Error).message.slice(0, 300));
+    return [];
+  }
+}
+/** geneCountsSql's 'any' row per gene: profiled and altered as the view counts every other gene */
+async function geneAnyOf(genes: string[], db = conn!.db): Promise<Map<string, { profiled: number; altered: number }>> {
+  const cohort = compileCohortDef(null, { study: STUDY, db });
+  const rows = (await chQuery<Row>(geneCountsSql(cohort, genes, STUDY, null, db), conn!)).data;
+  return new Map(rows.filter((r) => r.vtype === "any").map((r) => [String(r.gene), { profiled: Number(r.profiled), altered: Number(r.altered) }]));
+}
+/** the gene's one row against the count written down, and within the samples profiled for it; no row reads as 0 only where 0 is expected */
+function expectLine(tag: string, rows: Row[], gene: string, want: number, any?: Map<string, { profiled: number; altered: number }>) {
+  const found = rows.filter((r) => String(r.gene) === gene);
+  const name = tag + " " + gene;
+  if (found.length > 1) { ok(name, false, found.length + " rows"); return; }
+  const got = found.length ? Number(found[0].altered) : 0;
+  ok(name + " altered " + want, got === want && (found.length === 1 || want === 0), found.length ? "ours " + got : "no row");
+  const p = any?.get(gene);
+  if (p && found.length) ok(name + " altered within geneCountsSql's profiled (" + p.profiled + ")", got <= p.profiled, "ours " + got);
+}
+function expectNoLine(tag: string, rows: Row[], gene: string) {
+  const found = rows.filter((r) => String(r.gene) === gene);
+  ok(tag + " no row for " + gene + " (a bare line: geneCountsSql counts it)", !found.length, JSON.stringify(found));
+}
+
+// ---- P1, P3: a line with OQL, and a bare line ------------------------------------------------------
+// KRAS: AMP MUT=G12D — KRAS's copy number is +1 only (no amplification); G12D on P02-T1, P02-T2, P07, P12, P17: 5 of 59.
+// TP53 is bare: no row (P3). A line spelling out the default, TP53: MUT AMP HOMDEL FUSION, matches geneCountsSql's 17;
+//   KRAS: MUT likewise its 24 (no off-panel KRAS call, no ±2, no structural variant).
+{
+  const any = await geneAnyOf(["KRAS", "TP53", "EGFR", "FAT1", "STK11"]);
+  ok("P1 geneCountsSql profiles all 59 samples for KRAS, TP53, EGFR, FAT1, STK11 (WES)", ["KRAS", "TP53", "EGFR", "FAT1", "STK11"].every((g) => any.get(g)?.profiled === 59),
+    JSON.stringify([...any]));
+  const rows = await linesOf("P1/P3", ["KRAS: AMP MUT=G12D", "TP53"], {});
+  expectLine("P1 [KRAS: AMP MUT=G12D, TP53]:", rows, "KRAS", 5, any);
+  expectNoLine("P3 [KRAS: AMP MUT=G12D, TP53]:", rows, "TP53");
+  ok("P3 one row per gene with OQL, and no other", rows.length === 1, JSON.stringify(rows));
+  const dflt = await linesOf("P3", ["TP53: MUT AMP HOMDEL FUSION", "KRAS: MUT"], {});
+  expectLine("P3 the default spelled out equals geneCountsSql's altered:", dflt, "TP53", any.get("TP53")!.altered, any);
+  expectLine("P3 KRAS: MUT equals geneCountsSql's altered:", dflt, "KRAS", any.get("KRAS")!.altered, any);
+  ok("P3 (hand count) geneCountsSql's TP53 / KRAS altered are 17 / 24", any.get("TP53")!.altered === 17 && any.get("KRAS")!.altered === 24,
+    any.get("TP53")!.altered + " / " + any.get("KRAS")!.altered);
+  const bare = await linesOf("P3 bare only", ["TP53", "KRAS"], {});
+  ok("P3 bare lines only: no rows", bare.length === 0 && !!lineCountsSql, JSON.stringify(bare));
+}
+
+// ---- P4: two lines of one gene, counted together ----------------------------------------------------
+// KRAS: MUT=G12D; KRAS: MUT=G12C — 5 + 6 = 11 (no sample has both). FAT1: AMP; FAT1: HOMDEL — P02-T1 amp, P02-T2 and P34 homdel: 3.
+// EGFR: AMP; EGFR: MUT — amp P23, P26 (both mutated too) ∪ the 16 mutated: 16 (off-panel P33, P35, P37 included: they match
+//   and are profiled for EGFR, by WES — as the portal counts a sequenced, mutated sample; geneCountsSql's bare EGFR is 13).
+{
+  const any = await geneAnyOf(["KRAS", "FAT1", "EGFR"]);
+  const rows = await linesOf("P4", ["KRAS: MUT=G12D", "KRAS: MUT=G12C", "FAT1: AMP", "FAT1: HOMDEL"], {});
+  ok("P4 one row per gene, not per line", rows.length === 2, JSON.stringify(rows));
+  expectLine("P4 [KRAS: MUT=G12D, KRAS: MUT=G12C]:", rows, "KRAS", 11, any);
+  expectLine("P4 [FAT1: AMP, FAT1: HOMDEL]:", rows, "FAT1", 3, any);
+  const egfr = await linesOf("P4 EGFR", ["EGFR: AMP", "EGFR: MUT"], {});
+  expectLine("P4 [EGFR: AMP, EGFR: MUT]:", egfr, "EGFR", 16, any);
+  expectLine("P4 [EGFR: AMP] alone:", await linesOf("P4 EGFR: AMP", ["EGFR: AMP"], {}), "EGFR", 2, any);
+}
+
+// ---- P5: DRIVER in a line follows the driver settings -----------------------------------------------
+// STK11: MUT_DRIVER — OncoKB Q37*: P10, P12, P16, P18, P27, P31, P37, P39 (8); Cancer Hotspots: P29's X200_splice (1). All 59 profiled.
+{
+  const lines = ["STK11: MUT_DRIVER"];
+  const cases: [string, LineOql, number][] = [
+    ["no settings: OncoKB at the pin", { oncokbPin: ONCOKB }, 8],
+    ["OncoKB only", { oncokbPin: ONCOKB, drivers: { hotspots: false } }, 8],
+    ["hotspots only", { oncokbPin: ONCOKB, drivers: { oncokb: false }, hotspotPins: HOTSPOT_PINS }, 1],
+    ["OncoKB and hotspots", { oncokbPin: ONCOKB, drivers: {}, hotspotPins: HOTSPOT_PINS }, 9],
+  ];
+  for (const [tag, oql, n] of cases) expectLine("P5 " + tag + ":", await linesOf("P5 " + tag, lines, oql), "STK11", n);
+}
+
+// ---- P6: EXP / PROT, over the scratch copies above (EXPR); profiled as today, by the panels -----------
+// KRAS: EXP>=2 — P07 (2.5), P21 (3), P26 (2): 3. With KRAS: PROT<=-2 (P25 −3, P02-T1 −2.5): 5. KRAS profiled 59 (mutation panels).
+// EGFR: EXP>=2 — P31 (2.1) matches, but P31 is on PEERFIX_NO_EGFR and the copies hold no structural-variant panel: not profiled
+//   for EGFR, so 0 (profiled as today; the portal would count P31 as profiled by the mRNA profile — documented).
+// EGFR: MUT — the 16 above less P33, P35, P37, which are not profiled for EGFR here: 13 (altered AND profiled).
+{
+  const profiles = ["mutations", "cna", "structural_variants", EXP_PROFILE, PROT_PROFILE];
+  const any = await geneAnyOf(["KRAS", "EGFR"], scratch);
+  ok("P6 scratch: geneCountsSql profiles KRAS 59, EGFR 49", any.get("KRAS")?.profiled === 59 && any.get("EGFR")?.profiled === 49, JSON.stringify([...any]));
+  expectLine("P6 [KRAS: EXP>=2]:", await linesOf("P6 EXP", ["KRAS: EXP>=2"], { profiles }, scratch), "KRAS", 3, any);
+  expectLine("P6 [KRAS: EXP>=2] (EXP pinned):", await linesOf("P6 EXP pinned", ["KRAS: EXP>=2"], { profiles, pins: { EXP: EXP_PROFILE } }, scratch), "KRAS", 3, any);
+  expectLine("P4/P6 [KRAS: EXP>=2, KRAS: PROT<=-2]:", await linesOf("P6 EXP PROT", ["KRAS: EXP>=2", "KRAS: PROT<=-2"], { profiles }, scratch), "KRAS", 5, any);
+  expectLine("P6 [EGFR: EXP>=2] (P31 not profiled for EGFR):", await linesOf("P6 EGFR EXP", ["EGFR: EXP>=2"], { profiles }, scratch), "EGFR", 0, any);
+  expectLine("P1 [EGFR: MUT] (P33, P35, P37 not profiled for EGFR):", await linesOf("P1 EGFR MUT scratch", ["EGFR: MUT"], { profiles }, scratch), "EGFR", 13, any);
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);
