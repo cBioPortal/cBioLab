@@ -94,7 +94,7 @@ const show = (x: unknown) => JSON.stringify(x === undefined ? "<no such column>"
 const NEW: [string, string, string | RegExp, boolean | null][] = [
   // [id, name, header tooltip (exact, or a pattern for one with a legend), numeric (null: not checked)]
   ["gene", "Gene", "HUGO gene symbol", false],
-  ["study", "Study of Origin", "Study of Origin", false],
+  ["studyOfOrigin", "Study of Origin", "Study of Origin", false],
   ["cancerTypeAll", "Cancer Type", /./, false],
   ["copyNumber", "Copy #", /^Putative copy number call for the gene in this sample\. Hover over a value for details\./, null],
   ["validationStatus", "VS", /^Validation Status \(VS\): whether the mutation was confirmed by an independent validation experiment\./, false],
@@ -140,7 +140,7 @@ legend("validationStatus", ["Valid", "Confirmed by an independent validation met
 const ids = MUTATION_COLUMNS.map((c) => c.id);
 const NEW_IDS = NEW.map((n) => n[0]);
 ok("O2 Gene, Study of Origin, Cancer Type are the first three columns, then Sample ID",
-  ids.slice(0, 4).join(",") === "gene,study,cancerTypeAll,sample", ids.slice(0, 4).join(","));
+  ids.slice(0, 4).join(",") === "gene,studyOfOrigin,cancerTypeAll,sample", ids.slice(0, 4).join(","));
 for (const [after, id] of [["variantType", "copyNumber"], ["status", "validationStatus"], ["validationStatus", "center"], ["vaf", "vafNormal"],
   ["refCount", "normalAltCount"], ["normalAltCount", "normalRefCount"], ["mutCount", "exon"]]) {
   ok(`O2 ${id} directly after ${after}`, ids.indexOf(id) >= 0 && ids.indexOf(id) === ids.indexOf(after) + 1, ids.join(","));
@@ -160,7 +160,7 @@ ok("O5 the existing columns keep their order (Protein Position and Alteration wh
 
 /** [gene tab, sample, protein change, expected values by column id, why] — every row with that key */
 type Want = [string, string, string, Record<string, Value>, string];
-const TP53 = { gene: "TP53", study: STUDY_NAME, cancerTypeAll: NSCLC };
+const TP53 = { gene: "TP53", studyOfOrigin: STUDY_NAME, cancerTypeAll: NSCLC };
 const WANT: Want[] = [
   ["TP53", "FX-P01-T1", "R273H", { ...TP53, copyNumber: "Diploid", validationStatus: "Valid", center: "broad.mit.edu", vafNormal: 0.02, normalAltCount: 7,
     normalRefCount: 350, exon: "", variantType: "SNP", mutationType: "Missense_Mutation" },
@@ -177,7 +177,7 @@ const WANT: Want[] = [
   ["TP53", "FX-P21-T1", "SP1", { variantType: "SNP" }, "VT1 Y8 a mutation row's variant type upper-cased (stored 'snp')"],
   ["TP53", "FX-P24-T1", "SP9", { variantType: "DNP" }, "VT1 DNP"],
   ["TP53", "FX-P30-T1", "R175H", { copyNumber: "ShallowDel" }, "CN6"],
-  ["KRAS", "FX-P08-T1", "G12V", { gene: "KRAS", study: STUDY_NAME, cancerTypeAll: NSCLC, copyNumber: "Gain", center: "FIXTURE" }, "G; CN4 1 → Gain"],
+  ["KRAS", "FX-P08-T1", "G12V", { gene: "KRAS", studyOfOrigin: STUDY_NAME, cancerTypeAll: NSCLC, copyNumber: "Gain", center: "FIXTURE" }, "G; CN4 1 → Gain"],
   ["KRAS", "FX-P01-T1", "G12C", { copyNumber: "Diploid" }, "CN5"],
   ["EGFR", "FX-P23-T1", "L858R", { copyNumber: "Amp" }, "CN3 2 → Amp"],
   ["EGFR", "FX-P33-T1", "L858R", { copyNumber: "" }, "CN10 NA in the profile → ''"],
@@ -226,7 +226,7 @@ const FUSIONS: [string, string, string, string, string, string, string][] = [
     "G3; CN18 Copy # is site 1's gene (KIAA1549, not profiled: ''), not the tab's BRAF (0 in that sample: Diploid)"],
 ];
 const FUSION_BLANK: Record<string, Value> = {
-  study: STUDY_NAME, copyNumber: "", validationStatus: "", center: "N/A", vafNormal: null, normalAltCount: null, normalRefCount: null, exon: "", mutationType: "Fusion"
+  studyOfOrigin: STUDY_NAME, copyNumber: "", validationStatus: "", center: "N/A", vafNormal: null, normalAltCount: null, normalRefCount: null, exon: "", mutationType: "Fusion"
 };
 for (const [gene, sample, change, g, ct, vt, why] of FUSIONS) {
   const rows = await tab(gene);

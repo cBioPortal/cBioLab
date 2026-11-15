@@ -22,7 +22,8 @@ export interface MutationColumn { id: string; name: string; numeric: boolean; ti
 export const MUTATION_COLUMNS: MutationColumn[] = [
   // a fusion row's gene is its site 1 gene, on its site 2 gene's table too (ResultsViewPageStore mutationsByGene)
   { id: "gene", name: "Gene", numeric: false, tip: "HUGO gene symbol" },
-  { id: "study", name: "Study of Origin", numeric: false, tip: "Study of Origin" },
+  // not `study`: a downloaded line already leads with the row's study id (app/api/table)
+  { id: "studyOfOrigin", name: "Study of Origin", numeric: false, tip: "Study of Origin" },
   // the study's CANCER_TYPE attribute, which the portal lists among its clinical-attribute columns
   { id: "cancerTypeAll", name: "Cancer Type", numeric: false, tip: "Cancer Type" },
   { id: "sample", name: "Sample ID", numeric: false },
@@ -95,7 +96,7 @@ function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
   const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
   switch (c.id) {
     case "sample": return { ...c, text: "sid" };
-    case "study": return { ...c, text: str("studyName") };
+    case "studyOfOrigin": return { ...c, text: str("studyName") };
     // spelled as the table shows it, so search and the value list match what is on screen
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: "drv" };
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };

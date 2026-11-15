@@ -17,7 +17,7 @@ function mutationValue(r: Record<string, unknown>, id: string, pin: string | nul
   const num = (x: unknown) => x == null || x === "" ? null : Number(x);
   switch (id) {
     case "sample": return String(r.sid ?? "");
-    case "study": return String(r.studyName ?? "");
+    case "studyOfOrigin": return String(r.studyName ?? "");
     case "annotation": {
       const o = String(r.oncogenicity || ""), lv = String(r.level || "");
       return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";

@@ -26,7 +26,7 @@
             "tip": "HUGO gene symbol"
           },
           {
-            "id": "study",
+            "id": "studyOfOrigin",
             "name": "Study of Origin",
             "numeric": false,
             "tip": "Study of Origin"
