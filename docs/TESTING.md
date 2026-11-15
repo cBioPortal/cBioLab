@@ -157,8 +157,8 @@ Chromium it launches).
 ## The second database is a committed fixture study
 
 Every check that reads a second database (connection b, `CLICKHOUSE2_*`) reads
-**`test/fixtures/peer-study/`**, a small synthetic study (`cbiolab_peer_fixture`: 40 patients, 44
-samples, patient ids `FX-P01`…`FX-P40`) in cBioPortal's study-folder format, built to hold what those
+**`test/fixtures/peer-study/`**, a small synthetic study (`cbiolab_peer_fixture`: 44 patients, 49
+samples, patient ids `FX-P01`…`FX-P44`) in cBioPortal's study-folder format, built to hold what those
 checks assert rather than whatever a real warehouse happens to contain:
 
 - **KRAS-mutant patients** (`FX-P01`–`FX-P20`): the federation check's cohort is `KRAS: MUT` across
@@ -184,6 +184,13 @@ checks assert rather than whatever a real warehouse happens to contain:
   OncoKB's public calls; some variants are left unannotated). A peer annotates with its caller's pin,
   so they are stored under the version the app pins (`ONCOKB_PIN`, else the warehouse's latest) and
   under `fixture`.
+- **OncoKB by tumour type** on `FX-P41`–`FX-P44` (EGFR rows), for `check:oncokb-tumor-type`: a sample
+  with both cancer-type values blank (the portal's sample with no cancer type data: the study's type),
+  one with `CANCER_TYPE` only, a patient whose two samples differ in detailed type, and on `FX-P44`
+  germline rows spelled three ways, a `Fusion` row, a row with no protein change (`MUTATED`) and one
+  with `Mutation_Status` `NA`. Their calls are `test/fixtures/peer-oncokb-tumor-type.tsv`, synthetic
+  levels chosen so each tumour type's row is told apart from the gene-level call; a row with an
+  `oncokb_version` of its own is stored under that release alone.
 
 `npm run peer-db` (`scripts/peer-db.ts`) starts a private ClickHouse for it (the pinned release
 `npm run local` uses, data in `CBIOLAB_PEER_DATA`, default `~/.cbiolab-peer/<port>`), imports the

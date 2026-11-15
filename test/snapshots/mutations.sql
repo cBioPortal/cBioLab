@@ -51,7 +51,7 @@ k0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countI
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
-mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence,
+mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,
     if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
       WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
   FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
@@ -65,8 +65,8 @@ rows AS (
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
-         if(tt.found = 1, tt.oncogenicity, ann.oncogenicity) AS oncogenicity, if(tt.found = 1, tt.level, ann.level) AS level,
-         toUInt8(if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,
+         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
+         toUInt8(NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,
          m.mutationType AS mutationType, m.variantType AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
@@ -130,7 +130,7 @@ k0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countI
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM m0) GROUP BY sid),
-mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence,
+mt0 AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,
     if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
       WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
   FROM m0 AS m LEFT JOIN k0 AS k ON k.sid = m.sid),
@@ -144,8 +144,8 @@ rows AS (
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
-         if(tt.found = 1, tt.oncogenicity, ann.oncogenicity) AS oncogenicity, if(tt.found = 1, tt.level, ann.level) AS level,
-         toUInt8(if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,
+         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
+         toUInt8(NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,
          m.mutationType AS mutationType, m.variantType AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,

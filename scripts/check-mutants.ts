@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -31,6 +31,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   // reads the fixture study on connection b (CLICKHOUSE2_*, from scripts/peer-db.ts)
   "oncoprint-values": ["node", "--env-file=.env.local", "scripts/check-oncoprint-values.ts"],
   "oncoprint-spectrum": ["node", "--env-file=.env.local", "scripts/check-oncoprint-spectrum.ts"],
+  "oncokb-tumor-type": ["node", "--env-file=.env.local", "scripts/check-oncokb-tumor-type.ts"],
 };
 
 interface Mutant {
@@ -242,6 +243,18 @@ const MUTANTS: Mutant[] = [
     history: "Shipped in #198 before review: numbers were told from words by parsing the values.",
     find: "attribute_name IN (\" + declaredNumbers + \") AS declared_number",
     replace: "countIf(\" + smp + \" AND \" + num + \" IS NULL) = 0 AS declared_number" },
+  { id: "oncokb-tt-blank-is-data", layer: "counts", guard: "oncokb-tumor-type", file: "packages/annotation-sync/src/sources/oncokb-tumor-type.ts",
+    effect: "A sample whose cancer-type values are blank is asked about with no tumour type instead of its study's, so the table finds no tumour-type call for it and shows the gene-level level.",
+    find: " AND attribute_value != ''\" + only", replace: "\" + only" },
+  { id: "oncokb-tt-cancer-type-not-detailed", layer: "counts", guard: "oncokb-tumor-type", file: "packages/annotation-sync/src/sources/oncokb-tumor-type.ts",
+    effect: "Mutations are asked about with the sample's broad CANCER_TYPE instead of its detailed type, so levels of evidence are those of the wrong tumour type.",
+    find: "anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS detailed", replace: "anyIf(attribute_value, attribute_name = 'CANCER_TYPE') AS detailed" },
+  { id: "oncokb-tt-germline-called", layer: "counts", guard: "oncokb-tumor-type", file: "lib/mutation-table.ts",
+    effect: "A germline mutation is shown the somatic OncoKB call and level, which the portal never asks for.",
+    find: "positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ", replace: "0 AS germ" },
+  { id: "oncokb-tt-tumour-type-ignored", layer: "counts", guard: "oncokb-tumor-type", file: "lib/mutation-table.ts",
+    effect: "The mutation table reads any tumour type's level for a mutation, so a sample can show another cancer's level of evidence.",
+    find: " AND tt.tumor_type = m.tumorType", replace: "" },
   { id: "spectrum-strand-not-folded", layer: "counts", guard: "oncoprint-spectrum", file: "lib/oncoprint.ts",
     effect: "The mutation spectrum counts only substitutions written on the pyrimidine strand, so a G>T is not counted as a C>A and every spectrum is about half what it should be.",
     find: "+ \"') OR (me.reference_allele = '\" + ac + \"' AND me.tumor_seq_allele = '\" + bc + \"'))\";",

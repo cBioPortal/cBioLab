@@ -124,8 +124,10 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
     "         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
-    (pin ? "         if(tt.found = 1, tt.oncogenicity, ann.oncogenicity) AS oncogenicity, if(tt.found = 1, tt.level, ann.level) AS level,\n" +
-      "         toUInt8(if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,\n"
+    // a germline mutation has no protein-change call: the portal asks OncoKB about it by HGVSc
+    // (StoreUtils queryOncoKbData), which this store does not hold
+    (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n" +
+      "         toUInt8(NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
     "         m.mutationType AS mutationType, m.variantType AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
@@ -153,7 +155,7 @@ function tumorTypeCtes(p: TablePart, i: number, db: string): string {
     "    anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM " + clinicalTable(db, types) + "\n" +
     "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')\n" +
     "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM m" + i + ") GROUP BY sid),\n" +
-    "mt" + i + " AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence,\n" +
+    "mt" + i + " AS (SELECT m.*, ifNull(m.mutationType, '') AS consequence, positionCaseInsensitive(ifNull(m.status, ''), 'germline') > 0 AS germ,\n" +
     "    if(ifNull(k.sid, '') = '', (SELECT t.name FROM " + db + ".cancer_study cs JOIN " + db + ".type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id\n" +
     "      WHERE cs.cancer_study_identifier = " + sq(p.study) + "), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType\n" +
     "  FROM m" + i + " AS m LEFT JOIN k" + i + " AS k ON k.sid = m.sid),\n";

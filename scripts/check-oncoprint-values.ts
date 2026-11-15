@@ -164,17 +164,17 @@ const menu = async (draft?: unknown) => {
 };
 const whole = await menu(), female = await menu({ all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] });
 const freq = (rows: typeof whole, a: string) => { const x = rows.find((r) => r.attribute === a); return x ? trackFreqText(x.pct) : "(not listed)"; };
-/** [selection, rows, attribute, Freq], counted by hand from the fixture's data_clinical_*.txt (44 samples; 26 of the women's) */
+/** [selection, rows, attribute, Freq], counted by hand from the fixture's data_clinical_*.txt (49 samples; 29 of the women's) */
 const MENU: [string, typeof whole, string, string][] = [
-  ["all", whole, "PARSE_PROBE", "27.3%"], ["all", whole, "TUMOR_GRADE", "9.1%"], ["all", whole, "FLAG_BOOL", "11.4%"],
-  ["SEX = Female", female, "PARSE_PROBE", "26.9%"], ["SEX = Female", female, "FLAG_BOOL", "11.5%"],
+  ["all", whole, "PARSE_PROBE", "24.5%"], ["all", whole, "TUMOR_GRADE", "8.2%"], ["all", whole, "FLAG_BOOL", "10.2%"],
+  ["SEX = Female", female, "PARSE_PROBE", "24.1%"], ["SEX = Female", female, "FLAG_BOOL", "10.3%"],
   ["SEX = Female", female, "PATIENT_FLAG", "0%"]          // no woman has a value: listed, at 0%
 ];
 for (const [tag, rows, a, want] of MENU) ok(`tracks menu (${tag}) ${a}`, freq(rows, a) === want, "ours " + freq(rows, a) + ", expected " + want);
 ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(whole.length));
-// at 100%: MUTATION_COUNT first (stored priority 30, the rest 1), then by display name
+// at 100%: MUTATION_COUNT first (stored priority 30, the rest 1), then by display name (CANCER_TYPE is at 98%: FX-P41-T1's is blank)
 const top = whole.slice(0, 3).map((r) => r.attribute).join(", ");
-ok("tracks menu order: stored priority, then name", top === "MUTATION_COUNT, AGE, CANCER_TYPE", top);
+ok("tracks menu order: stored priority, then name", top === "MUTATION_COUNT, AGE, DEAD", top);
 
 const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);

@@ -47,3 +47,8 @@ FX-P37-T1	FX-P37	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.5
 FX-P38-T1	FX-P38	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.354					
 FX-P39-T1	FX-P39	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.196					
 FX-P40-T1	FX-P40	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Primary	0.284					
+FX-P41-T1	FX-P41				Primary	0.212					
+FX-P42-T1	FX-P42	Lung Cancer			Primary	0.187					
+FX-P43-T1	FX-P43	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.301					
+FX-P43-T2	FX-P43	Non-Small Cell Lung Cancer	Lung Squamous Cell Carcinoma	LUSC	Metastasis	0.296					
+FX-P44-T1	FX-P44	Non-Small Cell Lung Cancer	Lung Adenocarcinoma	LUAD	Primary	0.244					
