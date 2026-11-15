@@ -54,8 +54,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [x] CN Segments, several studies: igv rows keyed by bare sample id (`lib/views/segments/igv.ts:18`) merge two studies' samples with the same id ([08-cn-segments](legacy-spec/parity/08-cn-segments.md)) (#183)
 - [ ] Comparison, Include mode: a patient in two groups enters two survival curves, and the log-rank is run as if the groups were independent (G2 Male, Female, KRAS: p 0.910, 221 patients counted twice); the caveat says nothing ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
   - Decided 2026-11-13: default to Exclude, as legacy; in Include mode still draw the overlapping curves but give no log-rank p, and say why.
-- [ ] Comparison → Clinical picks its 8 attributes by coverage: near-constant ones (SAMPLE_TYPE, CANCER_TYPE, SOMATIC_STATUS, SAMPLE_COUNT) fill the slots and the q-correction, and the attribute the groups were built from (SEX) is not tested ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
-  - Decided 2026-11-13: test every attribute, as legacy, in a table with p, q, test and type; constant attributes skipped and listed as untested.
+- [x] Comparison → Clinical picks its 8 attributes by coverage: near-constant ones (SAMPLE_TYPE, CANCER_TYPE, SOMATIC_STATUS, SAMPLE_COUNT) fill the slots and the q-correction, and the attribute the groups were built from (SEX) is not tested ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
+  - Decided 2026-11-13: test every attribute, as legacy, in a table with p, q, test and type; constant attributes skipped and listed as untested. (PR #224 open)
 - [ ] Comparison → Survival: the KM axis ends at the last event (`lib/stats.ts:160-165`), so censored follow-up after it and its at-risk counts are never drawn (G1 OS to ~77 mo, data to 149) ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
   - Decided 2026-11-13: the axis runs to the last follow-up, with the censored tail and its at-risk counts, as legacy.
 - [ ] Comparison → Survival on a study without OS: the error says "pick one of those" endpoints, and the tab has no control to pick one ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
@@ -294,6 +294,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Per-user layout: Save settings, the restore banner, reset charts (STV-LP-1…6)
 - [ ] **Comparison → page, Overlap, Survival and Clinical tabs** ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
   - [ ] The Clinical tab tests every attribute (coadread 45; ours the 8 best covered, so a Sex comparison does not test SEX), as a table with p, q, type and test, sort, filter, download and a click-through plot (ours a −log₁₀ q bar chart of raw ids) (CMP-CL-2…4, CMP-STM-8; see bugs)
+    - [x] Every attribute, by display name, in the portal's table (Clinical Attribute, Attribute Type, Statistical Test, p, q; sorted by q, bold below 0.05, 20 a page, search, "Significant only"); untested ones listed with their reason and left out of q; the Results page's Clinical sub-tab too (CMP-CL-2, CMP-STM-6, CMP-STM-8) (PR #224 open)
+    - [ ] A categorical attribute with more than 200 values is refused, not tested (coadread OTHER_PATIENT_ID: ours 44 tested, the portal 45)
+    - [ ] The table's download and column menu; the row click's plot and its controls (CMP-CL-2, CMP-CL-3, CMP-CL-4)
   - [ ] Numeric clinical attributes by Wilcoxon / Kruskal-Wallis (ours report Welch t / Welch ANOVA: G1 Weight 2.80e-7 vs the portal's 3.86e-8, MSI MANTIS 0.0745 vs 0.798; ours computes the rank p, matching, but does not show it) (CMP-STM-7)
   - [ ] Survival: the survival-type table (PFS, DFS, DSS with p and q, the Min. # patients slider) and a way to pick the endpoint on the tab (ours OS only) (CMP-SV-1, CMP-SV-5, CMP-SV-6, CMP-STM-4)
   - [ ] Hazard ratios: the checkbox, control group, HR in the legend, HR matrix (CMP-KM-1, CMP-KM-8, CMP-STM-5)

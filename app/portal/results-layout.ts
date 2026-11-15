@@ -10,7 +10,6 @@ import { arrange, type PageLayout, type TabBanner } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 
-const CLINICAL_SHOWN = 8;
 
 /** What a Results page queries. */
 export interface ResultsQuery {
@@ -332,7 +331,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     { title: "Comparison/Survival", sub: [
       { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },
       { title: "Survival", views: [v("Survival", { kind: "survival", cohorts: both })] },
-      ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: data.clinical.slice(0, CLINICAL_SHOWN), cohorts: both })] }] : []),
+      ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, cohorts: both })] }] : []),
       { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),
         v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] },
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
