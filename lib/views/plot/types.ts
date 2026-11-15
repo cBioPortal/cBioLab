@@ -14,6 +14,12 @@ export interface PlotView {
   kind: "plot"; x: PlotAxis; y: PlotAxis; cohorts?: string[];
   /** what a point is (default "sample"); patient mode combines a patient's samples (mean, common value or "Multiple", any alteration) */
   unit?: "patient" | "sample";
+  /**
+   * A scatter's regression line, as the portal's "Show Regression Line" (default off, as there):
+   * drawn and labelled "y = mx + b" and "R² = …", its coefficients rounded to two decimals as the
+   * portal rounds them.
+   */
+  regression?: boolean;
   /** the grid a scatter is binned onto (default 240 x 160) */
   bins?: [number, number];
   /** where the scatter's axes start and end, in the attributes' own units: FGA {min: 0, max: 1}; an end left out is the data's */

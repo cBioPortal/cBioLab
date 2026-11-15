@@ -89,6 +89,32 @@ export function plotMethod(t: PlotTrace): MethodRecord {
         "print(f\"n = {n}, Pearson r = {pearson} (p = {p_of(pearson, n)}), Spearman rho = {spearman} (p = {p_of(spearman, n)})\")");
       check = { "plot:pPearson": { v: st.pPearson }, "plot:pSpearman": { v: st.pSpearman } };
     }
+    if (d.fit) {
+      const f = d.fit, s = f.sums;
+      steps.push({ kind: "statistic", title: "The regression line, as cbioportal.org rounds it",
+        detail: "From the six sums over the plotted points, as the portal's Plots tab fits its \u201cShow Regression Line\u201d (regression@2.0.1 linear, precision 2; PLT-STM-7): " +
+          "slope = (nΣxy − ΣxΣy) / (nΣx² − (Σx)²) rounded to 2 decimals (halves up); intercept = Σy/n − slope·Σx/n from that rounded slope, rounded; " +
+          "R² = 1 − SSE/SST with SSE from the rounded coefficients, rounded. The portal also rounds each predicted value to 0.01 before its SSE, which sums cannot repeat.",
+        params: [["line", "y = " + f.slope + "x + " + f.intercept], ["R²", f.r2 == null ? "none (every y equal)" : String(f.r2)]] });
+      functions.push("portalFit");
+      python.push(
+        "",
+        "import math",
+        "def round2(x):",
+        "    return math.floor(x * 100 + 0.5) / 100  # JavaScript's Math.round: halves up",
+        "",
+        "# the six sums over the plotted points" + (pooled ? ", added across studies" : " (the plot:stats query)"),
+        "f = dict(n=" + s.n + ", sx=" + pyNum(s.sx) + ", sy=" + pyNum(s.sy) + ", sxy=" + pyNum(s.sxy) + ", sxx=" + pyNum(s.sxx) + ", syy=" + pyNum(s.syy) + ")",
+        "run, rise = f[\"n\"] * f[\"sxx\"] - f[\"sx\"] ** 2, f[\"n\"] * f[\"sxy\"] - f[\"sx\"] * f[\"sy\"]",
+        "m = 0 if run == 0 else round2(rise / run)",
+        "b = round2(f[\"sy\"] / f[\"n\"] - m * f[\"sx\"] / f[\"n\"])",
+        "sst = f[\"syy\"] - f[\"sy\"] ** 2 / f[\"n\"]",
+        "sse = f[\"syy\"] - 2 * m * f[\"sxy\"] - 2 * b * f[\"sy\"] + m * m * f[\"sxx\"] + 2 * m * b * f[\"sx\"] + f[\"n\"] * b * b",
+        "r2 = round2(1 - sse / sst) if sst > 0 else None",
+        "RESULT.update({\"plot:fit:slope\": m, \"plot:fit:intercept\": b, \"plot:fit:r2\": r2})",
+        "print(f\"y = {m}x + {b}, R^2 = {r2}\")");
+      check = { ...check, "plot:fit:slope": { v: f.slope, abs: 1e-9 }, "plot:fit:intercept": { v: f.intercept, abs: 1e-9 }, "plot:fit:r2": { v: f.r2, abs: 1e-9 } };
+    }
   } else if (d.shape === "box" && d.groups) {
     steps.push({ kind: "fetch", title: "Each group's quartiles, in the database", scope, rowsOut: d.groups.length,
       detail: "The plot:box " + (pooled ? "queries" : "query") + " above: per category, the count, the extremes and the quartiles of the numeric axis's values (log-transformed first where it is on a log scale).",

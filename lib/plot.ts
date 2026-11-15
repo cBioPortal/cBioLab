@@ -547,7 +547,8 @@ export function coverageNote(d: PlotData, unit: "patient" | "sample"): string {
 }
 
 /**
- * exact statistics over every point: both coefficients and the least-squares line. Spearman's ρ is
+ * exact statistics over every point: both coefficients, the least-squares line, and the six sums the
+ * portal's rounded regression line is fitted from (portalFit). Spearman's ρ is
  * Pearson's r of the ranks, tied values sharing their average rank (as scipy's spearmanr and the
  * portal compute it), so it does not depend on row order. A coefficient is NULL when either axis
  * has no spread, and the line when x has none.
@@ -557,7 +558,8 @@ export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): Agg
   const avgRank = (v: string) => "rank() OVER (ORDER BY " + v + ") + (count() OVER (PARTITION BY " + v + ") - 1) / 2";
   return aggregateSql(pairCte(xSel, ySel, cohortSql) +
     "SELECT count() AS n, if(" + spread + ", corr(x, y), NULL) AS pearson, if(" + spread + ", corr(rx, ry), NULL) AS spearman,\n" +
-    "       if(min(x) < max(x), simpleLinearRegression(x, y).1, NULL) AS slope, if(min(x) < max(x), simpleLinearRegression(x, y).2, NULL) AS intercept\n" +
+    "       if(min(x) < max(x), simpleLinearRegression(x, y).1, NULL) AS slope, if(min(x) < max(x), simpleLinearRegression(x, y).2, NULL) AS intercept,\n" +
+    "       sum(x) AS sx, sum(y) AS sy, sum(x * y) AS sxy, sum(x * x) AS sxx, sum(y * y) AS syy\n" +
     "FROM (SELECT x, y, " + avgRank("x") + " AS rx, " + avgRank("y") + " AS ry FROM pair)");
 }
 
@@ -858,6 +860,37 @@ export function tukey(q1: number, q3: number, lo: number, hi: number): { loWhisk
   return { loWhisker: Math.max(lo, q1 - 1.5 * iqr), hiWhisker: Math.min(hi, q3 + 1.5 * iqr), iqr };
 }
 
+/** the portal's regression line as its Plots tab shows it: y = slope·x + intercept, and R² */
+export interface PlotFit { slope: number; intercept: number; r2: number | null }
+/** n, Σx, Σy, Σxy, Σx², Σy² over the plotted points */
+export interface FitSums { n: number; sx: number; sy: number; sxy: number; sxx: number; syy: number }
+
+/**
+ * The regression line cbioportal.org's Plots tab draws and labels ("Show Regression Line",
+ * PLT-STM-7: regression@2.0.1 `linear` at its default precision 2, ScatterPlot.tsx), from the six
+ * sums over the plotted points: the least-squares slope rounded to 2 decimals, the intercept
+ * ȳ − slope·x̄ from that rounded slope, rounded too, and R² = 1 − SSE/SST from the rounded
+ * coefficients, rounded. The library also rounds each predicted value to 0.01 before its SSE, which
+ * per-point sums cannot repeat; that moves R² by far less than its last shown digit. Null for fewer
+ * than two points; R² null when every y is equal.
+ */
+export function portalFit(m: FitSums): PlotFit | null {
+  if (!(m.n >= 2)) return null;
+  const round2 = (x: number) => Math.round(x * 100) / 100 || 0;
+  const run = m.n * m.sxx - m.sx * m.sx, rise = m.n * m.sxy - m.sx * m.sy;
+  const slope = run === 0 ? 0 : round2(rise / run);
+  const intercept = round2(m.sy / m.n - slope * m.sx / m.n);
+  const sst = m.syy - m.sy * m.sy / m.n;
+  const sse = m.syy - 2 * slope * m.sxy - 2 * intercept * m.sy + slope * slope * m.sxx + 2 * slope * intercept * m.sx + m.n * intercept * intercept;
+  return { slope, intercept, r2: sst > 0 ? round2(1 - sse / sst) : null };
+}
+
+/** a scatter's `fit` field from its sums: the portal's line, or nothing where there is none */
+export function fitOf(sums: FitSums): { fit?: PlotFit & { sums: FitSums } } {
+  const f = Object.values(sums).every(Number.isFinite) ? portalFit(sums) : null;
+  return f ? { fit: { ...f, sums } } : {};
+}
+
 /**
  * A two-sided p-value for a correlation coefficient, from Student's t on n-2 degrees of
  * freedom — the same test the portal applies to the same coefficients.
@@ -992,6 +1025,8 @@ export interface PlotData {
   bins?: PlotCell[];
   stats?: { pearson: number | null; spearman: number | null; slope: number | null; intercept: number | null;
             pPearson: number | null; pSpearman: number | null };
+  /** the regression line the view shows (its `regression`), as the portal rounds it, and the six sums it was fitted from; absent when not shown */
+  fit?: PlotFit & { sums: FitSums };
   groups?: PlotGroup[];
   /** the values behind the boxes: every one, when few enough and the reader may see cases */
   points?: PlotPoint[];
