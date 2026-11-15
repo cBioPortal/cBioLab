@@ -14,7 +14,7 @@
 // a local aggregate-only instance.
 import type { CohortDef, CohortSizes, ExploreResult } from "./types.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, PairOql, LollipopOql, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
-import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers } from "./plot.ts";
+import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers, PlotCell } from "./plot.ts";
 import type { Moments } from "./stats.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
 import { carriesPatientIds, studyRouting } from "./federation.ts";
@@ -184,9 +184,10 @@ export async function remoteFacets(study: string, url: string, draft: CohortDef 
   };
 }
 
-/** a plot request as it travels to a peer: the axes, unit and grid, nothing else */
+/** a plot request as it travels to a peer: the axes, unit, grid and axis ends, nothing else */
 const plotSpecOut = (spec: PlotRequest) => ({ x: spec.x, y: spec.y, unit: spec.unit,
-  ...(spec.colorBy ? { colorBy: spec.colorBy } : {}), ...(spec.ringBy ? { ringBy: spec.ringBy } : {}), ...(spec.bins ? { bins: spec.bins } : {}) });
+  ...(spec.colorBy ? { colorBy: spec.colorBy } : {}), ...(spec.ringBy ? { ringBy: spec.ringBy } : {}), ...(spec.bins ? { bins: spec.bins } : {}),
+  ...(spec.range ? { range: spec.range } : {}) });
 
 export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotCapable {
   readonly instance: Instance;
@@ -326,7 +327,7 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     return this.plotOp("extent", def, spec, { kinds: { xk, yk } });
   }
   async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]> {
     return this.plotOp("bins", def, spec, { kinds: { xk, yk }, bins, extent });
   }
   async plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments> {
