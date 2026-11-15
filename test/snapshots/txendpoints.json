@@ -157,6 +157,7 @@
                 "sha256": "22361b95eb19e37a"
               }
             ],
+            "tLast": 72.3944,
             "unobserved": 108,
             "medianLo": 2.2341,
             "medianHi": 2.7269,
@@ -286,6 +287,7 @@
                 "sha256": "1cc93b028903605e"
               }
             ],
+            "tLast": 86.0724,
             "unobserved": 175,
             "medianLo": 2.4312,
             "medianHi": 2.7598,

@@ -92,7 +92,7 @@ export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
   const last = clean.length ? Math.floor(clean[clean.length - 1].t) : -1;
   const atRisk: number[] = [];
   for (let m = 0; m <= last; m++) atRisk.push(riskAt(m));
-  return { points, median, n: n0, events, atRisk, ...(unobserved ? { unobserved } : {}) };
+  return { points, median, n: n0, events, atRisk, ...(clean.length ? { tLast: clean[clean.length - 1].t } : {}), ...(unobserved ? { unobserved } : {}) };
 }
 
 /**
@@ -154,11 +154,12 @@ export function toIncidence<T extends { points: KmPoint[] }>(curve: T): T {
 /**
  * Shared x-axis domain for both KM renderers (SVG and canvas), so a cutoff or a tick-interval
  * choice can't visually drift between them. `tMax` is the cutoff when one is set, otherwise the
- * latest observed event/censoring time (floored at 12mo so a very short curve doesn't collapse
- * to a sliver); `step` is the requested tick spacing, otherwise the existing 12/24mo default.
+ * last follow-up of any curve, event or censoring, as cBioPortal's KM axis runs (floored at 12mo
+ * so a very short curve doesn't collapse to a sliver); `step` is the requested tick spacing,
+ * otherwise 12mo, or 24mo past 60mo.
  */
-export function survivalAxis(curves: { points: { t: number }[] }[], opts?: { cutoffMonths?: number; tickMonths?: number }): { tMax: number; step: number } {
-  const observed = Math.max(12, ...curves.flatMap(c => c.points.map(p => p.t)));
+export function survivalAxis(curves: { points: { t: number }[]; tLast?: number }[], opts?: { cutoffMonths?: number; tickMonths?: number }): { tMax: number; step: number } {
+  const observed = Math.max(12, ...curves.flatMap(c => [...c.points.map(p => p.t), c.tLast ?? 0]));
   const tMax = opts?.cutoffMonths || observed;
   const step = opts?.tickMonths || (tMax > 60 ? 24 : 12);
   return { tMax, step };
@@ -467,14 +468,21 @@ export function chiSquareP1df(x: number): number {
 
 export type SurvPoint = SurvRecord;
 
+/**
+ * One stratum's two-group terms: observed and expected events in group A, the variance, and
+ * O1 − E1 summed as Σ (d1·n2 − d2·n1) / n, which swapping the groups negates exactly, so χ²
+ * does not depend on which group is named first even to the last bit.
+ */
+type Terms2 = { o1: number; e1: number; v: number; o2: number; dev: number };
+
 /** One stratum's contribution: observed and expected events in group A, and the variance. */
-function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number; v: number; o2: number } {
+function stratumTerms(a: SurvPoint[], b: SurvPoint[]): Terms2 {
   const ok = observable;
   const A = a.filter(ok).slice().sort((x, y) => x.t - y.t);
   const B = b.filter(ok).slice().sort((x, y) => x.t - y.t);
   const riskA = riskSweep(A), riskB = riskSweep(B);
   let i = 0, j = 0;
-  const acc = { o1: 0, e1: 0, v: 0, o2: 0 };
+  const acc = { o1: 0, e1: 0, v: 0, o2: 0, dev: 0 };
   while (i < A.length || j < B.length) {
     const t = Math.min(i < A.length ? A[i].t : Infinity, j < B.length ? B[j].t : Infinity);
     let d1 = 0, d2 = 0;
@@ -487,11 +495,12 @@ function stratumTerms(a: SurvPoint[], b: SurvPoint[]): { o1: number; e1: number;
 }
 
 /** One time's contribution to a two-group stratum: d1, d2 deaths among n1, n2 at risk. */
-function addTime2(acc: { o1: number; e1: number; v: number; o2: number }, d1: number, d2: number, n1: number, n2: number) {
+function addTime2(acc: Terms2, d1: number, d2: number, n1: number, n2: number) {
   const d = d1 + d2, n = n1 + n2;
   if (d > 0 && n > 1) {
     acc.o1 += d1; acc.o2 += d2;
     acc.e1 += (d * n1) / n;
+    acc.dev += (d1 * n2 - d2 * n1) / n;
     // hypergeometric variance; zero when every at-risk subject fails at t
     acc.v += (d * n1 * n2 * (n - d)) / (n * n * (n - 1));
   }
@@ -507,13 +516,13 @@ export function logRank(strata: { a: SurvPoint[]; b: SurvPoint[] }[]): LogRank {
 }
 
 /** The two-group statistic from each stratum's (o1, e1, v, o2). */
-function logRankOf(terms: { o1: number; e1: number; v: number; o2: number }[]): LogRank {
-  let O1 = 0, E1 = 0, V = 0, O2 = 0, used = 0;
-  for (const { o1, e1, v, o2 } of terms) {
+function logRankOf(terms: Terms2[]): LogRank {
+  let O1 = 0, E1 = 0, V = 0, O2 = 0, D = 0, used = 0;
+  for (const { o1, e1, v, o2, dev } of terms) {
     if (o1 + o2 === 0) continue;                 // a stratum with no events says nothing
-    O1 += o1; E1 += e1; V += v; O2 += o2; used++;
+    O1 += o1; E1 += e1; V += v; O2 += o2; D += dev; used++;
   }
-  const chi2 = V > 0 ? ((O1 - E1) * (O1 - E1)) / V : 0;
+  const chi2 = V > 0 ? (D * D) / V : 0;
   return {
     chi2: Math.round(chi2 * 1e4) / 1e4,
     p: chiSquareP1df(chi2),
@@ -701,7 +710,7 @@ export function kaplanMeierCounts(rows: SurvCount[]): Omit<KmCurve, "cohort"> {
   const last = clean.length ? Math.floor(clean[clean.length - 1].t) : -1;
   const atRisk: number[] = [];
   for (let m = 0; m <= last; m++) atRisk.push(riskAt(m));
-  return { points, median, n: n0, events, atRisk, ...(unobserved ? { unobserved } : {}) };
+  return { points, median, n: n0, events, atRisk, ...(clean.length ? { tLast: clean[clean.length - 1].t } : {}), ...(unobserved ? { unobserved } : {}) };
 }
 
 /** Every group's deaths and number at risk at each distinct time any of the groups has, in order. */
@@ -721,8 +730,8 @@ function* jointTimes(groups: SurvCount[][]): Generator<{ d: number[]; n: number[
 }
 
 /** stratumTerms over rows. */
-function stratumTermsCounts(a: SurvCount[], b: SurvCount[]): { o1: number; e1: number; v: number; o2: number } {
-  const acc = { o1: 0, e1: 0, v: 0, o2: 0 };
+function stratumTermsCounts(a: SurvCount[], b: SurvCount[]): Terms2 {
+  const acc = { o1: 0, e1: 0, v: 0, o2: 0, dev: 0 };
   for (const { d: [d1, d2], n: [n1, n2] } of jointTimes([a, b])) addTime2(acc, d1, d2, n1, n2);
   return acc;
 }

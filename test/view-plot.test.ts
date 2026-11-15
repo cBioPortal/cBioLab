@@ -95,6 +95,15 @@ describe("plot: one study", () => {
     assert.deepEqual(oql.plot!.groups!.map((g) => g.g), ["Unaltered", "Altered", "Not profiled"]);
   });
 
+  test("a contingency table's columns and rows come in their axes' orders (PLT-TB-3); an OQL axis leaves its own to the figure", async () => {
+    const table = (): PlotData => ({ shape: "table", n: 6, x: { label: "KRAS", kind: "cat" }, y: { label: "STAGE", kind: "cat" },
+      cells: [{ cx: "Not mutated", cy: "T10", n: 3 }, { cx: "Missense", cy: "T2", n: 2 }, { cx: "Truncating", cy: "T1", n: 1 }] });
+    const r = await run({ s1: local(table, []) }, { x: { source: "alteration", gene: "KRAS", by: "mutationType" }, y: { source: "clinical", attribute: "STAGE" } });
+    assert.deepEqual(r.plot!.order, { x: ["Missense", "Truncating", "Not mutated"], y: ["T1", "T2", "T10"] });
+    const oql = await run({ s1: local(table, []) }, { x: { source: "alteration", oql: "KRAS: MUT" }, y: { source: "clinical", attribute: "STAGE" } });
+    assert.deepEqual(oql.plot!.order, { y: ["T1", "T2", "T10"] });
+  });
+
   test("the bins asked for reach the participant; unset, the plot's own default", async () => {
     const calls: Calls = [];
     await run({ s1: local(() => scatterData(4), calls) }, { bins: [30, 20] });

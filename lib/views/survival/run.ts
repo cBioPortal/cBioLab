@@ -4,9 +4,10 @@ import { kaplanMeierCounts, logRankCounts, logRankKCounts, applyCutoffCounts, su
 import type { ViewResult, LogRank, LogRankK } from "../../types.ts";
 import type { SurvivalCount, EndpointColumns } from "../../federation.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
-import { ATTR_NAME, askEachSite } from "../shared.ts";
+import { ATTR_NAME, askEachSite, answering, plural } from "../shared.ts";
 import type { SurvivalView } from "./types.ts";
 import { survivalMethod } from "./method.ts";
+import { sharedPatientsSql } from "./sql.ts";
 
 export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
@@ -130,28 +131,13 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   // outright; the KM curves themselves still draw (they are descriptive, not a test).
   const MIN_ARM_N = 10;
   const thinArms = curves.filter((c) => c.n < MIN_ARM_N).map((c) => c.cohort + " (n=" + c.n + ")");
-  let logrank: LogRank | undefined, logrankPooled: LogRank | undefined;
-  let logrankK: LogRankK | undefined, logrankKPooled: LogRankK | undefined;
-  if (thinArms.length === 0 && vNames.length === 2) {
-    const [A, B] = vNames;
-    const sites = [...new Set([...perSite.get(A)!.keys(), ...perSite.get(B)!.keys()])];
-    const pooledTest = logRankCounts([{ a: countsFor(A), b: countsFor(B) }]);
-    if (sites.length > 1) {
-      logrank = logRankCounts(sites.map((st) => ({ a: countsFor(A, st), b: countsFor(B, st) })));
-      logrankPooled = pooledTest;   // shown for contrast: the two can disagree
-    } else {
-      logrank = pooledTest;
-    }
-  } else if (thinArms.length === 0 && vNames.length >= 3) {
-    const sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
-    const pooledTest = logRankKCounts([{ groups: vNames.map((n) => countsFor(n)) }]);
-    if (sites.length > 1) {
-      logrankK = logRankKCounts(sites.map((st) => ({ groups: vNames.map((n) => countsFor(n, st)) })));
-      logrankKPooled = pooledTest;
-    } else {
-      logrankK = pooledTest;
-    }
-  }
+  // A patient in two cohorts is in two curves, and the log-rank test assumes the groups are
+  // independent. How many are is always said; with noTestWhenShared (the Comparison page's Include
+  // mode) no p is given at all, the curves still drawn. Asked per study, since ids are
+  // study-qualified; a participant that cannot answer is named, not assumed disjoint.
+  const { shared, unchecked } = vNames.length >= 2 ? await sharedPatients(c) : { shared: 0, unchecked: [] };
+  const withheld = shared > 0 && (view as SurvivalView).noTestWhenShared === true;
+  const { logrank, logrankPooled, logrankK, logrankKPooled } = withheld || thinArms.length ? {} : logRankOf(vNames, perSite, countsFor);
   // How long after the anchor patients actually became observable. A long
   // tail here is a warning about the anchor itself — "first Diagnosis" in a
   // study that records prior unrelated cancers can sit decades back.
@@ -188,6 +174,7 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
     participation: participationFor(vStudies, false),
     ...(logrank ? { logrank } : {}), ...(logrankPooled ? { logrankPooled } : {}),
     ...(logrankK ? { logrankK } : {}), ...(logrankKPooled ? { logrankKPooled } : {}),
+    ...(shared > 0 ? { sharedPatients: shared, ...(withheld ? { testWithheld: true } : {}) } : {}),
     method: survivalMethod({
       endpoint, monthsColumn: columns ? columns.months : endpoint + "_MONTHS", statusColumn: columns ? columns.status : endpoint + "_STATUS",
       queryLabel: "survivalCounts:" + endpoint + (anchor ? "@" + anchor.eventType : ""),
@@ -207,7 +194,7 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
         : logrankK
           ? { kind: "logrankK", stratified: !!logrankKPooled, strata: logrankK.strata, chi2: logrankK.chi2, df: logrankK.df, p: logrankK.p,
               ...(logrankKPooled ? { pooled: { chi2: logrankKPooled.chi2, p: logrankKPooled.p } } : {}) }
-          : { kind: "none", reason: thinArms.length
+          : { kind: "none", reason: withheld ? sharedNote(shared) : thinArms.length
               ? "Refused: " + thinArms.join(", ") + (thinArms.length === 1 ? " has" : " have") + " fewer than " + MIN_ARM_N + " patients."
               : "A log-rank test needs at least two cohorts." },
     }),
@@ -240,7 +227,13 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
       (anchor ? "" : (vStudies.length > 1 ? "; baselines are NOT harmonized across studies" : "") + ")") +
       " Status '0:...' treated as censored." +
       endpointHelp +
-      (logrankPooled
+      (unchecked.length ? " Whether the cohorts share patients could not be checked at " + unchecked.join(", ") + " (" +
+        (unchecked.length === 1 ? "a remote peer, which does not" : "remote peers, which do not") + " answer that yet); the test below assumes they share none there." : "") +
+      (shared > 0 && !withheld ? " " + plural(shared, "patient is", "patients are") + " in more than one cohort, so in more than one curve;" +
+        " the log-rank test assumes the groups share no one, so its p is approximate." : "") +
+      (withheld
+        ? " " + sharedNote(shared)
+        : logrankPooled
         ? " The log-rank test is STRATIFIED by study (" + logrank!.strata + " strata contributed events): each study is" +
           " compared only against itself, so a difference in case mix between studies cannot masquerade as a difference" +
           " between cohorts. The pooled p is shown alongside — where the two disagree, the stratified one is the honest answer." +
@@ -260,4 +253,43 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
                 " fewer than " + MIN_ARM_N + " patients — a chi-squared from this few is not a meaningful test, only a" +
                 " number shaped like one. The curves above are still drawn; they are descriptive, not a test."
               : " Log-rank needs at least two cohorts.") };
+}
+
+/**
+ * The log-rank test over the cohorts' count rows: two-sided for 2 cohorts, the k-group test for 3+;
+ * stratified by study when the cohorts span several, with the pooled test beside it for contrast.
+ */
+function logRankOf(vNames: string[], perSite: Map<string, Map<string, SurvivalCount[]>>, countsFor: (n: string, st?: string) => SurvCount[]):
+  { logrank?: LogRank; logrankPooled?: LogRank; logrankK?: LogRankK; logrankKPooled?: LogRankK } {
+  const sites = [...new Set(vNames.flatMap((n) => [...perSite.get(n)!.keys()]))];
+  if (vNames.length === 2) {
+    const [A, B] = vNames;
+    const pooled = logRankCounts([{ a: countsFor(A), b: countsFor(B) }]);
+    return sites.length > 1
+      ? { logrank: logRankCounts(sites.map((st) => ({ a: countsFor(A, st), b: countsFor(B, st) }))), logrankPooled: pooled }
+      : { logrank: pooled };
+  }
+  if (vNames.length >= 3) {
+    const pooled = logRankKCounts([{ groups: vNames.map((n) => countsFor(n)) }]);
+    return sites.length > 1
+      ? { logrankK: logRankKCounts(sites.map((st) => ({ groups: vNames.map((n) => countsFor(n, st)) }))), logrankKPooled: pooled }
+      : { logrankK: pooled };
+  }
+  return {};
+}
+
+/** why a view whose cohorts share patients has no log-rank p */
+const sharedNote = (shared: number) => "No log-rank p: " + plural(shared, "patient is", "patients are") +
+  " in more than one cohort, so in more than one curve, and the test assumes the groups share no one." +
+  " Compare groups without their shared patients (on the Comparison page, Overlapping samples: exclude) for a test.";
+
+/** patients in more than one of the view's cohorts, summed over the studies that can say, and the studies that cannot */
+async function sharedPatients(c: ViewRun): Promise<{ shared: number; unchecked: string[] }> {
+  const { ok, excluded } = answering(c);
+  // only a study two of the cohorts reach can hold a shared patient
+  const sites = Object.keys(ok).map((st) => ({ st, here: c.vNames.filter((n) => c.cohorts[n].studies.includes(st)) })).filter((x) => x.here.length >= 2);
+  const answers = await Promise.all(sites.map(({ st, here }) => ok[st].viewAggregateMany("survival", here.map((n) => c.doc.cohorts[n]), sharedPatientsSql)));
+  const shared = answers.reduce((k, rows) => k + Number(rows[0]?.n || 0), 0);
+  const unchecked = excluded.filter((e) => c.vNames.filter((n) => c.cohorts[n].studies.includes(e.study)).length >= 2).map((e) => e.study);
+  return { shared, unchecked };
 }

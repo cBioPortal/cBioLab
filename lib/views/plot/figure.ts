@@ -11,8 +11,9 @@ import { LAYER_BASE } from "../../plot-layers.ts";
 import {
 
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels, legend, label,
-  textWidth, fmtInt, fmtNum, fmtP, FS, SW, SERIES, OTHER, type Scale, type SvgOpts, type LegendItem
+  textWidth, fmtInt, fmtNum, FS, SW, SERIES, OTHER, type Scale, type SvgOpts, type LegendItem
 } from "../../svg-kit.ts";
+import { portalCorr, portalP } from "../../chart/format.ts";
 
 type Pal = ReturnType<typeof palette>;
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -99,8 +100,9 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
   const hs = drawnLayers(d);
   const base = LAYER_BASE;
   const st = d.stats;
-  const statLine = st ? [st.pearson != null ? "Pearson r = " + fmtNum(st.pearson, 2) + " (" + fmtP(st.pPearson ?? 1) + ")" : "",
-    st.spearman != null ? "Spearman ρ = " + fmtNum(st.spearman, 2) + " (" + fmtP(st.pSpearman ?? 1) + ")" : ""].filter(Boolean).join("   ·   ") : "";
+  // as the portal's Plots tab writes them (PLT-SC-2): Spearman first, each to two decimals, its p by toConditionalPrecision
+  const corr = (name: string, r: number | null, pv: number | null) => r == null ? "" : name + ": " + portalCorr(r) + (pv != null ? " (p = " + portalP(pv) + ")" : "");
+  const statLine = st ? [corr("Spearman", st.spearman, st.pSpearman), corr("Pearson", st.pearson, st.pPearson)].filter(Boolean).join("   ·   ") : "";
   const T = statLine ? 28 : 12, R = 16, PLOT = plotHeight(W);
   const xTitle = axisTitle(d.x), yTitle = axisTitle(d.y);
   // the bins tile the extent exactly, so the scales keep its ends (no rounding outwards)
@@ -415,14 +417,14 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
 
 function table(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W0: number, p: Pal): string {
   // Every category on both axes — the engine refuses a pair past CATEGORY_CAP, so what arrives is
-  // already the whole table, and a table missing rows or columns is a wrong one. Ordered by
-  // marginal total so the big categories read first.
+  // already the whole table, and a table missing rows or columns is a wrong one. Ordered as the
+  // engine gives them (each axis's category order, PLT-TB-3), else by marginal total.
   const marg = (key: "cx" | "cy") => {
     const t = new Map<string, number>();
     for (const c of d.cells!) t.set(c[key], (t.get(c[key]) || 0) + c.n);
     return [...t.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([k]) => k);
   };
-  const xsCat = marg("cx"), ysCat = marg("cy");
+  const xsCat = d.order?.x || marg("cx"), ysCat = d.order?.y || marg("cy");
   const at = new Map(d.cells!.map((c) => [c.cx + "\u0000" + c.cy, c.n]));
   const maxN = Math.max(1, ...d.cells!.map((c) => c.n));
   const xTitle = axisTitle(d.x), yTitle = axisTitle(d.y);

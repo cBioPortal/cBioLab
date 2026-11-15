@@ -143,6 +143,7 @@
               "sha256": "ce019366da5426a4"
             }
           ],
+          "tLast": 126.73,
           "missing": 0
         },
         {
@@ -262,6 +263,7 @@
               "sha256": "348a13dfb556251a"
             }
           ],
+          "tLast": 186.4,
           "missing": 0
         }
       ],
@@ -280,7 +282,7 @@
       },
       "logrank": {
         "chi2": 0.3942,
-        "p": 0.5301191634922409,
+        "p": 0.530119163492241,
         "df": 1,
         "observed": [
           23,
@@ -293,7 +295,8 @@
         "variance": 21.5713,
         "strata": 1
       },
-      "caveat": "PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. Log-rank on a single study, so no stratification applies.",
+      "sharedPatients": 1,
+      "caveat": "PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. 1 patient is in more than one cohort, so in more than one curve; the log-rank test assumes the groups share no one, so its p is approximate. Log-rank on a single study, so no stratification applies.",
       "method": {
         "steps": [
           {
@@ -390,7 +393,7 @@
             "abs": 0.00005
           },
           "logrank:p": {
-            "v": 0.5301191634922409,
+            "v": 0.530119163492241,
             "rel": 0.00001,
             "abs": 1e-300
           }

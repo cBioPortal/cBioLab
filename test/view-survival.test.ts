@@ -16,8 +16,20 @@ import { survivalKind } from "../lib/views/survival/kind.ts";
 /** counts per cohort, per study, as each site answers them */
 type Answers = Record<string, Record<string, SurvivalCount[]>>;
 
+/** patients each study's database finds in more than one of the cohorts; a study listed as "remote" cannot be asked */
+let SHARED: Record<string, number | "remote"> = {};
+const sharedAsked: { study: string; label: string; cohorts: string[]; sql: string }[] = [];
+
 function site(study: string, answers: Answers, endpoints: string[] | "fail" = [], seen?: unknown[][]) {
+  const aggregates = SHARED[study] === "remote" ? {} : {
+    viewAggregate: async () => [],
+    viewAggregateMany: async (label: string, defs: { name: string }[], build: (sqls: string[], st: string, db: string) => string) => {
+      sharedAsked.push({ study, label, cohorts: defs.map((d) => d.name), sql: build(defs.map((d) => "SELECT pid, sid FROM " + d.name), study, "db") });
+      return [{ n: SHARED[study] ?? 0 }];
+    },
+  };
   return {
+    ...aggregates,
     instance: { id: "local", mode: "patient-level", label: "local", conn: PRIMARY }, study,
     survivalCounts: async (def: { name: string }, endpoint: string, anchor: unknown, columns: unknown) => {
       seen?.push([def.name, study, endpoint, anchor, columns]);
@@ -187,6 +199,58 @@ describe("survival: Kaplan–Meier and the log-rank test", () => {
     const v = unwrap(await runSurvival({ kind: "survival" } as never, ctx({ A: { s1: 10 } }, { A: { s1: DIE() } }))) as Out;
     assert.equal(v.logrank, undefined); assert.equal(v.logrankK, undefined);
     assert.match(v.caveat!, /Log-rank needs at least two cohorts\.$/);
+  });
+});
+
+describe("survival: cohorts that share patients get curves but, with noTestWhenShared (Include mode, CMP-SV-4, CMP-MD-2), no log-rank p", () => {
+  const run = async (counts: Record<string, Record<string, number>>, answers: Answers, shared: Record<string, number | "remote">, view: object = { noTestWhenShared: true }) => {
+    SHARED = shared; sharedAsked.length = 0;
+    try { return unwrap(await runSurvival({ kind: "survival", ...view } as never, ctx(counts, answers))) as Out; } finally { SHARED = {}; }
+  };
+  test("two cohorts sharing 221 patients: both curves drawn, no test, the reason in the caveat and the method record", async () => {
+    const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 221 });
+    assert.equal(v.curves.length, 2);
+    assert.equal(v.logrank, undefined); assert.equal(v.logrankK, undefined);
+    assert.match(v.caveat!, /No log-rank p: 221 patients are in more than one cohort, so in more than one curve/);
+    assert.equal((v as { sharedPatients?: number }).sharedPatients, 221);
+    assert.equal((v as { testWithheld?: boolean }).testWithheld, true);
+    assert.ok(!/Log-rank on a single study/.test(v.caveat!));
+    const none = (v.method.steps as { title: string; detail?: string }[]).find((st) => st.title === "No log-rank test");
+    assert.match(none!.detail!, /221 patients are in more than one cohort/);
+    assert.deepEqual(sharedAsked.map((a) => [a.study, a.label, a.cohorts]), [["s1", "survival", ["A", "B"]]]);
+    assert.match(sharedAsked[0].sql, /GROUP BY pid HAVING count\(\) > 1/);
+  });
+  test("one shared patient is enough, for three cohorts too (the k-group test is withheld)", async () => {
+    const v = await run({ A: { s1: 10 }, B: { s1: 10 }, C: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() }, C: { s1: LIVE() } }, { s1: 1 });
+    assert.equal(v.logrankK, undefined);
+    assert.match(v.caveat!, /No log-rank p: 1 patient is in more than one cohort/);
+  });
+  test("no shared patient: the test as before (χ² 19)", async () => {
+    const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 0 });
+    close(v.logrank!.chi2, 19);
+    assert.ok(!/No log-rank p/.test(v.caveat!));
+  });
+  test("shared patients summed over studies; a study only one cohort reaches is not asked", async () => {
+    const v = await run({ A: { s1: 10, s2: 10 }, B: { s1: 10 } }, { A: { s1: DIE(), s2: DIE() }, B: { s1: LIVE() } }, { s1: 2, s2: 5 });
+    assert.deepEqual(sharedAsked.map((a) => a.study), ["s1"]);
+    assert.match(v.caveat!, /No log-rank p: 2 patients are in more than one cohort/);
+  });
+  test("a participant that cannot be asked is named, and the test still given", async () => {
+    const v = await run({ A: { s1: 10, s2: 10 }, B: { s1: 10, s2: 10 } }, { A: { s1: DIE(), s2: DIE() }, B: { s1: LIVE(), s2: LIVE() } }, { s1: 0, s2: "remote" });
+    close(v.logrank!.chi2, 38);
+    assert.match(v.caveat!, /Whether the cohorts share patients could not be checked at s2 \(a remote peer/);
+  });
+  test("without noTestWhenShared the test is given, and the caveat says how many are shared", async () => {
+    const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 47 }, {});
+    close(v.logrank!.chi2, 19);
+    assert.equal((v as { sharedPatients?: number }).sharedPatients, 47);
+    assert.equal((v as { testWithheld?: boolean }).testWithheld, undefined);
+    assert.match(v.caveat!, /47 patients are in more than one cohort, so in more than one curve; the log-rank test assumes the groups share no one, so its p is approximate\./);
+    assert.ok(!/No log-rank p/.test(v.caveat!));
+  });
+  test("one cohort: nothing to ask", async () => {
+    await run({ A: { s1: 10 } }, { A: { s1: DIE() } }, { s1: 5 });
+    assert.equal(sharedAsked.length, 0);
   });
 });
 

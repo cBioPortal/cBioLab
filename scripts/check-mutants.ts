@@ -237,6 +237,10 @@ const MUTANTS: Mutant[] = [
     effect: "Splitting a cohort into arms (KRAS G12C, then other KRAS, then wild-type) puts G12C patients in two arms at once.",
     find: "    S.exclude(arm.where);\n",
     replace: "\n" },
+  { id: "survival-shared-counts-everyone", layer: "cohorts", guard: "cohort-logic", file: "lib/views/survival/sql.ts",
+    effect: "Survival counts every patient of the groups as shared between curves, so groups that share no one are given no log-rank p.",
+    find: "GROUP BY pid HAVING count() > 1",
+    replace: "GROUP BY pid HAVING count() >= 1" },
 
   { id: "enrichment-threshold-drops-from-q", layer: "statistics", guard: "unit", file: "lib/views/enrichment/run.ts",
     effect: "The Genomic Alterations tab leaves rarely altered genes out of the test, so Benjamini–Hochberg divides by fewer genes and calls genes significant that the portal does not (PUM1 q 0.0425 for 0.533).",

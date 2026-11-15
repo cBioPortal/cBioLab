@@ -27,6 +27,12 @@ export interface SurvivalView {
   tickMonths?: number;
   /** draw 1 - S(t), cumulative incidence, instead of survival (default "survival") */
   display?: "survival" | "incidence";
+  /**
+   * when the cohorts share a patient (so the patient is in two curves), give no log-rank test
+   * rather than one whose groups are not independent; the curves still draw. The Comparison page
+   * sets it, for its Include mode. Unset, the test is given and the caveat says how many are shared.
+   */
+  noTestWhenShared?: boolean;
 }
 
 declare module "../../types.ts" {
@@ -51,6 +57,10 @@ declare module "../../types.ts" {
       logrank?: LogRank; logrankPooled?: LogRank;
       /** 3+ cohorts: the k-group generalization (tests whether the groups differ AT ALL) */
       logrankK?: LogRankK; logrankKPooled?: LogRankK;
+      /** patients in more than one cohort, so in more than one curve */
+      sharedPatients?: number;
+      /** no log-rank test was given because of them (the view's noTestWhenShared) */
+      testWithheld?: boolean;
     };
   }
   interface ViewResultMain { survival: "curves" }

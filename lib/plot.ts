@@ -1010,6 +1010,8 @@ export interface PlotData {
   /** which of the two the figure is drawing, and why — the caption says so too */
   overlay?: "points" | "violin" | "none";
   cells?: { cx: string; cy: string; n: number }[];
+  /** a contingency table's columns (x) and rows (y), top to bottom, in their axis's category order; an axis without one is by marginal total */
+  order?: { x?: string[]; y?: string[] };
   note?: string;
   /** cases in the cohort, how many have each axis, and (patient mode) how many patients have several samples */
   coverage?: { total: number; nx: number; ny: number; multi?: number };

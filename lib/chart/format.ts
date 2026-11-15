@@ -76,6 +76,12 @@ export const portalPMin = (p: number): string => p === 0 || (p > 0 && Math.log10
 export const portalAlteredPct = (f: number): string => (f * 100).toFixed(2) + "%";
 
 /**
+ * A correlation coefficient as cBioPortal's Plots tab writes it: `toFixed(2)`, an ASCII hyphen for
+ * the sign (cbioportal-frontend ScatterPlot.tsx correlationInfo, PLT-STM-4; −0.05509 → "-0.06").
+ */
+export const portalCorr = (r: number): string => r.toFixed(2);
+
+/**
  * A value at two significant digits, as cBioPortal's FormatUtils.formatNumberValueInSignificantDigits(x, 2)
  * writes it for the mutation table's SIGNAL and gnomAD frequencies: no exponent, no separators,
  * 0 as "0" (0.0000583 → "0.000058", 0.125 → "0.13", 1234 → "1200").

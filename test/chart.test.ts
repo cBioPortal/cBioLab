@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalPMin, portalAlteredPct, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -78,6 +78,8 @@ test("the portal's own number spellings, where a table must read as cBioPortal's
   assert.deepEqual([21 / 171, 0, 1, 0.123456].map(portalAlteredPct), ["12.28%", "0.00%", "100.00%", "12.35%"]);
   // toConditionalPrecisionWithMinimum(x, 3, 0.01, -10): the Comparison page's clinical and survival-type tables
   assert.deepEqual([3.86e-8, 1.022e-6, 0.245, 1e-10, 9.9e-11, 0, 0.0123].map(portalPMin), ["3.86e-8", "1.022e-6", "0.245", "1.00e-10", "< 10^-10", "< 10^-10", "0.0123"]);
+  // ScatterPlot.tsx correlationInfo: toFixed(2) — audit Q4 Spearman −0.05509 shown "-0.06", Pearson −0.03816 "-0.04"
+  assert.deepEqual([-0.05509, -0.03816, 0.50806, 1, 0].map(portalCorr), ["-0.06", "-0.04", "0.51", "1.00", "0.00"]);
 });
 
 test("linear ticks are round steps; log ticks are powers of ten", () => {
