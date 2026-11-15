@@ -6,7 +6,7 @@ import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hots
 
 // ---- mutation types: getCanonicalMutationType / getProteinImpactTypeFromCanonical ----------
 
-const CANONICAL: Record<string, string> = {
+export const CANONICAL: Record<string, string> = {
   missense_mutation: "missense", missense: "missense", missense_variant: "missense",
   frame_shift_ins: "frame_shift_ins", frame_shift_del: "frame_shift_del", frameshift: "frameshift",
   frameshift_deletion: "frame_shift_del", frameshift_insertion: "frame_shift_ins",

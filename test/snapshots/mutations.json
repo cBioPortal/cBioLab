@@ -20,6 +20,24 @@
         "gene": "KRAS",
         "columns": [
           {
+            "id": "gene",
+            "name": "Gene",
+            "numeric": false,
+            "tip": "HUGO gene symbol"
+          },
+          {
+            "id": "study",
+            "name": "Study of Origin",
+            "numeric": false,
+            "tip": "Study of Origin"
+          },
+          {
+            "id": "cancerTypeAll",
+            "name": "Cancer Type",
+            "numeric": false,
+            "tip": "Cancer Type"
+          },
+          {
             "id": "sample",
             "name": "Sample ID",
             "numeric": false
@@ -54,7 +72,8 @@
           {
             "id": "mutationType",
             "name": "Mutation Type",
-            "numeric": false
+            "numeric": false,
+            "tip": "Consequence of the mutation on the protein (variant classification). Missense: Single amino acid substitution. IF: In-frame: adds or removes amino acids without a frameshift. Truncating: Truncates the protein. Nonsense: Premature stop codon. Nonstop: Loss of the stop codon. Nonstart: Loss of the start codon. FS: Frameshift: shifts the reading frame. FS del: Frameshift deletion: shifts the reading frame. FS ins: Frameshift insertion: shifts the reading frame. IF ins: In-frame insertion: adds amino acids without a frameshift. IF del: In-frame deletion: removes amino acids without a frameshift. Splice: Affects a splice site. Fusion: Gene fusion. Silent: No change to the amino acid sequence."
           },
           {
             "id": "alteration",
@@ -64,12 +83,25 @@
           {
             "id": "variantType",
             "name": "Variant Type",
-            "numeric": false
+            "numeric": false,
+            "tip": "Type of change at the DNA level (variant type). SNP: Single Nucleotide Polymorphism. DNP: Di-Nucleotide Polymorphism. TNP: Tri-Nucleotide Polymorphism. ONP: Oligo-Nucleotide Polymorphism. INS: Insertion. DEL: Deletion."
+          },
+          {
+            "id": "copyNumber",
+            "name": "Copy #",
+            "numeric": false,
+            "tip": "Putative copy number call for the gene in this sample. Hover over a value for details. Amp: High-level amplification. Gain: Low-level gain. Diploid: No copy number change. ShallowDel: Shallow (possibly heterozygous) deletion. DeepDel: Deep (possibly homozygous) deletion."
           },
           {
             "id": "vaf",
             "name": "Allele Freq (T)",
             "numeric": true
+          },
+          {
+            "id": "vafNormal",
+            "name": "Allele Freq (N)",
+            "numeric": true,
+            "tip": "Variant allele frequency in the matched normal sample (variant reads / total reads)"
           },
           {
             "id": "altCount",
@@ -82,50 +114,25 @@
             "numeric": true
           },
           {
+            "id": "normalAltCount",
+            "name": "Variant Reads (Normal)",
+            "numeric": true,
+            "tip": "Number of reads supporting the variant allele in the matched normal sample"
+          },
+          {
+            "id": "normalRefCount",
+            "name": "Ref Reads (Normal)",
+            "numeric": true,
+            "tip": "Number of reads supporting the reference allele in the matched normal sample"
+          },
+          {
             "id": "mutCount",
             "name": "# Mut in Sample",
             "numeric": true
           },
           {
-            "id": "chr",
-            "name": "Chromosome",
-            "numeric": false
-          },
-          {
-            "id": "start",
-            "name": "Start Pos",
-            "numeric": true
-          },
-          {
-            "id": "end",
-            "name": "End Pos",
-            "numeric": true
-          },
-          {
-            "id": "ref",
-            "name": "Ref",
-            "numeric": false
-          },
-          {
-            "id": "var",
-            "name": "Var",
-            "numeric": false
-          },
-          {
-            "id": "hgvsg",
-            "name": "HGVSg",
-            "numeric": false,
-            "tip": "Genomic change in HGVS notation (HGVSg). Click a value to view it in Genome Nexus."
-          },
-          {
-            "id": "hgvsc",
-            "name": "HGVSc",
-            "numeric": false,
-            "tip": "Coding DNA change in HGVS notation (HGVSc) for the selected transcript"
-          },
-          {
-            "…": "5 more",
-            "sha256": "24193a917309c610"
+            "…": "15 more",
+            "sha256": "eed771d4f8c5f13a"
           }
         ],
         "shown": [
@@ -172,6 +179,9 @@
             "patient": "P-0044990",
             "sample": "P-0044990-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0044990-T01-IM6",
               "Colon Adenocarcinoma",
               "G12D",
@@ -181,20 +191,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.928,
+              0.01,
               257,
               20,
+              4,
+              298,
               9,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "T",
-              "12:g.25398284C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "45a56e5fd3530ea3"
               }
             ]
           },
@@ -204,6 +211,9 @@
             "patient": "P-0066632",
             "sample": "P-0066632-T01-IM7",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0066632-T01-IM7",
               "Colon Adenocarcinoma",
               "G12D",
@@ -213,20 +223,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.896,
+              0.01,
               121,
               14,
+              2,
+              181,
               7,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "T",
-              "12:g.25398284C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "45a56e5fd3530ea3"
               }
             ]
           },
@@ -236,6 +243,9 @@
             "patient": "P-0011108",
             "sample": "P-0011108-T01-IM5",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0011108-T01-IM5",
               "Colon Adenocarcinoma",
               "G12D",
@@ -245,20 +255,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.888,
+              0.0025,
               772,
               97,
+              1,
+              403,
               9,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "T",
-              "12:g.25398284C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "45a56e5fd3530ea3"
               }
             ]
           },
@@ -268,6 +275,9 @@
             "patient": "P-0046395",
             "sample": "P-0046395-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0046395-T01-IM6",
               "Colorectal Adenocarcinoma",
               "G13D",
@@ -277,20 +287,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.814,
+              0.0083,
               415,
               95,
+              3,
+              357,
               10,
-              "12",
-              25398281,
-              25398281,
-              "C",
-              "T",
-              "12:g.25398281C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "c98f1088b8aafd72"
               }
             ]
           },
@@ -300,6 +307,9 @@
             "patient": "P-0018448",
             "sample": "P-0018448-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0018448-T01-IM6",
               "Colon Adenocarcinoma",
               "G12D",
@@ -309,20 +319,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.799,
+              null,
               860,
               217,
+              null,
+              677,
               16,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "T",
-              "12:g.25398284C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "45a56e5fd3530ea3"
               }
             ]
           },
@@ -332,6 +339,9 @@
             "patient": "P-0055331",
             "sample": "P-0055331-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0055331-T01-IM6",
               "Colon Adenocarcinoma",
               "G12A",
@@ -341,20 +351,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.796,
+              null,
               266,
               68,
+              null,
+              464,
               9,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "G",
-              "12:g.25398284C>G",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "3becda2de2d613ba"
               }
             ]
           },
@@ -364,6 +371,9 @@
             "patient": "P-0057020",
             "sample": "P-0057020-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0057020-T01-IM6",
               "Colorectal Adenocarcinoma",
               "G12C",
@@ -373,20 +383,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.792,
+              null,
               179,
               47,
+              null,
+              368,
               7,
-              "12",
-              25398285,
-              25398285,
-              "C",
-              "A",
-              "12:g.25398285C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "9d8015bb886c4c28"
               }
             ]
           },
@@ -396,6 +403,9 @@
             "patient": "P-0012877",
             "sample": "P-0012877-T01-IM5",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0012877-T01-IM5",
               "Colon Adenocarcinoma",
               "G12D",
@@ -405,20 +415,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.791,
+              0.0019,
               457,
               121,
+              1,
+              531,
               10,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "T",
-              "12:g.25398284C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "45a56e5fd3530ea3"
               }
             ]
           },
@@ -428,6 +435,9 @@
             "patient": "P-0005029",
             "sample": "P-0005029-T01-IM5",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0005029-T01-IM5",
               "Rectal Adenocarcinoma",
               "G13D",
@@ -437,20 +447,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.786,
+              null,
               434,
               118,
+              null,
+              565,
               3,
-              "12",
-              25398281,
-              25398281,
-              "C",
-              "T",
-              "12:g.25398281C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "c98f1088b8aafd72"
               }
             ]
           },
@@ -460,6 +467,9 @@
             "patient": "P-0015210",
             "sample": "P-0015210-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0015210-T01-IM6",
               "Colon Adenocarcinoma",
               "G12D",
@@ -469,20 +479,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.775,
+              null,
               856,
               248,
+              null,
+              457,
               5,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "T",
-              "12:g.25398284C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "45a56e5fd3530ea3"
               }
             ]
           },
@@ -492,6 +499,9 @@
             "patient": "P-0000739",
             "sample": "P-0000739-T01-IM3",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0000739-T01-IM3",
               "Colon Adenocarcinoma",
               "G12C",
@@ -501,20 +511,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.768,
+              null,
               540,
               163,
+              null,
+              299,
               7,
-              "12",
-              25398285,
-              25398285,
-              "C",
-              "A",
-              "12:g.25398285C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "9d8015bb886c4c28"
               }
             ]
           },
@@ -524,6 +531,9 @@
             "patient": "P-0078660",
             "sample": "P-0078660-T01-IM7",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0078660-T01-IM7",
               "Colorectal Adenocarcinoma",
               "G12C",
@@ -533,20 +543,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.763,
+              null,
               161,
               50,
+              null,
+              223,
               13,
-              "12",
-              25398285,
-              25398285,
-              "C",
-              "A",
-              "12:g.25398285C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "9d8015bb886c4c28"
               }
             ]
           },
@@ -556,6 +563,9 @@
             "patient": "P-0007990",
             "sample": "P-0007990-T01-IM5",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0007990-T01-IM5",
               "Colon Adenocarcinoma",
               "G12S",
@@ -565,20 +575,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Amp",
               0.759,
+              null,
               1216,
               386,
+              null,
+              365,
               7,
-              "12",
-              25398285,
-              25398285,
-              "C",
-              "T",
-              "12:g.25398285C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "1e3c6973b6b457a0"
               }
             ]
           },
@@ -588,6 +595,9 @@
             "patient": "P-0050517",
             "sample": "P-0050517-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0050517-T01-IM6",
               "Colon Adenocarcinoma",
               "G12V",
@@ -597,20 +607,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.751,
+              null,
               175,
               58,
+              null,
+              395,
               10,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "A",
-              "12:g.25398284C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "a6a9e4fd1db8bb24"
               }
             ]
           },
@@ -620,6 +627,9 @@
             "patient": "P-0039168",
             "sample": "P-0039168-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0039168-T01-IM6",
               "Mucinous Adenocarcinoma of the Colon and Rectum",
               "G12S",
@@ -629,20 +639,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Amp",
               0.744,
+              null,
               886,
               305,
+              null,
+              339,
               4,
-              "12",
-              25398285,
-              25398285,
-              "C",
-              "T",
-              "12:g.25398285C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "1e3c6973b6b457a0"
               }
             ]
           },
@@ -652,6 +659,9 @@
             "patient": "P-0041600",
             "sample": "P-0041600-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0041600-T01-IM6",
               "Colorectal Adenocarcinoma",
               "G12V",
@@ -661,20 +671,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.741,
+              0.0026,
               304,
               106,
+              1,
+              391,
               6,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "A",
-              "12:g.25398284C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "a6a9e4fd1db8bb24"
               }
             ]
           },
@@ -684,6 +691,9 @@
             "patient": "P-0046742",
             "sample": "P-0046742-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0046742-T01-IM6",
               "Colon Adenocarcinoma",
               "G13D",
@@ -693,20 +703,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.724,
+              null,
               184,
               70,
+              null,
+              309,
               7,
-              "12",
-              25398281,
-              25398281,
-              "C",
-              "T",
-              "12:g.25398281C>T",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "c98f1088b8aafd72"
               }
             ]
           },
@@ -716,6 +723,9 @@
             "patient": "P-0008735",
             "sample": "P-0008735-T01-IM5",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0008735-T01-IM5",
               "Colon Adenocarcinoma",
               "G12C",
@@ -725,20 +735,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.723,
+              null,
               748,
               286,
+              null,
+              352,
               10,
-              "12",
-              25398285,
-              25398285,
-              "C",
-              "A",
-              "12:g.25398285C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "9d8015bb886c4c28"
               }
             ]
           },
@@ -748,6 +755,9 @@
             "patient": "P-0089247",
             "sample": "P-0089247-T01-IM7",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0089247-T01-IM7",
               "Colon Adenocarcinoma",
               "G12V",
@@ -757,20 +767,17 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.722,
+              null,
               255,
               98,
+              null,
+              323,
               8,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "A",
-              "12:g.25398284C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "a6a9e4fd1db8bb24"
               }
             ]
           },
@@ -780,6 +787,9 @@
             "patient": "P-0057012",
             "sample": "P-0057012-T01-IM6",
             "values": [
+              "KRAS",
+              "MSK-CHORD (MSK, Nature 2024)",
+              "Colorectal Cancer",
               "P-0057012-T01-IM6",
               "Colon Adenocarcinoma",
               "G12V",
@@ -789,26 +799,23 @@
               "Missense_Mutation",
               "Missense · Driver",
               "SNP",
+              "Diploid",
               0.72,
+              null,
               353,
               137,
+              null,
+              381,
               9,
-              "12",
-              25398284,
-              25398284,
-              "C",
-              "A",
-              "12:g.25398284C>A",
-              "",
               {
-                "…": "5 more",
-                "sha256": "0d03a6e960bcf9f5"
+                "…": "15 more",
+                "sha256": "a6a9e4fd1db8bb24"
               }
             ]
           },
           {
             "…": "5 more",
-            "sha256": "40aefd9e3f5a4c93"
+            "sha256": "39e98f169f1c63ac"
           }
         ],
         "offset": 0,
@@ -850,7 +857,7 @@
           {
             "kind": "fetch",
             "title": "Count the KRAS mutation calls per cohort and study, and those the query keeps",
-            "detail": "The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; a driver when OncoKB calls it oncogenic or its genomic variant is a Cancer Hotspot of its kind in the stored Genome Nexus GRCh37 2.2.3-vep116-clinvar20260208+f2, GRCh38 1.4.1-vepNA-clinvar20250106+f2 annotation (a splice-site hotspot for a splice mutation, single-residue or in-frame indel otherwise); HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL from the stored Genome Nexus GRCh37 2.2.3-vep116-clinvar20260208+f2, GRCh38 1.4.1-vepNA-clinvar20250106+f2 annotation of its genomic variant; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads. Each structural variant with KRAS as site 1 or site 2 in the study's structural-variant profile is a row too, as the portal lists it: its protein change built from its genes (\"A-B Fusion\", or \"A intragenic\" / \"A intergenic\"), type Fusion, site 1's chromosome and position, the variant class as its variant type, OncoKB v7.5's call for the pair in the sample's tumour type as its annotation and the pair's call with no tumour type as its driver status (each the partners' gene-level Fusion calls where the pair has none stored). The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.",
+            "detail": "The mutations:counts query above: every called KRAS mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded and the OncoKB v7.5 call for its protein change; a driver when OncoKB calls it oncogenic or its genomic variant is a Cancer Hotspot of its kind in the stored Genome Nexus GRCh37 2.2.3-vep116-clinvar20260208+f2, GRCh38 1.4.1-vepNA-clinvar20250106+f2 annotation (a splice-site hotspot for a splice mutation, single-residue or in-frame indel otherwise); HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL from the stored Genome Nexus GRCh37 2.2.3-vep116-clinvar20260208+f2, GRCh38 1.4.1-vepNA-clinvar20250106+f2 annotation of its genomic variant; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads, the matched normal's likewise (4 decimals below 0.01, none at 0); Copy # the sample's call for the gene in the study's discrete copy-number profile; Exon from the canonical transcript of the stored Genome Nexus annotation. Each structural variant with KRAS as site 1 or site 2 in the study's structural-variant profile is a row too, as the portal lists it: its protein change built from its genes (\"A-B Fusion\", or \"A intragenic\" / \"A intergenic\"), type Fusion, site 1's chromosome and position, the variant class as its variant type, OncoKB v7.5's call for the pair in the sample's tumour type as its annotation and the pair's call with no tumour type as its driver status (each the partners' gene-level Fusion calls where the pair has none stored). The query keeps rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2.",
             "params": [
               [
                 "Colorectal · msk_chord_2024",
