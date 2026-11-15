@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -35,6 +35,8 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "oncokb-sv": ["node", "--env-file=.env.local", "scripts/check-oncokb-sv.ts"],
   "hotspot-drivers": ["node", "--env-file=.env.local", "scripts/check-hotspot-drivers.ts"],
   "results-oql": ["node", "--env-file=.env.local", "scripts/check-results-oql.ts"],
+  // the density chart's bins, run on the fixture study's connection b
+  "density": ["node", "--env-file=.env.local", "scripts/check-density.ts"],
 };
 
 interface Mutant {
@@ -186,6 +188,50 @@ const MUTANTS: Mutant[] = [
     effect: "An edge typed twice in Custom Bins draws an extra one-value bar, so that value is counted in two bars.",
     find: "return { edges: [...new Set(parts.map(Number))].sort((a, b) => a - b) };",
     replace: "return { edges: parts.map(Number).sort((a, b) => a - b) };" },
+  { id: "density-index-not-portal", layer: "counts", guard: "density", file: "lib/plot.ts",
+    effect: "The density chart puts a value on a cell edge in the cell above, not the one the portal's rounded interval gives (FGA 3/44 in cell 3, not 2).",
+    find: "floor((\" + col + \" - \" + lo + \") / ((\" + hi + \" - \" + lo + \") / \" + n + \"))",
+    replace: "floor((\" + col + \" - \" + lo + \") / (\" + hi + \" - \" + lo + \") * \" + n + \")" },
+  { id: "density-end-past-last-cell", layer: "counts", guard: "density", file: "lib/plot.ts",
+    effect: "A sample at the axis end (FGA 1, the largest mutation count) falls in a cell past the grid's edge.",
+    find: "return \"toUInt32(least(\" + (n - 1) + \", greatest(0,",
+    replace: "return \"toUInt32(least(\" + n + \", greatest(0," },
+  { id: "density-fixed-ends-ignored", layer: "counts", guard: "density", file: "lib/plot.ts",
+    effect: "The density chart cuts FGA between the data's own extremes instead of 0 and 1, so every cell covers a different stretch than the portal's.",
+    find: "(extent && extent[k] != null ? \"any(\"",
+    replace: "(extent && extent[k] == null ? \"any(\"" },
+  { id: "density-cell-extremes-crossed", layer: "counts", guard: "density", file: "lib/plot.ts",
+    effect: "Each density cell's tooltip shows the y values' extremes as its x range.",
+    find: "min(x) AS minX, max(x) AS maxX",
+    replace: "min(y) AS minX, max(y) AS maxX" },
+  { id: "density-fixed-end-not-logged", layer: "counts", guard: "unit", file: "lib/plot.ts",
+    effect: "On Log Scale the fixed end of the mutation-count axis is used as a raw count, so the cells are cut on the wrong scale.",
+    find: "isLog ? Math.log10(v + 1) : v",
+    replace: "v" },
+  { id: "density-plasma-not-capped", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
+    effect: "The densest cells are drawn in the plasma ramp's pale yellow end, which the portal stops short of so they stay visible.",
+    find: "const COLOR_MAX = 0.75;",
+    replace: "const COLOR_MAX = 1;" },
+  { id: "density-equal-counts-no-floor", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
+    effect: "When every cell holds the same number of samples, the chart draws them in the lowest colour with no legend, where the portal scales from 1.",
+    find: "  if (min === max) min = 1;\n",
+    replace: "" },
+  { id: "density-swap-keeps-log", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
+    effect: "Swap Axes leaves Log Scale on the axis position rather than moving it with mutation count.",
+    find: "return { swapped: !s.swapped, xLog: !!s.yLog, yLog: !!s.xLog };",
+    replace: "return { swapped: !s.swapped, xLog: !!s.xLog, yLog: !!s.yLog };" },
+  { id: "density-log-offered-on-fga", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
+    effect: "The fraction-genome-altered axis is drawn as ln(1 + v) when Log Scale is asked for, which the portal never offers.",
+    find: "return attribute === MUTATION_COUNT;",
+    replace: "return attribute !== \"\";" },
+  { id: "density-tip-y-one-value", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
+    effect: "A cell's tooltip gives one mutation count where it spans several.",
+    find: "portalRange(bin.minY, bin.maxY)",
+    replace: "portalLocale(bin.minY)" },
+  { id: "density-box-log-not-undone", layer: "cohorts", guard: "unit", file: "lib/study-view-density.ts",
+    effect: "A box dragged on the Log Scale axis filters on ln(1 + count) as if it were the count, selecting the wrong samples.",
+    find: "const raw = (v: number) => a.log ? Math.exp(v) - 1 : v;",
+    replace: "const raw = (v: number) => v;" },
   { id: "split-arms-overlap", layer: "cohorts", guard: "cohort-logic", file: "lib/cohort-partitions.ts",
     effect: "Splitting a cohort into arms (KRAS G12C, then other KRAS, then wild-type) puts G12C patients in two arms at once.",
     find: "    S.exclude(arm.where);\n",

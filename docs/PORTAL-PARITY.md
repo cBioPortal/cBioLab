@@ -269,7 +269,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Chart kinds: treatment tables, the GA frequency table (arm-level CNA by default), mutation-type counts, variant annotations, X-vs-Y density and violin, gene-specific violin, continuous gene bar (STS-OT-3…6, STS-VI-1…8, STS-GS-4, STS-SC-1)
   - [ ] Pie: for any attribute with few values (ours 9 allowlisted ids, else a list), slice labels, unselected slices greyed, a second click unselects (see bugs), the portal's colours (ours Okabe-Ito) (STS-LY-9, STS-PIE-3, STS-PIE-6…8)
   - [x] Survival: one card with an endpoint picker, kept on purpose in place of a KM tile per endpoint; the numbers match (STS-KM-1) (PR #203 open)
-  - [ ] Density: x = FGA, y = mutation count, linear (ours x = log10(MC + 1)); 44×38 bins (ours 48×32); Pearson / Spearman text; Swap Axes and Log menu; a fuller tooltip (ours "n samples") (STS-SC-2…5, STS-STM-15)
+  - [x] Density: x = FGA, y = mutation count, linear; 44×38 bins cut as the portal cuts them; plasma colours and legend; Pearson / Spearman text; Swap Axes and Log Scale; the portal's tooltip (STS-SC-2…5, STS-STM-15; [density-cases](legacy-spec/parity/density-cases.md)) (PR #222 open)
+    - [ ] The chart's Download (Data, SVG, PDF): with the other downloads (STS-DL-1…3)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
   - [ ] Empty selection: the "filtered out all the samples" message, other tabs hidden (ours draws the charts and "0 patients match") (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6)

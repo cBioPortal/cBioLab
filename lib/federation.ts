@@ -31,7 +31,7 @@ import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validate
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
-  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank, type ViolinBin } from "./plot.ts";
+  type PlotXYPoint, type SparseCells, type Whiskers, type PointRank, type ViolinBin, type PlotCell, plotExtent } from "./plot.ts";
 // re-exported so test/boundary.test.ts sweeps them with the other aggregate SQL builders
 export * from "./federation-views.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
@@ -50,6 +50,12 @@ export function legendFor(values: string[], ring = false): { label: string; colo
 }
 
 const num = (v: unknown): number | null => { if (v == null || v === "") return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
+/** a density cell as plotBinsSql answers it */
+const binOf = (b: ChRow): PlotCell => {
+  const cell: PlotCell = { bx: Number(b.bx), by: Number(b.by), n: Number(b.n) };
+  for (const k of ["minX", "maxX", "minY", "maxY"] as const) { const v = num(b[k]); if (v != null) cell[k] = v; }
+  return cell;
+};
 /** a plot's coverage row: the cohort's cases, each axis's, and (patient mode) the patients with several samples */
 const coverageOf = (row: Record<string, unknown>): NonNullable<PlotData["coverage"]> =>
   ({ total: Number(row.total || 0), nx: Number(row.nx || 0), ny: Number(row.ny || 0), ...(row.multi != null ? { multi: Number(row.multi) } : {}) });
@@ -1402,7 +1408,7 @@ export interface FederatedPlotCapable {
   plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }>;
   plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]>;
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]>;
   plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments>;
   plotTableCells(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ cx: string; cy: string; n: number }[]>;
@@ -1741,17 +1747,18 @@ abstract class BaseResolver implements AggregateCapable {
       const c = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), conn);
       const n = Number(c.data[0]?.n || 0);
       if (!n) return done({ shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" });
+      const extent = plotExtent({ x0: Number(c.data[0].x0), x1: Number(c.data[0].x1), y0: Number(c.data[0].y0), y1: Number(c.data[0].y1) },
+        spec.range, { x: !!logOf(spec.x).log, y: !!logOf(spec.y).log });
       const [st, bins] = await Promise.all([
         this.runLogged<ChRow>("plot:stats", plotStatsSql(xSel, ySel, ctx.cohortSql), conn),
-        this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins), conn)
+        this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins, spec.range ? extent : undefined), conn)
       ]);
       const r = st.data[0] || {};
       const pearson = num(r.pearson), spearman = num(r.spearman);
       return done({
-        shape, n, ...label,
-        extent: { x0: Number(c.data[0].x0), x1: Number(c.data[0].x1), y0: Number(c.data[0].y0), y1: Number(c.data[0].y1) },
+        shape, n, ...label, extent,
         grid: [spec.bins?.[0] ?? DEFAULT_BINS[0], spec.bins?.[1] ?? DEFAULT_BINS[1]],
-        bins: bins.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) })),
+        bins: bins.data.map(binOf),
         stats: { pearson, spearman, slope: num(r.slope), intercept: num(r.intercept),
           pPearson: corrPValue(pearson, n), pSpearman: corrPValue(spearman, n) }
       });
@@ -1851,15 +1858,15 @@ abstract class BaseResolver implements AggregateCapable {
 
   /** Pass 2: this site's bin counts against the shared extent every participant was given. */
   async plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]> {
     return this.binCountsIn("plot:bins", (await this.plotCtx(def, spec)), spec, xk, yk, bins, extent);
   }
 
   private async binCountsIn(label: string, ctx: Awaited<ReturnType<BaseResolver["plotCtx"]>>, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
-    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<{ bx: number; by: number; n: number }[]> {
+    bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]> {
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
     const r = await this.runLogged<ChRow>(label, plotBinsSql(xSel, ySel, ctx.cohortSql, bins, extent), this.instance.conn);
-    return r.data.map((b) => ({ bx: Number(b.bx), by: Number(b.by), n: Number(b.n) }));
+    return r.data.map(binOf);
   }
 
   /** This site's six sums for the pair — sufficient for a federated Pearson/regression (lib/stats.ts). */

@@ -83,11 +83,11 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
-,    e AS (SELECT 33 AS x0, 90 AS x1, 0 AS y0, 67.2 AS y1)
-SELECT least(239, toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * 240))) AS bx,
-       least(159, toUInt32(floor((y - y0) / if(y1 > y0, y1 - y0, 1) * 160))) AS by,
-       count() AS n
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
+,    e AS (SELECT any(33) x0, any(90) x1, any(0) y0, any(67.2) y1 FROM pair)
+SELECT toUInt32(least(239, greatest(0, if(x1 > x0, floor((x - x0) / ((x1 - x0) / 240)), 0)))) AS bx,
+       toUInt32(least(159, greatest(0, if(y1 > y0, floor((y - y0) / ((y1 - y0) / 160)), 0)))) AS by,
+       count() AS n, min(x) AS minX, max(x) AS maxX, min(y) AS minY, max(y) AS maxY
 FROM pair, e GROUP BY bx, by
 
 -- view 0 plot: plot:bins · lusc_tcga_pan_can_atlas_2018
@@ -119,11 +119,11 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
-,    e AS (SELECT 33 AS x0, 90 AS x1, 0 AS y0, 67.2 AS y1)
-SELECT least(239, toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * 240))) AS bx,
-       least(159, toUInt32(floor((y - y0) / if(y1 > y0, y1 - y0, 1) * 160))) AS by,
-       count() AS n
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
+,    e AS (SELECT any(33) x0, any(90) x1, any(0) y0, any(67.2) y1 FROM pair)
+SELECT toUInt32(least(239, greatest(0, if(x1 > x0, floor((x - x0) / ((x1 - x0) / 240)), 0)))) AS bx,
+       toUInt32(least(159, greatest(0, if(y1 > y0, floor((y - y0) / ((y1 - y0) / 160)), 0)))) AS by,
+       count() AS n, min(x) AS minX, max(x) AS maxX, min(y) AS minY, max(y) AS maxY
 FROM pair, e GROUP BY bx, by
 
 -- view 0 plot: plot:coverage · luad_tcga_pan_can_atlas_2018
@@ -221,7 +221,7 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
 SELECT count() AS n, min(x) AS x0, max(x) AS x1, min(y) AS y0, max(y) AS y1 FROM pair
 
 -- view 0 plot: plot:extent · lusc_tcga_pan_can_atlas_2018
@@ -253,7 +253,7 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
 SELECT count() AS n, min(x) AS x0, max(x) AS x1, min(y) AS y0, max(y) AS y1 FROM pair
 
 -- view 0 plot: plot:highlight:count · luad_tcga_pan_can_atlas_2018
@@ -481,7 +481,7 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
 SELECT count() AS n, sum(x) AS sx, sum(y) AS sy, sum(x * y) AS sxy, sum(x * x) AS sxx, sum(y * y) AS syy
 FROM pair
 
@@ -514,7 +514,7 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
 SELECT count() AS n, sum(x) AS sx, sum(y) AS sy, sum(x * y) AS sxy, sum(x * x) AS sxx, sum(y * y) AS syy
 FROM pair
 
