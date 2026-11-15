@@ -171,9 +171,12 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   const gs = d.groups!;
   const hs = drawnLayers(d);
   const base = LAYER_BASE;
-  const numAxis = d.x.kind === "num" ? d.x : d.y, catAxis = d.x.kind === "num" ? d.y : d.x;
+  // the categories lie along the horizontal axis when it is the categorical one, else down the
+  // side with each box on its side (the portal's PLT-PT-4 and PLT-PT-5)
+  const across = d.x.kind !== "num";
+  const numAxis = across ? d.y : d.x, catAxis = across ? d.x : d.y;
   const numTitle = axisTitle(numAxis), catTitle = axisTitle(catAxis);
-  const T = 12, R = 16, PLOT = plotHeight(W0);
+  const T = 12, R = 16, MIN_BW = 22;
   // The axis spans the whiskers and the points beyond them, but reaches at most one whisker
   // span further each way: one TMB of 570 would otherwise flatten every box to a line. A point
   // past that is pinned to the frame's edge as a triangle and counted in the caption.
@@ -184,15 +187,42 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   // the whiskers' own range, padded a little, with round ticks inside it: rounding the ends out
   // would stretch a −1 whisker into an empty band down to −20
   const pad = (hi - lo) * 0.03 || 1;
-  const ysProbe = numScale(lo - pad, hi + pad, T + PLOT, T, numAxis.log, false);
-  const L = 8 + leftAxisWidth(ysProbe, numTitle);
-  const MIN_BW = 22;
-  const W = Math.max(W0, L + R + gs.length * MIN_BW), plotW = W - L - R;
-  const ys = numScale(lo - pad, hi + pad, T + PLOT, T, numAxis.log, false);
-  const [vlo, vhi] = ys.domain;
-  const bw = plotW / gs.length;
+  // each group's name carries its count, so the two can never be read against different boxes
+  const names = gs.map((g) => g.g + " (" + fmtInt(g.n) + ")");
+  let W: number, L: number, PLOT: number, labW = 0;
+  let vs: Scale;
+  if (across) {
+    PLOT = plotHeight(W0);
+    vs = numScale(lo - pad, hi + pad, T + PLOT, T, numAxis.log, false);
+    L = 8 + leftAxisWidth(vs, numTitle);
+    W = Math.max(W0, L + R + gs.length * MIN_BW);
+  } else {
+    W = W0;
+    labW = Math.min(W0 * 0.3, Math.max(...names.map((s) => textWidth(s, FS.small))));
+    L = 8 + FS.body + 8 + labW + 8;
+    PLOT = Math.max(gs.length * MIN_BW, Math.min(plotHeight(W0), gs.length * 64));
+    vs = numScale(lo - pad, hi + pad, L, W - R, numAxis.log, false);
+  }
+  const plotW = W - L - R;
+  const [vlo, vhi] = vs.domain;
+  const bw = (across ? plotW : PLOT) / gs.length;
+  const centre = (i: number) => (across ? L : T) + bw * (i + 0.5);
+  // every mark is placed by its category position `c` and its value's pixel `v`, and turned here
+  const at = (c: number, vp: number): [number, number] => across ? [c, vp] : [vp, c];
+  const lineCV = (c0: number, v0: number, c1: number, v1: number, attrs: string) => {
+    const [x1, y1] = at(c0, v0), [x2, y2] = at(c1, v1);
+    return `<line x1="${r1(x1)}" y1="${r1(y1)}" x2="${r1(x2)}" y2="${r1(y2)}" ${attrs}/>`;
+  };
+  /** a rect from c0 to c1 across the category axis and between two value pixels, at least `min` long along it */
+  const rectCV = (c0: number, c1: number, v0: number, v1: number, min: number) => {
+    const vA = Math.min(v0, v1), len = Math.max(min, Math.abs(v1 - v0));
+    const [x, y] = at(c0, vA), [w, h] = across ? [c1 - c0, len] : [len, c1 - c0];
+    return `x="${r1(x)}" y="${r1(y)}" width="${r1(w)}" height="${r1(h)}"`;
+  };
+  const dotAt = (c: number, val: number) => { const [x, y] = at(c, vs(val)); return `cx="${r1(x)}" cy="${r1(y)}"`; };
   const out: string[] = [];
-  out.push(axisLeft(ys, L, p, { title: numTitle, gridTo: W - R }));
+  if (across) out.push(axisLeft(vs, L, p, { title: numTitle, gridTo: W - R }));
+  else out.push(axisBottom(vs, T + PLOT, p, { title: numTitle, gridTo: T, minX: 0, maxX: W }));
 
   // the values behind the boxes: every point when the reader may see cases and there are few
   // enough of them, otherwise the density of the same values
@@ -233,16 +263,19 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   const vBins = d.violinBins || 40;
   let offScale = 0, ptOffScale = 0;
   /** a value off the axis: a triangle at the frame's edge pointing the way it lies */
-  const edgeMark = (id: string, px: number, up: boolean, r: number, fill: string) => {
-    const ty = up ? T + 1 : T + PLOT - 1, k = r * 1.3;
-    return `<path${caseAttr(id)} d="M${r1(px - k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} L${r1(px + k)} ${r1(up ? ty + k * 1.6 : ty - k * 1.6)} ` +
-      `L${r1(px)} ${r1(ty)} Z" fill="${fill}" stroke="${p.bg}" stroke-width="0.5"/>`;
+  const edgeMark = (id: string, c: number, beyondHi: boolean, r: number, fill: string) => {
+    const tip = across ? (beyondHi ? T + 1 : T + PLOT - 1) : (beyondHi ? W - R - 1 : L + 1);
+    const out1 = (beyondHi ? 1 : -1) * (across ? -1 : 1), k = r * 1.3, b = tip - out1 * k * 1.6;
+    const [ax, ay] = at(c - k, b), [bx, by] = at(c + k, b), [tx, ty] = at(c, tip);
+    return `<path${caseAttr(id)} d="M${r1(ax)} ${r1(ay)} L${r1(bx)} ${r1(by)} L${r1(tx)} ${r1(ty)} Z" fill="${fill}" stroke="${p.bg}" stroke-width="0.5"/>`;
   };
   const inAxis = (val: number) => Math.max(vlo, Math.min(vhi, val));
   const categorised = colorKey.length > 0 || ringKey.length > 0;
+  // a group of one case has no quartiles to draw (the portal's PLT-BX-3): its value alone
+  const singles = gs.filter((g) => g.n < 2).length;
 
   gs.forEach((g, i) => {
-    const cx = L + bw * (i + 0.5), half = Math.min(24, bw * 0.32);
+    const cx = centre(i), half = Math.min(24, bw * 0.32);
     // the plotted cohort's violin and points, as one group a page can step back from
     const baseMarks: string[] = [];
     if (d.overlay === "violin" && vio.has(g.g)) {
@@ -257,10 +290,9 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
         if (vHi < cLo || vLo > cHi) continue;
         const total = [...byClass.values()].reduce((a, n) => a + n, 0);
         const w = half * 1.6 * Math.sqrt(total / (vioMax.get(g.g) || 1));
-        const yTop = ys(Math.min(cHi, vHi));
-        const step = Math.max(1.2, ys(Math.max(cLo, vLo)) - yTop);
+        const span = (c0: number, c1: number) => rectCV(c0, c1, vs(Math.max(cLo, vLo)), vs(Math.min(cHi, vHi)), 1.2);
         if (!colorKey.length) {
-          baseMarks.push(`<rect x="${r1(cx - w)}" y="${r1(yTop)}" width="${r1(w * 2)}" height="${r1(step)}" fill="${base}" fill-opacity="0.28"/>`);
+          baseMarks.push(`<rect ${span(cx - w, cx + w)} fill="${base}" fill-opacity="0.28"/>`);
           continue;
         }
         let x = cx - w;
@@ -269,7 +301,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
         for (const sg of segs) {
           if (!sg.n) continue;
           const seg = 2 * w * (sg.n / total);
-          baseMarks.push(`<rect x="${r1(x)}" y="${r1(yTop)}" width="${r1(seg)}" height="${r1(step)}" fill="${sg.color}" fill-opacity="0.75"/>`);
+          baseMarks.push(`<rect ${span(x, x + seg)} fill="${sg.color}" fill-opacity="0.75"/>`);
           x += seg;
         }
       }
@@ -279,21 +311,28 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
       for (const pt of byGroup.get(g.g)!) {
         const fill = pt.c != null && colorKey.length ? fillOf(pt.c) : base;
         const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
+        const pc = cx + jitterFor(pt.id) * half * 0.9;
         if (pt.v > vhi || pt.v < vlo) {
           ptOffScale++;
-          baseMarks.push(edgeMark(pt.id, cx + jitterFor(pt.id) * half * 0.9, pt.v > vhi, rBase, fill));
+          baseMarks.push(edgeMark(pt.id, pc, pt.v > vhi, rBase, fill));
           continue;
         }
-        baseMarks.push(`<circle${caseAttr(pt.id)} cx="${r1(cx + jitterFor(pt.id) * half * 0.9)}" cy="${r1(ys(pt.v))}" ` +
+        baseMarks.push(`<circle${caseAttr(pt.id)} ${dotAt(pc, pt.v)} ` +
           `r="${rBase}" fill="${fill}" fill-opacity="0.85" ` +
           (ring ? `stroke="${ring}" stroke-width="${r1(rBase * 0.36)}"` : halo(p)) + `/>`);
       }
     }
     out.push(layerGroup("base", baseMarks));
-    out.push(`<line x1="${r1(cx)}" y1="${r1(ys(g.loWhisker))}" x2="${r1(cx)}" y2="${r1(ys(g.hiWhisker))}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
-    out.push(`<rect x="${r1(cx - half)}" y="${r1(ys(g.q3))}" width="${r1(half * 2)}" height="${r1(Math.max(1, ys(g.q1) - ys(g.q3)))}" ` +
-      `fill="${base}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${base}" data-box="${i}"/>`);
-    out.push(`<line x1="${r1(cx - half)}" y1="${r1(ys(g.median))}" x2="${r1(cx + half)}" y2="${r1(ys(g.median))}" stroke="${base}" stroke-width="2"/>`);
+    const median = (c0: number, c1: number, attrs: string) => lineCV(c0, vs(g.median), c1, vs(g.median), attrs);
+    if (g.n >= 2) {
+      out.push(lineCV(cx, vs(g.loWhisker), cx, vs(g.hiWhisker), `stroke="${p.muted}" stroke-width="${SW.line}"`));
+      out.push(`<rect ${rectCV(cx - half, cx + half, vs(g.q1), vs(g.q3), 1)} ` +
+        `fill="${base}" fill-opacity="${d.overlay === "none" ? 0.25 : 0.1}" stroke="${base}" data-box="${i}"/>`);
+      out.push(median(cx - half, cx + half, `stroke="${base}" stroke-width="2"`));
+    } else if (!baseMarks.length) {
+      // nothing else marks where the one value lies
+      out.push(median(cx - half, cx + half, `stroke="${base}" stroke-width="2"`));
+    }
     // cohort layers past the budget: a narrow box of their own (side by side when several); then every
     // layer's points at the same fixed jitter the plotted cohort's points use
     const boxed = hs.filter((h) => h.shown === "boxes");
@@ -301,9 +340,10 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
       const hg = h.groups!.find((x) => x.g === g.g);
       if (!hg) return;
       const hw = Math.max(1.5, half * 0.42), hx = cx + (j - (boxed.length - 1) / 2) * hw * 1.25;
-      out.push(layerGroup(d.layers!.indexOf(h), [`<line x1="${r1(hx)}" y1="${r1(ys(inAxis(hg.loWhisker)))}" x2="${r1(hx)}" y2="${r1(ys(inAxis(hg.hiWhisker)))}" stroke="${h.color}"/>` +
-        `<rect x="${r1(hx - hw / 2)}" y="${r1(ys(hg.q3))}" width="${r1(hw)}" height="${r1(Math.max(1, ys(hg.q1) - ys(hg.q3)))}" fill="${h.color}" fill-opacity="0.85"/>` +
-        `<line x1="${r1(hx - hw / 2 - 1)}" y1="${r1(ys(hg.median))}" x2="${r1(hx + hw / 2 + 1)}" y2="${r1(ys(hg.median))}" stroke="${p.ink}" stroke-width="1.5"/>`]));
+      const hMedian = lineCV(hx - hw / 2 - 1, vs(hg.median), hx + hw / 2 + 1, vs(hg.median), `stroke="${p.ink}" stroke-width="1.5"`);
+      out.push(layerGroup(d.layers!.indexOf(h), hg.n < 2 ? [hMedian] : [
+        lineCV(hx, vs(inAxis(hg.loWhisker)), hx, vs(inAxis(hg.hiWhisker)), `stroke="${h.color}"`) +
+        `<rect ${rectCV(hx - hw / 2, hx + hw / 2, vs(hg.q1), vs(hg.q3), 1)} fill="${h.color}" fill-opacity="0.85"/>` + hMedian]));
     });
     // A layer's value past the axis is pinned to the frame's edge as a triangle pointing off it, and
     // counted in the caption, rather than drawn outside the figure. With the cases coloured by a
@@ -312,27 +352,35 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
       const rH = PLOT_POINT_R;
       const marks = (pts: HighlightPoint[], counted: boolean) => pts.flatMap((pt) => {
         if (!("g" in pt) || pt.g !== g.g) return [];
-        const px = cx + jitterFor(pt.id) * half * 0.9;
+        const pc = cx + jitterFor(pt.id) * half * 0.9;
         if (pt.v > vhi || pt.v < vlo) {
           if (counted) offScale++;
-          return [edgeMark(pt.id, px, pt.v > vhi, rH, h.color)];
+          return [edgeMark(pt.id, pc, pt.v > vhi, rH, h.color)];
         }
         return [categorised
-          ? `<circle${caseAttr(pt.id)} cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${r1(rH + 1.4)}" fill="none" stroke="${h.color}" stroke-width="1.4"/>`
-          : `<circle${caseAttr(pt.id)} cx="${r1(px)}" cy="${r1(ys(pt.v))}" r="${rH}" fill="${h.color}" fill-opacity="0.9" ${halo(p)}/>`];
+          ? `<circle${caseAttr(pt.id)} ${dotAt(pc, pt.v)} r="${r1(rH + 1.4)}" fill="none" stroke="${h.color}" stroke-width="1.4"/>`
+          : `<circle${caseAttr(pt.id)} ${dotAt(pc, pt.v)} r="${rH}" fill="${h.color}" fill-opacity="0.9" ${halo(p)}/>`];
       });
       const key = d.layers!.indexOf(h);
       out.push(layerGroup(key, marks(h.points!, true)));
       out.push(sharedGroups(h, key, (pt) => marks([pt], false)));
     }
   });
-  out.push(`<line x1="${L}" y1="${T + PLOT}" x2="${W - R}" y2="${T + PLOT}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
-  // each group's name carries its count, so the two can never be read against different boxes
-  const names = bandLabels(gs.map((g) => g.g + " (" + fmtInt(g.n) + ")"), gs.map((_, i) => L + bw * (i + 0.5)), bw, T + PLOT, p, { maxH: 130 });
-  out.push(names.svg);
-  let y = T + PLOT + names.height + 4;
-  out.push(label((L + W - R) / 2, y + FS.body, catTitle, { size: FS.body, fill: p.ink, anchor: "middle", maxW: plotW }));
-  y += FS.body + 12;
+  let y: number;
+  if (across) {
+    out.push(`<line x1="${L}" y1="${T + PLOT}" x2="${W - R}" y2="${T + PLOT}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
+    const band = bandLabels(names, gs.map((_, i) => centre(i)), bw, T + PLOT, p, { maxH: 130 });
+    out.push(band.svg);
+    y = T + PLOT + band.height + 4;
+    out.push(label((L + W - R) / 2, y + FS.body, catTitle, { size: FS.body, fill: p.ink, anchor: "middle", maxW: plotW }));
+    y += FS.body + 12;
+  } else {
+    out.push(`<line x1="${L}" y1="${T}" x2="${L}" y2="${T + PLOT}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
+    names.forEach((s, i) => out.push(label(L - 8, centre(i) + FS.small * 0.35, s, { size: FS.small, fill: p.ink, anchor: "end", maxW: labW })));
+    // the category axis's title, up the left edge
+    out.push(label(8 + FS.body * 0.8, T + PLOT / 2, catTitle, { size: FS.body, fill: p.ink, anchor: "middle", rotate: -90, maxW: Math.max(60, PLOT) }));
+    y = T + PLOT + bottomAxisHeight(numTitle) + 12;
+  }
 
   const keyItems = (keys: { label: string; color: string }[], ring: boolean): LegendItem[] =>
     keys.map((k) => ({ label: k.label, color: k.color, kind: "dot" as const, ...(ring ? { opacity: 0.6 } : {}) }));
@@ -354,8 +402,9 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   // the engine's note leads, as it does under the scatter: it is where the view says what it drew
   // over and what it had to leave out
   const cap = caption((v.note ? v.note + "  " : "") + "Box: quartiles; whiskers end at 1.5 × IQR past the box, or at the extreme value when none lies beyond (the portal's rule), computed over every case in the group; each name carries its count." +
+    (singles ? " " + (singles === 1 ? "A group" : fmtInt(singles) + " groups") + " of one case " + (singles === 1 ? "has" : "have") + " no box, only " + (singles === 1 ? "its value" : "their values") + "." : "") +
     (d.overlay === "points" ? " Every value is drawn over its box; the jitter is fixed per case."
-      : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that height, scaled per group."
+      : d.overlay === "violin" ? " The shaded width is the share of that group's values sitting at that " + (across ? "height" : "place") + ", scaled per group."
       : "") +
     (ptOffScale ? " " + fmtInt(ptOffScale) + " value" + (ptOffScale === 1 ? " lies" : "s lie") + " more than a whisker span" +
       " past the whiskers and " + (ptOffScale === 1 ? "is" : "are") + " drawn as a triangle at the frame's edge." : "") +
