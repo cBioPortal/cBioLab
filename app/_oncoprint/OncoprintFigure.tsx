@@ -630,10 +630,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const col = hit.n === 1 ? data.columns()[hit.ci] : null;
     lines.push({ text: col ?? hit.n.toLocaleString() + " " + data.unit + "s under this pixel", mono: !!col });
     lines.push({ text: visible.groups[hit.gi].name, dim: true });
+    const rowName = t.sublabel ? t.label + t.sublabel + " — " : t.label + ": ";
     if (hit.n === 1) {
       const c = t.cells[hit.ci];
       if (t.kind === "gene") {
-        lines.push({ text: t.label + ": " + decodeGene(c) });
+        lines.push({ text: rowName + decodeGene(c) });
         if (t.members && t.members.length > 1) lines.push({ text: "merged: " + t.members.join(" · "), dim: true });
       }
       else if (t.kind === "derivedEvent") lines.push({ text: t.label + ": " + (c > 0 ? "yes" : "no") });
@@ -648,8 +649,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     } else if (t.kind === "gene" || t.kind === "derivedEvent") {
       let alt = 0, prof = 0;
       for (let k = hit.k; k < hit.k1; k++) { const c = t.cells[visible.order[k]]; if (c !== -1) prof++; if (c > 0) alt++; }
-      lines.push({ text: t.label + ": " + alt + " altered of " + prof + " profiled" });
-    } else lines.push({ text: t.label + ": zoom in for per-" + data.unit + " values" });
+      lines.push({ text: rowName + alt + " altered of " + prof + " profiled" });
+    } else lines.push({ text: rowName + "zoom in for per-" + data.unit + " values" });
     // the specifics, once they arrive
     const d = col ? detail[col] : undefined;
     if (d === "loading") lines.push({ text: "…", dim: true });
@@ -916,13 +917,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             return (
               <div className="onco-trackmenu" style={{ left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6 }}
                 onMouseLeave={() => setTrackMenu(null)}>
-                <span className="meta onco-trackmenu-name">{t.label}
+                <span className="meta onco-trackmenu-name">{t.label + (t.sublabel || "")}
                   {t.members && t.members.length > 1 && <><br />{t.members.join(" · ")}</>}</span>
-                {props.onMoveTrack && item("Move up", false, () => props.onMoveTrack!(t.label, -1))}
-                {props.onMoveTrack && item("Move down", false, () => props.onMoveTrack!(t.label, 1))}
-                {props.onRemoveTrack && (!props.canRemoveTrack || props.canRemoveTrack(t.label)) && item("Remove track", false, () => props.onRemoveTrack!(t.label))}
+                {props.onMoveTrack && item("Move up", false, () => props.onMoveTrack!(t.key ?? t.label, -1))}
+                {props.onMoveTrack && item("Move down", false, () => props.onMoveTrack!(t.key ?? t.label, 1))}
+                {props.onRemoveTrack && (!props.canRemoveTrack || props.canRemoveTrack(t.key ?? t.label)) && item("Remove track", false, () => props.onRemoveTrack!(t.key ?? t.label))}
                 {props.onExpandTrack && t.members && t.members.length > 1 &&
-                  item("Expand into " + t.members.length + " rows", false, () => props.onExpandTrack!(t.label))}
+                  item("Expand into " + t.members.length + " rows", false, () => props.onExpandTrack!(t.key ?? t.label))}
                 {item("Sort a-Z", isKey(""), () => setPrimary(key("")), sortable)}
                 {item("Sort Z-a", isKey("-"), () => setPrimary(key("-")), sortable)}
                 {item("Don't sort by this", sortable && !isKey("") && !isKey("-"), () => setPrimary(null), sortable)}

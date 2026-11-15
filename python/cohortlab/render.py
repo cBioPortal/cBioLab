@@ -83,7 +83,7 @@ def bucket_codes(c: Contract, buckets: int) -> list[dict[str, Any]]:
     out = []
     for g in c.groups:
         edges = bucket_edges(g["count"], buckets)
-        tracks = {t.label: [int(x) for x in aggregate(t, np.asarray(t.cells[g["start"]: g["start"] + g["count"]]), edges)] for t in c.tracks}
+        tracks = {t.meta.get("key", t.label): [int(x) for x in aggregate(t, np.asarray(t.cells[g["start"]: g["start"] + g["count"]]), edges)] for t in c.tracks}
         out.append({"name": g["name"], "edges": [int(e) for e in edges], "tracks": tracks})
     return out
 

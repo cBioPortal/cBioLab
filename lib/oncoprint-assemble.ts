@@ -231,14 +231,14 @@ export function assembleContract(input: AssembleInput): Contract {
   // altered and profiled where any member was profiled — the union denominator, with no
   // special case: the sentinel survives only where every member is unprofiled. A gene may
   // appear in several rows (merged, and again on its own), so one symbol maps to a LIST.
-  const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.label, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
+  const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.key, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
   const rowsOfGene = new Map<string, Int32Array[]>();
   // a row with an OQL line draws only the alterations the line wants (lib/oql-match.ts)
   const oqlOf = new Map<Int32Array, OqlSpec[]>();
-  for (const t of geneTracks) if (t.oql) oqlOf.set(geneCells.get(t.label)!, t.oql);
+  for (const t of geneTracks) if (t.oql) oqlOf.set(geneCells.get(t.key)!, t.oql);
   for (const t of geneTracks) for (const m of t.members) {
     const list = rowsOfGene.get(m);
-    if (list) list.push(geneCells.get(t.label)!); else rowsOfGene.set(m, [geneCells.get(t.label)!]);
+    if (list) list.push(geneCells.get(t.key)!); else rowsOfGene.set(m, [geneCells.get(t.key)!]);
   }
   const rowsByMaskBit = geneSymbolList.map((g) => rowsOfGene.get(g) ?? []);
   for (const r of coverage) {
@@ -353,7 +353,7 @@ export function assembleContract(input: AssembleInput): Contract {
     const hi = ov.kind === "mrna" ? BITS.MRNA_HIGH : BITS.PROT_HIGH;
     const lo = ov.kind === "mrna" ? BITS.MRNA_LOW : BITS.PROT_LOW;
     for (const t of geneTracks) {
-      const cells = geneCells.get(t.label)!;
+      const cells = geneCells.get(t.key)!;
       for (const gene of t.members) for (let i = 0; i < allPids.length; i++) {
         const v = ov.values.get(allPids[i] + "|" + gene);
         if (v === undefined) continue;
@@ -544,7 +544,7 @@ export function assembleContract(input: AssembleInput): Contract {
   const keys: Float64Array[] = [];
   for (let from = 0; from < geneTracks.length; from += PER_KEY) {
     const key = new Float64Array(allPids.length);
-    const list = geneTracks.slice(from, from + PER_KEY).map((t) => geneCells.get(t.label)!);
+    const list = geneTracks.slice(from, from + PER_KEY).map((t) => geneCells.get(t.key)!);
     for (let i = 0; i < allPids.length; i++) {
       let k = 0;
       for (const cells of list) k = k * RADIX + (cells[i] === NOT_PROFILED ? unalteredRank : staircaseRank(cells[i], switches));
@@ -573,7 +573,7 @@ export function assembleContract(input: AssembleInput): Contract {
   // no track key it falls to the first gene row's: not profiled last (first when the genomic key
   // is descending), then the id by stringToVector ascending.
   const firstTrackKey = sort.find((s) => sortableTracks.has(s.track));
-  const firstRow = geneTracks.length ? geneCells.get(geneTracks[0].label)! : null;
+  const firstRow = geneTracks.length ? geneCells.get(geneTracks[0].key)! : null;
   const naSign = sort.find((s) => s.track === "genomic")?.dir === "desc" ? -1 : 1;
   let finalCmp = (x: number, y: number): number =>
     (firstRow ? naSign * (+(firstRow[x] === NOT_PROFILED) - +(firstRow[y] === NOT_PROFILED)) : 0) || idRank[x] - idRank[y];
@@ -664,10 +664,10 @@ export function assembleContract(input: AssembleInput): Contract {
       freqPct: Math.round(1000 * cells.filter((c) => c === 1).length / cells.length) / 10 });
   }
   for (const gt of geneTracks) {
-    const cells = remap(geneCells.get(gt.label)!);
+    const cells = remap(geneCells.get(gt.key)!);
     const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells);
     tracks.push({
-      kind: "gene", label: gt.label, cells,
+      kind: "gene", label: gt.label, ...(gt.key !== gt.label ? { key: gt.key } : {}), cells,
       ...(gt.members.length > 1 ? { members: gt.members } : {}),
       ...(gt.oql ? { sublabel: oqlSublabel(gt.oql) } : {}),
       altered, profiled, driverAltered, freqPct, driverPct,

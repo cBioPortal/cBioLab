@@ -60,7 +60,7 @@ Legacy values read from `window.frontendOnc.model` (track info, id order) and `r
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | ~~**Oncoprint ignores the query's OQL**~~ — fixed: each row draws its gene's line (Q5 KRAS 11 %, 63/594, as legacy). Still open: merged `[A B]` tracks refused on the Results page ("bad gene entry '[BRAF'"); two lines of one gene drawn as one row; a line's EXP / PROT not drawn | MD-9, LY-5, VI-6, GL-4 | (tracked) "The oncoprint draws each gene's line of the query"; "per-track OQL inside merged oncoprint groups" |
+| 1 | ~~**Oncoprint ignores the query's OQL**~~ — fixed: each row draws its gene's line (Q5 KRAS 11 %, 63/594, as legacy). Still open: merged `[A B]` tracks refused on the Results page ("bad gene entry '[BRAF'"); a line's EXP / PROT not drawn | MD-9, LY-5, VI-6, GL-4 | (tracked) "The oncoprint draws each gene's line of the query"; "per-track OQL inside merged oncoprint groups" |
 | 2 | **Gutter % format**: "36.9% / 37.4%" (driver / any, 1 decimal) vs legacy "37%" (integer ≥3 %, "<1%"); header "485 (81.6%)" vs "485 (82%)" | LY-4, STM-1, STM-2 | not tracked |
 | 3 | **Initial zoom fits all columns**, not the altered span (legacy 30 % on Q1, 3 % on Q3); unaltered columns crowd the view | ZM-2, STM-13, MD-11 | not tracked |
 | 4 | **Staircase sort differs**: one rank per cell (top class + driver bit) instead of legacy's per-key CNA → mutation; VUS truncating ranks above driver in-frame/missense; not-profiled ties with unaltered instead of last. Q1 order identical at 191/594 positions | ST-1, ST-2 | not tracked |
@@ -190,7 +190,7 @@ Data version: counts match exactly in every query, so the warehouse and cbioport
 | ONC-LY-2 | 🟡 | B | label \| info \| cells; no ⋮ (click label opens menu); label truncated at 17 chars + "…" |
 | ONC-LY-3 | 🟡 | BC | Auto rows: Profiled for <type> (named by alteration type, sorted alphabetically: CNA, mutations, SV — legacy profile names in profile order), Study of origin (multi), # Samples per Patient ✅; no clinicallist/session/server-config precedence |
 | ONC-LY-4 | 🔶 | B | "36.9% / 37.4%" driver/any at 1 decimal; no "<1%", no integer rounding; N/P ✅, "*" ✅ |
-| ONC-LY-5 | 🟡 | BC | Merged rows drawn "[A / B]"; Results page refuses `[A B]` OQL; genes deduplicated so one gene cannot appear twice (tracked: OQL coverage) |
+| ONC-LY-5 | 🟡 | BC | Merged rows drawn "[A / B]"; Results page refuses `[A B]` OQL; two lines of one gene are two rows, as legacy (tracked: OQL coverage) |
 | ONC-LY-6 | ✅ | B | No column labels, grows in height, own horizontal scrollbar |
 
 ### §3 Glyphs
@@ -276,7 +276,7 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 | ONC-MD-6 | ❌ | C | No germline (tracked) |
 | ONC-MD-7 | 🟡 | B | Inset glyph + split ✅; every SV VUS (no OncoKB SV entries; tracked) |
 | ONC-MD-8 | 🟡 | C | "Remove track" still offered on a single gene (no-op) |
-| ONC-MD-9 | 🟡 | B | Each row draws its gene's line (Q5 KRAS 11 %, 63/594, as legacy); `[ ]` refused; two lines of one gene drawn as one row; EXP / PROT terms not drawn (tracked) |
+| ONC-MD-9 | 🟡 | B | Each row draws its gene's line (Q5 KRAS 11 %, 63/594, as legacy); `[ ]` refused; EXP / PROT terms not drawn (tracked) |
 | ONC-MD-10 | ✅ | C | No special empty state; 0 % / N/P |
 | ONC-MD-11 | 🟡 | B | 10,336 columns draw fine; simple progress text; fit-all zoom; PNG export has no truncation alert (size chosen in dialog) |
 | ONC-MD-12 | N/A | C | Tracks live in the document/link (invariant 9), so there is no per-user save to disable |

@@ -1,6 +1,6 @@
 // The oncoprint's track edits on a view (the document): pure functions, each returning the next view.
 import { portalFreq } from "../../lib/chart/format.ts";
-import { normalizeGeneTracks, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
+import { normalizeGeneTracks, geneRowKeys, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import { heatmapTrackLabel, assayTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
 
 type V = Record<string, any>;
@@ -23,16 +23,15 @@ export const pruneSort = (v: V): V => {
   return next;
 };
 
-/** the row a gene-list entry draws, which is the label the figure sends back */
-export const geneRowLabel = (e: GeneTrackSpec): string => typeof e === "string" ? e.toUpperCase()
-  : (e.label || (e.genes || []).map((g) => String(g).toUpperCase()).join(" / "));
+/** each gene-list entry's row key (lib/gene-tracks.ts), which is what the figure sends back for a gene row */
+const rowKeys = (v: V): (string | null)[] => { try { return geneRowKeys(v.genes || []); } catch { return []; } };
 
 /** how many rows a view's gene list draws */
 export const geneRowCount = (v: V): number => { try { return normalizeGeneTracks(v.genes || []).tracks.length; } catch { return (v.genes || []).length; } };
 
 /** a track's label back to what produced it: the genes, a heatmap profile, or a clinical attribute */
 export const trackOwner = (v: V, label: string): "genes" | "clinical" | "heatmap" | null => {
-  if ((v.genes || []).some((g: GeneTrackSpec) => geneRowLabel(g) === label)) return "genes";
+  if (rowKeys(v).includes(label)) return "genes";
   if ((v.clinical || []).includes(label)) return "clinical";
   if (heatmapLabels(v).includes(label)) return "heatmap";
   return null;
@@ -47,7 +46,7 @@ export const moveTrack = (v: V, label: string, dir: -1 | 1): V => {
   const owner = trackOwner(v, label);
   const list = owner === "genes" ? (v.genes || []).map((g: string) => g) : owner === "clinical" ? [...(v.clinical || [])] : null;
   if (!list) return v;   // heatmap tracks follow their profile's gene list
-  const i = list.findIndex((x: GeneTrackSpec) => (owner === "genes" ? geneRowLabel(x) : x) === label), j = i + dir;
+  const i = owner === "genes" ? rowKeys(v).indexOf(label) : list.indexOf(label), j = i + dir;
   if (i < 0 || j < 0 || j >= list.length) return v;
   [list[i], list[j]] = [list[j], list[i]];
   return owner === "genes" ? { ...v, genes: list } : { ...v, clinical: list };
@@ -56,7 +55,8 @@ export const moveTrack = (v: V, label: string, dir: -1 | 1): V => {
 export const removeTrack = (v: V, label: string): V => {
   const owner = trackOwner(v, label);
   if (owner === "genes") {
-    const genes = (v.genes || []).filter((g: GeneTrackSpec) => geneRowLabel(g) !== label);
+    const keys = rowKeys(v);
+    const genes = (v.genes || []).filter((_: GeneTrackSpec, i: number) => keys[i] !== label);
     return genes.length ? pruneSort({ ...v, genes }) : v;   // a figure needs at least one gene
   }
   if (owner === "clinical") return pruneSort({ ...v, clinical: (v.clinical || []).filter((a: string) => a !== label) });
@@ -70,10 +70,11 @@ export const canRemoveTrack = (v: V, label: string): boolean => removeTrack(v, l
 /** replace a merged row with its members, in place — the figure's "expand" */
 export const splitGeneTrack = (v: V, label: string): V => {
   const out: GeneTrackSpec[] = [];
-  for (const e of (v.genes || []) as GeneTrackSpec[]) {
+  const keys = rowKeys(v);
+  ((v.genes || []) as GeneTrackSpec[]).forEach((e, i) => {
     const members = e && typeof e === "object" ? (e.genes || []).map((g) => String(g).toUpperCase()) : null;
-    if (members && geneRowLabel(e) === label) out.push(...members); else out.push(e);
-  }
+    if (members && keys[i] === label) out.push(...members); else out.push(e);
+  });
   // the same gene may already be drawn on its own; expanding must not create two rows with one name
   return withGenes(v, out.filter((e, i) => typeof e !== "string" || out.indexOf(e) === i));
 };
