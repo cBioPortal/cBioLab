@@ -60,12 +60,12 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - Decided 2026-11-13: the axis runs to the last follow-up, with the censored tail and its at-risk counts, as legacy.
 - [ ] Comparison → Survival on a study without OS: the error says "pick one of those" endpoints, and the tab has no control to pick one ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
   - Decided 2026-11-13: the tab gets legacy's survival-type table (OS, PFS, DFS, DSS…) to pick the endpoint, and is hidden when the study has no survival data.
-- [ ] Comparison → Genomic Alterations: the bar plot of "highest frequency in any group" ranks only the ≤300 most significant rows (`lib/views/enrichment/figure.ts:58`); G2 mutation leaves out MUC16 (12.3 % in Basal) and draws SYNE1 (9.4 %) ([21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
-  - Decided 2026-11-13: rank over every tested gene.
+- [x] Comparison → Genomic Alterations: the bar plot of "highest frequency in any group" ranks only the ≤300 most significant rows (`lib/views/enrichment/figure.ts:58`); G2 mutation leaves out MUC16 (12.3 % in Basal) and draws SYNE1 (9.4 %) ([21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
+  - Decided 2026-11-13: rank over every tested gene. (PR #228 open)
 - [ ] Comparison → Protein is offered for five groups, then refuses because one group has no data (`lib/views/diffexpr/run.ts:79,97`), though four groups hold 9,719 genes ([21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
   - Decided 2026-11-13: test the groups that have data, as legacy, with a visible note and a method-record line naming the dropped group and why.
-- [ ] Comparison → Genomic Alterations, SV: 41 genes tested by default (`minAltered: 5`), and PUM1 is called significant (q 0.0425); with every altered gene tested it is not (q 0.533). A display threshold changes the q-values (CMM-STM-7) ([21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
-  - Decided 2026-11-13: test every altered gene so q matches legacy; the threshold of 5 only hides rows from the display.
+- [x] Comparison → Genomic Alterations, SV: 41 genes tested by default (`minAltered: 5`), and PUM1 is called significant (q 0.0425); with every altered gene tested it is not (q 0.533). A display threshold changes the q-values (CMM-STM-7) ([21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
+  - Decided 2026-11-13: test every altered gene so q matches legacy; the threshold of 5 only hides rows from the display. (PR #228 open)
 - [x] Study View: two bars of one histogram AND to nothing: a second range on the same attribute is pushed as another clause (`app/lab/use-explore-state.ts:471`); AGE (50,60] then (70,75] gives "0 patients match". Derived buckets already OR (`:451-465`) (STS-BAR-5) ([30-study-summary](legacy-spec/parity/30-study-summary.md)) (#188)
 - [x] Study View: clicking a selected pie value again re-adds it (`SEX = Female` becomes `SEX ∈ {Female}`); only the pill's × removes it ([30-study-summary](legacy-spec/parity/30-study-summary.md)) (#188)
 - [x] Study View: a numeric chart under its own filter collapses (AGE (50,60] redraws AGE as ten one-value bars), so other ranges can't be added (`draftedClinical` skips NUMBER, `lib/explore.ts:268`) ([30-study-summary](legacy-spec/parity/30-study-summary.md)) (#188)
@@ -309,7 +309,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Tabs as the portal shows them: Mutations for any number of groups, with "We can't show mutations for more than 2 groups…" (ours hidden unless 2), expression tabs past 10 groups, `tabHasBeenShown` (CMM-TAB-3, CMM-TAB-4, CMM-MD-2; [21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
 - [ ] **Comparison → Genomic Alterations tab** ([21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
   - [ ] One table, a row per gene altered by any selected type, under the portal's checkbox tree with [Select] (ours three views, mutation, CNA and SV: G2 TP53 154/171 vs ours 153/171; MYC, the portal's #2 row, only in our CNA view) (CMM-AT-1…3, CMM-AL-5, CMM-STM-2)
-  - [ ] Every altered gene tested (ours `minAltered: 5`, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested, DYNC2H1 q 0.0503 vs 0.239; CNA 6,512 vs 6,156 significant; G5 mutation 145 vs 336; see bugs) (CMM-STM-7, CMM-AL-4)
+  - [x] Every altered gene tested (ours `minAltered: 5`, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested, DYNC2H1 q 0.0503 vs 0.239; CNA 6,512 vs 6,156 significant; G5 mutation 145 vs 336; see bugs) (CMM-STM-7, CMM-AL-4) (PR #228 open)
   - [ ] Every row (ours ≤300, and the frequency scatter and bar plot are built from those 300; the expression tabs' cap is under them) (CMM-AL-5, CMM-FS, CMM-BP-2, CMM-GN, CMM-EX-5)
   - [ ] Patient-level enrichment: the Sample / Patient select (CMM-AL-4, CMM-MD-5)
   - [ ] Formats: p and q "< 10^-10" (ours "1.1e-82"), altered % to 2 dp (ours 1), group headers "(A) Basal", the volcano's y capped at 10 (ours to 82) (CMM-STM-9, CMM-STM-3, CMM-AL-5, CMM-VO-1)
