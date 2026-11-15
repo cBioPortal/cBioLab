@@ -181,10 +181,6 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
   };
   const axisName = (side: "x" | "y") => plot?.[side].label || side;
   const unit = spec.unit || "sample";
-  // A box is drawn with its categories across, whichever axis the document holds them on, so a
-  // box whose categories sit on y shows its "vertical" axis across. Swapping makes the two agree.
-  const boxTransposed = plot?.shape === "box" && plot.x.kind === "num";
-  const boxDrawn = plot?.shape === "box" && !boxTransposed;
   const axisFields = (side: "x" | "y") => <>
     <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} catalog={catalog} loading={loading} busy={busy}
       onChange={(a) => update((vv) => ({ ...vv, [side]: a }))} />
@@ -206,12 +202,9 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
         <aside className="plot-side flex flex-col gap-1.5" aria-label="plot axes">
           <AxisBlock title="Horizontal axis">
             {axisFields("x")}
-            {boxTransposed && <p className="m-0 text-sm text-muted-foreground">A box plot draws its categories across, so this axis is drawn up the side. Swap to make them agree.</p>}
           </AxisBlock>
-          {/* a box drawn as the document says has nothing to swap: its categories are already across */}
-          <Button variant="link" size="inline" className="plot-swap self-center text-md" disabled={busy || boxDrawn}
-            data-tip={boxDrawn ? "a box plot is always drawn by category across, which this one already is — nothing to swap"
-              : "put the horizontal axis's definition on the vertical axis, and the vertical one's on the horizontal"}
+          <Button variant="link" size="inline" className="plot-swap self-center text-md" disabled={busy}
+            data-tip="put the horizontal axis's definition on the vertical axis, and the vertical one's on the horizontal"
             onClick={() => update((vv) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowUp />Swap axes<ArrowDown /></Button>
           <AxisBlock title="Vertical axis">
             {axisFields("y")}
