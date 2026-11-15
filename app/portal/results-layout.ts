@@ -72,7 +72,7 @@ const TYPE_WORD: Record<ProfileType, string> = { MUTATION: "mutation", CNA: "cop
  * bare gene there asks for mutation and copy-number profiling, and a type only some of the studies
  * hold is named rather than required (requiring it would drop every patient of the studies without it).
  */
-export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { cohorts: Record<string, CohortDef>; unchecked: string[] } {
+export function resultsGroups(q: ResultsQuery, held: ResultsData["held"], drivers?: DriverSettings): { cohorts: Record<string, CohortDef>; unchecked: string[] } {
   const scope = q.studies.length === 1 ? { study: q.studies[0] } : { studies: q.studies };
   const byType = new Map<ProfileType, string[]>(), unchecked: string[] = [];
   for (const entry of q.entries) {
@@ -91,7 +91,8 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { coh
   const profiled = [...byType].map(([type, genes]) => ({ kind: "profiled", type, genes }) as Clause);
   // the query as one OQL clause — its ";" is "or" between entries (up to 30), where an `any` group
   // of one clause per line would stop at 8
-  const query = { kind: "oql", q: q.entries.join("; "), ...pinsOf(q) };
+  const text = q.entries.join("; ");
+  const query = { kind: "oql", q: text, ...pinsOf(q), ...(asksDriver(text) ? { drivers: driverSources(drivers) } : {}) };
   const def = (all: Clause[]) => ({ ...scope, all: [...q.filters, ...all] }) as CohortDef;
   return {
     // Altered and Unaltered first: the comparison's figures draw them in the first two series colours, and the page's swatches follow this order
@@ -102,6 +103,35 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { coh
     },
     unchecked,
   };
+}
+
+/** does an OQL query name DRIVER anywhere (DRIVER, MUT_DRIVER, AMP_DRIVER, a range's _DRIVER)? */
+const asksDriver = (q: string): boolean => { try { return parseOql(q).some((e) => e.specs.some((sp) => sp.driver)); } catch { return false; } };
+/** the driver sources of the page's settings: what DRIVER reads in an oql clause (what is hidden is not the clause's) */
+const driverSources = (d: DriverSettings | undefined): DriverSettings =>
+  compactDrivers({ oncokb: d?.oncokb, hotspots: d?.hotspots, custom: d?.custom, tiers: d?.tiers }) || {};
+
+/**
+ * The page's driver settings, the oncoprint's, given to every oql clause of its cohorts that names
+ * DRIVER, as the portal's header count, Comparison/Survival and Download follow its settings
+ * (putativeDriver). A clause without DRIVER is left alone, so a settings change re-runs nothing there.
+ */
+export function syncDriverCohorts<D extends { cohorts?: Record<string, CohortDef>; views?: View[] }>(doc: D): D {
+  const onco = (doc.views || []).find((v) => v.kind === "oncoprint");
+  const sources = driverSources(onco ? driversOf(onco as never) : undefined);
+  const fix = (c: Clause): Clause => {
+    const x = c as { kind?: string; q?: string; not?: Clause };
+    if (x.not) { const inner = fix(x.not); return inner === x.not ? c : { ...c, not: inner } as Clause; }
+    if (x.kind !== "oql" || !asksDriver(String(x.q || ""))) return c;
+    return JSON.stringify((c as { drivers?: unknown }).drivers) === JSON.stringify(sources) ? c : { ...c, drivers: sources } as Clause;
+  };
+  let changed = false;
+  const cohorts = Object.fromEntries(Object.entries(doc.cohorts || {}).map(([k, def]) => {
+    const all = (def.all || []).map(fix);
+    if (all.some((c, i) => c !== (def.all || [])[i])) { changed = true; return [k, { ...def, all }]; }
+    return [k, def];
+  }));
+  return changed ? { ...doc, cohorts } : doc;
 }
 
 /** the query's EXP / PROT profile choice, as an oql clause and the Download tab carry it */
@@ -162,12 +192,12 @@ export function syncDrivers(prev: View[], next: View[]): View[] {
     const own = driversOf(v as never) || {};
     const merged = compactDrivers({ hideVus: own.hideVus, hideGermline: own.hideGermline,
       ...(fromOncoprint ? { hideVus: from.hideVus, hideGermline: from.hideGermline } : {}),
-      oncokb: from.oncokb, custom: from.custom, tiers: from.tiers });
+      oncokb: from.oncokb, hotspots: from.hotspots, custom: from.custom, tiers: from.tiers });
     if (v.kind === "oncoprint") return withDrivers(v, merged);
     const pv = v as unknown as { drivers?: DriverSettings };
     if (pv.drivers == null) return v;
     // a plot draws every mutation, so it keeps sources alone
-    const sources = compactDrivers({ oncokb: from.oncokb, custom: from.custom, tiers: from.tiers }) || {};
+    const sources = compactDrivers({ oncokb: from.oncokb, hotspots: from.hotspots, custom: from.custom, tiers: from.tiers }) || {};
     return { ...v, drivers: sources } as View;
   });
 }
