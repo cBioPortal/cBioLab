@@ -149,7 +149,9 @@ async function appVariantPin(): Promise<string | null> {
 
 /**
  * Cancer Hotspots for the fixture's variants (the study is GRCh37): one `annotation.variant` row per
- * variant of the TSV, its `hotspots` list as Genome Nexus's record holds it, under the release the
+ * variant of the TSV, its `hotspots` list as Genome Nexus's record holds it, and the rest of the record
+ * from its `annotation` column when filled (JSON: the `canonical` transcript per gene and the
+ * `transcripts` with their `exon`, which the mutation table's Exon column reads), under the release the
  * app reads and under "fixture", with a sync_run row so the study counts as synced. Replaced whole
  * when the TSV changes.
  */
@@ -168,7 +170,8 @@ async function seedHotspots(conn: WriteConn): Promise<void> {
     await exec(db, "ALTER TABLE variant DELETE WHERE source = 'genome_nexus' AND version = " + sq(v) + " SETTINGS mutations_sync = 1");
     await insertAll(db, "variant", rows.map((r) => ({
       source: "genome_nexus", version: v, chr: r.chr, start_position: Number(r.start_position), end_position: Number(r.end_position),
-      reference_allele: r.reference_allele, variant_allele: r.variant_allele, data: JSON.stringify({ hotspots: JSON.parse(r.hotspots || "[]") })
+      reference_allele: r.reference_allele, variant_allele: r.variant_allele,
+      data: JSON.stringify({ ...JSON.parse(r.annotation || "{}"), hotspots: JSON.parse(r.hotspots || "[]") })
     })));
     await insertAll(db, "sync_run", [{ run_id: "fixture_" + digest, started_at: new Date().toISOString().replace("T", " ").slice(0, 19), source: "genome_nexus",
       version: v, study: STUDY, variants_total: rows.length, already_stored: 0, annotated_new: rows.length, failed: 0, note: "fixture " + digest }]);
