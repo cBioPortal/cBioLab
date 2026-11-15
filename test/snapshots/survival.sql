@@ -26,6 +26,31 @@
   WHERE cancer_study_identifier = 'ucec_msk_2018'
     AND attribute_name = 'MSI_STATUS' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('MSS'))))))
 
+-- view 0 survival: survival · ucec_msk_2018
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'ucec_msk_2018_', '') AS pid, replaceOne(sample_unique_id, 'ucec_msk_2018_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'ucec_msk_2018'
+    AND (('sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', ''), replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'ucec_msk_2018'
+    AND attribute_name = 'MSI_STATUS' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('MSI-H')))) OR ('patient', replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', ''), replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'ucec_msk_2018'
+    AND attribute_name = 'MSI_STATUS' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('MSI-H'))))))),
+c1 AS ((SELECT replaceOne(patient_unique_id, 'ucec_msk_2018_', '') AS pid, replaceOne(sample_unique_id, 'ucec_msk_2018_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'ucec_msk_2018'
+    AND (('sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', ''), replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'ucec_msk_2018'
+    AND attribute_name = 'MSI_STATUS' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('MSS')))) OR ('patient', replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'ucec_msk_2018_', ''), replaceOne(patient_unique_id, 'ucec_msk_2018_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'ucec_msk_2018'
+    AND attribute_name = 'MSI_STATUS' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('MSS')))))))
+SELECT count() AS n FROM (SELECT pid FROM (SELECT DISTINCT pid FROM c0 UNION ALL SELECT DISTINCT pid FROM c1) GROUP BY pid HAVING count() > 1)
+
 -- view 0 survival: survivalCounts:PFS_1L · ucec_msk_2018
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'ucec_msk_2018_', '') AS pid, replaceOne(sample_unique_id, 'ucec_msk_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'ucec_msk_2018'
