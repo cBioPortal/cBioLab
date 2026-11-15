@@ -82,11 +82,17 @@ describe("plot: one study", () => {
     assert.deepEqual(r.plot!.groups!.map((g) => g.g), ["Deep deletion", "Diploid", "Gain", "Amplification", "Other"]);
   });
 
-  test("the levels keep the plot's order when the category is not a discrete profile, or the shape is not a box", async () => {
-    const cont = await run({ s1: local(() => boxData(["Amplification", "Diploid"]), []) }, { x: { source: "molecular", profileType: "mrna", gene: "TP53" } });
-    assert.deepEqual(cont.plot!.groups!.map((g) => g.g), ["Amplification", "Diploid"]);
-    const clin = await run({ s1: local(() => boxData(["Amplification", "Diploid"]), []) }, {});
-    assert.deepEqual(clin.plot!.groups!.map((g) => g.g), ["Amplification", "Diploid"]);
+  test("a clinical category's boxes are alphabetical, as the portal's (Q5: Colon, Mucinous, Rectal), whatever order the counts came in", async () => {
+    const clin = await run({ s1: local(() => boxData(["Rectal Adenocarcinoma", "Colon Adenocarcinoma", "Mucinous Adenocarcinoma of the Colon and Rectum"]), []) }, {});
+    assert.deepEqual(clin.plot!.groups!.map((g) => g.g), ["Colon Adenocarcinoma", "Mucinous Adenocarcinoma of the Colon and Rectum", "Rectal Adenocarcinoma"]);
+  });
+
+  test("a mutation-type axis's boxes are in the portal's class order, no mutation and not profiled last; an OQL axis keeps its order", async () => {
+    const t = await run({ s1: local(() => boxData(["Not mutated", "Truncating", "Missense", "Not profiled", "Splice"]), []) },
+      { x: { source: "alteration", gene: "KRAS", by: "mutationType" } });
+    assert.deepEqual(t.plot!.groups!.map((g) => g.g), ["Missense", "Truncating", "Splice", "Not mutated", "Not profiled"]);
+    const oql = await run({ s1: local(() => boxData(["Unaltered", "Altered", "Not profiled"]), []) }, { x: { source: "alteration", oql: "KRAS: MUT" } });
+    assert.deepEqual(oql.plot!.groups!.map((g) => g.g), ["Unaltered", "Altered", "Not profiled"]);
   });
 
   test("the bins asked for reach the participant; unset, the plot's own default", async () => {
