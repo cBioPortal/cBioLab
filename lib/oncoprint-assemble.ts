@@ -9,6 +9,8 @@
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, SPECTRUM_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
+import { eventWanted, oqlLevel, oqlSublabel } from "./oql-match.ts";
+import type { OqlSpec } from "./oql-parse.ts";
 import { STYLE, assayScale, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
@@ -41,7 +43,11 @@ export function mutClassBit(mt: string | undefined): number {
  * cbp_driver_tiers) and `germ` marks a germline mutation; rows from an older peer or a local file
  * may lack them, which reads as no call and somatic.
  */
-export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number; df?: string | null; dt?: string | null; germ?: boolean | number | null }
+export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number; df?: string | null; dt?: string | null; germ?: boolean | number | null;
+  /** a mutation's own protein start and end, read where a row's OQL has a position range */
+  ps?: number | null; pe?: number | null;
+  /** an expression datum (vt "exp" / "prot"): one sample's value in the profile a row's EXP / PROT reads */
+  z?: number | null }
 
 export interface SortKey { track: string; dir: "asc" | "desc" }
 
@@ -54,7 +60,7 @@ export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string;
   });
 }
 
-const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground",
+const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "showOql",
   "sortByMutationType", "sortByDrivers", "sortIgnoreVUS", "style", "colors"] as const;
 const GAP_MODES = ["none", "gaps", "pct", "pct-left"] as const;
 const LEGEND_MODES = ["all", "none"] as const;
@@ -70,7 +76,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
   for (const k of Object.keys(src))
     if (!(DISPLAY_KEYS as readonly string[]).includes(k))
       throw new Error("display: unknown option '" + k + "' (accepted: " + DISPLAY_KEYS.join(", ") + ")");
-  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "colorByGermline" | "hideVUS" | "whiteBackground" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS", dflt: boolean): boolean => {
+  const bool = (k: "showUnaltered" | "whitespace" | "colorByType" | "colorByGermline" | "hideVUS" | "whiteBackground" | "showOql" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS", dflt: boolean): boolean => {
     const v = src[k];
     if (v === undefined) return dflt;
     if (typeof v !== "boolean") throw new Error("display." + k + " must be true or false");
@@ -111,6 +117,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
     hideGermline: drivers.hideGermline,
     drivers,
     whiteBackground: bool("whiteBackground", false),
+    showOql: bool("showOql", true),
     // the staircase switches, echoed only when off the portal's defaults
     ...(!bool("sortByMutationType", true) ? { sortByMutationType: false } : {}),
     ...(!bool("sortByDrivers", true) ? { sortByDrivers: false } : {}),
@@ -226,11 +233,14 @@ export function assembleContract(input: AssembleInput): Contract {
   // altered and profiled where any member was profiled — the union denominator, with no
   // special case: the sentinel survives only where every member is unprofiled. A gene may
   // appear in several rows (merged, and again on its own), so one symbol maps to a LIST.
-  const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.label, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
+  const geneCells = new Map<string, Int32Array>(geneTracks.map((t) => [t.key, new Int32Array(allPids.length).fill(NOT_PROFILED)]));
   const rowsOfGene = new Map<string, Int32Array[]>();
+  // a row with an OQL line draws only the alterations the line wants (lib/oql-match.ts)
+  const oqlOf = new Map<Int32Array, OqlSpec[]>();
+  for (const t of geneTracks) if (t.oql) oqlOf.set(geneCells.get(t.key)!, t.oql);
   for (const t of geneTracks) for (const m of t.members) {
     const list = rowsOfGene.get(m);
-    if (list) list.push(geneCells.get(t.label)!); else rowsOfGene.set(m, [geneCells.get(t.label)!]);
+    if (list) list.push(geneCells.get(t.key)!); else rowsOfGene.set(m, [geneCells.get(t.key)!]);
   }
   const rowsByMaskBit = geneSymbolList.map((g) => rowsOfGene.get(g) ?? []);
   for (const r of coverage) {
@@ -276,7 +286,9 @@ export function assembleContract(input: AssembleInput): Contract {
     if (!held) { held = new Uint16Array(cells.length); m.set(cells, held); }
     held[i] |= bit;
   };
+  const levels: EventRow[] = [];
   for (const r of events) {
+    if (r.vt === "exp" || r.vt === "prot") { levels.push(r); continue; }
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
     const rows = rowsOfGene.get(r.gene);
@@ -287,12 +299,14 @@ export function assembleContract(input: AssembleInput): Contract {
     else if (r.vt === "structural_variant") bit = BITS.SV;
     else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
     if (!bit) continue;
-    const covered = rows.filter((cells) => cells[i] !== NOT_PROFILED);
-    if (covered.length < rows.length) offPanel++;
+    const driver = isDriver(r);
+    const wanted = oqlOf.size ? rows.filter((cells) => eventWanted(oqlOf.get(cells), r, driver)) : rows;
+    if (!wanted.length) continue;
+    const covered = wanted.filter((cells) => cells[i] !== NOT_PROFILED);
+    if (covered.length < wanted.length) offPanel++;
     if (!covered.length) continue;
     const germ = mut && !!r.germ;
     if (germ && hideGerm) { hiddenGerm++; continue; }
-    const driver = isDriver(r);
     if (hideVus && !driver) { hiddenVus++; continue; }
     if (germ) for (const cells of covered) mark(driver ? germDrv : germVus, cells, i, bit);
     if (mut && !driver) {
@@ -324,6 +338,38 @@ export function assembleContract(input: AssembleInput): Contract {
       const anyDriver = n[i * 4] + n[i * 4 + 2] > 0;
       cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | CNA_KEYS[best] | (anyDriver ? BITS.DRIVER : 0);
     }
+  // A row's EXP / PROT: each sample's level its line wants, high or low (the last command it
+  // meets decides, oqlfilter 568-577), and the cell shows the level with more samples, high on a
+  // tie (DataUtils selectDisplayValue: the portal takes the first sample's). A column with a level
+  // of the gene is profiled for the gene in every row, as a sample in a selected expression
+  // profile is in the portal's (filteredSequencedSampleKeysByGene).
+  const levelCounts = new Map<Int32Array, Uint16Array>();
+  // the profiles a row asks for: as the portal's selected profiles, none when no row names EXP / PROT
+  const asked = new Set<string>(geneTracks.flatMap((t) => (t.oql || []).filter((x) => x.type === "EXP" || x.type === "PROT").map((x) => x.type === "EXP" ? "exp" : "prot")));
+  for (const r of levels) {
+    const i = pidIndex.get(r.pid);
+    const rows = i === undefined ? undefined : rowsOfGene.get(r.gene);
+    if (i === undefined || !rows || !asked.has(r.vt)) continue;
+    for (const cells of rows) {
+      if (cells[i] === NOT_PROFILED) cells[i] = 0;
+      const level = oqlLevel(oqlOf.get(cells), r);
+      if (!level) continue;
+      let n = levelCounts.get(cells);
+      if (!n) { n = new Uint16Array(cells.length * 4); levelCounts.set(cells, n); }
+      n[i * 4 + (r.vt === "exp" ? 0 : 2) + (level === "high" ? 0 : 1)]++;
+    }
+  }
+  /** per row, the columns its EXP / PROT made altered: overlays set the same bits and are not counted */
+  const levelAltered = new Map<Int32Array, Uint8Array>();
+  for (const [cells, n] of levelCounts) {
+    const alt = new Uint8Array(cells.length);
+    for (let i = 0; i < cells.length; i++) {
+      const [mh, ml, ph, pl] = [n[i * 4], n[i * 4 + 1], n[i * 4 + 2], n[i * 4 + 3]];
+      if (mh || ml) { cells[i] |= mh >= ml ? BITS.MRNA_HIGH : BITS.MRNA_LOW; alt[i] = 1; }
+      if (ph || pl) { cells[i] |= ph >= pl ? BITS.PROT_HIGH : BITS.PROT_LOW; alt[i] = 1; }
+    }
+    levelAltered.set(cells, alt);
+  }
   for (const [cells, held] of vusMut)
     for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
   for (const cells of new Set([...germDrv.keys(), ...germVus.keys()])) {
@@ -343,7 +389,7 @@ export function assembleContract(input: AssembleInput): Contract {
     const hi = ov.kind === "mrna" ? BITS.MRNA_HIGH : BITS.PROT_HIGH;
     const lo = ov.kind === "mrna" ? BITS.MRNA_LOW : BITS.PROT_LOW;
     for (const t of geneTracks) {
-      const cells = geneCells.get(t.label)!;
+      const cells = geneCells.get(t.key)!;
       for (const gene of t.members) for (let i = 0; i < allPids.length; i++) {
         const v = ov.values.get(allPids[i] + "|" + gene);
         if (v === undefined) continue;
@@ -534,7 +580,7 @@ export function assembleContract(input: AssembleInput): Contract {
   const keys: Float64Array[] = [];
   for (let from = 0; from < geneTracks.length; from += PER_KEY) {
     const key = new Float64Array(allPids.length);
-    const list = geneTracks.slice(from, from + PER_KEY).map((t) => geneCells.get(t.label)!);
+    const list = geneTracks.slice(from, from + PER_KEY).map((t) => geneCells.get(t.key)!);
     for (let i = 0; i < allPids.length; i++) {
       let k = 0;
       for (const cells of list) k = k * RADIX + (cells[i] === NOT_PROFILED ? unalteredRank : staircaseRank(cells[i], switches));
@@ -563,7 +609,7 @@ export function assembleContract(input: AssembleInput): Contract {
   // no track key it falls to the first gene row's: not profiled last (first when the genomic key
   // is descending), then the id by stringToVector ascending.
   const firstTrackKey = sort.find((s) => sortableTracks.has(s.track));
-  const firstRow = geneTracks.length ? geneCells.get(geneTracks[0].label)! : null;
+  const firstRow = geneTracks.length ? geneCells.get(geneTracks[0].key)! : null;
   const naSign = sort.find((s) => s.track === "genomic")?.dir === "desc" ? -1 : 1;
   let finalCmp = (x: number, y: number): number =>
     (firstRow ? naSign * (+(firstRow[x] === NOT_PROFILED) - +(firstRow[y] === NOT_PROFILED)) : 0) || idRank[x] - idRank[y];
@@ -640,9 +686,9 @@ export function assembleContract(input: AssembleInput): Contract {
   const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
   // Shared by the pooled numbers below and the per-group breakdown: same formula, just
   // over a slice of columns instead of all of them.
-  const geneCounts = (slice: number[]) => {
+  const geneCounts = (slice: number[], byLevel?: number[]) => {
     const profiled = slice.filter((c) => c !== NOT_PROFILED).length;
-    const altered = slice.filter((c) => c > 0 && (c & ALT)).length;
+    const altered = slice.filter((c, j) => (c > 0 && (c & ALT)) || (byLevel && byLevel[j])).length;
     const driverAltered = slice.filter((c) => c > 0 && (c & ALT) && (c & BITS.DRIVER)).length;
     return { profiled, altered, driverAltered,
       freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
@@ -654,17 +700,20 @@ export function assembleContract(input: AssembleInput): Contract {
       freqPct: Math.round(1000 * cells.filter((c) => c === 1).length / cells.length) / 10 });
   }
   for (const gt of geneTracks) {
-    const cells = remap(geneCells.get(gt.label)!);
-    const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells);
+    const cells = remap(geneCells.get(gt.key)!);
+    const lv = levelAltered.get(geneCells.get(gt.key)!);
+    const byLevel = lv ? remap(lv as unknown as Int32Array) : undefined;
+    const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells, byLevel);
     tracks.push({
-      kind: "gene", label: gt.label, cells,
+      kind: "gene", label: gt.label, ...(gt.key !== gt.label ? { key: gt.key } : {}), cells,
       ...(gt.members.length > 1 ? { members: gt.members } : {}),
+      ...(gt.oql ? { sublabel: oqlSublabel(gt.oql) } : {}),
       altered, profiled, driverAltered, freqPct, driverPct,
       // Pooled is enough on its own with one group; with several, the figure already
       // draws a boundary between them, so the text/provenance side gets the same split
       // rather than only ever reporting the number pooled across all of them.
       ...(groupRanges.length > 1 ? { byGroup: groupRanges.map((g) => {
-        const { profiled, altered, freqPct, driverPct } = geneCounts(cells.slice(g.start, g.start + g.count));
+        const { profiled, altered, freqPct, driverPct } = geneCounts(cells.slice(g.start, g.start + g.count), byLevel?.slice(g.start, g.start + g.count));
         return { group: g.name, altered, profiled, freqPct, driverPct };
       }) } : {})
     });
@@ -686,7 +735,7 @@ export function assembleContract(input: AssembleInput): Contract {
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
       ...(input.clusterMethod ? { cluster: input.clusterMethod } : {}),
       ...customDriverReport(events) },
-    display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false },
+    display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false, showOql: true },
     stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}), ...(hideGerm ? { hiddenGermline: hiddenGerm } : {}), ...(offPanel ? { offPanel } : {}) }
   };
 }

@@ -44,7 +44,7 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
   const zReference: Record<string, ZReference> = {};
   for (const h of heatSpecs) {
     if (h.reference !== "federation" || /^vaf$/i.test(h.profileType) || (h.entities && h.entities.length)) continue;
-    const hGenes = h.genes && h.genes.length ? geneSymbols(h.genes) : geneSymbols(genes);
+    const hGenes = h.genes && h.genes.length ? geneSymbols(h.genes) : geneSymbols(genes, { oql: true });
     if (!hGenes.length) continue;
     const per = await Promise.all(vStudies.map(async (st) => ({
       // a failed study fails the view: a reference silently missing a study would shift every z-score
@@ -78,6 +78,9 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
     drivers: (view as OncoprintView).drivers,
     unit: (view as OncoprintView).unit,
     overlays: (view as OncoprintView).overlays,
+    ...((view as OncoprintView).exp ? { exp: (view as OncoprintView).exp } : {}),
+    ...((view as OncoprintView).prot ? { prot: (view as OncoprintView).prot } : {}),
+    ...((view as OncoprintView).ifHeld ? { ifHeld: (view as OncoprintView).ifHeld } : {}),
     ...(Object.keys(zReference).length ? { zReference } : {}),
     // document cohorts the view asked to draw as binary rows; the engine refuses them
     // across studies and in sample mode, which are exactly the cases where "is this

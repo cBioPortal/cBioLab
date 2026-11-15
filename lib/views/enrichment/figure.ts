@@ -55,7 +55,7 @@ function enrichmentScatter(r: EnResult, p: Pal, x0: number, y0: number, w: numbe
 /** "Genes with highest frequency in any group": the ten most-altered genes, a bar per group. */
 function enrichmentTop(r: EnResult, p: Pal, x0: number, y0: number, w: number, plotH: number, n = 10): Panel {
   const k = r.groups.length;
-  const genes = [...r.rows].sort((a, b) => Math.max(...b.cells.map((c) => c.pct ?? 0)) - Math.max(...a.cells.map((c) => c.pct ?? 0))).slice(0, n);
+  const genes = (r.topFrequency || [...r.rows].sort((a, b) => Math.max(...b.cells.map((c) => c.pct ?? 0)) - Math.max(...a.cells.map((c) => c.pct ?? 0)))).slice(0, n);
   const top = Math.max(1, ...genes.flatMap((g) => g.cells.map((c) => c.pct ?? 0)));
   const out: string[] = [];
   out.push(label(x0 + EDGE, y0 + FS.title, "Genes with highest frequency in any group", { size: FS.title, fill: p.ink, weight: 600, maxW: w }));

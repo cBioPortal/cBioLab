@@ -24,17 +24,17 @@ Legacy shows p/q only as "<0.001" / `toFixed(3)`, so exact legacy p/q were recom
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 5 |
+| ✅ match | 6 |
 | 🟡 partial | 11 |
 | 🔶 different | 11 |
-| ❌ missing | 11 |
+| ❌ missing | 10 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
 | N/A | 1 |
 | ? | 0 |
 | **Total IDs** | **40** |
 
-**Overall: 17.5 %** (✅ 5 + 🐞ok 1 + N/A 1 = 7 of 40). Counting 🟡 as half: 31.3 %.
+**Overall: 20.0 %** (✅ 6 + 🐞ok 1 + N/A 1 = 8 of 40). Counting 🟡 as half: 33.8 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
@@ -52,7 +52,7 @@ Legacy shows p/q only as "<0.001" / `toFixed(3)`, so exact legacy p/q were recom
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
 | 1 | **No table on the portal tab** — only a horizontal log₂ OR bar chart (row text "−1.7 · q = 2.2e-20"); Neither / A Not B / B Not A / Both, p and Tendency only in the SVG hover title. The table card exists only on `/lab` (`app/lab/kinds/cooccurrence.tsx`) | UI-6, TB-1, TB-2, STM-9 | not tracked |
-| 2 | **OQL ignored**: `KRAS: MUT` / `TP53: MUT HOMDEL` counted as whole genes (Q2b KRAS/TP53 5425/876/3714/930 vs legacy 5530/797/3772/846, log₂ OR 0.633 vs 0.638); labels are gene symbols | MD-3, STM-1, STM-3, 0.1 | (tracked) "the oncoprint and gene tabs still draw every alteration" |
+| 2 | ~~**OQL ignored**~~ — fixed: tracks are the query's lines (Q2b KRAS: MUT / TP53: MUT HOMDEL 5530/797/3772/846, as legacy). Was: `KRAS: MUT` / `TP53: MUT HOMDEL` counted as whole genes (Q2b KRAS/TP53 5425/876/3714/930 vs legacy 5530/797/3772/846, log₂ OR 0.633 vs 0.638); labels are gene symbols | MD-3, STM-1, STM-3, 0.1 | (tracked) "the oncoprint and gene tabs still draw every alteration" |
 | 3 | **Merged tracks `[BRAF NRAS]` refused** by the Results page ("bad gene entry '[BRAF'") | MD-4 | (tracked) OQL coverage: per-track OQL inside merged groups |
 | 4 | **Multi-study test is CMH stratified by study**, not pooled Fisher: Q4 TP53/KRAS legacy p 2.1e-7, q 3.2e-7 (Co-occurrence, significant) vs cBioLab CMH p = q = 0.880 (not significant); PIK3CA/APC tendency flips (legacy −0.232 ME, cBioLab MH log₂ OR +0.543 Co-occurrence). Deliberate (`doc.ts:7`) | MD-8, STM-5..7 | not tracked |
 | 5 | **No Mutual exclusivity / Co-occurrence / Significant only checkboxes** | UI-4, UI-5, STM-8 | not tracked |
@@ -101,7 +101,7 @@ Legacy p/q: recomputed from legacy counts with legacy's code (displayed value in
 | Q4 TP53/KRAS | same | 816/525/104/139; 1.055; p 2.13e-7; q 3.20e-7 (sig.) | 827/529/105/139; MH 0.055; CMH 0.880; q 0.880 (not sig.) | 🔶 |
 | Q4 KRAS/PIK3CA | same | 922/150/419/93; 0.448; p 0.037; q 0.044 | 935/150/421/94; MH 1.156; CMH 8.93e-6; q 1.34e-5 | 🔶 |
 | Q4 PIK3CA/APC | same | 784/390/288/122; −0.232; p 0.220; q 0.220; **Mutual exclusivity** | 796/391/289/124; MH +0.543; CMH 0.084; q 0.101; **co-occurrence** | 🔶 tendency flips |
-| Q2 KRAS: MUT / TP53: MUT HOMDEL | MD-3 | 5530/797/3772/846; 0.638; p 1.90e-16; q 5.70e-16 | (Q2b, OQL dropped) KRAS/TP53 5425/876/3714/930; 0.633; p 2.16e-17 | 🔶 |
+| Q2 KRAS: MUT / TP53: MUT HOMDEL | MD-3 | 5530/797/3772/846; 0.638; p 1.90e-16; q 5.70e-16 | KRAS: MUT / TP53: MUT HOMDEL 5530/797/3772/846 | ✅ counts |
 | Q2 KRAS: MUT / BRAF / NRAS | MD-4 | 8495/1577/807/66; −1.183; p 6.47e-12 | refused (merged); Q2b gives KRAS/BRAF −1.104 and KRAS/NRAS −1.595 as separate rows | ❌ |
 | Q2 TP53: MUT HOMDEL / BRAF / NRAS | MD-4 | 5802/4270/525/348; −0.151; p = q = 0.153 | refused | ❌ |
 | Summary "tested 6 pairs between the 4 tracks" | UI-3 | 6 / 4 | "BH across the 6 assessable pairs" (note) | 🟡 |
@@ -162,7 +162,7 @@ Diagnosis:
 |---|---|---|---|
 | MEX-MD-1 | 🟡 | B | 1 gene → tab hidden ✅, but also when routed to; no ER-1 |
 | MEX-MD-2 | 🟡 | C | Unprofiled handled per pair (dropped + named), not per track; no ER-2 |
-| MEX-MD-3 | ❌ | B | OQL lines reduced to gene symbols (`geneSymbols`, `results-layout.ts:214` passes `genes`); Q2b KRAS/TP53 = plain-gene counts; labels are symbols (tracked) |
+| MEX-MD-3 | ✅ | B | Tracks are the query's lines, named as legacy ("KRAS: MUT"); Q2b KRAS: MUT / TP53: MUT HOMDEL = legacy's counts |
 | MEX-MD-4 | ❌ | B | `[BRAF NRAS]` refused by the Results page: "bad gene entry '[BRAF'" (tracked: OQL coverage) |
 | MEX-MD-5 | ✅ | BC | Always sample-level (`pairCountsSql` counts `bareSampleId`, `federation.ts:410`); Q1 profiled 10,945 = samples. Caption says "patients" (see bugs) |
 | MEX-MD-6 | ❌ | C | No Show only profiled (unprofiled samples are excluded per pair anyway) |

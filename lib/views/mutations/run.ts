@@ -5,7 +5,7 @@ import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterati
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
-import { overLimit, refuse } from "../shared.ts";
+import { overLimit, refuse, viewOql } from "../shared.ts";
 import type { MutationsView } from "./types.ts";
 import { mutationsMethod } from "./method.ts";
 import { describePins, studiesWithoutVariantAnnotation, variantPins } from "../../variant-annotation.ts";
@@ -69,6 +69,8 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   let gene: string;
   try { [gene] = geneSymbols([view.gene]); } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   if (!gene) return refuse("mutations", ctx, "a mutations view needs a gene, e.g. KRAS");
+  const lines = viewOql(view);
+  if ("error" in lines) return refuse("mutations", ctx, lines.error);
   const size = view.rows == null ? 25 : Math.floor(Number(view.rows));
   if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return refuse("mutations", ctx, "rows (the page size) is 1 to " + TABLE_ROWS_MAX);
   const q = viewQuery(view);
@@ -80,7 +82,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   let r: Rows;
   try {
-    r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS), size, (parts) => (db) => mutationRowSource(parts, db, gene, pin, pins),
+    r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS), size, (parts) => (db) => mutationRowSource(parts, db, gene, pin, pins, lines.oql),
       ctx.values ? { column: ctx.values, numeric: !!MUTATION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   const rows = r.rows.map((x) => {

@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import BITS, STYLE, bar_band, cell_layers, heat_rgb, format_gutter_pct, gene_legend, glyph_presence, resolve_style, style_for_display, track_category_color, track_label_text
+from .style import BITS, STYLE, bar_band, cell_layers, heat_rgb, format_gutter_pct, gene_legend, glyph_presence, resolve_style, style_for_display, track_category_color, track_label_text, track_sublabel_text, fit_sublabel
 
 _G = STYLE["geometry"]
 _MUT = BITS["MISSENSE"] | BITS["TRUNCATING"] | BITS["INFRAME"] | BITS["SPLICE"] | BITS["OTHER_MUT"] | BITS["PROMOTER"]
@@ -83,7 +83,7 @@ def bucket_codes(c: Contract, buckets: int) -> list[dict[str, Any]]:
     out = []
     for g in c.groups:
         edges = bucket_edges(g["count"], buckets)
-        tracks = {t.label: [int(x) for x in aggregate(t, np.asarray(t.cells[g["start"]: g["start"] + g["count"]]), edges)] for t in c.tracks}
+        tracks = {t.meta.get("key", t.label): [int(x) for x in aggregate(t, np.asarray(t.cells[g["start"]: g["start"] + g["count"]]), edges)] for t in c.tracks}
         out.append({"name": g["name"], "edges": [int(e) for e in edges], "tracks": tracks})
     return out
 
@@ -181,9 +181,31 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
     ax.axis("off")
     for e in extents:
         ax.text(e["x0"], -header / 2, f'{e["name"]} ({e["count"]:,})', fontsize=8, color=P["muted"], va="center", clip_on=True)
+    renderer = fig.canvas.get_renderer()
+    to_data = ax.transData.inverted()
+
+    def data_width(artist: Any, from_x: bool = False) -> float:
+        """an artist's right edge (from_x) or width, in the axes' data units"""
+        ext = artist.get_window_extent(renderer)
+        right = to_data.transform((ext.x1, 0))[0]
+        return right if from_x else right - to_data.transform((ext.x0, 0))[0]
+
+    def text_width(s: str) -> float:
+        probe = ax.text(0, 0, s, fontsize=8)
+        w = data_width(probe)
+        probe.remove()
+        return w
+
     for ti, t in enumerate(c.tracks):
         y = ti * (ROW_H + ROW_GAP) + ROW_H / 2
-        ax.text(4, y, track_label_text(t, S), fontsize=8, color=P["text"], va="center")
+        label = ax.text(4, y, track_label_text(t, S), fontsize=8, color=P["text"], va="center")
+        sub = track_sublabel_text(t.meta, c.display)
+        if sub:
+            x0 = data_width(label, from_x=True)
+            pct_w = text_width(format_gutter_pct(t.meta, c.n)) + 6 if "freqPct" in t.meta else 0
+            sub = fit_sublabel(sub, gutter - 8 - pct_w - x0, text_width)
+            if sub:
+                ax.text(x0, y, sub, fontsize=8, color=P["sublabel"], va="center")
         if "freqPct" in t.meta:
             ax.text(gutter - 8, y, format_gutter_pct(t.meta, c.n), fontsize=7.5, color=P["muted"], va="center", ha="right")
     gene_cells = np.concatenate([np.asarray(t.cells) for t in c.tracks if t.kind == "gene"] or [np.zeros(0, dtype=np.int32)])

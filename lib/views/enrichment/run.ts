@@ -8,6 +8,8 @@ import type { EnrichmentView, EnrichmentGene } from "./types.ts";
 import { enrichmentMethod } from "./method.ts";
 
 const ENRICH_ROWS = 300;
+/** the genes "Genes with highest frequency in any group" draws */
+const TOP_FREQUENCY = 10;
 const ALTERATION_WORD: Record<EnrichAlteration, string> = {
   mutation: "mutation", cna: "amplification or deep deletion", amp: "amplification", homdel: "deep deletion", sv: "structural variant"
 };
@@ -46,6 +48,8 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     perSite.push({ cohort: n, study: st, genes: a.length, wes: wn });
   }
   const two = vNames.length === 2;
+  // every altered gene profiled in each cohort is tested, as the portal tests them, so q counts them
+  // all; minAltered only decides which are listed
   const tested: EnrichmentGene[] = [];
   let untested = 0;
   for (const g of genes) {
@@ -55,7 +59,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
       return { cohort: n, altered: alt, profiled, pct: profiled ? Math.round(1000 * alt / profiled) / 10 : null };
     });
     const total = cells.reduce((a, c) => a + c.altered, 0);
-    if (total < minAltered || cells.some((c) => !c.profiled)) { untested++; continue; }
+    if (!total || cells.some((c) => !c.profiled)) { untested++; continue; }
     const p = two
       ? fisherExact(cells[0].altered, cells[0].profiled - cells[0].altered, cells[1].altered, cells[1].profiled - cells[1].altered)
       : chiSquareTest(cells.map((c) => [c.altered, c.profiled - c.altered])).p;
@@ -64,10 +68,17 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     tested.push({ gene: g, cells, ...(two ? { log2Ratio: shares[0] > 0 && shares[1] > 0 ? Math.log2(shares[0] / shares[1]) : null } : {}),
       p, q: 1, enrichedIn: vNames[best] });
   }
-  if (!tested.length) return refuse("enrichment", ctx, "no gene had at least " + minAltered + " altered samples (" + ALTERATION_WORD[alteration] + ") across these cohorts, profiled in each of them");
+  if (!tested.length) return refuse("enrichment", ctx, "no gene had a " + ALTERATION_WORD[alteration] + " in these cohorts, profiled in each of them");
   benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
   tested.sort((a, b) => a.p - b.p || a.gene.localeCompare(b.gene));
-  const rows = tested.slice(0, ENRICH_ROWS);
+  const alteredIn = (g: EnrichmentGene) => g.cells.reduce((a, c) => a + c.altered, 0);
+  const listed = tested.filter((g) => alteredIn(g) >= minAltered);
+  const hidden = tested.length - listed.length;
+  const rows = listed.slice(0, ENRICH_ROWS);
+  // the portal's "Genes with highest frequency in any group": every tested gene by its highest altered
+  // share, the order before it (by p) kept among ties (EnrichmentsUtil compareByAlterationPercentage)
+  const highest = (g: EnrichmentGene) => Math.max(...g.cells.map((c) => c.altered / c.profiled));
+  const topFrequency = [...tested].sort((a, b) => highest(b) - highest(a)).slice(0, TOP_FREQUENCY);
   const bands = await cytobands(ok, rows.map((g) => g.gene));
   for (const g of rows) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
   const labels = rows.slice(0, label).map((g) => g.gene);
@@ -78,7 +89,8 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     const xMax = niceCeil(Math.max(1, ...finite.map(Math.abs)));
     const yMax = niceCeil(Math.max(1, ...tested.map((g) => lp(g.p))));
     const nx = 80, ny = 50, cells = new Map<string, number>();
-    for (const g of tested.slice(ENRICH_ROWS)) {
+    const inRows = new Set(rows);
+    for (const g of tested.filter((x) => !inRows.has(x))) {
       const x = g.log2Ratio == null ? (g.cells[0].altered ? xMax : -xMax) : g.log2Ratio;
       const bx = Math.min(nx - 1, Math.max(0, Math.floor((x + xMax) / (2 * xMax) * nx)));
       const by = Math.min(ny - 1, Math.floor(lp(g.p) / yMax * ny));
@@ -91,10 +103,10 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   const multi = ctx.vStudies.length > 1;
   return {
     kind: "enrichment", cohorts: vNames,
-    enrichment: { alteration: ALTERATION_WORD[alteration], measure, groups: vNames, tested: tested.length, untested, significant, minAltered, test,
-      rows, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
+    enrichment: { alteration: ALTERATION_WORD[alteration], measure, groups: vNames, tested: tested.length, untested, hidden, significant, minAltered, test,
+      rows, topFrequency, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
     method: enrichmentMethod({ alteration: ALTERATION_WORD[alteration], measure, oncokbPin: pin, cohorts: vNames, minAltered, test, two, perSite,
-      tested: tested.length, untested, results: rows.map((g) => ({ gene: g.gene, p: g.p, q: g.q })) }),
+      tested: tested.length, untested, hidden, results: rows.map((g) => ({ gene: g.gene, p: g.p, q: g.q })) }),
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: "Every gene's " + ALTERATION_WORD[alteration] + " frequency in each cohort, counted in SAMPLES over the samples profiled for that gene " +
@@ -102,7 +114,9 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
       (alteration === "mutation" ? ", uncalled mutations excluded as the portal excludes them" : alteration === "sv" ? "" : ", high-level copy number only") + ". " +
       (measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "") +
       tested.length.toLocaleString("en-US") + " genes tested with a " + test + "; q is Benjamini–Hochberg across all of them. " +
-      untested.toLocaleString("en-US") + " altered genes were not tested: fewer than " + minAltered + " altered samples across the cohorts, or not profiled in one of them. " +
+      (untested ? untested.toLocaleString("en-US") + " altered gene" + (untested === 1 ? " was" : "s were") + " not tested: not profiled in one of the cohorts. " : "") +
+      (hidden ? hidden.toLocaleString("en-US") + " tested gene" + (hidden === 1 ? " has" : "s have") + " fewer than " + minAltered + " altered samples across the cohorts and " + (hidden === 1 ? "is" : "are") + " not listed, though counted in q. " : "") +
+      (listed.length > rows.length ? "The " + rows.length + " most significant of the " + listed.length.toLocaleString("en-US") + " listed genes are in the table; the rest are drawn as density on the volcano. " : "") +
       (two ? "The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. " : "") +
       "A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. " +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; overlap is not deduplicated. " : "") +

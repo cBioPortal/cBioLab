@@ -5,11 +5,20 @@ import {
 } from "../../svg-kit.ts";
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import { AMP, DEL, MULTI, MUT, SV } from "../../figures/common.ts";
+import { STYLE } from "../../oncoprint-style.ts";
 import type { CancertypesGroup } from "./types.ts";
 
 type CtResult = NonNullable<ViewResultOf<"cancertypes">["cancertypes"]>;
+/** a line's EXP / PROT kinds, in the oncoprint's colours and labels for them */
+const level = (opts: readonly { bit: string; color: string; label: string }[], bit: string): [string, string] => {
+  const o = opts.find((x) => x.bit === bit)!;
+  return [o.label, o.color];
+};
 const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["mutation", "Mutation", MUT], ["amp", "Amplification", AMP],
-  ["homdel", "Deep Deletion", DEL], ["sv", "Structural Variant", SV], ["multiple", "Multiple Alterations", MULTI]];
+  ["homdel", "Deep Deletion", DEL], ["sv", "Structural Variant", SV],
+  ["mrnaHigh", ...level(STYLE.glyph.mrna.options, "MRNA_HIGH")], ["mrnaLow", ...level(STYLE.glyph.mrna.options, "MRNA_LOW")],
+  ["protHigh", ...level(STYLE.glyph.protein.options, "PROT_HIGH")], ["protLow", ...level(STYLE.glyph.protein.options, "PROT_LOW")],
+  ["multiple", "Multiple Alterations", MULTI]];
 const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string, string][] = [["mutation", "Mutation data", "mutation"], ["cna", "CNA data", "CNA"], ["sv", "Structural variant data", "structural variant"]];
 
 /** a bar's band never narrows below this: labels turned 45° then sit a line of text apart */
@@ -32,7 +41,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const src = o.gene && pn.perGene ? pn.perGene.find((x) => x.gene === o.gene) || pn : pn;
   const groups = [...src.groups, ...(src.pooled ? [src.pooled] : [])];
   const freq = r.show === "frequency";
-  const value = (g: CancertypesGroup, k: keyof CancertypesGroup) => freq ? 100 * Number(g[k]) / (g.profiled || 1) : Number(g[k]);
+  const value = (g: CancertypesGroup, k: keyof CancertypesGroup) => freq ? 100 * Number(g[k] ?? 0) / (g.profiled || 1) : Number(g[k] ?? 0);
   const top = Math.max(1, ...groups.map((g) => value(g, "altered")));
   const yTitle = freq ? "Alteration Frequency" : "Absolute Counts";
 
@@ -77,7 +86,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
       const h = (T + PLOT_H) - ys(Math.min(ys.domain[1], value(g, k)));
       if (h <= 0) continue;
       y0 -= h;
-      out.push(`<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k])) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
+      out.push(`<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
     }
     const alt = value(g, "altered");
     out.push(`<rect x="${x}" y="${r1(ys(alt))}" width="${r1(bw)}" height="${r1(T + PLOT_H - ys(alt))}" fill="none"><title>${esc(g.label + ": " + fmtPct(100 * g.altered / (g.profiled || 1)) + " (" + fmtInt(g.altered) + " / " + fmtInt(g.profiled) + " " + r.unit + "s" + (g.samples > g.profiled ? ", " + fmtInt(g.samples) + " in the group" : "") + ")")}</title></rect>`);
@@ -94,7 +103,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const bl = bandLabels(groups.map((g) => g.label), centers, band, y, p, { maxH: LABEL_H });
   out.push(bl.svg);
   y += bl.height + 6;
-  const items: LegendItem[] = CT_KINDS.filter(([k]) => groups.some((g) => Number(g[k]) > 0)).map(([, name, col]) => ({ label: name, color: col }));
+  const items: LegendItem[] = CT_KINDS.filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
   const lg = legend(items, L, y, W - L - PAD, p, { size: FS.small });
   out.push(lg.svg);
   y += lg.height;

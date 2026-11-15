@@ -8,21 +8,32 @@ import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit, COOCCUR_GENE_LIMIT } from "../shared.ts";
 import type { CooccurrenceView, CooccurRow } from "./types.ts";
 import { cooccurrenceMethod } from "./method.ts";
+import { oqlTrackName } from "../../oql-match.ts";
+import { resolveDrivers } from "../../driver-settings.ts";
 
 export async function runCooccurrence(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
   // Co-occurrence is a property of ONE cohort, not a comparison between two,
   // so it reads the first cohort in the view and says which.
-  const uniq = geneSymbols((view as CooccurrenceView).genes);
+  const v = view as CooccurrenceView;
+  // with `oql`, the tracks are the query's lines: a bare line its gene, else the line written back
+  let uniq: string[];
+  if (v.oql !== undefined) {
+    if (!Array.isArray(v.oql) || !v.oql.length) return untimed({ kind: "cooccurrence", error: "oql is a list of OQL lines, one gene each" });
+    try { uniq = [...new Set(v.oql.map((l) => oqlTrackName(String(l))))]; if (v.drivers !== undefined) resolveDrivers(v.drivers); }
+    catch (e) { return untimed({ kind: "cooccurrence", error: "oql: " + (e as Error).message }); }
+  } else uniq = geneSymbols(v.genes);
   { const e = overLimit("a co-occurrence view", COOCCUR_GENE_LIMIT, uniq.length);
     if (e) return untimed({ kind: "cooccurrence", error: e.replace("at most " + COOCCUR_GENE_LIMIT, "at most " + COOCCUR_GENE_LIMIT + " genes") }); }
-  if (uniq.length < 2) return untimed({ kind: "cooccurrence", error: "co-occurrence needs at least 2 distinct genes" });
+  if (uniq.length < 2) return untimed({ kind: "cooccurrence", error: v.oql !== undefined ? "co-occurrence needs at least 2 distinct tracks (query lines)" : "co-occurrence needs at least 2 distinct genes" });
+  const pairOql = v.oql !== undefined ? { ...(v.drivers !== undefined ? { drivers: v.drivers } : {}), ...(v.exp ? { exp: v.exp } : {}),
+    ...(v.prot ? { prot: v.prot } : {}), ...(v.ifHeld ? { ifHeld: true } : {}) } : undefined;
   const pairs: [string, string][] = [];
   for (let i = 0; i < uniq.length; i++) for (let j = i + 1; j < uniq.length; j++) pairs.push([uniq[i], uniq[j]]);
   const cn = vNames[0];
   const byStudy = new Map<string, PairCounts[]>();
   await Promise.all(cohorts[cn].studies.map(async (st) => {
-    byStudy.set(st, await resolvers[st].pairCounts(doc.cohorts[cn], pairs));
+    byStudy.set(st, await resolvers[st].pairCounts(doc.cohorts[cn], pairs, pairOql));
   }));
   const sites = [...byStudy.keys()];
   const find = (st: string, a: string, b: string) =>
@@ -61,7 +72,7 @@ export async function runCooccurrence(view: DocView, c: ViewRun): Promise<ViewRe
   return { kind: "cooccurrence", cohorts: [cn], pairs: rows,
     studies: cohorts[cn].studies,
     method: cooccurrenceMethod({
-      cohort: cn, pairs: pairs.length, assessable: assessable.length,
+      cohort: cn, pairs: pairs.length, assessable: assessable.length, ...(v.oql !== undefined ? { oql: v.oql.map(String) } : {}),
       cohortSamples: [...sites].sort().map((st) => ({ study: st, samples: cohorts[cn].perStudy[st]?.samples || 0 })),
       counts: [...sites].sort().flatMap((st) => pairs.map(([a, b]) => find(st, a, b)).filter((x): x is PairCounts => !!x)
         .map((x) => ({ study: st, a: x.a, b: x.b, both: x.both, onlyA: x.onlyA, onlyB: x.onlyB, neither: x.neither }))),

@@ -7,6 +7,8 @@ export interface EnrichmentTrace {
   test: string; two: boolean;
   perSite: { cohort: string; study: string; genes: number; wes: number }[];
   tested: number; untested: number;
+  /** tested genes under minAltered, not listed */
+  hidden?: number;
   /** the rows the view shows, whose p and q the script must reproduce */
   results: { gene: string; p: number; q: number }[];
 }
@@ -19,9 +21,9 @@ export function enrichmentMethod(t: EnrichmentTrace): MethodRecord {
     scope: s.cohort + " · " + s.study, rowsOut: s.genes, params: [["whole-exome samples", s.wes.toLocaleString("en-US")]],
   }));
   steps.push({ kind: "transform", title: "Profiled = panel samples + whole-exome samples, summed across studies",
-    detail: "A sample altered in a gene its panel does not list still counts as measured. Genes with fewer than " + t.minAltered +
-      " altered samples across the cohorts, or not profiled in one of them, are not tested.",
-    params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")]] });
+    detail: "A sample altered in a gene its panel does not list still counts as measured. Every altered gene profiled in each cohort is tested, as cBioPortal tests them; one not profiled in a cohort is not. Genes with fewer than " + t.minAltered +
+      " altered samples across the cohorts are tested, and counted in the q-values, but not listed.",
+    params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")], ["tested, not listed", (t.hidden || 0).toLocaleString("en-US")]] });
   steps.push({ kind: "statistic", title: (t.two ? "Fisher's exact test" : "Chi-squared test") + " per gene, then Benjamini–Hochberg",
     detail: "A " + t.test + " on altered vs not among the profiled, per gene; q across every gene tested." });
   const python = [
@@ -35,11 +37,10 @@ export function enrichmentMethod(t: EnrichmentTrace): MethodRecord {
     "# summed across studies — export it from the enrichment queries above as enrichment_counts.csv",
     "counts = pd.read_csv(\"enrichment_counts.csv\")",
     "cohorts = " + JSON.stringify(t.cohorts),
-    "MIN_ALTERED = " + t.minAltered,
     "rows = []",
     "for gene, g in counts.groupby(\"gene\"):",
     "    g = g.set_index(\"cohort\").reindex(cohorts).fillna(0)",
-    "    if g[\"altered\"].sum() < MIN_ALTERED or (g[\"profiled\"] == 0).any():",
+    "    if g[\"altered\"].sum() == 0 or (g[\"profiled\"] == 0).any():  # every altered gene profiled in each cohort is tested",
     "        continue",
     t.two
       ? "    (a, pa), (b, pb) = [(r.altered, r.profiled) for r in g.itertuples()]\n    p = fisher_exact([[a, pa - a], [b, pb - b]], alternative=\"two-sided\").pvalue"

@@ -11,7 +11,7 @@ import { useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
 import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
 import { usePageDoc } from "../page-doc";
-import { resultsLayout, samplesLine, svCheckCohort, syncDrivers } from "../results-layout.ts";
+import { resultsLayout, samplesLine, svCheckCohort, syncDriverCohorts, syncDrivers } from "../results-layout.ts";
 import { Button } from "../../_ui/button";
 import { TB } from "../../_ui/toolbar.ts";
 import { Pencil } from "lucide-react";
@@ -132,7 +132,7 @@ export default function ResultsPage() {
       {chosen.notes.map((n) => <p key={n} className="mt-2.5 mb-0 text-sm text-muted-foreground">{n}</p>)}
       {oqlNarrows && (
         <p className="mt-2.5 mb-0 text-sm text-muted-foreground">
-          The query&apos;s OQL decides who is Altered; the oncoprint and the gene tabs draw every alteration of {genes.length === 1 ? "its gene." : "its genes."}
+          The query&apos;s OQL decides who is Altered and what the oncoprint, Cancer Types Summary, Mutual Exclusivity and Pathways draw; the other gene tabs draw every alteration of {genes.length === 1 ? "its gene." : "its genes."}
         </p>
       )}
     </PortalSummary>
@@ -149,7 +149,7 @@ export default function ResultsPage() {
     {!ready
       ? <PortalLoading />
       : <PortalTabs legacy={{ page: { page: "results", studies, entries: check.entries.map((e) => e.text), filters,
-            query: legacyQueryParams(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)) }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={(d) => page.update({ ...d, views: syncDrivers(page.doc?.views || [], d.views || []) })}
+            query: legacyQueryParams(target.options || null, optionsData.data, studies, check.entries.map((e) => e.text)) }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={(d) => page.update(syncDriverCohorts({ ...d, views: syncDrivers(page.doc?.views || [], d.views || []) }))}
           catalog={{ attrs: known?.attrs || [], profiles, profileCatalog, loading: !known, ...(known ? { totals: { patients: known.patients, samples: known.samples } } : {}),
             spectrum: !!basics && (basics.held.every.includes("MUTATION") || basics.held.some.includes("MUTATION")) }} />}
   </>);

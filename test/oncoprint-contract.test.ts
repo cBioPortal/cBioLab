@@ -311,7 +311,7 @@ describe("one study's share, as a federation peer reads it", () => {
 describe("checking a peer's share", () => {
   const ok = { genes: ["TP53"], groups: [["P1"]], events: [], coverage: [["P1", 1]], facts: [["P1", 1, 7]], clinical: [],
     heatmap: [{ assay: { datatype: "LIMIT-VALUE", patientLevel: true }, available: "yes", values: [["P1", "SBS1", 0.4]] }, { assay: null, values: [] }],
-    overlays: [{ available: true, values: [] }], profileTypes: ["mrna"], assays: [], queries: [{ label: "x", sql: "SELECT 1" }] };
+    overlays: [{ available: true, values: [] }], levels: [["P1", "TP53", "exp", 2.5]], profileTypes: ["mrna"], assays: [], queries: [{ label: "x", sql: "SELECT 1" }] };
 
   test("a well-formed share is read field by field, flags only when exactly true, and its SQL is not kept", () => {
     const r = checkStudyInputs(ok, 1);
@@ -328,6 +328,8 @@ describe("checking a peer's share", () => {
     assert.throws(() => checkStudyInputs({ ...ok, overlays: [{ values: [[1, 2, 3]] }] }, 1), /overlay values/);
     assert.throws(() => checkStudyInputs({ ...ok, genes: [1] }, 1), /genes/);
     assert.throws(() => checkStudyInputs({ ...ok, profileTypes: "mrna" }, 1), /profile types/);
+    assert.throws(() => checkStudyInputs({ ...ok, levels: [["P1", "TP53", "mrna", 2.5]] }, 1), /expression levels/);
+    assert.throws(() => checkStudyInputs({ ...ok, levels: [["P1", "TP53"]] }, 1), /expression levels/);
     assert.throws(() => checkStudyInputs({ ...ok, groups: [["x".repeat(201)]] }, 1), /column ids/);
   });
 });

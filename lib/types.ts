@@ -25,7 +25,9 @@ export type ClinicalOp = "=" | "!=" | ">" | ">=" | "<" | "<=";
  * prefix) that the query's EXP / PROT alterations read — the query page's mRNA and protein profile
  * choice; without them, the study's z-score profile of that kind.
  */
-export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string; ifHeld?: boolean }
+export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string; ifHeld?: boolean;
+  /** how DRIVER reads: the page's driver settings (lib/driver-settings.ts); without them, OncoKB at the pin alone */
+  drivers?: DriverSettings }
 export interface ClinicalLeaf {
   kind: "clinical";
   /** matched at the level the study records it: a sample attribute selects the matching samples,
@@ -402,13 +404,15 @@ export interface CompileCtx {
   /** database (schema) holding this study — per instance, so never a constant */
   db?: string;
   oncokbPin?: string | null;
+  /** the Genome Nexus releases Cancer Hotspots are read at, for an OQL clause whose driver settings use them */
+  hotspotPins?: { hg19: string | null; hg38: string | null };
   profiles?: string[];
   gaProfiles?: string[];
   lineGap?: number;
 }
 
 // ---------- analysis document ----------------------------------------------
-import type { ResolvedDrivers } from "./driver-settings.ts";
+import type { ResolvedDrivers, DriverSettings } from "./driver-settings.ts";
 import type { GeneTrackSpec } from "./gene-tracks.ts";
 import type { TableQuery, ColumnValues } from "./table-query.ts";
 export type { TableQuery, ColumnValues, ColumnFilter, TextFilterOp } from "./table-query.ts";
@@ -455,6 +459,8 @@ export interface DisplaySpec {
   annotate?: "oncokb" | "none";
   /** unaltered cells drawn white rather than grey, for print (default false) */
   whiteBackground?: boolean;
+  /** a gene row's OQL line drawn after its label (default true) — the portal's "Show OQL filters" */
+  showOql?: boolean;
   /** the genomic staircase ranks mutations by class (default true) — the portal's Sort › Mutation Type */
   sortByMutationType?: boolean;
   /** the genomic staircase ranks every driver before every VUS (default true) — the portal's Sort › Driver */
@@ -472,7 +478,7 @@ export interface DisplaySpec {
  * `drivers` the settings in full.
  */
 export type ResolvedDisplay = Required<Pick<DisplaySpec, "showUnaltered" | "whitespace" | "gaps" | "clinicalLegends" | "colorByType" | "hideVUS" | "annotate" | "whiteBackground">>
-  & Pick<DisplaySpec, "style" | "colors" | "colorByGermline" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS"> & { hideGermline?: boolean; drivers?: ResolvedDrivers };
+  & Pick<DisplaySpec, "style" | "colors" | "colorByGermline" | "showOql" | "sortByMutationType" | "sortByDrivers" | "sortIgnoreVUS"> & { hideGermline?: boolean; drivers?: ResolvedDrivers };
 export interface IncidenceCurve {
   cohort: string;
   n: number; events: number; competing: number; censored: number;
@@ -854,6 +860,10 @@ export interface Track {
   name?: string;
   /** a heatmap track's profile: its alteration type and datatype ("MRNA_EXPRESSION Z-SCORE") */
   profileKind?: string;
+  /** a gene row's OQL line less the gene (": AMP MUT=G12D"), drawn after its label */
+  sublabel?: string;
+  /** a gene row's name where its label is not unique: its line ("KRAS: AMP"), what track edits name it by */
+  key?: string;
 }
 export interface GroupRange { name: string; start: number; count: number; patients?: number }
 export interface Contract {

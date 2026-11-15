@@ -21,6 +21,11 @@
  * its samples' value furthest from 0, sign kept, a positive one on a ± tie whatever order the rows
  * arrive in, values that are not numbers left out. The fixture has no expression or generic-assay
  * profile, so these run over scratch copies of the two value tables on the same connection.
+ * And a row's EXP / PROT values (expressionEventsSql, read for lib/oql-match.ts eventWanted /
+ * oqlLevel; the portal's fillGeneticTrackDatum counts each sample's datum): one row per SAMPLE,
+ * unaggregated — a patient with two samples gives two rows, both with the patient's id, in patient
+ * columns — values that are not numbers left out, another gene or profile never read; run over a
+ * scratch copy of the value tables, as the heatmaps are.
  * And the oncoprint's Tracks › Clinical rows for the fixture (Explore's facets through trackAttrs
  * and clinicalTrackRows, as the Results page builds them): every declared attribute listed, at 0%
  * where the selection has no value; a sample attribute's Freq over the queried samples; ties by
@@ -28,12 +33,19 @@
  * And the Tabular download's names: each clinical row's display name (clinicalNamesSql: the
  * meta header's first line; none for an unknown attribute or the computed mutation spectrum), and
  * each profile's alteration type and datatype (profileInventorySql: its meta file's).
+ * And a gene row's OQL (lib/oql-match.ts over genomicEventsSql's rows): a row with a position range
+ * reads its gene's mutations with their own protein positions, the same rows as without, and its
+ * range picks the patients written down from the fixture's MAF; the cohort's OQL SQL (oqlCasesSql)
+ * picks the same patients; a protein change matches whatever its case; a mutation typed Fusion is
+ * no mutation to MUT (FX-P44's EGFR-SEPT14).
  *
  * Run: node --env-file=.env.local scripts/check-oncoprint-values.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines; scripts/gate.sh sets them).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
-import { assayHeatmapSql, clinicalNamesSql, clinicalSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
+import { assayHeatmapSql, clinicalNamesSql, clinicalSql, genomicEventsSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
+import { oqlCasesSql, oqlEventsSql, parseOql } from "../lib/oql.ts";
+import { eventWanted } from "../lib/oql-match.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { clinicalTrackRows, trackAttrs, trackFreqText } from "../app/_oncoprint/track-edits.ts";
 
@@ -160,6 +172,65 @@ for (const [tag, got] of [["heatmap", heat], ["generic assay", assay]] as const)
   }
 await run("DROP DATABASE IF EXISTS " + scratch);
 
+// ---- a row's EXP / PROT values ---------------------------------------------------------------
+// imported by name at run time: the function is the change under test, and its absence fails this
+// section alone
+const expressionEventsSql = (await import("../lib/oncoprint.ts") as Record<string, unknown>).expressionEventsSql as
+  ((profileType: string, genes: string[], study: string, db: string, unit: "patient" | "sample", samples?: string | null) => string) | undefined;
+/** [patient, its samples' values in arrival order; null = a NULL value] */
+const EXPR: [string, (string | null)[]][] = [
+  ["X1", ["2.5", "-3"]],            // X8: two samples, both rows back, unaggregated
+  ["X2", ["2.5", "3", "-3"]],       // X9
+  ["X3", ["1", "2.5"]],             // X10
+  ["X4", ["NA", "2.5"]],            // not a number: left out
+  ["X5", ["", null]],               // nothing: no row
+];
+/** the rows expected in patient columns: [pid, z], every sample's that is a number */
+const EXPR_PATIENT: [string, number][] = [["X1", 2.5], ["X1", -3], ["X2", 2.5], ["X2", 3], ["X2", -3], ["X3", 1], ["X3", 2.5], ["X4", 2.5]];
+let exprChecks = 0;
+const exprOk = (name: string, pass: boolean, detail: string) => { exprChecks++; ok(name, pass, detail); };
+if (typeof expressionEventsSql !== "function") {
+  exprOk("expression events: lib/oncoprint.ts exports expressionEventsSql", false, "not exported");
+} else {
+  const xs = "cbiolab_check_expression";
+  await run("CREATE DATABASE IF NOT EXISTS " + xs);
+  for (const t of ["genetic_alteration_derived", "sample_derived"])
+    await run("CREATE OR REPLACE TABLE " + xs + "." + t + " AS " + conn.db + "." + t);
+  const xsid = (p: string, i: number) => "xs_" + p + "-S" + (i + 1);
+  const value = (sample: string, gene: string, profile: string, v: string | null) =>
+    run("INSERT INTO " + xs + ".genetic_alteration_derived (sample_unique_id, cancer_study_identifier, hugo_gene_symbol, profile_type, alteration_value) VALUES ('" +
+      sample + "', 'xs', '" + gene + "', '" + profile + "', " + lit(v) + ")");
+  for (const [p, vals] of EXPR)
+    for (let i = 0; i < vals.length; i++) {
+      await run("INSERT INTO " + xs + ".sample_derived (sample_unique_id, patient_unique_id) VALUES ('" + xsid(p, i) + "', 'xs_" + p + "')");
+      await value(xsid(p, i), "KRAS", "mrna_z", vals[i]);
+      await value(xsid(p, i), "TP53", "mrna_z", "9");          // another gene: not read
+      await value(xsid(p, i), "KRAS", "rppa_z", "7");          // another profile: not read
+    }
+  type ExprRow = { pid: string; gene: string; z: number | string };
+  const got = async (unit: "patient" | "sample", samples?: string) =>
+    (await chQuery<ExprRow>(expressionEventsSql("mrna_z", ["KRAS"], "xs", xs, unit, samples ?? null), conn)).data;
+  const norm = (rows: ExprRow[]) => rows.map((r) => r.pid + "|" + r.gene + "|" + Number(r.z)).sort();
+  const want = (rows: [string, number][]) => rows.map(([p, v]) => p + "|KRAS|" + v).sort();
+  const patient = await got("patient");
+  exprOk("expression events, patient columns: one row per sample with a number, the patient's id, unaggregated",
+    JSON.stringify(norm(patient)) === JSON.stringify(want(EXPR_PATIENT)), "ours " + JSON.stringify(norm(patient)));
+  exprOk("expression events: X1's two samples both come back (2.5 and -3)",
+    JSON.stringify(norm(patient.filter((r) => r.pid === "X1"))) === JSON.stringify(want([["X1", 2.5], ["X1", -3]])), JSON.stringify(patient.filter((r) => r.pid === "X1")));
+  exprOk("expression events: 'NA' left out, X4's 2.5 kept", norm(patient.filter((r) => r.pid === "X4")).join() === "X4|KRAS|2.5",
+    JSON.stringify(patient.filter((r) => r.pid === "X4")));
+  exprOk("expression events: X5's empty and NULL values give no row", !patient.some((r) => r.pid === "X5"), "");
+  exprOk("expression events: every z is a number", patient.every((r) => Number.isFinite(Number(r.z)) && r.z !== null && r.z !== ""), "");
+  const sample = await got("sample");
+  const wantSample = EXPR.flatMap(([p, vals]) => vals.map((v, i) => [p + "-S" + (i + 1), v] as [string, string | null]))
+    .filter(([, v]) => v !== null && v !== "" && Number.isFinite(Number(v))).map(([s, v]) => [s, Number(v)] as [string, number]);
+  exprOk("expression events, sample columns: each sample its own id", JSON.stringify(norm(sample)) === JSON.stringify(want(wantSample)),
+    "ours " + JSON.stringify(norm(sample)));
+  const only = await got("patient", "SELECT arrayJoin(['X1-S2'])");
+  exprOk("expression events: only the query's samples count", JSON.stringify(norm(only)) === JSON.stringify(want([["X1", -3]])), "ours " + JSON.stringify(norm(only)));
+  await run("DROP DATABASE IF EXISTS " + xs);
+}
+
 // ---- the Tracks › Clinical rows ----------------------------------------------------------------
 const menu = async (draft?: unknown) => {
   const r = await buildExplore({ study: STUDY, conn, skipGenes: true, skipBins: true, ...(draft ? { draft: draft as never } : {}) } as never);
@@ -194,6 +265,47 @@ const KINDS: [string, string][] = [["mutations", "MUTATION_EXTENDED MAF"], ["cna
 const kinds = new Map((await chQuery<{ pt: string; type: string; datatype: string }>(profileInventorySql(STUDY, conn.db), conn)).data.map((r) => [r.pt, r.type + " " + r.datatype]));
 for (const [pt, want] of KINDS) ok(`profile kind ${pt}`, kinds.get(pt) === want, "ours " + kinds.get(pt) + ", expected " + want);
 
-const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
+// ---- a gene row's OQL ----------------------------------------------------------------------------
+type Ev = { pid: string; gene: string; vt: string; mt: string; mv: string; cna: string; ps: number | null; pe: number | null };
+const evRows = async (genes: string[], unit: "patient" | "sample", ranged: string[]): Promise<Ev[]> =>
+  (await chQuery<Record<string, unknown>>(genomicEventsSql(genes, STUDY, conn.db, unit, null, ranged), conn)).data.map((r) =>
+    ({ pid: String(r.pid), gene: String(r.gene), vt: String(r.vt), mt: String(r.mt ?? ""), mv: String(r.mv ?? ""), cna: String(r.cna ?? ""),
+      ps: r.ps == null ? null : Number(r.ps), pe: r.pe == null ? null : Number(r.pe) }));
+let oqlChecks = 0;
+const oqlOk = (name: string, pass: boolean, detail: string) => { oqlChecks++; ok(name, pass, detail); };
+for (const unit of ["patient", "sample"] as const) {
+  const plain = await evRows(["KRAS", "EGFR"], unit, []), ranged = await evRows(["KRAS", "EGFR"], unit, ["EGFR"]);
+  const key = (e: Ev) => [e.pid, e.gene, e.vt, e.mt, e.mv, e.cna].join("|");
+  oqlOk(`ranged events, ${unit} columns: the same rows`, JSON.stringify(plain.map(key).sort()) === JSON.stringify(ranged.map(key).sort()), plain.length + " and " + ranged.length + " rows");
+  const egfr = ranged.filter((e) => e.gene === "EGFR" && e.vt === "mutation");
+  oqlOk(`ranged events, ${unit} columns: every EGFR mutation has its positions`, egfr.length > 0 && egfr.every((e) => e.ps != null && e.pe != null), egfr.length + " rows");
+}
+const egfrEvents = await evRows(["EGFR"], "patient", ["EGFR"]);
+const drawn = (line: string) => [...new Set(egfrEvents.filter((e) => eventWanted(parseOql(line)[0].specs, e, false)).map((e) => e.pid))].sort().join(" ");
+const casesOf = async (line: string) => (await chQuery<{ pid: string }>(oqlCasesSql(line, { study: STUDY, db: conn.db, unit: "patient" }), conn)).data.map((r) => r.pid).sort().join(" ");
+/** [line, the patients its row draws, from the MAF: E746_A750del 746-750 (P22 P24 P26 P28), SP3 3-4 and SP4 4-5 (P21), SP7 7-8 (P27), SP11 11-12 (P25), SP12 12-13 (P28), SP10fs no position (P24)] */
+const RANGES: [string, string][] = [
+  ["EGFR: MUT_(747-747)", "FX-P22 FX-P24 FX-P26 FX-P28"],
+  ["EGFR: MUT_(745-751*)", "FX-P22 FX-P24 FX-P26 FX-P28"],
+  ["EGFR: MUT_(747-751*)", ""],
+  ["EGFR: MUT_(1-12)", "FX-P21 FX-P25 FX-P27 FX-P28"],
+  ["EGFR: MUT_(1-12*)", "FX-P21 FX-P25 FX-P27"],
+];
+for (const [line, want] of RANGES) {
+  oqlOk(`oncoprint row ${line}`, drawn(line) === want, "ours " + JSON.stringify(drawn(line)) + ", expected " + JSON.stringify(want));
+  const cases = await casesOf(line);
+  oqlOk(`cohort ${line} picks the row's patients`, cases === want, "ours " + JSON.stringify(cases) + ", expected " + JSON.stringify(want));
+}
+const g12c = "FX-P01 FX-P06 FX-P10 FX-P11 FX-P16";
+for (const line of ["KRAS: MUT=G12C", "KRAS: MUT=g12c", "KRAS: g12c"])
+  oqlOk(`cohort ${line}`, await casesOf(line) === g12c, "ours " + JSON.stringify(await casesOf(line)));
+const p44 = egfrEvents.filter((e) => e.pid === "FX-P44" && e.vt === "mutation");
+const wantedP44 = p44.filter((e) => eventWanted(parseOql("EGFR: MUT")[0].specs, e, false)).map((e) => e.mv);
+oqlOk("oncoprint row EGFR: MUT leaves out the Fusion-typed mutation", p44.length === 9 && wantedP44.length === 8 && !wantedP44.includes("EGFR-SEPT14"), JSON.stringify(wantedP44));
+const evLabels = async (line: string) => (await chQuery<{ ev: string }>(oqlEventsSql(line, { study: STUDY, db: conn.db }), conn)).data.map((r) => r.ev);
+oqlOk("cohort events EGFR: MUT leave out the Fusion-typed mutation; a bare EGFR keeps it",
+  !(await evLabels("EGFR: MUT")).includes("EGFR-SEPT14") && (await evLabels("EGFR")).includes("EGFR-SEPT14"), "");
+
+const total = exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

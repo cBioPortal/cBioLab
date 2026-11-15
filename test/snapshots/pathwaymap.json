@@ -354,7 +354,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Each gene node's % is the share of the cohort's samples profiled for THAT gene (on a mutation, copy-number or structural-variant panel covering it) with a mutation, a high-level copy-number change (amplification or deep deletion) or a structural variant in it; a sample whose panel omits the gene is not counted, and a gene no sample was profiled for reads N/P, never 0%. Pathways are ranked by how many of the 7 query genes each holds, as PathwayMapper ranks them. Every alteration of a gene counts here, whatever narrower OQL a query may give it. Pathway diagrams: PathwayMapper (i-Vis at Bilkent), 55 pathways from TCGA publications.",
+      "caveat": "Each gene node's % is the share of the cohort's samples profiled for THAT gene (on a mutation, copy-number or structural-variant panel covering it) with a mutation, a high-level copy-number change (amplification or deep deletion) or a structural variant in it; a sample whose panel omits the gene is not counted, and a gene no sample was profiled for reads N/P, never 0%. Pathways are ranked by how many of the 7 query genes each holds, as PathwayMapper ranks them. Every alteration of a gene counts here. Pathway diagrams: PathwayMapper (i-Vis at Bilkent), 55 pathways from TCGA publications.",
       "method": {
         "steps": [
           {

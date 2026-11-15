@@ -1,6 +1,6 @@
 // The plot view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type {  } from "../../types.ts";
-import type { PlotAxis, PlotData } from "../../plot.ts";
+import type { PlotAxis, PlotData, PlotRange } from "../../plot.ts";
 import type { PointLayerSpec } from "../../plot-layers.ts";
 import type { DriverSettings } from "../../driver-settings.ts";
 
@@ -16,6 +16,8 @@ export interface PlotView {
   unit?: "patient" | "sample";
   /** the grid a scatter is binned onto (default 240 x 160) */
   bins?: [number, number];
+  /** where the scatter's axes start and end, in the attributes' own units: FGA {min: 0, max: 1}; an end left out is the data's */
+  range?: PlotRange;
   /**
    * Every case is a point when there are at most POINTS_CAP (10,000) of them and the reader may see cases
    * (default true); false draws the density alone at any size.
