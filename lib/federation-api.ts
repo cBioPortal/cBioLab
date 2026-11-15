@@ -14,7 +14,7 @@
 // authentication yet: anyone who can reach this endpoint can read what it discloses.
 import { z } from "zod";
 import { resolveStudy, studyProfiles } from "./analysis.ts";
-import { resolverFor, carriesPatientIds, studyRouting, routeStudy, PatientLevelResolver, PEER_TABLES, hasFederatedPlot, type PeerTable, type CourseOpts, type SequenceOpts } from "./federation.ts";
+import { resolverFor, carriesPatientIds, studyRouting, routeStudy, PatientLevelResolver, PEER_TABLES, hasFederatedPlot, type PeerTable, type CourseOpts, type SequenceOpts, type PairOql } from "./federation.ts";
 import { timelinePatientRowSource, TIMELINE_COLUMNS, PATIENT_ID } from "./patient-timeline.ts";
 import { ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, PATIENT_SAMPLE_COLUMNS, alterationPatientRowSource, alterationSource, patientSamplesSource } from "./patient-alterations.ts";
 import { loopbackConnId, servingAsLoopbackPeer } from "./loopback-peer.ts";
@@ -107,6 +107,9 @@ const aggregates: FederationOp = {
     survivalEndpoints: z.boolean().nullish(),
     // gene pairs: each pair's 2x2 among the cohort's samples profiled for both
     pairs: z.array(z.tuple([z.string(), z.string()])).max(66).nullish(),
+    // with `pairs` of query lines: the page's driver settings and the profiles their EXP / PROT read
+    pairOql: z.object({ drivers: z.record(z.string(), z.unknown()).optional(), exp: z.string().max(120).optional(),
+      prot: z.string().max(120).optional(), ifHeld: z.boolean().optional() }).nullish(),
     // value counts for categorical attributes, (n, sum, sum of squares, min, max) for numeric
     attributes: z.array(z.string()).max(20).nullish(),
     // each numeric attribute's (value, count) distribution: safe only because the caller compares
@@ -135,7 +138,7 @@ const aggregates: FederationOp = {
     // with `pairs` or `momentGenes`, a continuous molecular profile (e.g. mRNA z-scores)
     profileType: z.string().max(120).nullish()
   }),
-  async run({ study, cohort, genes, survival, pairs, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor, timelineSpan, course, sequence, sequenceKeys }: { timelineSpan?: boolean | null; course?: CourseOpts | null; sequence?: SequenceOpts | null; sequenceKeys?: string | null; study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) {
+  async run({ study, cohort, genes, survival, pairs, pairOql, attributes, attributeHistograms, attributeTopValues, profileType, variantGenes, lollipopGenes, minCount, momentGenes, endpoint, endpointColumns, survivalEndpoints, anchor, timelineSpan, course, sequence, sequenceKeys }: { timelineSpan?: boolean | null; course?: CourseOpts | null; sequence?: SequenceOpts | null; sequenceKeys?: string | null; study: string; cohort: any; genes?: string[] | null; survival?: boolean | null; pairs?: [string, string][] | null; pairOql?: PairOql | null; attributes?: string[] | null; attributeHistograms?: boolean | null; attributeTopValues?: number | null; profileType?: string | null; variantGenes?: string[] | null; lollipopGenes?: string[] | null; minCount?: number | null; momentGenes?: string[] | null; endpoint?: string | null; endpointColumns?: { months: string; status: string } | null; survivalEndpoints?: boolean | null; anchor?: any }) {
     // Refused here, by the peer, whatever the caller checked: an explicit list compiles to the
     // ids themselves, and beside a clinical attribute a count of 0 or 1 reads one patient's value.
     if (carriesPatientIds(cohort)) throw new Error(ID_LIST);
@@ -147,7 +150,7 @@ const aggregates: FederationOp = {
       res.sizes(cohort),
       genes && genes.length ? res.geneCounts(cohort, genes) : Promise.resolve([]),
       survival ? res.survivalCounts(cohort, endpoint || "OS", anchor || null, endpointColumns || undefined) : Promise.resolve([]),
-      pairs && pairs.length ? res.pairCounts(cohort, pairs) : Promise.resolve([]),
+      pairs && pairs.length ? res.pairCounts(cohort, pairs, pairOql ?? undefined) : Promise.resolve([]),
       attributes && attributes.length ? res.attributeStats(cohort, attributes, { histograms: !!attributeHistograms, ...(attributeTopValues != null ? { topValues: attributeTopValues } : {}) }) : Promise.resolve([]),
       pairs && pairs.length && profileType ? res.pairMoments(cohort, pairs, profileType) : Promise.resolve([]),
       variantGenes && variantGenes.length

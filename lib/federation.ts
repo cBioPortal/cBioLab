@@ -60,7 +60,8 @@ import { PATIENT_ID, patientEventsSql, patientSamplesSql, toEvents, toSamples } 
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { PATIENT_KINDS, type PatientKind } from "./disclosure.ts";
 import { finiteSql } from "./sql-number.ts";
-import { driverAnnotationJoin } from "./oql.ts";
+import type { DriverSettings } from "./driver-settings.ts";
+import { driverAnnotationJoin, oqlEventsSql, parseOql, type OqlPins, type OqlDriverOpts } from "./oql.ts";
 import { aggregateSql, cohortSubquery, patientSql, type AggregateSql, type CohortSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
@@ -408,22 +409,39 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * only this instance knows what its panels cover. That is also why a federated
  * co-occurrence is more correct than one computed from pooled exports.
  */
-export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB): AggregateSql {
-  const genes = [...new Set(pairs.flat())];
+/** how a pair's query lines read: the page's driver settings and the profiles its EXP / PROT read */
+export interface PairOql { drivers?: DriverSettings; exp?: string; prot?: string; ifHeld?: boolean }
+
+/** what a line's track is matched with: the study's pins and profiles, the page's driver settings and EXP / PROT profiles */
+export interface PairOqlSql extends OqlDriverOpts { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins }
+
+export function pairCountsSql(cohortSql: string, pairs: [string, string][], study: string, db: string = DB, oql?: PairOqlSql): AggregateSql {
+  // a pair names two TRACKS: a gene, or (with `oql`) a query line written back, "KRAS: AMP"
+  const tracks = [...new Set(pairs.flat())];
+  const lineOf = new Map<string, string>();
+  if (oql) for (const t of tracks) if (t.includes(":")) lineOf.set(t, parseOql(t)[0].gene);
+  const geneOf = (t: string): string => lineOf.get(t) ?? t;
+  const genes = [...new Set(tracks.map(geneOf))];
+  const bare = tracks.filter((t) => !lineOf.has(t));
   const geneList = genes.map(sq).join(",");
   const sid = bareSampleId("g.sample_unique_id", study);
   const covSid = bareSampleId("sp.sample_unique_id", study);
-  const arrA = "[" + pairs.map((p) => sq(p[0])).join(",") + "]";
-  const arrB = "[" + pairs.map((p) => sq(p[1])).join(",") + "]";
-  const bothCov = "has(cov, ga) AND has(cov, gb)";
+  const arr = (f: (p: [string, string]) => string) => "[" + pairs.map((p) => sq(f(p))).join(",") + "]";
+  const bothCov = "has(cov, gna) AND has(cov, gnb)";
+  const altered = [
+    ...(bare.length ? ["  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + sid + " AS sid\n" +
+      "  FROM " + db + ".genomic_event_derived g\n" +
+      "  WHERE " + genomicStudySql(study, "g") + "\n" +
+      "    AND g.hugo_gene_symbol IN (" + bare.map(sq).join(",") + ") AND " + ALTERED_COND + "\n" +
+      "    AND " + inCohortSamples(sid)] : []),
+    // a line's track: the samples its OQL matches (lib/oql.ts), as the portal's OQL-filtered data
+    ...[...lineOf.keys()].map((t) => "  SELECT DISTINCT " + sq(t) + " AS gene, e.sid AS sid\n" +
+      "  FROM (" + oqlEventsSql(t, { ...oql, study, db }) + ") e\n" +
+      "  WHERE " + inCohortSamples("e.sid"))
+  ];
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
-    "altered AS (\n" +
-    "  SELECT DISTINCT g.hugo_gene_symbol AS gene, " + sid + " AS sid\n" +
-    "  FROM " + db + ".genomic_event_derived g\n" +
-    "  WHERE " + genomicStudySql(study, "g") + "\n" +
-    "    AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
-    "    AND " + inCohortSamples(sid) + "\n" +
+    "altered AS (\n" + altered.join("\n  UNION ALL\n") + "\n" +
     "),\n" +
     "covered AS (\n" +
     "  SELECT DISTINCT pg.gene AS gene, " + covSid + " AS sid\n" +
@@ -446,7 +464,7 @@ export function pairCountsSql(cohortSql: string, pairs: [string, string][], stud
     "       countIf(" + bothCov + " AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,\n" +
     "       countIf(" + bothCov + " AND NOT has(alt, ga) AND has(alt, gb)) AS only_b\n" +
     "FROM pp\n" +
-    "ARRAY JOIN " + arrA + " AS ga, " + arrB + " AS gb\n" +
+    "ARRAY JOIN " + arr((p) => p[0]) + " AS ga, " + arr((p) => p[1]) + " AS gb, " + arr((p) => geneOf(p[0])) + " AS gna, " + arr((p) => geneOf(p[1])) + " AS gnb\n" +
     "GROUP BY ga, gb"
   ));
 }
@@ -1182,7 +1200,8 @@ export interface AggregateCapable {
   treatmentSequence(def: CohortDef | null | undefined, opts: SequenceOpts): Promise<SequenceFlow[]>;
   /** which attribute keys could label a therapy line here */
   sequenceKeys(def: CohortDef | null | undefined, eventType: string): Promise<{ key: string; label: string; patients: number; values: number }[]>;
-  pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]>;
+  /** pairs of tracks: genes, or with `oql` query lines written back ("KRAS: AMP"), read with the page's settings */
+  pairCounts(def: CohortDef | null | undefined, pairs: [string, string][], oql?: PairOql): Promise<PairCounts[]>;
   /** a plot's aggregated contract: bins, groups or cells — never points */
   plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData>;
   attributeStats(def: CohortDef | null | undefined, attributes: string[], opts?: { histograms?: boolean; topValues?: number }): Promise<AttrStats[]>;
@@ -1929,10 +1948,13 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await this.runLogged<ChRow>(label, build(this.study, this.instance.conn.db), this.instance.conn);
     return r.data;
   }
-  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
+  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][], oql?: PairOql): Promise<PairCounts[]> {
     if (!pairs.length) return [];
+    const lines = oql ? { oncokbPin: this.ctx.oncokbPin, profiles: this.ctx.profiles, hotspotPins: this.ctx.hotspotPins,
+      pins: { ...(oql.exp ? { EXP: oql.exp } : {}), ...(oql.prot ? { PROT: oql.prot } : {}), ...(oql.ifHeld ? { ifHeld: true } : {}) },
+      ...(oql.drivers !== undefined ? { drivers: oql.drivers } : {}) } : undefined;
     const r = await this.runLogged<ChRow>("pairCounts",
-      pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db), this.instance.conn);
+      pairCountsSql(this.cohortSql(def), pairs, this.study, this.instance.conn.db, lines), this.instance.conn);
     return r.data.map((x) => {
       const profiled = Number(x.profiled), both = Number(x.both), onlyA = Number(x.only_a), onlyB = Number(x.only_b);
       return { a: x.ga, b: x.gb, both, onlyA, onlyB, profiled, neither: profiled - both - onlyA - onlyB };

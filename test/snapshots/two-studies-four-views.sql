@@ -662,12 +662,12 @@ pp AS (
   GROUP BY sid
 )
 SELECT ga, gb,
-       countIf(has(cov, ga) AND has(cov, gb)) AS profiled,
-       countIf(has(cov, ga) AND has(cov, gb) AND has(alt, ga) AND has(alt, gb)) AS both,
-       countIf(has(cov, ga) AND has(cov, gb) AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,
-       countIf(has(cov, ga) AND has(cov, gb) AND NOT has(alt, ga) AND has(alt, gb)) AS only_b
+       countIf(has(cov, gna) AND has(cov, gnb)) AS profiled,
+       countIf(has(cov, gna) AND has(cov, gnb) AND has(alt, ga) AND has(alt, gb)) AS both,
+       countIf(has(cov, gna) AND has(cov, gnb) AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,
+       countIf(has(cov, gna) AND has(cov, gnb) AND NOT has(alt, ga) AND has(alt, gb)) AS only_b
 FROM pp
-ARRAY JOIN ['TP53','TP53','TP53','KRAS','KRAS','PIK3CA'] AS ga, ['KRAS','PIK3CA','APC','PIK3CA','APC','APC'] AS gb
+ARRAY JOIN ['TP53','TP53','TP53','KRAS','KRAS','PIK3CA'] AS ga, ['KRAS','PIK3CA','APC','PIK3CA','APC','APC'] AS gb, ['TP53','TP53','TP53','KRAS','KRAS','PIK3CA'] AS gna, ['KRAS','PIK3CA','APC','PIK3CA','APC','APC'] AS gnb
 GROUP BY ga, gb
 
 -- view 3 cooccurrence: pairCounts · msk_met_2021
@@ -700,10 +700,10 @@ pp AS (
   GROUP BY sid
 )
 SELECT ga, gb,
-       countIf(has(cov, ga) AND has(cov, gb)) AS profiled,
-       countIf(has(cov, ga) AND has(cov, gb) AND has(alt, ga) AND has(alt, gb)) AS both,
-       countIf(has(cov, ga) AND has(cov, gb) AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,
-       countIf(has(cov, ga) AND has(cov, gb) AND NOT has(alt, ga) AND has(alt, gb)) AS only_b
+       countIf(has(cov, gna) AND has(cov, gnb)) AS profiled,
+       countIf(has(cov, gna) AND has(cov, gnb) AND has(alt, ga) AND has(alt, gb)) AS both,
+       countIf(has(cov, gna) AND has(cov, gnb) AND has(alt, ga) AND NOT has(alt, gb)) AS only_a,
+       countIf(has(cov, gna) AND has(cov, gnb) AND NOT has(alt, ga) AND has(alt, gb)) AS only_b
 FROM pp
-ARRAY JOIN ['TP53','TP53','TP53','KRAS','KRAS','PIK3CA'] AS ga, ['KRAS','PIK3CA','APC','PIK3CA','APC','APC'] AS gb
+ARRAY JOIN ['TP53','TP53','TP53','KRAS','KRAS','PIK3CA'] AS ga, ['KRAS','PIK3CA','APC','PIK3CA','APC','APC'] AS gb, ['TP53','TP53','TP53','KRAS','KRAS','PIK3CA'] AS gna, ['KRAS','PIK3CA','APC','PIK3CA','APC','APC'] AS gnb
 GROUP BY ga, gb

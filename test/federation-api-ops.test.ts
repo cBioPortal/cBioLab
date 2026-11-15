@@ -136,6 +136,23 @@ describe("aggregates", () => {
     const res = await resolverFor("s1", {});
     assert.deepEqual(await res.survivalEndpoints(), []);
   });
+
+  // M11 of the Mutual Exclusivity OQL case table: the op passes `pairOql` on to the resolver, which
+  // counts with this instance's own profiles (s1 holds mutations only, as the profiles test reads them).
+  // What the counts are is run against the fixture in scripts/check-results-oql.ts.
+  test("M11: pairs of tracks with pairOql: the settings reach the peer's resolver, which reads its own profiles", async () => {
+    on(/AS patients/, [{ patients: 12, samples: 15 }]);
+    const pairs = [["KRAS: EXP>=2", "TP53"]];
+    // the study's own profiles: it has no mRNA profile, so its EXP line is refused
+    const own = await answerFederation("aggregates", { study: "s1", cohort: OQL, pairs, pairOql: {} });
+    assert.match(errorOf(own), /OQL EXP requires an mRNA profile; this study has: /, JSON.stringify(own.body).slice(0, 300));
+    // the caller's exp pin reaches it: refused naming the pinned profile
+    const pinned = await answerFederation("aggregates", { study: "s1", cohort: OQL, pairs, pairOql: { exp: "nope_mrna_zscores" } });
+    assert.match(errorOf(pinned), /nope_mrna_zscores/, JSON.stringify(pinned.body).slice(0, 300));
+    // a bad driver setting reaches it too, and is refused by name
+    const drv = await answerFederation("aggregates", { study: "s1", cohort: OQL, pairs: [["KRAS: MUT_DRIVER", "TP53"]], pairOql: { drivers: { bogus: true } } });
+    assert.match(errorOf(drv), /bogus/, JSON.stringify(drv.body).slice(0, 300));
+  });
 });
 
 describe("plot: a whole plot, or one site's piece of a pooled one", () => {

@@ -4,7 +4,7 @@
 // can a script that checks the views run.
 import type { Clause, CohortDef, View } from "../../lib/types.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
-import { oqlSublabel } from "../../lib/oql-match.ts";
+import { oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
 import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
 import { arrange, type PageLayout } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
@@ -106,7 +106,7 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"], driver
 }
 
 /** the view kinds that read the query's lines (`oql`) with the page's driver settings */
-const OQL_DRIVER_KINDS = new Set(["cancertypes"]);
+const OQL_DRIVER_KINDS = new Set(["cancertypes", "cooccurrence"]);
 /** does an OQL query name DRIVER anywhere (DRIVER, MUT_DRIVER, AMP_DRIVER, a range's _DRIVER)? */
 const asksDriver = (q: string): boolean => { try { return parseOql(q).some((e) => e.specs.some((sp) => sp.driver)); } catch { return false; } };
 /** the driver sources of the page's settings: what DRIVER reads in an oql clause (what is hidden is not the clause's) */
@@ -272,6 +272,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   // every tab draws the queried patients, as cBioPortal's do; only Comparison/Survival compares groups
   const queried = ["Queried"], both = ["Altered", "Unaltered"];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
+  // Mutual Exclusivity's tracks are the query's lines, named as the portal names them (2 or more to pair)
+  const meTracks = new Set(q.entries.map((x) => { try { return oqlTrackName(x); } catch { return x; } })).size;
   const left = [
     // what the profiles decide is said once they are known
     ...(data.partial ? [] : [
@@ -280,7 +282,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       data.expr && multi && !data.expressionAcross ? "expression in Plots (expression data cannot be compared across the selected studies)" : null,
       !plotY ? "Plots (no mRNA profile or numeric clinical attribute)" : null,
     ]),
-    genes.length < 2 ? "Mutual Exclusivity (one gene)" : null,
+    meTracks < 2 ? "Mutual Exclusivity (one track)" : null,
     !svHeld ? "Structural Variants (no structural-variant data)"
       : data.svs === false ? "Structural Variants (no structural variant in the queried genes)"
       : data.svs === null ? "Structural Variants (could not check for structural variants in the queried genes)" : null,
@@ -291,7 +293,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), ...pinsOf(q), cohorts: queried })] },
     { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, oql: q.entries, ...pinsOf(q),
       ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] },
-    ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: queried })] }] : []),
+    ...(meTracks >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, oql: q.entries, ...pinsOf(q),
+      ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] }] : []),
     ...(plotY ? [{ title: "Plots", views: [v("Plot", { kind: "plot",
       x: expr ? (data.cna ? { source: "profile", profile: data.cna, gene: genes[0] } : { source: "alteration", gene: genes[0], by: "cna" }) : { source: "alteration", gene: genes[0], by: "mutationType" },
       y: plotY, cohorts: queried, points: [{ cohort: "Altered" }, { rule: "outliers" }], drivers: {} })] }] : []),

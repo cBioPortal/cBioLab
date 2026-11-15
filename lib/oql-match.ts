@@ -2,7 +2,7 @@
 // row draws (oqlfilter.ts isDatumWantedByOQLLine and its commands), and the line written back as
 // the row's sublabel (parsedOQLAlterationToSourceOQL). Pure and browser-safe; lib/oql.ts compiles
 // the same rules to SQL for the cohorts, from the same class table.
-import type { OqlSpec, OqlRange } from "./oql-parse.ts";
+import { parseOql, type OqlSpec, type OqlRange } from "./oql-parse.ts";
 
 /**
  * A mutation's class as cBioPortal's OQL sees it — cbioportal-frontend's getMutationSubType and
@@ -122,6 +122,16 @@ function specText(s: OqlSpec): string {
     case "SV": return "FUSION" + drv;
     default: return s.type + (s.op || "") + (s.z ?? "");
   }
+}
+
+/**
+ * A query line's track name, as the portal names a Mutual Exclusivity track
+ * (getSingleGeneResultKey): its gene for a bare line, else the line written back ("KRAS: AMP").
+ */
+export function oqlTrackName(line: string): string {
+  const entries = parseOql(line);
+  if (entries.length !== 1) throw new Error("'" + line.slice(0, 40) + "' names " + entries.length + " genes; give each its own line");
+  return entries[0].gene + oqlSublabel(entries[0].specs);
 }
 
 /** the row's sublabel: its line written back less the gene (": AMP MUT=G12D"), "" with no OQL */
