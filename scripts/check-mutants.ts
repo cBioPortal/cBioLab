@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "plot-stats";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -37,6 +37,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "results-oql": ["node", "--env-file=.env.local", "scripts/check-results-oql.ts"],
   // the density chart's bins, run on the fixture study's connection b
   "density": ["node", "--env-file=.env.local", "scripts/check-density.ts"],
+  "plot-stats": ["node", "--env-file=.env.local", "scripts/check-plot-stats.ts"],
 };
 
 interface Mutant {
@@ -861,6 +862,18 @@ const MUTANTS: Mutant[] = [
     effect: "The cohort's EGFR: MUT takes FX-P44's mutation typed Fusion, which the oncoprint's row leaves out.",
     find: "conds.push(\"lower(g.mutation_type) != 'fusion'\");\n",
     replace: "" },
+  { id: "box-quartile-rounds-down", layer: "statistics", guard: "plot-stats", file: "lib/plot.ts",
+    effect: "A box's first quartile takes the value below the portal's whenever n/4 ends in a half, so boxes of 2, 6 or 10 cases start lower than cbioportal.org draws them.",
+    find: "s[greatest(1, intDiv(n + 2, 4))]",
+    replace: "s[greatest(1, intDiv(n + 1, 4))]" },
+  { id: "box-median-upper-middle", layer: "statistics", guard: "plot-stats", file: "lib/plot.ts",
+    effect: "A box over an even number of cases draws the upper of its two middle values as the median, not their mean (Q1 Amplification 2722.74 for the portal's 2668.88).",
+    find: "(s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2",
+    replace: "s[intDiv(n, 2) + 1]" },
+  { id: "spearman-ordinal-ties", layer: "statistics", guard: "plot-stats", file: "lib/plot.ts",
+    effect: "Spearman's rho ranks tied values one after another instead of giving them their average rank, so it changes with the order the rows come back in.",
+    find: "rank() OVER (ORDER BY \" + v + \") + (count() OVER (PARTITION BY \" + v + \") - 1) / 2",
+    replace: "row_number() OVER (ORDER BY \" + v + \")" },
 ];
 
 /**

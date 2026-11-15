@@ -189,7 +189,7 @@ describe("plot: a whole plot, or one site's piece of a pooled one", () => {
     on(/AS a, upper\(cam\.datatype\) AS dt/, [{ a: "AGE", dt: "NUMBER" }, { a: "SEX", dt: "STRING" }]);
     on(/SELECT x AS cx, y AS cy/, [{ cx: "F", cy: "yes", n: "4" }]);
     on(/AS vx0/, [{ g: "F", b: "2", n: "3" }, { g: "M", b: "0", n: "1" }]);
-    on(/quantilesExact/, [{ g: "F", n: 5, lo: 1, hi: 9, q: [2, 4, 6] }]);
+    on(/arraySort\(groupArray/, [{ g: "F", n: 5, lo: 1, hi: 9, q: [2, 4, 6] }]);
     on(/AS bx/, [{ bx: 1, by: 2, n: 3 }]);
     on(/uniqExact\(pid\) AS n, uniqExact\(sid\) AS ns/, [{ n: "6", ns: "8" }]);
     const kinds = ok(await plot("axisKinds"));
@@ -488,7 +488,7 @@ describe("a whole plot over one study (op 'plot')", () => {
 
   test("a box: quartiles and Tukey whiskers per group, its density, and a legend when coloured", async () => {
     META({ AGE: "NUMBER", SEX: "STRING", GRADE: "STRING" });
-    on(/quantilesExact/, [{ g: "F", n: 4, lo: 1, hi: 100, q: [10, 20, 30] }, { g: "M", n: 2, lo: 5, hi: 6, q: [5, 5.5, 6] }]);
+    on(/arraySort\(groupArray/, [{ g: "F", n: 4, lo: 1, hi: 100, q: [10, 20, 30] }, { g: "M", n: 2, lo: 5, hi: 6, q: [5, 5.5, 6] }]);
     on(/AS vx0/, [{ g: "F", b: 0, c: "G1", n: 4, vx0: 1, vx1: 60 }]);
     const r = ok(await whole("SEX", "AGE", { colorBy: { source: "clinical", attribute: "GRADE" } })).result;
     assert.equal(r.shape, "box");
@@ -503,7 +503,7 @@ describe("a whole plot over one study (op 'plot')", () => {
 
   test("a box past the category cap is refused, not cut", async () => {
     META({ AGE: "NUMBER", SEX: "STRING" });
-    on(/quantilesExact/, Array.from({ length: 151 }, (_, i) => ({ g: "g" + i, n: 1, lo: 1, hi: 1, q: [1, 1, 1] })));
+    on(/arraySort\(groupArray/, Array.from({ length: 151 }, (_, i) => ({ g: "g" + i, n: 1, lo: 1, hi: 1, q: [1, 1, 1] })));
     assert.match(errorOf(await whole("AGE", "SEX")), /more than 150 groups on the categorical axis/);
   });
 

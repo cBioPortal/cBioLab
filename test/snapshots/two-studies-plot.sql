@@ -547,10 +547,13 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'SEX' AND attribute_value != ''
     AND type = 'sample' AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id)
-SELECT gs.v AS g, count() AS n, min(vs.v) AS lo, max(vs.v) AS hi,
-       quantilesExact(0.25, 0.5, 0.75)(vs.v) AS q
-FROM vs INNER JOIN gs ON gs.id = vs.id
-GROUP BY g ORDER BY n DESC LIMIT 151
+SELECT g, n, s[1] AS lo, s[n] AS hi,
+       [s[greatest(1, intDiv(n + 2, 4))],
+        if(n % 2 = 1, s[intDiv(n + 1, 2)], (s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2),
+        s[greatest(1, intDiv(3 * n + 2, 4))]] AS q
+FROM (SELECT gs.v AS g, count() AS n, arraySort(groupArray(vs.v)) AS s
+      FROM vs INNER JOIN gs ON gs.id = vs.id GROUP BY g)
+ORDER BY n DESC LIMIT 151
 
 -- view 1 plot: plot:box · lusc_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -581,10 +584,13 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'SEX' AND attribute_value != ''
     AND type = 'sample' AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id)
-SELECT gs.v AS g, count() AS n, min(vs.v) AS lo, max(vs.v) AS hi,
-       quantilesExact(0.25, 0.5, 0.75)(vs.v) AS q
-FROM vs INNER JOIN gs ON gs.id = vs.id
-GROUP BY g ORDER BY n DESC LIMIT 151
+SELECT g, n, s[1] AS lo, s[n] AS hi,
+       [s[greatest(1, intDiv(n + 2, 4))],
+        if(n % 2 = 1, s[intDiv(n + 1, 2)], (s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2),
+        s[greatest(1, intDiv(3 * n + 2, 4))]] AS q
+FROM (SELECT gs.v AS g, count() AS n, arraySort(groupArray(vs.v)) AS s
+      FROM vs INNER JOIN gs ON gs.id = vs.id GROUP BY g)
+ORDER BY n DESC LIMIT 151
 
 -- view 1 plot: plot:coverage · luad_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived

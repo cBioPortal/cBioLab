@@ -26,7 +26,6 @@ import { PREVIEW_KINDS } from "../lib/preview-kinds.ts";
 const EXEMPT: Record<string, string> = {
   oncoprint: "a picture of alterations per patient: nothing is computed beyond the counts its own provenance page shows",
   hotspots: "a lollipop of mutation counts per position: no statistic",
-  plot: "a scatter/density plot of two axes: no statistic",
   // preview kinds carry their Preview badge until their record lands (lib/preview-kinds.ts)
   ...Object.fromEntries(Object.entries(PREVIEW_KINDS).map(([k, why]) => [k, "preview: " + why])),
 };
