@@ -9,6 +9,7 @@ import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts"
 import { arrange, type PageLayout, type TabBanner } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
+import { survivalDefault } from "./comparison-layout.ts";
 
 
 /** What a Results page queries. */
@@ -330,7 +331,9 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     ...(expr && !multi ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: queried })] }] : []),
     { title: "Comparison/Survival", sub: [
       { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },
-      { title: "Survival", views: [v("Survival", { kind: "survival", cohorts: both })] },
+      // the survival-type table beside the curves, on the portal's first endpoint; only with survival data once the attributes are known
+      ...(data.partial || survivalDefault(data.clinical) ? [{ title: "Survival", views: [v("Survival", { kind: "survival", types: true, cohorts: both,
+        ...(!data.partial && survivalDefault(data.clinical) !== "OS" ? { endpoint: survivalDefault(data.clinical) } : {}) })] }] : []),
       ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true, cohorts: both })] }] : []),
       { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),
         v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] },
