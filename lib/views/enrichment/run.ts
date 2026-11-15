@@ -10,6 +10,8 @@ import { enrichmentMethod } from "./method.ts";
 const ENRICH_ROWS = 300;
 /** the genes "Genes with highest frequency in any group" draws */
 const TOP_FREQUENCY = 10;
+/** the volcano's −log10 p is drawn up to here, as the portal's (CMM-VO-1) */
+const VOLCANO_Y_CAP = 10;
 const ALTERATION_WORD: Record<EnrichAlteration, string> = {
   mutation: "mutation", cna: "amplification or deep deletion", amp: "amplification", homdel: "deep deletion", sv: "structural variant"
 };
@@ -87,13 +89,14 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     const lp = (p: number) => -Math.log10(Math.max(1e-300, p));
     const finite = tested.map((g) => g.log2Ratio).filter((x): x is number => x != null);
     const xMax = niceCeil(Math.max(1, ...finite.map(Math.abs)));
-    const yMax = niceCeil(Math.max(1, ...tested.map((g) => lp(g.p))));
+    // −log10 p capped at 10, as the portal's volcano (p = 0 is drawn at 10)
+    const yMax = niceCeil(Math.min(VOLCANO_Y_CAP, Math.max(1, ...tested.map((g) => lp(g.p)))));
     const nx = 80, ny = 50, cells = new Map<string, number>();
     const inRows = new Set(rows);
     for (const g of tested.filter((x) => !inRows.has(x))) {
       const x = g.log2Ratio == null ? (g.cells[0].altered ? xMax : -xMax) : g.log2Ratio;
       const bx = Math.min(nx - 1, Math.max(0, Math.floor((x + xMax) / (2 * xMax) * nx)));
-      const by = Math.min(ny - 1, Math.floor(lp(g.p) / yMax * ny));
+      const by = Math.min(ny - 1, Math.floor(Math.min(yMax, lp(g.p)) / yMax * ny));
       cells.set(bx + "," + by, (cells.get(bx + "," + by) || 0) + 1);
     }
     grid = { xMax, yMax, nx, ny, cells: [...cells].map(([k, c]) => { const [x, y] = k.split(",").map(Number); return [x, y, c] as [number, number, number]; }) };

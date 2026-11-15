@@ -97,3 +97,10 @@ describe("enrichment: \"Genes with highest frequency in any group\" ranks every 
     assert.match(svg, /<title>MUC16 in A: 40(\.0)?% \(40 \/ 100\)<\/title>/, "the bar plot draws MUC16");
   });
 });
+
+test("the volcano's −log10 p stops at 10, as the portal's (CMM-VO-1)", async () => {
+  // 100 of 100 against 0 of 100: Fisher p ≈ 2.2e-59, so −log10 p ≈ 58.7; drawn at the cap
+  const e = (await run({ A: { wes: 100, altered: { ALL: 100, SOME: 10 } }, B: { wes: 100, altered: { SOME: 2 } } })).enrichment;
+  assert.equal(e.grid.yMax, 10);
+  assert.ok(e.rows[0].p < 1e-50, "the p itself is kept: " + e.rows[0].p);
+});

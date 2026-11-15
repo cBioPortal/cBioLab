@@ -72,6 +72,9 @@ export function portalP(p: number): string {
  */
 export const portalPMin = (p: number): string => p === 0 || (p > 0 && Math.log10(p) < -10) ? "< 10^-10" : portalP(p);
 
+/** An altered share (0–1) as cBioPortal's Genomic Alterations table writes it: a percentage to 2 decimals (EnrichmentsUtil, toFixed(2)), "12.28%". */
+export const portalAlteredPct = (f: number): string => (f * 100).toFixed(2) + "%";
+
 /**
  * A value at two significant digits, as cBioPortal's FormatUtils.formatNumberValueInSignificantDigits(x, 2)
  * writes it for the mutation table's SIGNAL and gnomAD frequencies: no exponent, no separators,
