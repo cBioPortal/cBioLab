@@ -57,3 +57,5 @@ export function profiledTrackLabel(type: ProfiledType): string {
 export const SAMPLES_TRACK = "# Samples per Patient";
 /** the mutation spectrum row: asked for in a view's `clinical` list by this name, as the portal's Tracks menu lists it */
 export const SPECTRUM_TRACK = "MUTATION_SPECTRUM";
+/** its display name, as the portal names the row (its clinical attribute has no metadata) */
+export const SPECTRUM_NAME = "Mutation spectrum";

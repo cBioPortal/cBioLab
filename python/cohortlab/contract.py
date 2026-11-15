@@ -14,7 +14,7 @@ from typing import Any, Iterable
 
 import numpy as np
 
-from .style import BITS, numeric_value  # the one bit definition, generated from lib/oncoprint-style.ts
+from .style import BITS, STYLE, numeric_value  # the one bit definition, generated from lib/oncoprint-style.ts
 
 DEFAULT_DISPLAY: dict[str, Any] = {"showUnaltered": True, "whitespace": True, "gaps": "none", "clinicalLegends": "all",
                                    "colorByType": True, "colorByGermline": True, "hideVUS": False, "annotate": "oncokb", "whiteBackground": False}
@@ -93,35 +93,61 @@ class Contract:
         return Contract(obj["study"], obj.get("studies") or [obj["study"]], obj["groups"], obj["columns"], tracks,
                         obj.get("conventions", {}), obj.get("stats", {}), obj.get("unit", "patient"), obj.get("display") or dict(DEFAULT_DISPLAY))
 
-    # ---- tabular export (the portal's "Tabular" download shape) -------------
-    def rows(self) -> Iterable[list[str]]:
-        yield ["track_name", "track_type", *self.columns]
+    # ---- tabular export (the portal's "Tabular" download, lib/oncoprint-tabular.ts) ----
+    def rows(self, order: Iterable[int] | None = None) -> Iterable[list[str]]:
+        """CLINICAL rows, then each gene's CNA, MUTATIONS, MRNA, PROTEIN, STRUCTURAL_VARIANT rows, then a
+        group per heatmap profile kind, then DERIVED. `order`: the columns as drawn, as indices; without it
+        the contract's order, less the unaltered columns when its display hides them."""
+        genes = [t for t in self.tracks if t.kind == "gene"]
+        if order is not None:
+            idx = [int(i) for i in order]
+        else:
+            idx = [i for i in range(len(self.columns))
+                   if self.display.get("showUnaltered", True) is not False or any(int(t.cells[i]) > 0 for t in genes)]
+        annotated = (self.display.get("annotate") or "none") != "none"
+        yield ["track_name", "track_type", *[self.columns[i] for i in idx]]
         for t in self.tracks:
-            if t.kind == "gene":
-                vals = [gene_cell_label(int(c)) for c in t.cells]
-                kind = "GENE"
-            elif t.kind == "derivedEvent":
-                vals = ["yes" if c > 0 else "no" for c in t.cells]
-                kind = "DERIVED"
-            elif t.meta.get("stack"):
-                # one row per category, as the portal writes its mutation spectrum
-                st, v = t.meta["stack"], t.meta.get("values") or []
-                for j, cat in enumerate(st):
-                    yield [f"{t.label} ({cat})", "CLINICAL", *["" if c == -1 else _float32_text(v[int(c) * len(st) + j]) for c in t.cells]]
+            if t.kind != "clinical":
                 continue
-            elif t.meta.get("numeric"):
+            name = t.meta.get("name") or t.label
+            if t.meta.get("stack") and t.meta.get("values") is not None:
+                st, v = t.meta["stack"], t.meta["values"]
+                for j, cat in enumerate(st):
+                    yield [f"{name} ({cat})", "CLINICAL", *["" if int(t.cells[i]) == -1 else _float32_text(v[int(t.cells[i]) * len(st) + j]) for i in idx]]
+                continue
+            yield [name, "CLINICAL", *[_clinical_text(t, i) for i in idx]]
+        by_label: dict[str, list[Track]] = {}
+        for t in genes:
+            by_label.setdefault(t.label, []).append(t)
+        for group in GENETIC_GROUPS:
+            for label, ts in by_label.items():
+                vals = []
+                for i in idx:
+                    texts: list[str] = []
+                    for t in ts:
+                        x = genetic_text(int(t.cells[i]), group, annotated)
+                        if x and x not in texts:
+                            texts.append(x)
+                    vals.append(", ".join(texts))
+                yield [label, group, *vals]
+        heat: dict[str, list[Track]] = {}
+        for t in self.tracks:
+            if t.kind == "heatmap":
+                heat.setdefault("HEATMAP " + (t.meta.get("profileKind") or t.meta.get("profileType") or ""), []).append(t)
+        for kind, ts in heat.items():
+            for t in ts:
                 exact = t.meta.get("values")
-                vals = ["" if c == -1 else _float32_text(exact[i]) if exact is not None and exact[i] is not None
-                        else str(round(numeric_value(t.meta, int(c)), 2)) for i, c in enumerate(t.cells)]
-                kind = "HEATMAP " + t.meta.get("profileType", "") if t.kind == "heatmap" else "CLINICAL"
-            else:
-                cats = t.meta.get("categories") or []
-                vals = ["" if c == -1 else (cats[c] if c < len(cats) else "Other") for c in t.cells]
-                kind = "CLINICAL"
-            yield [t.label, kind, *vals]
+                vals = []
+                for i in idx:
+                    x = exact[i] if exact is not None else None
+                    vals.append("" if int(t.cells[i]) == -1 or x is None or math.isnan(x) else _float32_text(x))
+                yield [t.meta.get("gene") or t.label, kind, *vals]
+        for t in self.tracks:
+            if t.kind == "derivedEvent":
+                yield [t.label, "DERIVED", *["yes" if int(t.cells[i]) > 0 else "no" for i in idx]]
 
-    def to_tsv(self, path: str | None = None) -> str:
-        text = "".join("\t".join(r) + "\n" for r in self.rows())
+    def to_tsv(self, path: str | None = None, order: Iterable[int] | None = None) -> str:
+        text = "".join("\t".join(r) + "\n" for r in self.rows(order))
         if path:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
@@ -145,26 +171,43 @@ def _jsnum(v: Any) -> Any:
     return v
 
 
-def gene_cell_label(code: int) -> str:
-    if code == NOT_PROFILED:
-        return "not profiled"
-    if code <= 0:
+GENETIC_GROUPS = ("CNA", "MUTATIONS", "MRNA", "PROTEIN", "STRUCTURAL_VARIANT")
+# the portal's texts per mutation class (tabularDownload.ts mutationMap); splice and other named alike
+_MUTATION_TEXT = {"TRUNCATING": "Truncating mutation", "SPLICE": "Splice Mutation", "INFRAME": "Inframe Mutation",
+                  "PROMOTER": "Promoter Mutation", "MISSENSE": "Missense Mutation", "OTHER_MUT": "Other Mutation"}
+_DRIVER, _PASSENGER = " (putative driver)", " (putative passenger)"
+
+
+def genetic_text(code: int, group: str, annotated: bool) -> str:
+    """a gene cell's text in one genetic group; "" when it has none of that kind or was not profiled"""
+    if code == NOT_PROFILED or code <= 0:
         return ""
-    sig = {True: " (putative driver)", False: " (unknown significance)"}
-    parts = []
-    for bit, name in (("MISSENSE", "Missense Mutation"), ("TRUNCATING", "Truncating Mutation"), ("INFRAME", "Inframe Mutation"),
-                      ("SPLICE", "Splice Mutation"), ("PROMOTER", "Promoter Mutation"), ("OTHER_MUT", "Other Mutation")):
-        if code & BITS[bit]:
-            parts.append(name + sig[bool(code & BITS["MUT_DRIVER"])])
-    if code & BITS["GERMLINE"]:
-        parts.append("Germline Mutation")
-    if code & BITS["SV"]:
-        parts.append("Structural Variant" + sig[bool(code & BITS["SV_DRIVER"])])
-    if code & BITS["AMP"]:
-        parts.append("Amplification")
-    if code & BITS["HOMDEL"]:
-        parts.append("Deep Deletion")
-    return ", ".join(parts)
+    if group == "MUTATIONS":
+        bit = next((m["bit"] for m in STYLE["glyph"]["mutation"]["priority"] if code & BITS[m["bit"]]), None)
+        if bit is None:
+            return ""
+        text = _MUTATION_TEXT[bit]
+        return text if not annotated or bit == "PROMOTER" else text + (_DRIVER if code & BITS["MUT_DRIVER"] else _PASSENGER)
+    if group == "CNA":
+        text = "Amplification" if code & BITS["AMP"] else "Deep Deletion" if code & BITS["HOMDEL"] else ""
+        return text + _DRIVER if text and annotated and code & BITS["CNA_DRIVER"] else text
+    if group == "STRUCTURAL_VARIANT":
+        return "Structural Variant" + (_DRIVER if annotated and code & BITS["SV_DRIVER"] else "") if code & BITS["SV"] else ""
+    return ""
+
+
+def _clinical_text(t: Track, i: int) -> str:
+    c = int(t.cells[i])
+    if t.meta.get("numeric"):
+        if c == -1:
+            return ""
+        exact = t.meta.get("values")
+        x = exact[i] if exact is not None else None
+        return _float32_text(x) if x is not None and not math.isnan(x) else str(round(numeric_value(t.meta, c), 2))
+    if c == -1:
+        return STYLE["glyph"]["profiled"]["no"] if t.meta.get("profiledFor") else ""
+    cats = t.meta.get("categories") or []
+    return cats[c] if c < len(cats) else "Other"
 
 
 # ---- OPB1 --------------------------------------------------------------------

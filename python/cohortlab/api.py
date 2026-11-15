@@ -71,8 +71,8 @@ class Oncoprint:
         return pd.DataFrame([r[2:] for r in rows[1:]], index=[r[0] for r in rows[1:]], columns=rows[0][2:])
 
     # ---- outputs --------------------------------------------------------------
-    def to_tsv(self, path: str | None = None) -> str:
-        return self.contract.to_tsv(path)
+    def to_tsv(self, path: str | None = None, order: Any = None) -> str:
+        return self.contract.to_tsv(path, order)
 
     def to_json(self, path: str | None = None) -> dict[str, Any]:
         obj = self.contract.to_json()

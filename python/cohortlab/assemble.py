@@ -201,6 +201,23 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
         clin.append(Track("clinical", "Study of origin", cells, {"categories": list(studies)}))
     for c in clinical:
         attr, val_by_pid = c["attr"], c["values"]
+        named = {"name": c["name"]} if c.get("name") and c["name"] != attr else {}
+        if attr == "MUTATION_SPECTRUM":
+            # each column's six substitution counts ("a,b,c,d,e,f"); a column with none is no data
+            k = len(STYLE["glyph"]["spectrum"]["categories"])
+            cells = np.full(n, -1, dtype=np.int32)
+            stacked = [0.0] * (n * k)
+            for i, p in enumerate(all_pids):
+                v = val_by_pid.get(p)
+                if not v:
+                    continue
+                counts = [float(x) for x in v.split(",")]
+                if len(counts) != k or not any(x > 0 for x in counts):
+                    continue
+                stacked[i * k:(i + 1) * k] = counts
+                cells[i] = i
+            clin.append(Track("clinical", attr, cells, {**named, "stack": list(STYLE["glyph"]["spectrum"]["categories"]), "values": stacked}))
+            continue
         present = [val_by_pid[p] for p in all_pids if p in val_by_pid]
         if not present:
             clin.append(Track("clinical", attr + " (no data)", np.full(n, -1, dtype=np.int32), {"categories": []}))
@@ -221,7 +238,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                     if math.isfinite(x):
                         cells[i] = encode_numeric(x, lo, hi, log_scale)
                         values[i] = x
-            clin.append(Track("clinical", attr, cells, {"numeric": True, "bar": True, **({"logScale": True} if log_scale else {}), "min": _num(lo), "max": _num(hi),
+            clin.append(Track("clinical", attr, cells, {**named, "numeric": True, "bar": True, **({"logScale": True} if log_scale else {}), "min": _num(lo), "max": _num(hi),
                                                         "values": values}))
             continue
         counts: dict[str, int] = {}
@@ -236,7 +253,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             v = val_by_pid.get(p)
             if v is not None:
                 cells[i] = cat_idx[v]
-        clin.append(Track("clinical", attr, cells, {"categories": categories}))
+        clin.append(Track("clinical", attr, cells, {**named, "categories": categories}))
 
     # ---- heatmap tracks ----------------------------------------------------
     heat: list[Track] = []
@@ -276,7 +293,9 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                 note = "allele fraction, max across a patient's mutations in the gene"
             else:
                 note = "a patient's: its samples' value furthest from 0"
-            heat.append(Track("heatmap", label, cells, {"numeric": True, **({"ramp": ramp} if ramp else {}), "gene": gene, "profileType": h["profileType"], "note": note,
+            heat.append(Track("heatmap", label, cells, {"numeric": True, **({"ramp": ramp} if ramp else {}), "gene": gene, "profileType": h["profileType"],
+                                                        **({"profileKind": h["profileKind"]} if h.get("profileKind") else {"profileKind": "MUTATION_EXTENDED VAF"} if h.get("isVaf") else {}),
+                                                        "note": note,
                                                         # an assay's range is exact: its colour stops sit on it
                                                         "min": _num(lo if assay else _round(lo * 100) / 100), "max": _num(hi if assay else _round(hi * 100) / 100),
                                                         "center": None if center is None else _round(255 * (0 - lo) / span), "values": values,
@@ -401,7 +420,13 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             return t.meta
         return {**t.meta, "values": [None if math.isnan(x) else float(x) for x in t.meta["values"][order_arr]]}
 
-    tracks: list[Track] = [Track(t.kind, t.label, t.cells[order_arr], reordered(t)) for t in clin]
+    def restacked(t: Track) -> Track:
+        """a stacked row moves each column's counts together, and its cells name their new positions"""
+        k, v = len(t.meta["stack"]), t.meta["values"]
+        cells = np.array([-1 if t.cells[i] == -1 else j for j, i in enumerate(order)], dtype=np.int32)
+        return Track(t.kind, t.label, cells, {**t.meta, "values": [x for i in order for x in v[i * k:(i + 1) * k]]})
+
+    tracks: list[Track] = [restacked(t) if t.meta.get("stack") else Track(t.kind, t.label, t.cells[order_arr], reordered(t)) for t in clin]
 
     def gene_counts(cells: np.ndarray) -> dict[str, Any]:
         """The pooled numbers and each group's: the same formula over a slice of the columns."""

@@ -25,12 +25,15 @@
  * and clinicalTrackRows, as the Results page builds them): every declared attribute listed, at 0%
  * where the selection has no value; a sample attribute's Freq over the queried samples; ties by
  * stored priority, then name.
+ * And the Tabular download's names: each clinical row's display name (clinicalNamesSql: the
+ * meta header's first line; none for an unknown attribute or the computed mutation spectrum), and
+ * each profile's alteration type and datatype (profileInventorySql: its meta file's).
  *
  * Run: node --env-file=.env.local scripts/check-oncoprint-values.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines; scripts/gate.sh sets them).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
-import { assayHeatmapSql, clinicalSql, heatmapSql } from "../lib/oncoprint.ts";
+import { assayHeatmapSql, clinicalNamesSql, clinicalSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { clinicalTrackRows, trackAttrs, trackFreqText } from "../app/_oncoprint/track-edits.ts";
 
@@ -176,6 +179,21 @@ ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(w
 const top = whole.slice(0, 3).map((r) => r.attribute).join(", ");
 ok("tracks menu order: stored priority, then name", top === "MUTATION_COUNT, AGE, DEAD", top);
 
-const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2;
+// ---- the Tabular download's row names and types -------------------------------------------------
+/** [attribute, display name from the fixture's data_clinical_*.txt header; null = none] */
+const NAMES: [string, string | null][] = [
+  ["SEX", "Sex"], ["KI67_INDEX", "Ki-67 Index"], ["FRACTION_GENOME_ALTERED", "Fraction Genome Altered"],
+  ["PATIENT_FLAG", "Patient Flag"], ["NO_SUCH_ATTRIBUTE", null], ["MUTATION_SPECTRUM", null]
+];
+const nameSql = clinicalNamesSql(NAMES.map(([a]) => a), STUDY, conn.db)!;
+const names = new Map((await chQuery<{ a: string; n: string }>(nameSql, conn)).data.map((r) => [r.a, r.n]));
+for (const [a, want] of NAMES) ok(`display name ${a}`, (names.get(a) ?? null) === want, "ours " + JSON.stringify(names.get(a) ?? null) + ", expected " + JSON.stringify(want));
+ok("display names: no attribute of another study", names.size === NAMES.filter(([, n]) => n).length, String(names.size));
+/** [profile type, its meta file's genetic_alteration_type and datatype] */
+const KINDS: [string, string][] = [["mutations", "MUTATION_EXTENDED MAF"], ["cna", "COPY_NUMBER_ALTERATION DISCRETE"]];
+const kinds = new Map((await chQuery<{ pt: string; type: string; datatype: string }>(profileInventorySql(STUDY, conn.db), conn)).data.map((r) => [r.pt, r.type + " " + r.datatype]));
+for (const [pt, want] of KINDS) ok(`profile kind ${pt}`, kinds.get(pt) === want, "ours " + kinds.get(pt) + ", expected " + want);
+
+const total = EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
