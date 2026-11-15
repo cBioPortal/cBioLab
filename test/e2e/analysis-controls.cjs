@@ -310,6 +310,191 @@ async function analysisControls({ decodeUrlJson, ok, BASE, page, errors }) {
     await page.setViewportSize({ width: 1400, height: 1000 });
   } catch (e) { tbWhat = String(e.message).split("\n")[0]; }
   ok("the oncoprint toolbar keeps its zones intact when it wraps", tbOk, tbWhat);
+
+  // The oncoprint's PDF export (ONC-DL-2): the Export image dialog's PDF format draws the server
+  // SVG the SVG export saves onto one page its size, as the portal's svgToPdfDownload does
+  // (cbioportal-frontend-commons/src/lib/svgToPdfDownload.ts). Checked from the downloaded bytes,
+  // with no PDF library: page count and MediaBox from the file, text decoded through the font's
+  // ToUnicode map from the (Flate-compressed) streams.
+  {
+    const zlib = require("node:zlib");
+    const errsBeforePdf = errors.length;
+    /** every stream's bytes, inflated when they are Flate-compressed */
+    const pdfStreams = (buf) => {
+      const raw = buf.toString("latin1"), out = [];
+      const re = /stream\r?\n/g;
+      let m;
+      while ((m = re.exec(raw))) {
+        if (raw.slice(Math.max(0, m.index - 3), m.index) === "end") continue;
+        const start = m.index + m[0].length, end = raw.indexOf("endstream", start);
+        if (end < 0) break;
+        const body = buf.subarray(start, end);
+        let text;
+        try { text = zlib.inflateSync(body).toString("latin1"); } catch { text = body.toString("latin1"); }
+        out.push(text);
+        re.lastIndex = end + 9;
+      }
+      return out;
+    };
+    /** the text a PDF shows, decoded through its ToUnicode maps (hex glyph codes) or read as literal strings */
+    const pdfText = (streams) => {
+      const map = new Map();
+      let codeLen = 4;
+      const hexU = (h) => String.fromCodePoint(...(h.match(/.{4}/g) || []).map((x) => parseInt(x, 16)));
+      for (const s of streams.filter((x) => /begincmap/.test(x))) {
+        for (const blk of s.match(/beginbfchar([\s\S]*?)endbfchar/g) || [])
+          for (const [, c, u] of blk.matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g)) { map.set(c.toUpperCase(), hexU(u)); codeLen = c.length; }
+        for (const blk of s.match(/beginbfrange([\s\S]*?)endbfrange/g) || [])
+          for (const [, a, b, u] of blk.matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g)) {
+            codeLen = a.length;
+            for (let i = parseInt(a, 16), k = 0; i <= parseInt(b, 16); i++, k++)
+              map.set(i.toString(16).toUpperCase().padStart(a.length, "0"), String.fromCodePoint(parseInt(u, 16) + k));
+          }
+      }
+      const shown = [];
+      for (const s of streams.filter((x) => /\bT[jJ]\b/.test(x) && /\bBT\b/.test(x))) {
+        for (const [, bt] of s.matchAll(/\bBT\b([\s\S]*?)\bET\b/g)) {
+          let line = "";
+          for (const [, hex, lit] of bt.matchAll(/<([0-9A-Fa-f\s]*)>|\(((?:\\[\s\S]|[^\\)])*)\)/g)) {
+            if (hex !== undefined) {
+              const h = hex.replace(/\s/g, "").toUpperCase();
+              line += map.size ? (h.match(new RegExp(".{" + codeLen + "}", "g")) || []).map((c) => map.get(c) ?? "�").join("")
+                : Buffer.from(h, "hex").toString("latin1");
+            } else line += lit.replace(/\\([nrtbf()\\])/g, (_, c) => ({ n: "\n", r: "\r", t: "\t", b: "\b", f: "\f" })[c] ?? c);
+          }
+          shown.push(line);
+        }
+      }
+      return shown;
+    };
+    const unent = (s) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
+      .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(+d)).replace(/&amp;/g, "&");
+    const norm = (s) => s.replace(/\s+/g, " ").trim();
+    const openExport = async () => {
+      await page.locator('button[data-tip="download or open this figure elsewhere"]').click();
+      await page.getByText("Export image (PNG, SVG or PDF)", { exact: false }).first().click();
+      const dlg = page.locator("[role=dialog][data-slot=dialog-content]").filter({ hasText: "Export image" });
+      await dlg.waitFor({ timeout: 30000 });
+      return dlg;
+    };
+    const pickPdf = async (dlg) => {
+      await dlg.locator(".setrow", { hasText: "format" }).getByRole("combobox").click();
+      const formats = (await page.getByRole("option").allInnerTexts()).map((t) => t.trim().split(/\s/)[0]);
+      await page.getByRole("option", { name: /^PDF/ }).click();
+      return formats;
+    };
+    const svgPost = (r) => r.request().method() === "POST" && /\/api\/oncoprint\?/.test(r.url()) && /[?&]format=svg\b/.test(r.url());
+
+    let formats = [], name = "", bytes = Buffer.alloc(0), svgText = "", what = "no oncoprint rendered";
+    try {
+      await page.goto(BASE + "/lab?doc=" + encodeURIComponent(Buffer.from(JSON.stringify({
+        study: "msk_chord_2024",
+        cohorts: { "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] } },
+        views: [{ kind: "oncoprint", genes: ["TP53", "KRAS"] }]
+      })).toString("base64")));
+      await page.waitForSelector('button[data-tip="download or open this figure elsewhere"]', { timeout: 300000 });
+      const dlg = await openExport();
+      formats = await pickPdf(dlg);
+      const widthShown = await dlg.locator('input[type=number]').first().inputValue().catch(() => "?");
+      const svgP = page.waitForResponse(svgPost, { timeout: 300000 }).catch(() => null);
+      const dlP = page.waitForEvent("download", { timeout: 300000 }).catch(() => null);
+      await dlg.getByRole("button", { name: "Export PDF" }).click();
+      const [resp, dl] = await Promise.all([svgP, dlP]);
+      svgText = resp && resp.ok() ? await resp.text() : "";
+      if (dl) { name = dl.suggestedFilename(); bytes = require("fs").readFileSync(await dl.path()); }
+      what = "page width field " + widthShown + "; " + (dl ? name + ", " + bytes.length + " bytes" : "no download") + "; server SVG " + svgText.length + " chars";
+    } catch (e) { what = String(e.message).split("\n")[0]; }
+
+    const raw = bytes.toString("latin1");
+    const streams = bytes.length ? pdfStreams(bytes) : [];
+    const shown = pdfText(streams);
+    const text = norm(shown.join(" "));
+    const svgRoot = (svgText.match(/<svg\b[^>]*>/) || [""])[0];
+    const attr = (a) => (svgRoot.match(new RegExp("\\s" + a + "=\"([^\"]*)\"")) || [])[1] || "";
+    const vb = attr("viewBox").split(/[\s,]+/).map(Number);
+    const svgWIn = parseFloat(attr("width")), svgHIn = parseFloat(attr("height"));
+    const svgInches = /in$/.test(attr("width")) && /in$/.test(attr("height"));
+    const mb = raw.match(/\/MediaBox\s*\[\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*\]/);
+    const [mw, mh] = mb ? [mb[3] - mb[1], mb[4] - mb[2]] : [NaN, NaN];
+
+    ok("oncoprint PDF: the export dialog offers PNG, SVG and PDF (ours: the portal puts PDF in its Download menu)",
+      formats.join(",") === "PNG,SVG,PDF", formats.join(", ") + " · " + what);
+    ok("oncoprint PDF: the download is a PDF file", bytes.length > 1000 && raw.startsWith("%PDF-"),
+      bytes.length + " bytes, starts " + JSON.stringify(raw.slice(0, 8)));
+    const pages = (raw.match(/\/Type\s*\/Page(?![A-Za-z])/g) || []).length;
+    ok("oncoprint PDF: one page", pages === 1, pages + " /Type /Page objects");
+    // the page is the SVG's size in points: 8.5in = 612pt wide, and the SVG's own height (in, or 8.5 × h ÷ w of its viewBox)
+    const wantH = svgInches ? svgHIn * 72 : vb.length === 4 && vb[2] > 0 ? 612 * vb[3] / vb[2] : NaN;
+    ok("oncoprint PDF: the page is the SVG's size in points, 612 pt wide at 8.5 in",
+      mb !== null && Math.abs(mw - 612) < 0.01 && mh > 0 && Math.abs(mh - wantH) < 1 && (!svgInches || Math.abs(svgWIn - 8.5) < 1e-6),
+      "MediaBox " + (mb ? mb[0] : "none") + "; SVG width=" + attr("width") + " height=" + attr("height") + " viewBox=" + attr("viewBox") + " -> want 612 × " + wantH.toFixed(2));
+    // landscape or portrait, the MediaBox stays width × height, never rotated
+    const rotate = (raw.match(/\/Rotate\s+(-?\d+)/) || [])[1];
+    ok("oncoprint PDF: wider than tall is landscape, and the MediaBox is still width × height (not rotated)",
+      mb !== null && Number.isFinite(wantH) && (mw > mh) === (612 > wantH) && (!rotate || Number(rotate) % 360 === 0),
+      "page " + mw + " × " + mh + (mw > mh ? " (landscape)" : " (portrait)") + ", /Rotate " + (rotate ?? "none"));
+    const hasTextOp = streams.some((s) => /\bBT\b/.test(s) && /\bT[jJ]\b/.test(s));
+    ok("oncoprint PDF: the gene labels are text (Tj/TJ), not paths", hasTextOp && /\bTP53\b/.test(text) && /\bKRAS\b/.test(text),
+      (hasTextOp ? "text operators present" : "no Tj/TJ") + ", " + shown.length + " text objects: " + JSON.stringify(text.slice(0, 120)));
+    const baseFonts = [...raw.matchAll(/\/(?:BaseFont|FontName)\s*\/([^\s/\[\]<>()]+)/g)]
+      .map((m) => m[1].replace(/#([0-9A-Fa-f]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/^[A-Z]{6}\+/, ""));
+    ok("oncoprint PDF: IBM Plex Sans is embedded as TrueType (ours: our UI font; the portal fetches FreeSans)",
+      /\/FontFile2\b/.test(raw) && baseFonts.some((f) => /^IBM ?Plex ?Sans/.test(f)),
+      "FontFile2 " + /\/FontFile2\b/.test(raw) + ", fonts " + [...new Set(baseFonts)].join(", "));
+    // the same figure as the SVG export: every piece of text the SVG writes, the gutter's % among them, and its cells
+    const svgTexts = [...svgText.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/g)]
+      .map((m) => norm(unent(m[1].replace(/<title\b[\s\S]*?<\/title>/g, "").replace(/<[^>]+>/g, "")))).filter(Boolean);
+    const missing = svgTexts.filter((t) => !text.includes(t));
+    const pcts = svgTexts.filter((t) => /\d%/.test(t));
+    const rects = (svgText.match(/<rect\b/g) || []).length;
+    const fills = streams.reduce((n, s) => n + (s.match(/(?:^|\s)(?:f\*?|F|B\*?|b\*?)(?=\s|$)/g) || []).length, 0);
+    ok("oncoprint PDF: the same figure as the SVG export — its labels, gutter %, legend and cells",
+      svgTexts.length > 4 && pcts.length > 0 && missing.length === 0 && rects > 0 && fills >= rects,
+      svgTexts.length + " SVG texts (" + pcts.length + " with %), missing from the PDF: " + JSON.stringify(missing.slice(0, 6)) +
+      "; " + rects + " SVG rects, " + fills + " PDF fills");
+    ok("oncoprint PDF: the file is named oncoprint-<study>-<w>in.pdf (ours; the portal saves oncoprint.pdf)",
+      /^oncoprint-msk_chord_2024-8\.5in\.pdf$/.test(name), name || "no download");
+    const pdfErrors = errors.slice(errsBeforePdf);
+    ok("oncoprint PDF: the export raises no page errors", bytes.length > 0 && pdfErrors.length === 0, pdfErrors.slice(0, 3).join(" | "));
+
+    // a failed server SVG: the dialog says so, and nothing is saved
+    let failWhat = "not reached", failOk = false;
+    const errsBeforeFail = errors.length;
+    const planted = "planted failure: oncoprint PDF test";
+    const fail = (route) => svgPost({ request: () => route.request(), url: () => route.request().url() })
+      ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: planted }) })
+      : route.continue();
+    try {
+      await page.route("**/api/oncoprint?**", fail);
+      let dlg = page.locator("[role=dialog][data-slot=dialog-content]").filter({ hasText: "Export image" });
+      if (!(await dlg.isVisible().catch(() => false))) dlg = await openExport();
+      const fmt = await dlg.locator(".setrow", { hasText: "format" }).getByRole("combobox").innerText();
+      if (!/^PDF/.test(fmt.trim())) await pickPdf(dlg);
+      const dlP = page.waitForEvent("download", { timeout: 15000 }).then((d) => d.suggestedFilename()).catch(() => null);
+      await dlg.getByRole("button", { name: "Export PDF" }).click();
+      await page.waitForFunction((t) => document.body.innerText.includes(t), planted, { timeout: 60000 });
+      const dialogOpen = await dlg.isVisible().catch(() => false);
+      const inDialog = (await dlg.getByText(planted, { exact: false }).count()) > 0;
+      const where = await page.evaluate((t) => {
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n; (n = w.nextNode());) if (n.textContent.includes(t)) {
+          const el = n.parentElement.closest("[role=dialog],[role=alert],.viewcard,section") || n.parentElement;
+          return el.tagName.toLowerCase() + (el.getAttribute("role") ? "[role=" + el.getAttribute("role") + "]" : "") + "." + String(el.className).split(" ")[0];
+        }
+        return "nowhere";
+      }, planted);
+      const saved = await dlP;
+      const figureKept = (await page.locator("canvas").count()) > 0;
+      failOk = inDialog && saved === null;
+      failWhat = "error " + (inDialog ? "shown in the dialog" : "shown outside the dialog, in " + where + "; dialog " + (dialogOpen ? "open" : "closed")) + "; download " + (saved ?? "none") + "; figure " + (figureKept ? "still drawn" : "gone");
+    } catch (e) { failWhat = String(e.message).split("\n")[0]; }
+    await page.unroute("**/api/oncoprint?**", fail).catch(() => {});
+    await page.keyboard.press("Escape").catch(() => {});
+    ok("oncoprint PDF: a failed server SVG shows the dialog's error and saves no file (ours)", failOk, failWhat);
+    // the planted 500 is this check's own doing, not a page error
+    errors.splice(errsBeforeFail, errors.length - errsBeforeFail,
+      ...errors.slice(errsBeforeFail).filter((e) => !/status of 500|http 500 POST .*\/api\/oncoprint/.test(e)));
+  }
 }
 
 module.exports = { analysisControls };

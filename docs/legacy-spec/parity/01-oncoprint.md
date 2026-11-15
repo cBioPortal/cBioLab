@@ -167,7 +167,7 @@ Data version: counts match exactly in every query, so the warehouse and cbioport
 | ID | verdict | how | note |
 |---|---|---|---|
 | ONC-DL-1 | ❌ | C | No hide-download switch (tracked: Data-governance switches) |
-| ONC-DL-2 | 🟡 | BC | PNG/SVG via "Export image…" dialog (page width, DPI); no PDF (tracked); names `oncoprint-<study>-<w>in.png` |
+| ONC-DL-2 | 🟡 | BC | PNG/SVG/PDF via "Export image…" dialog (page width, DPI); the PDF the server SVG on one page its size, font embedded; names `oncoprint-<study>-<w>in.png` (portal `oncoprint.png`) |
 | ONC-DL-3 | ✅ | BC | "Patient order in the Oncoprint is:" + the ids as drawn; file `OncoPrintPatients.txt` / `OncoPrintSamples.txt` |
 | ONC-DL-4 | 🟡 | BC | The portal's rows: CLINICAL by display name, each gene's CNA/MUTATIONS/MRNA/PROTEIN/STRUCTURAL_VARIANT, `HEATMAP <type> <datatype>`; the columns as drawn (`oncoprint-tabular.ts`). Readable text where the portal writes raw codes (`splice_rec`, `amp_rec`, `sv_rec`); a merged row by its label |
 | ONC-DL-5 | ❌ | B | No Open in Oncoprinter, deferred to after the initial release; offers CLI emulator / Python notebook links instead |

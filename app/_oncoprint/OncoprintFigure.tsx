@@ -17,6 +17,7 @@ import { STYLE, clinicalLegend, heatColor, geneLegend, glyphPresence, numericVal
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { contractToTsv, orderFileName, orderFileText, tabularFileName } from "../../lib/oncoprint-tabular.ts";
+import { svgToPdf } from "./pdf.ts";
 import { setPngDpi } from "../../lib/png-dpi.ts";
 import { api } from "../lab/api.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
@@ -189,10 +190,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   // in state, so the preview draws once the dialog has mounted its canvas
   const [exportCanvas, setExportCanvas] = useState<HTMLCanvasElement | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"png" | "svg">("png");
+  const [exportFormat, setExportFormat] = useState<"png" | "svg" | "pdf">("png");
   const [exportWidthIn, setExportWidthIn] = useState(8.5);
   const [exportDpi, setExportDpi] = useState(150);
-  const openExport = () => setExportOpen(true);
+  const openExport = () => { setExportError(null); setExportOpen(true); };
   const perfRef = useRef<Perf>({ frames: 0 });
   const bump = (p: Partial<Perf>) => {
     perfRef.current = { ...perfRef.current, ...p };
@@ -707,9 +708,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
   const [saving, setSaving] = useState<string | null>(null);
-  const download = async (what: "png" | "svg" | "tsv" | "ids") => {
+  // a download that fails says so beside its control; the figure it was made from stays
+  const [exportError, setExportError] = useState<string | null>(null);
+  const download = async (what: "png" | "svg" | "pdf" | "tsv" | "ids") => {
     if (!data || !visible) return;
-    setSaving(what);
+    setSaving(what); setExportError(null);
     try {
       const stem = "oncoprint-" + (data.studies || [data.study]).join("+").slice(0, 40);
       if (what === "ids") {
@@ -738,14 +741,17 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         const out = setPngDpi(new Uint8Array(await blob.arrayBuffer()), exportDpi);
         const sized = new Blob([out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer], { type: "image/png" });
         save(sized, stem + "-" + exportWidthIn + "in.png");
-      } else if (what === "svg") {
+      } else if (what === "svg" || what === "pdf") {
+        // a PDF is the same server SVG, drawn onto a page its size
         const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
         const res = await api.oncoprint(specOnScreen() as OncoprintBody, { query: "?format=svg&width=" + w + "&widthIn=" + exportWidthIn,
           endpoint: props.endpoint, pins: props.uploads });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || res.statusText);
-        save(await res.blob(), stem + "-" + exportWidthIn + "in.svg");
+        const name = stem + "-" + exportWidthIn + "in." + what;
+        if (what === "svg") save(await res.blob(), name);
+        else save(await svgToPdf(await res.text()), name);
       }
-    } catch (e) { setError(String((e as Error).message || e)); }
+    } catch (e) { setExportError(String((e as Error).message || e)); }
     setSaving(null);
   };
   return (
@@ -757,6 +763,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         <div className="loading-block" role="status"><span className="spinner" /> querying and building the oncoprint…</div>
         <div className="skeleton skeleton-view" />
       </>}
+      {exportError && !exportOpen && <ErrorAlert>download: {exportError}</ErrorAlert>}
       {data && visible && !error && <>
         {/* The toolbar is two kinds of control, and they are kept apart on purpose. DATA changes
             what is drawn and costs a query; VIEW changes how it is drawn and is instant. Each zone
@@ -842,7 +849,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               label={saving ? "saving…" : <Ellipsis />}>
               {(close) => <>
                 <span className="meta px-2">download figures</span>
-                <MenuItem onClick={() => { close(); openExport(); }}><ImageDown />Export image (PNG or SVG)… — choose a page width</MenuItem>
+                <MenuItem onClick={() => { close(); openExport(); }}><ImageDown />Export image (PNG, SVG or PDF)… — choose a page width</MenuItem>
                 <MenuItem onClick={() => { close(); void download("tsv"); }}><Sheet />Tabular — rows by data type, one column per {data.unit} as drawn</MenuItem>
                 <MenuItem onClick={() => { close(); void download("ids"); }}><ListOrdered />{data.unit === "sample" ? "Sample" : "Patient"} order — the ids as drawn</MenuItem>
                 {/* Not a download: the same spec, opened where it can be run rather than looked at.
@@ -1049,9 +1056,10 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             <DialogHeader><DialogTitle className="text-base">Export image</DialogTitle></DialogHeader>
             <label className="setrow">
               <span className="meta">format</span>
-              <OptionSelect value={exportFormat} onValueChange={(v) => setExportFormat(v as "png" | "svg")}>
+              <OptionSelect value={exportFormat} onValueChange={(v) => setExportFormat(v as "png" | "svg" | "pdf")}>
                 <option value="png">PNG — raster</option>
                 <option value="svg">SVG — vector, sharp at any size</option>
+                <option value="pdf">PDF — vector, one page the figure's size</option>
               </OptionSelect>
             </label>
             <label className="setrow">
@@ -1079,6 +1087,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             <div className="onco-export-preview">
               <canvas ref={setExportCanvas} />
             </div>
+            {exportError && <ErrorAlert>export: {exportError}</ErrorAlert>}
             <DialogFooter className="mt-1">
               <Button type="button" variant="ghost" onClick={() => setExportOpen(false)}>Cancel</Button>
               <Button disabled={!!saving} onClick={() => download(exportFormat)}>

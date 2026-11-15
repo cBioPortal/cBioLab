@@ -535,6 +535,14 @@ const MUTANTS: Mutant[] = [
     effect: "A profile's kind is read without its datatype, so heatmap rows are typed \"HEATMAP MRNA_EXPRESSION \" and two profiles of one alteration type share a group.",
     find: "gp.genetic_alteration_type AS type, gp.datatype AS datatype\\n\"",
     replace: "gp.genetic_alteration_type AS type, '' AS datatype\\n\"" },
+  { id: "pdf-inches-as-css-px", layer: "counts", guard: "unit", file: "app/_oncoprint/pdf.ts",
+    effect: "The PDF export reads the SVG's inches at 96 to the inch instead of 72 points, so an 8.5 in figure prints on an 11.3 in page.",
+    find: "return m[2] === \"in\" ? x * 72 :",
+    replace: "return m[2] === \"in\" ? x * 96 :" },
+  { id: "pdf-px-as-points", layer: "counts", guard: "unit", file: "app/_oncoprint/pdf.ts",
+    effect: "The PDF export reads an SVG width in CSS pixels as points, so a figure sized in pixels prints a third larger than on screen.",
+    find: ": m[2] === \"pt\" ? x : x * 0.75;",
+    replace: ": x;" },
 ];
 
 /**
