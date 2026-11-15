@@ -338,10 +338,8 @@ test("O23: re-normalizing a list's canonical form keeps each row's OQL (lib/onco
   assert.deepEqual(again, tracks);
 });
 
-test("O29: a row's EXP or PROT is refused, naming it", () => {
-  assert.throws(() => normalizeGeneTracks(["KRAS: EXP>2"]), /EXP|PROT/);
-  assert.throws(() => normalizeGeneTracks(["KRAS: PROT<-1"]), /EXP|PROT/);
-  assert.throws(() => normalizeGeneTracks(["KRAS: AMP EXP>2", "TP53"]), /EXP|PROT/, "even beside a drawable command");
+test("O29: a row's EXP or PROT is drawn (PR 4; test/oncoprint-oql-exp.test.ts)", () => {
+  assert.equal(normalizeGeneTracks(["KRAS: AMP EXP>2", "TP53"]).tracks[0].key, "KRAS: AMP EXP>2");
 });
 
 test("O30: OQL inside a merged row is refused", () => {
