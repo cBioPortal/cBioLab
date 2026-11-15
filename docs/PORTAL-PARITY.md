@@ -377,7 +377,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] "Show only profiled" (`hide_unprofiled_samples`) with its all/any radios, its CaseFilterWarning, and the AlterationFilterWarning, on every Results tab (ONC-MD-3, CTS-MD-7, MEX-MD-6, PLT-MD-5, PLT-CH-3, MUT-MD-13, CNS-0.2) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md), [05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] OncoKB's germline rule (Pathogenic / Likely Pathogenic for a germline mutation): the store holds one call per alteration
   - [ ] A plot's menu lists no tiers (a plot does not report its data's tiers); the plot tooltip's OncoKB and hotspot icons
-- [ ] **Oncoprint export** — PDF and tabular ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
+- [x] **Oncoprint export** — PDF and tabular ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
   - [x] The Tabular download as the portal writes it, `PATIENT_DATA_oncoprint.tsv` / `SAMPLE_DATA_oncoprint.tsv` (tabularDownload.ts): CLINICAL rows by display name (the mutation spectrum one row per substitution, "Mutation spectrum (C>A)"); then each gene's CNA, MUTATIONS, MRNA, PROTEIN and STRUCTURAL_VARIANT rows, every gene in every group; then a group per heatmap profile, `HEATMAP MRNA_EXPRESSION Z-SCORE`, `HEATMAP GENERIC_ASSAY LIMIT-VALUE`, rows named by gene or entity; the columns as drawn (the page's sort, Show unaltered). A mutation cell is the one class drawn, "Truncating mutation (putative driver)", "(putative passenger)" with annotation on, no suffix with it off, Promoter never; a cell not profiled is empty. The server's, the CLI's and the Python package's TSV are the same file, without the page's order (ONC-DL-4)
     - Ours alone: splice and other mutations as "Splice Mutation" / "Other Mutation", a driver copy number "Amplification (putative driver)", a structural variant "Structural Variant" (and "(putative driver)"); the portal writes its internal codes `splice_rec`, `amp_rec`, `sv_rec`
     - Ours alone: a merged row is named as drawn (`RAS`); the portal names it by its genes (`KRAS / NRAS`) whatever its label
@@ -385,7 +385,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - Ours alone: numbers as float32 holds them (7 significant digits); the VAF heatmap is `HEATMAP MUTATION_EXTENDED VAF`; derived-event rows come last, typed `DERIVED`, `yes`/`no`
     - Several studies naming one attribute differently (AGE: "Age", "Diagnosis Age", … in 14 forms): the first study's name
   - [x] The order file as the portal's: "Patient order in the Oncoprint is:" then the ids as drawn, `OncoPrintPatients.txt` / `OncoPrintSamples.txt` (ONC-DL-3)
-  - [ ] PDF (ONC-DL-2)
+  - [x] PDF, as the portal makes one (svgToPdfDownload: jsPDF and svg2pdf.js over the figure's SVG): the server SVG the SVG export saves, one page its size in points (612 pt wide at 8.5 in), vectors with the text kept as text, the font embedded (ONC-DL-2)
+    - Ours alone: in the Export image dialog beside PNG and SVG, at its chosen page width, named `oncoprint-<study>-<w>in.pdf`; the portal's Download menu saves `oncoprint.pdf` at the figure's screen size. Our font is IBM Plex Sans, bundled; the portal fetches FreeSans from its CDN
   - [ ] **After the initial release:** Open in Oncoprinter (ONC-DL-5)
 
 ## Lower — resources, tools and niche features
