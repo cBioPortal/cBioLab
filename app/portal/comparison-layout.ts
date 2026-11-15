@@ -7,6 +7,19 @@ import { mrnaComparisonProfile, proteinProfile, methylationProfile, probeMethyla
 /** the most groups an expression tab compares (the diffexpr view's limit) */
 const EXPRESSION_MAX_GROUPS = 10;
 
+/** the portal's priorities for the usual survival endpoints (Survival.tsx); others follow, by name */
+const SURVIVAL_PRIORITY = ["OS", "DFS", "PFS", "DSS"];
+
+/**
+ * The endpoint the Survival tab opens on: the study's <X>_MONTHS / <X>_STATUS pairs, the first by the
+ * portal's priority; null when it has none, and the tab is not shown (CMP-SV-1, CMP-PG-4).
+ */
+export function survivalDefault(attributes: string[]): string | null {
+  const ids = new Set(attributes);
+  const pairs = [...ids].map((a) => /^(.+)_MONTHS$/.exec(a)?.[1]).filter((x): x is string => !!x && ids.has(x + "_STATUS")).sort();
+  return SURVIVAL_PRIORITY.find((e) => pairs.includes(e)) || pairs[0] || null;
+}
+
 /** the page's tabs; before the study's profiles and attributes are known (`known` null), those that need neither */
 export function comparisonLayout(linked: AnalysisDoc, study: string, known: StudyKnown | null, drivers: boolean): PageLayout {
   const names = Object.keys(linked.cohorts || {});
@@ -26,17 +39,21 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
   const mutationsOk = mutationProfile && names.length === 2;
   const assays = known ? assayComparisonProfiles(catalog) : [];
   const clinical = known?.clinical || [];
+  const endpoint = survivalDefault(clinical);
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
   const measure = drivers ? "driver" : "any";
-  const left = !known ? [] : [!clinical.length && "Clinical (no attributes)",
+  const left = !known ? [] : [!clinical.length && "Clinical (no attributes)", !endpoint && "Survival (no survival data)",
     !mutationProfile ? "Mutations (no mutation profile)" : !mutationsOk && "Mutations (compares exactly 2 groups, and " + names.length + (names.length === 1 ? " is" : " are") + " compared)",
     ...expression.filter((e) => (!e.profile && e.none) || (e.profile && !groupsOk)).map((e) => e.title + " (" + (!e.profile ? e.none
       : "compares 2 to " + EXPRESSION_MAX_GROUPS + " groups, and " + names.length + (names.length === 1 ? " is" : " are") + " compared") + ")"),
     !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
   return arrange({ study, cohorts: linked.cohorts }, [
     { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
-    // the page's Include mode compares groups that may share patients: their curves, but no test
-    { title: "Survival", views: [v("Survival", { kind: "survival", noTestWhenShared: true })] },
+    // the survival-type table beside the curves, which start on the portal's first endpoint; the
+    // page's Include mode compares groups that may share patients: their curves, but no test. Before
+    // the study's attributes are known the tab is offered on OS, and once known only with survival data
+    ...(!known || endpoint ? [{ title: "Survival", views: [v("Survival", { kind: "survival", types: true, noTestWhenShared: true,
+      ...(endpoint && endpoint !== "OS" ? { endpoint } : {}) })] }] : []),
     // every attribute, as the portal's tab tests them
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true })] }] : []),
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),

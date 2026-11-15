@@ -3,7 +3,7 @@
 // a tab the page cannot show says why rather than going missing.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { comparisonLayout } from "../app/portal/comparison-layout.ts";
+import { comparisonLayout, survivalDefault } from "../app/portal/comparison-layout.ts";
 import { mrnaComparisonProfile, proteinProfile, methylationProfile, probeMethylation, type StudyKnown } from "../app/portal/study-known.ts";
 import type { ProfileInfo } from "../lib/profile-catalog.ts";
 
@@ -125,7 +125,22 @@ test("the Mutations tab: the two-group lollipop after Genomic Alterations, for e
 test("the Clinical tab tests every attribute the study declares, not the 8 best covered (CMP-CL-2)", () => {
   assert.deepEqual(tabOf(layout(2, BRCA_TCGA), "Clinical"), { kind: "clinical", allAttributes: true, rankTests: true });
 });
+test("the Survival tab: the survival-type table, and no log-rank p when the groups share patients (CMP-SV-4, CMP-SV-5)", () => {
+  const withOs = comparisonLayout({ study: "s", cohorts: cohorts(2) } as any, "s", { ...known(BRCA_TCGA), clinical: ["SEX", "OS_MONTHS", "OS_STATUS"] }, false);
+  assert.deepEqual(tabOf(withOs, "Survival"), { kind: "survival", types: true, noTestWhenShared: true });
+});
 
-test("the Survival tab gives no log-rank p when the groups share patients (Include mode, CMP-SV-4)", () => {
-  assert.deepEqual(tabOf(layout(2, BRCA_TCGA), "Survival"), { kind: "survival", noTestWhenShared: true });
+test("the Survival tab opens on the portal's first endpoint, and is not shown without survival data (CMP-SV-1, CMP-PG-4)", () => {
+  // OS 400, DFS 300, PFS and DSS 250, then the others by name; a pair needs both _MONTHS and _STATUS
+  assert.equal(survivalDefault(["PFS_MONTHS", "PFS_STATUS", "OS_MONTHS", "OS_STATUS"]), "OS");
+  assert.equal(survivalDefault(["PFS_MONTHS", "PFS_STATUS", "DFS_MONTHS", "DFS_STATUS", "OS_MONTHS"]), "DFS");
+  assert.equal(survivalDefault(["RFS_MONTHS", "RFS_STATUS", "EFS_STATUS", "EFS_MONTHS"]), "EFS");
+  assert.equal(survivalDefault(["OS_MONTHS", "SEX"]), null);
+  const of = (clinical: string[]) => comparisonLayout({ study: "s", cohorts: cohorts(2) } as any, "s", { ...known(BRCA_TCGA), clinical }, false);
+  assert.deepEqual(tabOf(of(["PFS_MONTHS", "PFS_STATUS"]), "Survival"), { kind: "survival", types: true, noTestWhenShared: true, endpoint: "PFS" });
+  const none = of(["SEX"]);
+  assert.equal(none.tabs.some((t) => t.title === "Survival"), false);
+  assert.ok(none.left.includes("Survival (no survival data)"), none.left.join("; "));
+  // before the attributes are known the tab is offered, on OS
+  assert.deepEqual(tabOf(layout(2, null), "Survival"), { kind: "survival", types: true, noTestWhenShared: true });
 });

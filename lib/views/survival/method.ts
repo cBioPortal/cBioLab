@@ -21,6 +21,10 @@ export interface SurvivalTrace {
   }[];
   /** every (months, event, n[, entry]) row each study returned, per cohort */
   counts: { cohort: string; study: string; months: number; event: number; n: number; entry?: number }[];
+  /** the survival-type table: each endpoint's test (df, whether stratified by study) or why none, and its q */
+  types?: { endpoint: string; title: string; patients: number; p?: number; q?: number; why?: string; df?: number; stratified?: boolean }[];
+  /** every (months, event, n) row each study returned for each endpoint of the table, per cohort */
+  typeCounts?: { endpoint: string; cohort: string; study: string; months: number; event: number; n: number }[];
   test:
     | { kind: "none"; reason: string }
     | { kind: "logrank" | "logrankK"; stratified: boolean; strata: number; chi2: number; df: number; p: number;
@@ -73,6 +77,15 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
       ],
     });
   }
+  const typed = (t.types || []).filter((x) => x.p != null);
+  if (t.types?.length) {
+    steps.push({ kind: "statistic", title: "The survival-type table: a log-rank test per endpoint, then Benjamini–Hochberg",
+      detail: "Every endpoint the studies declare (an <X>_MONTHS / <X>_STATUS pair), counted per cohort as above with no cutoff, each tested by the same rules as the curves drawn" +
+        " (refused under the same patient floor, or when the cohorts share patients and the view withholds the test). q-values are Benjamini–Hochberg over the " +
+        typed.length + " endpoints tested, as cBioPortal's survival-type table computes them.",
+      params: t.types.map((x) => [x.title + " (" + x.endpoint + ")", plural(x.patients, "patient") + " · " +
+        (x.p != null ? "p " + pFmt(x.p) + " · q " + pFmt(x.q!) : "not tested: " + x.why)] as [string, string]) });
+  }
   const hasEntry = t.counts.some((r) => r.entry != null);
   const cols = ["cohort", "study", "months", "event", "n", ...(hasEntry ? ["entry"] : [])];
   const python = [
@@ -116,6 +129,24 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
         "RESULT[\"logrank:chi2\"], RESULT[\"logrank:p\"] = chi2, chi2_dist.sf(chi2, " + t.test.df + ")",
       ]),
     ]),
+    ...(typed.length ? [
+      "",
+      "# the survival-type table: each endpoint's log-rank p from its own count rows, then BH over those tested",
+      "from statsmodels.stats.multitest import multipletests",
+      ...pyTable("type_counts", "What the survivalCounts query returned for each endpoint of the table, cohort and study", ["endpoint", "cohort", "study", "months", "event", "n"],
+        (t.typeCounts || []).map((r) => [r.endpoint, r.cohort, r.study, r.months, r.event, r.n]), "survival_type_counts.csv"),
+      "tested = " + JSON.stringify(Object.fromEntries(typed.map((x) => [x.endpoint, [x.df, x.stratified ? 1 : 0]]))) + "  # endpoint: [df, stratified by study]",
+      "type_p = {}",
+      "for e, (dfree, strat) in tested.items():",
+      "    g = type_counts[type_counts[\"endpoint\"] == e]",
+      "    g = g.loc[g.index.repeat(g[\"n\"])].reset_index(drop=True)",
+      "    g = g[g[\"months\"] >= 0]",
+      "    chi2, _ = survdiff(g[\"months\"], g[\"event\"], g[\"cohort\"], **({\"strata\": g[\"study\"]} if strat else {}))",
+      "    type_p[e] = chi2_dist.sf(chi2, dfree)",
+      "for e, qv in zip(type_p, multipletests(list(type_p.values()), method=\"fdr_bh\")[1]):",
+      "    print(f\"{e}: log-rank p={type_p[e]:.4g}, q={qv:.4g}\")",
+      "    RESULT[f\"type:{e}:p\"], RESULT[f\"type:{e}:q\"] = type_p[e], qv",
+    ] : []),
   ].join("\n") + "\n";
   return {
     steps,
@@ -131,6 +162,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
         "logrank:chi2": { v: t.test.chi2, abs: 5e-5 }, "logrank:p": { v: t.test.p, rel: 1e-5, abs: 1e-300 },
         ...(t.test.pooled ? { "logrank:pooled:chi2": { v: t.test.pooled.chi2, abs: 5e-5 }, "logrank:pooled:p": { v: t.test.pooled.p, rel: 1e-5, abs: 1e-300 } } : {}),
       }),
+      ...checks("type:", typed, (x) => x.endpoint, [["p", "p", { rel: 1e-5, abs: 1e-300 }], ["q", "q", { rel: 1e-5, abs: 1e-300 }]]),
     },
   };
 }
