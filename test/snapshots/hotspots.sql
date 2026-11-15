@@ -88,7 +88,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
              AND sampleId IN (SELECT sid FROM cohort)),
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExact(pid) AS patients, uniqExact((pid, change)) AS pairs,
-       uniqExactIf(sid, status != 'GERMLINE') AS somatic_samples
+       uniqExactIf(sid, NOT positionCaseInsensitive(ifNull(status, ''), 'germline') > 0) AS somatic_samples
 FROM m GROUP BY gene
 
 -- view 0 hotspots: lollipop:types · msk_chord_2024

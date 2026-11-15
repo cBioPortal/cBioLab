@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "germline-status";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -34,6 +34,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "oncokb-tumor-type": ["node", "--env-file=.env.local", "scripts/check-oncokb-tumor-type.ts"],
   "oncokb-sv": ["node", "--env-file=.env.local", "scripts/check-oncokb-sv.ts"],
   "hotspot-drivers": ["node", "--env-file=.env.local", "scripts/check-hotspot-drivers.ts"],
+  "germline-status": ["node", "--env-file=.env.local", "scripts/check-germline-status.ts"],
 };
 
 interface Mutant {
@@ -674,6 +675,10 @@ const MUTANTS: Mutant[] = [
     effect: "The cohort's EGFR: MUT takes FX-P44's mutation typed Fusion, which the oncoprint's row leaves out.",
     find: "conds.push(\"lower(g.mutation_type) != 'fusion'\");\n",
     replace: "" },
+  { id: "germline-status-case-sensitive", layer: "counts", guard: "germline-status", file: "lib/driver-sql.ts",
+    effect: "A study that writes its germline calls \"Germline\" has them counted as somatic, so the Mutations tab's somatic frequency is too high (ov_tcga_pub BRCA1: 37 samples for the portal's 11).",
+    find: "\"positionCaseInsensitive(\" + col + \", 'germline') > 0\"",
+    replace: "col + \" = 'GERMLINE'\"" },
 ];
 
 /**

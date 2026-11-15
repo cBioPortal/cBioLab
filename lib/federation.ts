@@ -37,6 +37,7 @@ export * from "./federation-views.ts";
 export { plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotHighlightCountSql, plotMomentsSql, plotStatsSql, plotTableSql, plotViolinSql };
 export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLayer, HighlightPoint, ViolinBin } from "./plot.ts";
 import { impactSql } from "./lollipop.ts";
+import { germlineStatusSql } from "./driver-sql.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
 import { pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
@@ -565,11 +566,11 @@ export function lollipopTypesSql(cohortSql: string, genes: string[], study: stri
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
     "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
-/** Per gene: mutated patients, distinct (patient, change) pairs, and samples with a somatic one. */
+/** Per gene: mutated patients, distinct (patient, change) pairs, and samples with a somatic one (a mutation whose status is not germline, in any spelling). */
 export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB): AggregateSql {
   return aggregateSql(lollipopCte(cohortSql, genes, study, 1, null, db) +
     "SELECT gene, uniqExact(pid) AS patients, uniqExact((pid, change)) AS pairs,\n" +
-    "       uniqExactIf(sid, status != 'GERMLINE') AS somatic_samples\n" +
+    "       uniqExactIf(sid, NOT " + germlineStatusSql("ifNull(status, '')") + ") AS somatic_samples\n" +
     "FROM m GROUP BY gene");
 }
 /** A compiled cohort's size: its patients (the owners of its samples) and its samples. */

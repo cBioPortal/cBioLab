@@ -47,7 +47,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] Plots: a box for n = 1 is drawn as a flat box with a whisker ([04-plots](legacy-spec/parity/04-plots.md))
 - [ ] Plots: Swap on a box plot with its categories on the vertical axis is not drawn; the sidebar says "Swap to make them agree" instead ([04-plots](legacy-spec/parity/04-plots.md))
 - [ ] Mutations: a gene with no mutations (Q2 ERG) has no empty state: it is dropped from the result (`lib/views/hotspots/run.ts:28`), and the card shows only the method caption, `note` being always set (`app/_lollipop/HotspotsBody.tsx:87`) ([05-mutations](legacy-spec/parity/05-mutations.md))
-- [ ] Mutations: the germline test is case-sensitive (`status != 'GERMLINE'`, `lib/federation.ts:566`), so a study's "Germline" calls count as somatic ([05-mutations](legacy-spec/parity/05-mutations.md))
+- [x] Mutations: the germline test is case-sensitive (`status != 'GERMLINE'`, `lib/federation.ts:566`), so a study's "Germline" calls count as somatic ([05-mutations](legacy-spec/parity/05-mutations.md)) (#PR)
 - [ ] Mutations: the Ensembl link is always GRCh37 (`app/_lollipop/TranscriptSummary.tsx:25`), wrong for a GRCh38 study ([05-mutations](legacy-spec/parity/05-mutations.md))
 - [ ] Mutations: the legend lists "Splice site" under Truncating, while splice stems are drawn orange as Splice (copied from the portal, MUT-LP-5) ([05-mutations](legacy-spec/parity/05-mutations.md))
 - [x] CN Segments: `lib/views/segments/README.md` and the caption say rows are in the portal's API order; they are not (CNS-3.5) ([08-cn-segments](legacy-spec/parity/08-cn-segments.md)) (#183)

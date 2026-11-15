@@ -22,6 +22,14 @@ export function driverCondSql(s: ResolvedDrivers, pin: string | null | undefined
   return or.length ? "(" + or.join("\n   OR ") + ")" : "0";
 }
 
+/**
+ * A mutation status is germline, as SQL: it contains "germline" in any case, as the portal's
+ * GERMLINE_REGEXP (/germline/i, cbioportal-frontend MutationUtils.tsx) tests it — "Germline",
+ * "GERMLINE", "germline" alike. A Nullable column is wrapped in ifNull(…, '') by the caller, so that
+ * a NULL status is not germline, as the regexp finds no "germline" in "null".
+ */
+export const germlineStatusSql = (col: string): string => "positionCaseInsensitive(" + col + ", 'germline') > 0";
+
 /** a genomic_event_derived row is a germline mutation, as SQL */
 export const germlineCondSql = (g = ""): string =>
-  "(" + (g ? g + "." : "") + "variant_type = 'mutation' AND positionCaseInsensitive(" + (g ? g + "." : "") + "mutation_status, 'germline') > 0)";
+  "(" + (g ? g + "." : "") + "variant_type = 'mutation' AND " + germlineStatusSql((g ? g + "." : "") + "mutation_status") + ")";
