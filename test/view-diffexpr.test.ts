@@ -270,3 +270,46 @@ describe("diffexpr: enrichment", () => {
     assert.match(r.error!, /no MSigDB set named HALLMARK_NOPE in this warehouse/);
   });
 });
+
+describe("diffexpr: a group without data is left out, the others compared (CMM-MD-8, CMM-STM-4)", () => {
+  // the portal's G5 Protein: Normal has no CPTAC protein data, so the other four groups are tested
+  const A = { UP: [5, 6, 7, 6, 5.5], DOWN: [0, 0.5, 1, 0.2] }, B = { UP: [0, 1, 0.5, 0.2, 0.7], DOWN: [4, 5, 6, 5] };
+  const C = { UP: [1, 1.5, 0.5, 1.2], DOWN: [2, 2.5, 3, 2.2] }, D = { UP: [2, 3, 2.5], DOWN: [1, 1.5, 1.2] };
+  test("five groups, one with no values: one-way ANOVA over the four, the left-out group named in the caveat, the result and the method", async () => {
+    const r = await run({}, ctx({ Basal: cohort({ s1: 5 }), Her2: cohort({ s1: 5 }), LumA: cohort({ s1: 4 }), LumB: cohort({ s1: 3 }), Normal: cohort({ s1: 6 }) },
+      { s1: site({ Basal: A, Her2: B, LumA: C, LumB: D, Normal: {} }) }));
+    const d = de(r);
+    assert.equal(r.error, undefined);
+    assert.deepEqual(d.groups, ["Basal", "Her2", "LumA", "LumB"]);
+    assert.deepEqual(d.dropped, ["Normal"]);
+    assert.equal(d.test, "one-way ANOVA");
+    assert.equal(d.tested, 2);
+    const up = d.points.find((g) => g.gene === "UP")!;
+    assert.deepEqual(up.n, [5, 5, 4, 3]);
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const w = oneWayAnova([A.UP, B.UP, C.UP, D.UP].map((xs) => { const m = moments("UP", xs); return { n: xs.length, mean: mean(xs), variance: varianceFromMoments(xs.length, m.sx, m.sxx) }; }));
+    assert.equal(up.p, w.p);
+    assert.match(r.caveat!, /^Normal is left out: no gene has 3 samples with a mrna_zscores value in it, so the other groups are compared, as cBioPortal leaves a group without data out\. One-way ANOVA per gene across the 4 cohorts/);
+    const step = r.method!.steps.find((s) => s.title === "Leave out a group without data")!;
+    assert.deepEqual(step.params, [["compared", "Basal, Her2, LumA, LumB"], ["left out", "Normal"]]);
+    assert.match(r.method!.python!, /cohorts = \["Basal","Her2","LumA","LumB"\]/);
+  });
+  test("a group with values for too few samples counts as without data; two left are compared by Welch's t", async () => {
+    const r = await run({}, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }), N: cohort({ s1: 2 }) }, { s1: site({ A, B, N: { UP: [1, 2], DOWN: [3, 4] } }) }));
+    const d = de(r);
+    assert.deepEqual(d.groups, ["A", "B"]);
+    assert.deepEqual(d.dropped, ["N"]);
+    assert.equal(d.test, "Welch's t-test");
+    const up = d.points.find((g) => g.gene === "UP")!;
+    const a = moments("UP", A.UP), b = moments("UP", B.UP);
+    assert.equal(up.p, welchT(5, a.sx / 5, varianceFromMoments(5, a.sx, a.sxx), 5, b.sx / 5, varianceFromMoments(5, b.sx, b.sxx)).p);
+  });
+  test("every group holding data: nothing left out", async () => {
+    const d = de(await run({}, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 5 }) }, { s1: site({ A, B }) })));
+    assert.equal(d.dropped, undefined);
+  });
+  test("only one group with data: refused as before, the groups' sizes named", async () => {
+    const r = await run({}, ctx({ A: cohort({ s1: 5 }), B: cohort({ s1: 4 }), C: cohort({ s1: 3 }) }, { s1: site({ A, B: {}, C: {} }) }));
+    assert.match(r.error!, /no gene had at least 3 samples with a mrna_zscores value in every cohort \(cohort sizes A 5, B 4, C 3\)/);
+  });
+});

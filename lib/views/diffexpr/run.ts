@@ -22,7 +22,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
   if (vNames.length < 2 || vNames.length > DE_MAX_COHORTS)
     return refuse("diffexpr", ctx, "a diffexpr view compares 2 to " + DE_MAX_COHORTS + " cohorts; this one draws " + vNames.length +
       (vNames.length > DE_MAX_COHORTS ? " — name at most " + DE_MAX_COHORTS + " in its cohorts" : " — add a second cohort to compare against"));
-  const two = vNames.length === 2;
+  let two = vNames.length === 2;
   const profileType = String(view.profileType || "").trim();
   if (!profileType) return refuse("diffexpr", ctx, "a diffexpr view needs profileType, the molecular profile to compare on");
   const label = view.label == null ? 12 : Math.floor(Number(view.label));
@@ -70,12 +70,20 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       moments.set(k, cur);
     }
   }
-  const [A, B] = vNames;
+  // A cohort holding no gene with enough values in this profile is left out, as the portal leaves a
+  // group without data out (CMM-MD-8), and the others are compared, said in the caveat and the method
+  const enough = new Set<string>();
+  for (const [k, m] of moments) if (m.n >= DE_MIN_N) enough.add(k.slice(0, k.indexOf("|")));
+  const withData = vNames.filter((n) => enough.has(n));
+  const dropped = withData.length >= 2 ? vNames.filter((n) => !enough.has(n)) : [];
+  const groups = dropped.length ? withData : vNames;
+  two = groups.length === 2;
+  const [A, B] = groups;
   const genes = [...new Set([...moments.keys()].map((k) => k.slice(k.indexOf("|") + 1)))];
   const tested: DiffexprGene[] = [];
   let skipped = 0;
   for (const g of genes) {
-    const ms = vNames.map((n) => moments.get(n + "|" + g));
+    const ms = groups.map((n) => moments.get(n + "|" + g));
     if (ms.some((m) => !m || m.n < DE_MIN_N)) { skipped++; continue; }
     const cs = ms.map((m) => ({ n: m!.n, mean: m!.sx / m!.n, v: varianceFromMoments(m!.n, m!.sx, m!.sxx) }));
     // a constant gene's variance from Σv² − (Σv)²/n is rounding noise, whose sign depends on the
@@ -157,24 +165,25 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
   return {
     kind: "diffexpr", cohorts: vNames,
     method: diffexprMethod({
-      profileType, log2, groups: vNames, minN: DE_MIN_N, tested: tested.length, skipped,
+      profileType, log2, groups, minN: DE_MIN_N, tested: tested.length, skipped, ...(dropped.length ? { dropped } : {}),
       perSite: vNames.flatMap((n) => [...cohorts[n].studies].filter((st) => ok[st]).sort()
         .map((st) => ({ cohort: n, study: st, cohortSamples: cohorts[n].perStudy[st]?.samples || 0 }))),
       moments: [...moments].map(([k, m]) => ({ cohort: k.slice(0, k.indexOf("|")), gene: k.slice(k.indexOf("|") + 1), n: m.n, sx: m.sx, sxx: m.sxx }))
-        .sort((x, y) => vNames.indexOf(x.cohort) - vNames.indexOf(y.cohort) || (x.gene < y.gene ? -1 : x.gene > y.gene ? 1 : 0)),
+        .filter((m) => groups.includes(m.cohort))
+        .sort((x, y) => groups.indexOf(x.cohort) - groups.indexOf(y.cohort) || (x.gene < y.gene ? -1 : x.gene > y.gene ? 1 : 0)),
       ...(gsea && gseaSets ? { gsea: { sets: gseaSets, tested: gsea.sets.length, skipped: gsea.skipped, permutations: DE_PERMUTATIONS, minSize: 10 } } : {}),
       results: { genes: points.map((g) => ({ gene: g.gene, p: g.p, q: g.q })),
         sets: (gsea?.sets || []).map((x) => ({ name: x.name, es: x.es, nes: x.nes, p: x.p })) },
     }),
-    diffexpr: { profileType, ...(gene ? { gene } : {}), ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups: vNames,
+    diffexpr: { profileType, ...(gene ? { gene } : {}), ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups, ...(dropped.length ? { dropped } : {}),
       test: two ? "Welch's t-test" : "one-way ANOVA", tested: tested.length, skipped, significant: sig.length, ...(two ? { up, down } : {}),
       points, ...(grid ? { grid } : {}), pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: (two ? "Welch's t-test per gene on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") + ", " + A + " minus " + B +
+    caveat: (dropped.length ? droppedNote(dropped, profileType) + " " : "") + (two ? "Welch's t-test per gene on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") + ", " + A + " minus " + B +
       ", each sample in the cohort one observation, as the portal's group comparison tests expression"
-      : "One-way ANOVA per gene across the " + vNames.length + " cohorts on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") +
+      : "One-way ANOVA per gene across the " + groups.length + " cohorts on " + profileType + (log2 ? " as log2(v + 1)" : " as stored") +
         ", each sample in a cohort one observation, as the portal's group comparison tests three or more groups (it assumes the cohorts' variances are equal)") +
       "; computed from three running totals per gene and cohort, so it is exact across sites. " +
       tested.length.toLocaleString("en-US") + " genes tested" + (skipped ? ", " + skipped.toLocaleString("en-US") + " left out (fewer than " + DE_MIN_N + " samples with a value in a cohort, or no variance)" : "") +
@@ -188,4 +197,10 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       (multi ? "Values are pooled across " + ctx.vStudies.length + " studies with no batch correction. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };
+}
+
+/** the cohorts left out for holding no data in the profile, in words */
+function droppedNote(dropped: string[], profileType: string): string {
+  return (dropped.length === 1 ? dropped[0] + " is" : dropped.join(", ") + " are") + " left out: no gene has " + DE_MIN_N +
+    " samples with a " + profileType + " value in " + (dropped.length === 1 ? "it" : "them") + ", so the other groups are compared, as cBioPortal leaves a group without data out.";
 }

@@ -16,6 +16,8 @@ export interface DiffexprTrace {
   minN: number;
   tested: number;
   skipped: number;
+  /** cohorts left out for holding no data in the profile */
+  dropped?: string[];
   gsea?: { sets: { name: string; genes: string[] }[]; tested: number; skipped: string[]; permutations: number; minSize: number };
   /** what the view reported — genes drawn as points, and each set tested — for the script check */
   results: { genes: { gene: string; p: number; q: number }[]; sets: { name: string; es: number; nes: number; p: number }[] };
@@ -32,6 +34,10 @@ export function diffexprMethod(t: DiffexprTrace): MethodRecord {
   }));
   if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's sums across its studies",
     detail: "The totals add exactly; there is no batch correction between studies." });
+  if (t.dropped?.length) steps.push({ kind: "transform", title: "Leave out " + (t.dropped.length === 1 ? "a group" : "groups") + " without data",
+    detail: t.dropped.join(", ") + (t.dropped.length === 1 ? " has" : " have") + " no gene with " + t.minN + " samples with a value in “" + t.profileType +
+      "”, so " + (t.dropped.length === 1 ? "it is" : "they are") + " left out and the other " + t.groups.length + " groups compared, as cBioPortal leaves a group without data out.",
+    params: [["compared", t.groups.join(", ")], ["left out", t.dropped.join(", ")]] });
   steps.push({ kind: "transform", title: "Leave out genes that cannot be tested",
     detail: "A gene with fewer than " + t.minN + " samples with a value in " + (two ? "either cohort" : "any cohort") + ", or with no variance (the cohorts' variances sum to ≤ 1e-9 · (1 + the sum of their squared means) — judged to a tolerance, since a constant gene's variance from the sums is rounding noise).",
     rowsIn: t.tested + t.skipped, rowsOut: t.tested });
