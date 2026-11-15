@@ -78,6 +78,9 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
     drivers: (view as OncoprintView).drivers,
     unit: (view as OncoprintView).unit,
     overlays: (view as OncoprintView).overlays,
+    ...((view as OncoprintView).exp ? { exp: (view as OncoprintView).exp } : {}),
+    ...((view as OncoprintView).prot ? { prot: (view as OncoprintView).prot } : {}),
+    ...((view as OncoprintView).ifHeld ? { ifHeld: (view as OncoprintView).ifHeld } : {}),
     ...(Object.keys(zReference).length ? { zReference } : {}),
     // document cohorts the view asked to draw as binary rows; the engine refuses them
     // across studies and in sample mode, which are exactly the cases where "is this

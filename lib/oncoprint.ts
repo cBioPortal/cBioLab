@@ -37,6 +37,7 @@ import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, 
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, clinicalMetaTable, assertCustomDataPresent } from "./custom-data.ts";
 import { finiteSql } from "./sql-number.ts";
+import { expressionProfileFor, type OqlPins } from "./oql.ts";
 import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
 import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
 import { CLINICAL_TRACK_LIMIT } from "./views/oncoprint/types.ts";
@@ -353,6 +354,22 @@ export function vafSql(genes: string[], study: string = STUDY, db: string = DB, 
     "GROUP BY pid, gene";
 }
 
+/**
+ * A row's EXP / PROT values: one row per SAMPLE (pid, gene, z), never combined, so each sample's
+ * value meets the row's OQL on its own as the portal's datum does (DataUtils
+ * fillGeneticTrackDatum); a patient column's samples all carry its id. Values that are not
+ * numbers are left out.
+ */
+export function expressionEventsSql(profileType: string, genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
+  return "SELECT " + (unit === "sample" ? "replaceOne(ga.sample_unique_id, " + sq(study + "_") + ", '')" : "replaceOne(sd.patient_unique_id, " + sq(study + "_") + ", '')") + " AS pid,\n" +
+    "       ga.hugo_gene_symbol AS gene, " + finiteSql("ga.alteration_value") + " AS z\n" +
+    "FROM " + db + ".genetic_alteration_derived ga\n" +
+    (unit === "sample" ? "" : "JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = ga.sample_unique_id\n") +
+    "WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(profileType) + "\n" +
+    "  AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+    "  AND " + finiteSql("ga.alteration_value") + " IS NOT NULL" + fromColumnSamples("ga.sample_unique_id", study, samples);
+}
+
 /** a group's value furthest from 0, sign kept; of a ± tie the positive one */
 const furthestFromZero = (v: string): string => "argMax(" + v + ", (abs(" + v + "), " + v + "))";
 
@@ -400,6 +417,11 @@ export function normalizeSpec(spec: OncoprintSpec) {
   const geneList = toGeneList(geneTracks);
   // genes a row's OQL tests by protein position, whose mutations are read with their positions
   const rangeGenes = geneTracks.filter((t) => t.oql?.some((x) => x.range)).map((t) => t.members[0]);
+  // genes a row's EXP / PROT reads, and the profiles they read (the query page's choice)
+  const levelGenes = { EXP: [] as string[], PROT: [] as string[] };
+  for (const t of geneTracks) for (const x of t.oql || [])
+    if ((x.type === "EXP" || x.type === "PROT") && !levelGenes[x.type].includes(t.members[0])) levelGenes[x.type].push(t.members[0]);
+  const levelPins = specLevelPins(spec);
   const clinical = (spec.clinical || []).map(String);
   if (clinical.length > CLINICAL_TRACK_LIMIT)
     throw new Error("clinical: " + clinical.length + " tracks asked for; an oncoprint draws at most " + CLINICAL_TRACK_LIMIT);
@@ -432,7 +454,36 @@ export function normalizeSpec(spec: OncoprintSpec) {
     const threshold = Number(o && o.threshold);
     return { kind, profileType, threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 2 };
   }).filter((o) => o.profileType);
-  return { genes, geneList, rangeGenes, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display, spec.drivers) };
+  return { genes, geneList, rangeGenes, levelGenes, levelPins, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display, spec.drivers) };
+}
+
+/** the profiles a row's EXP / PROT read, as an oql clause names them (ids without the study prefix) */
+function specLevelPins(spec: OncoprintSpec): OqlPins {
+  const pins: OqlPins = {};
+  for (const [k, t] of [["exp", "EXP"], ["prot", "PROT"]] as const) {
+    const v = spec[k];
+    if (v == null) continue;
+    if (typeof v !== "string" || !/^[A-Za-z0-9._-]{1,120}$/.test(v)) throw new Error("oncoprint: " + k + " names a profile by its id without the study prefix");
+    pins[t] = v;
+  }
+  if (spec.ifHeld != null) {
+    if (spec.ifHeld !== true) throw new Error("oncoprint: ifHeld is true or left out");
+    pins.ifHeld = true;
+  }
+  return pins;
+}
+
+/** a study's share of a row's EXP / PROT values: each read as (pid, gene, z), labelled with its type */
+async function levelRows(levelGenes: { EXP: string[]; PROT: string[] }, pins: OqlPins, profiles: string[],
+  read: (label: string, sql: string) => Promise<unknown[][]>, sql: (profile: string, genes: string[]) => string): Promise<unknown[][]> {
+  const out: unknown[][] = [];
+  for (const type of ["EXP", "PROT"] as const) {
+    if (!levelGenes[type].length) continue;
+    const profile = expressionProfileFor(type, profiles, pins);
+    for (const r of await read("oncoprint:" + (type === "EXP" ? "mRNA" : "protein") + " levels", sql(profile, levelGenes[type])))
+      out.push([r[0], r[1], type === "EXP" ? "exp" : "prot", r[2]]);
+  }
+  return out;
 }
 
 /** The study a single-study spec draws: `studies` when it lists exactly one, else `study`. */
@@ -505,6 +556,8 @@ export interface StudyInputs {
     kind?: string }[];
   /** per overlay spec: whether the study has the profile, and its values */
   overlays: { available: boolean; values: unknown[][] }[];
+  /** pid, gene, "exp" | "prot", z: the values a row's EXP / PROT reads, one per sample */
+  levels: unknown[][];
   /** the study's molecular profile types and numeric generic-assay profiles: what a missing profile is named against */
   profileTypes: string[];
   assays: string[];
@@ -520,6 +573,7 @@ export interface StudyInputs {
 export interface StudyInputsRequest {
   groups: (CohortDef | false)[] | null;
   genes: OncoprintSpec["genes"]; clinical: string[]; heatmap: HeatmapSpec[]; overlays: NonNullable<OncoprintSpec["overlays"]>;
+  exp?: string; prot?: string; ifHeld?: boolean;
   unit: Unit; lineGap: number;
 }
 
@@ -532,8 +586,9 @@ export interface OncoprintPeer { oncoprintInputs(req: StudyInputsRequest): Promi
  */
 export function studyOncoprintInputs(study: string, conn: ChConn, req: StudyInputsRequest, pin: string | null): Promise<StudyInputs> {
   return ensureChContext(async () => {
-    const { genes, rangeGenes, clinical, heatmap, overlays, unit, lineGap } = normalizeSpec({ genes: req.genes, clinical: req.clinical,
-      heatmap: req.heatmap, overlays: req.overlays, unit: req.unit, conventions: { lineGap: req.lineGap } });
+    const { genes, rangeGenes, levelGenes, levelPins, clinical, heatmap, overlays, unit, lineGap } = normalizeSpec({ genes: req.genes, clinical: req.clinical,
+      heatmap: req.heatmap, overlays: req.overlays, unit: req.unit, conventions: { lineGap: req.lineGap },
+      ...(req.exp ? { exp: req.exp } : {}), ...(req.prot ? { prot: req.prot } : {}), ...(req.ifHeld ? { ifHeld: req.ifHeld } : {}) });
     const queries: NonNullable<StudyInputs["queries"]> = [];
     const rows = async (label: string, sql: string): Promise<unknown[][]> => {
       const entry: { label: string; sql: string; ms?: number } = { label, sql };
@@ -595,7 +650,8 @@ export function studyOncoprintInputs(study: string, conn: ChConn, req: StudyInpu
       const available = types.has(ov.profileType);
       over.push({ available, values: available ? await rows("oncoprint:overlay " + ov.kind, heatmapSql(ov.profileType, genes, study, db, unit, samples)) : [] });
     }
-    return { genes, groups, events, coverage, facts, clinical: clinicalRows, clinicalNames, heatmap: heat, overlays: over,
+    const levels = await levelRows(levelGenes, levelPins, [...types], rows, (profile, g) => expressionEventsSql(profile, g, study, db, unit, samples));
+    return { genes, groups, events, coverage, facts, clinical: clinicalRows, clinicalNames, heatmap: heat, overlays: over, levels,
       profileTypes: [...types], assays: [...assayProfiles].filter(([, a]) => !isCategoricalAssay(a.datatype)).map(([pt]) => pt), queries };
   });
 }
@@ -626,6 +682,7 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
   return { genes: strings(r.genes, "genes"), groups, events: table(r.events, 11, "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
     facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"),
     ...(r.clinicalNames === undefined ? {} : { clinicalNames: table(r.clinicalNames, 2, "clinical display names") }), heatmap, overlays,
+    levels: table(r.levels, 4, "expression levels").map((x) => x[2] === "exp" || x[2] === "prot" ? x : bad("expression levels")),
     profileTypes: strings(r.profileTypes, "profile types"), assays: strings(r.assays, "assay profiles") };
 }
 
@@ -698,7 +755,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   }));
   const connOf = (s: string): ChConn => conns.get(s)!;
   const dbOf = (s: string): string => connOf(s).db;
-  const { genes, geneList, rangeGenes, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
+  const { genes, geneList, rangeGenes, levelGenes, levelPins, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
   if (unit === "sample" && derivedEvents.length)
     throw new Error("cohort rows are patient-level: a cohort selects patients, so drawing one per sample would repeat a patient's answer across their samples. Drop the rows or switch columns back to patients.");
@@ -716,7 +773,8 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
       return c[PIDS_SQL] && typeof c[PIDS_SQL] === "object" && !(c[PEER_STUDIES] || []).includes(s) ? false : c;
     }) : spec.cohort ? [spec.cohort.dsl] : null;
     const p = peer.oncoprintInputs({ groups, genes: spec.genes, clinical, heatmap: (spec.heatmap || []).slice(0, 4),
-      overlays: (spec.overlays || []).slice(0, 2), unit, lineGap }).then((r) => {
+      overlays: (spec.overlays || []).slice(0, 2), unit, lineGap,
+      ...(spec.exp ? { exp: spec.exp } : {}), ...(spec.prot ? { prot: spec.prot } : {}), ...(spec.ifHeld ? { ifHeld: spec.ifHeld } : {}) }).then((r) => {
       // drawn beside this instance's rows, so it must mean what they mean
       if (r.genes.join(",") !== genes.join(",") || r.heatmap.length !== heatmap.length || r.overlays.length !== overlays.length)
         throw new Error("the peer serving " + s + " read a different oncoprint than the one asked for; it is likely on another build");
@@ -837,6 +895,17 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   const drivers = forData(display.drivers!, events.some((e) => e.dt));
   if (drivers !== display.drivers) Object.assign(display, { drivers, hideVUS: drivers.hideVus, annotate: drivers.annotated ? "oncokb" : "none" });
   const annotation = await driverAnnotation(drivers, events, genes, multi ? studies : study);
+
+  // ---- a row's EXP / PROT: each sample's value in the profile it reads ----
+  if (levelGenes.EXP.length || levelGenes.PROT.length) {
+    const read = await Promise.all(studies.map(async (s) => ({ s, rows: peers.has(s) ? (await peerShare(s)).levels
+      : await levelRows(levelGenes, levelPins, [...await studyProfileTypes(s, dbOf(s), connOf(s))],
+        async (label, sql) => (await lqRows(label, sql, s)).rows, (profile, g) => expressionEventsSql(profile, g, s, dbOf(s), unit, samplesOf(s))) })));
+    for (const { s, rows } of read) {
+      const pref = multi ? s + "_" : "";
+      for (const r of rows) events.push({ pid: pref + (r[0] as string), gene: r[1] as string, vt: r[2] as string, z: Number(r[3]) });
+    }
+  }
 
   // ---- clinical values per attribute -------------------------------------
   const clinicalIn: AssembleInput["clinical"] = [];

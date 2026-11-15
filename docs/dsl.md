@@ -601,7 +601,12 @@ oncoprint does: an alteration is drawn when any of the line's commands wants it,
 follows the view's driver settings. The row keeps the gene as its label and its percentage's
 denominator (the patients profiled for the gene), and shows the line after the label in grey
 (`display.showOql: false` hides it). Two lines of one gene are two rows, both labelled by the gene,
-as the portal draws them (`["KRAS: AMP", "KRAS: MUT"]`). `EXP` / `PROT` in a row are refused for now.
+as the portal draws them (`["KRAS: AMP", "KRAS: MUT"]`). A row's `EXP>=2` / `PROT<=-1.5` draws the
+gene's mRNA (protein) level high or low in its cells, each sample's value against the line (the
+last command it meets sets high or low; a patient shows the level more of its samples have, high on
+a tie) and counts those columns as altered; it reads the view's `exp` / `prot` profile (ids
+without the study prefix, as an oql clause's, with `ifHeld`), else the study's z-score profile of
+that kind.
 
 **Oncoprint clinical tracks**: any attribute name; patient-level rows win, sample-level attributes
 fall back to one sample value per patient. Numeric attributes (≥90% parseable, >10 distinct) render

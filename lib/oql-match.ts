@@ -37,7 +37,19 @@ export function mutationClass(type: string | null | undefined, change: string | 
 export interface OqlEvent {
   vt: string; mt?: string | null; mv?: string | null; cna?: string | number | null;
   ps?: number | null; pe?: number | null;
+  /** an expression datum's level: vt "exp" (mRNA) or "prot" (protein), one sample's value */
+  z?: number | null;
 }
+
+/** an EXP / PROT command against a level: "high" or "low" when it is met, null otherwise (oqlfilter 1005-1060) */
+function levelOf(s: OqlSpec, ev: OqlEvent): "high" | "low" | null {
+  if (ev.vt !== (s.type === "EXP" ? "exp" : "prot") || ev.z == null || !Number.isFinite(ev.z)) return null;
+  const z = ev.z, t = s.z!;
+  if ((s.op === "<" && z < t) || (s.op === "<=" && z <= t)) return "low";
+  if ((s.op === ">" && z > t) || (s.op === ">=" && z >= t)) return "high";
+  return null;
+}
+const isLevel = (ev: OqlEvent): boolean => ev.vt === "exp" || ev.vt === "prot";
 
 /** the portal's RANGE test against the mutation's own [start, end]: a position only when both are known, neither -1, start <= end */
 function inRange(r: OqlRange, ps: number | null | undefined, pe: number | null | undefined): boolean {
@@ -47,6 +59,9 @@ function inRange(r: OqlRange, ps: number | null | undefined, pe: number | null |
 }
 
 function specWants(s: OqlSpec, ev: OqlEvent, driver: boolean): boolean {
+  if (s.type === "EXP" || s.type === "PROT") return levelOf(s, ev) !== null;
+  // an expression level is wanted by an EXP / PROT command alone
+  if (isLevel(ev)) return false;
   if (s.driver && !driver) return false;
   switch (s.type) {
     case "ANY": return true;
@@ -64,8 +79,18 @@ function specWants(s: OqlSpec, ev: OqlEvent, driver: boolean): boolean {
       return s.cna === 2 ? v >= 2 : s.cna === -2 ? v <= -2 : Math.abs(v) >= 2;
     }
     case "SV": return ev.vt === "structural_variant";
-    default: return false;   // EXP / PROT are not alterations of a gene row's cells
+    default: return false;
   }
+}
+
+/**
+ * An expression datum's subtype under a line: every command that meets it sets it, so the last one
+ * wins (oqlfilter 568-577, 1042-1044); null when none does.
+ */
+export function oqlLevel(specs: readonly OqlSpec[] | null | undefined, ev: OqlEvent): "high" | "low" | null {
+  let level: "high" | "low" | null = null;
+  for (const s of specs || []) if (s.type === "EXP" || s.type === "PROT") level = levelOf(s, ev) ?? level;
+  return level;
 }
 
 /**
@@ -75,7 +100,7 @@ function specWants(s: OqlSpec, ev: OqlEvent, driver: boolean): boolean {
  * driver call under the page's driver settings, the portal's putativeDriver.
  */
 export function eventWanted(specs: readonly OqlSpec[] | null | undefined, ev: OqlEvent, driver: boolean): boolean {
-  if (!specs || !specs.length) return true;
+  if (!specs || !specs.length) return !isLevel(ev);
   return specs.some((s) => specWants(s, ev, driver));
 }
 

@@ -34,6 +34,8 @@ export interface OncoprintView {
   unit?: "patient" | "sample";
   /** mRNA / protein evidence drawn into the gene cells (see OncoprintSpec.overlays) */
   overlays?: { kind: "mrna" | "protein"; profileType: string; threshold?: number }[];
+  /** the profiles a row's EXP / PROT read (see OncoprintSpec.exp) */
+  exp?: string; prot?: string; ifHeld?: boolean;
   /**
    * Document cohorts drawn as binary rows: a column is filled when that patient is in the
    * cohort. Any cohort definition can be a row, which is what this engine has that the portal
@@ -48,6 +50,12 @@ export interface OncoprintSpec {
   genes: GeneTrackSpec[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
   /** the view's driver settings */
   drivers?: DriverSettings;
+  /**
+   * The profiles a row's EXP / PROT read (ids without the study prefix: the query page's mRNA and
+   * protein choice); the study's z-score profile of that kind when unnamed. `ifHeld`: a study
+   * without the named profile has no EXP / PROT values instead of being refused.
+   */
+  exp?: string; prot?: string; ifHeld?: boolean;
   /** what a column is (default "patient") */
   unit?: "patient" | "sample";
   /**

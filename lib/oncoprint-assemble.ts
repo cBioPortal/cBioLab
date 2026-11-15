@@ -9,7 +9,7 @@
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, SPECTRUM_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
-import { eventWanted, oqlSublabel } from "./oql-match.ts";
+import { eventWanted, oqlLevel, oqlSublabel } from "./oql-match.ts";
 import type { OqlSpec } from "./oql-parse.ts";
 import { STYLE, assayScale, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
@@ -45,7 +45,9 @@ export function mutClassBit(mt: string | undefined): number {
  */
 export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number; df?: string | null; dt?: string | null; germ?: boolean | number | null;
   /** a mutation's own protein start and end, read where a row's OQL has a position range */
-  ps?: number | null; pe?: number | null }
+  ps?: number | null; pe?: number | null;
+  /** an expression datum (vt "exp" / "prot"): one sample's value in the profile a row's EXP / PROT reads */
+  z?: number | null }
 
 export interface SortKey { track: string; dir: "asc" | "desc" }
 
@@ -284,7 +286,9 @@ export function assembleContract(input: AssembleInput): Contract {
     if (!held) { held = new Uint16Array(cells.length); m.set(cells, held); }
     held[i] |= bit;
   };
+  const levels: EventRow[] = [];
   for (const r of events) {
+    if (r.vt === "exp" || r.vt === "prot") { levels.push(r); continue; }
     const i = pidIndex.get(r.pid);
     if (i === undefined) continue;
     const rows = rowsOfGene.get(r.gene);
@@ -334,6 +338,38 @@ export function assembleContract(input: AssembleInput): Contract {
       const anyDriver = n[i * 4] + n[i * 4 + 2] > 0;
       cells[i] = (cells[i] === NOT_PROFILED ? 0 : cells[i]) | CNA_KEYS[best] | (anyDriver ? BITS.DRIVER : 0);
     }
+  // A row's EXP / PROT: each sample's level its line wants, high or low (the last command it
+  // meets decides, oqlfilter 568-577), and the cell shows the level with more samples, high on a
+  // tie (DataUtils selectDisplayValue: the portal takes the first sample's). A column with a level
+  // of the gene is profiled for the gene in every row, as a sample in a selected expression
+  // profile is in the portal's (filteredSequencedSampleKeysByGene).
+  const levelCounts = new Map<Int32Array, Uint16Array>();
+  // the profiles a row asks for: as the portal's selected profiles, none when no row names EXP / PROT
+  const asked = new Set<string>(geneTracks.flatMap((t) => (t.oql || []).filter((x) => x.type === "EXP" || x.type === "PROT").map((x) => x.type === "EXP" ? "exp" : "prot")));
+  for (const r of levels) {
+    const i = pidIndex.get(r.pid);
+    const rows = i === undefined ? undefined : rowsOfGene.get(r.gene);
+    if (i === undefined || !rows || !asked.has(r.vt)) continue;
+    for (const cells of rows) {
+      if (cells[i] === NOT_PROFILED) cells[i] = 0;
+      const level = oqlLevel(oqlOf.get(cells), r);
+      if (!level) continue;
+      let n = levelCounts.get(cells);
+      if (!n) { n = new Uint16Array(cells.length * 4); levelCounts.set(cells, n); }
+      n[i * 4 + (r.vt === "exp" ? 0 : 2) + (level === "high" ? 0 : 1)]++;
+    }
+  }
+  /** per row, the columns its EXP / PROT made altered: overlays set the same bits and are not counted */
+  const levelAltered = new Map<Int32Array, Uint8Array>();
+  for (const [cells, n] of levelCounts) {
+    const alt = new Uint8Array(cells.length);
+    for (let i = 0; i < cells.length; i++) {
+      const [mh, ml, ph, pl] = [n[i * 4], n[i * 4 + 1], n[i * 4 + 2], n[i * 4 + 3]];
+      if (mh || ml) { cells[i] |= mh >= ml ? BITS.MRNA_HIGH : BITS.MRNA_LOW; alt[i] = 1; }
+      if (ph || pl) { cells[i] |= ph >= pl ? BITS.PROT_HIGH : BITS.PROT_LOW; alt[i] = 1; }
+    }
+    levelAltered.set(cells, alt);
+  }
   for (const [cells, held] of vusMut)
     for (let i = 0; i < cells.length; i++) if (held[i] && !(cells[i] & BITS.MUT_DRIVER)) cells[i] |= held[i];
   for (const cells of new Set([...germDrv.keys(), ...germVus.keys()])) {
@@ -650,9 +686,9 @@ export function assembleContract(input: AssembleInput): Contract {
   const ALT = BITS.MISSENSE | BITS.TRUNCATING | BITS.INFRAME | BITS.SPLICE | BITS.OTHER_MUT | BITS.PROMOTER | BITS.SV | BITS.AMP | BITS.HOMDEL;
   // Shared by the pooled numbers below and the per-group breakdown: same formula, just
   // over a slice of columns instead of all of them.
-  const geneCounts = (slice: number[]) => {
+  const geneCounts = (slice: number[], byLevel?: number[]) => {
     const profiled = slice.filter((c) => c !== NOT_PROFILED).length;
-    const altered = slice.filter((c) => c > 0 && (c & ALT)).length;
+    const altered = slice.filter((c, j) => (c > 0 && (c & ALT)) || (byLevel && byLevel[j])).length;
     const driverAltered = slice.filter((c) => c > 0 && (c & ALT) && (c & BITS.DRIVER)).length;
     return { profiled, altered, driverAltered,
       freqPct: profiled ? Math.round(1000 * altered / profiled) / 10 : null,
@@ -665,7 +701,9 @@ export function assembleContract(input: AssembleInput): Contract {
   }
   for (const gt of geneTracks) {
     const cells = remap(geneCells.get(gt.key)!);
-    const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells);
+    const lv = levelAltered.get(geneCells.get(gt.key)!);
+    const byLevel = lv ? remap(lv as unknown as Int32Array) : undefined;
+    const { profiled, altered, driverAltered, freqPct, driverPct } = geneCounts(cells, byLevel);
     tracks.push({
       kind: "gene", label: gt.label, ...(gt.key !== gt.label ? { key: gt.key } : {}), cells,
       ...(gt.members.length > 1 ? { members: gt.members } : {}),
@@ -675,7 +713,7 @@ export function assembleContract(input: AssembleInput): Contract {
       // draws a boundary between them, so the text/provenance side gets the same split
       // rather than only ever reporting the number pooled across all of them.
       ...(groupRanges.length > 1 ? { byGroup: groupRanges.map((g) => {
-        const { profiled, altered, freqPct, driverPct } = geneCounts(cells.slice(g.start, g.start + g.count));
+        const { profiled, altered, freqPct, driverPct } = geneCounts(cells.slice(g.start, g.start + g.count), byLevel?.slice(g.start, g.start + g.count));
         return { group: g.name, altered, profiled, freqPct, driverPct };
       }) } : {})
     });
