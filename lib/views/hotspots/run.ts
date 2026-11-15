@@ -24,8 +24,8 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
     Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount))),
     Promise.all(uniq.map((g) => fetchProteinInfo(g)))
   ]);
-  const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]))
-    .filter((h) => h.mutated > 0);
+  // a gene with no mutations stays: the portal draws its empty plot and zero badges (MUT-MD-1)
+  const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));
   const f = (n: number) => n.toLocaleString("en-US");
   const unpositioned = hotspots.reduce((n, h) => n + h.unpositioned, 0);
   const withheld = hotspots.reduce((n, h) => n + h.withheld, 0);

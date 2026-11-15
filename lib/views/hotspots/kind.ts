@@ -9,7 +9,7 @@ export const hotspotsKind: ViewKindDef<"hotspots"> = {
   title: () => "Recurrent protein changes",
   text: (v, { out, caveatOf, noteOf }) => {
     out.push("Mutations by protein position (commonest changes; share of patients mutated in THAT gene):\n" +
-      (v.hotspots || []).map((g) =>
+      (v.hotspots || []).map((g) => !g.mutated && !g.withheld ? `  ${g.gene}: no mutations in this cohort` :
         `  ${g.gene}: ${g.mutated.toLocaleString()} mutated, ${g.mutations.toLocaleString()} mutations on ${g.positions.length.toLocaleString()} codons — ` +
         (g.topChanges.slice(0, 6).map((x) => `${x.change} ${x.n.toLocaleString()} (${x.pct}%)`).join(", ") || "no change above the floor") +
         (g.unpositioned ? `  [${g.unpositioned.toLocaleString()} with no protein position, not drawn]` : "") +

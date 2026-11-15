@@ -28,9 +28,12 @@ function GeneSummary({ g }: { g: HotspotGene }) {
     <>
       <TranscriptSummary ids={g.ids} gene={g.gene} />
       <div className="lp-summary">
-        <div className="lp-freq" data-tip={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
-          <span>Somatic Mutation Frequency</span> <b>{freq}</b>
-        </div>
+        {/* a gene with no mutations has no rate, as on the portal (MUT-MD-1); the empty plot and zero badges say the rest */}
+        {g.mutated ? (
+          <div className="lp-freq" data-tip={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
+            <span>Somatic Mutation Frequency</span> <b>{freq}</b>
+          </div>
+        ) : <div className="lp-freq lp-none">No {g.gene} mutations in this cohort</div>}
       </div>
     </>
   );
