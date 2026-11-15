@@ -45,8 +45,6 @@ function geneRow(raw: string): GeneTrack | null {
   const entries = parseOql(raw);
   if (entries.length !== 1) throw new Error("gene list: '" + raw.slice(0, 40) + "' is more than one row; give each its own entry");
   const { gene, specs } = entries[0];
-  const exp = specs.find((x) => x.type === "EXP" || x.type === "PROT");
-  if (exp) throw new Error("gene list: a row's " + exp.type + " ('" + raw.slice(0, 40) + "') is not drawn on the oncoprint yet");
   return hasOql(specs) ? { label: gene, members: [gene], oql: specs, key: gene + oqlSublabel(specs) } : { label: gene, members: [gene], key: gene };
 }
 

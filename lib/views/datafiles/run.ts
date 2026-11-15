@@ -17,6 +17,8 @@ import { datafilesCountsSql, type DataType, type LinePlan } from "./sql.ts";
 import { STATUS_TABLES, lineColumns, matrixColumns, matrixRowSource, statusColumns, statusRowSource, type FileColumn, type MatrixFile, type StatusTable, type StudyPlan } from "./tables.ts";
 import type { DataFile, DatafilesResult, DatafilesView, LineFrequency } from "./types.ts";
 import { datafilesMethod } from "./method.ts";
+import { resolveDrivers } from "../../driver-settings.ts";
+import { variantPins } from "../../variant-annotation.ts";
 
 type Cell = string | number | null;
 
@@ -108,6 +110,8 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
     if (!pins.EXP && !pins.PROT) return no("ifHeld says how exp / prot apply to a study without that profile; name exp or prot");
     pins.ifHeld = true;
   }
+  if (view.drivers !== undefined) try { resolveDrivers(view.drivers); } catch (e) { return no((e as Error).message); }
+  const drivers = view.drivers !== undefined ? { drivers: view.drivers, hotspotPins: await variantPins() } : {};
   const genes = [...new Set(lines.map((l) => l.gene))];
   const size = pageSize(view.rows);
   if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return no("rows (the page size of the case table) is 1 to " + TABLE_ROWS_MAX);
@@ -124,7 +128,7 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
     const held = heldTypes(catalogs[st]);
     const plan: LinePlan[] = checked.map((l) => ({ line: l.line, gene: l.gene,
       types: [...new Set(l.specs.flatMap((t) => OQL_PROFILE[t as keyof typeof OQL_PROFILE] || []))].filter((t) => held.includes(t)) }));
-    plans[st] = { lines: plan, opts: { study: st, db: ctx.resolvers[st].instance.conn.db, pin, profiles: profiles[st], pins } };
+    plans[st] = { lines: plan, opts: { study: st, db: ctx.resolvers[st].instance.conn.db, pin, profiles: profiles[st], pins, ...drivers } };
   }
   const planOf = (st: string) => plans[st];
   const unchecked = checked.filter((l) => l.specs.some((t) => t === "EXP" || t === "PROT")).map((l) => l.line);

@@ -233,10 +233,10 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-SC-1 | 🟡 | BC | Fixed "Mutation count vs fraction genome altered" card when both attributes exist; no other X vs Y |
-| STS-SC-2 | 🔶 | B | 48×32 cells, opacity by log count (no plasma colours, no legend); x log10(MC+1) |
-| STS-SC-3 | ❌ | BC | No correlation text (Spearman computed by the view, not rendered) |
-| STS-SC-4 | 🔶 | B | Cell tip "N samples" only |
-| STS-SC-5 | 🔶 | B | No menu (no swap, no log toggles, no download); axes fixed MC log x, FGA y |
+| STS-SC-2 | ✅ | B | 44×38 bins cut as the portal cuts them (FGA 0–1, MC from 0), a plasma dot per bin, the "# samples" legend; the middle label is the count at the middle of the bar (⚠ C6, [density-cases](density-cases.md)) |
+| STS-SC-3 | ✅ | BC | Pearson and Spearman with p, as the portal writes them; shown whenever n > 2 (⚠ S9) |
+| STS-SC-4 | ✅ | B | "Number of Samples", the x range to 2 places, the y range as formatRange |
+| STS-SC-5 | 🔶 | B | Swap Axes, Log Scale X / Y on the MC axis (kept by the browser); no Download yet |
 | STS-SC-6 | 🟡 | C | Drag a box → two range clauses (MC rounded to whole counts, FGA by span) (`explore-charts.tsx:89-92`); no custom bins added to the bar charts |
 | STS-SC-7 | ✅ | C | Own filters included (the plot is drawn over the draft) |
 | STS-SC-8 | 🐞 ok | C | Legacy dead code / out-of-range bin bug not present |
@@ -345,7 +345,7 @@ Filters not in the URL (as legacy); study list and drivers toggle are (`?study=`
 | STS-STM-12 | 🟡 | C | Quartiles/Median cut by the server over the selection's values (`compareQuantiles`); Current bins one group per bar ✅; quartiles single study only |
 | STS-STM-13 | ✅ | BC | # = altered incl. off-panel, Freq = on-panel ÷ profiled, UNCALLED excluded; identical numbers. A sample on two panels counted once (`surplus`, `explore.ts:574-588`) where legacy counts per panel — no difference on these studies |
 | STS-STM-14 | 🟡 | B | Data types ✅, events ✅ (patients); case lists in patients; no Freq on these |
-| STS-STM-15 | 🔶 | BC | n identical; Spearman identical (not shown); Pearson on log10(MC+1) (−0.408 vs −0.332), not shown; 48×32 grid |
+| STS-STM-15 | ✅ | BC | The portal's bins, cell rule, ln(1 + v) Log Scale and coefficients: coadread Pearson −0.3317, Spearman −0.3487, as on cbioportal.org |
 | STS-STM-16 | ❌ | C | No violin |
 | STS-STM-17 | ❌ | C | No gene violin |
 | STS-STM-18 | ✅ | B | KM over the selection's patients: 590 / 120 / 81.4 and 280 / 56 / not reached, as legacy |

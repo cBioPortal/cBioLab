@@ -43,7 +43,8 @@ export function geneticText(code: number, group: typeof GENETIC[number], annotat
   }
   if (group === "STRUCTURAL_VARIANT")
     return code & BITS.SV ? "Structural Variant" + (annotated && code & BITS.SV_DRIVER ? DRIVER : "") : "";
-  return "";   // mRNA and protein calls are not loaded
+  if (group === "MRNA") return code & BITS.MRNA_HIGH ? "mRNA High" : code & BITS.MRNA_LOW ? "mRNA Low" : "";
+  return code & BITS.PROT_HIGH ? "Protein High" : code & BITS.PROT_LOW ? "Protein Low" : "";
 }
 
 function clinicalText(t: CellTrack, i: number): string {

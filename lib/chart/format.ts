@@ -67,6 +67,12 @@ export function portalP(p: number): string {
 }
 
 /**
+ * A p- or q-value as cBioPortal's Comparison tables write it, toConditionalPrecisionWithMinimum(x, 3,
+ * 0.01, -10) (FormatUtils.tsx:102): "< 10^-10" for 0 or anything below 1e-10, else as portalP.
+ */
+export const portalPMin = (p: number): string => p === 0 || (p > 0 && Math.log10(p) < -10) ? "< 10^-10" : portalP(p);
+
+/**
  * A value at two significant digits, as cBioPortal's FormatUtils.formatNumberValueInSignificantDigits(x, 2)
  * writes it for the mutation table's SIGNAL and gnomAD frequencies: no exponent, no separators,
  * 0 as "0" (0.0000583 → "0.000058", 0.125 → "0.13", 1234 → "1200").
@@ -143,3 +149,16 @@ export function portalTipNumber(x: number, clinical = true): string {
 
 /** a value carried as float32, at the seven significant digits it holds ("2.446799", not 2.4467992782592773) */
 export const fmtFloat32 = (x: number): string => String(Number(x.toPrecision(7)));
+
+/** a number to `d` places, as the portal's `toFixed(d)` writes it, with a hyphen for minus ("-0.3317") */
+export const portalFixed = (x: number, d: number): string => x.toFixed(d);
+
+/** a number as the portal's bare `toLocaleString()` writes it in an en-US browser: separators, three decimals at most ("1,234.568") */
+export const portalLocale = (x: number): string => x.toLocaleString("en-US");
+
+/**
+ * A bin's span as the portal's formatRange(min, max) writes it (StudyViewUtils.tsx:649-673): one
+ * value when the ends agree, else "(min, max]" ("(3, 4]", "(1.609, 1.792]").
+ */
+export const portalRange = (min: number, max: number): string =>
+  min === max ? portalLocale(min) : "(" + portalLocale(min) + ", " + portalLocale(max) + "]";

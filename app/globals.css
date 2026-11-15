@@ -1577,8 +1577,14 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .xc-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--s2); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--muted); font-size: var(--t-sm); }
 .xc-density { display: block; touch-action: none; cursor: crosshair; user-select: none; }
 .xc-frame { fill: none; stroke: var(--line); }
-.xc-cell { fill: var(--accent); }
 .xc-brush { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-dasharray: 3 2; }
+.xc-dens { display: flex; align-items: flex-start; gap: var(--s2); }
+.xc-legend { display: flex; flex-direction: column; gap: var(--s2); padding-top: var(--s4); font-size: var(--t-sm); min-width: 5.5rem; }
+.xc-legend-scale { display: flex; gap: var(--s1); }
+.xc-legend-bar { width: 10px; height: 68px; }
+.xc-legend-bar.short { height: 38px; }
+.xc-legend-labels { display: flex; flex-direction: column; justify-content: space-between; line-height: 1; }
+.xc-corr { line-height: 1.3; font-variant-numeric: tabular-nums; }
 
 /* the portal-style card bodies (app/lab/kinds/<kind>.tsx, on app/lab/portal-bodies.tsx) */
 .pb-scroll { overflow-x: auto; }

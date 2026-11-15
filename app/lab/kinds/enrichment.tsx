@@ -34,7 +34,8 @@ function EnrichmentBody({ v }: { v: DrawnResultOf<"enrichment"> }) {
       <DrawAtWidth draw={(width) => enrichmentChartsSvg(r, { width })} deps={[r]} />
       <PortalTable rows={r.rows} cols={cols} initialSort={{ key: "q" }} search={(g) => g.gene + " " + (g.cytoband || "")}
         filters={[{ label: "Significant only", test: (g) => g.q < 0.05 }]}
-        note={r.tested > r.rows.length ? "the " + r.rows.length + " most significant of " + r.tested.toLocaleString() + " genes tested" : undefined} />
+        note={r.tested > r.rows.length ? "the " + r.rows.length + " most significant of " + r.tested.toLocaleString() + " genes tested" +
+          (r.hidden ? " (" + r.hidden.toLocaleString() + " under " + r.minAltered + " altered samples not listed)" : "") : undefined} />
     </div>
   );
 }
@@ -56,8 +57,8 @@ function Controls({ c }: { c: KindCardCtx }) {
             <option value="any">any</option><option value="driver">drivers</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" data-tip="genes altered in fewer samples than this across the cohorts are counted but not tested">
-          test genes altered in ≥ <OptionSelect value={String(spec.minAltered ?? 5)} disabled={busy} onValueChange={(v) => patch({ minAltered: Number(v) })}>
+        <label className="tbfield" data-tip="genes altered in fewer samples than this across the cohorts are tested, and counted in the q-values, but not listed">
+          list genes altered in ≥ <OptionSelect value={String(spec.minAltered ?? 5)} disabled={busy} onValueChange={(v) => patch({ minAltered: Number(v) })}>
             {[1, 5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
           </OptionSelect>
         </label>

@@ -122,8 +122,7 @@ One commit per item; `npm test` and a focused check per item; the gate before ea
 
 Backlog: waterfall ("ordered samples"), generic assays and SV axes, bar charts for two
 categoricals, the examples bar, SVG/PNG/data export, a method record for the plot's correlations
-(it is on the method-check exempt list as "no statistic", which it is not), a horizontal box (a box
-is always drawn with its categories across today).
+(it is on the method-check exempt list as "no statistic", which it is not).
 
 ## Open questions
 

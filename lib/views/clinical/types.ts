@@ -3,7 +3,14 @@ import type { SplitBy } from "../../types.ts";
 
 export interface ClinicalView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
-  note?: string; kind: "clinical"; attributes: string[]; cohorts?: string[]; splitBy?: SplitBy }
+  note?: string; kind: "clinical"; attributes?: string[]; cohorts?: string[]; splitBy?: SplitBy;
+  /**
+   * test every clinical attribute the studies declare, as cBioPortal's Comparison page does, in
+   * place of `attributes`: all but the survival endpoints' <X>_MONTHS / <X>_STATUS pairs,
+   * AGE_LAST_FU_YEARS and BIRTH_YEAR, which the portal leaves out
+   */
+  allAttributes?: boolean;
+}
 /** One clinical attribute compared across cohorts. */
 export interface ClinicalCell {
   cohort: string; n: number;
@@ -24,6 +31,8 @@ export interface ClinicalCell {
 }
 export interface ClinicalRow {
   attribute: string; per: "patient" | "sample"; kind: "cat" | "num";
+  /** the attribute's display name, as the study declares it (allAttributes) */
+  label?: string;
   cells: ClinicalCell[];
   test?: string; statistic?: number; df?: number; p?: number; q?: number;
   /** Welch's ANOVA (3+ numeric cohorts) only: the denominator degrees of freedom — `df` above

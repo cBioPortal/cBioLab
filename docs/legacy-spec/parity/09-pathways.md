@@ -21,8 +21,8 @@ Scripts and output: (local scratch, not committed) (`legother.js pwy` → `out/l
 | Verdict | Count |
 |---|---|
 | ✅ match | 5 |
-| 🟡 partial | 10 |
-| 🔶 different | 5 |
+| 🟡 partial | 12 |
+| 🔶 different | 3 |
 | ❌ missing | 6 |
 | 🐞 ok | 2 |
 | 🐞 copied | 1 |
@@ -30,7 +30,7 @@ Scripts and output: (local scratch, not committed) (`legother.js pwy` → `out/l
 | ? | 0 |
 | **Total IDs** | **33** |
 
-**Overall: 33.3 %** (✅ 5 + 🐞ok 2 + N/A 4 = 11 of 33). Counting 🟡 as half: 48.5 %.
+**Overall: 33.3 %** (✅ 5 + 🐞ok 2 + N/A 4 = 11 of 33). Counting 🟡 as half: 51.5 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | 🐞copied | N/A | One line |
 |---|---|---|---|---|---|---|---|---|---|
@@ -47,7 +47,7 @@ Scripts and output: (local scratch, not committed) (`legother.js pwy` → `out/l
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **Query OQL not applied to node %** (KRAS under `AMP MUT=G12D` reads 37.4 %, legacy 10.6 %); `[ ]` merged groups refused | 0.5, MD-3, STM-1 | (tracked) "the oncoprint and gene tabs still draw every alteration" |
+| 1 | ~~**Query OQL not applied to node %**~~ — fixed: a query gene's node counts what its lines match (Q5 KRAS 10.6 %, 63 / 594, as legacy). Was: (KRAS under `AMP MUT=G12D` reads 37.4 %, legacy 10.6 %); `[ ]` merged groups refused | 0.5, MD-3, STM-1 | (tracked) "the oncoprint and gene tabs still draw every alteration" |
 | 2 | **Sample-level %, not patient-level** — equal here (1 sample/patient), differs on multi-sample studies | 3.1, MD-6, STM-1 | not tracked (README states it) |
 | 3 | **No PathwayMapper toolbar**: Save PNG/SVG, Perform layout, Add selected / all valid genes to query, Edit pathway, Help | 1.3–1.5 | (tracked) "add genes to query"; rest not tracked |
 | 4 | **No NDEx / pathway-source pills** | 0.2, 0.4, MD-2 | (tracked) "NDEx" |
@@ -68,7 +68,7 @@ Scripts and output: (local scratch, not committed) (`legother.js pwy` → `out/l
 | EGFR (non-query) | STM-2 | 3.0% | 3.0% (18/594) | ✅ |
 | HRAS (non-query) | STM-2 | 1.2% | 1.2% (7/594) | ✅ |
 | TP53 / APC (stored) | STM-1 | — (not drawn in RTK-RAS) | 53.03 / 66.67 | n/a |
-| KRAS under Q5 OQL | MD-3 | 10.6 % (63/594) | 37.4 % (OQL not applied) | 🔶 |
+| KRAS under Q5 OQL | MD-3 | 10.6 % (63/594) | 10.6 % (63/594) | ✅ |
 | Ranking, match count | STM-4 | RTK-RAS 3.00 (KRAS NRAS BRAF); WNT 1.00 (APC); TP53 1.00; Cell Cycle 1.00 (TP53); 6 × 0.00 | RTK-RAS 3; WNT 1; Cell Cycle 1; TP53 1; 6 × 0 | ✅ scores; 🔶 tie order |
 | Weighted (count + frequency) RTK-RAS | STM-4 | 54.54 | 37.37 + 6.40 + 10.77 = 54.54 (`frequencySum`) | ✅ |
 | Weighted WNT | STM-4 | 66.67 | 66.67 | ✅ |
@@ -89,7 +89,7 @@ Data version: counts identical to the oncoprint's and Download's (same warehouse
 | PWY-0.2 | ❌ | B | No "Choose Pathway Source" pills (tracked: NDEx) |
 | PWY-0.3 | N/A | C | No sub-tabs; the drawn pathway and ranking live in the document (invariant 9), so they survive reload (legacy restore bug moot) |
 | PWY-0.4 | ❌ | C | No NDEx iframe (tracked) |
-| PWY-0.5 | 🔶 | B | Page note says gene tabs draw every alteration; legacy tab reflects OQL (tracked) |
+| PWY-0.5 | 🟡 | B | The page note says Pathways follows the OQL; no banner on the tab itself |
 
 ### §1 PathwayMapper layout
 
@@ -130,7 +130,7 @@ Data version: counts identical to the oncoprint's and Download's (same warehouse
 |---|---|---|---|
 | PWY-MD-1 | N/A | C | No deployment switch for the tab |
 | PWY-MD-2 | ❌ | C | No NDEx (tracked) |
-| PWY-MD-3 | 🔶 | C | OQL ignored; merged groups refused (tracked) |
+| PWY-MD-3 | 🟡 | C | The query's OQL applied to query-gene nodes; merged groups refused (tracked) |
 | PWY-MD-4 | 🐞 ok | C | N/P gene adds 0 to a weighted score, not −101 (`rank.ts:177`) |
 | PWY-MD-5 | 🟡 | C | Multi-study supported, counts summed (never % averaged) ✅; sample level |
 | PWY-MD-6 | 🔶 | C | Always sample level (legacy always patient level) |

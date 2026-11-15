@@ -531,3 +531,52 @@ describe("plot figures draw every group and category they are given", () => {
     assert.ok(svg.includes("caveat39"), "the last line of the caption is present");
   });
 });
+
+// The portal's box rules (docs/legacy-spec/04-plots.md): PLT-PT-4 categories on x draw vertical
+// boxes, PLT-PT-5 categories on y draw horizontal ones; PLT-BX-3 a category of one point draws no box.
+describe("plot boxes: either way round, and none for one case", () => {
+  const groups = [
+    { g: "A", n: 5, lo: 0, hi: 10, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 },
+    { g: "B", n: 5, lo: 0, hi: 10, q1: 2, median: 5, q3: 8, loWhisker: 0, hiWhisker: 10 },
+  ];
+  const num = { label: "TMB", kind: "num" }, cat = { label: "CANCER_TYPE", kind: "cat" };
+  const boxes = (svg: string) => [...svg.matchAll(/<rect x="([^"]+)" y="([^"]+)" width="([^"]+)" height="([^"]+)"[^>]*data-box="(\d+)"/g)]
+    .map((m) => ({ x: Number(m[1]), y: Number(m[2]), w: Number(m[3]), h: Number(m[4]), i: Number(m[5]) }));
+
+  test("categories across: the boxes stand side by side, a box's height its IQR", () => {
+    const [a, b] = boxes(viewToSvg({ kind: "plot", plot: { shape: "box", n: 10, x: cat, y: num, groups, overlay: "none" } as any })!);
+    assert.ok(b.x > a.x, "B is right of A");
+    assert.equal(a.w, b.w);
+    assert.ok(b.h > a.h, "B's IQR (6) is taller than A's (4)");
+  });
+
+  test("categories down the side: the boxes lie one above the other, a box's width its IQR, the names at the left", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { shape: "box", n: 10, x: num, y: cat, groups, overlay: "none" } as any })!;
+    const [a, b] = boxes(svg);
+    assert.ok(b.y > a.y, "B is below A");
+    assert.equal(a.x, b.x, "both start at q1 = 2");
+    assert.equal(a.h, b.h);
+    assert.ok(Math.abs(b.w / a.w - 1.5) < 0.05, "B's IQR (6) is 1.5 times A's (4): " + b.w + " / " + a.w);
+    assert.match(svg, /<text [^>]*text-anchor="end"[^>]*>A \(5\)<\/text>/, "A's name sits left of its box");
+    assert.match(svg, /<text [^>]*rotate\(-90[^>]*>CANCER_TYPE<\/text>/, "the category title runs up the side");
+  });
+
+  test("categories down the side: a value past the axis is a triangle at the right edge pointing right", () => {
+    const svg = viewToSvg({ kind: "plot", plot: { shape: "box", n: 10, x: num, y: cat, groups, overlay: "points",
+      points: [{ id: "far", g: "A", v: 500 }], pointSet: { rule: "all", drawn: 1 } } as any })!;
+    const m = /<path data-id="far" d="M([\d.]+) ([\d.]+) L([\d.]+) ([\d.]+) L([\d.]+) ([\d.]+) Z"/.exec(svg);
+    assert.ok(m, "the value is pinned as a triangle");
+    const [ax, , bx, , tx] = m!.slice(1).map(Number);
+    assert.equal(ax, bx, "its base is upright");
+    assert.ok(tx > ax, "its tip points right, the way the value lies");
+  });
+
+  test("a group of one case draws no box and no whisker, only its value, and the caption says so", () => {
+    const one = { g: "Deep", n: 1, lo: 468.29, hi: 468.29, q1: 468.29, median: 468.29, q3: 468.29, loWhisker: 468.29, hiWhisker: 468.29 };
+    const svg = viewToSvg({ kind: "plot", plot: { shape: "box", n: 6, x: cat, y: num, groups: [groups[0], one], overlay: "points",
+      points: [{ id: "d1", g: "Deep", v: 468.29 }], pointSet: { rule: "all", drawn: 1 } } as any })!;
+    assert.deepEqual(boxes(svg).map((b) => b.i), [0], "only A has a box");
+    assert.match(svg, /<circle data-id="d1"/, "its value is drawn");
+    assert.match(svg.replace(/<\/text><text [^>]*>/g, " "), /A group of one case has no box, only its value\./);
+  });
+});

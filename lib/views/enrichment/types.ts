@@ -13,7 +13,7 @@ export interface EnrichmentView {
   alteration?: "mutation" | "cna" | "amp" | "homdel" | "sv";
   /** count OncoKB drivers only, or any alteration (default) */
   measure?: "driver" | "any";
-  /** genes altered in fewer samples than this, across all cohorts, are not tested (default 5) */
+  /** genes altered in fewer samples than this, across all cohorts, are tested (q counts them) but not listed (default 5) */
   minAltered?: number;
   /** genes named on the volcano (default 12) */
   label?: number;
@@ -32,9 +32,13 @@ export interface EnrichmentGene {
 export interface EnrichmentResult {
   alteration: string; measure: "driver" | "any"; groups: string[];
   tested: number; untested: number; significant: number; minAltered: number;
+  /** tested genes under minAltered, not listed */
+  hidden?: number;
   test: string;
-  /** the most significant genes (≤300), the rest summarised in `grid` */
+  /** the most significant genes with at least minAltered altered samples (≤300), the rest summarised in `grid` */
   rows: EnrichmentGene[];
+  /** "Genes with highest frequency in any group": the tested genes with the highest altered share in any cohort, highest first */
+  topFrequency?: EnrichmentGene[];
   /** two cohorts: every other tested gene binned on the volcano's axes, [x bin, y bin, count] */
   grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][] };
   labels: string[];

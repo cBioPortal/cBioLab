@@ -45,6 +45,10 @@
                 "homdel": 0,
                 "sv": 0,
                 "multiple": 49,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 2729,
                   "cna": 2729,
@@ -62,6 +66,10 @@
                 "homdel": 0,
                 "sv": 0,
                 "multiple": 0,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 269,
                   "cna": 269,
@@ -79,6 +87,10 @@
                 "homdel": 4,
                 "sv": 1,
                 "multiple": 14,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 4993,
                   "cna": 4993,
@@ -96,6 +108,10 @@
                 "homdel": 20,
                 "sv": 1,
                 "multiple": 68,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 6633,
                   "cna": 6633,
@@ -113,6 +129,10 @@
                 "homdel": 0,
                 "sv": 0,
                 "multiple": 16,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 663,
                   "cna": 663,
@@ -130,6 +150,10 @@
                 "homdel": 4,
                 "sv": 0,
                 "multiple": 33,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 1706,
                   "cna": 1706,
@@ -147,6 +171,10 @@
                 "homdel": 7,
                 "sv": 1,
                 "multiple": 14,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 1535,
                   "cna": 1535,
@@ -164,6 +192,10 @@
                 "homdel": 6,
                 "sv": 0,
                 "multiple": 4,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 2373,
                   "cna": 2373,
@@ -181,6 +213,10 @@
                 "homdel": 1,
                 "sv": 0,
                 "multiple": 5,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 803,
                   "cna": 803,
@@ -198,6 +234,10 @@
                 "homdel": 3,
                 "sv": 0,
                 "multiple": 5,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 1671,
                   "cna": 1671,
@@ -215,6 +255,10 @@
                 "homdel": 13,
                 "sv": 1,
                 "multiple": 9,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 2075,
                   "cna": 2075,
@@ -232,6 +276,10 @@
                 "homdel": 0,
                 "sv": 0,
                 "multiple": 2,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 1353,
                   "cna": 1353,
@@ -249,6 +297,10 @@
                 "homdel": 2,
                 "sv": 0,
                 "multiple": 2,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 326,
                   "cna": 326,
@@ -266,6 +318,10 @@
                 "homdel": 13,
                 "sv": 1,
                 "multiple": 3,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 2046,
                   "cna": 2046,
@@ -283,6 +339,10 @@
                 "homdel": 2,
                 "sv": 0,
                 "multiple": 0,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 429,
                   "cna": 429,
@@ -300,6 +360,10 @@
                 "homdel": 0,
                 "sv": 0,
                 "multiple": 2,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 352,
                   "cna": 352,
@@ -317,6 +381,10 @@
                 "homdel": 0,
                 "sv": 0,
                 "multiple": 0,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 610,
                   "cna": 610,
@@ -334,6 +402,10 @@
                 "homdel": 6,
                 "sv": 0,
                 "multiple": 0,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 442,
                   "cna": 442,
@@ -347,10 +419,14 @@
                 "profiled": 2128,
                 "altered": 103,
                 "mutation": 63,
-                "amp": 17,
+                "amp": 18,
                 "homdel": 15,
                 "sv": 1,
-                "multiple": 7,
+                "multiple": 6,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 2128,
                   "cna": 2128,
@@ -368,6 +444,10 @@
                 "homdel": 3,
                 "sv": 0,
                 "multiple": 1,
+                "mrnaHigh": 0,
+                "mrnaLow": 0,
+                "protHigh": 0,
+                "protLow": 0,
                 "profiledFor": {
                   "mutation": 337,
                   "cna": 337,
@@ -376,7 +456,7 @@
               },
               {
                 "…": "8 more",
-                "sha256": "a8285816abe66c3d"
+                "sha256": "1731b700d9fb8c8a"
               }
             ],
             "pooled": {
@@ -386,10 +466,14 @@
               "profiled": 1842,
               "altered": 250,
               "mutation": 231,
-              "amp": 8,
+              "amp": 9,
               "homdel": 8,
               "sv": 0,
-              "multiple": 3,
+              "multiple": 2,
+              "mrnaHigh": 0,
+              "mrnaLow": 0,
+              "protHigh": 0,
+              "protLow": 0,
               "profiledFor": {
                 "mutation": 1842,
                 "cna": 1842,
@@ -412,6 +496,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 48,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2729,
                       "cna": 2729,
@@ -429,6 +517,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 269,
                       "cna": 269,
@@ -446,6 +538,10 @@
                     "homdel": 0,
                     "sv": 1,
                     "multiple": 10,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 4993,
                       "cna": 4993,
@@ -463,6 +559,10 @@
                     "homdel": 6,
                     "sv": 0,
                     "multiple": 61,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 6633,
                       "cna": 6633,
@@ -480,6 +580,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 16,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 663,
                       "cna": 663,
@@ -497,6 +601,10 @@
                     "homdel": 0,
                     "sv": 1,
                     "multiple": 10,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1535,
                       "cna": 1535,
@@ -514,6 +622,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2373,
                       "cna": 2373,
@@ -531,6 +643,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 3,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1671,
                       "cna": 1671,
@@ -548,6 +664,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1353,
                       "cna": 1353,
@@ -565,6 +685,10 @@
                     "homdel": 0,
                     "sv": 1,
                     "multiple": 6,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2075,
                       "cna": 2075,
@@ -582,6 +706,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 326,
                       "cna": 326,
@@ -599,6 +727,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 2,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2046,
                       "cna": 2046,
@@ -616,6 +748,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 610,
                       "cna": 610,
@@ -633,6 +769,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 442,
                       "cna": 442,
@@ -650,6 +790,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 6,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1706,
                       "cna": 1706,
@@ -667,6 +811,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 506,
                       "cna": 506,
@@ -684,6 +832,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 803,
                       "cna": 803,
@@ -701,6 +853,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 324,
                       "cna": 324,
@@ -718,6 +874,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 429,
                       "cna": 429,
@@ -735,6 +895,10 @@
                     "homdel": 4,
                     "sv": 1,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 5803,
                       "cna": 5803,
@@ -743,7 +907,7 @@
                   },
                   {
                     "…": "8 more",
-                    "sha256": "67690ccb247396a1"
+                    "sha256": "cf40ba1ad932162e"
                   }
                 ],
                 "pooled": {
@@ -757,6 +921,10 @@
                   "homdel": 0,
                   "sv": 0,
                   "multiple": 2,
+                  "mrnaHigh": 0,
+                  "mrnaLow": 0,
+                  "protHigh": 0,
+                  "protLow": 0,
                   "profiledFor": {
                     "mutation": 1842,
                     "cna": 1842,
@@ -779,6 +947,10 @@
                     "homdel": 2,
                     "sv": 0,
                     "multiple": 23,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1706,
                       "cna": 1706,
@@ -796,6 +968,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 2,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 803,
                       "cna": 803,
@@ -813,6 +989,10 @@
                     "homdel": 6,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 4993,
                       "cna": 4993,
@@ -830,6 +1010,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 663,
                       "cna": 663,
@@ -847,6 +1031,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2373,
                       "cna": 2373,
@@ -864,6 +1052,10 @@
                     "homdel": 3,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1535,
                       "cna": 1535,
@@ -881,6 +1073,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 269,
                       "cna": 269,
@@ -898,6 +1094,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1353,
                       "cna": 1353,
@@ -915,6 +1115,10 @@
                     "homdel": 2,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 429,
                       "cna": 429,
@@ -932,6 +1136,10 @@
                     "homdel": 1,
                     "sv": 1,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2046,
                       "cna": 2046,
@@ -949,6 +1157,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2075,
                       "cna": 2075,
@@ -966,6 +1178,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 382,
                       "cna": 382,
@@ -983,6 +1199,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2128,
                       "cna": 2128,
@@ -1000,6 +1220,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 326,
                       "cna": 326,
@@ -1017,6 +1241,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 337,
                       "cna": 337,
@@ -1034,6 +1262,10 @@
                     "homdel": 3,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1671,
                       "cna": 1671,
@@ -1051,6 +1283,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 324,
                       "cna": 324,
@@ -1068,6 +1304,10 @@
                     "homdel": 6,
                     "sv": 1,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 6633,
                       "cna": 6633,
@@ -1085,6 +1325,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 610,
                       "cna": 610,
@@ -1102,6 +1346,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 442,
                       "cna": 442,
@@ -1110,7 +1358,7 @@
                   },
                   {
                     "…": "8 more",
-                    "sha256": "98fc00fd9877bd84"
+                    "sha256": "3bf4d0d8798a115c"
                   }
                 ],
                 "pooled": {
@@ -1124,6 +1372,10 @@
                   "homdel": 1,
                   "sv": 0,
                   "multiple": 0,
+                  "mrnaHigh": 0,
+                  "mrnaLow": 0,
+                  "protHigh": 0,
+                  "protLow": 0,
                   "profiledFor": {
                     "mutation": 1842,
                     "cna": 1842,
@@ -1146,6 +1398,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 1,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 352,
                       "cna": 352,
@@ -1163,6 +1419,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 429,
                       "cna": 429,
@@ -1180,6 +1440,10 @@
                     "homdel": 11,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2046,
                       "cna": 2046,
@@ -1197,6 +1461,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 3,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 803,
                       "cna": 803,
@@ -1214,6 +1482,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 610,
                       "cna": 610,
@@ -1231,6 +1503,10 @@
                     "homdel": 2,
                     "sv": 0,
                     "multiple": 3,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1706,
                       "cna": 1706,
@@ -1248,6 +1524,10 @@
                     "homdel": 5,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 442,
                       "cna": 442,
@@ -1265,6 +1545,10 @@
                     "homdel": 13,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2128,
                       "cna": 2128,
@@ -1282,6 +1566,10 @@
                     "homdel": 7,
                     "sv": 1,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2893,
                       "cna": 2893,
@@ -1299,6 +1587,10 @@
                     "homdel": 3,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 337,
                       "cna": 337,
@@ -1316,6 +1608,10 @@
                     "homdel": 5,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 1535,
                       "cna": 1535,
@@ -1333,6 +1629,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 326,
                       "cna": 326,
@@ -1350,6 +1650,10 @@
                     "homdel": 6,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2373,
                       "cna": 2373,
@@ -1367,6 +1671,10 @@
                     "homdel": 11,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2042,
                       "cna": 2042,
@@ -1384,6 +1692,10 @@
                     "homdel": 13,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 2075,
                       "cna": 2075,
@@ -1401,6 +1713,10 @@
                     "homdel": 1,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 324,
                       "cna": 324,
@@ -1418,6 +1734,10 @@
                     "homdel": 27,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 5803,
                       "cna": 5803,
@@ -1435,6 +1755,10 @@
                     "homdel": 4,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 520,
                       "cna": 520,
@@ -1452,6 +1776,10 @@
                     "homdel": 0,
                     "sv": 0,
                     "multiple": 0,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 4993,
                       "cna": 4993,
@@ -1469,6 +1797,10 @@
                     "homdel": 10,
                     "sv": 0,
                     "multiple": 2,
+                    "mrnaHigh": 0,
+                    "mrnaLow": 0,
+                    "protHigh": 0,
+                    "protLow": 0,
                     "profiledFor": {
                       "mutation": 6633,
                       "cna": 6633,
@@ -1477,7 +1809,7 @@
                   },
                   {
                     "…": "8 more",
-                    "sha256": "2397ab07fdd60ed9"
+                    "sha256": "84ee958d194f6b1a"
                   }
                 ],
                 "pooled": {
@@ -1491,6 +1823,10 @@
                   "homdel": 8,
                   "sv": 0,
                   "multiple": 0,
+                  "mrnaHigh": 0,
+                  "mrnaLow": 0,
+                  "protHigh": 0,
+                  "protLow": 0,
                   "profiledFor": {
                     "mutation": 1842,
                     "cna": 1842,
@@ -1515,13 +1851,13 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under \"multiple\". A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. ",
+      "caveat": "Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under \"multiple\"; an amplification and a deep deletion are one kind (copy number), shown as the amplification. A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. ",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Count patients per CANCER_TYPE group",
-            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only, or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
+            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
             "scope": "all patients · msk_impact_50k_2026",
             "rowsOut": 67,
             "params": [

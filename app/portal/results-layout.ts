@@ -4,13 +4,12 @@
 // can a script that checks the views run.
 import type { Clause, CohortDef, View } from "../../lib/types.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
-import { oqlSublabel } from "../../lib/oql-match.ts";
+import { hasOql, oqlHasMutationOql, oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
 import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
-import { arrange, type PageLayout } from "./page-doc.ts";
+import { arrange, type PageLayout, type TabBanner } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 
-const CLINICAL_SHOWN = 8;
 
 /** What a Results page queries. */
 export interface ResultsQuery {
@@ -72,7 +71,7 @@ const TYPE_WORD: Record<ProfileType, string> = { MUTATION: "mutation", CNA: "cop
  * bare gene there asks for mutation and copy-number profiling, and a type only some of the studies
  * hold is named rather than required (requiring it would drop every patient of the studies without it).
  */
-export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { cohorts: Record<string, CohortDef>; unchecked: string[] } {
+export function resultsGroups(q: ResultsQuery, held: ResultsData["held"], drivers?: DriverSettings): { cohorts: Record<string, CohortDef>; unchecked: string[] } {
   const scope = q.studies.length === 1 ? { study: q.studies[0] } : { studies: q.studies };
   const byType = new Map<ProfileType, string[]>(), unchecked: string[] = [];
   for (const entry of q.entries) {
@@ -91,7 +90,8 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { coh
   const profiled = [...byType].map(([type, genes]) => ({ kind: "profiled", type, genes }) as Clause);
   // the query as one OQL clause — its ";" is "or" between entries (up to 30), where an `any` group
   // of one clause per line would stop at 8
-  const query = { kind: "oql", q: q.entries.join("; "), ...pinsOf(q) };
+  const text = q.entries.join("; ");
+  const query = { kind: "oql", q: text, ...pinsOf(q), ...(asksDriver(text) ? { drivers: driverSources(drivers) } : {}) };
   const def = (all: Clause[]) => ({ ...scope, all: [...q.filters, ...all] }) as CohortDef;
   return {
     // Altered and Unaltered first: the comparison's figures draw them in the first two series colours, and the page's swatches follow this order
@@ -102,6 +102,60 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"]): { coh
     },
     unchecked,
   };
+}
+
+/** the view kinds that read the query's lines (`oql`) with the page's driver settings */
+const OQL_DRIVER_KINDS = new Set(["cancertypes", "cooccurrence", "pathwaymap", "datafiles", "hotspots", "mutations"]);
+
+/**
+ * The Mutations tab's OQL status, as the portal's OqlStatusBanner says it (Mutations.tsx 185-197):
+ * filtered, with "Do not filter by OQL"; not filtered, with "Filter by OQL"; or unaffected when the
+ * query narrows no mutation. The switch is the views' `useOql`.
+ */
+function mutationsBanner(narrows: boolean): TabBanner {
+  const on = (vs: View[]) => (vs[0] as unknown as { useOql?: boolean }).useOql !== false;
+  if (!narrows) return { text: () => "Your OQL specification does not affect the results below because you have not specified any filters for mutations in this gene." };
+  return {
+    text: (vs) => on(vs) ? "The results below are filtered by the OQL specification from your query." : "The results below are not filtered by the OQL specification from your query.",
+    toggle: {
+      label: (vs) => on(vs) ? "Do not filter by OQL" : "Filter by OQL",
+      apply: (vs) => vs.map((v) => { const n = { ...v } as Record<string, unknown>; if (on(vs)) n.useOql = false; else delete n.useOql; return n as unknown as View; }),
+    },
+  };
+}
+/** does an OQL query name DRIVER anywhere (DRIVER, MUT_DRIVER, AMP_DRIVER, a range's _DRIVER)? */
+const asksDriver = (q: string): boolean => { try { return parseOql(q).some((e) => e.specs.some((sp) => sp.driver)); } catch { return false; } };
+/** the driver sources of the page's settings: what DRIVER reads in an oql clause (what is hidden is not the clause's) */
+const driverSources = (d: DriverSettings | undefined): DriverSettings =>
+  compactDrivers({ oncokb: d?.oncokb, hotspots: d?.hotspots, custom: d?.custom, tiers: d?.tiers }) || {};
+
+/**
+ * The page's driver settings, the oncoprint's, given to every oql clause of its cohorts that names
+ * DRIVER, as the portal's header count, Comparison/Survival and Download follow its settings
+ * (putativeDriver). A clause without DRIVER is left alone, so a settings change re-runs nothing there.
+ */
+export function syncDriverCohorts<D extends { cohorts?: Record<string, CohortDef>; views?: View[] }>(doc: D): D {
+  const onco = (doc.views || []).find((v) => v.kind === "oncoprint");
+  const sources = driverSources(onco ? driversOf(onco as never) : undefined);
+  const fix = (c: Clause): Clause => {
+    const x = c as { kind?: string; q?: string; not?: Clause };
+    if (x.not) { const inner = fix(x.not); return inner === x.not ? c : { ...c, not: inner } as Clause; }
+    if (x.kind !== "oql" || !asksDriver(String(x.q || ""))) return c;
+    return JSON.stringify((c as { drivers?: unknown }).drivers) === JSON.stringify(sources) ? c : { ...c, drivers: sources } as Clause;
+  };
+  // a view that reads the query's OQL itself (`oql`, its lines) and takes driver settings follows them
+  const views = (doc.views || []).map((v) => {
+    const x = v as unknown as { oql?: unknown; drivers?: unknown };
+    if (!OQL_DRIVER_KINDS.has(v.kind) || !Array.isArray(x.oql) || !asksDriver(x.oql.join("; "))) return v;
+    return JSON.stringify(x.drivers) === JSON.stringify(sources) ? v : { ...v, drivers: sources } as View;
+  });
+  let changed = views.some((v, i) => v !== (doc.views || [])[i]);
+  const cohorts = Object.fromEntries(Object.entries(doc.cohorts || {}).map(([k, def]) => {
+    const all = (def.all || []).map(fix);
+    if (all.some((c, i) => c !== (def.all || [])[i])) { changed = true; return [k, { ...def, all }]; }
+    return [k, def];
+  }));
+  return changed ? { ...doc, cohorts, ...(doc.views ? { views } : {}) } : doc;
 }
 
 /** the query's EXP / PROT profile choice, as an oql clause and the Download tab carry it */
@@ -162,12 +216,12 @@ export function syncDrivers(prev: View[], next: View[]): View[] {
     const own = driversOf(v as never) || {};
     const merged = compactDrivers({ hideVus: own.hideVus, hideGermline: own.hideGermline,
       ...(fromOncoprint ? { hideVus: from.hideVus, hideGermline: from.hideGermline } : {}),
-      oncokb: from.oncokb, custom: from.custom, tiers: from.tiers });
+      oncokb: from.oncokb, hotspots: from.hotspots, custom: from.custom, tiers: from.tiers });
     if (v.kind === "oncoprint") return withDrivers(v, merged);
     const pv = v as unknown as { drivers?: DriverSettings };
     if (pv.drivers == null) return v;
     // a plot draws every mutation, so it keeps sources alone
-    const sources = compactDrivers({ oncokb: from.oncokb, custom: from.custom, tiers: from.tiers }) || {};
+    const sources = compactDrivers({ oncokb: from.oncokb, hotspots: from.hotspots, custom: from.custom, tiers: from.tiers }) || {};
     return { ...v, drivers: sources } as View;
   });
 }
@@ -213,21 +267,11 @@ const cnSegmentsTab = (genes: string[], queried: string[]) => ({
 
 /**
  * The Oncoprint tab's rows: each line of the query its own row, in order, as the portal's oncoprint
- * draws them (OncoprintUtils makeGeneticTrackWith), a gene without OQL bare. A line's EXP / PROT
- * terms are left out: the oncoprint draws neither yet (`oncoprintAside` says so).
+ * draws them (OncoprintUtils makeGeneticTrackWith), a gene without OQL bare.
  */
 export function oncoprintRows(entries: string[]): string[] {
-  return entries.flatMap((x) => parseOql(x)).map(({ gene, specs }) => {
-    const drawn = specs.filter((sp) => sp.type !== "EXP" && sp.type !== "PROT");
-    return !drawn.length || drawn.some((sp) => sp.type === "ANY" && !sp.driver) ? gene : gene + oqlSublabel(drawn);
-  });
-}
-
-/** what the Oncoprint tab leaves out of the query's lines, in words, or null */
-export function oncoprintAside(entries: string[]): string | null {
-  const parsed = entries.flatMap((x) => { try { return parseOql(x); } catch { return []; } });
-  const exp = [...new Set(parsed.filter((e) => e.specs.some((sp) => sp.type === "EXP" || sp.type === "PROT")).map((e) => e.gene))];
-  return exp.length ? "the oncoprint does not draw " + exp.join(", ") + "'s EXP / PROT terms" : null;
+  return entries.flatMap((x) => parseOql(x)).map(({ gene, specs }) =>
+    specs.some((sp) => sp.type === "ANY" && !sp.driver) ? gene : gene + oqlSublabel(specs));
 }
 
 /** The Results page as the portal has it, for this query. */
@@ -244,6 +288,11 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   // every tab draws the queried patients, as cBioPortal's do; only Comparison/Survival compares groups
   const queried = ["Queried"], both = ["Altered", "Unaltered"];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
+  // the Mutations tab follows the query's lines where they narrow mutations, as the portal's
+  const mutOql = { oql: q.entries, ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}) };
+  const queryHasOql = q.entries.some((x) => { try { return parseOql(x).some((e) => hasOql(e.specs)); } catch { return false; } });
+  // Mutual Exclusivity's tracks are the query's lines, named as the portal names them (2 or more to pair)
+  const meTracks = new Set(q.entries.map((x) => { try { return oqlTrackName(x); } catch { return x; } })).size;
   const left = [
     // what the profiles decide is said once they are known
     ...(data.partial ? [] : [
@@ -252,7 +301,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       data.expr && multi && !data.expressionAcross ? "expression in Plots (expression data cannot be compared across the selected studies)" : null,
       !plotY ? "Plots (no mRNA profile or numeric clinical attribute)" : null,
     ]),
-    genes.length < 2 ? "Mutual Exclusivity (one gene)" : null,
+    meTracks < 2 ? "Mutual Exclusivity (one track)" : null,
     !svHeld ? "Structural Variants (no structural-variant data)"
       : data.svs === false ? "Structural Variants (no structural variant in the queried genes)"
       : data.svs === null ? "Structural Variants (could not check for structural variants in the queried genes)" : null,
@@ -260,15 +309,18 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     partly.length ? "Unaltered is not checked for " + partly.map((t) => TYPE_WORD[t]).join(" or ") + " profiling, which only some of the selected studies hold" : null,
   ].filter(Boolean) as string[];
   return arrange({ study: q.studies[0], cohorts }, [
-    { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), cohorts: queried })] },
-    { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, cohorts: queried })] },
-    ...(genes.length >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, cohorts: queried })] }] : []),
+    { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), ...pinsOf(q), cohorts: queried })] },
+    { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, oql: q.entries, ...pinsOf(q),
+      ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] },
+    ...(meTracks >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, oql: q.entries, ...pinsOf(q),
+      ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] }] : []),
     ...(plotY ? [{ title: "Plots", views: [v("Plot", { kind: "plot",
       x: expr ? (data.cna ? { source: "profile", profile: data.cna, gene: genes[0] } : { source: "alteration", gene: genes[0], by: "cna" }) : { source: "alteration", gene: genes[0], by: "mutationType" },
       y: plotY, cohorts: queried, points: [{ cohort: "Altered" }, { rule: "outliers" }], drivers: {} })] }] : []),
     // the portal's Mutations tab: one gene at a time, its lollipop over its mutation table
-    { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], cohorts: queried }),
-        v("Mutation table", { kind: "mutations", gene: genes[0], cohorts: queried })],
+    { title: "Mutations", views: [v("Mutation diagram", { kind: "hotspots", genes: [genes[0]], ...mutOql, cohorts: queried }),
+        v("Mutation table", { kind: "mutations", gene: genes[0], ...mutOql, cohorts: queried })],
+      ...(queryHasOql ? { banner: mutationsBanner(oqlHasMutationOql(q.entries)) } : {}),
       chooser: { label: "gene", options: genes, locks: ["gene", "genes"],
         value: (vs: View[]) => String(((vs[1] as unknown as { gene?: string }).gene) || genes[0]),
         // a new gene keeps the grid's selection (it is about classes, not this gene) and starts the table's own query over
@@ -279,16 +331,18 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     { title: "Comparison/Survival", sub: [
       { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },
       { title: "Survival", views: [v("Survival", { kind: "survival", cohorts: both })] },
-      ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", attributes: data.clinical.slice(0, CLINICAL_SHOWN), cohorts: both })] }] : []),
+      ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, cohorts: both })] }] : []),
       { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),
         v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] },
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
     ] },
     cnSegmentsTab(genes, queried),
     // the portal's PathwayMapper tab: the pathway holding most of the queried genes, each gene's altered %
-    { title: "Pathways", views: [v("Pathways", { kind: "pathwaymap", genes, cohorts: queried })] },
+    { title: "Pathways", views: [v("Pathways", { kind: "pathwaymap", genes, oql: q.entries, ...pinsOf(q),
+      ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] },
     // the portal's Download tab, after Pathways, last as there: the files of the queried samples for the query's lines
-    { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, ...pinsOf(q), cohorts: queried })] }
+    { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, ...pinsOf(q),
+      ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] }
   ], left, { partial: data.partial || (svHeld && data.svs === undefined) });
 }
 

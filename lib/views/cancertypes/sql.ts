@@ -6,6 +6,37 @@ import { clinicalValueFoldSql } from "../../event-names.ts";
 import { clinicalTable } from "../../custom-data.ts";
 import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { oqlEventsSql, parseOql, expressionProfileFor, type OqlPins, type OqlDriverOpts } from "../../oql.ts";
+import { finiteSql } from "../../sql-number.ts";
+
+/** the query's lines, one gene each: what is altered is what they match (the portal's OQL-filtered data) */
+export interface CancertypesOql extends OqlDriverOpts { lines: string[]; profiles?: string[]; pins?: OqlPins }
+
+/** each line's matches as (suid, gene, t), t the kind the portal counts it as */
+function oqlAltSql(oql: CancertypesOql, study: string, db: string, pin: string | null): string {
+  const kind = "multiIf(e.o = 1, 'mutation', e.o = 2 AND e.ev = 'AMP', 'amp', e.o = 2, 'homdel', e.o = 3, 'sv',\n" +
+    "           e.ev = 'EXP HIGH', 'mrnaHigh', e.ev = 'EXP LOW', 'mrnaLow', e.ev = 'PROT HIGH', 'protHigh', 'protLow')";
+  return oql.lines.map((line) => {
+    const [{ gene }] = parseOql(line);
+    return "  SELECT concat(" + sq(study + "_") + ", e.sid) AS suid, " + sq(gene) + " AS gene, " + kind + " AS t\n" +
+      "  FROM (" + oqlEventsSql(line, { oncokbPin: pin, profiles: oql.profiles, pins: oql.pins, study, db, drivers: oql.drivers, hotspotPins: oql.hotspotPins }) + ") e\n" +
+      "  WHERE concat(" + sq(study + "_") + ", e.sid) IN (SELECT suid FROM samp)";
+  }).join("\n  UNION ALL\n");
+}
+
+/** the samples a line's EXP / PROT reads a value for: profiled for its gene, as a sample in a selected expression profile */
+function oqlLevelCoverageSql(oql: CancertypesOql, study: string, db: string): string {
+  const parts: string[] = [];
+  for (const type of ["EXP", "PROT"] as const) {
+    const genes = [...new Set(oql.lines.flatMap((l) => parseOql(l)).filter((e) => e.specs.some((x) => x.type === type)).map((e) => e.gene))];
+    if (!genes.length) continue;
+    const prof = expressionProfileFor(type, oql.profiles, oql.pins);
+    parts.push("  SELECT DISTINCT ga.sample_unique_id AS suid, ga.hugo_gene_symbol AS gene FROM " + db + ".genetic_alteration_derived ga\n" +
+      "  WHERE ga.cancer_study_identifier = " + sq(study) + " AND ga.profile_type = " + sq(prof) + " AND ga.hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
+      "    AND " + finiteSql("ga.alteration_value") + " IS NOT NULL AND ga.sample_unique_id IN (SELECT suid FROM samp)");
+  }
+  return parts.map((p) => "\n  UNION DISTINCT\n" + p).join("");
+}
 
 /**
  * Per group of the cohort's samples (a sample attribute's value, or the study) and per gene — plus
@@ -16,7 +47,7 @@ import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
  * in-cohort samples is, and carries the union of those samples' alterations. Counts only.
  */
 export function cancerTypesSql(cohortSql: string, study: string, db: string, genes: string[], attribute: string | null,
-  pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample"): AggregateSql {
+  pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample", oql?: CancertypesOql): AggregateSql {
   const geneList = genes.map(sq).join(",");
   const drv = measure === "driver" && pin;
   const fold = clinicalValueFoldSql("attribute_value");
@@ -34,7 +65,8 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
         "),\n"
       : "grp AS (SELECT suid, " + sq(study) + " AS g, " + sq(study) + " AS label FROM samp),\n") +
     "alt AS (\n" +
-    "  SELECT g.sample_unique_id AS suid, g.hugo_gene_symbol AS gene,\n" +
+    (oql ? oqlAltSql(oql, study, db, pin) + "\n),\n" : "") +
+    (oql ? "" : "  SELECT g.sample_unique_id AS suid, g.hugo_gene_symbol AS gene,\n" +
     "         multiIf(g.variant_type = 'mutation', 'mutation', g.variant_type = 'cna' AND g.cna_alteration >= 2, 'amp',\n" +
     "                 g.variant_type = 'cna', 'homdel', 'sv') AS t\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
@@ -42,13 +74,14 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "  WHERE " + genomicStudySql(study, "g") + " AND g.hugo_gene_symbol IN (" + geneList + ") AND " + ALTERED_COND + "\n" +
     "    AND g.sample_unique_id IN (SELECT suid FROM samp)" + (drv ? " AND ann.is_driver" : "") + "\n" +
     "  GROUP BY suid, gene, t\n" +
-    "),\n" +
+    "),\n") +
     // a sample is profiled for a gene its panel lists
     "cov AS (\n" +
     "  SELECT DISTINCT sp.sample_unique_id AS suid, pg.gene AS gene FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + geneList + ")\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.sample_unique_id IN (SELECT suid FROM samp)\n" +
-    "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')\n" +
+    "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')" +
+    (oql ? oqlLevelCoverageSql(oql, study, db) : "") + "\n" +
     "),\n" +
     "sg AS (\n" +
     "  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types\n" +
@@ -63,13 +96,19 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "),\n" +
     // the whole cohort, each unit once however many groups it is in: grp '' is reserved for it below
     "uall AS (SELECT k, '\\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types FROM u GROUP BY k, gene),\n" +
-    "uu AS (SELECT k, g, label, gene, types FROM u UNION ALL SELECT k, g, label, gene, types FROM uall)\n" +
-    "SELECT g AS grp, gene, any(label) AS label, count() AS profiled,\n" +
+    "uu AS (SELECT k, g, label, gene, types FROM u UNION ALL SELECT k, g, label, gene, types FROM uall),\n" +
+    // a unit's alterations are counted once per TYPE (the portal's uniqBy alterationType): an
+    // amplification and a deep deletion are one copy-number kind, shown as the amplification
+    "uk AS (SELECT grp_, gene, label, types, arrayDistinct(arrayMap((t) -> multiIf(t IN ('amp', 'homdel'), 'cna', t IN ('mrnaHigh', 'mrnaLow'), 'mrna',\n" +
+    "         t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds FROM (SELECT g AS grp_, gene, label, types FROM uu))\n" +
+    "SELECT grp_ AS grp, gene, any(label) AS label, count() AS profiled,\n" +
     "       countIf(length(types) > 0) AS altered,\n" +
-    "       countIf(types = ['mutation']) AS mutation, countIf(types = ['amp']) AS amp,\n" +
-    "       countIf(types = ['homdel']) AS homdel, countIf(types = ['sv']) AS sv,\n" +
-    "       countIf(length(types) > 1) AS multiple\n" +
-    "FROM uu GROUP BY grp, gene"
+    "       countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND has(types, 'amp')) AS amp,\n" +
+    "       countIf(kinds = ['cna'] AND NOT has(types, 'amp')) AS homdel, countIf(kinds = ['sv']) AS sv,\n" +
+    "       countIf(kinds = ['mrna'] AND has(types, 'mrnaHigh')) AS mrnaHigh, countIf(kinds = ['mrna'] AND NOT has(types, 'mrnaHigh')) AS mrnaLow,\n" +
+    "       countIf(kinds = ['prot'] AND has(types, 'protHigh')) AS protHigh, countIf(kinds = ['prot'] AND NOT has(types, 'protHigh')) AS protLow,\n" +
+    "       countIf(length(kinds) > 1) AS multiple\n" +
+    "FROM uk GROUP BY grp, gene"
   ));
 }
 
