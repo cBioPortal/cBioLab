@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -34,6 +34,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "oncokb-tumor-type": ["node", "--env-file=.env.local", "scripts/check-oncokb-tumor-type.ts"],
   "oncokb-sv": ["node", "--env-file=.env.local", "scripts/check-oncokb-sv.ts"],
   "hotspot-drivers": ["node", "--env-file=.env.local", "scripts/check-hotspot-drivers.ts"],
+  "results-oql": ["node", "--env-file=.env.local", "scripts/check-results-oql.ts"],
 };
 
 interface Mutant {
@@ -690,6 +691,30 @@ const MUTANTS: Mutant[] = [
     effect: "A row's EXP reads values that are not numbers, so 'NA' comes back as a level.",
     find: "\"  AND \" + finiteSql(\"ga.alteration_value\") + \" IS NOT NULL\" + fromColumnSamples(\"ga.sample_unique_id\", study, samples);\n}",
     replace: "fromColumnSamples(\"ga.sample_unique_id\", study, samples);\n}" },
+  { id: "cts-cna-kinds-multiple", layer: "counts", guard: "results-oql", file: "lib/views/cancertypes/sql.ts",
+    effect: "A patient with an amplification and a deep deletion counts as Multiple, where the portal counts one copy-number kind.",
+    find: "t IN ('amp', 'homdel'), 'cna',",
+    replace: "t = 'amp', 'cna'," },
+  { id: "cts-level-coverage-missing", layer: "counts", guard: "results-oql", file: "lib/views/cancertypes/sql.ts",
+    effect: "A sample with an mRNA value but no gene panel is left out of a line's EXP denominator.",
+    find: "(oql ? oqlLevelCoverageSql(oql, study, db) : \"\")",
+    replace: "\"\"" },
+  { id: "cts-mrna-high-as-low", layer: "counts", guard: "results-oql", file: "lib/views/cancertypes/sql.ts",
+    effect: "A high mRNA level is counted as low.",
+    find: "e.ev = 'EXP HIGH', 'mrnaHigh'",
+    replace: "e.ev = 'EXP HIGH', 'mrnaLow'" },
+  { id: "cts-driver-measure-with-oql", layer: "counts", guard: "unit", file: "lib/views/cancertypes/run.ts",
+    effect: "The view takes measure: driver beside OQL, counting drivers twice over.",
+    find: "if (view.measure === \"driver\") return refuse(",
+    replace: "if (false) return refuse(" },
+  { id: "results-cts-no-oql", layer: "counts", guard: "unit", file: "app/portal/results-layout.ts",
+    effect: "The Results page's Cancer Types Summary ignores the query's OQL again (KRAS 454 of 1567 NSCLC patients where the portal has 64).",
+    find: "{ kind: \"cancertypes\", genes, oql: q.entries,",
+    replace: "{ kind: \"cancertypes\", genes," },
+  { id: "cts-legend-every-kind", layer: "counts", guard: "unit", file: "lib/views/cancertypes/figure.ts",
+    effect: "The legend keys mRNA and protein kinds no group has.",
+    find: "CT_KINDS.filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0))",
+    replace: "CT_KINDS.filter(() => true)" },
   { id: "oncoprint-ranged-events-twice", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
     effect: "A ranged gene's mutations are read from both tables, so every one is drawn twice and counted twice.",
     find: "(ranged.length ? \"\\n  AND NOT (variant_type = 'mutation' AND hugo_gene_symbol IN (\" + ranged.map(sq).join(\",\") + \"))\" : \"\") +",
