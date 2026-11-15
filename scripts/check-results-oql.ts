@@ -22,12 +22,18 @@
  * a few samples (listed at EXPR below) and the structural-variant panel left out, so that EGFR is
  * unprofiled on FX-P31…FX-P40 but for what the expression rows add.
  *
+ * The Mutual Exclusivity section (M*, PR 6) runs lib/federation.ts pairCountsSql over the query's
+ * tracks the same way: a track with OQL is altered where its line matches, a bare one by any
+ * alteration; its counts are written down from the same files, and its EXP / PROT rows (M7) read the
+ * scratch copies before they are dropped.
+ *
  * Run: node --env-file=.env.local scripts/check-results-oql.ts (connection b must be the fixture:
  * `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql } from "../lib/views/cancertypes/sql.ts";
+import { pairCountsSql } from "../lib/federation.ts";
 import type { DriverSettings } from "../lib/driver-settings.ts";
 
 const STUDY = "cbiolab_peer_fixture";
@@ -228,6 +234,112 @@ for (const [sid, gene, prof, v] of EXPR)
   expectRow("C6/C10 patients:", p, "*", NSCLC, { profiled: 49, altered: 10, mutation: 2, multiple: 2, mrnaHigh: 3, mrnaLow: 1, protHigh: 1, protLow: 1 });
   expectRow("C6/C10 patients:", p, "*", ALL, { profiled: 53, altered: 10 });
 }
+
+// ==== Mutual Exclusivity: pairCountsSql over the query's tracks (M*, PR 6 of the OQL series) ======
+// Legacy: cbioportal-frontend cd8c6df src/pages/resultsView/ResultsViewPageStoreUtils.ts 473-597
+// getSampleAlteredMap — per line, a sample is ALTERED where the line's OQL-filtered data holds it,
+// UNPROFILED where not profiled for the line's gene, else UNALTERED; 599-619 getSingleGeneResultKey
+// names the track. Profiled is ours, as before the change: on a mutation panel covering both genes
+// (MEX-STM-1). Every sample of the fixture is on PEERFIX_FULL or PEERFIX_NO_EGFR (FX-P31…FX-P40);
+// both list KRAS, TP53, STK11, so 59 samples are profiled for any pair of those; EGFR only the 49
+// not on PEERFIX_NO_EGFR. neither = profiled − both − onlyA − onlyB.
+//
+// The expected counts below are read off the fixture files, sample by sample:
+//   TP53 (bare: any mutation, ±2 copy number, structural variant; its copy number is −1 only, no SV):
+//     mutated FX-P01-T1, P03-T1, P05, P07, P09, P10, P11, P13, P15, P17, P19, P21, P24, P27, P30, P33, P36 — 17
+//   KRAS (bare): mutated P01-T1/T2, P02-T1/T2, P03-T1/T2, P04-T1/T2, P05…P20 — 24 (its copy number is +1 only)
+//   KRAS G12D: P02-T1, P02-T2, P07, P12, P17 — 5;  KRAS G12C: P01-T1, P01-T2, P06, P10, P11, P16 — 6
+//   EGFR mutated on its panel: P21…P28, P41, P42, P43-T1/T2, P44 — 13 (P33, P35, P37's L858R are on
+//     PEERFIX_NO_EGFR: unprofiled); EGFR amplified (2): P23, P26, both also mutated
+type PairOql = { oncokbPin?: string | null; profiles?: string[]; pins?: { EXP?: string; PROT?: string; ifHeld?: boolean };
+  drivers?: DriverSettings; hotspotPins?: { hg19: string | null; hg38: string | null } };
+type Cells = { profiled: number; both: number; onlyA: number; onlyB: number; neither: number };
+/** pairCountsSql with `oql`, over every sample of the study, one row per pair by its track names */
+async function pairsOf(tag: string, pairs: [string, string][], oql: PairOql | undefined, db = conn!.db): Promise<Row[]> {
+  const cohort = compileCohortDef(null, { study: STUDY, db });
+  try {
+    return (await chQuery<Row>(pairCountsSql(cohort, pairs, STUDY, db, oql as never), conn!)).data;
+  } catch (e) {
+    ok(tag + " runs", false, (e as Error).message.slice(0, 300));
+    return [];
+  }
+}
+function expectPair(tag: string, rows: Row[], a: string, b: string, want: Cells) {
+  const found = rows.filter((r) => String(r.ga) === a && String(r.gb) === b);
+  const name = tag + " " + a + " / " + b;
+  if (found.length !== 1) { ok(name, false, found.length + " rows; got pairs " + JSON.stringify(rows.map((r) => [r.ga, r.gb]))); return; }
+  const r = found[0];
+  const got: Cells = { profiled: Number(r.profiled), both: Number(r.both), onlyA: Number(r.only_a), onlyB: Number(r.only_b),
+    neither: Number(r.profiled) - Number(r.both) - Number(r.only_a) - Number(r.only_b) };
+  const bad = (Object.keys(want) as (keyof Cells)[]).filter((k) => got[k] !== want[k]);
+  ok(name, !bad.length, bad.map((k) => k + " ours " + got[k] + ", expected " + want[k]).join("; "));
+}
+
+// ---- M1, M2, M3: tracks with OQL, bare tracks, and two tracks of one gene, in one query ----------
+// KRAS: MUT=G12D / TP53 (M1): both P07, P17 = 2; only G12D P02-T1, P02-T2, P12 = 3; only TP53 17 − 2 = 15; neither 59 − 20 = 39.
+// KRAS / TP53 (M2, bare: as before the change): both P01-T1, P03-T1, P05, P07, P09, P10, P11, P13, P15, P17, P19 = 11;
+//   only KRAS 24 − 11 = 13; only TP53 P21, P24, P27, P30, P33, P36 = 6; neither 59 − 30 = 29.
+// KRAS / KRAS: MUT=G12D (M2/M3, a bare and an OQL track of one gene): both 5; only KRAS 19; only G12D 0; neither 35.
+// KRAS: MUT=G12D / KRAS: MUT=G12C (M3): both 0; 5; 6; neither 48.
+{
+  const pairs: [string, string][] = [["KRAS: MUT=G12D", "TP53"], ["KRAS", "TP53"], ["KRAS", "KRAS: MUT=G12D"], ["KRAS: MUT=G12D", "KRAS: MUT=G12C"]];
+  const rows = await pairsOf("M1/M2/M3", pairs, {});
+  ok("M1 one row per pair, named by its tracks", rows.length === pairs.length && pairs.every(([a, b]) => rows.some((r) => r.ga === a && r.gb === b)),
+    JSON.stringify(rows.map((r) => [r.ga, r.gb])));
+  expectPair("M1:", rows, "KRAS: MUT=G12D", "TP53", { profiled: 59, both: 2, onlyA: 3, onlyB: 15, neither: 39 });
+  expectPair("M2:", rows, "KRAS", "TP53", { profiled: 59, both: 11, onlyA: 13, onlyB: 6, neither: 29 });
+  expectPair("M2/M3:", rows, "KRAS", "KRAS: MUT=G12D", { profiled: 59, both: 5, onlyA: 19, onlyB: 0, neither: 35 });
+  expectPair("M3:", rows, "KRAS: MUT=G12D", "KRAS: MUT=G12C", { profiled: 59, both: 0, onlyA: 5, onlyB: 6, neither: 48 });
+  // a bare pair counts as it did before the change, without `oql`
+  expectPair("M2 (no oql argument):", await pairsOf("M2 (no oql)", [["KRAS", "TP53"]], undefined), "KRAS", "TP53",
+    { profiled: 59, both: 11, onlyA: 13, onlyB: 6, neither: 29 });
+}
+
+// ---- M3, M5: two tracks of EGFR, and profiled by the line's gene ---------------------------------
+// EGFR: AMP / EGFR: MUT (M3): profiled 49 (EGFR's panel); both P23, P26 = 2; only AMP 0; only MUT 11; neither 36.
+// EGFR: MUT / TP53 (M5): profiled 49; TP53 among them 17 − P33, P36 = 15; both P21, P24, P27 = 3; only EGFR 10;
+//   only TP53 12; neither 24. FX-P33 (L858R and R248Q) is not in it: its panel omits EGFR, so it is unprofiled, not "both".
+// EGFR: AMP / KRAS: MUT=G12D (M5): profiled 49 (G12D's samples all on PEERFIX_FULL); both 0; 2; 5; neither 42.
+{
+  const rows = await pairsOf("M3/M5", [["EGFR: AMP", "EGFR: MUT"], ["EGFR: MUT", "TP53"], ["EGFR: AMP", "KRAS: MUT=G12D"]], {});
+  expectPair("M3:", rows, "EGFR: AMP", "EGFR: MUT", { profiled: 49, both: 2, onlyA: 0, onlyB: 11, neither: 36 });
+  expectPair("M5:", rows, "EGFR: MUT", "TP53", { profiled: 49, both: 3, onlyA: 10, onlyB: 12, neither: 24 });
+  expectPair("M5:", rows, "EGFR: AMP", "KRAS: MUT=G12D", { profiled: 49, both: 0, onlyA: 2, onlyB: 5, neither: 42 });
+}
+
+// ---- M6: DRIVER in a track follows the driver settings -------------------------------------------
+// STK11: MUT_DRIVER — OncoKB Q37*: P10, P12, P16, P18, P27, P31, P37, P39 (8); Cancer Hotspots: P29's X200_splice (1).
+// With KRAS: MUT=G12C (6), all 59 profiled:
+//   OncoKB (no settings, or hotspots off): both P10, P16 = 2; only STK11 6; only G12C 4; neither 47.
+//   hotspots only: both 0; 1; 6; neither 52.     OncoKB and hotspots: both 2; 7; 4; neither 46.
+{
+  const pair: [string, string][] = [["STK11: MUT_DRIVER", "KRAS: MUT=G12C"]];
+  const cases: [string, PairOql, Cells][] = [
+    ["no settings: OncoKB at the pin", { oncokbPin: ONCOKB }, { profiled: 59, both: 2, onlyA: 6, onlyB: 4, neither: 47 }],
+    ["OncoKB only", { oncokbPin: ONCOKB, drivers: { hotspots: false } }, { profiled: 59, both: 2, onlyA: 6, onlyB: 4, neither: 47 }],
+    ["hotspots only", { oncokbPin: ONCOKB, drivers: { oncokb: false }, hotspotPins: HOTSPOT_PINS }, { profiled: 59, both: 0, onlyA: 1, onlyB: 6, neither: 52 }],
+    ["OncoKB and hotspots", { oncokbPin: ONCOKB, drivers: {}, hotspotPins: HOTSPOT_PINS }, { profiled: 59, both: 2, onlyA: 7, onlyB: 4, neither: 46 }],
+  ];
+  for (const [tag, oql, want] of cases) expectPair("M6 " + tag + ":", await pairsOf("M6 " + tag, pair, oql), pair[0][0], pair[0][1], want);
+}
+
+// ---- M7: EXP / PROT tracks, over the scratch copies above (EXPR) ---------------------------------
+// KRAS: EXP>=2 — P07 (2.5), P21 (3), P26 (2); TP53 holds P07, P21: both 2; only EXP 1; only TP53 15; neither 41 (59 profiled:
+//   the mutation panels are kept in the copies).
+// KRAS: PROT<=-2 — P25 (−3), P02-T1 (−2.5), neither in TP53: both 0; 2; 17; neither 40.
+// KRAS: MUT=G12D EXP>=2 (one line, either) — P02-T1, P02-T2, P07, P12, P17, P21, P26 = 7; with TP53 P07, P17, P21:
+//   both 3; 4; 14; neither 38.
+{
+  const oql: PairOql = { profiles: ["mutations", "cna", "structural_variants", EXP_PROFILE, PROT_PROFILE] };
+  const rows = await pairsOf("M7", [["KRAS: EXP>=2", "TP53"], ["KRAS: PROT<=-2", "TP53"], ["KRAS: MUT=G12D EXP>=2", "TP53"]], oql, scratch);
+  expectPair("M7:", rows, "KRAS: EXP>=2", "TP53", { profiled: 59, both: 2, onlyA: 1, onlyB: 15, neither: 41 });
+  expectPair("M7:", rows, "KRAS: PROT<=-2", "TP53", { profiled: 59, both: 0, onlyA: 2, onlyB: 17, neither: 40 });
+  expectPair("M7:", rows, "KRAS: MUT=G12D EXP>=2", "TP53", { profiled: 59, both: 3, onlyA: 4, onlyB: 14, neither: 38 });
+  // the profile pinned by name reads the same values
+  const pinned = await pairsOf("M7 pinned", [["KRAS: EXP>=2", "TP53"]], { ...oql, pins: { EXP: EXP_PROFILE } }, scratch);
+  expectPair("M7 (EXP pinned):", pinned, "KRAS: EXP>=2", "TP53", { profiled: 59, both: 2, onlyA: 1, onlyB: 15, neither: 41 });
+}
+
 await write("DROP DATABASE IF EXISTS " + scratch);
 
 console.log(`\n${checks - failures}/${checks} results OQL checks passed`);

@@ -13,7 +13,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, CohortSizes, ExploreResult } from "./types.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, PairOql, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
 import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers } from "./plot.ts";
 import type { Moments } from "./stats.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
@@ -364,10 +364,10 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
       "and this needs its own federation op rather than guessing at one");
   }
 
-  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][]): Promise<PairCounts[]> {
+  async pairCounts(def: CohortDef | null | undefined, pairs: [string, string][], oql?: PairOql): Promise<PairCounts[]> {
     this.guard(def);
     if (!pairs.length) return [];
-    const r = await this.call("aggregates", { study: this.study, cohort: def || {}, pairs });
+    const r = await this.call("aggregates", { study: this.study, cohort: def || {}, pairs, ...(oql ? { pairOql: oql } : {}) });
     this.remember(r);
     return r.pairCounts || [];
   }
