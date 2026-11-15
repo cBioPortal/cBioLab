@@ -35,7 +35,8 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
   return arrange({ study, cohorts: linked.cohorts }, [
     { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
-    { title: "Survival", views: [v("Survival", { kind: "survival" })] },
+    // the page's Include mode compares groups that may share patients: their curves, but no test
+    { title: "Survival", views: [v("Survival", { kind: "survival", noTestWhenShared: true })] },
     // every attribute, as the portal's tab tests them
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true })] }] : []),
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),

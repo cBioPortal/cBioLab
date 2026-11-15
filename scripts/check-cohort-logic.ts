@@ -18,6 +18,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { compileCohortDef, memberSamplesSql } from "../lib/cohort2.ts";
+import { sharedPatientsSql } from "../lib/views/survival/sql.ts";
 import { runAnalysis, studyProfiles } from "../lib/analysis.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
@@ -88,6 +89,23 @@ async function algebra(study: string, A: Clause, B: Clause, C: Clause) {
   const notAnotB = await ids(study, { all: [{ not: A as never }, { not: B as never }] });
   record(study, "not", "\"not (A or B)\" equals \"not A and not B\" (De Morgan's law)",
     same(notAorB, notAnotB) && same(notAorB, minus(base, or(a, b))), diff("not (A or B)", notAorB, minus(base, or(a, b))));
+}
+
+/**
+ * The survival view gives no log-rank p when its cohorts share a patient (lib/views/survival/sql.ts):
+ * its count of patients in more than one cohort must be exactly the patients two or more of the
+ * cohorts' id sets hold.
+ */
+async function sharedPatients(study: string, defs: CohortDef[]) {
+  const sqls = await Promise.all(defs.map((d) => cohortSql(study, d)));
+  const sets = await Promise.all(sqls.map(async (sql) =>
+    new Set((await chQuery<{ pid: string }>("SELECT DISTINCT pid FROM (" + sql + ")", PRIMARY)).data.map((r) => r.pid))));
+  const seen = new Map<string, number>();
+  for (const s of sets) for (const p of s) seen.set(p, (seen.get(p) || 0) + 1);
+  const expected = [...seen.values()].filter((k) => k > 1).length;
+  const ours = Number((await chQuery<{ n: string }>(sharedPatientsSql(sqls), PRIMARY)).data[0]?.n ?? -1);
+  record(study, "overlap", "the survival view's shared-patient count is the patients in two or more of the cohorts", ours === expected,
+    `engine ${ours.toLocaleString()}, expected ${expected.toLocaleString()} of ${sets.map((s) => s.size.toLocaleString()).join(" / ")} patients`);
 }
 
 /** Refinements of one gene's alterations must nest, and OQL's union must be a union. */
@@ -328,6 +346,8 @@ const CHORD = "msk_chord_2024";
 await algebra(CHORD, { kind: "oql", q: "TP53: MUT" }, { kind: "clinical", attribute: "SMOKING_PREDICTIONS_3_CLASSES", values: ["Never"] } as Clause,
   { kind: "event", a: { eventType: "Treatment", attrs: [{ key: "SUBTYPE", value: "Immuno" }] }, rel: { type: "NONE" } } as Clause);
 await algebra("brca_tcga", { kind: "oql", q: "PIK3CA: MUT" }, { kind: "oql", q: "MYC: AMP" }, { kind: "clinical", attribute: "AGE", op: ">=", value: 60 } as Clause);
+await sharedPatients("coadread_tcga_pan_can_atlas_2018", [{ all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] },
+  { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] }, { all: [{ kind: "oql", q: "KRAS" }] }] as CohortDef[]);
 await oqlNesting(CHORD, "KRAS", "G12C");
 await oqlNesting("brca_tcga", "PIK3CA", "H1047R");
 await clinicalPartition(CHORD, "GENDER", ["Female", "Male", "Unknown"], "CURRENT_AGE_DEID", 65);

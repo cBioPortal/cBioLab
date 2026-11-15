@@ -526,6 +526,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "overlapCountsSql": () => aggregates.overlapCountsSql([cohortSql, cohortSql, cohortSql], "x", "db"),
     // clinical: the study's attribute ids and display names, metadata only
     "clinicalAttributeListSql": () => aggregates.clinicalAttributeListSql("x", "db"),
+    // survival: the patients in more than one cohort stay inside; one count leaves
+    "sharedPatientsSql": () => aggregates.sharedPatientsSql([cohortSql, cohortSql], "x", "db"),
     // enrichment: per-gene sample counts, and panel-level sample counts joined to genes
     "enrichAlteredSql": () => aggregates.enrichAlteredSql(cohortSql, "x", "db", "mutation", "v7.5", true),
     "enrichAlteredSql:cna-any": () => aggregates.enrichAlteredSql(cohortSql, "x", "db", "cna", null, false),

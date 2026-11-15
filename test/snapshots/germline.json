@@ -172,7 +172,8 @@
                     "…": "14 more",
                     "sha256": "39b3e42295cedea5"
                   }
-                ]
+                ],
+                "tLast": 33.02
               },
               {
                 "group": "non-carriers",
@@ -290,7 +291,8 @@
                     "…": "49 more",
                     "sha256": "ae65496c83275d59"
                   }
-                ]
+                ],
+                "tLast": 68.99
               }
             ],
             "logrank": {

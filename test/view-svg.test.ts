@@ -123,6 +123,33 @@ describe("survival: tick interval and cutoff controls reach the SVG", () => {
   });
 });
 
+describe("survival: the axis runs to the last follow-up, each curve to its own (CMP-KM-3, CMP-KM-6)", () => {
+  // A's last event is at 5 months and its last patient censored at 40; B followed to 20
+  const tail = (): DrawnResultOf<"survival"> => ({ kind: "survival", cohorts: ["A", "B"], curves: [
+    { cohort: "A", points: [{ t: 0, s: 1 }, { t: 5, s: 0.5 }], median: 5, n: 10, events: 5, tLast: 40, atRisk: Array.from({ length: 41 }, (_, m) => m < 5 ? 10 : m <= 40 ? 3 : 0) },
+    { cohort: "B", points: [{ t: 0, s: 1 }, { t: 3, s: 0.8 }], median: null, n: 10, events: 2, tLast: 20, atRisk: Array.from({ length: 21 }, () => 8) },
+  ] } as any);
+  test("ticks past the last event, to the censored tail, and its at-risk counts", () => {
+    const svg = viewToSvg(tail(), { width: 900 })!;
+    assert.ok(svg.includes(">36</text>"), "a 36-month tick: the axis reaches A's follow-up at 40, past its last event at 5");
+    assert.match(svg, /<title>A: 3 at risk at 36 months<\/title>3</);
+    assert.match(svg, /<title>B: 0 at risk at 36 months<\/title>0</);
+  });
+  test("a curve ends at its own last follow-up, not the axis end", () => {
+    const svg = viewToSvg(tail(), { width: 900 })!;
+    const paths = [...svg.matchAll(/<path d="([^"]+)" fill="none" stroke="[^"]+" stroke-width/g)].map((m) => m[1]);
+    const endX = (d: string) => Number(d.match(/H([\d.]+)(?!.*H)/)![1]);
+    assert.equal(paths.length, 2);
+    assert.ok(endX(paths[0]) > endX(paths[1]) * 1.5, "A (to 40 mo) runs well past B (to 20 mo): " + endX(paths[0]) + " vs " + endX(paths[1]));
+  });
+  test("cohorts that share patients: the line under the figure says why there is no p", () => {
+    const svg = viewToSvg({ ...tail(), sharedPatients: 221, testWithheld: true } as any, { width: 900 })!;
+    assert.match(svg, /No log-rank p: 221 patients are in more than one curve/);
+    const kept = viewToSvg({ ...tail(), sharedPatients: 47 } as any, { width: 900 })!;
+    assert.match(kept, /47 patients are in more than one curve; the test assumes the groups share no one, so its p is approximate/);
+  });
+});
+
 describe("survival: the number at risk under each tick", () => {
   const withRisk = (): DrawnResultOf<"survival"> => ({ kind: "survival", cohorts: ["A", "B"], curves: [
     { cohort: "A", points: [{ t: 0, s: 1 }, { t: 6, s: 0.5 }, { t: 25, s: 0.3 }], median: 6, n: 1200, events: 600, atRisk: Array.from({ length: 30 }, (_, m) => 1200 - m * 40) },

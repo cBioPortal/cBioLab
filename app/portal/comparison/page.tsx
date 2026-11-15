@@ -3,8 +3,8 @@
 // arrive in an analysis document (?doc=, the lab's own link encoding); the page's views replace
 // any the link carries unless they are this page's own (a link made on this page). A setting
 // changed here travels as ?changes= beside the cohorts (page-doc.ts). As on the portal, a group can
-// be taken out of every tab and put back (?off=), and the groups compared with or without the
-// samples they share (?overlap=exclude, lib/partition-arms.ts's exclusiveCohorts). The Genomic
+// be taken out of every tab and put back (?off=), and the groups compared without the samples they
+// share (lib/partition-arms.ts's exclusiveCohorts), the portal's default, or with them (?overlap=include). The Genomic
 // Alterations tab counts every alteration, or only OncoKB drivers (?drivers=1), a setting of the
 // page's own that each of its views carries as `measure`.
 import { useMemo, useState } from "react";
@@ -28,7 +28,7 @@ export default function ComparisonPage() {
   // a link without ?off= opens on its first groups, as many as the page compares at once
   const [off, setOff] = useState<string[]>(() => (decodeParam<string[]>(q.get("off")) || names.slice(COMPARISON_MAX_ACTIVE)).filter((n) => names.includes(n)));
   const sizeOk = names.length >= 2 && names.length <= COMPARISON_MAX_GROUPS && names.length - off.length <= COMPARISON_MAX_ACTIVE;
-  const [exclude, setExclude] = useState(() => q.get("overlap") === "exclude");
+  const [exclude, setExclude] = useState(() => q.get("overlap") !== "include");
   const [driversAsked, setDriversAsked] = useState(() => q.get("drivers") === "1");
   // drivers only where every compared study has OncoKB calls here; otherwise said so, never applied
   const noDrivers = basics?.noDrivers || [];
@@ -54,7 +54,7 @@ export default function ComparisonPage() {
     const usual = names.slice(COMPARISON_MAX_ACTIVE);
     syncUrl({ off: next.length === usual.length && next.every((x) => usual.includes(x)) ? null : encodeParam(next) });
   };
-  const overlap = (v: string) => { setExclude(v === "exclude"); syncUrl({ overlap: v === "exclude" ? "exclude" : null }); };
+  const overlap = (v: string) => { setExclude(v === "exclude"); syncUrl({ overlap: v === "exclude" ? null : "include" }); };
   const alterations = (v: string) => { setDriversAsked(v === "drivers"); syncUrl({ drivers: v === "drivers" ? "1" : null }); };
   const shell = (body: React.ReactNode) => <><SiteHeader page="group comparison" /><main className="analysis-main">{body}</main></>;
   if (!linked || !study) return shell(<p className="note">This page compares the cohorts of an analysis document passed as <code>?doc=</code> (the lab&apos;s own link encoding); none was given.</p>);
@@ -70,7 +70,7 @@ export default function ComparisonPage() {
           title={noDrivers.length ? "drivers only needs OncoKB driver calls, which " + noDrivers.join(", ") + " does not have on this deployment" : "count every alteration, or only those OncoKB calls drivers, in the Genomic Alterations tab"}
           options={[["all", "Alterations: all"], ["drivers", "Alterations: OncoKB drivers only"]]} />
         <Choice value={exclude ? "exclude" : "include"} onChange={overlap} title="samples in more than one group" className="overlapchoice"
-          options={[["include", "Overlapping samples: include"], ["exclude", "Overlapping samples: exclude"]]} />
+          options={[["exclude", "Overlapping samples: exclude"], ["include", "Overlapping samples: include"]]} />
       </span>} />
     {page.note && <p className="note">{page.note}</p>}
     {compared.refused && <p className="note">Overlapping samples are still included: {compared.refused}.</p>}

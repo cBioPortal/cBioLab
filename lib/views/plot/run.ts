@@ -11,6 +11,7 @@ import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POIN
 import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
 import { OQL_NOT_PROFILED } from "../../plot-oql.ts";
+import { naturalSort } from "./natural-sort.ts";
 import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
 import { resolveDrivers, type DriverSettings } from "../../driver-settings.ts";
@@ -77,14 +78,15 @@ const NO_MUTATION = ["Not mutated", OQL_NOT_PROFILED];
  * deletion to amplification, mutation classes (Missense, Inframe, Truncating, Splice, Promoter,
  * Other, Multiple, then no mutation and not profiled; each class's Driver before its VUS),
  * Mutated / Not mutated / Not profiled, Driver / VUS / … — and any other is alphabetical, by code
- * unit as lodash's sortBy compares strings. A category outside a type's order follows it,
- * alphabetically (the portal puts it first, an artefact of indexOf). An OQL axis, which the portal
- * does not have, keeps its groups by size; null leaves the order as it is.
+ * unit as lodash's sortBy compares strings (`rest`; a contingency table's is naturalSort, as the
+ * portal's TablePlot sorts). A category outside a type's order follows it, by `rest` (the portal
+ * puts a box's first, an artefact of indexOf, and leaves a table's out). An OQL axis, which the
+ * portal does not have, keeps its groups by size; null leaves the order as it is.
  */
-export function categoryOrder(cat: PlotRequest["x"]): ((labels: string[]) => string[]) | null {
+export function categoryOrder(cat: PlotRequest["x"], rest: (a: string, b: string) => number = alpha): ((labels: string[]) => string[]) | null {
   const listed = (order: string[]) => (labels: string[]) => {
     const rank = (g: string) => { const i = order.indexOf(g); return i < 0 ? order.length : i; };
-    return [...labels].sort((a, b) => rank(a) - rank(b) || alpha(a, b));
+    return [...labels].sort((a, b) => rank(a) - rank(b) || rest(a, b));
   };
   if (cat.source === "molecular" && cat.discrete) return listed(CNA_LEVELS);
   if (cat.source === "alteration" && "gene" in cat) {
@@ -95,12 +97,18 @@ export function categoryOrder(cat: PlotRequest["x"]): ((labels: string[]) => str
     return listed(["Mutated", ...NO_MUTATION]);
   }
   if (cat.source === "alteration") return "oql" in cat ? null : listed(["Mutated", ...NO_MUTATION]);
-  return (labels: string[]) => [...labels].sort(alpha);
+  return (labels: string[]) => [...labels].sort(rest);
 }
 const alpha = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 
-/** a box plot's groups in their axis's category order */
+/** a box plot's groups in their axis's category order; a contingency table's rows and columns in theirs (PLT-TB-3) */
 function orderLevels(data: PlotData, spec: PlotRequest): void {
+  if (data.shape === "table" && data.cells) {
+    const along = (axis: PlotRequest["x"], key: "cx" | "cy") => categoryOrder(axis, naturalSort)?.([...new Set(data.cells!.map((c) => c[key]))]);
+    const x = along(spec.x, "cx"), y = along(spec.y, "cy");
+    if (x || y) data.order = { ...(x ? { x } : {}), ...(y ? { y } : {}) };
+    return;
+  }
   const cat = data.x.kind === "cat" ? spec.x : spec.y;
   if (data.shape !== "box" || !data.groups) return;
   const order = categoryOrder(cat);
