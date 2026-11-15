@@ -366,14 +366,14 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
 
 function table(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W0: number, p: Pal): string {
   // Every category on both axes — the engine refuses a pair past CATEGORY_CAP, so what arrives is
-  // already the whole table, and a table missing rows or columns is a wrong one. Ordered by
-  // marginal total so the big categories read first.
+  // already the whole table, and a table missing rows or columns is a wrong one. Ordered as the
+  // engine gives them (each axis's category order, PLT-TB-3), else by marginal total.
   const marg = (key: "cx" | "cy") => {
     const t = new Map<string, number>();
     for (const c of d.cells!) t.set(c[key], (t.get(c[key]) || 0) + c.n);
     return [...t.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([k]) => k);
   };
-  const xsCat = marg("cx"), ysCat = marg("cy");
+  const xsCat = d.order?.x || marg("cx"), ysCat = d.order?.y || marg("cy");
   const at = new Map(d.cells!.map((c) => [c.cx + "\u0000" + c.cy, c.n]));
   const maxN = Math.max(1, ...d.cells!.map((c) => c.n));
   const xTitle = axisTitle(d.x), yTitle = axisTitle(d.y);

@@ -234,7 +234,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The "Show Regression Line" toggle and the "y = mx + b", R² label (ours always draws the line) (PLT-UT-7, PLT-SC-3, PLT-STM-7)
   - [ ] Category order: boxes alphabetical (Q5 Colon, Mucinous, Rectal; ours by count), mutation types before "No mutation" and "Not profiled", table rows likewise; Filter categories, Sort by Median (PLT-BX-1, PLT-TB-3, PLT-DT-3, PLT-AX-9, PLT-AX-10, PLT-STM-9)
     - [x] Boxes in the portal's order: a data type's own (copy number, mutation class, mutated, Driver/VUS), else alphabetical (PLT-BX-1, PLT-DT-3) (#240)
-    - [ ] Contingency table rows and columns in the same order (ours by marginal total) (PLT-TB-3)
+    - [x] Contingency table rows and columns in the same order, natural sort otherwise (was by marginal total) (PLT-TB-3) (#PR)
     - [ ] Filter categories and Sort by Median (PLT-AX-9, PLT-AX-10, PLT-STM-9)
   - [ ] Clinical attributes by display name with their ⓘ description, in the select, axis title and tooltip (ours `MUTATION_COUNT`) (PLT-AX-2, PLT-DT-19)
 - [ ] **Results → Cancer Types Summary tab** ([02-cancer-types-summary](legacy-spec/parity/02-cancer-types-summary.md))
