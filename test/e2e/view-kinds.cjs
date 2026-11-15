@@ -14,6 +14,10 @@ const covers = [
 /** at most this many pages at once: each runs its example against the warehouse */
 const AT_ONCE = 3;
 
+/** igv.js fetches the reference sequence from UCSC, which intermittently refuses CI runners; a failure
+ * there is that server's, not the page's, so its console errors are not counted */
+const THIRD_PARTY = /hgdownload\.soe\.ucsc\.edu/;
+
 async function drawKind({ ctx, ok, BASE, encodeUrlJson, EXAMPLES }, kind) {
   const ex = EXAMPLES.find((e) => e.snapshot === kind);
   if (!ex || ex.customData?.length) {
@@ -23,7 +27,10 @@ async function drawKind({ ctx, ok, BASE, encodeUrlJson, EXAMPLES }, kind) {
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
-  page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
+  page.on("console", (m) => {
+    if (m.type() !== "error" || THIRD_PARTY.test(m.text()) || THIRD_PARTY.test(m.location()?.url ?? "")) return;
+    errors.push("console: " + m.text());
+  });
   page.on("response", (r) => { if (r.status() >= 500) errors.push("http " + r.status() + " " + r.request().method() + " " + r.url()); });
   const t0 = Date.now();
   try {
