@@ -11,8 +11,9 @@ import { LAYER_BASE } from "../../plot-layers.ts";
 import {
 
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels, legend, label,
-  textWidth, fmtInt, fmtNum, fmtP, FS, SW, SERIES, OTHER, type Scale, type SvgOpts, type LegendItem
+  textWidth, fmtInt, fmtNum, FS, SW, SERIES, OTHER, type Scale, type SvgOpts, type LegendItem
 } from "../../svg-kit.ts";
+import { portalCorr, portalP } from "../../chart/format.ts";
 
 type Pal = ReturnType<typeof palette>;
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -99,8 +100,9 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
   const hs = drawnLayers(d);
   const base = LAYER_BASE;
   const st = d.stats;
-  const statLine = st ? [st.pearson != null ? "Pearson r = " + fmtNum(st.pearson, 2) + " (" + fmtP(st.pPearson ?? 1) + ")" : "",
-    st.spearman != null ? "Spearman ρ = " + fmtNum(st.spearman, 2) + " (" + fmtP(st.pSpearman ?? 1) + ")" : ""].filter(Boolean).join("   ·   ") : "";
+  // as the portal's Plots tab writes them (PLT-SC-2): Spearman first, each to two decimals, its p by toConditionalPrecision
+  const corr = (name: string, r: number | null, pv: number | null) => r == null ? "" : name + ": " + portalCorr(r) + (pv != null ? " (p = " + portalP(pv) + ")" : "");
+  const statLine = st ? [corr("Spearman", st.spearman, st.pSpearman), corr("Pearson", st.pearson, st.pPearson)].filter(Boolean).join("   ·   ") : "";
   const T = statLine ? 28 : 12, R = 16, PLOT = plotHeight(W);
   const xTitle = axisTitle(d.x), yTitle = axisTitle(d.y);
   // the bins tile the extent exactly, so the scales keep its ends (no rounding outwards)
