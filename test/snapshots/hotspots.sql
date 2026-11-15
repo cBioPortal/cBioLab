@@ -12,6 +12,11 @@
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))
 
+-- view 0 hotspots: hotspots:build · msk_chord_2024
+SELECT rg.name AS build FROM snapshot_db.cancer_study cs
+JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
+WHERE cs.cancer_study_identifier = 'msk_chord_2024'
+
 -- view 0 hotspots: lollipop:changes · msk_chord_2024
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'

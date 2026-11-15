@@ -6,10 +6,11 @@
 import React from "react";
 import { ChevronDown } from "lucide-react";
 import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
+import { ensemblTranscriptUrl } from "../../lib/lollipop-links.ts";
 
 type Ids = NonNullable<HotspotGene["ids"]>;
 
-export function TranscriptSummary({ ids, gene }: { ids: Ids | undefined; gene: string }) {
+export function TranscriptSummary({ ids, gene, grch38 = false }: { ids: Ids | undefined; gene: string; grch38?: boolean }) {
   const t = ids || {};
   const link = (text: string | undefined, href: string) => text ? <a href={href} target="_blank" rel="noreferrer">{text}</a> : <span>-</span>;
   const shownId = t.refseq || t.ensembl || "";
@@ -22,7 +23,7 @@ export function TranscriptSummary({ ids, gene }: { ids: Ids | undefined; gene: s
         <ChevronDown aria-hidden="true" />
       </span>
       <div className="lp-summary">
-        <div>{link(t.refseq, "https://www.ncbi.nlm.nih.gov/nuccore/" + (t.refseq || ""))} | {link(t.ensembl, "https://grch37.ensembl.org/homo_sapiens/Transcript/Summary?t=" + (t.ensembl || "").replace(/\.\d+$/, ""))}</div>
+        <div>{link(t.refseq, "https://www.ncbi.nlm.nih.gov/nuccore/" + (t.refseq || ""))} | {link(t.ensembl, ensemblTranscriptUrl(t.ensembl || "", grch38))}</div>
         <div>{link(t.ccds, "https://www.ncbi.nlm.nih.gov/CCDS/CcdsBrowse.cgi?REQUEST=CCDS&DATA=" + (t.ccds || ""))} | {link(t.uniprotName || t.uniprotAccession, "https://www.uniprot.org/uniprot/" + (t.uniprotAccession || ""))}</div>
       </div>
     </>

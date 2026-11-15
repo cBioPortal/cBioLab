@@ -68,6 +68,8 @@ declare module "../../types.ts" {
       hide?: string[];
       /** the codons selected on each gene's lollipop, as the figure draws them */
       codons?: Record<string, number[]>;
+      /** every study is on GRCh38, so the transcript links go to that build's Ensembl (lib/lollipop-links.ts) */
+      grch38?: true;
     };
   }
   interface ViewResultMain { hotspots: "hotspots" }

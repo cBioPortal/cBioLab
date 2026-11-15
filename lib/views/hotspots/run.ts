@@ -4,6 +4,9 @@ import { buildLollipopGene, fetchProteinInfo, checkHide, checkCodons, pruneCodon
 import type { ViewResult } from "../../types.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit } from "../shared.ts";
+import { studyGenomeSql } from "../../federation-views.ts";
+import { hasViewAggregates } from "../../federation.ts";
+import { allGrch38 } from "../../lollipop-links.ts";
 import type { HotspotsView, HotspotGene } from "./types.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
@@ -20,9 +23,13 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const cn = vNames[0];
   const studies = cohorts[cn].studies;
   // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
-  const [reports, proteins] = await Promise.all([
+  const [reports, proteins, builds] = await Promise.all([
     Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount))),
-    Promise.all(uniq.map((g) => fetchProteinInfo(g)))
+    Promise.all(uniq.map((g) => fetchProteinInfo(g))),
+    // each study's reference genome, for the build the transcript's Ensembl link points at; a peer
+    // that cannot say is GRCh37, the portal's default
+    Promise.all(studies.map(async (st) => { const r = resolvers[st];
+      return hasViewAggregates(r) ? String((await r.viewMeta("hotspots:build", studyGenomeSql))[0]?.build || "") : ""; }))
   ]);
   const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]))
     .filter((h) => h.mutated > 0);
@@ -34,6 +41,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
   const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
+    ...(allGrch38(builds) ? { grch38: true as const } : {}),
     participation: participationFor(studies, false),
     note: (vNames.length > 1 ? "A lollipop draws one cohort: this shows “" + cn + "” only; " +
         vNames.slice(1).map((n) => "“" + n + "”").join(", ") + (vNames.length === 2 ? " is" : " are") + " not drawn. " : "") +
