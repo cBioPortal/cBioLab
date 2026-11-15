@@ -106,7 +106,7 @@ export function resultsGroups(q: ResultsQuery, held: ResultsData["held"], driver
 }
 
 /** the view kinds that read the query's lines (`oql`) with the page's driver settings */
-const OQL_DRIVER_KINDS = new Set(["cancertypes", "cooccurrence", "pathwaymap"]);
+const OQL_DRIVER_KINDS = new Set(["cancertypes", "cooccurrence", "pathwaymap", "datafiles"]);
 /** does an OQL query name DRIVER anywhere (DRIVER, MUT_DRIVER, AMP_DRIVER, a range's _DRIVER)? */
 const asksDriver = (q: string): boolean => { try { return parseOql(q).some((e) => e.specs.some((sp) => sp.driver)); } catch { return false; } };
 /** the driver sources of the page's settings: what DRIVER reads in an oql clause (what is hidden is not the clause's) */
@@ -321,7 +321,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     { title: "Pathways", views: [v("Pathways", { kind: "pathwaymap", genes, oql: q.entries, ...pinsOf(q),
       ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] },
     // the portal's Download tab, after Pathways, last as there: the files of the queried samples for the query's lines
-    { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, ...pinsOf(q), cohorts: queried })] }
+    { title: "Download", views: [v("Download", { kind: "datafiles", oql: q.entries, ...pinsOf(q),
+      ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] }
   ], left, { partial: data.partial || (svHeld && data.svs === undefined) });
 }
 

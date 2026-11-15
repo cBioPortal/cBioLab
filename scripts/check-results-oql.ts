@@ -32,12 +32,17 @@
  * AND profiled for the gene on a mutation, copy-number or structural-variant panel, as
  * lib/federation.ts geneCountsSql's 'any' row counts profiled (run beside it for that comparison).
  *
+ * The Download section (L*, PR 8) runs lib/views/datafiles/sql.ts lineCtes — each sample of the cohort a
+ * line alters, the CTE the counts, the lists, the matrix and the case table all read — with the view's
+ * driver settings, over every sample of the study.
+ *
  * Run: node --env-file=.env.local scripts/check-results-oql.ts (connection b must be the fixture:
  * `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql } from "../lib/views/cancertypes/sql.ts";
+import { lineCtes, type StudyOpts } from "../lib/views/datafiles/sql.ts";
 import { pairCountsSql, geneCountsSql } from "../lib/federation.ts";
 import type { DriverSettings } from "../lib/driver-settings.ts";
 
@@ -458,6 +463,42 @@ function expectNoLine(tag: string, rows: Row[], gene: string) {
   expectLine("P4/P6 [KRAS: EXP>=2, KRAS: PROT<=-2]:", await linesOf("P6 EXP PROT", ["KRAS: EXP>=2", "KRAS: PROT<=-2"], { profiles }, scratch), "KRAS", 5, any);
   expectLine("P6 [EGFR: EXP>=2] (P31 not profiled for EGFR):", await linesOf("P6 EGFR EXP", ["EGFR: EXP>=2"], { profiles }, scratch), "EGFR", 0, any);
   expectLine("P1 [EGFR: MUT] (P33, P35, P37 not profiled for EGFR):", await linesOf("P1 EGFR MUT scratch", ["EGFR: MUT"], { profiles }, scratch), "EGFR", 13, any);
+}
+
+// ==== Download: lineCtes with the view's driver settings (L*, PR 8 of the OQL series) ===============
+// Legacy: cbioportal-frontend cd8c6df src/pages/resultsView/download/DownloadTab.tsx — the lists, matrix and case table
+// come from the OQL-filtered data, whose DRIVER is putativeDriver (ResultsViewPageStoreUtils 134-152: OncoKB || hotspots
+// || custom, each when its setting is on). PIK3CA: MUT_DRIVER, from data_mutations.txt, peer-oncokb.tsv, peer-hotspots.tsv:
+//   E545K (OncoKB Oncogenic, not a hotspot in the fixture) on FX-P02-T1, FX-P10-T1, FX-P16-T1, FX-P18-T1;
+//   H1047R and E110del (Cancer Hotspots, not in peer-oncokb.tsv) both on FX-P29-T1. No custom calls or tiers. No PIK3CA copy number.
+/** the samples lineCtes says the one line alters, sorted */
+async function dlAltered(tag: string, line: string, extra: Partial<StudyOpts> & Record<string, unknown>): Promise<string[] | null> {
+  const cohort = compileCohortDef(null, { study: STUDY, db: conn!.db });
+  const gene = line.split(":")[0].trim().toUpperCase();
+  const o = { study: STUDY, db: conn!.db, pin: ONCOKB, profiles: ["mutations", "cna", "structural_variants"], ...extra } as StudyOpts;
+  try {
+    const sql = "WITH cohort AS (" + cohort + "),\n" + lineCtes("d", "cohort", [{ line, gene, types: ["MUTATION"] }], o) + "\nSELECT sid FROM d_e0 ORDER BY sid";
+    return (await chQuery<Row>(sql, conn!)).data.map((r) => String(r.sid));
+  } catch (e) {
+    ok(tag + " runs", false, (e as Error).message.slice(0, 300));
+    return null;
+  }
+}
+{
+  const LINE = "PIK3CA: MUT_DRIVER";
+  const ONCO = ["FX-P02-T1", "FX-P10-T1", "FX-P16-T1", "FX-P18-T1"], HOT = ["FX-P29-T1"];
+  const OFF: DriverSettings = { oncokb: false, hotspots: false, custom: false, tiers: [] };
+  const cases: [string, Record<string, unknown>, string[]][] = [
+    ["L4 no drivers: OncoKB at the pin alone", {}, ONCO],
+    ["L1 drivers {}: OncoKB or a hotspot (or custom)", { drivers: {}, hotspotPins: HOTSPOT_PINS }, [...ONCO, ...HOT]],
+    ["L2 OncoKB off: hotspots (and custom) only", { drivers: { oncokb: false }, hotspotPins: HOTSPOT_PINS }, HOT],
+    ["L1 hotspots off: OncoKB alone", { drivers: { hotspots: false }, hotspotPins: HOTSPOT_PINS }, ONCO],
+    ["L3 every source off: no sample", { drivers: OFF, hotspotPins: HOTSPOT_PINS }, []],
+  ];
+  for (const [tag, extra, want] of cases) {
+    const got = await dlAltered(tag, LINE, extra);
+    if (got) ok("Download " + tag + " [" + LINE + "]: " + (want.join(", ") || "none"), JSON.stringify(got) === JSON.stringify(want), "ours " + (got.join(", ") || "none"));
+  }
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);
