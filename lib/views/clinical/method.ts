@@ -5,6 +5,8 @@ import { BUILD_COMMIT } from "../../build-info.ts";
 export interface ClinicalTrace {
   cohorts: string[];
   singleStudy: boolean;
+  /** numeric attributes tested by Kruskal-Wallis (the view's rankTests) */
+  rankTests?: boolean;
   perSite: { cohort: string; study: string; cohortPatients: number }[];
   attributes: {
     attribute: string; per: "patient" | "sample"; kind: "cat" | "num"; skipped?: string;
@@ -47,7 +49,16 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
   }
   const fmtP = (p?: number) => p == null ? "—" : pFmt(p);
   const cat = t.attributes.filter((a) => !a.skipped && a.kind === "cat");
-  const num = t.attributes.filter((a) => !a.skipped && a.kind === "num");
+  const isRank = (a: { test?: string }) => a.test === "Wilcoxon" || a.test === "Kruskal-Wallis";
+  const ranked = t.attributes.filter((a) => !a.skipped && a.kind === "num" && isRank(a));
+  const num = t.attributes.filter((a) => !a.skipped && a.kind === "num" && !isRank(a));
+  if (ranked.length) {
+    steps.push({ kind: "statistic", title: "Kruskal–Wallis for each numeric attribute, as cBioPortal's Comparison page",
+      detail: "From each group's complete value distribution: ranks averaged within tied values, H divided by the tie correction 1 − Σ(t³ − t)/(N³ − N), χ² on (groups holding values − 1) df." +
+        (k === 2 ? " With two groups this is the portal's \"Wilcoxon Test\": the two-sided rank-sum by the normal approximation, without continuity correction." : "") +
+        " Its p is the attribute's p and enters the q-values.",
+      params: ranked.map((a) => [a.attribute, "H " + a.statistic + " on " + a.df + " df · p " + (a.p == null ? "—" : pFmt(a.p))] as [string, string]) });
+  }
   if (cat.length) {
     steps.push({ kind: "statistic", title: "Pearson χ² for each categorical attribute",
       detail: "On the cohort × value table over the full vocabulary, with no continuity correction; an all-zero row or column is dropped first. The smallest expected count is reported because the χ² approximation is poor below about 5.",
@@ -83,13 +94,14 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
     "import numpy as np",
     "import pandas as pd",
     ...((names) => names.length ? ["from scipy.stats import " + names.join(", ")] : [])(
-      [hasCat ? "chi2_contingency" : "", hasHist ? (k === 2 ? "mannwhitneyu" : "kruskal") : "", hasNum && k === 2 ? "ttest_ind_from_stats" : ""].filter(Boolean)),
+      [hasCat ? "chi2_contingency" : "", hasHist ? (k === 2 ? "mannwhitneyu" : "kruskal") : "", hasHist && k === 2 && ranked.length ? "kruskal" : "", hasNum && k === 2 ? "ttest_ind_from_stats" : ""].filter(Boolean)),
     ...(hasNum && k > 2 ? ["from statsmodels.stats.oneway import anova_generic"] : []),
     "from statsmodels.stats.multitest import multipletests",
     "",
     "cohorts = " + JSON.stringify(t.cohorts),
     RESULT_INIT,
     "p_values = {}",
+    ...(ranked.length ? ["ranked = " + JSON.stringify(ranked.map((a) => a.attribute)) + "  # numeric attributes tested by Kruskal-Wallis"] : []),
     ...(hasCat ? [
       "",
       ...pyTable("categorical", "Categorical attributes: what the attributeStats query returned per cohort and study, a count per value",
@@ -109,7 +121,7 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
       "m = numeric.groupby([\"attribute\", \"cohort\"])[[\"n\", \"sum\", \"sumsq\"]].sum()",
       "m[\"mean\"] = m[\"sum\"] / m[\"n\"]",
       "m[\"var\"] = ((m[\"sumsq\"] - m[\"sum\"] ** 2 / m[\"n\"]) / (m[\"n\"] - 1)).clip(lower=0)  # rounding can put a constant attribute's just below 0",
-      "for attr in numeric[\"attribute\"].unique():",
+      ranked.length ? "for attr in [a for a in numeric[\"attribute\"].unique() if a not in ranked]:" : "for attr in numeric[\"attribute\"].unique():",
       "    g = m.loc[attr].reindex(cohorts)",
       ...(k === 2 ? [
         "    a, b = g.iloc[0], g.iloc[1]",
@@ -128,6 +140,15 @@ export function clinicalMethod(t: ClinicalTrace): MethodRecord {
         t.histograms.map((r) => [r.cohort, r.attribute, r.value, r.n]), "value_histograms.csv"),
       "for attr, g in histograms.groupby(\"attribute\", sort=False):",
       "    values = [np.repeat(h[\"value\"].to_numpy(), h[\"n\"].to_numpy()) for _, h in g.groupby(\"cohort\", sort=False)]",
+      ...(ranked.length ? [
+        "    for c, v in zip(g[\"cohort\"].unique(), values):",
+        "        for name, q in ((\"median\", 50), (\"q1\", 25), (\"q3\", 75)):",
+        "            RESULT[f\"clinical:{attr}:{c}:{name}\"] = np.percentile(v, q)",
+        "    if attr in ranked:",
+        "        p_values[attr] = kruskal(*values).pvalue  # tie-corrected, over the groups holding values",
+        "        print(f\"{attr}: Kruskal-Wallis p={p_values[attr]:.4g}\")",
+        "        continue",
+      ] : []),
       "    if len(values) < len(cohorts):",
       "        continue  # a cohort's distribution was too large to send whole: no rank test, as in the view",
       "    for c, v in zip(g[\"cohort\"].unique(), values):",

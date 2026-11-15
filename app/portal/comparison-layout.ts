@@ -38,7 +38,7 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     // the page's Include mode compares groups that may share patients: their curves, but no test
     { title: "Survival", views: [v("Survival", { kind: "survival", noTestWhenShared: true })] },
     // every attribute, as the portal's tab tests them
-    ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true })] }] : []),
+    ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true })] }] : []),
     { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", measure }), v("Copy-number alterations", { kind: "enrichment", alteration: "cna", measure }),
       v("Structural variants", { kind: "enrichment", alteration: "sv", measure })] },
     ...(mutationsOk ? [{ title: "Mutations", views: [v("Mutations", { kind: "mutcompare" })] }] : []),
