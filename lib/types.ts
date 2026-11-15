@@ -625,6 +625,8 @@ export interface KmCurve {
   n: number; events: number; missing?: number;
   /** the number at risk at each whole month from 0 (index = month), through the last follow-up */
   atRisk?: number[];
+  /** the last follow-up time, event or censoring: the curve is drawn to here */
+  tLast?: number;
   /** patients whose follow-up ended at or before their entry: never at risk, so left out of n */
   unobserved?: number;
 }

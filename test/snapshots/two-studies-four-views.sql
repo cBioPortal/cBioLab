@@ -298,6 +298,62 @@ SELECT gene, 'any' AS vtype,
        uniqExact(sid) AS profiled, uniqExactIf(sid, is_alt = 1) AS altered, uniqExactIf(sid, is_drv = 1) AS driver
 FROM perSample GROUP BY gene
 
+-- view 1 survival: survival · msk_chord_2024
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
+    AND g.hugo_gene_symbol IN ('TP53')
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+c1 AS (((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024')
+EXCEPT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024'
+    AND g.hugo_gene_symbol IN ('TP53')
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
+INTERSECT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT DISTINCT replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') AS sid
+  FROM snapshot_db.sample_to_gene_panel_derived sp
+  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
+    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (
+      SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53')))))
+SELECT count() AS n FROM (SELECT pid FROM (SELECT DISTINCT pid FROM c0 UNION ALL SELECT DISTINCT pid FROM c1) GROUP BY pid HAVING count() > 1)
+
+-- view 1 survival: survival · msk_met_2021
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_met_2021_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_met_2021'
+    AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
+    AND g.hugo_gene_symbol IN ('TP53')
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation')))))),
+c1 AS (((SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_met_2021_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_met_2021')
+EXCEPT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_met_2021_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_met_2021'
+    AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'msk_met_2021_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE startsWith(g.genetic_profile_stable_id, 'msk_met_2021_') AND g.cancer_study_identifier = 'msk_met_2021'
+    AND g.hugo_gene_symbol IN ('TP53')
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))))
+INTERSECT DISTINCT
+(SELECT replaceOne(patient_unique_id, 'msk_met_2021_', '') AS pid, replaceOne(sample_unique_id, 'msk_met_2021_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_met_2021'
+    AND replaceOne(sample_unique_id, 'msk_met_2021_', '') IN (SELECT DISTINCT replaceOne(sp.sample_unique_id, 'msk_met_2021_', '') AS sid
+  FROM snapshot_db.sample_to_gene_panel_derived sp
+  WHERE sp.cancer_study_identifier = 'msk_met_2021' AND sp.alteration_type = 'MUTATION_EXTENDED'
+    AND (sp.gene_panel_id = 'WES' OR sp.gene_panel_id IN (
+      SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53')))))
+SELECT count() AS n FROM (SELECT pid FROM (SELECT DISTINCT pid FROM c0 UNION ALL SELECT DISTINCT pid FROM c1) GROUP BY pid HAVING count() > 1)
+
 -- view 1 survival: survivalCounts:OS · msk_chord_2024
 WITH cohort AS (((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024')

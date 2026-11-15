@@ -172,7 +172,8 @@
                       "…": "53 more",
                       "sha256": "306528a48f3ec966"
                     }
-                  ]
+                  ],
+                  "tLast": 72.7
                 },
                 {
                   "label": "heterozygous at all",
@@ -290,7 +291,8 @@
                       "…": "75 more",
                       "sha256": "a7b734920b09db45"
                     }
-                  ]
+                  ],
+                  "tLast": 94.6
                 }
               ],
               "logrank": {

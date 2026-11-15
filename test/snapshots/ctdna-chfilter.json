@@ -342,7 +342,8 @@
                       "…": "60 more",
                       "sha256": "4d0fc974e5bb866f"
                     }
-                  ]
+                  ],
+                  "tLast": 79.99
                 },
                 {
                   "label": "not detected",
@@ -460,7 +461,8 @@
                       "…": "50 more",
                       "sha256": "a40f231d9d4c50d3"
                     }
-                  ]
+                  ],
+                  "tLast": 69.7
                 }
               ],
               "logrank": {

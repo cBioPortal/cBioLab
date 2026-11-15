@@ -37,7 +37,8 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts): string {
   out.push(axisBottom(xs, T + PLOT, p, { title: xTitle, minX: 0, maxX: W, fmt: (t) => fmtNum(t) }));
   curves.forEach((c, i) => {
     const st = seriesStyle(i);
-    const d = stepPath(c.points.filter((q) => q.t <= tMax), xs, ys, { t: 0, s: incidence ? 0 : 1 }, tMax);
+    // each curve runs to its own last follow-up, so a censored tail is drawn flat
+    const d = stepPath(c.points.filter((q) => q.t <= tMax), xs, ys, { t: 0, s: incidence ? 0 : 1 }, Math.min(tMax, c.tLast ?? tMax));
     out.push(`<path d="${d}" fill="none" stroke="${st.color}" stroke-width="${SW.series}"` +
       (st.dash ? ` stroke-dasharray="${st.dash}"` : "") + ` stroke-linejoin="round"/>`);
   });
@@ -73,6 +74,8 @@ function statLines(v: DrawnResultOf<"survival">): string[] {
   if (v.logrankK) lines.push(v.logrankK.groups + "-group log-rank χ² = " + fmtNum(v.logrankK.chi2) + " (" + v.logrankK.df + " df) · " + fmtP(v.logrankK.p) +
     strat(v.logrankK.strata) + (v.logrankKPooled ? " · pooled " + fmtP(v.logrankKPooled.p) + disagree(v.logrankK.p, v.logrankKPooled.p) : "") +
     " — whether the groups differ at all, not which pair does");
+  if (v.sharedPatients) lines.push((v.testWithheld ? "No log-rank p: " : "") + fmtInt(v.sharedPatients) + (v.sharedPatients === 1 ? " patient is" : " patients are") +
+    " in more than one curve" + (v.testWithheld ? ", and the test assumes the groups share no one" : "; the test assumes the groups share no one, so its p is approximate"));
   return lines;
 }
 

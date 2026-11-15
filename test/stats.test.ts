@@ -190,13 +190,19 @@ describe("toIncidence (cumulative incidence, the complement of a KM curve)", () 
 });
 
 describe("survivalAxis (shared x-axis domain for both KM renderers)", () => {
-  test("defaults to the latest EVENT time and the existing 12/24mo tick rule", () => {
-    // kaplanMeier only emits a point where an event actually occurred (SIXMP's last two
-    // rows are pure censoring at 34 and 35mo), so the domain — like the pre-existing
-    // renderer code this replaces — runs to the last event, not the last censoring.
-    const a = survivalAxis([kaplanMeier(SIXMP)]);
-    assert.equal(a.tMax, 23, "SIXMP's latest event time");
-    assert.equal(a.step, 12, "23mo is under the 60mo threshold, so ticks stay at 12");
+  test("defaults to the last FOLLOW-UP, censored or not, and the 12/24mo tick rule (CMP-KM-3)", () => {
+    // SIXMP's last event is at 23mo; its last two rows are censorings at 34 and 35mo. cBioPortal's
+    // KM axis runs to the last follow-up, so the censored tail and its at-risk counts are drawn.
+    const km = kaplanMeier(SIXMP);
+    assert.equal(km.tLast, 35, "the last follow-up, a censoring");
+    assert.equal(km.points[km.points.length - 1].t, 23, "points stay at events");
+    assert.equal(km.atRisk!.length, 36, "at risk read through month 35");
+    assert.equal(km.atRisk![34], 2, "34 and 35 still at risk at month 34");
+    const a = survivalAxis([km]);
+    assert.equal(a.tMax, 35, "SIXMP's last follow-up, not its last event (23)");
+    assert.equal(a.step, 12, "35mo is under the 60mo threshold, so ticks stay at 12");
+    assert.equal(survivalAxis([{ points: [{ t: 0 }, { t: 5 }], tLast: 8 }]).tMax, 12, "floored at 12mo");
+    assert.equal(survivalAxis([{ points: [{ t: 0 }, { t: 70 }], tLast: 149 }, { points: [{ t: 0 }, { t: 77 }], tLast: 140 }]).tMax, 149, "the longest curve's follow-up");
   });
   test("an explicit cutoff or tick spacing overrides both defaults", () => {
     const a = survivalAxis([kaplanMeier(SIXMP)], { cutoffMonths: 20, tickMonths: 6 });

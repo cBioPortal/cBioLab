@@ -92,7 +92,7 @@ export function kaplanMeier(data: SurvRecord[]): Omit<KmCurve, "cohort"> {
   const last = clean.length ? Math.floor(clean[clean.length - 1].t) : -1;
   const atRisk: number[] = [];
   for (let m = 0; m <= last; m++) atRisk.push(riskAt(m));
-  return { points, median, n: n0, events, atRisk, ...(unobserved ? { unobserved } : {}) };
+  return { points, median, n: n0, events, atRisk, ...(clean.length ? { tLast: clean[clean.length - 1].t } : {}), ...(unobserved ? { unobserved } : {}) };
 }
 
 /**
@@ -154,11 +154,12 @@ export function toIncidence<T extends { points: KmPoint[] }>(curve: T): T {
 /**
  * Shared x-axis domain for both KM renderers (SVG and canvas), so a cutoff or a tick-interval
  * choice can't visually drift between them. `tMax` is the cutoff when one is set, otherwise the
- * latest observed event/censoring time (floored at 12mo so a very short curve doesn't collapse
- * to a sliver); `step` is the requested tick spacing, otherwise the existing 12/24mo default.
+ * last follow-up of any curve, event or censoring, as cBioPortal's KM axis runs (floored at 12mo
+ * so a very short curve doesn't collapse to a sliver); `step` is the requested tick spacing,
+ * otherwise 12mo, or 24mo past 60mo.
  */
-export function survivalAxis(curves: { points: { t: number }[] }[], opts?: { cutoffMonths?: number; tickMonths?: number }): { tMax: number; step: number } {
-  const observed = Math.max(12, ...curves.flatMap(c => c.points.map(p => p.t)));
+export function survivalAxis(curves: { points: { t: number }[]; tLast?: number }[], opts?: { cutoffMonths?: number; tickMonths?: number }): { tMax: number; step: number } {
+  const observed = Math.max(12, ...curves.flatMap(c => [...c.points.map(p => p.t), c.tLast ?? 0]));
   const tMax = opts?.cutoffMonths || observed;
   const step = opts?.tickMonths || (tMax > 60 ? 24 : 12);
   return { tMax, step };
@@ -701,7 +702,7 @@ export function kaplanMeierCounts(rows: SurvCount[]): Omit<KmCurve, "cohort"> {
   const last = clean.length ? Math.floor(clean[clean.length - 1].t) : -1;
   const atRisk: number[] = [];
   for (let m = 0; m <= last; m++) atRisk.push(riskAt(m));
-  return { points, median, n: n0, events, atRisk, ...(unobserved ? { unobserved } : {}) };
+  return { points, median, n: n0, events, atRisk, ...(clean.length ? { tLast: clean[clean.length - 1].t } : {}), ...(unobserved ? { unobserved } : {}) };
 }
 
 /** Every group's deaths and number at risk at each distinct time any of the groups has, in order. */
