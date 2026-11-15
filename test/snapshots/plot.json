@@ -30,10 +30,10 @@
             "n": 260,
             "lo": -3.8045,
             "hi": 0.351,
-            "q1": -0.9513,
-            "median": -0.6594,
-            "q3": -0.4083,
-            "loWhisker": -1.7658,
+            "q1": -0.9583,
+            "median": -0.66035,
+            "q3": -0.4333,
+            "loWhisker": -1.7458,
             "hiWhisker": 0.351
           },
           {
@@ -41,11 +41,11 @@
             "n": 480,
             "lo": -2.742,
             "hi": 1.1073,
-            "q1": -0.4187,
-            "median": -0.1185,
-            "q3": 0.1519,
-            "loWhisker": -1.2746,
-            "hiWhisker": 1.0078
+            "q1": -0.4191,
+            "median": -0.11979999999999999,
+            "q3": 0.1511,
+            "loWhisker": -1.2744,
+            "hiWhisker": 1.0064000000000002
           },
           {
             "g": "Gain",
@@ -53,7 +53,7 @@
             "lo": -1.5533000000000001,
             "hi": 3.1795,
             "q1": -0.23,
-            "median": 0.1592,
+            "median": 0.15825,
             "q3": 0.415,
             "loWhisker": -1.1975,
             "hiWhisker": 1.3825
@@ -64,7 +64,7 @@
             "lo": -0.7721,
             "hi": 3.7214,
             "q1": 1.4466999999999999,
-            "median": 2.3303,
+            "median": 2.3071,
             "q3": 2.8102,
             "loWhisker": -0.5985500000000004,
             "hiWhisker": 3.7214
@@ -407,7 +407,7 @@
               },
               {
                 "…": "21 more",
-                "sha256": "be5f632d51e52e3a"
+                "sha256": "1763683319d8878a"
               }
             ],
             "drawn": 41
@@ -432,7 +432,71 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: 41 values beyond the whiskers. The statistics are over the whole plotted cohort."
+      "note": "1,068 of 1,084 samples have a value on both axes (14 have no ERBB2: Putative copy-number alterations from GISTIC; 2 have no ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)); only those are drawn. Point layers — outliers: 41 values beyond the whiskers. The statistics are over the whole plotted cohort.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Each group's quartiles, in the database",
+            "scope": "all samples · brca_tcga_pan_can_atlas_2018",
+            "rowsOut": 4,
+            "detail": "The plot:box query above: per category, the count, the extremes and the quartiles of the numeric axis's values (log-transformed first where it is on a log scale).",
+            "params": [
+              [
+                "quartiles",
+                "the portal's rule (jStat.quartiles, PLT-STM-8): of the n sorted values, q1 is the round(n/4)-th and q3 the round(3n/4)-th, halves rounded up, no interpolation"
+              ],
+              [
+                "median",
+                "the middle value; for an even n the mean of the two middle values"
+              ],
+              [
+                "a group of one",
+                "no quartiles, drawn as its value with no box"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Whiskers",
+            "detail": "The portal's rule (PLT-STM-8): each whisker ends at its fence, q1 − 1.5 × IQR or q3 + 1.5 × IQR, when some value lies beyond it, else at the extreme value. Not Tukey's furthest value inside the fence, so a whisker may end where no case lies."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "tukey"
+          ],
+          "file": "lib/plot.ts",
+          "commit": null
+        },
+        "verification": "In the database, the coefficients and quartiles are checked against scipy 1.18.1 (pearsonr, spearmanr) and the portal's jStat rule on known values by scripts/check-plot-stats.ts.",
+        "check": {
+          "plot:Shallow deletion:loWhisker": {
+            "v": -1.7458
+          },
+          "plot:Shallow deletion:hiWhisker": {
+            "v": 0.351
+          },
+          "plot:Diploid:loWhisker": {
+            "v": -1.2744
+          },
+          "plot:Diploid:hiWhisker": {
+            "v": 1.0064000000000002
+          },
+          "plot:Gain:loWhisker": {
+            "v": -1.1975
+          },
+          "plot:Gain:hiWhisker": {
+            "v": 1.3825
+          },
+          "plot:Amplification:loWhisker": {
+            "v": -0.5985500000000004
+          },
+          "plot:Amplification:hiWhisker": {
+            "v": 3.7214
+          }
+        }
+      }
     },
     {
       "kind": "plot",
@@ -453,18 +517,18 @@
             "n": 209,
             "lo": 0,
             "hi": 0.9463,
-            "q1": 0.2622,
+            "q1": 0.2605,
             "median": 0.3797,
             "q3": 0.5222,
             "loWhisker": 0,
-            "hiWhisker": 0.9122
+            "hiWhisker": 0.91475
           },
           {
             "g": "Inframe",
             "n": 5,
             "lo": 0.2493,
             "hi": 0.5605,
-            "q1": 0.2545,
+            "q1": 0.2493,
             "median": 0.2741,
             "q3": 0.4806,
             "loWhisker": 0.2493,
@@ -476,7 +540,7 @@
             "lo": 0.0002,
             "hi": 0.947,
             "q1": 0.2982,
-            "median": 0.4656,
+            "median": 0.4635,
             "q3": 0.6182,
             "loWhisker": 0.0002,
             "hiWhisker": 0.947
@@ -486,9 +550,9 @@
             "n": 24,
             "lo": 0.0027,
             "hi": 0.8331,
-            "q1": 0.2373,
-            "median": 0.4675,
-            "q3": 0.5381,
+            "q1": 0.2209,
+            "median": 0.4314,
+            "q3": 0.5356,
             "loWhisker": 0.0027,
             "hiWhisker": 0.8331
           },
@@ -497,10 +561,10 @@
             "n": 4,
             "lo": 0.1011,
             "hi": 0.6513,
-            "q1": 0.4622,
-            "median": 0.6276,
-            "q3": 0.6513,
-            "loWhisker": 0.17855000000000004,
+            "q1": 0.1011,
+            "median": 0.5449,
+            "q3": 0.6276,
+            "loWhisker": 0.1011,
             "hiWhisker": 0.6513
           },
           {
@@ -509,7 +573,7 @@
             "lo": 0,
             "hi": 0.9971,
             "q1": 0.1049,
-            "median": 0.1949,
+            "median": 0.19474999999999998,
             "q3": 0.346,
             "loWhisker": 0,
             "hiWhisker": 0.7076499999999999
@@ -520,7 +584,7 @@
             "lo": 0,
             "hi": 0.6502,
             "q1": 0.0052,
-            "median": 0.1065,
+            "median": 0.1058,
             "q3": 0.1675,
             "loWhisker": 0,
             "hiWhisker": 0.41095000000000004
@@ -758,7 +822,7 @@
             "kind": "outliers",
             "label": "outliers",
             "color": "#D55E00",
-            "n": 16,
+            "n": 15,
             "shown": "points",
             "points": [
               {
@@ -795,11 +859,6 @@
                 "id": "TCGA-BH-A0BA-01",
                 "g": "Not mutated",
                 "v": 0.8633
-              },
-              {
-                "id": "TCGA-E9-A243-01",
-                "g": "Multiple",
-                "v": 0.1011
               },
               {
                 "id": "TCGA-A8-A07Z-01",
@@ -842,7 +901,7 @@
                 "v": 0.9462
               }
             ],
-            "drawn": 16
+            "drawn": 15
           }
         ]
       },
@@ -864,7 +923,89 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: 16 values beyond the whiskers. The statistics are over the whole plotted cohort."
+      "note": "1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: 15 values beyond the whiskers. The statistics are over the whole plotted cohort.",
+      "method": {
+        "steps": [
+          {
+            "kind": "fetch",
+            "title": "Each group's quartiles, in the database",
+            "scope": "all samples · brca_tcga_pan_can_atlas_2018",
+            "rowsOut": 7,
+            "detail": "The plot:box query above: per category, the count, the extremes and the quartiles of the numeric axis's values (log-transformed first where it is on a log scale).",
+            "params": [
+              [
+                "quartiles",
+                "the portal's rule (jStat.quartiles, PLT-STM-8): of the n sorted values, q1 is the round(n/4)-th and q3 the round(3n/4)-th, halves rounded up, no interpolation"
+              ],
+              [
+                "median",
+                "the middle value; for an even n the mean of the two middle values"
+              ],
+              [
+                "a group of one",
+                "no quartiles, drawn as its value with no box"
+              ]
+            ]
+          },
+          {
+            "kind": "statistic",
+            "title": "Whiskers",
+            "detail": "The portal's rule (PLT-STM-8): each whisker ends at its fence, q1 − 1.5 × IQR or q3 + 1.5 × IQR, when some value lies beyond it, else at the extreme value. Not Tukey's furthest value inside the fence, so a whisker may end where no case lies."
+          }
+        ],
+        "implementation": {
+          "functions": [
+            "tukey"
+          ],
+          "file": "lib/plot.ts",
+          "commit": null
+        },
+        "verification": "In the database, the coefficients and quartiles are checked against scipy 1.18.1 (pearsonr, spearmanr) and the portal's jStat rule on known values by scripts/check-plot-stats.ts.",
+        "check": {
+          "plot:Missense:loWhisker": {
+            "v": 0
+          },
+          "plot:Missense:hiWhisker": {
+            "v": 0.91475
+          },
+          "plot:Inframe:loWhisker": {
+            "v": 0.2493
+          },
+          "plot:Inframe:hiWhisker": {
+            "v": 0.5605
+          },
+          "plot:Truncating:loWhisker": {
+            "v": 0.0002
+          },
+          "plot:Truncating:hiWhisker": {
+            "v": 0.947
+          },
+          "plot:Splice:loWhisker": {
+            "v": 0.0027
+          },
+          "plot:Splice:hiWhisker": {
+            "v": 0.8331
+          },
+          "plot:Multiple:loWhisker": {
+            "v": 0.1011
+          },
+          "plot:Multiple:hiWhisker": {
+            "v": 0.6513
+          },
+          "plot:Not mutated:loWhisker": {
+            "v": 0
+          },
+          "plot:Not mutated:hiWhisker": {
+            "v": 0.7076499999999999
+          },
+          "plot:Not profiled:loWhisker": {
+            "v": 0
+          },
+          "plot:Not profiled:hiWhisker": {
+            "v": 0.41095000000000004
+          }
+        }
+      }
     }
   ]
 }

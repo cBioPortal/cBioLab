@@ -2011,7 +2011,7 @@ ERBB2-amplified TCGA breast tumors with an mRNA z-score heatmap under the gene t
 
 ### Example 16: A plot of 13,000 samples, drawn as density
 
-Tumour mutational burden against fraction of the genome altered, over every sample of a TP53-mutant cohort. The figure is a density field: the samples are counted into a 240x160 grid, and only the occupied cells travel, plus the outliers — the cases in the sparse cells at the fringe, drawn as points. Pearson, Spearman and the fitted line are computed over EVERY sample inside ClickHouse, so they describe the whole cohort rather than the points that happened to be painted last. The second view groups the same measure by TP53 mutation class, as quartiles with Tukey whiskers over a violin, with the values beyond the whiskers drawn as points.
+Tumour mutational burden against fraction of the genome altered, over every sample of a TP53-mutant cohort. The figure is a density field: the samples are counted into a 240x160 grid, and only the occupied cells travel, plus the outliers — the cases in the sparse cells at the fringe, drawn as points. Pearson, Spearman and the fitted line are computed over EVERY sample inside ClickHouse, so they describe the whole cohort rather than the points that happened to be painted last. The second view groups the same measure by TP53 mutation class, as quartiles with whiskers at the portal's 1.5 × IQR fences over a violin, with the values beyond the whiskers drawn as points.
 
 ```json
 {

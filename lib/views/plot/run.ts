@@ -14,6 +14,7 @@ import { OQL_NOT_PROFILED } from "../../plot-oql.ts";
 import { naturalSort } from "./natural-sort.ts";
 import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
+import { plotMethod } from "./method.ts";
 import { resolveDrivers, type DriverSettings } from "../../driver-settings.ts";
 
 type BoxRow = { g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number };
@@ -526,6 +527,7 @@ async function runPlotByCohort(pv: PlotView, c: ViewRun): Promise<ViewResult | U
     ? "Each cohort's values are drawn as its box alone" + (data.pointSet?.why ? ": no case is drawn as a point (" + data.pointSet.why + ")." : ".") : "";
   return {
     kind: "plot", plot: data, cohorts: vNames, studies, participation: participationFor(studies, false),
+    method: plotMethod({ cohort: vNames.join(", "), studies, unit, data }),
     note: [coverageNote(data, unit), combineNote(data, unit), cases,
       vNames.length > 1 ? "One " + (data.shape === "table" ? "column" : "box") + " per cohort; a " + unit + " in more than one cohort is in each." : ""]
       .filter(Boolean).join(" ") || undefined
@@ -600,7 +602,8 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined
+        note: [coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
+        method: plotMethod({ cohort: cn, studies: sites, unit, data })
       };
       return pr;
     } else {
@@ -620,6 +623,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const label = { x: { label: xLabel, kind: xk }, y: { label: yLabel, kind: yk } };
       const scaleNote = sites.length + " studies pooled (" + sites.join(", ") + ")";
       let data: PlotData;
+      let moments: (Moments & { study: string })[] | undefined;
 
       if (shape === "scatter") {
         const extents = await Promise.all(sites.map((s) => fr[s].plotExtent(doc.cohorts[cn], spec, xk, yk)));
@@ -636,6 +640,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
             Promise.all(sites.map((s) => fr[s].plotBinCounts(doc.cohorts[cn], spec, xk, yk, bins, extent))),
             Promise.all(sites.map((s) => fr[s].plotMoments(doc.cohorts[cn], spec, xk, yk)))
           ]);
+          moments = momentParts.map((m, i) => ({ ...m, study: sites[i] }));
           const cells = new Map<string, PlotCell>();
           for (const part of binParts) for (const c of part) {
             const key = c.bx + "," + c.by, had = cells.get(key);
@@ -725,7 +730,8 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       if (ls.length) data.layers = ls;
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [coverageNote(data, unit), combineNote(data, unit), data.note, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined };
+        note: [coverageNote(data, unit), combineNote(data, unit), data.note, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
+        method: plotMethod({ cohort: cn, studies: sites, unit, data, moments }) };
       return pr;
     }
   } catch (e) {

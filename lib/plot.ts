@@ -636,15 +636,24 @@ function num(x: number): string {
   return String(x);
 }
 
-/** per category: the count, the quartiles and the extremes — everything a box needs */
+/**
+ * per category: the count, the quartiles and the extremes — everything a box needs. The quartiles
+ * are the portal's (`jStat.quartiles`, legacy `boxPlotUtils.ts` calculateBoxPlotModel, PLT-STM-8):
+ * of the n sorted values, q1 is the round(n/4)-th and q3 the round(3n/4)-th, rounding halves up and
+ * never interpolating; the median is the middle value, or the mean of the two middle values for an
+ * even n. A group of one has no quartiles there (no box); here q1 = q3 = its value.
+ */
 export function plotBoxSql(numSel: string, catSel: string, cohortSql: string): AggregateSql {
   return aggregateSql("WITH cohort AS (" + cohortSql + "),\n" +
     "     vs AS (" + numSel + "),\n" +
     "     gs AS (" + catSel + ")\n" +
-    "SELECT gs.v AS g, count() AS n, min(vs.v) AS lo, max(vs.v) AS hi,\n" +
-    "       quantilesExact(0.25, 0.5, 0.75)(vs.v) AS q\n" +
-    "FROM vs INNER JOIN gs ON gs.id = vs.id\n" +
-    "GROUP BY g ORDER BY n DESC LIMIT " + (CATEGORY_CAP + 1));
+    "SELECT g, n, s[1] AS lo, s[n] AS hi,\n" +
+    "       [s[greatest(1, intDiv(n + 2, 4))],\n" +
+    "        if(n % 2 = 1, s[intDiv(n + 1, 2)], (s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2),\n" +
+    "        s[greatest(1, intDiv(3 * n + 2, 4))]] AS q\n" +
+    "FROM (SELECT gs.v AS g, count() AS n, arraySort(groupArray(vs.v)) AS s\n" +
+    "      FROM vs INNER JOIN gs ON gs.id = vs.id GROUP BY g)\n" +
+    "ORDER BY n DESC LIMIT " + (CATEGORY_CAP + 1));
 }
 
 /**
