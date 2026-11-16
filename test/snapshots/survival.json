@@ -144,6 +144,10 @@
             }
           ],
           "tLast": 126.73,
+          "medianCi": {
+            "lo": 13.37,
+            "hi": 30.5
+          },
           "missing": 0
         },
         {
@@ -264,6 +268,10 @@
             }
           ],
           "tLast": 186.4,
+          "medianCi": {
+            "lo": 12.67,
+            "hi": 18.67
+          },
           "missing": 0
         }
       ],
@@ -330,7 +338,7 @@
           {
             "kind": "statistic",
             "title": "Estimate survival by Kaplan–Meier",
-            "detail": "The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5.",
+            "detail": "The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5; its 95% interval runs from the first time the pointwise band's lower edge reaches 0.5 to the first time its upper edge does (Greenwood variance on the log scale, R survfit's default and cBioPortal's), an end never reached shown as NA.",
             "params": [
               [
                 "MSI-H",

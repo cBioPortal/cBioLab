@@ -1,13 +1,13 @@
 // Survival view: Kaplan-Meier curves pooled exactly from each participant's id-free
 // (months, event, n) counts, with log-rank tests, all computed from those grouped rows directly.
-import { kaplanMeierCounts, logRankCounts, logRankKCounts, applyCutoffCounts, survSubjects, toIncidence, type SurvCount } from "../../stats.ts";
+import { kaplanMeierCounts, kmMedianCiCounts, logRankCounts, logRankKCounts, applyCutoffCounts, survSubjects, toIncidence, benjaminiHochberg, type SurvCount } from "../../stats.ts";
 import type { ViewResult, LogRank, LogRankK } from "../../types.ts";
 import type { SurvivalCount, EndpointColumns } from "../../federation.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { ATTR_NAME, askEachSite, answering, plural } from "../shared.ts";
-import type { SurvivalView } from "./types.ts";
+import type { SurvivalView, SurvivalType } from "./types.ts";
 import { survivalMethod } from "./method.ts";
-import { sharedPatientsSql } from "./sql.ts";
+import { sharedPatientsSql, survivalStatusMetaSql } from "./sql.ts";
 
 export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, vStudies, participationFor } = c;
@@ -115,7 +115,8 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
   };
   const curvesRaw = vNames.map((n) => {
     const rows = countsFor(n);
-    return { cohort: n, ...kaplanMeierCounts(rows), missing: cohorts[n].count - survSubjects(rows) };
+    const ci = kmMedianCiCounts(rows);
+    return { cohort: n, ...kaplanMeierCounts(rows), medianCi: { lo: ci.lo, hi: ci.hi }, missing: cohorts[n].count - survSubjects(rows) };
   });
   const curves = display === "incidence" ? curvesRaw.map((c) => toIncidence(c)) : curvesRaw;
   // Two cohorts is the case the 2-arm log-rank test is defined for, matching the compare
@@ -166,7 +167,11 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
     ? vNames.reduce((sum, n) => sum + survSubjects(rowsOf([...perSite.get(n)!.values()].flat())
         .filter((r) => r.t > cutoffMonths!)), 0)
     : 0;
+  const typed = (view as SurvivalView).types === true && !columns && !anchor
+    ? await survivalTypes(c, endpoint, perSite, { withheld, shared, minArm: MIN_ARM_N }) : null;
+  const types = typed && typed.types;
   return { kind: "survival", cohorts: vNames, curves, endpoint,
+    ...(types ? { types } : {}),
     ...(entryMonths ? { entryMonths } : {}),
     ...(anchor ? { anchoredTo: anchor.eventType + (anchor.key ? " [" + anchor.key + "=" + anchor.value + "]" : ""), truncated: true } : {}),
     ...(cutoffMonths != null ? { cutoffMonths } : {}), ...(tickMonths != null ? { tickMonths } : {}),
@@ -186,6 +191,8 @@ export async function runSurvival(view: DocView, c: ViewRun): Promise<ViewResult
           study: st, cohortPatients: cohorts[c.cohort].perStudy[st]?.count || 0,
           patients: rows.reduce((k, r) => k + r.n, 0), rows: rows.length })),
       })),
+      ...(typed ? { types: typed.types.map((x) => ({ endpoint: x.endpoint, title: x.title, patients: x.patients, p: x.p, q: x.q, why: x.why, df: vNames.length - 1, stratified: typed.stratified.has(x.endpoint) })),
+        typeCounts: typed.rows } : {}),
       counts: vNames.flatMap((n) => [...perSite.get(n)!.entries()].flatMap(([st, rows]) =>
         rows.map((r) => ({ cohort: n, study: st, months: r.months, event: r.event, n: r.n, ...(r.entry != null ? { entry: r.entry } : {}) })))),
       test: logrank
@@ -276,6 +283,60 @@ function logRankOf(vNames: string[], perSite: Map<string, Map<string, SurvivalCo
       : { logrankK: pooled };
   }
   return {};
+}
+
+/** the portal's fixed priorities for the usual endpoints (Survival.tsx); others take their _STATUS attribute's */
+const TYPE_PRIORITY: Record<string, number> = { OS: 400, DFS: 300, PFS: 250, DSS: 250 };
+
+/**
+ * The survival-type table: for every endpoint the studies declare, each cohort's patients and the
+ * log-rank p by the drawn curves' rules (none when the cohorts' shared patients withhold it, an arm
+ * is under minArm, or there is one cohort), then BH q over the endpoints tested. No cutoff applies,
+ * as on the portal. The drawn endpoint's rows are reused.
+ */
+async function survivalTypes(c: ViewRun, drawn: string, drawnRows: Map<string, Map<string, SurvivalCount[]>>,
+  rule: { withheld: boolean; shared: number; minArm: number }): Promise<{ types: SurvivalType[]; rows: { endpoint: string; cohort: string; study: string; months: number; event: number; n: number }[]; stratified: Set<string> }> {
+  const { doc, resolvers, vNames, vStudies } = c;
+  const declared = [...new Set((await Promise.all(vStudies.map((st) => resolvers[st].survivalEndpoints().catch(() => [] as string[])))).flat())]
+    .filter((e) => /^[A-Z][A-Z0-9_]{0,39}$/.test(e)).sort();
+  if (!declared.includes(drawn)) declared.unshift(drawn);
+  const { ok } = answering(c);
+  const meta = new Map<string, { label: string; priority: number }>();
+  for (const rows of await Promise.all(Object.values(ok).map((r) => r.viewMeta("survivalStatusMeta", (st, db) => survivalStatusMetaSql(st, db)).catch(() => []))))
+    for (const r of rows) if (!meta.has(String(r.a))) meta.set(String(r.a), { label: String(r.label || ""), priority: Number(r.priority) || 0 });
+  const rowsFor = async (e: string) => {
+    if (e === drawn) return drawnRows;
+    const per = new Map<string, Map<string, SurvivalCount[]>>(vNames.map((n) => [n, new Map()]));
+    for (const { cohort, study, answer } of await askEachSite(c, resolvers, (n, _st, r) => r.survivalCounts(doc.cohorts[n], e, null, undefined)))
+      per.get(cohort)!.set(study, answer);
+    return per;
+  };
+  const rows: { endpoint: string; cohort: string; study: string; months: number; event: number; n: number }[] = [];
+  const stratified = new Set<string>();
+  const out = await Promise.all(declared.map(async (e): Promise<SurvivalType> => {
+    const per = await rowsFor(e);
+    for (const [cohort, byStudy] of per) for (const [study, rs] of byStudy) for (const r of rs) rows.push({ endpoint: e, cohort, study, months: r.months, event: r.event, n: r.n });
+    const countsFor = (n: string, st?: string): SurvCount[] => (st ? (per.get(n)!.get(st) || []) : [...per.get(n)!.values()].flat())
+      .map((r) => r.entry == null ? { t: r.months, event: r.event, n: r.n } : { t: r.months, event: r.event, entry: r.entry, n: r.n });
+    const groups = vNames.map((n) => { const km = kaplanMeierCounts(countsFor(n)); return { cohort: n, n: km.n, events: km.events, median: km.median }; });
+    const label = meta.get(e + "_STATUS")?.label || "";
+    const title = label.replace(/status|survival/gi, "").replace(/\s+/g, " ").trim() || e;
+    const priority = TYPE_PRIORITY[e] ?? meta.get(e + "_STATUS")?.priority ?? 0;
+    const base = { endpoint: e, title, priority, patients: groups.reduce((k, g) => k + g.n, 0), groups };
+    const thin = groups.filter((g) => g.n < rule.minArm);
+    const why = vNames.length < 2 ? "one group" : rule.withheld ? "the groups share " + plural(rule.shared, "patient")
+      : thin.length ? thin.map((g) => g.cohort + " has " + g.n).join(", ") + " (under " + rule.minArm + ")" : null;
+    if (why) return { ...base, why };
+    const t = logRankOf(vNames, per, countsFor);
+    if (t.logrankPooled || t.logrankKPooled) stratified.add(e);
+    return { ...base, p: (t.logrank || t.logrankK)!.p };
+  }));
+  const tested = out.filter((t) => t.p != null);
+  benjaminiHochberg(tested.map((t) => t.p!)).forEach((q, i) => { tested[i].q = q; });
+  // the order the answers arrived in is not the rows' order
+  const order = (r: typeof rows[number]) => [declared.indexOf(r.endpoint), vNames.indexOf(r.cohort)];
+  rows.sort((a, b) => order(a)[0] - order(b)[0] || order(a)[1] - order(b)[1] || a.study.localeCompare(b.study) || a.months - b.months || a.event - b.event);
+  return { types: out.sort((a, b) => b.priority - a.priority || a.endpoint.localeCompare(b.endpoint)), rows, stratified };
 }
 
 /** why a view whose cohorts share patients has no log-rank p */

@@ -193,12 +193,12 @@
                   ],
                   "types": [
                     {
-                      "mtype": "Frame_Shift_Del",
+                      "mtype": "Frame_Shift_Ins",
                       "driver": true,
                       "rows": 1
                     },
                     {
-                      "mtype": "Frame_Shift_Ins",
+                      "mtype": "Frame_Shift_Del",
                       "driver": true,
                       "rows": 1
                     }
@@ -628,7 +628,7 @@
                 },
                 {
                   "…": "60 more",
-                  "sha256": "5d4f1c4f8ba1e740"
+                  "sha256": "7c19798d32d01ad4"
                 }
               ],
               "domains": [
@@ -746,7 +746,7 @@
                 },
                 "fusion": {
                   "driver": 0,
-                  "vus": 0
+                  "vus": 1
                 },
                 "other": {
                   "driver": 0,
@@ -899,14 +899,14 @@
                   ],
                   "types": [
                     {
-                      "mtype": "Splice_Site",
-                      "driver": true,
-                      "rows": 2
-                    },
-                    {
                       "mtype": "Missense_Mutation",
                       "driver": true,
                       "rows": 1
+                    },
+                    {
+                      "mtype": "Splice_Site",
+                      "driver": true,
+                      "rows": 2
                     }
                   ]
                 },
@@ -1375,7 +1375,7 @@
                 },
                 "fusion": {
                   "driver": 0,
-                  "vus": 0
+                  "vus": 1
                 },
                 "other": {
                   "driver": 0,

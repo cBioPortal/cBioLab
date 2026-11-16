@@ -33,7 +33,7 @@ test("every group keeps the selection: its studies and Explore's filters", () =>
 });
 
 const data = (over: Partial<Parameters<typeof resultsLayout>[1]> = {}) =>
-  ({ expr: "rna_seq_v2_mrna", cna: "gistic", clinical: ["AGE"], numeric: ["MUTATION_COUNT"], expressionAcross: true, held: { every: ["MUTATION", "CNA"], some: ["SV"] }, ...over } as Parameters<typeof resultsLayout>[1]);
+  ({ expr: "rna_seq_v2_mrna", cna: "gistic", clinical: ["AGE", "OS_MONTHS", "OS_STATUS"], numeric: ["MUTATION_COUNT"], expressionAcross: true, held: { every: ["MUTATION", "CNA"], some: ["SV"] }, ...over } as Parameters<typeof resultsLayout>[1]);
 const titles = (l: ReturnType<typeof resultsLayout>) => l.tabs.map((t) => t.title);
 const plotY = (l: ReturnType<typeof resultsLayout>) => (l.doc.views!.find((v: any) => v.kind === "plot") as any)?.y;
 
@@ -191,4 +191,12 @@ test("the header's samples line, only when the queried samples outnumber the pat
   assert.equal(samplesLine({ queried: 594, alteredSamples: 485, queriedSamples: 594 }), null);
   assert.equal(samplesLine({ queried: 594 }), null);
   assert.equal(samplesLine({ queried: 10, alteredSamples: 0, queriedSamples: 12 }), "0 (0%) of 12 queried samples altered");
+});
+
+test("Comparison/Survival › Survival: the survival-type table, on the portal's first endpoint, only with survival data (CMP-SV-1, CMP-SV-5)", () => {
+  const sub = (l: ReturnType<typeof resultsLayout>) => l.tabs.find((t) => t.title === "Comparison/Survival")!.sub!;
+  const survival = (l: ReturnType<typeof resultsLayout>) => { const t = sub(l).find((x) => x.title === "Survival"); return t && l.doc.views![t.views[0]]; };
+  assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data())), { kind: "survival", types: true, cohorts: ["Altered", "Unaltered"] });
+  assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data({ clinical: ["PFS_MONTHS", "PFS_STATUS"] }))), { kind: "survival", types: true, cohorts: ["Altered", "Unaltered"], endpoint: "PFS" });
+  assert.equal(survival(resultsLayout(q(["a"], ["KRAS"]), data({ clinical: ["AGE"] }))), undefined);
 });

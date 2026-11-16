@@ -16,6 +16,10 @@ import { survivalKind } from "../lib/views/survival/kind.ts";
 /** counts per cohort, per study, as each site answers them */
 type Answers = Record<string, Record<string, SurvivalCount[]>>;
 
+/** a study's counts per endpoint, where a test gives each endpoint its own; otherwise every endpoint reads `answers` */
+let BY_ENDPOINT: Record<string, Answers> = {};
+/** the _STATUS attributes' metadata every study's database returns */
+let STATUS_META: { a: string; label: string; priority: number }[] = [];
 /** patients each study's database finds in more than one of the cohorts; a study listed as "remote" cannot be asked */
 let SHARED: Record<string, number | "remote"> = {};
 const sharedAsked: { study: string; label: string; cohorts: string[]; sql: string }[] = [];
@@ -23,6 +27,11 @@ const sharedAsked: { study: string; label: string; cohorts: string[]; sql: strin
 function site(study: string, answers: Answers, endpoints: string[] | "fail" = [], seen?: unknown[][]) {
   const aggregates = SHARED[study] === "remote" ? {} : {
     viewAggregate: async () => [],
+    viewMeta: async (label: string, build: (st: string, db: string) => string) => {
+      assert.equal(label, "survivalStatusMeta");
+      assert.match(build(study, "db"), /LIKE '%\\\\_STATUS'/);
+      return STATUS_META;
+    },
     viewAggregateMany: async (label: string, defs: { name: string }[], build: (sqls: string[], st: string, db: string) => string) => {
       sharedAsked.push({ study, label, cohorts: defs.map((d) => d.name), sql: build(defs.map((d) => "SELECT pid, sid FROM " + d.name), study, "db") });
       return [{ n: SHARED[study] ?? 0 }];
@@ -33,7 +42,7 @@ function site(study: string, answers: Answers, endpoints: string[] | "fail" = []
     instance: { id: "local", mode: "patient-level", label: "local", conn: PRIMARY }, study,
     survivalCounts: async (def: { name: string }, endpoint: string, anchor: unknown, columns: unknown) => {
       seen?.push([def.name, study, endpoint, anchor, columns]);
-      return answers[def.name]?.[study] ?? [];
+      return (BY_ENDPOINT[endpoint] || answers)[def.name]?.[study] ?? [];
     },
     survivalEndpoints: async () => { if (endpoints === "fail") throw new Error("down"); return endpoints; },
   };
@@ -138,6 +147,8 @@ describe("survival: Kaplan–Meier and the log-rank test", () => {
     assert.deepEqual(seen.map((s) => s.slice(0, 5)), [["A", "s1", "OS", null, undefined], ["B", "s1", "OS", null, undefined]]);
     const [a, b] = v.curves;
     assert.equal(a.n, 10); assert.equal(a.events, 10); assert.equal(a.median, 1); assert.equal(a.missing, 2);
+    // all ten die at month 1: S = 0, so the log band is undefined and neither end is reached (R reports NA)
+    assert.deepEqual((a as { medianCi?: unknown }).medianCi, { lo: null, hi: null });
     assert.equal(b.n, 10); assert.equal(b.events, 0); assert.equal(b.median, null); assert.equal(b.missing, 0);
     assert.equal(v.logrank!.df, 1);
     close(v.logrank!.chi2, 19);
@@ -251,6 +262,54 @@ describe("survival: cohorts that share patients get curves but, with noTestWhenS
   test("one cohort: nothing to ask", async () => {
     await run({ A: { s1: 10 } }, { A: { s1: DIE() } }, { s1: 5 });
     assert.equal(sharedAsked.length, 0);
+  });
+});
+
+describe("survival: the survival-type table (types, CMP-SV-1, CMP-SV-5, CMP-STM-4)", () => {
+  const counts = { A: { s1: 10 }, B: { s1: 10 } };
+  const run = async (view: object, endpoints: string[], byEndpoint: Record<string, Answers>, meta: typeof STATUS_META = [], shared: Record<string, number> = {}) => {
+    BY_ENDPOINT = byEndpoint; STATUS_META = meta; SHARED = shared;
+    const seen: unknown[][] = [];
+    try { return { v: unwrap(await runSurvival({ kind: "survival", types: true, ...view } as never, ctx(counts, byEndpoint.OS || {}, { s1: endpoints }, seen))) as Out & { types?: any[] }, seen }; }
+    finally { BY_ENDPOINT = {}; STATUS_META = []; SHARED = {}; }
+  };
+  const FOUR = { OS: { A: { s1: DIE() }, B: { s1: LIVE() } }, PFS: { A: { s1: DIE() }, B: { s1: DIE() } },
+    DFS: { A: { s1: DIE() }, B: { s1: LIVE(3) } }, RFS: { A: { s1: LIVE() }, B: { s1: DIE() } } };
+  const META = [{ a: "OS_STATUS", label: "Overall Survival Status", priority: 0 }, { a: "PFS_STATUS", label: "Progression Free Status", priority: 0 },
+    { a: "RFS_STATUS", label: "Relapse Free Status", priority: 100 }, { a: "OTHER_STATUS", label: "x", priority: 9 }];
+  test("every declared endpoint: titles, the portal's order, patients, p by the curve's rules, BH q over those tested", async () => {
+    const { v, seen } = await run({}, ["DFS", "OS", "PFS", "RFS"], FOUR, META);
+    const t = v.types!;
+    // OS 400, DFS 300, PFS 250, then RFS by its _STATUS priority (100)
+    assert.deepEqual(t.map((x) => [x.endpoint, x.title, x.priority, x.patients]),
+      [["OS", "Overall", 400, 20], ["DFS", "DFS", 300, 13], ["PFS", "Progression Free", 250, 20], ["RFS", "Relapse Free", 100, 20]]);
+    // OS and RFS: χ² 19 by hand (10 events against 10 censored); PFS: identical groups, χ² 0, p 1; DFS: B has 3, under 10
+    close(t[0].p, P19, 1e-3); close(t[3].p, P19, 1e-3); close(t[2].p, 1, 1e-9);
+    assert.equal(t[1].p, undefined); assert.equal(t[1].why, "B has 3 (under 10)");
+    // BH over 3 tested: sorted OS, RFS (tied), PFS → q(OS) = q(RFS) = P19·3/2, q(PFS) = 1
+    close(t[0].q, t[0].p * 3 / 2, 1e-9); close(t[3].q, t[3].p * 3 / 2, 1e-9); close(t[2].q, 1, 1e-9);
+    assert.equal(t[1].q, undefined);
+    assert.deepEqual(t[0].groups, [{ cohort: "A", n: 10, events: 10, median: 1 }, { cohort: "B", n: 10, events: 0, median: null }]);
+    // the drawn endpoint's rows are reused: OS asked once per cohort
+    assert.equal(seen.filter((x) => x[2] === "OS").length, 2);
+    assert.ok(seen.filter((x) => x[2] !== "OS").every((x) => x[3] === null && x[4] === undefined), "no anchor, no columns");
+  });
+  test("the drawn endpoint is listed even when the study does not declare it", async () => {
+    const { v } = await run({ endpoint: "PFS" }, ["OS"], FOUR, META);
+    assert.deepEqual(v.types!.map((x) => x.endpoint), ["OS", "PFS"]);
+  });
+  test("cohorts that share patients under noTestWhenShared: no p on any type", async () => {
+    const { v } = await run({ noTestWhenShared: true }, ["OS", "PFS"], FOUR, META, { s1: 4 });
+    assert.ok(v.types!.every((x) => x.p === undefined && x.q === undefined && x.why === "the groups share 4 patients"));
+  });
+  test("not computed for an anchored clock or explicit columns, nor without types", async () => {
+    BY_ENDPOINT = FOUR;
+    try {
+      for (const view of [{ types: true, anchor: { eventType: "Treatment" } }, { types: true, monthsAttribute: "M", statusAttribute: "S" }, {}]) {
+        const v = unwrap(await runSurvival({ kind: "survival", ...view } as never, ctx(counts, FOUR.OS, { s1: ["OS", "PFS"] }))) as Out & { types?: unknown };
+        assert.equal(v.types, undefined, JSON.stringify(view));
+      }
+    } finally { BY_ENDPOINT = {}; }
   });
 });
 

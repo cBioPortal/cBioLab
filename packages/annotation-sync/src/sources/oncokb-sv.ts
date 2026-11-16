@@ -8,8 +8,9 @@
 // and site 2's Entrez ids ('' where a site names no gene), the SV type and the tumour type ('' when
 // none). The SV type is FUSION when both sites name a gene; with one, the variant's class when it is
 // exactly one of OncoKB's types, else UNKNOWN. The tumour type is the one tumorTypeKeySpace gives a
-// mutation. A key is asked when either partner is a gene OncoKB curates; any other is stored unasked,
-// with an empty oncogenicity, so the sync does not pick it up again.
+// mutation; every variant is keyed with no tumour type ('') as well, the query behind the portal's
+// driver call. A key is asked when either partner is a gene OncoKB curates; any other is stored
+// unasked, with an empty oncogenicity, so the sync does not pick it up again.
 import type { Row } from "@cbiolab/clickhouse";
 import { sq } from "@cbiolab/clickhouse";
 import type { AnnotationSource } from "../source.ts";
@@ -29,10 +30,12 @@ export function svKeySpace(portalDb: string, study: string | null): string {
   const only = study == null ? "" : " AND cs.cancer_study_identifier = " + sq(study);
   const genes = "(ifNull(g1.hugo_gene_symbol, '') != '') + (ifNull(g2.hugo_gene_symbol, '') != '')";
   return (
-    "SELECT site1_entrez, site2_entrez, sv_type, tumor_type FROM (" +
+    // each variant's key for its sample's tumour type, and again with none (the portal's query for the
+    // driver call, which its oncoprint and the Mutations tab's badges ask with no tumour type)
+    "SELECT site1_entrez, site2_entrez, sv_type, tt AS tumor_type FROM (" +
     "SELECT " + site("sv.site1_entrez_gene_id") + " AS site1_entrez, " + site("sv.site2_entrez_gene_id") + " AS site2_entrez, " +
     "if(" + genes + " >= 2, 'FUSION', if(ifNull(sv.class, '') IN (" + ONE_GENE_TYPES.map(sq).join(", ") + "), sv.class, 'UNKNOWN')) AS sv_type, " +
-    "if(c.sample_unique_id = '', ifNull(st.name, ''), if(c.n_detailed > 0, c.detailed, '')) AS tumor_type" +
+    "if(c.sample_unique_id = '', ifNull(st.name, ''), if(c.n_detailed > 0, c.detailed, '')) AS sample_type" +
     " FROM " + portalDb + ".structural_variant sv" +
     " INNER JOIN " + portalDb + ".genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id" +
     " INNER JOIN " + portalDb + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id" +
@@ -42,7 +45,7 @@ export function svKeySpace(portalDb: string, study: string | null): string {
     " LEFT JOIN (" + sampleTumorTypesSql(portalDb, study) + ") c ON c.sample_unique_id = concat(cs.cancer_study_identifier, '_', smp.stable_id)" +
     " LEFT JOIN (" + studyTumorTypesSql(portalDb) + ") st ON st.study = cs.cancer_study_identifier" +
     " WHERE gp.genetic_alteration_type = 'STRUCTURAL_VARIANT' AND (ifNull(sv.site1_entrez_gene_id, 0) != 0 OR ifNull(sv.site2_entrez_gene_id, 0) != 0)" + only +
-    ") GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type"
+    ") ARRAY JOIN [sample_type, ''] AS tt GROUP BY site1_entrez, site2_entrez, sv_type, tt"
   );
 }
 

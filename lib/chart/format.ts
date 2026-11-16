@@ -93,6 +93,17 @@ export function portalEquation(slope: number, intercept: number): string {
 }
 
 /**
+ * A Kaplan–Meier median with its 95% interval as cBioPortal's survival summary writes it
+ * (SurvivalUtil.getMedian): months to 2 decimals, an end the band never reaches "NA" —
+ * "62.79 (56.25 - NA)", "65.85 (51.48 - 80.20)", "NA" when the median is not reached.
+ */
+export function portalMedianCi(median: number | null, lo: number | null, hi: number | null): string {
+  if (median == null) return "NA";
+  if (lo == null && hi == null) return median.toFixed(2);
+  return median.toFixed(2) + " (" + (lo == null ? "NA" : lo.toFixed(2)) + " - " + (hi == null ? "NA" : hi.toFixed(2)) + ")";
+}
+
+/**
  * A value at two significant digits, as cBioPortal's FormatUtils.formatNumberValueInSignificantDigits(x, 2)
  * writes it for the mutation table's SIGNAL and gnomAD frequencies: no exponent, no separators,
  * 0 as "0" (0.0000583 → "0.000058", 0.125 → "0.13", 1234 → "1200").

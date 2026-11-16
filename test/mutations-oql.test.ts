@@ -349,3 +349,35 @@ describe("U6/U7/U9 (the pieces): what decides whether the Mutations tab is filte
     assert.ok(!mutationRowSource(parts, "c1", "KRAS", null, pins).with.includes("IN (\n  SELECT g.sample_unique_id"));
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// F1: oqlFusionFilterSql — the fusion rows' sibling of oqlMutationFilterSql (spec-e-oql; legacy
+// cbioportal-frontend e9d70fb ResultsViewPageStore.ts 3686-3712, oqlfilter.ts 260-290, 498-693).
+// Which fusions a condition keeps (F2–F14) is SQL, run against the fixture study in
+// scripts/check-mutation-fusions.ts, never read here as text.
+// ---------------------------------------------------------------------------------------------
+
+const fusionFilterSql = (lines: string[]): string | null => {
+  const f = (oql as Record<string, unknown>).oqlFusionFilterSql;
+  assert.equal(typeof f, "function", "lib/oql.ts exports oqlFusionFilterSql");
+  return (f as (l: string[], s1: string, s2: string, d: string) => string | null)(lines, "v.gene1", "v.gene2", "v.drv = 1");
+};
+
+describe("F1: oqlFusionFilterSql — null when the query holds no mutation OQL (RVPS 3694, OF 260-290)", () => {
+  const none: string[][] = [
+    ["TMPRSS2"], ["TMPRSS2: FUSION"], ["TMPRSS2: MUT"], ["TMPRSS2: AMP"],
+    ["TMPRSS2", "ERG"], ["TMPRSS2: MUT", "ERG: FUSION"], ["ALK: FUSION_DRIVER"], ["KRAS: AMP_DRIVER"], [],
+  ];
+  const some: [string[], string][] = [
+    [["TMPRSS2: MUT=V5I"], "F2"], [["TMPRSS2: MUT=V5I FUSION"], "F3"], [["TMPRSS2: MUT=V5I", "ERG"], "F4"],
+    [["TMPRSS2: FUSION_DRIVER MUT=V5I"], "F5"], [["TMPRSS2: DRIVER"], "F6"], [["KRAS: MUT=G12D", "TMPRSS2: MUT"], "F7"],
+    [["KRAS: MUT=G12D", "TMPRSS2: AMP"], "F8"], [["KRAS: MUT=G12D"], "F9"], [["TMPRSS2: MUT=V5I", "ERG: FUSION"], "F10"],
+    [["ERG: MUT=V5I", "TMPRSS2: FUSION"], "F11"], [["ALK: MUT_DRIVER"], "F12"], [["ALK: FUSION MUT_DRIVER", "KRAS: MUT=G12D"], "F13"],
+  ];
+  for (const lines of none) test("null: " + (lines.join("; ") || "(none)"), () => assert.equal(fusionFilterSql(lines), null));
+  for (const [lines, id] of some) test(id + " a condition: " + lines.join("; "), () => {
+    const s = fusionFilterSql(lines);
+    assert.equal(typeof s, "string");
+    assert.ok(s!.trim().length > 0);
+  });
+});

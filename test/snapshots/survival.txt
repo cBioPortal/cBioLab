@@ -5,8 +5,8 @@ Cohorts:
 - MSS: 148 patients — MSI_STATUS in [MSS]
 
 Survival (KM, PFS_1L):
-  MSI-H: median 18.4 mo (n=28, 23 events)
-  MSS: median 15.3 mo (n=148, 142 events)
+  MSI-H: median 18.4 mo (95% CI 13.37 - 30.50) (n=28, 23 events)
+  MSS: median 15.3 mo (95% CI 12.67 - 18.67) (n=148, 142 events)
   log-rank p=0.5301
 CAVEAT (tell the user): PFS_1L from each study's own baseline (left truncation applies) Status '0:...' treated as censored. 1 patient is in more than one cohort, so in more than one curve; the log-rank test assumes the groups share no one, so its p is approximate. Log-rank on a single study, so no stratification applies.
   METHOD:
@@ -14,7 +14,7 @@ CAVEAT (tell the user): PFS_1L from each study's own baseline (left truncation a
         count rows: 28
     - Count patients by time and status [MSS · ucec_msk_2018] (148 → 148 rows): The survivalCounts:PFS_1L query above: patients grouped by identical PFS_MONTHS_FIRST_LINE_TX, event, returned as counts — no patient identifier leaves the database. Event: PROGRESSION_STATUS starting with “1”; any other value is censored. Every cohort patient had a value.
         count rows: 138
-    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5.
+    - Estimate survival by Kaplan–Meier: The product-limit estimator, one curve per cohort, pooled over its studies, computed from the count rows directly: at each distinct time, the deaths and the number at risk are sums of the rows' patient counts. The median is the first time the curve is at or below 0.5; its 95% interval runs from the first time the pointwise band's lower edge reaches 0.5 to the first time its upper edge does (Greenwood variance on the log scale, R survfit's default and cBioPortal's), an end never reached shown as NA.
         MSI-H: 28 patients, 23 events, median 18.4 months
         MSS: 148 patients, 142 events, median 15.3 months
     - Two-group log-rank test: At each event time, every cohort's observed events against its share of the risk set, with the hypergeometric variance; χ² on 1 df.

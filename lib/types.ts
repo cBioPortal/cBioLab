@@ -627,6 +627,8 @@ export interface KmCurve {
   atRisk?: number[];
   /** the last follow-up time, event or censoring: the curve is drawn to here */
   tLast?: number;
+  /** the median's 95% interval (Greenwood, log scale, as R survfit and cBioPortal), an end never reached null */
+  medianCi?: { lo: number | null; hi: number | null };
   /** patients whose follow-up ended at or before their entry: never at risk, so left out of n */
   unobserved?: number;
 }

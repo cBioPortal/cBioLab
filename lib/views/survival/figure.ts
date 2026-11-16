@@ -3,12 +3,13 @@
 // each cohort's median, size and events in the legend, and the log-rank test under it.
 import type { KmCurve, DrawnResultOf } from "../../types.ts";
 import { survivalAxis } from "../../stats.ts";
+import { portalMedianCi, portalP } from "../../chart/format.ts";
 import { stepPath } from "../../chart/marks.ts";
 import { plotHeight } from "../../figures/common.ts";
 import {
 
   palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, legend,
-  seriesStyle, fmtInt, fmtMonths, fmtP, fmtNum, label, textWidth, esc, FS, SW, type SvgOpts
+  seriesStyle, fmtInt, fmtMonths, fmtNum, label, textWidth, esc, FS, SW, type SvgOpts
 } from "../../svg-kit.ts";
 
 export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts): string {
@@ -47,7 +48,8 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts): string {
   if (risk) { const rt = riskTable(curves, xs, y, W, L, nameW, p); out.push(rt.svg); y += rt.height + 8; }
   const items = curves.map((c, i) => ({
     label: c.cohort, color: seriesStyle(i).color, dash: seriesStyle(i).dash, kind: "line" as const,
-    detail: (incidence ? "50% incidence by " : "median ") + (c.median == null ? "not reached" : fmtMonths(c.median)) +
+    detail: (incidence ? "50% incidence by " + (c.median == null ? "not reached" : fmtMonths(c.median))
+      : "median " + (c.median == null ? "not reached" : portalMedianCi(c.median, c.medianCi?.lo ?? null, c.medianCi?.hi ?? null) + " mo")) +
       " · n = " + fmtInt(c.n) + " · " + fmtInt(c.events) + " events"
   }));
   const lg = legend(items, 8, y, W - 16, p, { grid: true });
@@ -69,10 +71,12 @@ function statLines(v: DrawnResultOf<"survival">): string[] {
   const lines: string[] = [];
   const strat = (s: number) => s > 1 ? " · stratified by study, " + s + " strata" : "";
   const disagree = (a: number, b: number) => (a < 0.05) !== (b < 0.05) ? " — the two disagree at p = 0.05" : "";
-  if (v.logrank) lines.push("log-rank χ² = " + fmtNum(v.logrank.chi2) + " (" + v.logrank.df + " df) · " + fmtP(v.logrank.p) + strat(v.logrank.strata) +
-    (v.logrankPooled ? " · pooled " + fmtP(v.logrankPooled.p) + disagree(v.logrank.p, v.logrankPooled.p) : ""));
-  if (v.logrankK) lines.push(v.logrankK.groups + "-group log-rank χ² = " + fmtNum(v.logrankK.chi2) + " (" + v.logrankK.df + " df) · " + fmtP(v.logrankK.p) +
-    strat(v.logrankK.strata) + (v.logrankKPooled ? " · pooled " + fmtP(v.logrankKPooled.p) + disagree(v.logrankK.p, v.logrankKPooled.p) : "") +
+  // p as cBioPortal's KM chart writes it (toConditionalPrecision(p, 3, 0.01)), "0.684"
+  const pp = (p: number) => "p = " + portalP(p);
+  if (v.logrank) lines.push("log-rank χ² = " + fmtNum(v.logrank.chi2) + " (" + v.logrank.df + " df) · " + pp(v.logrank.p) + strat(v.logrank.strata) +
+    (v.logrankPooled ? " · pooled " + pp(v.logrankPooled.p) + disagree(v.logrank.p, v.logrankPooled.p) : ""));
+  if (v.logrankK) lines.push(v.logrankK.groups + "-group log-rank χ² = " + fmtNum(v.logrankK.chi2) + " (" + v.logrankK.df + " df) · " + pp(v.logrankK.p) +
+    strat(v.logrankK.strata) + (v.logrankKPooled ? " · pooled " + pp(v.logrankKPooled.p) + disagree(v.logrankK.p, v.logrankKPooled.p) : "") +
     " — whether the groups differ at all, not which pair does");
   if (v.sharedPatients) lines.push((v.testWithheld ? "No log-rank p: " : "") + fmtInt(v.sharedPatients) + (v.sharedPatients === 1 ? " patient is" : " patients are") +
     " in more than one curve" + (v.testWithheld ? ", and the test assumes the groups share no one" : "; the test assumes the groups share no one, so its p is approximate"));

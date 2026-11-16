@@ -33,6 +33,26 @@ export interface SurvivalView {
    * sets it, for its Include mode. Unset, the test is given and the caveat says how many are shared.
    */
   noTestWhenShared?: boolean;
+  /**
+   * the survival-type table, as cBioPortal's Comparison page has it: every endpoint the studies
+   * declare (an <X>_MONTHS / <X>_STATUS pair), each with its patients, log-rank p and BH q, so the
+   * reader can pick the one drawn (`endpoint`)
+   */
+  types?: boolean;
+}
+
+/** One endpoint in the survival-type table. */
+export interface SurvivalType {
+  endpoint: string;
+  /** the <X>_STATUS attribute's display name without "status" and "survival", as the portal titles it */
+  title: string;
+  /** the portal's order: OS 400, DFS 300, PFS and DSS 250, others their _STATUS attribute's priority */
+  priority: number;
+  /** patients in the curves, over every cohort */
+  patients: number;
+  groups: { cohort: string; n: number; events: number; median: number | null }[];
+  /** the log-rank p, by the same rules as the drawn curves' (absent with `why`) and its BH q over the types tested */
+  p?: number; q?: number; why?: string;
 }
 
 declare module "../../types.ts" {
@@ -61,6 +81,8 @@ declare module "../../types.ts" {
       sharedPatients?: number;
       /** no log-rank test was given because of them (the view's noTestWhenShared) */
       testWithheld?: boolean;
+      /** the survival-type table (the view's `types`) */
+      types?: SurvivalType[];
     };
   }
   interface ViewResultMain { survival: "curves" }

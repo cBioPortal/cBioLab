@@ -885,7 +885,7 @@
             "pos": 600,
             "text": "V600E"
           },
-          "somaticSamples": 618,
+          "somaticSamples": 624,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -906,7 +906,7 @@
             },
             "fusion": {
               "driver": 0,
-              "vus": 0
+              "vus": 7
             },
             "other": {
               "driver": 0,
@@ -2101,7 +2101,7 @@
             },
             {
               "…": "120 more",
-              "sha256": "778a5410e6b34d59"
+              "sha256": "10bdf51649c270e1"
             }
           ],
           "domains": [
@@ -2198,7 +2198,7 @@
             "pos": 175,
             "text": "R175H/C/L"
           },
-          "somaticSamples": 4068,
+          "somaticSamples": 4088,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -2219,7 +2219,7 @@
             },
             "fusion": {
               "driver": 0,
-              "vus": 0
+              "vus": 22
             },
             "other": {
               "driver": 0,
@@ -2250,7 +2250,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations). VUS and germline mutations are included, as they are by default on the portal. A suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,111 mutations."
+      "note": "Mutations in “CRC” by protein position, as cBioPortal's mutation tab draws them: one stem per codon (the stored protein start position), its height the number of distinct patient + protein change pairs there. Colour is the codon's dominant mutation type, putative drivers before VUS (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations). VUS and germline mutations are included, as they are by default on the portal. Structural variants are counted as the portal's Mutations tab counts them: in the Fusion badge of each queried partner, and in the somatic frequency of their site 1 gene only; they have no codon, so no stem, and the mutation table lists them. A suppression floor of 3 patients per change was applied BY EACH SITE before returning anything, withholding 1,111 mutations."
     }
   ]
 }
