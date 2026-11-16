@@ -47,3 +47,25 @@ The rows are built in `lib/study-view-download.ts`.
 | SD14 | ⚠ Gene-state charts | Category is the state as the chart names it (`Mutated`, `Not mutated`, `Not profiled`, …). The portal writes its backend codes here (`MUTATED`, `NOT_PROFILED`, `-2`), while its Full Data and screen use names | SPS:10424-10431 vs SVU:2050-2061 |
 | SD15 | ⚠ Values cut across studies | Each study sends its 200 most frequent values. When their union holds more than 200, the merged chart keeps the 200 most frequent, and its count of values (`distinct`) is at least the union's size. The cut therefore shows, both in "showing N of M values" and in SD13, even when no single study had more than 200 | cBioLab (`mergeExplore`, `lib/explore.ts`) |
 | SD16 | ⚠ Generic-assay values cut | A categorical generic-assay chart keeps its 30 most frequent values and reports how many it has, so SD13 applies to it too | cBioLab (`ASSAY_VALUE_LIMIT`, `lib/explore.ts`) |
+
+## SVG and PDF (FG)
+
+Further source: PC = `src/pages/studyView/charts/pieChart/PieChart.tsx`, CC =
+`src/pages/studyView/charts/ChartContainer.tsx`, BC = `src/pages/studyView/charts/barChart/BarChart.tsx`.
+The figures are built in `lib/study-view-figures.ts`.
+
+| # | Case | Rule | Source |
+|---|---|---|---|
+| FG1 | Entries | Pie and table charts: Summary Data, then SVG, then PDF (Full Data comes with the per-case files). Bar, density and survival charts: SVG, PDF (their Data with the per-case files). Gene tables, Data Types, Case Lists: no SVG or PDF | ST:231-239, 306-316, 391-399, 651-663, 783-848 |
+| FG2 | File names | The chart's name with each space and tab as `_`, then `.svg` or `.pdf` | CH:102-103; DC:153-173 |
+| FG3 | An SVG file | A standalone SVG document (`xmlns`, `width`, `height` and `viewBox` set), its text in the figure's own font, no stylesheet needed to read it | DC:114-130 (`excludeCss`, saveSvgAsPng) |
+| FG4 | A PDF file | The same figure as vectors, on one page the figure's size, landscape when wider than tall | svgToPdfDownload.ts:19-56 |
+| FG5 | Pie | The pie, then its legend below: the chart's title, then one entry per slice, "<value>: <count> (<share>)", the value as stored and the share as `portalFreq` writes it, in the slices' order, each with its slice's colour. The wider of pie and legend sets the width; the narrower is centred | PC:130-136, 265-299; SVU:1285-1332 |
+| FG6 | A table chart | Saved as the pie of its values (FG5), not as the list | CC:445-449, 652-685 |
+| FG7 | Bar | The bars as this page draws them: the same bins, each bar's height its count over the tallest with at least 2% of the plot (so a bar of 1 stays visible), every bar in the one colour, the NA bar among them when Show NA is on, otherwise the page's "NA <count>" note beside them; the tick labels the card shows. No legend | BC:88-90, 347-366 (the portal's heights are strictly in proportion and its note reads "NA: <count>") |
+| FG8 | Density | The plot as drawn, with its colour legend ("# samples", its top, middle and bottom counts) and, when shown, the Pearson and Spearman lines, inside the one SVG | CC:1523-1536; StudyViewDensityScatterPlot.tsx:102-110 |
+| FG9 | Survival | The KM figure as drawn, with its legend | SurvivalChart.tsx:249-254 |
+| FG10 | ⚠ Selection colouring | The figure is the chart as this page draws it. The portal greys a pie's unselected slices in its saved figure; this page doesn't grey them on screen (the pie work is on hold), so neither does the file | PC:144-174 |
+| FG11 | Text room | A saved pie's legend is sized for a fallback font (18% wider than IBM Plex Sans measures), so a viewer without Plex (DejaVu Sans, Arial) doesn't cut a long value off at the right edge | cBioLab (`FALLBACK`, `lib/study-view-figures.ts`) |
+| FG12 | ⚠ PDF font | The PDF's text is IBM Plex Sans, embedded. Only its regular weight is embedded, so a bold title prints regular (the portal's PDF uses its page font) | cBioLab (`pdfFonts`, `app/lab/chart-files.ts`) |
+| FG13 | Number at risk | Under the KM figure, a count that would touch the one before it (the first is pulled in at the plot's left edge) is left out, as the thinned ticks are | cBioLab (`riskTable`, `lib/views/survival/figure.ts`) |
