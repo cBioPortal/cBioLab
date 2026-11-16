@@ -13,6 +13,7 @@ import type { ChRow } from "./types.ts";
 import { isDriverEvent, driverSourceText, type DriverFields, type ResolvedDrivers } from "./driver-settings.ts";
 import { sq } from "./compiler.ts";
 import { ONCOKB_TABLE, syncedStudiesSql } from "./annotation-store.ts";
+import { svDriverKeySetSql } from "./sv-oncokb.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
 import { describePins, studiesWithoutVariantAnnotation, variantPins } from "./variant-annotation.ts";
 
@@ -46,7 +47,8 @@ const FUSION_GENES = new Set(["ALK", "RET", "ROS1", "NTRK1", "NTRK2", "NTRK3", "
 const TRUNCATING = /^(nonsense|frame_shift|splice|nonstop)/i;
 const HOTSPOT_MIN_RECURRENCE = 5;
 
-type EvRow = { vt?: string; gene?: string; mv?: string; mt?: string; cna?: string | number };
+/** an event; `svk`, a structural variant's key in the OncoKB pair calls (lib/sv-oncokb.ts SV_EVENT_KEY) */
+type EvRow = { vt?: string; gene?: string; mv?: string; mt?: string; cna?: string | number; svk?: string };
 export interface AnnotationIndex { isDriver: (r: EvRow) => boolean; source: string }
 
 function mockIndex(eventRows: EvRow[]): AnnotationIndex {
@@ -120,7 +122,16 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
       else if (r.t === "CNA") { if (r.alteration === "AMPLIFICATION") e.amp = true; else if (r.alteration === "DELETION") e.del = true; }
       else if (r.t === "SV" && r.alteration === "Fusion") e.sv = true;
     }
+    // a structural variant with its key is called by its pair (lib/sv-oncokb.ts), as the portal's
+    // oncoprint asks OncoKB about it; one without (a peer's) by its gene's gene-level Fusion row
+    const list = Array.isArray(study) ? study : (study ? [study] : []);
+    const svDrivers = new Set<string>();
+    if (list.length && eventRows.some((r) => r.svk)) {
+      const keys = await chQuery<{ k: string }>(svDriverKeySetSql(DB, pin, list, genes));
+      for (const r of keys.data) svDrivers.add(r.k);
+    }
     const isDriver = (r: EvRow): boolean => {
+      if (r.vt === "structural_variant" && r.svk) return svDrivers.has(r.svk);
       const e = byGene.get(r.gene as string);
       if (!e) return false;
       if (r.vt === "mutation") return e.mut.has(r.mv as string);
@@ -131,7 +142,6 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
     const synced = await syncedStudies();
     // `study` may be one id or a list (federated views); name unsynced studies
     // when there are few, count them when there are many
-    const list = Array.isArray(study) ? study : (study ? [study] : []);
     const unsynced = list.filter(s => !synced.includes(s));
     const partial = synced.length && unsynced.length;
     const where = unsynced.length <= 2 ? unsynced.join(", ")

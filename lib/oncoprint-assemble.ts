@@ -50,6 +50,8 @@ export function mutClassBit(mt: string | undefined): number {
 export interface EventRow { pid: string; gene: string; vt: string; mt?: string; mv?: string; cna?: string | number; df?: string | null; dt?: string | null; germ?: boolean | number | null;
   /** a mutation's own protein start and end, read where a row's OQL has a position range */
   ps?: number | null; pe?: number | null;
+  /** a structural variant's key in the OncoKB pair calls (lib/sv-oncokb.ts SV_EVENT_KEY) */
+  svk?: string;
   /** an expression datum (vt "exp" / "prot"): one sample's value in the profile a row's EXP / PROT reads */
   z?: number | null }
 

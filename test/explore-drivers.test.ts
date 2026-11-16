@@ -35,15 +35,21 @@ const eventReads = () => sent.filter((q) => /FROM cbio_a\.genomic_event_derived/
 const panelReads = () => sent.filter((q) => /sample_to_gene_panel_derived/.test(q) && !/FROM cbio_a\.genomic_event_derived/.test(q));
 
 describe("the OncoKB driver condition", () => {
-  test("matches an event on the store's own keys, the same ones the driver join uses", () => {
+  test("matches a mutation or copy-number event on the store's own keys, the same ones the driver join uses", () => {
     const sql = driverEventSql("v7.5", "g");
-    assert.match(sql, /^\(g\.hugo_gene_symbol, multiIf\(g\.variant_type = 'mutation', 'MUTATION'/);
-    assert.match(sql, /IN \(\n\s+SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation\.oncokb/);
-    assert.match(sql, /oncokb_version = 'v7\.5' AND is_driver\)$/);
+    assert.match(sql, /^\(\(g\.variant_type != 'structural_variant' AND \(g\.hugo_gene_symbol, multiIf\(g\.variant_type = 'mutation', 'MUTATION'/);
+    assert.match(sql, /IN \(\n\s+SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation\.oncokb\n\s+WHERE oncokb_version = 'v7\.5' AND is_driver\)\)/);
     const join = annotationMatchSql("ann", "g");
-    for (const key of ["'MUTATION'", "'CNA'", "'SV'", "'AMPLIFICATION'", "'DELETION'", "'Fusion'", "g.mutation_variant"])
+    for (const key of ["'MUTATION'", "'CNA'", "'AMPLIFICATION'", "'DELETION'", "g.mutation_variant"])
       assert.ok(sql.includes(key) && join.includes(key), key);
-    assert.match(driverEventSql("v7.5"), /^\(hugo_gene_symbol, multiIf\(variant_type/, "unqualified columns when no table is named");
+    assert.match(driverEventSql("v7.5"), /^\(\(variant_type != 'structural_variant' AND \(hugo_gene_symbol, multiIf\(variant_type/, "unqualified columns when no table is named");
+  });
+  test("matches a structural variant event on its pair's call, in the database and studies named", () => {
+    const sql = driverEventSql("v7.5", "g", { db: "cbio_b", studies: ["s1"] });
+    assert.match(sql, /OR \(g\.variant_type = 'structural_variant' AND \(g\.sample_unique_id, g\.hugo_gene_symbol, g\.sv_event_info\) IN \(/);
+    assert.match(sql, /FROM annotation\.oncokb_sv WHERE oncokb_version = 'v7\.5' AND tumor_type = ''/);
+    assert.match(sql, /FROM cbio_b\.structural_variant sv/);
+    assert.match(sql, /cs\.cancer_study_identifier IN \('s1'\)/);
   });
   test("a pin reaches SQL as a quoted literal only", () => {
     assert.match(driverEventSql("v1' OR 1=1 --"), /oncokb_version = 'v1\\' OR 1=1 --'/);
@@ -62,7 +68,7 @@ describe("gene tables", () => {
       : /gene_panel_id = 'WES'/.test(q) ? [{ n: 566 }] : [];
     const r = await geneTables({ studies: [STUDY], db: "cbio_a", conn: PRIMARY, driverPin: "v7.5" });
     assert.equal(eventReads().length, 9, "altered, distinct-gene and panel-gene reads for mutations, CNA and SVs");
-    for (const q of eventReads()) assert.ok(q.includes(driverEventSql("v7.5")), "event read without the driver condition:\n" + q);
+    for (const q of eventReads()) assert.ok(q.includes(driverEventSql("v7.5", "", { db: "cbio_a", studies: [STUDY] })), "event read without the driver condition:\n" + q);
     assert.ok(panelReads().length > 0);
     for (const q of panelReads()) assert.doesNotMatch(q, /annotation\.oncokb/, "a denominator must not depend on driver status");
     assert.deepEqual((r.mutatedGenes || []).map((g) => [g.gene, g.altered, g.profiled, g.freqPct]), [["KRAS", 168, 566, 29.7]]);
@@ -85,7 +91,7 @@ describe("Explore", () => {
       assert.ok(states.includes(label), label + " in " + states.join(", "));
     const chartReads = eventReads().filter((q) => /hugo_gene_symbol = 'KRAS'/.test(q));
     assert.equal(chartReads.length, 3, "mutated, CNA calls and any CNA call");
-    for (const q of chartReads) assert.ok(q.includes(driverEventSql("v7.5")));
+    for (const q of chartReads) assert.ok(q.includes(driverEventSql("v7.5", "", { db: "cbio_a", studies: [STUDY] })));
   });
   test("counting every alteration keeps the charts' own labels and no driver field", async () => {
     answer = profiled;
