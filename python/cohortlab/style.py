@@ -571,6 +571,18 @@ def reserved_color(value: str, S: dict[str, Any] = STYLE) -> str | None:
     return S["palette"]["reserved"].get(_re.sub(r"\s", "", value).lower())
 
 
+def stack_color(track: Any, j: int, S: dict[str, Any] = STYLE, colors: dict[str, dict[str, str]] | None = None) -> str:
+    """A stacked row's (the mutation spectrum's) colour for category j: the reader's own, else the portal's fill
+    (lib/oncoprint-style.ts stackColor)."""
+    label = track.label if hasattr(track, "label") else track.get("label")
+    meta = track.meta if hasattr(track, "meta") else track
+    stack = meta.get("stack") or []
+    cat = stack[j] if j < len(stack) else None
+    override = (colors or {}).get(label, {}).get(cat) if cat is not None else None
+    fills = S["glyph"]["spectrum"]["colors"]
+    return str(override or fills[j % len(fills)])
+
+
 def track_category_color(track: Any, code: int, S: dict[str, Any] = STYLE, colors: dict[str, dict[str, str]] | None = None) -> str:
     """Colour for a categorical cell: display.colors[trackLabel][value], then a reserved colour, then the cycle."""
     cats = (track.meta.get("categories") if hasattr(track, "meta") else None) or []
