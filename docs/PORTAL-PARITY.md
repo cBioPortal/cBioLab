@@ -197,7 +197,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] ONC-TT-2's numeric typing by the attribute's datatype (ours: ≥90 % parse and >10 distinct values); "(average of n values)" zoomed out (ONC-STM-8)
   - [x] The mutation spectrum track (ONC-TT-3, ONC-STM-6) (#199)
     - [x] Its Freq in Tracks › Clinical (the portal's % of samples sequenced) (#258)
-    - [x] Edit Colors: the spectrum row's track menu edits its six categories' colours (display.colors, as the clinical rows'), used by the canvas, the SVG, both legends and the Python port (OncoprintUtils 1466-1474) (PR pending)
+    - [x] Edit Colors: the spectrum row's track menu edits its six categories' colours (display.colors, as the clinical rows'), used by the canvas, the SVG, both legends and the Python port (OncoprintUtils 1466-1474) (#265)
     - [x] The Tabular download names clinical rows by display name (`Mutation spectrum (C>A)`, `Diagnosis Age`), as the portal (ONC-DL-4)
     - Not as the portal, on purpose: a case whose substitutions are all ref = alt (one row in the warehouse) has no spectrum here; the portal keeps six zeros, draws no data, and writes 0 in its TSV
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
