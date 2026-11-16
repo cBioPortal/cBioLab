@@ -330,11 +330,11 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - ~~A KM tile per endpoint, drawn small (STS-KM-1, STS-KM-3)~~ Kept on purpose (2026-11-13): one full card with a picker.
     - [ ] The survival chart's download, and left truncation offered on the card (STS-KM-5, STS-KM-6)
   - [x] Density: x = FGA, y = mutation count, linear; 44×38 bins cut as the portal cuts them; plasma colours and legend; Pearson / Spearman text; Swap Axes and Log Scale; the portal's tooltip (STS-SC-2…5, STS-STM-15; [density-cases](legacy-spec/parity/density-cases.md)) (#222)
-    - [x] The chart's Download (Data, SVG, PDF) (STS-SC-5; download-cases FG8, PC7) (#270, PR #PRNUM open)
+    - [x] The chart's Download (Data, SVG, PDF) (STS-SC-5; download-cases FG8, PC7) (#270, PR #273 open)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4, STS-MD-16)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
     - [x] Summary Data for every categorical chart (clinical pie or list, generic-assay categorical, gene state): Category, count, percentage of every case with NA last, as the portal writes it; disabled, saying why, when the chart holds only its most frequent values (STS-DL-1; [download-cases](legacy-spec/parity/download-cases.md) SD1–SD16) (#257)
-    - [x] Full Data of a clinical pie or list chart, and the Data of a clinical bar, the density and the survival chart: per-case files as the portal writes them, read through the patient-level table route (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) PC1–PC14) (PR #PRNUM open)
+    - [x] Full Data of a clinical pie or list chart, and the Data of a clinical bar, the density and the survival chart: per-case files as the portal writes them, read through the patient-level table route (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) PC1–PC14) (PR #273 open)
       - [ ] Gene-state and generic-assay charts' Full Data / Data: their values are not clinical rows, so they need their own row source
     - [x] SVG and PDF of each chart: a pie or list chart as its pie with the legend below, bars, density (its legend inside the file) and survival as drawn; the gene tables, Data Types and Case Lists have none, as in the portal (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) FG1–FG10) (PR #270 open)
     - [x] The gene tables' Data: every gene, the portal's columns (CNA's profiled and altered under their own headers) (STS-DL-1; [gene-tables-cases](legacy-spec/parity/gene-tables-cases.md) GD1–GD11) (#261)
@@ -342,7 +342,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Case lists: all of them, by kind across studies, counted in samples, Freq of the selected samples (STS-OT-2; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (#260)
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
   - [ ] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12, STV-MD-13)
-  - [x] "Download clinical data" (⤓) for the selection: every attribute of each selected sample, `<study>_clinical_data.tsv` (STV-AB-4, STV-STM-5, STV-HD-2; download-cases PC9) (PR #PRNUM open)
+  - [x] "Download clinical data" (⤓) for the selection: every attribute of each selected sample, `<study>_clinical_data.tsv` (STV-AB-4, STV-STM-5, STV-HD-2; download-cases PC9) (PR #273 open)
   - [x] Filters in the URL: the bookmark, `#filterJson`, `filterAttributeId` / `filterValues` (STV-URL-2, STV-URL-3, STV-BM-1…3, STV-FB-7; see bugs) (#189)
     - [ ] A bookmark icon in the filter bar (STV-FB-7): the header's Copy link carries the filters instead
     - [ ] `sharedGroups`, `sharedCustomData` and the Plots tab's parameters (STV-URL-2): no Groups manager or Plots tab yet
