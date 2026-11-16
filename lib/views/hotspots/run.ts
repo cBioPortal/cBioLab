@@ -27,7 +27,8 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
     Promise.all(uniq.map((g) => fetchProteinInfo(g)))
   ]);
   const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]))
-    .filter((h) => h.mutated > 0);
+    // a gene with structural variants but no mutations is kept for its Fusion badge and frequency, as the portal keeps its tab
+    .filter((h) => h.mutated > 0 || h.tally.fusion.driver + h.tally.fusion.vus > 0);
   const f = (n: number) => n.toLocaleString("en-US");
   const unpositioned = hotspots.reduce((n, h) => n + h.unpositioned, 0);
   const withheld = hotspots.reduce((n, h) => n + h.withheld, 0);
@@ -44,6 +45,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
       " Colour is the codon's dominant mutation type, putative drivers before VUS" +
       (annotated ? " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
+      " Structural variants are counted as the portal's Mutations tab counts them: in the Fusion badge of each queried partner, and in the somatic frequency of their site 1 gene only; they have no codon, so no stem, and the mutation table lists them." +
       (unpositioned ? " " + f(unpositioned) + " mutation" + (unpositioned === 1 ? " has" : "s have") + " no protein position (or one past the protein) and " +
         (unpositioned === 1 ? "is" : "are") + " not drawn; the portal drops these without saying so." : "") +
       (observed.length ? " Genome Nexus could not be reached for " + observed.join(", ") + ", so the axis runs to the highest codon seen and no domains are drawn." : "") +

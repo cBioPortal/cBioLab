@@ -161,6 +161,27 @@ export function oqlMutationFilterSql(lines: string[], gene: string, { study, db,
     "  WHERE " + conds.join("\n     OR ") + ")";
 }
 
+/**
+ * The condition on a gene's fusion rows the query's OQL keeps on the Mutations tab, or null when nothing
+ * is filtered: the same gate as oqlMutationFilterSql (ResultsViewPageStore 3686-3712). A fusion is the
+ * datum of both its partners (AccessorsForOqlFilter gene), so a line of either partner's gene keeps it:
+ * a bare line or FUSION keeps every fusion, FUSION_DRIVER or a standalone DRIVER a driver one; MUT,
+ * copy-number and EXP / PROT commands never address a fusion (oqlfilter.ts 498-693). `site1`, `site2`:
+ * the partners' symbols; `driver`: whether the fusion is a driver — all SQL expressions.
+ */
+export function oqlFusionFilterSql(lines: string[], site1: string, site2: string, driver: string): string | null {
+  if (!oqlHasMutationOql(lines)) return null;
+  const every = new Set<string>(), drivers = new Set<string>();
+  for (const e of lines.flatMap((l) => parseOql(l)))
+    for (const x of e.specs) if (x.type === "SV" || x.type === "ANY") (x.driver ? drivers : every).add(e.gene);
+  const either = (genes: Set<string>): string => {
+    const list = [...genes].map(sq).join(", ");
+    return "(" + site1 + " IN (" + list + ") OR " + site2 + " IN (" + list + "))";
+  };
+  const conds = [...(every.size ? [either(every)] : []), ...(drivers.size ? ["(" + driver + " AND " + either(drivers) + ")"] : [])];
+  return conds.length ? "(" + conds.join(" OR ") + ")" : "0";
+}
+
 /** the profile EXP and PROT read, by id without the study prefix, where the query names one */
 /**
  * The profiles EXP and PROT read (ids without the study prefix). `ifHeld`: a study without the

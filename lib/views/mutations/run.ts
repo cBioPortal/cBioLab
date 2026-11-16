@@ -104,6 +104,8 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every " + gene + " mutation call in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples, one row per call; uncalled mutations are left out, as the portal leaves them out. " +
+      "Structural variants with " + gene + " as either partner are rows too, as the portal's Mutations tab lists them: type Fusion, the protein change built from their genes, no allele counts or Genome Nexus columns" +
+      (pin ? "; their annotation is the pair's OncoKB call in the sample's tumour type, their driver status the pair's call with no tumour type (as the portal asks each), or the partners' gene-level Fusion calls where the pair has none stored" : "") + ". " +
       (pin ? "Annotation is OncoKB " + pin + " (oncogenicity and its highest sensitivity level for the gene). " : "No OncoKB version is pinned here, so the annotation column is empty. ") +
       (gn ? "HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL are " + gn + ", read from the offline store; HGVSc and SIFT, PolyPhen-2 and AlphaMissense are on the canonical transcript of " + gene + " (MSKCC overrides). " +
         "Genome Nexus's GRCh38 service has no SIGNAL, so it is empty for a GRCh38 study; gnomAD and dbSNP are blank for the few variants Genome Nexus cannot serve myvariant.info's record of. " +
