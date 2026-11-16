@@ -6,8 +6,8 @@
 # Python port's conformance; no secrets), `warehouse` (the counts against cBioPortal, the cohort
 # logic, the pooled paths, the gallery examples and their method scripts, the denominator, facet,
 # value-folding, oncoprint patient-value and splitBy checks) and `e2e` (the build, then the browser suite and federation
-# against it). The planted-bug check follows the warehouse lane rather than running beside it, so
-# no more than two jobs query the warehouse at once, each with its ClickHouse concurrency halved.
+# against it). The planted-bug check runs beside the lanes, so up to three jobs query the warehouse at
+# once, each with its ClickHouse concurrency halved (CLICKHOUSE_MAX_INFLIGHT).
 # The report /verification displays (docs/verification/*.json) is kept as this run's
 # verification-report artifact, merged from the jobs that write it.
 #
@@ -208,11 +208,8 @@ jobs:
           path: /tmp/gate-server-*.log
           if-no-files-found: warn
 
-  # After the warehouse lane, not beside it: its guards query the warehouse too. It runs whether
-  # or not that lane passed.
+  # Beside the lanes: its guards query the warehouse too, with the same halved concurrency.
   planted-bugs:
-    needs: gate-warehouse
-    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
