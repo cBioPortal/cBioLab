@@ -998,6 +998,8 @@ export interface GeneTableRow {
    * Absent from a peer that predates it, which then reads as `altered`.
    */
   alteredOnPanel?: number;
+  /** the gene panels a selected sample holds for this alteration type that list the gene (whole-exome as WES), A to Z */
+  panels?: string[];
   /** number of alteration events (a sample may carry several) */
   events: number;
   /** samples profiled for this gene = panel-profiled + whole-exome */

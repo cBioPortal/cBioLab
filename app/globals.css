@@ -1845,3 +1845,14 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .fi-medium { color: #ffaa22; }
 .fi-low { color: #ffd700; }
 .fi-neutral { color: #c1c1c1; }
+/* a gene table row's query-queue icon, shown on hover or while queued; the "#" header's alteration-filter icon */
+.generow .gname { display: inline-flex; align-items: center; gap: 0.2rem; }
+.generow .gqueue { all: unset; cursor: pointer; display: inline-flex; color: var(--muted); opacity: 0; }
+.generow .gqueue svg { width: 0.75rem; height: 0.75rem; }
+.generow:hover .gqueue, .generow .gqueue:focus-visible, .generow .gqueue.on { opacity: 1; }
+.generow .gqueue.on { color: var(--accent); }
+.generow .gqueue:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.generow.ghead .gfiltered { display: inline-flex; align-items: center; justify-content: flex-end; gap: 0.15rem; }
+.generow.ghead .gfilter { width: 0.65rem; height: 0.65rem; color: var(--line); }
+.generow.ghead .gfilter.on { color: var(--ink); }
+.generow.applied { background: var(--accent-soft); }
