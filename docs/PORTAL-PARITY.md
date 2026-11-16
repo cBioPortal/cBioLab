@@ -341,7 +341,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Empty selection: the "filtered out all the samples" message in place of the charts, the filter bar kept (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (#260)
   - [x] Case lists: all of them, by kind across studies, counted in samples, Freq of the selected samples (STS-OT-2; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (#260)
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
-  - [ ] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12, STV-MD-13)
+  - [x] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12; [clinical-tab-cases](legacy-spec/parity/clinical-tab-cases.md) CT1–CT12) (PR #PRNUM open)
+    - [ ] Header tooltips (name, description, attribute id), "Cancer Study" as its own column, the tab in the URL
+    - [ ] The Columns menu (Clinical / Genomic / X vs Y) (STV-MD-13)
   - [x] "Download clinical data" (⤓) for the selection: every attribute of each selected sample, `<study>_clinical_data.tsv` (STV-AB-4, STV-STM-5, STV-HD-2; download-cases PC9) (PR #273 open)
   - [x] Filters in the URL: the bookmark, `#filterJson`, `filterAttributeId` / `filterValues` (STV-URL-2, STV-URL-3, STV-BM-1…3, STV-FB-7; see bugs) (#189)
     - [ ] A bookmark icon in the filter bar (STV-FB-7): the header's Copy link carries the filters instead

@@ -4,7 +4,7 @@ import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { isDrawn, type AnalysisDoc, type TableRows, type ViewResult } from "../../../lib/types.ts";
-import { caseFileHeader, caseFileLine, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
+import { caseFileBreaks, caseFileHeader, caseFileLine, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
 
 export const maxDuration = 300;
 
@@ -83,23 +83,24 @@ export async function POST(req: Request) {
 }
 
 /**
- * The table's shown columns as a cBioPortal Study View file (download-cases.md PC): TSV, a line per
- * row, no line ending after the last. The studies left out, that may not list their patients, are
+ * The table's shown columns as a cBioPortal Study View file (download-cases.md PC, clinical-tab-cases.md
+ * CT11-CT12): TSV, a line per row, the line breaks the format says. The studies left out, that may not list their patients, are
  * named in the x-left-out header. A download cut short ends with a # line, as the CSV does.
  */
 function portalFile(t: TableRows<unknown>, format: CaseFileFormat, page: (offset: number) => Promise<{ views: ViewResult[] }>, table: string | undefined): Response {
   const shown = t.shown.filter((id) => id !== "cohort" && id !== "study" && id !== "samples");
   const at = shown.map((id) => t.columns.findIndex((c) => c.id === id));
   const enc = new TextEncoder();
+  const { before, after } = caseFileBreaks(format);
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      controller.enqueue(enc.encode(caseFileHeader(at.map((i) => t.columns[i]), format)));
+      controller.enqueue(enc.encode(caseFileHeader(at.map((i) => t.columns[i]), format) + after));
       try {
         for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
           const r = await page(offset);
           const p = pagedTable(r.views[0], table);
           if (!p) throw new Error(r.views[0].error || "the page at row " + offset + " returned nothing");
-          controller.enqueue(enc.encode(p.rows.map((row) => "\n" + caseFileLine(row.study, at.map((i) => String(row.values[i] ?? "")))).join("")));
+          controller.enqueue(enc.encode(p.rows.map((row) => before + caseFileLine(row.study, at.map((i) => String(row.values[i] ?? "")), format) + after).join("")));
         }
       } catch (e) {
         controller.enqueue(enc.encode("\n# DOWNLOAD INCOMPLETE: " + String((e as Error)?.message || e).replace(/\s+/g, " ")));

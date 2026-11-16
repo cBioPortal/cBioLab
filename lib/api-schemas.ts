@@ -138,7 +138,8 @@ export const TableRequest = z.object({
    * write the shown columns as a cBioPortal Study View file (lib/study-view-case-files.ts): TSV,
    * the study column under this header, attributes headed by their names or ids, a missing value NA
    */
-  format: z.object({ study: z.enum(["Study ID", "Cancer Study"]), header: z.enum(["names", "ids"]) }).optional(),
+  format: z.object({ study: z.enum(["Study ID", "Cancer Study"]), header: z.enum(["names", "ids"]),
+    table: z.object({ studyColumn: z.boolean() }).optional() }).optional(),
   ...customData,
 });
 
