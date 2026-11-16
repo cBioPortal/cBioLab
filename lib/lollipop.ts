@@ -6,7 +6,7 @@ import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hots
 
 // ---- mutation types: getCanonicalMutationType / getProteinImpactTypeFromCanonical ----------
 
-const CANONICAL: Record<string, string> = {
+export const CANONICAL: Record<string, string> = {
   missense_mutation: "missense", missense: "missense", missense_variant: "missense",
   frame_shift_ins: "frame_shift_ins", frame_shift_del: "frame_shift_del", frameshift: "frameshift",
   frameshift_deletion: "frame_shift_del", frameshift_insertion: "frame_shift_ins",
@@ -147,6 +147,30 @@ const PRIORITY: Record<string, number> = {
 };
 
 /** AlterationColors: [putative driver, VUS] per protein impact type */
+/**
+ * The Legend panel's colour codes (LegendColorCodes), as data: a putative-driver and an
+ * unknown-significance line per type when drivers are annotated, one line per type otherwise,
+ * Fusion once. Splice is its own entry: the portal's legend lists "Splice site" under Truncating
+ * while its stems, badges and table draw splice sites as Splice, so the legend follows the drawing.
+ */
+export function lollipopLegend(o: { drivers: boolean; fusions: boolean }): { label: string; color: string; items: string[] }[] {
+  const WHAT: Partial<Record<ImpactType, string[]>> = {
+    truncating: ["Nonsense", "Nonstop", "Frameshift deletion", "Frameshift insertion"],
+    inframe: ["Inframe deletion", "Inframe insertion"],
+    other: ["All other types of mutations"],
+  };
+  const order: ImpactType[] = ["missense", "truncating", "inframe", "splice", "fusion", "other"];
+  return order.filter((k) => o.fusions || k !== "fusion").flatMap((k) => {
+    const c = IMPACT_COLORS[k], items = WHAT[k] || [], name = c.label + " Mutations";
+    if (k === "fusion" || !o.drivers) return [{ label: name, color: c.driver, items }];
+    return [{ label: name + " (putative driver)", color: c.driver, items }, { label: name + " (unknown significance)", color: c.vus, items }];
+  });
+}
+
+/** A gene the cohort has no mutation and no fusion in: the portal still draws its tab, its plot empty. */
+export const lollipopGeneEmpty = (g: HotspotGene): boolean =>
+  g.mutated === 0 && Object.values(g.tally).every((t) => t.driver + t.vus === 0);
+
 export const IMPACT_COLORS: Record<ImpactType, { driver: string; vus: string; label: string }> = {
   missense: { driver: "#008000", vus: "#53D400", label: "Missense" },
   truncating: { driver: "#000000", vus: "#708090", label: "Truncating" },

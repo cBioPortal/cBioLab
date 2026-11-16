@@ -1,9 +1,12 @@
 // Hotspots view: a lollipop of mutation counts per protein position for each gene.
 import { geneSymbols } from "../../gene-tracks.ts";
-import { buildLollipopGene, fetchProteinInfo, checkHide, checkCodons, pruneCodons } from "../../lollipop.ts";
+import { lollipopGeneEmpty, buildLollipopGene, fetchProteinInfo, checkHide, checkCodons, pruneCodons } from "../../lollipop.ts";
 import type { ViewResult } from "../../types.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit, viewOql } from "../shared.ts";
+import { isGrch38 } from "../../mutation-cell-text.ts";
+import { studyGenomeSql } from "../../federation-views.ts";
+import { hasViewAggregates } from "../../federation.ts";
 import type { HotspotsView, HotspotGene } from "./types.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
@@ -26,17 +29,23 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
     Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql))),
     Promise.all(uniq.map((g) => fetchProteinInfo(g)))
   ]);
-  const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]))
-    // a gene with structural variants but no mutations is kept for its Fusion badge and frequency, as the portal keeps its tab
-    .filter((h) => h.mutated > 0 || h.tally.fusion.driver + h.tally.fusion.vus > 0);
+  // every queried gene, an empty one included: the portal keeps its tab and draws its plot empty
+  const hotspots: HotspotGene[] = uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));
+  // the transcript links go to GRCh38 Ensembl only when every study is on it, as the portal decides
+  // (a remote peer that serves no metadata reads as GRCh37, the default)
+  const grch38 = isGrch38(await Promise.all(studies.map(async (st) => {
+    const r = resolvers[st];
+    return hasViewAggregates(r) ? String((await r.viewMeta("genome:build", studyGenomeSql))[0]?.build || "") : "";
+  })));
   const f = (n: number) => n.toLocaleString("en-US");
+  const empty = hotspots.filter(lollipopGeneEmpty).map((h) => h.gene);
   const unpositioned = hotspots.reduce((n, h) => n + h.unpositioned, 0);
   const withheld = hotspots.reduce((n, h) => n + h.withheld, 0);
   const observed = hotspots.filter((h) => h.lengthSource === "observed").map((h) => h.gene);
   const annotated = reports.every((r) => r.annotated);
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
-  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
+  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
     participation: participationFor(studies, false),
     note: (vNames.length > 1 ? "A lollipop draws one cohort: this shows “" + cn + "” only; " +
         vNames.slice(1).map((n) => "“" + n + "”").join(", ") + (vNames.length === 2 ? " is" : " are") + " not drawn. " : "") +
@@ -45,6 +54,8 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
       " Colour is the codon's dominant mutation type, putative drivers before VUS" +
       (annotated ? " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
+      (empty.length ? " " + empty.join(", ") + (empty.length === 1 ? " has" : " have") + " no mutations in “" + cn + "”: " + (empty.length === 1 ? "its plot is" : "their plots are") +
+        " drawn empty, with no somatic mutation frequency, as the portal draws a gene with none." : "") +
       " Structural variants are counted as the portal's Mutations tab counts them: in the Fusion badge of each queried partner, and in the somatic frequency of their site 1 gene only; they have no codon, so no stem, and the mutation table lists them." +
       (unpositioned ? " " + f(unpositioned) + " mutation" + (unpositioned === 1 ? " has" : "s have") + " no protein position (or one past the protein) and " +
         (unpositioned === 1 ? "is" : "are") + " not drawn; the portal drops these without saying so." : "") +

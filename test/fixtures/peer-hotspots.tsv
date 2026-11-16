@@ -1,21 +1,21 @@
-chr	start_position	end_position	reference_allele	variant_allele	hotspots
-1	226252155	226252155	G	C	[{"hugoSymbol":"H3-3A","transcriptId":"ENST00000366696","residue":"G35","type":"single residue","tumorCount":25}]
-3	178952085	178952085	A	G	[{"hugoSymbol":"PIK3CA","transcriptId":"ENST00000263967","residue":"H1047","type":"single residue","tumorCount":25}]
-3	178916944	178916946	GAA	-	[{"hugoSymbol":"PIK3CA","transcriptId":"ENST00000263967","residue":"E110del","type":"in-frame indel","tumorCount":25}]
-7	140453154	140453154	T	C	[{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"D594","type":"3d","tumorCount":25},{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"D594","type":"single residue","tumorCount":25}]
-11	108160400	108160400	G	T	[{"hugoSymbol":"ATM","transcriptId":"ENST00000278616","residue":"A1100","type":"3d","tumorCount":25}]
-17	29553485	29553485	G	A	[{"hugoSymbol":"NF1","transcriptId":"ENST00000358273","residue":"R304","type":"splice site","tumorCount":25}]
-19	1221319	1221319	G	A	[{"hugoSymbol":"STK11","transcriptId":"ENST00000326873","residue":"X200","type":"splice site","tumorCount":25}]
-19	1221320	1221320	G	T	[{"hugoSymbol":"STK11","transcriptId":"ENST00000326873","residue":"X200","type":"splice site","tumorCount":25}]
-1	27101000	27101000	G	T	[{"hugoSymbol":"ARID1A","transcriptId":"ENST00000324856","residue":"X900","type":"splice site","tumorCount":25}]
-19	11100000	11100000	G	A	[{"hugoSymbol":"SMARCA4","transcriptId":"ENST00000344626","residue":"X500","type":"single residue","tumorCount":25}]
-19	11100100	11100100	G	A	[{"hugoSymbol":"SMARCA4","transcriptId":"ENST00000344626","residue":"X520","type":"in-frame indel","tumorCount":25}]
-10	89711000	89711000	G	A	[{"hugoSymbol":"PTEN","transcriptId":"ENST00000371953","residue":"X200","type":"3d","tumorCount":25}]
-8	128750700	128750700	C	T	[]
-7	140481400	140481400	C		[{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"G469","type":"single residue","tumorCount":25}]
-10	89692904	89692904	C	G	[{"hugoSymbol":"PTEN","transcriptId":"ENST00000371953","residue":"R130","type":"single residue","tumorCount":25}]
-11	108200000	108200000	C	T	[{"hugoSymbol":"ATM","transcriptId":"ENST00000278616","residue":"R2000","type":"single residue","tumorCount":25}]
-11	108170000	108170000	C	T	[{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"R1500","type":"single residue","tumorCount":25}]
-17	29560000	29560000	C	T	[{"hugoSymbol":"NF1","transcriptId":"ENST00000358273","residue":"R500","type":"single residue","tumorCount":25}]
-19	1223125	1223125	C	G	[{"hugoSymbol":"STK11","transcriptId":"ENST00000326873","residue":"F354","type":"single residue","tumorCount":25}]
-9	21971108	21971108	C	A	[{"hugoSymbol":"CDKN2A","transcriptId":"ENST00000304494","residue":"D84","type":"single residue","tumorCount":25}]
+chr	start_position	end_position	reference_allele	variant_allele	hotspots	annotation
+1	226252155	226252155	G	C	[{"hugoSymbol":"H3-3A","transcriptId":"ENST00000366696","residue":"G35","type":"single residue","tumorCount":25}]	
+3	178952085	178952085	A	G	[{"hugoSymbol":"PIK3CA","transcriptId":"ENST00000263967","residue":"H1047","type":"single residue","tumorCount":25}]	
+3	178916944	178916946	GAA	-	[{"hugoSymbol":"PIK3CA","transcriptId":"ENST00000263967","residue":"E110del","type":"in-frame indel","tumorCount":25}]	
+7	140453154	140453154	T	C	[{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"D594","type":"3d","tumorCount":25},{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"D594","type":"single residue","tumorCount":25}]	{"canonical":{"BRAF":"ENST00000288602"},"transcripts":[{"transcriptId":"ENST00000288602","exon":"15/18"}]}
+11	108160400	108160400	G	T	[{"hugoSymbol":"ATM","transcriptId":"ENST00000278616","residue":"A1100","type":"3d","tumorCount":25}]	{"canonical":{"ATM":"ENST00000278616"},"transcripts":[{"transcriptId":"ENST00000675843","exon":"5/62"},{"transcriptId":"ENST00000278616","exon":"17/63"}]}
+17	29553485	29553485	G	A	[{"hugoSymbol":"NF1","transcriptId":"ENST00000358273","residue":"R304","type":"splice site","tumorCount":25}]	{"canonical":{"NF1":"ENST00000358273"},"transcripts":[{"transcriptId":"ENST00000356175","exon":"10/57"}]}
+19	1221319	1221319	G	A	[{"hugoSymbol":"STK11","transcriptId":"ENST00000326873","residue":"X200","type":"splice site","tumorCount":25}]	{"canonical":{"STK11":"ENST00000326873"},"transcripts":[{"transcriptId":"ENST00000326873"}]}
+19	1221320	1221320	G	T	[{"hugoSymbol":"STK11","transcriptId":"ENST00000326873","residue":"X200","type":"splice site","tumorCount":25}]	
+1	27101000	27101000	G	T	[{"hugoSymbol":"ARID1A","transcriptId":"ENST00000324856","residue":"X900","type":"splice site","tumorCount":25}]	
+19	11100000	11100000	G	A	[{"hugoSymbol":"SMARCA4","transcriptId":"ENST00000344626","residue":"X500","type":"single residue","tumorCount":25}]	
+19	11100100	11100100	G	A	[{"hugoSymbol":"SMARCA4","transcriptId":"ENST00000344626","residue":"X520","type":"in-frame indel","tumorCount":25}]	
+10	89711000	89711000	G	A	[{"hugoSymbol":"PTEN","transcriptId":"ENST00000371953","residue":"X200","type":"3d","tumorCount":25}]	
+8	128750700	128750700	C	T	[]	
+7	140481400	140481400	C		[{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"G469","type":"single residue","tumorCount":25}]	
+10	89692904	89692904	C	G	[{"hugoSymbol":"PTEN","transcriptId":"ENST00000371953","residue":"R130","type":"single residue","tumorCount":25}]	
+11	108200000	108200000	C	T	[{"hugoSymbol":"ATM","transcriptId":"ENST00000278616","residue":"R2000","type":"single residue","tumorCount":25}]	{"canonical":{"ATM":"ENST00000278616"},"transcripts":[{"transcriptId":"ENST00000278616","exon":"9/63"}]}
+11	108170000	108170000	C	T	[{"hugoSymbol":"BRAF","transcriptId":"ENST00000288602","residue":"R1500","type":"single residue","tumorCount":25}]	{"canonical":{"ATM":"ENST00000278616"},"transcripts":[{"transcriptId":"ENST00000278616","exon":"31/63"}]}
+17	29560000	29560000	C	T	[{"hugoSymbol":"NF1","transcriptId":"ENST00000358273","residue":"R500","type":"single residue","tumorCount":25}]	
+19	1223125	1223125	C	G	[{"hugoSymbol":"STK11","transcriptId":"ENST00000326873","residue":"F354","type":"single residue","tumorCount":25}]	{"canonical":{"STK11":"ENST00000326873"},"transcripts":[{"transcriptId":"ENST00000326873","exon":"8/10"}]}
+9	21971108	21971108	C	A	[{"hugoSymbol":"CDKN2A","transcriptId":"ENST00000304494","residue":"D84","type":"single residue","tumorCount":25}]	

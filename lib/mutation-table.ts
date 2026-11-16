@@ -12,12 +12,20 @@ import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } f
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
 import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
+import { mutationTypeLabelSql } from "./mutation-type.ts";
+import { finiteSql } from "./sql-number.ts";
 import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
 
 /** The table's columns, in the portal's order. */
 export const MUTATION_COLUMNS: MutationColumn[] = [
+  // a fusion row's gene is its site 1 gene, on its site 2 gene's table too (ResultsViewPageStore mutationsByGene)
+  { id: "gene", name: "Gene", numeric: false, tip: "HUGO gene symbol" },
+  // not `study`: a downloaded line already leads with the row's study id (app/api/table)
+  { id: "studyOfOrigin", name: "Study of Origin", numeric: false, tip: "Study of Origin" },
+  // the study's CANCER_TYPE attribute, which the portal lists among its clinical-attribute columns
+  { id: "cancerTypeAll", name: "Cancer Type", numeric: false, tip: "Cancer Type" },
   { id: "sample", name: "Sample ID", numeric: false },
   { id: "cancerType", name: "Cancer Type Detailed", numeric: false },
   { id: "proteinChange", name: "Protein Change", numeric: false },
@@ -28,13 +36,21 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   // MutationAssessor, SIFT, PolyPhen-2 and AlphaMissense on the canonical transcript; the portal does not sort it
   { id: "functionalImpact", name: "Functional Impact", numeric: false, unsorted: true,
     tip: "Functional impact of the variant on the protein: Mutation Assessor, SIFT, PolyPhen-2 and AlphaMissense predictions. Hover over a dot to see the prediction and its score." },
-  { id: "mutationType", name: "Mutation Type", numeric: false },
+  // the row holds the type as stored (the portal downloads it so); the cell, search, filters and sort use its label
+  { id: "mutationType", name: "Mutation Type", numeric: false, tip: "Consequence of the mutation on the protein (variant classification). Missense: Single amino acid substitution. IF: In-frame: adds or removes amino acids without a frameshift. Truncating: Truncates the protein. Nonsense: Premature stop codon. Nonstop: Loss of the stop codon. Nonstart: Loss of the start codon. FS: Frameshift: shifts the reading frame. FS del: Frameshift deletion: shifts the reading frame. FS ins: Frameshift insertion: shifts the reading frame. IF ins: In-frame insertion: adds amino acids without a frameshift. IF del: In-frame deletion: removes amino acids without a frameshift. Splice: Affects a splice site. Fusion: Gene fusion. Silent: No change to the amino acid sequence." },
   { id: "alteration", name: "Alteration", numeric: false },
-  { id: "variantType", name: "Variant Type", numeric: false },
+  { id: "variantType", name: "Variant Type", numeric: false, tip: "Type of change at the DNA level (variant type). SNP: Single Nucleotide Polymorphism. DNP: Di-Nucleotide Polymorphism. TNP: Tri-Nucleotide Polymorphism. ONP: Oligo-Nucleotide Polymorphism. INS: Insertion. DEL: Deletion." },
+  // the sample's call for the gene in the study's discrete copy-number profile, as its label; sorted by the call
+  { id: "copyNumber", name: "Copy #", numeric: false, tip: "Putative copy number call for the gene in this sample. Hover over a value for details. Amp: High-level amplification. Gain: Low-level gain. Diploid: No copy number change. ShallowDel: Shallow (possibly heterozygous) deletion. DeepDel: Deep (possibly homozygous) deletion." },
   { id: "vaf", name: "Allele Freq (T)", numeric: true },
+  { id: "vafNormal", name: "Allele Freq (N)", numeric: true, tip: "Variant allele frequency in the matched normal sample (variant reads / total reads)" },
   { id: "altCount", name: "Variant Reads", numeric: true },
   { id: "refCount", name: "Ref Reads", numeric: true },
+  { id: "normalAltCount", name: "Variant Reads (Normal)", numeric: true, tip: "Number of reads supporting the variant allele in the matched normal sample" },
+  { id: "normalRefCount", name: "Ref Reads (Normal)", numeric: true, tip: "Number of reads supporting the reference allele in the matched normal sample" },
   { id: "mutCount", name: "# Mut in Sample", numeric: true },
+  // the canonical transcript's exon in the stored Genome Nexus annotation, "8/11"; the cell shows the exon
+  { id: "exon", name: "Exon", numeric: false, tip: "Exon affected by the mutation, from the Genome Nexus annotation of the selected transcript" },
   { id: "chr", name: "Chromosome", numeric: false },
   { id: "start", name: "Start Pos", numeric: true },
   { id: "end", name: "End Pos", numeric: true },
@@ -45,6 +61,8 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   // the rest from Genome Nexus, read from the offline store at its pin (lib/variant-annotation.ts)
   { id: "hgvsc", name: "HGVSc", numeric: false, tip: "Coding DNA change in HGVS notation (HGVSc) for the selected transcript" },
   { id: "status", name: "MS", numeric: false },
+  { id: "validationStatus", name: "VS", numeric: false, tip: "Validation Status (VS): whether the mutation was confirmed by an independent validation experiment. V (Valid): Confirmed by an independent validation method. W (Wildtype): Validation found the wildtype allele. U (Unknown): Not validated, or validation status unknown." },
+  { id: "center", name: "Center", numeric: false, tip: "Center that sequenced or called the mutation" },
   { id: "gnomad", name: "gnomAD", numeric: true,
     tip: "gnomAD population allele frequencies. Overall population allele frequency is shown. Hover over a frequency to see the frequency for each specific population." },
   { id: "clinvar", name: "ClinVar", numeric: false, tip: "ClinVar aggregates information about genomic variation and its relationship to human health." },
@@ -78,6 +96,7 @@ function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
   const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
   switch (c.id) {
     case "sample": return { ...c, text: "sid" };
+    case "studyOfOrigin": return { ...c, text: str("studyName") };
     // spelled as the table shows it, so search and the value list match what is on screen
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: "drv" };
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
@@ -92,6 +111,12 @@ function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
     case "gnomad": return { ...c, text: str("gnomadFreq"), num: "gnomadFreq" };
     case "dbsnp": return { ...c, text: "rsid", order: "nullIf(rsid, '')" };
     case "functionalImpact": return { ...c, text: "functionalImpact" };
+    case "mutationType": return { ...c, text: mutationTypeLabelSql("mutationType"), order: "nullIf(" + mutationTypeLabelSql("mutationType") + ", '')" };
+    case "copyNumber": return { ...c, text: "copyNumber", order: "cnv" };
+    case "exon": return { ...c, text: str("exon"), order: "toInt32OrNull(splitByChar('/', exon)[1])" };
+    case "vafNormal": return { ...c, text: str("vafNormal"), num: num("vafNormal") };
+    // shown blank at 0, sorted by the count as stored
+    case "normalAltCount": case "normalRefCount": return { ...c, text: str(c.id), num: num(c.id + "Raw") };
     default: return c.numeric ? { ...c, text: str(c.id), num: num(c.id) } : { ...c, text: str(c.id) };
   }
 }
@@ -115,7 +140,8 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "c" + i + " AS (" + p.cohortSql + "),\n" +
     "m" + i + " AS (\n" +
     "  SELECT patientId AS pid, sampleId AS sid, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
-    "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos\n" +
+    "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos,\n" +
+    "         center, validationStatus AS vs, normalAltCount AS nAlt, normalRefCount AS nRef\n" +
     "  FROM " + db + ".mutation_derived\n" +
     "  WHERE " + mutationStudySql(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n" +
@@ -123,6 +149,8 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     fusionCtes(p, i, db, gene, pin) +
     attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n" +
+    attr("CANCER_TYPE", "cta" + i) + ",\n" +
+    copyNumberCte(p, i, db) + ",\n" +
     (pin ? tumorTypeCtes(p, i, db) : "");
   const gn = variantAnnotationCte("g" + i, db, p.study, "SELECT chr, start, end, ref, var FROM m" + i, pins);
   const rows =
@@ -135,17 +163,54 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n" +
       "         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0)))" + (gn && HOTSPOT_GENES.has(gene) ? " OR " + hotspotCondSql("m.mutationType", "ifNull(g.gd, '')") : "") + ") AS drv,\n"
       : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
-    "         m.mutationType AS mutationType, m.variantType AS variantType,\n" +
+    "         m.mutationType AS mutationType, upper(m.variantType) AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
     "         " + hgvsgSql("ifNull(m.chr, '')", "ifNull(m.start, 0)", "ifNull(m.end, 0)", "ifNull(m.ref, '')", "ifNull(m.var, '')") + " AS hgvsg,\n" +
-    "         " + variantColumnsSql(gn ? "ifNull(g.gd, '')" : "''", gene) + "\n" +
+    "         " + variantColumnsSql(gn ? "ifNull(g.gd, '')" : "''", gene) + ",\n" +
+    "         " + extraColumnsSql(p, db, sq(gene), "m.center", "m.vs", "m.nAlt", "m.nRef") + "\n" +
     "  FROM " + (pin ? "mt" : "m") + i + " AS m\n" +
     (pin ? "  LEFT JOIN ann ON ann.alteration = m.proteinChange\n" +
       "  LEFT JOIN att AS tt ON tt.alteration = m.proteinChange AND tt.consequence = m.consequence AND tt.tumor_type = m.tumorType\n" : "") +
     (gn ? "  LEFT JOIN g" + i + " AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var\n" : "") +
-    "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n";
+    "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n" +
+    "  LEFT JOIN cta" + i + " AS cta ON cta.sid = m.sid LEFT JOIN cn" + i + " AS cn ON cn.sid = m.sid AND cn.g = " + sq(gene) + "\n";
   return { ctes: ctes + (gn ? gn + ",\n" : ""), rows: rows + "  UNION ALL\n" + fusionRows(p, i, db, gene, pin, oql) };
+}
+
+/**
+ * `cn<i>` AS (sid, g, v): each of the part's samples' calls in the study's discrete copy-number profile
+ * (the one with the highest id where a study has several), for the gene and the fusion rows' site 1
+ * genes. A value that is not a whole number (MSK's −1.5) is no call: the portal's API serves none.
+ */
+function copyNumberCte(p: TablePart, i: number, db: string): string {
+  const pre = sq(p.study + "_");
+  return "cn" + i + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, hugo_gene_symbol AS g, any(" + finiteSql("alteration_value") + ") AS v\n" +
+    "  FROM " + db + ".genetic_alteration_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND profile_type = (SELECT replaceOne(gp.stable_id, " + pre + ", '') FROM " + db + ".genetic_profile gp\n" +
+    "      JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = " + sq(p.study) + "\n" +
+    "        AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)\n" +
+    "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM (SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i + "))\n" +
+    "  GROUP BY sid, g)";
+}
+
+/**
+ * The columns PR G added, the same for mutation and fusion rows (so their UNION lines up): the row's
+ * gene, the study's name, the sample's CANCER_TYPE, its Copy # (the call, and its label as the portal
+ * writes it), validation status and centre as stored, the normal allele frequency as the portal shows
+ * it (4 decimals below 0.01, else 2; none at 0 or with a count missing), the normal read counts (none at
+ * 0, sorted by the count as stored) and the canonical transcript's exon (`tc`, from variantColumnsSql).
+ */
+function extraColumnsSql(p: TablePart, db: string, gene: string, center: string, vs: string, nAlt: string, nRef: string): string {
+  const cnv = "if(cn.v = floor(cn.v), toInt8(cn.v), NULL)";
+  const vafN = "if(" + nAlt + " > 0 AND " + nRef + " >= 0, " + nAlt + " / (" + nAlt + " + " + nRef + "), NULL)";
+  return gene + " AS gene, (SELECT name FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(p.study) + ") AS studyName, cta.v AS cancerTypeAll,\n" +
+    "         " + cnv + " AS cnv, multiIf(cnv IS NULL, '', cnv = 2, 'Amp', cnv = 1, 'Gain', cnv = 0, 'Diploid', cnv = -1, 'ShallowDel', 'DeepDel') AS copyNumber,\n" +
+    "         " + vs + " AS validationStatus, " + center + " AS center,\n" +
+    "         round(" + vafN + ", if(" + vafN + " < 0.01, 4, 2)) AS vafNormal,\n" +
+    "         if(" + nAlt + " > 0, " + nAlt + ", NULL) AS normalAltCount, " + nAlt + " AS normalAltCountRaw,\n" +
+    "         if(" + nRef + " > 0, " + nRef + ", NULL) AS normalRefCount, " + nRef + " AS normalRefCountRaw,\n" +
+    "         JSONExtractString(tc, 'exon') AS exon";
 }
 
 /**
@@ -196,13 +261,15 @@ function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: stri
     "         NULL AS vaf, NULL AS altCount, NULL AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,\n" +
     "         '' AS hgvsg,\n" +
-    "         " + variantColumnsSql("''", gene) + "\n" +
+    "         " + variantColumnsSql("''", gene) + ",\n" +
+    "         " + extraColumnsSql(p, db, "v.gene1", "'N/A'", "NULL", "NULL", "NULL") + "\n" +
     "  FROM v" + i + " AS v\n" +
     (pin ? "  LEFT JOIN vk" + i + " AS vk ON vk.sid = v.sid\n" +
       "  LEFT JOIN sva AS va1 ON va1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS va2 ON va2.gene = v.gene2 AND v.gene2 != ''\n" +
       "  LEFT JOIN svp AS vp ON vp.site1_entrez = v.k1 AND vp.site2_entrez = v.k2 AND vp.sv_type = " + svTypeSql("v.") + " AND vp.tumor_type = vk.tumorType\n" +
       "  LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''\n" : "") +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = v.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = v.sid\n" +
+    "  LEFT JOIN cta" + i + " AS cta ON cta.sid = v.sid LEFT JOIN cn" + i + " AS cn ON cn.sid = v.sid AND cn.g = v.gene1\n" +
     (filter ? "  WHERE " + filter + "\n" : "");
 }
 
