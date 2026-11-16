@@ -65,7 +65,7 @@ function warehouse(q: string): Row[] {
   if (/attribute_name AS k/.test(q)) return [{ pid: "P1", k: "SEX", v: "Female" }, { pid: "P2", k: "SEX", v: "Male" }, { pid: "P1", k: "UNASKED", v: "x" }];
   if (/generic_assay_data_derived g/.test(q)) return [{ pid: "P1", gene: "SBS1", v: 0.4 }, { pid: "P2", gene: "SBS1", v: 0.1 }];
   if (/genetic_alteration_derived ga/.test(q)) return [{ pid: "P1", gene: "TP53", v: 2.5 }, { pid: "P2", gene: "TP53", v: -2.5 }, { pid: "P3", gene: "TP53", v: 0.2 }, { pid: "P2", gene: "KRAS", v: 1 }];
-  if (/max\(tumorAltCount/.test(q)) return [{ pid: "P1", gene: "TP53", v: 0.42 }];
+  if (/maxIf\(vaf, ok = 1\)/.test(q)) return [{ pid: "P1", gene: "TP53", v: 0.42 }];
   if (/annotation\.oncokb/.test(q)) return [{ t: "MUTATION", gene: "TP53", alteration: "R175H", is_driver: 1 }];
   if (/sync_run/.test(q)) return [{ study: "s1" }];
   return [];
@@ -183,7 +183,7 @@ describe("rows beside the gene tracks", () => {
 
   test("VAF: drawn from allele counts where loaded; refused for a study without them", async () => {
     const c = await buildContract(spec({ heatmap: [{ profileType: "VAF", genes: ["TP53"] }] }));
-    assert.ok(queriesLike(/max\(tumorAltCount/).length === 1);
+    assert.ok(queriesLike(/maxIf\(vaf, ok = 1\)/).length === 1);
     assert.ok(c.tracks.some((t) => t.kind === "heatmap"));
     await assert.rejects(buildContract(spec({ study: "s2", heatmap: [{ profileType: "vaf" }] })), /'VAF' needs mutation allele counts, which s2 did not load/);
   });
@@ -366,8 +366,8 @@ describe("SQL builders", () => {
     assert.match(clinicalSql(["STAGE"], "s1", "cbio", "patient", "SELECT sid FROM t"), /type = 'patient' OR replaceOne\(sample_unique_id, 's1_', ''\) IN \(SELECT sid FROM t\)/);
   });
   test("VAF and heatmap SQL per unit, narrowed to the column samples when given", () => {
-    assert.match(vafSql(["TP53"], "s1", "cbio", "sample", "SELECT sid FROM t"), /^SELECT sampleId AS pid[\s\S]*AND sampleId IN \(SELECT sid FROM t\)/);
-    assert.match(vafSql(["TP53"], "s1", "cbio"), /^SELECT patientId AS pid/);
+    assert.match(vafSql(["TP53"], "s1", "cbio", "sample", "SELECT sid FROM t"), /SELECT replaceOne\(sp\.sample_unique_id, 's1_', ''\) AS pid[\s\S]*AND sampleId IN \(SELECT sid FROM t\)/);
+    assert.match(vafSql(["TP53"], "s1", "cbio"), /SELECT replaceOne\(sd\.patient_unique_id, 's1_', ''\) AS pid[\s\S]*SELECT patientId,/);
     const h = heatmapSql("mrna", ["TP53"], "s1", "cbio", "sample");
     assert.doesNotMatch(h, /sample_derived/, "sample columns need no join to patients");
     assert.match(heatmapSql("mrna", ["TP53"], "s1", "cbio", "patient", "SELECT sid FROM t"), /replaceOne\(ga\.sample_unique_id, 's1_', ''\) IN \(SELECT sid FROM t\)/);

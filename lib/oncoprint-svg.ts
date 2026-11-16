@@ -104,6 +104,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
         if (t.kind === "gene") geneCell(code, x, y, w);
         else if (t.kind === "derivedEvent") parts.push(rect(x, y, w, ROW_H, code > 0 ? P.derived : P.unaltered));
         else if (code === -1) noData(x, y, w);
+        else if (code === -2) parts.push(rect(x, y, w, ROW_H, S.glyph.heatNull.fill));
         else if (t.stack && t.values) {
           // the column's counts, each a share of the cell, the first category on top
           const k = t.stack.length, v = t.values;
@@ -182,6 +183,10 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     if (t.numeric) {
       for (let i = 0; i < 24; i++) parts.push(rect(cx + i * 4, cy - 9, 4, 10, heatColor(t, 255 * i / 23, S)));
       parts.push(`<text x="${cx + 24 * 4 + 8}" y="${cy}" fill="${P.muted}">${fmtNum(t.min!)} → ${fmtNum(t.max!)}${t.ramp === "expression" ? " (0 at black)" : t.ramp === "methylation" ? " (white at 0.35)" : t.center != null ? " (0 at white)" : ""}${t.kind === "heatmap" ? " · " + esc(t.profileType) + ", " + esc(t.note || "") : ""}</text>`);
+      if (t.ramp === "vaf" && Array.prototype.includes.call(t.cells, -2)) {
+        const lx = cx + 24 * 4 + 8 + (fmtNum(t.min!) + " → " + fmtNum(t.max!) + " · " + (t.profileType || "") + ", " + (t.note || "")).length * 6.2 + 16;
+        parts.push(rect(lx, cy - 9, 10, 10, S.glyph.heatNull.fill), `<text x="${lx + 14}" y="${cy}" fill="${P.muted}">${esc(S.glyph.heatNull.vafLabel)}</text>`);
+      }
       continue;
     }
     const key = clinicalLegend(t, S, colors);
