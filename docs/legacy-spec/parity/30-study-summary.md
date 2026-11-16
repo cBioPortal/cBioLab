@@ -66,7 +66,7 @@ Legacy numbers from `/api/clinical-data-counts`, `/api/clinical-data-bin-counts?
 | 4 | **Clicking a second bar of one histogram ANDs the ranges → 0 patients** (AGE (50,60] + (70,75] = 0); categorical values OR correctly | BAR-5 (cBioLab bug) | not tracked |
 | 5 | **No bar-chart menu**: no Custom Bins / Quartiles / Median / Generate, no Log Scale toggle, no Show NA; no default MSI custom bins (legacy MANTIS 468/22/67, MSIsensor 496/10/78) | BAR-1, BAR-6…8, HD-5 | fixed (PR #203) |
 | 6 | **Gene tables**: 500-row cap ("500 of 18,275 genes"), no column sort, title lacks "(N profiled samples)", no OncoKB cancer-gene icon/filter, no MutSig/GISTIC q-value, no gene-panel tooltip, no query-queue on gene click, Union only, SV default sort by # altered not # SV | GT-2, GT-3, GT-5…GT-9 | not tracked |
-| 7 | **No chart downloads** (Summary/Full data, SVG, PDF, gene-table TSV) | DL-*, HD-5 | Data-governance switch tracked; downloads themselves not |
+| 7 | **No chart downloads** (Summary/Full data, SVG, PDF, gene-table TSV) | DL-*, HD-5 | Summary Data done (PR #257); the rest tracked in PORTAL-PARITY |
 | 8 | **Missing chart kinds**: treatment tables, GA frequency table (arm-level CNA shown by default in legacy), mutation-type counts, variant annotations, X-vs-Y density/violin, gene-specific violin, continuous gene bar | OT-3…6, VI-*, GS-4, SC-1 | not tracked |
 | 9 | **Pie behaviour**: pie only for 9 allowlisted ids (else a list, even for 2 values); legend beside pie instead of slice labels; unselected slices not greyed; clicking a selected value does not remove it (turns "=" into "∈ {…}"); Okabe-Ito colours | LY-9, PIE-3, PIE-6…8 | not tracked |
 | 10 | **Survival**: one chart with an endpoint picker instead of one KM tile per endpoint; numbers match | KM-1 | not tracked |
@@ -290,7 +290,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-DL-1 | ❌ | B | No chart downloads |
+| STS-DL-1 | 🟡 | B | Categorical charts (clinical pie or list, generic-assay categorical, gene state): Download ▸ Summary Data, as the portal writes it ([download-cases](download-cases.md) SD1–SD16). Not yet: Full Data, a numeric chart's Data, SVG, PDF, the gene tables' Data |
 | STS-DL-2 | ❌ | C | No download-hide switch (tracked: Data-governance switches) |
 | STS-DL-3 | ❌ | C | n/a — nothing to download (legacy TSV bugs therefore absent) |
 

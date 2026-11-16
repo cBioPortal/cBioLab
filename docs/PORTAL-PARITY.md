@@ -286,6 +286,10 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The chart's Download (Data, SVG, PDF): with the other downloads (STS-DL-1…3)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
+    - [x] Summary Data for every categorical chart (clinical pie or list, generic-assay categorical, gene state): Category, count, percentage of every case with NA last, as the portal writes it; disabled, saying why, when the chart holds only its most frequent values (STS-DL-1; [download-cases](legacy-spec/parity/download-cases.md) SD1–SD16) (PR #257 open)
+    - [ ] Full Data, and a numeric, density or survival chart's Data: per-case files, read through the patient-level path (with "Download clinical data", STV-AB-4)
+    - [ ] SVG and PDF of each chart (the bars are HTML today, so each chart needs a figure to save)
+    - [ ] The gene tables' Data: with the gene tables' every row (item: Gene tables)
   - [ ] Empty selection: the "filtered out all the samples" message, other tabs hidden (ours draws the charts and "0 patients match") (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6)
   - [ ] Case lists: all of them, counted in samples (ours 10, `LIMIT 10 BY s`, in patients; coad, read, protein_quantification, methylation_hm450 missing) (STS-OT-2)
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))

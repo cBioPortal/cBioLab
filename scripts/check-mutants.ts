@@ -236,6 +236,22 @@ const MUTANTS: Mutant[] = [
     effect: "When every cell holds the same number of samples, the chart draws them in the lowest colour with no legend, where the portal scales from 1.",
     find: "  if (min === max) min = 1;\n",
     replace: "" },
+  { id: "summary-na-not-last", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "A chart's Summary Data file sorts NA by its count instead of writing it last.",
+    find: "isNa(a.value) ? (isNa(b.value) ? 0 : 1) : isNa(b.value) ? -1 : b.count - a.count",
+    replace: "b.count - a.count" },
+  { id: "summary-share-without-na", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "Summary Data's percentages are of the cases with a value, so they no longer match the chart's (NA left out of the sum).",
+    find: "const sum = counts.reduce((n, c) => n + c.count, 0);",
+    replace: "const sum = counts.reduce((n, c) => n + (isNa(c.value) ? 0 : c.count), 0);" },
+  { id: "summary-file-name-tabs-kept", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "A chart's download file name keeps its tabs, where the portal writes _.",
+    find: "chartName.replace(/[ \\t]/g, \"_\")",
+    replace: "chartName.replace(/ /g, \"_\")" },
+  { id: "summary-cut-not-said", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "A categorical chart over several studies whose merged values were cut to 200 reads as complete, so its Summary Data is offered as if whole.",
+    find: "const distinct = Math.max(base.distinct ?? 0, vals.size) || undefined;",
+    replace: "const distinct = base.distinct;" },
   { id: "density-swap-keeps-log", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
     effect: "Swap Axes leaves Log Scale on the axis position rather than moving it with mutation count.",
     find: "return { swapped: !s.swapped, xLog: !!s.yLog, yLog: !!s.xLog };",
@@ -986,7 +1002,8 @@ const MUTANTS: Mutant[] = [
  * shows as SURVIVED, a failure, never as a pass.
  */
 function suitesImporting(dir: string, file: string): string[] {
-  const imports = new RegExp("from \"(\\.\\./)+" + file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\"");
+  // a static import, or a dynamic one: a suite that sets the environment before loading the module awaits import()
+  const imports = new RegExp("(from |import\\()\"(\\.\\./)+" + file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\"");
   const suites = readdirSync(join(dir, "test")).filter((f) => f.endsWith(".test.ts"))
     .filter((f) => imports.test(readFileSync(join(dir, "test", f), "utf8"))).map((f) => "test/" + f);
   // `node --test` given no files runs every suite, which would hide that none guards this one
