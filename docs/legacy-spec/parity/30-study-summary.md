@@ -146,7 +146,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-LY-8 | 🔶 | C | DB priority used raw (`explore.ts:283`); no config table, no "1 → config" replacement; priority < 0 not dropped specially |
 | STS-LY-9 | 🔶 | BC | Pie only for `PIE_ATTRIBUTES` (SEX, GENDER, *_STATUS, SAMPLE_TYPE, SOMATIC_STATUS; `explore-sections.tsx:57`), every other STRING a list; NUMBER → histogram ✅ |
 | STS-LY-10 | 🟡 | B | Skeleton grid while building, "updating…" over survival/density, busy class on the grid; no progress list, no per-chart error text beyond the API error |
-| STS-LY-11 | ❌ | BC | 0 samples: facets still drawn, "0 patients match"; no message; no invalid-sample alert; no saved-layout banner |
+| STS-LY-11 | 🟡 | BC | 0 samples: the portal's message, no charts, the filter bar kept ([empty-caselists-cases](empty-caselists-cases.md) EM1–EM5). No invalid-sample alert, no saved-layout banner |
 
 ### §2 Chart header
 
@@ -221,7 +221,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-OT-1 | 🟡 | B | "Data types" card: profile id + name + count; counts identical; no Freq column; pick → `profiled` clause for MUT/CNA/SV only, OR (legacy Intersection default) |
-| STS-OT-2 | 🟡 | BC | "Case lists" always shown; top 10 only; n counts patients (`explore.ts:1093` uniqExact p.stable_id), legacy samples; OR on pick |
+| STS-OT-2 | 🟡 | BC | Every case list, by kind across studies, counted in samples, Freq of the selected samples; coadread's 14 lists match cbioportal.org's counts ([empty-caselists-cases](empty-caselists-cases.md) CL1–CL10). Always shown (the portal only when filtered on one) |
 | STS-OT-3 | ❌ | C | No mutation-type counts table |
 | STS-OT-4 | ❌ | C | No variant-annotations table |
 | STS-OT-5 | ❌ | B | No GA frequency table; Add chart › Generic assays charts one entity at a time (see GS-5/6) |
@@ -319,7 +319,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-MD-11 | N/A | C | cBioLab never shows cancer-gene icons, so there is nothing for this mode to hide (the gap is GT-6) |
 | STS-MD-12 | 🟡 | C | No manual submit |
 | STS-MD-13 | ❌ | C | Chart picks, layout not saved per user |
-| STS-MD-14 | 🔶 | B | Empty: facets drawn, no message (see LY-11) |
+| STS-MD-14 | ✅ | B | Empty: the message, no charts (see LY-11) |
 | STS-MD-15 | ✅ | C | No host-specific priorities, as cbioportal.org |
 | STS-MD-16 | 🟡 | B | Grid reflows by width; cards don't resize |
 

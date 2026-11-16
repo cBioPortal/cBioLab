@@ -286,8 +286,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The chart's Download (Data, SVG, PDF): with the other downloads (STS-DL-1…3)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
-  - [ ] Empty selection: the "filtered out all the samples" message, other tabs hidden (ours draws the charts and "0 patients match") (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6)
-  - [ ] Case lists: all of them, counted in samples (ours 10, `LIMIT 10 BY s`, in patients; coad, read, protein_quantification, methylation_hm450 missing) (STS-OT-2)
+  - [x] Empty selection: the "filtered out all the samples" message in place of the charts, the filter bar kept (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (PR #260 open)
+  - [x] Case lists: all of them, by kind across studies, counted in samples, Freq of the selected samples (STS-OT-2; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (PR #260 open)
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
   - [ ] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12)
   - [ ] "Download clinical data" (⤓) for the selection (STV-AB-4, STV-STM-5, STV-HD-2)
