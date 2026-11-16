@@ -10,7 +10,7 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, trackSublabelText, fitSublabel, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, stackCompare, thresholdColor, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, trackSublabelText, fitSublabel, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -155,6 +155,7 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
   }
   if (t.kind === "derivedEvent") { ctx.fillStyle = code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, h); return; }
   if (code === -2) { ctx.fillStyle = S.glyph.heatNull.fill; ctx.fillRect(x, y, w, h); return; }
+  if (code <= -3) { ctx.fillStyle = thresholdColor(-3 - code, S); ctx.fillRect(x, y, w, h); return; }
   if (code === -1) {
     // the portal's no-data glyph: the not-profiled cell's white and midline
     const [s0, s1] = S.glyph.notProfiled.stripe.band;

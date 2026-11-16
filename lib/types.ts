@@ -817,6 +817,8 @@ export interface ClusterMethod { profileType: string; columns: number; noData: n
 
 export interface Track {
   kind: TrackKind; label: string; cells: number[] | Int32Array;
+  /** a generic assay's threshold categories (">90.00"), in order: cell -3 - k is category k */
+  thresholds?: string[];
   /** a heatmap row's colour ramp, the portal's for its profile (lib/oncoprint-style.ts ramps) */
   ramp?: "expression" | "methylation" | "vaf";
   /** a generic-assay heatmap row's own gradient: colours (r, g, b) at these values (assayScale) */
