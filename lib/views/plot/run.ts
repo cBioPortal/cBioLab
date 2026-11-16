@@ -3,7 +3,7 @@
 import type { ViewResult } from "../../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
-import { plotExtent, plotRangeOf, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
+import { logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
 import { fitOf, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
@@ -12,6 +12,7 @@ import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
 import { OQL_NOT_PROFILED } from "../../plot-oql.ts";
 import { naturalSort } from "./natural-sort.ts";
+import { fmtNum } from "../../chart/format.ts";
 import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
 import { plotMethod } from "./method.ts";
@@ -583,8 +584,13 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
     axes = withDrivers(axes, pv.drivers);
     range = plotRangeOf(pv.range, axisLogs(axes));
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
-  const spec = { x: axes.x, y: axes.y, unit,
+  let spec = { x: axes.x, y: axes.y, unit,
     ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}), ...(range ? { range } : {}) };
+  let logs: LogChecks;
+  try {
+    logs = await checkLogScales(spec, sites, resolvers, doc.cohorts[cn]);
+    spec = { ...spec, x: logs.x?.off ? withoutLog(spec.x) : spec.x, y: logs.y?.off ? withoutLog(spec.y) : spec.y };
+  } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   const bins: [number, number] = Array.isArray(pv.bins) && pv.bins.length === 2
     ? [Number(pv.bins[0]), Number(pv.bins[1])] : DEFAULT_BINS;
   const problem = layersProblem(pv, c, cn);
@@ -599,11 +605,12 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const ls = await pointLayers(pv, data, c, cn, sites, spec);
       if (ls.length) data.layers = ls;
       if (data.n > POINTS_CAP && ls.some((l) => l.kind === "outliers" && l.shown === "points" && data.shape === "box")) data.overlay = "violin";
+      markLogOff(data, logs);
       // what the pair left out leads: cases missing either axis are not on the figure at all
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data })
       };
       return pr;
@@ -621,7 +628,8 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const fr = resolvers as Record<string, Resolver & FederatedPlotCapable>;
       const { xk, yk, shape, xLabel, yLabel } = await fr[sites[0]].plotAxisKinds(spec);
       if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
-      const label = { x: { label: xLabel, kind: xk }, y: { label: yLabel, kind: yk } };
+      const lr = axisLogs(spec);
+      const label = { x: { label: xLabel, kind: xk, ...(lr.x ? { log: lr.x } : {}) }, y: { label: yLabel, kind: yk, ...(lr.y ? { log: lr.y } : {}) } };
       const scaleNote = sites.length + " studies pooled (" + sites.join(", ") + ")";
       let data: PlotData;
       let moments: (Moments & { study: string })[] | undefined;
@@ -729,9 +737,10 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         { total: 0, nx: 0, ny: 0 });
       const ls = await pointLayers(pv, data, c, cn, sites, spec);
       if (ls.length) data.layers = ls;
+      markLogOff(data, logs);
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [coverageNote(data, unit), combineNote(data, unit), data.note, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data, moments }) };
       return pr;
     }
@@ -740,9 +749,54 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   }
 }
 
-/** whether each axis reads log10(v + 1) */
-function axisLogs(spec: { x: PlotAxis; y: PlotAxis }): { x: boolean; y: boolean } {
-  return { x: "log" in spec.x && !!spec.x.log, y: "log" in spec.y && !!spec.y.log };
+/** the log rule each axis is drawn with, if any */
+function axisLogs(spec: { x: PlotAxis; y: PlotAxis }): { x?: LogRule; y?: LogRule } {
+  return { x: logRuleOf(spec.x), y: logRuleOf(spec.y) };
+}
+
+/** what became of an axis's log scale: turned off for its negative values (the lowest given), or kept with `negatives` of them drawn at 0 */
+type LogCheck = { off: true; min: number } | { off?: false; negatives: number };
+type LogChecks = { x?: LogCheck; y?: LogCheck };
+
+const withoutLog = (a: PlotAxis): PlotAxis => { const { log: _, ...rest } = a as PlotAxis & { log?: boolean }; return rest as PlotAxis; };
+
+/**
+ * cBioPortal's Plots tab offers no log scale on an axis with negative values (logScalePossible,
+ * PLT-AX-4, PLT-MD-11) but an RNA-seq profile's, which log2(max(v, 0) + 1) draws at 0. Each
+ * log axis's values over the cohort are read first, on every site, so the plot can follow that rule
+ * and say what it did.
+ */
+async function checkLogScales(spec: PlotRequest, sites: string[], resolvers: Record<string, Resolver>, def: Def): Promise<LogChecks> {
+  const out: LogChecks = {};
+  for (const side of ["x", "y"] as const) {
+    const a = spec[side];
+    if (!logRuleOf(a)) continue;
+    const rs = sites.map((s) => resolvers[s] as Resolver & Partial<FederatedPlotCapable>);
+    if (!rs.every((r) => typeof r.plotAxisNegatives === "function")) continue;
+    const parts = await Promise.all(rs.map((r) => r.plotAxisNegatives!(def, withoutLog(a), spec.unit)));
+    const mins = parts.map((p) => p.min).filter((m): m is number => m != null);
+    const negatives = parts.reduce((t, p) => t + p.negatives, 0);
+    if (!negatives) continue;
+    out[side] = logScaleExempt(a) ? { negatives } : { off: true, min: Math.min(...mins) };
+  }
+  return out;
+}
+
+/** which axes the view asks a log scale of and are drawn linear, so the page shows their Log scale unchecked and disabled */
+function markLogOff(d: PlotData, logs: LogChecks): void {
+  const off = { ...(logs.x?.off ? { x: logs.x.min } : {}), ...(logs.y?.off ? { y: logs.y.min } : {}) };
+  if (Object.keys(off).length) d.logOff = off;
+}
+
+/** the caption's account of a log scale the rule turned off or kept */
+function logNote(logs: LogChecks, d: PlotData): string {
+  return (["x", "y"] as const).map((side) => {
+    const c = logs[side];
+    if (!c) return "";
+    const name = d[side].label;
+    if (c.off) return name + " has values below 0 (the lowest " + fmtNum(c.min) + "), so it is drawn on a linear scale: cBioPortal's Plots tab offers a log scale on such an axis only for an RNA-seq profile.";
+    return fmtNum(c.negatives) + " " + name + " value" + (c.negatives === 1 ? " is" : "s are") + " below 0 and drawn at 0, as cBioPortal's log2(max(value, 0) + 1) draws them.";
+  }).filter(Boolean).join(" ");
 }
 
 /** one density cell from two sites: the counts add, the extremes are the outer ones */

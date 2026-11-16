@@ -26,7 +26,7 @@ import { peerSource } from "./provenance.ts";
 import { connections, directConnections } from "./ch.ts";
 import { studiesFor } from "./study-list.ts";
 import { catalogFor } from "./study-catalog.ts";
-import { validateAxis, plotRangeOf, type PlotAxis, type PlotRequest, type AxisKind, type PointRank, type SparseCells, type Whiskers } from "./plot.ts";
+import { validateAxis, plotRangeOf, logRuleOf, type PlotAxis, type PlotRequest, type AxisKind, type PointRank, type SparseCells, type Whiskers } from "./plot.ts";
 import { resolveAxes } from "./plot-profile.ts";
 import { setting } from "./settings.ts";
 import { studyOncoprintInputs } from "./oncoprint.ts";
@@ -79,7 +79,7 @@ async function plotSpecHere(study: string, raw: any): Promise<PlotRequest> {
   if (axes.colorBy) validateAxis(axes.colorBy, "colorBy");
   if (axes.ringBy) validateAxis(axes.ringBy, "ringBy");
   const bins = Array.isArray(raw.bins) && raw.bins.length === 2 ? [Number(raw.bins[0]), Number(raw.bins[1])] as [number, number] : undefined;
-  const range = plotRangeOf(raw.range, { x: "log" in axes.x && !!axes.x.log, y: "log" in axes.y && !!axes.y.log });
+  const range = plotRangeOf(raw.range, { x: logRuleOf(axes.x), y: logRuleOf(axes.y) });
   return { x: axes.x, y: axes.y, unit: raw.unit === "patient" ? "patient" : "sample",
     ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}), ...(bins ? { bins } : {}), ...(range ? { range } : {}) };
 }

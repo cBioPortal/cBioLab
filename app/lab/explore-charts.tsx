@@ -135,7 +135,7 @@ function Density({ data, axes, onSelect }: { data: PlotData; axes: { x: DensityA
   const LEGEND_W = 92;
   const W = Math.max(200, (width ?? 340) - LEGEND_W), H = Math.round(Math.max(200, Math.min(300, W * 0.72)));
   const [gx, gy] = data.grid!;
-  // the engine's log axis is log10(1 + v); the portal draws ln(1 + v)
+  // the engine's log axis is log2(1 + v); the portal draws ln(1 + v)
   const show = (v: number, log: boolean) => log ? lnFromEngine(v) : v;
   const e = { x0: show(data.extent!.x0, axes.x.log), x1: show(data.extent!.x1, axes.x.log),
     y0: show(data.extent!.y0, axes.y.log), y1: show(data.extent!.y1, axes.y.log) };

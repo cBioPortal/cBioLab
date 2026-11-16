@@ -95,7 +95,7 @@ describe("the SQL each reading runs", () => {
     assert.match(cat, /trimBoth\(value\) NOT IN \('', 'NA',/);
     assert.match(cat, /if\(uniqExact\(r\.av\) > 1, 'Multiple', any\(r\.av\)\)/);
     const log = axisSelect({ source: "assay", profileType: "p", entity: "e", log: true }, ctx, "num");
-    assert.match(log, /log10\(avg\(r\.av\) \+ 1\)[\s\S]*WHERE v IS NOT NULL/);
+    assert.match(log, /if\(avg\(r\.av\) > 0, log10\(avg\(r\.av\)\), if\(avg\(r\.av\) = 0, 0, NULL\)\)[\s\S]*WHERE v IS NOT NULL/);
     assert.equal(axisKind({ source: "assay", profileType: "p", entity: "e", categorical: true }), "cat");
     assert.equal(axisKind({ source: "assay", profileType: "p", entity: "e" }), "num");
     assert.equal(axisLabel({ source: "assay", profileType: "p", entity: "SBS1", label: "SBS1: Signatures" }), "SBS1: Signatures");

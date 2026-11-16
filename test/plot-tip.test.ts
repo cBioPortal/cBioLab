@@ -8,7 +8,7 @@ import { boxTip, pointTip } from "../lib/views/plot/point-tip.ts";
 import type { PlotData } from "../lib/plot.ts";
 
 const scatter: PlotData = {
-  shape: "scatter", n: 3, x: { label: "log10(TMB + 1)", kind: "num", log: true }, y: { label: "FGA", kind: "num" },
+  shape: "scatter", n: 3, x: { label: "TMB (log2(value + 1))", kind: "num", log: "log2" }, y: { label: "FGA", kind: "num" },
   extent: { x0: 0, x1: 2, y0: 0, y1: 1 }, grid: [10, 10], bins: [{ bx: 0, by: 0, n: 3 }],
   xyPoints: [{ id: "S1", x: 1, y: 0.123 }, { id: "S2", x: 2, y: 0.5 }, { id: "S3", x: 0, y: 0 }],
   pointSet: { rule: "all", drawn: 3 },
@@ -36,7 +36,7 @@ test("every point carries its case, and the plotted cohort's dots are the size o
 });
 
 test("a scatter point's tip: case, both axes, a log axis in its own units, its layers", () => {
-  assert.deepEqual(pointTip(scatter, "S1", "base"), { id: "S1", rows: [["TMB (log scale)", "9"], ["FGA", "0.12"]], layers: [] });
+  assert.deepEqual(pointTip(scatter, "S1", "base"), { id: "S1", rows: [["TMB (log2(value + 1))", "1"], ["FGA", "0.12"]], layers: [] });
   assert.deepEqual(pointTip(scatter, "S2", "0")?.layers, ["Altered"]);
   assert.equal(pointTip(scatter, "nobody", "base"), null);
 });
