@@ -33,7 +33,7 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 
 | Scorecard | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞 ok | N/A | ? | Strict | Half |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [01 OncoPrint](01-oncoprint.md) | 104 | 19 | 41 | 24 | 17 | 1 | 2 | 0 | 21% | 41% |
+| [01 OncoPrint](01-oncoprint.md) | 104 | 50 | 39 | 2 | 10 | 1 | 2 | 0 | 51% | 70% |
 | [02 Cancer Types Summary](02-cancer-types-summary.md) | 59 | 11 | 15 | 14 | 15 | 1 | 3 | 0 | 25% | 38% |
 | [03 Mutual Exclusivity](03-mutual-exclusivity.md) | 40 | 5 | 11 | 11 | 11 | 1 | 1 | 0 | 18% | 31% |
 | [04 Plots](04-plots.md) | 170 | 13 | 42 | 33 | 75 | 2 | 5 | 0 | 12% | 24% |
@@ -49,11 +49,11 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 | [31 Study View shell](31-study-view-shell.md) | 118 | 7 | 26 | 15 | 62 | 4 | 4 | 0 | 13% | 24% |
 | [40 Patient summary](40-patient-summary.md) | 92 | 35 | 25 | 12 | 15 | 4 | 1 | 0 | 43% | 57% |
 | [41 Patient tabs](41-patient-tabs.md) | 81 | 18 | 15 | 15 | 30 | 0 | 3 | 0 | 26% | 35% |
-| **Results** | 718 | 113 | 210 | 138 | 204 | 17 | 32 | 2 | 23% | 37% |
+| **Results** | 718 | 144 | 208 | 116 | 197 | 17 | 32 | 2 | 27% | 41% |
 | **Comparison** | 161 | 20 | 60 | 41 | 30 | 2 | 7 | 1 | 18% | 37% |
 | **Study View** | 253 | 26 | 64 | 50 | 100 | 7 | 6 | 0 | 15% | 28% |
 | **Patient** | 173 | 53 | 40 | 27 | 45 | 4 | 4 | 0 | 35% | 47% |
-| **All** | **1,305** | 212 | 374 | 256 | 379 | 30 | 49 | 3 | **22%** | **37%** |
+| **All** | **1,305** | 243 | 372 | 234 | 372 | 30 | 49 | 3 | **25%** | **39%** |
 
 Two legacy bugs are reproduced in cBioLab, and are not counted as matches:
 - 05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).
