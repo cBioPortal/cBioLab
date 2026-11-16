@@ -219,7 +219,20 @@ checks assert rather than whatever a real warehouse happens to contain:
   mutation types (`Splice_Site`, `Splice_Region`, a lowercase `splice`, an empty type), an empty list,
   no record, an empty variant allele, a `chr10` chromosome, a germline hotspot, a hotspot OncoKB calls
   Likely Neutral, and a hotspot in a gene the sample is also deeply deleted in. No other fixture
-  variant has a record, so hotspots call nothing outside `FX-P29`.
+  variant has a record, so hotspots call nothing outside `FX-P29`. The TSV's `annotation` column
+  fills in the rest of some records (`canonical` transcript per gene, `transcripts[].exon`): ATM's
+  three (one whose first transcript is not the canonical one), STK11 F354L and its `Splice_Site`
+  X200 (a canonical transcript with no exon), NF1 R304Q (only a non-canonical transcript) and BRAF
+  D594G, for the Exon column.
+- **The mutation table's remaining columns**, for `check:mutation-columns` (Gene, Study of Origin,
+  Cancer Type, Copy #, VS, Center, Allele Freq (N), the normal read counts, Exon, Variant Type and the
+  Mutation Type label), by editing fields of existing rows only: a `Validation_Status` column (`Valid`,
+  `Untested`, `Unknown`, `VALIDATED` on TP53's FX-P01/P03/P05/P07 rows, blank — stored `NA` — elsewhere);
+  Center `broad.mit.edu`, `.` and blank (stored `NA`) on TP53's FX-P01/P03/P05; normal counts on TP53's
+  FX-P01 (7/350), FX-P03 (1/280), FX-P07 (alt blank), FX-P09 (128/385) and FX-P10 (0/0); TP53 SP1 on
+  FX-P21 with Variant_Type `snp` (lower case); and STK11 Q37* on FX-P39 typed `nonsense` (lower case),
+  so sorting by the label differs from sorting by the raw type. Copy # reads the existing
+  `data_cna.txt` values (Amp, Gain, Diploid, ShallowDel, DeepDel and `NA` all occur on mutated rows).
 
 `npm run peer-db` (`scripts/peer-db.ts`) starts a private ClickHouse for it (the pinned release
 `npm run local` uses, data in `CBIOLAB_PEER_DATA`, default `~/.cbiolab-peer/<port>`), imports the

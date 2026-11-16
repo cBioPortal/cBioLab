@@ -76,7 +76,7 @@ async function tables({ browser, ok, BASE }) {
       const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120000 }).catch(() => null), page.locator("form[action='/api/table'] button").first().click()]);
       const csv = dl ? require("fs").readFileSync(await dl.path(), "utf8") : "";
       const lines = csv.trim().split(/\r?\n/);
-      ok("table: the CSV holds every kept row with every column", lines[0].startsWith("cohort,study,sample,cancerType,proteinChange") && lines.length - 1 === picked.kept,
+      ok("table: the CSV holds every kept row with every column", lines[0].startsWith("cohort,study,gene,studyOfOrigin,cancerTypeAll,sample,cancerType,proteinChange") && lines.length - 1 === picked.kept,
         (dl ? dl.suggestedFilename() : "no download") + " · " + (lines.length - 1) + " rows, header " + lines[0].slice(0, 60));
     } catch (e) {
       ok("table: the mutation table's controls", false, String(e.message).split("\n")[0].slice(0, 200));

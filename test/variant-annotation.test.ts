@@ -87,8 +87,8 @@ test("the mutation table reads the store only when a genome has a pin, and joins
   assert.match(sorted("hgvsc"), /ORDER BY toInt64OrNull\(extract\(hgvsc, 'c\\\.\(-\?\[0-9\]\+\)'\)\) ASC NULLS LAST/);
   assert.match(sorted("clinvar"), /ORDER BY nullIf\(clinvar, ''\) ASC NULLS LAST/);
   assert.match(sorted("signal"), /ORDER BY signalFreq ASC NULLS LAST/);
-  // the portal's order: … HGVSg, HGVSc, then gnomAD, ClinVar, dbSNP, SIGNAL last; Functional Impact before Mutation Type
-  assert.deepEqual(MUTATION_COLUMNS.slice(-8).map((c) => c.id), ["var", "hgvsg", "hgvsc", "status", "gnomad", "clinvar", "dbsnp", "signal"]);
+  // the portal's order: … HGVSg, HGVSc, MS with VS and Center after it, then gnomAD, ClinVar, dbSNP, SIGNAL last; Functional Impact before Mutation Type
+  assert.deepEqual(MUTATION_COLUMNS.slice(-10).map((c) => c.id), ["var", "hgvsg", "hgvsc", "status", "validationStatus", "center", "gnomad", "clinvar", "dbsnp", "signal"]);
   const ids = MUTATION_COLUMNS.map((c) => c.id);
   assert.equal(ids.indexOf("functionalImpact") + 1, ids.indexOf("mutationType"));
   // gnomAD sorts by its overall frequency, dbSNP by its id; Functional Impact is not sorted, as on the portal

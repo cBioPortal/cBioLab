@@ -17,13 +17,14 @@ function mutationValue(r: Record<string, unknown>, id: string, pin: string | nul
   const num = (x: unknown) => x == null || x === "" ? null : Number(x);
   switch (id) {
     case "sample": return String(r.sid ?? "");
+    case "studyOfOrigin": return String(r.studyName ?? "");
     case "annotation": {
       const o = String(r.oncogenicity || ""), lv = String(r.level || "");
       return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
     }
     case "vaf": return r.vaf == null ? null : Math.round(Number(r.vaf) * 1000) / 1000;
     case "alteration": return alterationOf(String(r.mutationType ?? ""), Number(r.drv) === 1, pin);
-    case "altCount": case "refCount": case "mutCount": case "start": case "end": return num(r[id]);
+    case "altCount": case "refCount": case "mutCount": case "start": case "end": case "vafNormal": case "normalAltCount": case "normalRefCount": return num(r[id]);
     case "proteinPos": return r.pos == null ? "" : String(r.pos);
     case "clinvar": return r.clinvar ? String(r.clinvar) + (r.clinvarConflicting ? "(" + String(r.clinvarConflicting) + ")" : "") : "";
     case "signal": return r.signalFreq == null ? "" : portalSig2(Number(r.signalFreq));
