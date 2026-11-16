@@ -353,7 +353,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The Groups manager: a group from the selection, its colour, share, Filter by union, compare 2–20 saved groups ("Save as a Cohort" stands in) (STV-GR-1…9, STV-STM-10)
   - [ ] Virtual study: description and its auto-text, a name built from the filters, static or dynamic, a shareable `/study?id=`, saved signed out as well (ours "Save as a Cohort": a name, always a definition) (STV-VS-1…6, STV-STM-8, STV-STM-9, STV-AB-3, STV-MD-3, STV-MD-4, STV-MD-8)
   - [ ] Custom Selection by sample or patient ids on the page (Analysis has it, signed-in only) (STV-CS-1…9)
-  - [ ] Header: the study's name, description, PubMed link and download (ours id chips) (STV-HD-2, STV-HD-3, STV-MD-1)
+  - [x] Header: the study's name (or "Combined Study"), description, PubMed link and ⊕ (STV-HD-2, STV-HD-3, STV-MD-1; [study-header-cases](legacy-spec/parity/study-header-cases.md) SH1–SH8) (PR #PRNUM open)
+    - [ ] The study download icon: [data: the portal's study download server and its study list]
   - [ ] An unknown study id: a banner naming it and the page drawn on the valid ones (ours refuses the whole request, invariant 1) (STV-HD-1, STV-LD-3)
   - [ ] Query hand-off: an inline gene box in the header; the selection passed as sample ids (ours the filters as case clauses) (STV-HD-4, STV-MD-5, STV-STM-6)
   - [ ] View patients in a new window (ours the same tab) (STV-AB-2)

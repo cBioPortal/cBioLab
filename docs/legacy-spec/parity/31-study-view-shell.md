@@ -112,8 +112,8 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | ID | verdict | how | note |
 |---|---|---|---|
 | STV-HD-1 | 🔶 | C | Unknown study → loud refusal from `/api/explore` ("Explore cannot reach … Deselect it"), whole request, not a per-id banner (invariant 1) |
-| STV-HD-2 | 🔶 | B | "EXPLORING — 1 study · 594 patients · 594 samples" + id chips (name in tooltip); no study name, no "Combined Study", no download icon |
-| STV-HD-3 | ❌ | B | No description, PubMed, ⊕ list, VS origin |
+| STV-HD-2 | 🟡 | B | The study's name, or "Combined Study", under the Exploring row ([study-header-cases](study-header-cases.md) SH1). No study download icon: the portal's download server list is not readable here (SH9) |
+| STV-HD-3 | ✅ | B | Description's first line (its links kept, other HTML dropped), "PubMed", ⊕ for the other lines or the studies' list; brca_tcga_pan_can_atlas_2018's name, description and PubMed ids match the portal's API ([study-header-cases](study-header-cases.md) SH2–SH8). Virtual-study origins: no virtual studies here |
 | STV-HD-4 | 🟡 | BC | "Query genes…" button opens the gene query dialog (OQL, profiles, case set, product-limit refusal) carrying the filters; not an inline box, no gene-symbol click-to-queue |
 
 ### §3 Filter bar
