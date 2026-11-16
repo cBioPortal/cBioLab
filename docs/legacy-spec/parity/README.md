@@ -33,12 +33,12 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 
 | Scorecard | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞 ok | N/A | ? | Strict | Half |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [01 OncoPrint](01-oncoprint.md) | 104 | 19 | 41 | 24 | 17 | 1 | 2 | 0 | 21% | 41% |
+| [01 OncoPrint](01-oncoprint.md) | 104 | 50 | 39 | 2 | 10 | 1 | 2 | 0 | 51% | 70% |
 | [02 Cancer Types Summary](02-cancer-types-summary.md) | 59 | 11 | 15 | 14 | 15 | 1 | 3 | 0 | 25% | 38% |
 | [03 Mutual Exclusivity](03-mutual-exclusivity.md) | 40 | 5 | 11 | 11 | 11 | 1 | 1 | 0 | 18% | 31% |
 | [04 Plots](04-plots.md) | 170 | 13 | 42 | 33 | 75 | 2 | 5 | 0 | 12% | 24% |
-| [05 Mutations](05-mutations.md) | 139 | 14 | 34 | 22 | 58 | 3 | 7 | 0 | 17% | 30% |
-| [06 Structural Variants](06-structural-variants.md) | 54 | 25 | 11 | 8 | 7 | 2 | 1 | 0 | 52% | 62% |
+| [05 Mutations](05-mutations.md) | 139 | 27 | 44 | 18 | 33 | 4 | 7 | 6 | 27% | 43% |
+| [06 Structural Variants](06-structural-variants.md) | 54 | 28 | 12 | 7 | 5 | 2 | 0 | 0 | 56% | 67% |
 | [07 Co-expression](07-coexpression.md) | 49 | 10 | 14 | 11 | 6 | 1 | 6 | 1 | 35% | 49% |
 | [08 CN Segments](08-cn-segments.md) | 29 | 6 | 9 | 4 | 5 | 3 | 1 | 1 | 34% | 50% |
 | [09 Pathways](09-pathways.md) | 33 | 5 | 10 | 5 | 6 | 2 | 4 | 0 | 33% | 48% |
@@ -49,14 +49,14 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 | [31 Study View shell](31-study-view-shell.md) | 118 | 7 | 26 | 15 | 62 | 4 | 4 | 0 | 13% | 24% |
 | [40 Patient summary](40-patient-summary.md) | 92 | 35 | 25 | 12 | 15 | 4 | 1 | 0 | 43% | 57% |
 | [41 Patient tabs](41-patient-tabs.md) | 81 | 18 | 15 | 15 | 30 | 0 | 3 | 0 | 26% | 35% |
-| **Results** | 718 | 113 | 210 | 138 | 204 | 17 | 32 | 2 | 23% | 37% |
+| **Results** | 718 | 160 | 219 | 111 | 170 | 18 | 31 | 8 | 29% | 44% |
 | **Comparison** | 161 | 20 | 60 | 41 | 30 | 2 | 7 | 1 | 18% | 37% |
 | **Study View** | 253 | 26 | 64 | 50 | 100 | 7 | 6 | 0 | 15% | 28% |
 | **Patient** | 173 | 53 | 40 | 27 | 45 | 4 | 4 | 0 | 35% | 47% |
-| **All** | **1,305** | 212 | 374 | 256 | 379 | 30 | 49 | 3 | **22%** | **37%** |
+| **All** | **1,305** | 259 | 383 | 229 | 345 | 31 | 48 | 9 | **26%** | **41%** |
 
-Two legacy bugs are reproduced in cBioLab, and are not counted as matches:
-- 05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).
+One legacy bug is reproduced in cBioLab, and is not counted as a match:
+- ~~05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).~~ Fixed rather than copied (#250); re-scored 2026-11-16.
 - 09 Pathways uses legacy's "match % weighted" formula on purpose (PWY-STM-4).
 
 ## What the audit found overall
