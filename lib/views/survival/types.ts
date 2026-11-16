@@ -28,11 +28,19 @@ export interface SurvivalView {
   /** draw 1 - S(t), cumulative incidence, instead of survival (default "survival") */
   display?: "survival" | "incidence";
   /**
-   * when the cohorts share a patient (so the patient is in two curves), give no log-rank test
-   * rather than one whose groups are not independent; the curves still draw. The Comparison page
-   * sets it, for its Include mode. Unset, the test is given and the caveat says how many are shared.
+   * when the cohorts share a patient, split the patients by which of the cohorts each is in and draw
+   * those groups instead ("Only A", "Only A, B"), so every patient is in one curve and the log-rank
+   * test's groups are independent, as cBioPortal's Comparison page draws survival in its Include
+   * mode. The portal pages set it. Unset, a shared patient is in each of its cohorts' curves and the
+   * caveat calls the p approximate.
    */
-  noTestWhenShared?: boolean;
+  partitions?: boolean;
+  /**
+   * give the log-rank p at any group size, as cBioPortal does (a group with no patients is left out
+   * of the test). Unset, the test is refused when a curve has fewer than 10 patients. The portal
+   * pages set it.
+   */
+  testAnySize?: boolean;
   /**
    * the survival-type table, as cBioPortal's Comparison page has it: every endpoint the studies
    * declare (an <X>_MONTHS / <X>_STATUS pair), each with its patients, log-rank p and BH q, so the
@@ -77,10 +85,10 @@ declare module "../../types.ts" {
       logrank?: LogRank; logrankPooled?: LogRank;
       /** 3+ cohorts: the k-group generalization (tests whether the groups differ AT ALL) */
       logrankK?: LogRankK; logrankKPooled?: LogRankK;
-      /** patients in more than one cohort, so in more than one curve */
+      /** patients in more than one cohort: in more than one curve, or with `partitioned` in the curve of their cohorts' overlap */
       sharedPatients?: number;
-      /** no log-rank test was given because of them (the view's noTestWhenShared) */
-      testWithheld?: boolean;
+      /** the curves are the cohorts' overlaps, each patient in one (the view's `partitions`) */
+      partitioned?: boolean;
       /** the survival-type table (the view's `types`) */
       types?: SurvivalType[];
     };

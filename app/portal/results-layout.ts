@@ -332,7 +332,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     { title: "Comparison/Survival", sub: [
       { title: "Overlap", views: [v("Overlap", { kind: "overlap", cohorts: both })] },
       // the survival-type table beside the curves, on the portal's first endpoint; only with survival data once the attributes are known
-      ...(data.partial || survivalDefault(data.clinical) ? [{ title: "Survival", views: [v("Survival", { kind: "survival", types: true, cohorts: both,
+      ...(data.partial || survivalDefault(data.clinical) ? [{ title: "Survival", views: [v("Survival", { kind: "survival", types: true, partitions: true, testAnySize: true, cohorts: both,
         ...(!data.partial && survivalDefault(data.clinical) !== "OS" ? { endpoint: survivalDefault(data.clinical) } : {}) })] }] : []),
       ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true, cohorts: both })] }] : []),
       { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),

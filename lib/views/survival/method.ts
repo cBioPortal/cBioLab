@@ -12,6 +12,8 @@ export interface SurvivalTrace {
   cutoffMonths?: number;
   beyondCutoff: number;
   display: "survival" | "incidence";
+  /** the curves are the cohorts' overlaps (the view's partitions): the cohorts, how many patients they share, and each overlap's patients */
+  partitions?: { cohorts: string[]; shared: number; groups: { name: string; patients: number }[] };
   cohorts: {
     name: string;
     perStudy: { study: string; cohortPatients: number; patients: number; rows: number }[];
@@ -33,6 +35,15 @@ export interface SurvivalTrace {
 
 export function survivalMethod(t: SurvivalTrace): MethodRecord {
   const steps: MethodStep[] = [];
+  if (t.partitions) {
+    steps.push({
+      kind: "transform", title: "Split the patients by the cohorts they are in",
+      detail: plural(t.partitions.shared, "patient is", "patients are") + " in more than one of " + t.partitions.cohorts.join(", ") +
+        ". As cBioPortal draws survival when overlapping samples are included, every patient goes to the one group named by exactly the cohorts they are in (“Only A, B”: in A and B and no other), so no patient is in two curves and the test's groups are independent." +
+        " The survivalPartitions query labels each patient with that set inside the database and returns counts per set; no patient identifier leaves it.",
+      params: t.partitions.groups.map((g) => [g.name, plural(g.patients, "patient")] as [string, string]),
+    });
+  }
   for (const c of t.cohorts) for (const s of c.perStudy) {
     steps.push({
       kind: "fetch", title: "Count patients by time and status",
@@ -63,7 +74,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
   if (t.test.kind === "none") {
     steps.push({ kind: "statistic", title: "No log-rank test", detail: t.test.reason });
   } else {
-    const k = t.cohorts.length, x = t.test;
+    const x = t.test, k = x.df + 1;
     steps.push({
       kind: "statistic",
       title: (k === 2 ? "Two-group" : k + "-group") + " log-rank test" + (x.stratified ? ", stratified by study" : ""),
@@ -81,7 +92,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
   if (t.types?.length) {
     steps.push({ kind: "statistic", title: "The survival-type table: a log-rank test per endpoint, then Benjamini–Hochberg",
       detail: "Every endpoint the studies declare (an <X>_MONTHS / <X>_STATUS pair), counted per cohort as above with no cutoff, each tested by the same rules as the curves drawn" +
-        " (refused under the same patient floor, or when the cohorts share patients and the view withholds the test). q-values are Benjamini–Hochberg over the " +
+        " (refused under the same patient floor, or when fewer than two groups have patients). q-values are Benjamini–Hochberg over the " +
         typed.length + " endpoints tested, as cBioPortal's survival-type table computes them.",
       params: t.types.map((x) => [x.title + " (" + x.endpoint + ")", plural(x.patients, "patient") + " · " +
         (x.p != null ? "p " + pFmt(x.p) + " · q " + pFmt(x.q!) : "not tested: " + x.why)] as [string, string]) });
@@ -157,7 +168,7 @@ export function survivalMethod(t: SurvivalTrace): MethodRecord {
       VERIFIED.logrank.fn + " to a relative 1e-6, pooled, stratified, with delayed entry and for k groups (test/survival-golden.test.ts).",
     python: withResult(python),
     check: {
-      ...checks("km:", t.cohorts, (c) => c.name, [["n", "n", { abs: 0 }], ["events", "events", { abs: 0 }], ["median", "median", { abs: 1e-9 }]]),
+      ...checks("km:", t.cohorts.filter((c) => c.n > 0), (c) => c.name, [["n", "n", { abs: 0 }], ["events", "events", { abs: 0 }], ["median", "median", { abs: 1e-9 }]]),
       ...(t.test.kind === "none" ? {} : {
         "logrank:chi2": { v: t.test.chi2, abs: 5e-5 }, "logrank:p": { v: t.test.p, rel: 1e-5, abs: 1e-300 },
         ...(t.test.pooled ? { "logrank:pooled:chi2": { v: t.test.pooled.chi2, abs: 5e-5 }, "logrank:pooled:p": { v: t.test.pooled.p, rel: 1e-5, abs: 1e-300 } } : {}),

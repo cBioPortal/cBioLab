@@ -528,6 +528,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "clinicalAttributeListSql": () => aggregates.clinicalAttributeListSql("x", "db"),
     // survival: the patients in more than one cohort stay inside; one count leaves
     "sharedPatientsSql": () => aggregates.sharedPatientsSql([cohortSql, cohortSql], "x", "db"),
+    // survival: each patient's set of cohorts stays inside; counts per (set, months, event) leave
+    "partitionSurvivalSql": () => aggregates.partitionSurvivalSql([cohortSql, cohortSql], "x", "db", "OS"),
     // survival: the study's _STATUS attributes' display names and priorities, metadata only
     "survivalStatusMetaSql": () => aggregates.survivalStatusMetaSql("x", "db"),
     // enrichment: per-gene sample counts, and panel-level sample counts joined to genes

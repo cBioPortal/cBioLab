@@ -196,7 +196,7 @@ test("the header's samples line, only when the queried samples outnumber the pat
 test("Comparison/Survival › Survival: the survival-type table, on the portal's first endpoint, only with survival data (CMP-SV-1, CMP-SV-5)", () => {
   const sub = (l: ReturnType<typeof resultsLayout>) => l.tabs.find((t) => t.title === "Comparison/Survival")!.sub!;
   const survival = (l: ReturnType<typeof resultsLayout>) => { const t = sub(l).find((x) => x.title === "Survival"); return t && l.doc.views![t.views[0]]; };
-  assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data())), { kind: "survival", types: true, cohorts: ["Altered", "Unaltered"] });
-  assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data({ clinical: ["PFS_MONTHS", "PFS_STATUS"] }))), { kind: "survival", types: true, cohorts: ["Altered", "Unaltered"], endpoint: "PFS" });
+  assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data())), { kind: "survival", types: true, partitions: true, testAnySize: true, cohorts: ["Altered", "Unaltered"] });
+  assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data({ clinical: ["PFS_MONTHS", "PFS_STATUS"] }))), { kind: "survival", types: true, partitions: true, testAnySize: true, cohorts: ["Altered", "Unaltered"], endpoint: "PFS" });
   assert.equal(survival(resultsLayout(q(["a"], ["KRAS"]), data({ clinical: ["AGE"] }))), undefined);
 });

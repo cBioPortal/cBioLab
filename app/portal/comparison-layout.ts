@@ -49,10 +49,11 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     !assays.length && "Generic Assays (no generic-assay profile)"].filter(Boolean) as string[];
   return arrange({ study, cohorts: linked.cohorts }, [
     { title: "Overlap", views: [v("Overlap", { kind: "overlap" })] },
-    // the survival-type table beside the curves, which start on the portal's first endpoint; the
-    // page's Include mode compares groups that may share patients: their curves, but no test. Before
-    // the study's attributes are known the tab is offered on OS, and once known only with survival data
-    ...(!known || endpoint ? [{ title: "Survival", views: [v("Survival", { kind: "survival", types: true, noTestWhenShared: true,
+    // the survival-type table beside the curves, which start on the portal's first endpoint; groups
+    // that share patients (the page's Include mode) are drawn as their overlaps, and the test given at
+    // any group size, as the portal does both. Before the study's attributes are known the tab is
+    // offered on OS, and once known only with survival data
+    ...(!known || endpoint ? [{ title: "Survival", views: [v("Survival", { kind: "survival", types: true, partitions: true, testAnySize: true,
       ...(endpoint && endpoint !== "OS" ? { endpoint } : {}) })] }] : []),
     // every attribute, as the portal's tab tests them
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true })] }] : []),
