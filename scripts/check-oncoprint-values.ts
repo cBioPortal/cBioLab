@@ -242,7 +242,11 @@ const freq = (rows: typeof whole, a: string) => { const x = rows.find((r) => r.a
 const MENU: [string, typeof whole, string, string][] = [
   ["all", whole, "PARSE_PROBE", "20.3%"], ["all", whole, "TUMOR_GRADE", "6.8%"], ["all", whole, "FLAG_BOOL", "8.5%"],
   ["SEX = Female", female, "PARSE_PROBE", "21.2%"], ["SEX = Female", female, "FLAG_BOOL", "9.1%"],
-  ["SEX = Female", female, "PATIENT_FLAG", "0%"]          // no woman has a value: listed, at 0%
+  ["SEX = Female", female, "PATIENT_FLAG", "0%"],         // no woman has a value: listed, at 0%
+  // patient-level attributes in their patients' queried samples, as the portal: PATIENT_SCORE is FX-P01's and FX-P02's
+  // (two samples each), PATIENT_FLAG FX-P01's; OS_MONTHS every patient's
+  ["all", whole, "PATIENT_SCORE", "6.8%"], ["all", whole, "PATIENT_FLAG", "3.4%"], ["all", whole, "OS_MONTHS", "100.0%"],
+  ["SEX = Female", female, "PATIENT_SCORE", "6.1%"]
 ];
 for (const [tag, rows, a, want] of MENU) ok(`tracks menu (${tag}) ${a}`, freq(rows, a) === want, "ours " + freq(rows, a) + ", expected " + want);
 ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(whole.length));
