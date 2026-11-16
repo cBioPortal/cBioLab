@@ -82,11 +82,8 @@ const together = tables(await buildExploreFederated({ studies: STUDIES, profiles
 // `altered` is a distinct-sample count and sample ids are unique across studies,
 // so pooling the query must return precisely what summing the per-study tables
 // returns. This is the arithmetic that lets Explore pool at all.
-// Compared ONE GENE AT A TIME. Both tables are cut at GENE_TABLE_LIMIT, and a
-// gene inside the pooled top-N can fall outside a single study's top-N — so
-// comparing the two truncated lists would measure the cut, not the arithmetic.
-// Narrowing to one gene puts both sides far below the limit, and then the two
-// must agree to the sample.
+// Compared ONE GENE AT A TIME, which keeps each side to a handful of rows; for
+// every gene the two must agree to the sample.
 {
   const GENES = ["TP53", "KRAS", "BRAF", "DNMT3A", "ERBB2", "CDKN2A", "MYC", "PTEN"];
   const conn = PRIMARY;

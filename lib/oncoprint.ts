@@ -283,13 +283,13 @@ export function profileInventorySql(study: string = STUDY, db: string = DB): str
     "WHERE cs.cancer_study_identifier = " + sq(study);
 }
 
-/** each attribute's display name in the study (attr, name): what the Tabular download names a row */
+/** each attribute's display name and datatype in the study (attr, name, datatype): the Tabular download's row name, and whether its track is bars or categories */
 export function clinicalNamesSql(attrs: string[], study: string = STUDY, db: string = DB): string | null {
   attrs = attrs.filter((a) => a !== SPECTRUM_TRACK);
   if (!attrs.length) return null;
-  return "SELECT cam.attr_id AS a, any(cam.display_name) AS n FROM " + clinicalMetaTable(db) + " cam\n" +
+  return "SELECT cam.attr_id AS a, any(cam.display_name) AS n, upper(any(cam.datatype)) AS d FROM " + clinicalMetaTable(db) + " cam\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ") AND cam.display_name != ''\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")\n" +
     "GROUP BY a";
 }
 
@@ -345,13 +345,24 @@ async function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMA
   return ok;
 }
 export function vafSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
-  return "SELECT " + (unit === "sample" ? "sampleId" : "patientId") + " AS pid, `GENE.hugoGeneSymbol` AS gene,\n" +
-    "       max(tumorAltCount / (tumorAltCount + tumorRefCount)) AS v\n" +
-    "FROM " + db + ".mutation_derived\n" +
-    "WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
-    "  AND tumorAltCount > 0 AND tumorRefCount >= 0 AND molecularProfileId NOT LIKE '%uncalled%'\n" +
-    (samples ? "  AND sampleId IN (" + samples + ")\n" : "") +
-    "GROUP BY pid, gene";
+  // one row per column profiled for the gene in a mutation profile (the portal's
+  // createHeatmapTracksData keeps only those): its largest VAF, or NULL when no mutation of the
+  // gene there has usable counts (getVariantAlleleFrequency: alt / (alt + ref), so alt 0 is a VAF of 0)
+  const list = genes.map(sq).join(",");
+  return "SELECT pid, gene, if(countIf(ok = 1) = 0, NULL, maxIf(vaf, ok = 1)) AS v FROM (\n" +
+    "  SELECT " + idCol(unit, study + "_", unit === "sample" ? "sp." : "sd.") + " AS pid, pg.gene AS gene, toNullable(toFloat64(0)) AS vaf, 0 AS ok\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + list + ")\n" +
+    (unit === "sample" ? "" : "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n") +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'" +
+    fromColumnSamples("sp.sample_unique_id", study, samples) + "\n" +
+    "  UNION ALL\n" +
+    "  SELECT " + (unit === "sample" ? "sampleId" : "patientId") + ", `GENE.hugoGeneSymbol`, tumorAltCount / (tumorAltCount + tumorRefCount), 1\n" +
+    "  FROM " + db + ".mutation_derived\n" +
+    "  WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ")\n" +
+    "    AND tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0 AND molecularProfileId NOT LIKE '%uncalled%'" +
+    (samples ? "\n    AND sampleId IN (" + samples + ")" : "") + "\n" +
+    ")\nGROUP BY pid, gene HAVING countIf(ok = 0) > 0";
 }
 
 /**
@@ -556,7 +567,7 @@ export interface StudyInputs {
   facts: unknown[][];
   /** pid, attribute, value */
   clinical: unknown[][];
-  /** attribute, display name (absent from an older peer) */
+  /** attribute, display name, datatype */
   clinicalNames?: unknown[][];
   /**
    * per heatmap spec: the study's generic assay of that profile type, if it has one; whether it has
@@ -692,7 +703,7 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
     ({ available: o?.available === true, values: table(o?.values, 3, "overlay values") }));
   return { genes: strings(r.genes, "genes"), groups, events: table(r.events, 11, "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
     facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"),
-    ...(r.clinicalNames === undefined ? {} : { clinicalNames: table(r.clinicalNames, 2, "clinical display names") }), heatmap, overlays,
+    ...(r.clinicalNames === undefined ? {} : { clinicalNames: table(r.clinicalNames, 3, "clinical display names and datatypes") }), heatmap, overlays,
     levels: table(r.levels, 4, "expression levels").map((x) => x[2] === "exp" || x[2] === "prot" ? x : bad("expression levels")),
     profileTypes: strings(r.profileTypes, "profile types"), assays: strings(r.assays, "assay profiles") };
 }
@@ -932,9 +943,14 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
     // each attribute's display name, as the first study that declares one names it
     const named = await Promise.all(studies.map(async (s) => peers.has(s) ? (await peerShare(s)).clinicalNames ?? []
       : await ((q) => q ? lqRows("oncoprint:clinicalNames", q, s).then((r) => r.rows) : [])(clinicalNamesSql(clinical, s, dbOf(s)))));
-    const nameOf = new Map<string, string>([[SPECTRUM_TRACK, SPECTRUM_NAME]]);
-    for (const rs of named) for (const x of rs) if (!nameOf.has(x[0] as string) && x[1]) nameOf.set(x[0] as string, String(x[1]));
-    for (const attr of clinical) clinicalIn.push({ attr, values: byAttr.get(attr)!, ...(nameOf.has(attr) ? { name: nameOf.get(attr)! } : {}) });
+    // and its datatype, as the first study that declares it does (the portal's uniqBy over the studies' attributes)
+    const nameOf = new Map<string, string>([[SPECTRUM_TRACK, SPECTRUM_NAME]]), typeOf = new Map<string, string>();
+    for (const rs of named) for (const x of rs) {
+      if (!nameOf.has(x[0] as string) && x[1]) nameOf.set(x[0] as string, String(x[1]));
+      if (!typeOf.has(x[0] as string) && x[2]) typeOf.set(x[0] as string, String(x[2]));
+    }
+    for (const attr of clinical) clinicalIn.push({ attr, values: byAttr.get(attr)!, ...(nameOf.has(attr) ? { name: nameOf.get(attr)! } : {}),
+      ...(typeOf.has(attr) ? { datatype: typeOf.get(attr)! } : {}) });
   }
 
   // ---- heatmap values per profile (validated against each study's inventory) ----
@@ -983,7 +999,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
       ({ s, r: peers.has(s) ? await peerRows(s, (i) => i.heatmap[hi].values)
         : await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit, samplesOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit, samplesOf(s)), s) })));
     for (const { s, r } of hFetched)
-      for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
+      for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), row[2] == null ? NaN : Number(row[2]));
     const kinds = await Promise.all(okStudies.map(async (s) => peers.has(s) ? (await peerShare(s)).heatmap[hi].kind
       : isVaf ? undefined : (await studyProfileKinds(s, dbOf(s), connOf(s))).get(h.profileType)));
     const profileKind = kinds.find((k) => k);

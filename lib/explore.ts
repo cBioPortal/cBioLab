@@ -165,8 +165,6 @@ export function numericBinEdges(
   return { edges, interval };
 }
 
-/** display cap per gene table; totals report the full count behind it */
-const GENE_TABLE_LIMIT = 500;
 /** how many genes may carry their own alteration facet at once */
 const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
@@ -379,7 +377,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     clinical, derived, declaredAttributes,
     ...(unknownAttributes.length ? { unknownAttributes } : {}),
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
-    caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
+    caseLists: byCount(lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) }))),
     mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
     profiles: profiles || [], gaProfiles: gaProfiles || [],
     ...(driverPin ? { drivers: driverPin } : {}),
@@ -533,12 +531,11 @@ async function buildDerivedFacets(
  * returns exactly the arithmetic that merging per-study results produces — at
  * ~2.3s of query time for all 546 rather than ~7,100 round trips.
  *
- * Pooling also CORRECTS the per-study merge. Each study's table is truncated at
- * GENE_TABLE_LIMIT and the merge sums only the parts that survived that cut, so
- * a gene ranking outside some study's top-N lost that study's PROFILED samples
- * along with its (small) altered count, and the frequency came out biased high.
- * Pooled, every selected study contributes to the denominator whether or not the
- * gene ranks in it. Pinned by test/denominator.test.ts and npm run check:denominators.
+ * Pooled, every selected study contributes its profiled samples to a gene's
+ * denominator whether or not the gene is altered in it: a per-study merge would
+ * add a study's profiled count only where that study has a row for the gene, and
+ * the frequency would come out biased high. Every gene is returned, with no cap
+ * on the rows. Pinned by test/denominator.test.ts and npm run check:denominators.
  *
  * Safe because `sample_unique_id` is unique across studies — measured 408,055
  * rows and 408,055 distinct values in sample_derived — so `uniqExact` over a
@@ -576,13 +573,13 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
       (driverPin ? "\n  AND " + driverEventSql(driverPin) : "") +
       inSamples(set);
 
-    const [altered, panelProfiled, wes, distinct, surplus] = await Promise.all([
+    const [altered, panelProfiled, wes, distinct, surplus, panelsOf] = await Promise.all([
       chQuery<ChRow>(
         "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
         "       uniqExact(sample_unique_id) AS altered, uniqExactIf(sample_unique_id, NOT off_panel) AS on_panel, count() AS events\n" +
         "FROM " + db + ".genomic_event_derived\n" + where + "\n" +
         "GROUP BY g" + (isCna ? ", cna" : "") + "\n" +
-        "ORDER BY altered DESC, g ASC LIMIT " + GENE_TABLE_LIMIT, conn),
+        "ORDER BY events DESC, g ASC", conn),
       // Aggregate samples PER PANEL first, then join panels to their genes. The
       // naive sample-level join costs 13s on a 290k-sample study; collapsing to
       // ~100 panel rows first gives the identical answer in ~250ms.
@@ -639,16 +636,27 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
         "  INNER JOIN " + db + ".gene_panel_to_gene_derived gptg ON gptg.gene_panel_id = m.panel\n" +
         "  GROUP BY s, g\n" +
         ") WHERE extra > 0 GROUP BY g", conn),
+      // the panels a selected sample holds for this alteration type, by the genes altered here
+      chQuery<ChRow>(
+        "SELECT gptg.gene AS g, arraySort(groupUniqArray(gptg.gene_panel_id)) AS panels\n" +
+        "FROM " + db + ".gene_panel_to_gene_derived gptg\n" +
+        "WHERE gptg.gene_panel_id IN (\n" +
+        "  SELECT DISTINCT gene_panel_id FROM " + db + ".sample_to_gene_panel_derived\n" +
+        "  WHERE " + studyIn(studies) + " AND alteration_type = " + sq(alterationType) + inSamples(set) + "\n" +
+        ")\n" +
+        "  AND gptg.gene IN (SELECT hugo_gene_symbol FROM " + db + ".genomic_event_derived\n" + where + ")\n" +
+        "GROUP BY g", conn),
     ]);
 
     const panelMap = new Map<string, number>(panelProfiled.data.map((r) => [r.g, Number(r.n)]));
     const wesN = Number(wes.data[0]?.n || 0);
     const surplusOf = new Map<string, number>(surplus.data.map((r) => [r.g, Number(r.n)]));
+    const panelsByGene = new Map<string, string[]>(panelsOf.data.map((r) => [r.g, (r.panels as unknown as unknown[]).map(String)]));
     const rows = altered.data.map((r): GeneTableRow => {
       const profiled = (panelMap.get(r.g) || 0) + wesN - (surplusOf.get(r.g) || 0);
       const alt = Number(r.altered), onPanel = Number(r.on_panel);
       return {
-        gene: r.g, altered: alt, alteredOnPanel: onPanel, events: Number(r.events), profiled,
+        gene: r.g, altered: alt, alteredOnPanel: onPanel, events: Number(r.events), profiled, panels: panelsByGene.get(r.g) || [],
         freqPct: profiled ? Math.round(1000 * onPanel / profiled) / 10 : null,
         ...(isCna ? { cna: Number(r.cna), cytoband: r.cytoband } : {})
       };
@@ -1280,6 +1288,10 @@ function resolvedFromRows(study: string, rows: [string, string][]): Awaited<Retu
   return { set: studySet(study, cohortTable(study)), rows, count: new Set(rows.map((x) => x[0])).size, sampleCount: rows.length };
 }
 
+/** case lists in the Case Lists chart's order: the most samples first, ties by the list's id */
+const byCount = <T extends { id: string; n: number }>(lists: T[]): T[] =>
+  lists.sort((x, y) => y.n - x.n || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+
 /** How many patients (owners of a sample) and samples these studies hold within `set`. */
 async function cohortSize(studies: string[], db: string, conn: ChConn, set: CohortSet): Promise<{ patients: number; samples: number }> {
   const r = await chQuery<ChRow>(
@@ -1417,16 +1429,15 @@ async function prefetchFacets(opts: {
       (set.samples ? "\n  AND sd.sample_unique_id IN " + set.samples : "") + "\n" +
       "GROUP BY gp.stable_id, sd.cancer_study_identifier, atype ORDER BY n DESC", conn),
     chQuery<ChRow>(
-      "SELECT cs.cancer_study_identifier AS s, sl.stable_id AS id, any(sl.name) AS name, uniqExact(p.stable_id) AS n\n" +
+      "SELECT cs.cancer_study_identifier AS s, sl.stable_id AS id, any(sl.name) AS name, uniqExact(s.internal_id) AS n\n" +
       "FROM " + db + ".sample_list sl\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n" +
       "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
       "JOIN " + db + ".sample s ON s.internal_id = sll.sample_id\n" +
-      "JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
       "WHERE cs.cancer_study_identifier IN " + IN +
-      // a list's members are samples: only the cohort's own count, each list sized by their owners
+      // a list's members are samples, counted as samples: only the cohort's own
       (set.samples ? "\n  AND concat(cs.cancer_study_identifier, '_', s.stable_id) IN " + set.samples : "") + "\n" +
-      "GROUP BY s, id ORDER BY n DESC LIMIT 10 BY s", conn),
+      "GROUP BY s, id", conn),
     // a patient-level attribute counted in the queried samples of the patients with a value, as the
     // portal's clinical-attributes/counts does (ClinicalAttributeMapper): the Tracks menu's Freq
     chQuery<ChRow>(
@@ -1639,11 +1650,11 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
       cur.altered += r.altered; cur.events += r.events; cur.profiled += r.profiled;
       cur.alteredOnPanel = (cur.alteredOnPanel ?? 0) + (r.alteredOnPanel ?? r.altered);
       cur.cytoband = cur.cytoband || r.cytoband;
+      if (r.panels?.length) cur.panels = [...new Set([...(cur.panels || []), ...r.panels])].sort();
     }
     return [...m.values()]
       .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * (r.alteredOnPanel ?? r.altered) / r.profiled) / 10 : null }))
-      .sort((a, b) => b.altered - a.altered)
-      .slice(0, GENE_TABLE_LIMIT);
+      .sort((a, b) => b.events - a.events || (a.gene < b.gene ? -1 : a.gene > b.gene ? 1 : 0));
   };
 
   // Per-gene facets sum: total, profiled and every state are sample counts over
@@ -1681,7 +1692,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     declaredAttributes: [...new Map(parts.flatMap((p) => p.declaredAttributes || []).reverse().map((d) => [d.attribute, d])).values()].reverse(),
     ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
-    caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),
+    caseLists: byCount([...lm.values()]),
     geneFacets: [...gfMap.values()],
     mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),
     cnaGenes: mergeGeneTable((p) => p.cnaGenes),

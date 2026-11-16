@@ -168,7 +168,7 @@ checks assert rather than whatever a real warehouse happens to contain:
 - **Timelines** (treatment and specimen events) for every patient but the structural-variant ones (`FX-P45`–`FX-P53`), and TP53-mutant and wild-type
   patients both, for the timeline, plot and oncoprint checks.
 - **Two gene panels**: `FX-P31`–`FX-P40` are on `PEERFIX_NO_EGFR`, and `FX-P33`, `FX-P35`, `FX-P37` are
-  EGFR-mutant there — mutated on no panel covering the gene, the case `check:genefacets` exists for.
+  EGFR-mutant there — mutated on no panel covering the gene, the case `check:genefacets` exists for, and the panels `check:gene-panels` lists in the gene tables' Freq tooltip.
   `FX-P02` is FAT1-amplified in one sample and FAT1-deleted in the other, its other case.
 - **`DEAD` spelled `False`/`FALSE` and `True`/`TRUE`**, for `check:values`.
 - **Two samples each for `FX-P01`–`FX-P04`**, whose values agree (`CANCER_TYPE`), differ
@@ -180,6 +180,7 @@ checks assert rather than whatever a real warehouse happens to contain:
 - **Single-base substitutions of every kind** on `FX-P21`–`FX-P30` (both strands of each class, a
   second row at one locus, a DNP and an insertion, a lowercase allele, germline and UNCALLED rows,
   ref = alt), each on a gene the patient already had mutated, for `check:oncoprint-spectrum`.
+- **A case list of three samples** (`cbiolab_peer_fixture_subset`: both samples of `FX-P01` and one of `FX-P02`) beside the importer's standard lists, which hold every sample, for `check:case-lists`: a list counted in samples, not patients, and one a filter can empty.
 - **OncoKB calls** for its variants (`test/fixtures/peer-oncokb.tsv`, a hand-written subset of
   OncoKB's public calls; some variants are left unannotated). A peer annotates with its caller's pin,
   so they are stored under the version the app pins (`ONCOKB_PIN`, else the warehouse's latest) and

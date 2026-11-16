@@ -9,6 +9,7 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
+import { zoomedTip } from "./zoomed-tip.ts";
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
@@ -642,7 +643,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       else if (t.numeric) {
         // the exact value where the contract carries it; an older contract has only the drawing code
         const x = t.values ? t.values[hit.ci] : NaN;
-        lines.push({ text: t.label + ": " + (c === -1 ? "no data" : !Number.isNaN(x) ? portalTipNumber(x, t.kind !== "heatmap")
+        lines.push({ text: t.label + ": " + (c === -1 ? "no data" : c === -2 ? "N/A" : !Number.isNaN(x) ? portalTipNumber(x, t.kind !== "heatmap")
           : "≈" + portalTipNumber(numericValue(t, c), t.kind !== "heatmap")) });
       }
       else lines.push({ text: t.label + ": " + (c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : (t.categories && t.categories[c]) || "Other") });
@@ -650,7 +651,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       let alt = 0, prof = 0;
       for (let k = hit.k; k < hit.k1; k++) { const c = t.cells[visible.order[k]]; if (c !== -1) prof++; if (c > 0) alt++; }
       lines.push({ text: rowName + alt + " altered of " + prof + " profiled" });
-    } else lines.push({ text: rowName + "zoom in for per-" + data.unit + " values" });
+    } else {
+      const cols: number[] = [];
+      for (let k = hit.k; k < hit.k1; k++) cols.push(visible.order[k]);
+      for (const text of zoomedTip(t, cols)) lines.push({ text });
+    }
     // the specifics, once they arrive
     const d = col ? detail[col] : undefined;
     if (d === "loading") lines.push({ text: "…", dim: true });
@@ -1155,7 +1160,8 @@ function Legend({ data, display, colors, shown }: { data: UnpackedContract; disp
                 {key.kind === "number" ? key.min + " → " + key.max : ""}{t.logScale ? " (log scale)" : ""}</>;
             })()
           : t.numeric
-          ? <>{sw("linear-gradient(90deg," + [0, 64, 128, 191, 255].map((c) => heatColor(t, c, S)).join(",") + ")", 44)}{t.min} → {t.max}</>
+          ? <>{sw("linear-gradient(90deg," + [0, 64, 128, 191, 255].map((c) => heatColor(t, c, S)).join(",") + ")", 44)}{t.min} → {t.max}
+              {t.ramp === "vaf" && Array.prototype.includes.call(t.cells, -2) && <span style={{ marginLeft: 6 }}>{sw(S.glyph.heatNull.fill)}{S.glyph.heatNull.vafLabel}</span>}</>
           : (() => {
               const key = clinicalLegend(t, S, colors, shown);
               if (key.kind !== "categories") return null;

@@ -23,6 +23,10 @@ const PRIORITY_BITS = STYLE.glyph.mutation.priority.map((m) => BITS[m.bit as key
 /** the mutation class bit a cell draws (the first by display priority), 0 for none */
 const shownMutation = (c: number): number => { for (const b of PRIORITY_BITS) if (c & b) return b; return 0; };
 export const NOT_PROFILED = -1;
+/** a heatmap cell profiled but without a value: a VAF row's "Not mutated/no VAF data", drawn in the portal's null colour */
+export const HEAT_NULL = -2;
+/** of two cells with no value, the one profiled (HEAT_NULL) first: 1 for it, 0 for not profiled */
+const missingRank = (cell: number): number => cell === HEAT_NULL ? 1 : 0;
 
 
 export function mutClassBit(mt: string | undefined): number {
@@ -164,7 +168,9 @@ export interface AssembleInput {
   /** clinical attributes in track order, each with its per-column value */
   clinical: { attr: string; values: Map<string, string>;
     /** the attribute's display name, when it has one: the Tabular download's row name */
-    name?: string }[];
+    name?: string;
+    /** its declared datatype ("NUMBER", "STRING", "BOOLEAN"), which alone decides a bar or a category track, as in the portal */
+    datatype?: string }[];
   /** continuous per-gene values per profile, keyed "<columnId>|<gene>" */
   /** `assay`: a generic-assay profile, whose `genes` are its entities */
   heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, number>;
@@ -442,7 +448,7 @@ export function assembleContract(input: AssembleInput): Contract {
   { const hidden = new Set(input.hideTracks || []);
     autoTracks.push(...clinTracks.map((t) => t.label));
     for (let i = clinTracks.length - 1; i >= 0; i--) if (hidden.has(clinTracks[i].label)) clinTracks.splice(i, 1); }
-  for (const { attr, values: valByPid, name } of clinical) {
+  for (const { attr, values: valByPid, name, datatype } of clinical) {
     const named = name && name !== attr ? { name } : {};
     if (attr === SPECTRUM_TRACK) {
       // each column's six substitution counts, as the engine's rows carry them ("a,b,c,d,e,f");
@@ -464,7 +470,9 @@ export function assembleContract(input: AssembleInput): Contract {
     // expensive phase of assembly.
     const val: (string | undefined)[] = new Array(allPids.length);
     for (let i = 0; i < allPids.length; i++) val[i] = valByPid.get(allPids[i]);
-    // numeric attribute (≥90% of present values parse, >10 distinct) -> continuous
+    // a NUMBER attribute is a bar track, any other declared datatype a category track (the portal's
+    // OncoprintUtils 1421-1470); an attribute no study declares is numeric when ≥90% of its values
+    // parse and it has >10 distinct
     // heat track: cells are the value scaled to 0..255 over the cohort's min..max
     // one pass over the columns: how many have a value, how many parse, their range and
     // distinct count. Never materialises a per-column array (a spread of 400k values throws).
@@ -481,11 +489,12 @@ export function assembleContract(input: AssembleInput): Contract {
       if (x > max) max = x;
       if (distinct.size <= 11) distinct.add(x);
     }
-    if (!nPresent) { // unknown attribute or none of these patients have it — say so
+    const declared = datatype ? datatype.toUpperCase() : null;
+    if (!nPresent || (declared === "NUMBER" && !nNumeric)) { // unknown attribute, or none of these patients has a value — say so
       clinTracks.push({ kind: "clinical", label: attr + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
       continue;
     }
-    if (nNumeric >= 0.9 * nPresent && distinct.size > 10) {
+    if (declared ? declared === "NUMBER" : nNumeric >= 0.9 * nPresent && distinct.size > 10) {
       // drawn as bars over the data's range, as the portal does; its fixed range for a fraction
       // of the genome, and its log scale for mutation counts
       const fraction = attr === "FRACTION_GENOME_ALTERED";
@@ -528,8 +537,9 @@ export function assembleContract(input: AssembleInput): Contract {
       const usingRef = !!(ref && ref.sd > 0);
       const tx = (v: number) => usingRef ? (v - ref!.mean) / ref!.sd : v;
       const vals: number[] = [];
-      for (const p of allPids) { const v = h.values.get(p + "|" + gene); if (v !== undefined) vals.push(tx(v)); }
-      if (!vals.length) {
+      let profiledNoValue = false;
+      for (const p of allPids) { const v = h.values.get(p + "|" + gene); if (v !== undefined) { if (Number.isNaN(v)) profiledNoValue = true; else vals.push(tx(v)); } }
+      if (!vals.length && !profiledNoValue) {
         heatTracks.push({ kind: "clinical", label: label + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
         continue;
       }
@@ -545,7 +555,9 @@ export function assembleContract(input: AssembleInput): Contract {
       const cells = new Int32Array(allPids.length).fill(-1), values = new Float32Array(allPids.length).fill(NaN);
       allPids.forEach((p, i) => {
         const v = h.values.get(p + "|" + gene);
-        if (v !== undefined) { cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span); values[i] = tx(v); }
+        if (v === undefined) return;
+        if (Number.isNaN(v)) { cells[i] = HEAT_NULL; return; }
+        cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span); values[i] = tx(v);
       });
       heatTracks.push({ kind: "heatmap", numeric: true, ...(ramp ? { ramp } : {}), label, gene, profileType: h.profileType,
         ...(h.profileKind ? { profileKind: h.profileKind } : h.isVaf ? { profileKind: "MUTATION_EXTENDED VAF" } : {}),
@@ -632,9 +644,9 @@ export function assembleContract(input: AssembleInput): Contract {
     if (a === -1 || b === -1) return a === b ? 0 : a === -1 ? 1 : -1;
     return sign * stackCompare(t.values!, t.stack!.length, x, y);
   } : t.values ? (x: number, y: number): number => {
-    // a numeric track sorts by its exact values, missing last
+    // a numeric track sorts by its exact values; then the profiled cells without one (HEAT_NULL), then not profiled
     const a = t.values![x], b = t.values![y], na = Number.isNaN(a), nb = Number.isNaN(b);
-    if (na || nb) return na === nb ? 0 : na ? 1 : -1;
+    if (na || nb) return na !== nb ? (na ? 1 : -1) : -missingRank((t.cells as number[])[x]) + missingRank((t.cells as number[])[y]);
     return sign * (a - b);
   } : ((rank) => (x: number, y: number): number => {
     const a = (t.cells as number[])[x], b = (t.cells as number[])[y];

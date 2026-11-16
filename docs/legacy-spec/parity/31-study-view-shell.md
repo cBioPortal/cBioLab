@@ -243,7 +243,7 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 | STV-LD-3 | 🔶 | C | Some unknown → whole request refused, "Deselect it to continue"; legacy works on the valid ones |
 | STV-LD-4 | 🟡 | B | "counting…", "updating…"; no step list |
 | STV-LD-5 | N/A | C | Cohorts are definitions; no stored sample list to go stale (sample-list cohorts report unmatched ids when made) |
-| STV-LD-6 | 🔶 | C | 0 samples: facets of the filtered attribute only, "0 patients match"; no message. Legacy "Rendering" spinner bug not present → also 🐞 ok for that clause |
+| STV-LD-6 | ✅ | C | 0 samples: the portal's two-paragraph message, no charts, the filter bar kept ([empty-caselists-cases](empty-caselists-cases.md) EM1–EM5). Legacy "Rendering" spinner bug not present → also 🐞 ok for that clause |
 | STV-LD-7 | 🐞 ok | C | No tour component |
 
 ### §13 Modes & conditions
@@ -255,7 +255,7 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 | STV-MD-3 | ❌ | C | No virtual studies |
 | STV-MD-4 | ❌ | C | — |
 | STV-MD-5 | 🟡 | B | "N filters · M patients match"; query dialog carries the filters as clauses (not case_ids) |
-| STV-MD-6 | 🔶 | C | See LD-6 |
+| STV-MD-6 | ✅ | C | See LD-6 |
 | STV-MD-7 | ❌ | C | No manual submit |
 | STV-MD-8 | 🔶 | C | Logged out: Explore works; saving cohorts / id lists need sign-in |
 | STV-MD-9 | 🔶 | C | Logged in: Saved work (cohorts, analyses), no layout |

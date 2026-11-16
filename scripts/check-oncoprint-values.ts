@@ -254,6 +254,20 @@ ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(w
 const top = whole.slice(0, 3).map((r) => r.attribute).join(", ");
 ok("tracks menu order: stored priority, then name", top === "MUTATION_COUNT, AGE, DEAD", top);
 
+// ---- clinical tracks typed by the declared datatype ---------------------------------------------
+// data_clinical_sample.txt: KI67_INDEX is declared NUMBER, its values 10, 20, 30, ">90", "high", "high"
+// (3 numbers, so the old ">10 distinct" rule drew categories); TUMOR_GRADE is declared STRING, "1" once, "2" three times
+let typeChecks = 0;
+const typeOk = (name: string, pass: boolean, detail: string) => { typeChecks++; ok(name, pass, detail); };
+{
+  const c = await buildContract({ study: STUDY, genes: ["KRAS"], unit: "sample", clinical: ["KI67_INDEX", "TUMOR_GRADE"] } as never);
+  const ki = c.tracks.find((t) => t.label === "KI67_INDEX")!, tg = c.tracks.find((t) => t.label === "TUMOR_GRADE")!;
+  const drawn = (ki.values || []).filter((x) => x != null && !Number.isNaN(x as number)).map(Number).sort((x, y) => x - y);
+  typeOk("a NUMBER with 3 distinct numbers is a bar track, its text values no data",
+    ki.numeric === true && ki.min === 10 && ki.max === 30 && JSON.stringify(drawn) === "[10,20,30]", JSON.stringify({ numeric: ki.numeric, min: ki.min, max: ki.max, drawn }));
+  typeOk("a STRING of numbers is a category track", !tg.numeric && JSON.stringify(tg.categories) === '["2","1"]', JSON.stringify(tg.categories));
+}
+
 // ---- the automatic rows: listed, counted and hidden ----------------------------------------------
 // every fixture sample has a mutations panel in data_gene_panel_matrix.txt (59 of 59), and its
 // patients hold one or two samples, so the figure draws # Samples per Patient by itself
@@ -274,6 +288,25 @@ const autoOk = (name: string, pass: boolean, detail: string) => { autoChecks++; 
   const head = rows.slice(0, 2).map((x) => x.label + " " + trackFreqText(x.pct)).join(", ");
   // the spectrum first; then MUTATION_COUNT (100%, stored priority 30) ahead of # Samples per Patient (100%, priority 0)
   autoOk("tracks menu leads with the spectrum, then by Freq and priority", head === "Mutation spectrum 100.0%, Mutation Count 100.0%", head);
+}
+
+// ---- the VAF row: a value, profiled without one, not profiled ------------------------------------
+// by hand from data_mutations.txt and data_gene_panel_matrix.txt: EGFR is on PEERFIX_FULL (49 samples), not on
+// PEERFIX_NO_EGFR (FX-P31-T1 … FX-P40-T1); 13 samples on the full panel have an EGFR mutation with allele counts
+// (FX-P21…P28-T1, FX-P41-T1, FX-P42-T1, FX-P43-T1/T2, FX-P44-T1), so 36 are profiled without a VAF; FX-P21-T1's
+// largest is 130 / (130 + 124); FX-P33-T1's mutation is off its panel, so it is not profiled
+let vafChecks = 0;
+const vafOk = (name: string, pass: boolean, detail: string) => { vafChecks++; ok(name, pass, detail); };
+{
+  const c = await buildContract({ study: STUDY, genes: ["EGFR"], unit: "sample", heatmap: [{ profileType: "VAF", genes: ["EGFR"] }] } as never);
+  const t = c.tracks.find((x) => x.kind === "heatmap")!;
+  const cells = t.cells as number[], at = (sid: string) => c.columns.indexOf(sid);
+  const n = (code: number) => cells.filter((x) => x === code).length, valued = cells.filter((x) => x >= 0).length;
+  vafOk("VAF EGFR: 13 values, 36 profiled without one, 10 not profiled", valued === 13 && n(-2) === 36 && n(-1) === 10,
+    JSON.stringify({ valued, profiledNoValue: n(-2), notProfiled: n(-1) }));
+  const v21 = (t.values as (number | null)[])[at("FX-P21-T1")];
+  vafOk("VAF EGFR FX-P21-T1 is its largest", v21 != null && Math.abs(v21 - 130 / 254) < 1e-6, String(v21));
+  vafOk("VAF EGFR FX-P33-T1, mutated off its panel, is not profiled", cells[at("FX-P33-T1")] === -1, String(cells[at("FX-P33-T1")]));
 }
 
 // ---- the Tabular download's row names and types -------------------------------------------------
@@ -332,6 +365,6 @@ const evLabels = async (line: string) => (await chQuery<{ ev: string }>(oqlEvent
 oqlOk("cohort events EGFR: MUT leave out the Fusion-typed mutation; a bare EGFR keeps it",
   !(await evLabels("EGFR: MUT")).includes("EGFR-SEPT14") && (await evLabels("EGFR")).includes("EGFR-SEPT14"), "");
 
-const total = autoChecks + exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
+const total = typeChecks + vafChecks + autoChecks + exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

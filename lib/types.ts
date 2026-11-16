@@ -998,6 +998,8 @@ export interface GeneTableRow {
    * Absent from a peer that predates it, which then reads as `altered`.
    */
   alteredOnPanel?: number;
+  /** the gene panels a selected sample holds for this alteration type that list the gene (whole-exome as WES), A to Z */
+  panels?: string[];
   /** number of alteration events (a sample may carry several) */
   events: number;
   /** samples profiled for this gene = panel-profiled + whole-exome */
@@ -1088,6 +1090,7 @@ export interface ExploreResult {
   /** per-attribute numeric stats, used to derive shared bins when federating */
   /** cohort size in both units, as the portal's header reports it */
   totals?: { patients: number; samples: number };
+  /** every case list holding a selected sample, by kind (the id less its study prefix), counted in samples; the most first */
   caseLists: { id: string; name: string; n: number }[];
   profiles: string[]; gaProfiles: string[];
   /** every profile as the studies describe them (genetic_profile), for a plot axis's Data picker */

@@ -1,4 +1,4 @@
-// Explore's facets (lib/explore.ts) beyond the gene tables: the portal's numeric bin edges, how
+// Explore's facets (lib/explore.ts) beyond the gene tables (whose merge, GR2 and GP5, is here too): the portal's numeric bin edges, how
 // participants' facets merge (counts summed before dividing, overlap not deduplicated), a single
 // study's clinical / derived / per-gene facets with their disjunctive counting, the draft resolved
 // once and shipped as a table (or inlined past the bound), the multi-study pass pooled per
@@ -225,6 +225,99 @@ describe("merging participants' facets", () => {
     assert.equal(m.draftCount, null);
     assert.equal(m.derived, undefined);
     assert.deepEqual(m.mutatedGenes, []);
+  });
+
+  // docs/legacy-spec/parity/empty-caselists-cases.md, Case Lists rows CL5, CL6, CL8
+  describe("CL5/CL6/CL8: case lists merged across studies", () => {
+    test("CL6: lists of one kind are one row, counts added, named after the first study's list", () => {
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: [{ id: "all", name: "All samples", n: 30 }, { id: "cna", name: "CNA", n: 5 }] }),
+        part({ study: "s2", caseLists: [{ id: "all", name: "All tumors", n: 20 }, { id: "rppa", name: "RPPA", n: 7 }] }),
+      ]);
+      assert.deepEqual(m.caseLists, [
+        { id: "all", name: "All samples", n: 50 },
+        { id: "rppa", name: "RPPA", n: 7 },
+        { id: "cna", name: "CNA", n: 5 },
+      ]);
+    });
+
+    test("CL5: no cap on the number of rows (twelve lists in one study, all kept)", () => {
+      const twelve = Array.from({ length: 12 }, (_, i) => ({ id: "l" + String(i).padStart(2, "0"), name: "List " + i, n: 100 - i }));
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: twelve }),
+        part({ study: "s2", caseLists: [{ id: "all", name: "All samples", n: 1 }] }),
+      ]);
+      assert.equal(m.caseLists.length, 13, "every list of every study is a row");
+      assert.deepEqual(m.caseLists.slice(0, 12).map((l) => l.id), twelve.map((l) => l.id));
+      assert.deepEqual(m.caseLists[12], { id: "all", name: "All samples", n: 1 });
+    });
+
+    test("CL8: by count descending, ties by id A to Z", () => {
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: [
+          { id: "sv", name: "SV", n: 4 }, { id: "cna", name: "CNA", n: 4 }, { id: "zeta", name: "Zeta", n: 9 },
+        ] }),
+        part({ study: "s2", caseLists: [
+          { id: "sequenced", name: "Sequenced", n: 4 }, { id: "all", name: "All", n: 4 }, { id: "beta", name: "Beta", n: 1 },
+        ] }),
+      ]);
+      assert.deepEqual(m.caseLists.map((l) => [l.id, l.n]),
+        [["zeta", 9], ["all", 4], ["cna", 4], ["sequenced", 4], ["sv", 4], ["beta", 1]]);
+    });
+
+    test("CL8: a tie formed by summing is ordered by id too", () => {
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: [{ id: "mrna", name: "mRNA", n: 6 }, { id: "cnaseq", name: "CNA seq", n: 3 }] }),
+        part({ study: "s2", caseLists: [{ id: "cnaseq", name: "CNA seq", n: 3 }] }),
+      ]);
+      assert.deepEqual(m.caseLists.map((l) => [l.id, l.n]), [["cnaseq", 6], ["mrna", 6]]);
+    });
+  });
+
+  // ---- docs/legacy-spec/parity/gene-tables-cases.md GP4–GP5: a row's gene panels across connections ----
+  const prow = (gene: string, panels?: string[], extra: Record<string, unknown> = {}) =>
+    ({ gene, altered: 1, alteredOnPanel: 1, events: 1, profiled: 10, freqPct: 10, ...(panels ? { panels } : {}), ...extra });
+
+  for (const key of ["mutatedGenes", "cnaGenes", "svGenes"] as const) {
+    const extra = key === "cnaGenes" ? { cna: 2, cytoband: "1p" } : {};
+    test(`GP5: ${key} — a gene in both parts holds every part's panels, each once, A to Z`, () => {
+      const m = mergeExplore([
+        part({ study: "x", [key]: [prow("KRAS", ["B", "WES"], extra)] } as never),
+        part({ study: "y", [key]: [prow("KRAS", ["A", "B"], extra)] } as never),
+      ]);
+      const kras = m[key]!.find((g) => g.gene === "KRAS")!;
+      assert.deepEqual((kras as { panels?: string[] }).panels, ["A", "B", "WES"]);
+    });
+
+    test(`GP5: ${key} — a part whose row has no panels keeps the other part's`, () => {
+      for (const order of [0, 1]) {
+        const ps = [part({ study: "x", [key]: [prow("TP53", undefined, extra)] } as never),
+          part({ study: "y", [key]: [prow("TP53", ["P1", "P2"], extra)] } as never)];
+        const m = mergeExplore(order ? ps.reverse() : ps);
+        const tp53 = m[key]!.find((g) => g.gene === "TP53")!;
+        assert.deepEqual((tp53 as { panels?: string[] }).panels, ["P1", "P2"], order ? "panel-less part second" : "panel-less part first");
+      }
+    });
+  }
+
+  test("GP5: panels do not leak between genes, or between a CNA gene's AMP and HOMDEL rows", () => {
+    const m = mergeExplore([
+      part({ study: "x", mutatedGenes: [prow("KRAS", ["K"]), prow("TP53", ["T"])], cnaGenes: [prow("MYC", ["AMP1"], { cna: 2 })] } as never),
+      part({ study: "y", mutatedGenes: [prow("KRAS", ["K2"])], cnaGenes: [prow("MYC", ["DEL1"], { cna: -2 })] } as never),
+    ]);
+    const panelsOf = (rows: unknown[] | undefined, gene: string, cna?: number) =>
+      (rows as { gene: string; cna?: number; panels?: string[] }[]).find((g) => g.gene === gene && g.cna === cna)!.panels;
+    assert.deepEqual(panelsOf(m.mutatedGenes, "KRAS"), ["K", "K2"]);
+    assert.deepEqual(panelsOf(m.mutatedGenes, "TP53"), ["T"]);
+    assert.deepEqual(panelsOf(m.cnaGenes, "MYC", 2), ["AMP1"]);
+    assert.deepEqual(panelsOf(m.cnaGenes, "MYC", -2), ["DEL1"]);
+  });
+
+  test("GP5: merging leaves the parts' own panel lists unchanged", () => {
+    const a = prow("KRAS", ["B", "WES"]), b = prow("KRAS", ["A", "B"]);
+    mergeExplore([part({ study: "x", mutatedGenes: [a] } as never), part({ study: "y", mutatedGenes: [b] } as never)]);
+    assert.deepEqual(a.panels, ["B", "WES"]);
+    assert.deepEqual(b.panels, ["A", "B"]);
   });
 });
 
@@ -804,5 +897,81 @@ describe("generic-assay charts", () => {
     assert.ok(own.every((q) => !/sample_unique_id IN/.test(q)), "its own chart reads no cohort condition");
     const other = sent.filter((q) => /AS total_p/.test(q) && /entity_stable_id = 'SBS2' AND v IS NOT NULL/.test(q));
     assert.ok(other.every((q) => /sample_unique_id IN/.test(q)), "another entity's chart is drawn under the draft");
+  });
+});
+
+// ---- gene tables hold every gene (docs/legacy-spec/parity/gene-tables-cases.md GR1, GR2) ----
+// The portal's alteration-count queries have no LIMIT (ClickhouseAlterationMapper.xml:32, 59, 82),
+// so a table holds every gene with an event of its type, and a merge keeps every row it is given.
+describe("gene tables hold every gene", () => {
+  const gpart = (o: Partial<ExploreResult>): ExploreResult => ({
+    study: "", studies: [], draftCount: null, clinical: [], events: [], caseLists: [], profiles: [], gaProfiles: [], stats: { ms: 0 }, ...o,
+  } as ExploreResult);
+  const geneRows = (prefix: string, n: number, extra: Record<string, unknown> = {}) =>
+    Array.from({ length: n }, (_, i) => ({ gene: prefix + String(i).padStart(4, "0"), altered: 1, alteredOnPanel: 1, events: 1, profiled: 10, freqPct: 10, ...extra }));
+
+  for (const key of ["mutatedGenes", "cnaGenes", "svGenes"] as const) {
+    test(`GR2: ${key} of two parts with 400 different genes each merge to all 800`, () => {
+      const extra = key === "cnaGenes" ? { cna: 2, cytoband: "1p" } : {};
+      const m = mergeExplore([gpart({ [key]: geneRows("A", 400, extra) } as never), gpart({ [key]: geneRows("B", 400, extra) } as never)]);
+      const got = m[key]!;
+      assert.equal(got.length, 800);
+      assert.equal(new Set(got.map((g) => g.gene)).size, 800);
+    });
+  }
+
+  test("GR2: a gene in both parts is summed, among 800 others", () => {
+    const shared = (altered: number, onPanel: number, events: number, profiled: number) =>
+      ({ gene: "KRAS", altered, alteredOnPanel: onPanel, events, profiled, freqPct: null });
+    const m = mergeExplore([
+      gpart({ mutatedGenes: [...geneRows("A", 400), shared(3, 2, 5, 30)] as never }),
+      gpart({ mutatedGenes: [...geneRows("B", 400), shared(4, 4, 6, 70)] as never }),
+    ]);
+    assert.equal(m.mutatedGenes!.length, 801);
+    const kras = m.mutatedGenes!.find((g) => g.gene === "KRAS")!;
+    assert.deepEqual([kras.altered, kras.alteredOnPanel, kras.events, kras.profiled], [7, 6, 11, 100]);
+  });
+
+  test("GR2: a CNA gene's two calls stay two rows; the same call in both parts is summed", () => {
+    const m = mergeExplore([
+      gpart({ cnaGenes: [...geneRows("A", 400, { cna: 2 }), { gene: "MYC", altered: 1, alteredOnPanel: 1, events: 1, profiled: 10, freqPct: 10, cna: 2, cytoband: "8q24.21" }] as never }),
+      gpart({ cnaGenes: [...geneRows("B", 400, { cna: 2 }), { gene: "MYC", altered: 2, alteredOnPanel: 2, events: 2, profiled: 20, freqPct: 10, cna: 2, cytoband: "8q24.21" },
+        { gene: "MYC", altered: 5, alteredOnPanel: 5, events: 5, profiled: 20, freqPct: 25, cna: -2, cytoband: "8q24.21" }] as never }),
+    ]);
+    assert.equal(m.cnaGenes!.length, 802);
+    const amp = m.cnaGenes!.find((g) => g.gene === "MYC" && g.cna === 2)!;
+    assert.deepEqual([amp.altered, amp.events, amp.profiled], [3, 3, 30]);
+    assert.ok(m.cnaGenes!.some((g) => g.gene === "MYC" && g.cna === -2));
+  });
+
+  const answer600 = () => {
+    facetAnswers();
+    on(/AS altered/, (q) => /variant_type = 'mutation'/.test(q)
+      ? Array.from({ length: 600 }, (_, i) => ({ g: "G" + String(i).padStart(4, "0"), altered: 1, on_panel: 1, events: 1 }))
+      : []);
+    on(/gene_panel_id = 'WES'/, [{ n: 100 }]);
+  };
+
+  test("GR1: one study's mutated-gene table holds all 600 genes the statement returns", async () => {
+    answer600();
+    const r = await buildExplore({ study: S, conn: PRIMARY, skipBins: true });
+    assert.equal(r.mutatedGenes!.length, 600);
+  });
+
+  test("GR1: the gene-table statement asks for every row (no LIMIT)", async () => {
+    answer600();
+    await buildExplore({ study: S, conn: PRIMARY, skipBins: true });
+    // The stand-in answers by matching text and cannot apply a LIMIT, so the 600 rows above come
+    // back whatever the statement says; whether the warehouse would cut them is only visible here.
+    const geneStmts = sent.filter((q) => /AS altered/.test(q) && /genomic_event_derived/.test(q));
+    assert.equal(geneStmts.length, 3, "one per table: mutation, CNA, SV");
+    for (const q of geneStmts) assert.ok(!/\bLIMIT\b/i.test(q), "no LIMIT in:\n" + q);
+  });
+
+  test("GR1: the multi-study path keeps all 600 genes of a connection's pooled table", async () => {
+    answer600();
+    const r = await buildExploreFederated({ studies: [S], skipBins: true,
+      profilesByStudy: new Map([[S, { profiles: ["mutations"], gaProfiles: [] }]]) } as never);
+    assert.equal(r.mutatedGenes!.length, 600);
   });
 });
