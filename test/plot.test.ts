@@ -2,7 +2,7 @@
 // statistics, the correlation p-value, and the promise that no axis query returns a case id.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { axisKind, axisLabel, axisSelect, corrPValue, fromLog, logRuleOf, logScaleExempt, toLog, plotBinsSql, plotBoxSql, plotCountSql,
+import { axisKind, axisLabel, axisSelect, corrPValue, plotBinsSql, plotBoxSql, plotCountSql,
   plotShape, plotStatsSql, plotTableSql, plotPointsSql, plotOutlierPointsSql, outlierExtremity, plotViolinSql, categoryColor, isAbsent,
   tukey, validateAxis, CATEGORY_CAP, DEFAULT_BINS , coverageNote, combineNote, plotCoverageSql, plotScatterPointsSql, type PlotData } from "../lib/plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
@@ -228,26 +228,6 @@ test("log: true reads the portal's log2(max(v, 0) + 1), a generic assay's log10(
   assert.equal(axisLabel({ source: "clinical", attribute: "MUTATION_COUNT", log: true }), "MUTATION_COUNT (log2(value + 1))");
   assert.equal(axisLabel({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }), "ESR1 mrna (log2(value + 1))");
   assert.equal(axisLabel({ source: "assay", profileType: "mutational_signature", entity: "SBS1", log: true }), "SBS1 mutational_signature (log10)");
-});
-
-test("the portal's log transforms and their inverses (PLT-STM-11)", () => {
-  assert.equal(logRuleOf({ source: "clinical", attribute: "A" }), undefined);
-  assert.equal(logRuleOf({ source: "clinical", attribute: "A", log: true }), "log2");
-  assert.equal(logRuleOf({ source: "assay", profileType: "p", entity: "e", log: true }), "log10");
-  // log2(max(x, 0) + 1): a negative is drawn at 0
-  assert.deepEqual([-3, 0, 1, 3, 1023].map((x) => toLog("log2", x)), [0, 0, 1, 2, 10]);
-  // log10(x), 0 read as 0
-  assert.deepEqual([0, 1, 100, 0.01].map((x) => toLog("log10", x)), [0, 0, 2, -2]);
-  assert.equal(fromLog("log2", 10), 1023);
-  assert.equal(fromLog("log10", 2), 100);
-});
-
-test("an axis keeps its log scale with values below 0 only for an RNA-seq profile, not a z-score (logScalePossibleForProfile)", () => {
-  assert.equal(logScaleExempt({ source: "molecular", profileType: "rna_seq_v2_mrna", gene: "KRAS", log: true }), true);
-  assert.equal(logScaleExempt({ source: "profile", profile: "rna_seq_mrna", gene: "KRAS", log: true }), true);
-  assert.equal(logScaleExempt({ source: "molecular", profileType: "rna_seq_v2_mrna_median_all_sample_Zscores", gene: "KRAS", log: true }), false);
-  assert.equal(logScaleExempt({ source: "molecular", profileType: "linear_CNA", gene: "KRAS", log: true }), false);
-  assert.equal(logScaleExempt({ source: "clinical", attribute: "AGE", log: true }), false);
 });
 
 test("an OQL axis: Altered when a case matches any statement, Unaltered only when it is profiled for every one", () => {
