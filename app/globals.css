@@ -491,6 +491,10 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .vrowshead { position: sticky; top: 0; z-index: 1; background: var(--card); border-bottom: 1px solid var(--line); }
 .generow.ghead { border-top: none; cursor: default; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
 .generow.ghead:hover { background: none; }
+.generow.ghead .gsort { all: unset; cursor: pointer; white-space: nowrap; }
+.generow.ghead .gsort.gnum { text-align: right; }
+.generow.ghead .gsort:hover, .generow.ghead .gsort.on { color: var(--ink); }
+.generow.ghead .gsort:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .generow .gnum { text-align: right; font-variant-numeric: tabular-nums; }
 .generow .gname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .generow .cnatag { font-size: var(--t-xs); padding: 0.05rem 0.2rem; border-radius: 3px; text-align: center; }

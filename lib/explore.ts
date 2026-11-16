@@ -165,8 +165,6 @@ export function numericBinEdges(
   return { edges, interval };
 }
 
-/** display cap per gene table; totals report the full count behind it */
-const GENE_TABLE_LIMIT = 500;
 /** how many genes may carry their own alteration facet at once */
 const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
@@ -528,12 +526,11 @@ async function buildDerivedFacets(
  * returns exactly the arithmetic that merging per-study results produces — at
  * ~2.3s of query time for all 546 rather than ~7,100 round trips.
  *
- * Pooling also CORRECTS the per-study merge. Each study's table is truncated at
- * GENE_TABLE_LIMIT and the merge sums only the parts that survived that cut, so
- * a gene ranking outside some study's top-N lost that study's PROFILED samples
- * along with its (small) altered count, and the frequency came out biased high.
- * Pooled, every selected study contributes to the denominator whether or not the
- * gene ranks in it. Pinned by test/denominator.test.ts and npm run check:denominators.
+ * Pooled, every selected study contributes its profiled samples to a gene's
+ * denominator whether or not the gene is altered in it: a per-study merge would
+ * add a study's profiled count only where that study has a row for the gene, and
+ * the frequency would come out biased high. Every gene is returned, with no cap
+ * on the rows. Pinned by test/denominator.test.ts and npm run check:denominators.
  *
  * Safe because `sample_unique_id` is unique across studies — measured 408,055
  * rows and 408,055 distinct values in sample_derived — so `uniqExact` over a
@@ -577,7 +574,7 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
         "       uniqExact(sample_unique_id) AS altered, uniqExactIf(sample_unique_id, NOT off_panel) AS on_panel, count() AS events\n" +
         "FROM " + db + ".genomic_event_derived\n" + where + "\n" +
         "GROUP BY g" + (isCna ? ", cna" : "") + "\n" +
-        "ORDER BY altered DESC, g ASC LIMIT " + GENE_TABLE_LIMIT, conn),
+        "ORDER BY events DESC, g ASC", conn),
       // Aggregate samples PER PANEL first, then join panels to their genes. The
       // naive sample-level join costs 13s on a 290k-sample study; collapsing to
       // ~100 panel rows first gives the identical answer in ~250ms.
@@ -1626,8 +1623,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     }
     return [...m.values()]
       .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * (r.alteredOnPanel ?? r.altered) / r.profiled) / 10 : null }))
-      .sort((a, b) => b.altered - a.altered)
-      .slice(0, GENE_TABLE_LIMIT);
+      .sort((a, b) => b.events - a.events || (a.gene < b.gene ? -1 : a.gene > b.gene ? 1 : 0));
   };
 
   // Per-gene facets sum: total, profiled and every state are sample counts over

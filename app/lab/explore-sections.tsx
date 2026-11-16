@@ -2,7 +2,7 @@
 // Explore's sections: the study picker, the action bar, the add-chart dialog and the facet grid's
 // cards. The page owns Explore's state (app/lab/use-explore.ts and the draft) and hands every
 // section the same ExploreCtx — what it reads and the edits it can make.
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
 import CustomBinsDialog from "./custom-bins-dialog";
@@ -16,6 +16,7 @@ import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
+import { defaultGeneSort, geneHeaderTips, geneTableName, geneTableTitle, geneTableTsv, nextGeneSort, profiledSamples, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
@@ -1117,49 +1118,62 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   const picks = usePicks();
   // counting OncoKB drivers only, every number here and every clause a click writes is a driver call
   const drivers = !!explore.drivers;
+  const [sort, setSort] = useState<GeneSort>(() => defaultGeneSort(kind));
+  const profiledByKind = Object.fromEntries((explore.dataTypes || []).map((d) => [d.profile, d.n]));
   const meta = {
-    mutated: { title: "Mutated Genes", rows: explore.mutatedGenes, total: explore.geneTotals?.mutated, oql: (g: any) => g.gene + ": " + callOql("MUT") },
-    cna:     { title: "CNA Genes",     rows: explore.cnaGenes,     total: explore.geneTotals?.cna,     oql: (g: any) => g.gene + ": " + callOql(g.cna === 2 ? "AMP" : "HOMDEL") },
-    sv:      { title: "SV Genes",      rows: explore.svGenes,      total: explore.geneTotals?.sv,      oql: (g: any) => g.gene + ": " + callOql("FUSION") }
+    mutated: { rows: explore.mutatedGenes, oql: (g: any) => g.gene + ": " + callOql("MUT") },
+    cna:     { rows: explore.cnaGenes,     oql: (g: any) => g.gene + ": " + callOql(g.cna === 2 ? "AMP" : "HOMDEL") },
+    sv:      { rows: explore.svGenes,      oql: (g: any) => g.gene + ": " + callOql("FUSION") }
   }[kind];
+  const name = geneTableName(kind);
+  const title = geneTableTitle(kind, profiledSamples(kind, profiledByKind));
+  const tips = geneHeaderTips(kind);
   const all = meta.rows || [];
-  // Client-side, over the rows already loaded. The table is capped
-  // at GENE_TABLE_LIMIT server-side, so this finds a gene among the
-  // top 500 by alteration count and says so when it cannot — a box
-  // that silently searched less than it appeared to would be worse
-  // than no box.
   const needle = (geneFilter[kind] || "").trim().toUpperCase();
-  const rows = needle ? all.filter((g: any) => g.gene.toUpperCase().includes(needle)) : all;
+  const rows = useMemo(() => {
+    const loaded = meta.rows || [];
+    return sortGeneRows(needle ? loaded.filter((g: any) => g.gene.toUpperCase().includes(needle)) : loaded, sort);
+  }, [meta.rows, needle, sort]);
+  const head = (column: GeneSortColumn, label: string, numeric = false) => (
+    <button type="button" className={cn("gsort", numeric && "gnum", sort.column === column && "on")} data-tip={tips[column]}
+      aria-sort={sort.column === column ? (sort.desc ? "descending" : "ascending") : undefined}
+      onClick={() => setSort(nextGeneSort(sort, column))}>
+      {label}{sort.column === column ? (sort.desc ? " ↓" : " ↑") : ""}
+    </button>
+  );
   if (!all.length) return null;
   const rowKey = (g: any) => g.gene + (g.cna ?? "");
   const byKey = new Map(all.map((g: any) => [rowKey(g), g]));
   return (
     <div className="card" data-genetable={kind}>
       <div className="row baseline g5">
-        <h2 className="flush">{meta.title}</h2>
+        <h2 className="flush">{title}</h2>
         {drivers && <span className="meta" data-tip={"counting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered"}>OncoKB drivers</span>}
         <span className="spacer" />
         <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="find gene" value={geneFilter[kind] || ""}
-          data-tip={"filters the " + all.length + " genes loaded for this table, not all " + (meta.total || all.length)}
+          data-tip={"show the genes whose symbol contains this, of all " + all.length.toLocaleString()}
           onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
         {(() => {
           const chart: ChartKey = { kind: "genes", specs: (kind === "mutated" ? ["MUT"] : kind === "cna" ? ["AMP", "HOMDEL"] : ["FUSION"]).map((c) => ": " + callOql(c)) };
           const checked = picks.picked.map((k) => byKey.get(k)).filter(Boolean);
-          return <ChartMenu label={meta.title} actions={addMode ? [] : checked.length < 2
+          const file = chartFileName(name, "data");
+          return <ChartMenu label={name} actions={[...(addMode ? [] : checked.length < 2
             ? [{ label: "Check genes to compare or analyze", disabled: true, title: "check at least 2 genes: each becomes a group of the cases altered in it (a case altered in both is in both)" }]
-            : forBoth((t) => compareAction([], checked.map((g: any) => ({ name: armLabel(meta.oql(g)), where: { kind: "oql", q: meta.oql(g) } as Leaf })), "gene", (arms) => compareItems(chart, arms, t), t))} />;
+            : forBoth((t) => compareAction([], checked.map((g: any) => ({ name: armLabel(meta.oql(g)), where: { kind: "oql", q: meta.oql(g) } as Leaf })), "gene", (arms) => compareItems(chart, arms, t), t))),
+            { label: "Download", title: "save this table as a file", sub: [{ label: "Data", title: "every gene in the table, as " + file,
+              onClick: () => saveText(file, geneTableTsv(kind, all)) }] }]} />;
         })()}
       </div>
       {/* the portal's columns: the gene, its event count (mutations, SVs) or cytoband and call
           (CNA), "#" altered samples and the panel-aware frequency */}
       <VirtualRows items={rows} rowKey={rowKey} estimate={GENEROW_H} className="generows"
         header={
-          <div className={"generow ghead gk-" + kind} aria-hidden="true">
+          <div className={"generow ghead gk-" + kind}>
             <span />
-            <span>Gene</span>
-            {kind === "cna" ? <><span>Cytoband</span><span>CNA</span></> : <span className="gnum">{kind === "sv" ? "# SV" : "# Mut"}</span>}
-            <span className="gnum">#</span>
-            <span className="gnum">Freq</span>
+            {head("gene", "Gene")}
+            {kind === "cna" ? <>{head("cytoband", "Cytoband")}{head("cna", "CNA")}</> : head("events", kind === "sv" ? "# SV" : "# Mut", true)}
+            {head("altered", "#", true)}
+            {head("freq", "Freq", true)}
           </div>
         }>
         {(g: any) => {
@@ -1188,15 +1202,13 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         }}
       </VirtualRows>
       <span className="meta pad-tight vlistfoot">{needle
-        ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " loaded genes match"
-        : rows.length.toLocaleString() + " of " + (meta.total || rows.length).toLocaleString() + " genes" +
-          (meta.total && meta.total > rows.length ? " (the most altered)" : "")}</span>
+        ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " genes match"
+        : all.length.toLocaleString() + " genes"}</span>
       <PickBar picks={picks} hint={"keep the samples " + (drivers ? "with an OncoKB driver call in" : "altered in") + " any of the checked genes (one OQL query)"}
         onApply={(keys) => addClause({ kind: "oql", q: keys.map((k) => meta.oql(byKey.get(k))).join("; ") })} />
       {needle && !rows.length && (
         <p className="note flush mt-1.5">
-          No match among the {all.length.toLocaleString()} genes loaded for this table
-          {meta.total && meta.total > all.length ? " (of " + meta.total.toLocaleString() + " altered in this cohort)" : ""}.
+          No match among the {all.length.toLocaleString()} genes in this table.
         </p>
       )}
     </div>

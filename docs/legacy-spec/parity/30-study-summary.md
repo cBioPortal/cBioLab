@@ -204,16 +204,16 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-GT-1 | 🟡 | B | Mutated, CNA, SV tables per alteration type ✅; no SV-pair table; 500-row cap |
-| STS-GT-2 | ❌ | B | Titles "MUTATED GENES" etc. without "(N profiled samples)" |
-| STS-GT-3 | 🔶 | B | Columns ✅ (Gene · # Mut · # · Freq; Gene · Cytoband · CNA · # · Freq; Gene · # SV · # · Freq); no column sort; order = # altered desc, gene asc (SV legacy # SV desc) |
-| STS-GT-4 | 🟡 | B | No header tooltips; cell tips explain (`"639 events across 387 samples"`, off-panel note) |
+| STS-GT-1 | 🟡 | B | Mutated, CNA, SV tables per alteration type, every gene (coadread 18,275 / 23,770 / 810) ([gene-tables-cases](gene-tables-cases.md)); no SV-pair table |
+| STS-GT-2 | ✅ | B | "Mutated Genes (534 profiled samples)", "CNA Genes (592 …)", "Structural Variant Genes (534 …)" on coadread, as the portal ([gene-tables-cases](gene-tables-cases.md)) |
+| STS-GT-3 | ✅ | B | Columns ✅; a header click sorts by any column, a second reverses; default Freq desc (SV # SV desc), ties by events then gene ([gene-tables-cases](gene-tables-cases.md)) |
+| STS-GT-4 | 🟡 | B | The portal's header tooltips ([gene-tables-cases](gene-tables-cases.md)); the alteration-filter variant not built (no Alteration Filter menu) |
 | STS-GT-5 | 🟡 | B | # Mut/# SV = events ✅, # = altered ✅, Freq ✅; CNA AMP/HOMDEL tag ✅; Freq tip "387 altered of 534 samples profiled for APC — …" but no "Gene panels:" list/modal |
 | STS-GT-6 | ❌ | B | No gene-symbol query queue, no OncoKB cancer-gene tooltip, no q-value icon |
 | STS-GT-7 | ❌ | C | No OncoKB cancer-gene filter |
 | STS-GT-8 | 🔶 | B | "Alterations: all / OncoKB drivers only" page-level select instead of the alteration-filter indicator |
 | STS-GT-9 | 🟡 | B | Check rows → [Apply filter] = one OQL clause (Union only, no Intersection, no ∪/∩ choice); applied rows not pinned; compare via "…" ("Compare checked groups") |
-| STS-GT-10 | ✅ | B | "find gene" filters the loaded rows by symbol (substring); legacy Freq-search bug not reproduced |
+| STS-GT-10 | ✅ | B | "find gene" filters every row by symbol (substring); legacy Freq-search bug not reproduced |
 | STS-GT-11 | ✅ | B | Own gene filter included; driver toggle changes counts (OncoKB only, see 01 RV-2) |
 
 ### §7 Other table charts
