@@ -14,7 +14,7 @@ import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOff
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { portalTipNumber } from "../../lib/chart/format.ts";
-import { STYLE, clinicalLegend, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, stackColor, clinicalLegend, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { contractToTsv, orderFileName, orderFileText, tabularFileName } from "../../lib/oncoprint-tabular.ts";
@@ -938,13 +938,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                   item("Show gaps (w/% on right)", display.gaps === "pct", () => set({ gaps: "pct" }))}
                 {t.categories && t.categories.length > 0 && primaryKey === t.label &&
                   item("Show gaps (w/% on left)", display.gaps === "pct-left", () => set({ gaps: "pct-left" }))}
-                {t.categories && t.categories.length > 0 && (
+                {((t.categories && t.categories.length > 0) || (t.stack && t.stack.length > 0)) && (
                   <details>
                     <summary className="meta" style={{ cursor: "pointer", padding: "0.2rem 0.3rem" }}>Edit colours</summary>
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem", padding: "0.2rem 0.3rem", maxHeight: 200, overflowY: "auto" }}>
-                      {t.categories.map((v, ci) => (
+                      {(t.categories && t.categories.length ? t.categories : t.stack!).map((v, ci) => (
                         <label key={v} className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
-                          <input type="color" value={trackCategoryColor(t, ci, figureStyle(data, display), display.colors)}
+                          <input type="color" value={(t.categories && t.categories.length ? trackCategoryColor : stackColor)(t, ci, figureStyle(data, display), display.colors).toLowerCase()}
                             onChange={(e) => set({ colors: { ...(display.colors || {}), [t.label]: { ...(display.colors?.[t.label] || {}), [v]: e.target.value } } })}
                             style={{ width: 26, height: 18, padding: 0, border: "none", background: "none" }} />
                           <span style={{ flex: 1 }}>{v}</span>
@@ -1148,7 +1148,7 @@ function Legend({ data, display, colors, shown }: { data: UnpackedContract; disp
       })()}
       {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent").map((t) => (
         <span key={t.label}>{t.label}: {t.stack
-          ? <>{t.stack.map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(S.glyph.spectrum.colors[i])}{c}</span>)}</>
+          ? <>{t.stack.map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(stackColor(t, i, S, colors))}{c}</span>)}</>
           : t.bar
           ? (() => {
               // the portal's key: green above 0, red below, both when the range spans 0
