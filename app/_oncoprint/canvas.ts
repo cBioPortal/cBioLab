@@ -154,6 +154,7 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     return;
   }
   if (t.kind === "derivedEvent") { ctx.fillStyle = code > 0 ? P.derived : P.unaltered; ctx.fillRect(x, y, w, h); return; }
+  if (code === -2) { ctx.fillStyle = S.glyph.heatNull.fill; ctx.fillRect(x, y, w, h); return; }
   if (code === -1) {
     // the portal's no-data glyph: the not-profiled cell's white and midline
     const [s0, s1] = S.glyph.notProfiled.stripe.band;
@@ -389,7 +390,9 @@ export function sortColumns(data: UnpackedContract, order: Uint32Array, groups: 
     const c = t.cells;
     const v = t.values;
     if (t.stack && v) return (a, b) => { const x = c[a], y = c[b]; if (x === -1 || y === -1) return x === y ? 0 : x === -1 ? 1 : -1; return sign * stackCompare(v, t.stack!.length, x, y); };
-    if (v) return (a, b) => { const x = v[a], y = v[b], na = Number.isNaN(x), nb = Number.isNaN(y); if (na || nb) return na === nb ? 0 : na ? 1 : -1; return sign * (x - y); };
+    // values, then the profiled cells without one (-2), then not profiled, in either direction
+    if (v) return (a, b) => { const x = v[a], y = v[b], na = Number.isNaN(x), nb = Number.isNaN(y);
+      if (na || nb) return na !== nb ? (na ? 1 : -1) : +(c[b] === -2) - +(c[a] === -2); return sign * (x - y); };
     // a text clinical track by naturalSort of its values, as the engine
     const rank = t.kind === "clinical" && t.categories?.length ? naturalRanks(t.categories) : null;
     return (a, b) => { const x = c[a], y = c[b]; if (x === y) return 0; if (x === -1) return 1; if (y === -1) return -1; return sign * (rank ? rank[x] - rank[y] : x - y); };

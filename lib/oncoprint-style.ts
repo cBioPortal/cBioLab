@@ -106,6 +106,8 @@ export const STYLE = {
       colors: ["#3D6EB1", "#8EBFDC", "#DFF1F8", "#FCE08E", "#F78F5E", "#D62B23"] },
     /** the "Profiled for <type>" rows: the portal's reserved colour for "yes"; "no" is drawn as no data */
     profiled: { color: "#1b9e77", yes: "Yes", no: "No" },
+    /** a heatmap cell profiled but without a value (the portal's null_color); the VAF row names it in its legend */
+    heatNull: { fill: "#e0e0e0", vafLabel: "Not mutated/no VAF data" },
     notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
     unalteredLabel: "No alterations"
   },
@@ -739,6 +741,6 @@ export function styleForDisplay(S: Style, display?: { colorByType?: boolean; col
       mutation: { ...G.mutation, priority: G.mutation.priority.map((m) => ({ ...m, vus: m.color })) } } };
   }
   if (display?.whiteBackground)
-    out = { ...out, palette: { ...out.palette, unaltered: "#ffffff" }, glyph: { ...out.glyph, notProfiled: { ...out.glyph.notProfiled, fill: "#ffffff" } } };
+    out = { ...out, palette: { ...out.palette, unaltered: "#ffffff" }, glyph: { ...out.glyph, notProfiled: { ...out.glyph.notProfiled, fill: "#ffffff" }, heatNull: { ...out.glyph.heatNull, fill: "#ffffff" } } };
   return out;
 }

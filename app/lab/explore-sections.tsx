@@ -1235,9 +1235,9 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
     </div>
     <div className="card">
       <h2>Case lists</h2>
-      <ValueList hint="keep the patients on any of the checked case lists"
-        rows={explore.caseLists.map((l) => ({ key: l.id, name: l.id, n: l.n, on: listOn(l.id),
-          title: l.name + " — " + l.n.toLocaleString() + " patients" }))}
+      <ValueList hint="keep the samples on any of the checked case lists" pct={portalFreq}
+        rows={explore.caseLists.map((l) => ({ key: l.id, name: l.name, n: l.n, total: explore.totals?.samples, on: listOn(l.id),
+          title: l.id + " — " + l.n.toLocaleString() + " of " + (explore.totals?.samples ?? 0).toLocaleString() + " selected samples" }))}
         onApply={(ids) => anyOf(ids.map((id) => ({ kind: "caseList", id })))} />
       <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
     </div>

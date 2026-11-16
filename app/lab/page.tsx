@@ -570,7 +570,13 @@ export default function AnalysisPage() {
           )}
           <AddChartDialog ctx={exploreCtx} />
           <DerivedFacets ctx={exploreCtx} />
-          {explore && <>
+          {explore && explore.draftCount === 0 && (
+            <div className="card nosamples" data-empty-selection>
+              <p>The filters you have selected have filtered out all the samples in this study; because of this, no data visualizations are shown.</p>
+              <p>You can remove filters in the header of this page to widen your search criteria and add samples back to your results.</p>
+            </div>
+          )}
+          {explore && explore.draftCount !== 0 && <>
             <div className="facetgrid">
               <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} draft={parseDraft()}
                 attrs={explore.clinical || []}

@@ -310,6 +310,10 @@
       "yes": "Yes",
       "no": "No"
     },
+    "heatNull": {
+      "fill": "#e0e0e0",
+      "vafLabel": "Not mutated/no VAF data"
+    },
     "notProfiled": {
       "fill": "#ffffff",
       "stripe": {

@@ -345,13 +345,24 @@ async function vafAvailable(study: string, db: string = DB, conn: ChConn = PRIMA
   return ok;
 }
 export function vafSql(genes: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
-  return "SELECT " + (unit === "sample" ? "sampleId" : "patientId") + " AS pid, `GENE.hugoGeneSymbol` AS gene,\n" +
-    "       max(tumorAltCount / (tumorAltCount + tumorRefCount)) AS v\n" +
-    "FROM " + db + ".mutation_derived\n" +
-    "WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + genes.map(sq).join(",") + ")\n" +
-    "  AND tumorAltCount > 0 AND tumorRefCount >= 0 AND molecularProfileId NOT LIKE '%uncalled%'\n" +
-    (samples ? "  AND sampleId IN (" + samples + ")\n" : "") +
-    "GROUP BY pid, gene";
+  // one row per column profiled for the gene in a mutation profile (the portal's
+  // createHeatmapTracksData keeps only those): its largest VAF, or NULL when no mutation of the
+  // gene there has usable counts (getVariantAlleleFrequency: alt / (alt + ref), so alt 0 is a VAF of 0)
+  const list = genes.map(sq).join(",");
+  return "SELECT pid, gene, if(countIf(ok = 1) = 0, NULL, maxIf(vaf, ok = 1)) AS v FROM (\n" +
+    "  SELECT " + idCol(unit, study + "_", unit === "sample" ? "sp." : "sd.") + " AS pid, pg.gene AS gene, toNullable(toFloat64(0)) AS vaf, 0 AS ok\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + list + ")\n" +
+    (unit === "sample" ? "" : "  JOIN " + db + ".sample_derived sd ON sd.sample_unique_id = sp.sample_unique_id\n") +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = 'MUTATION_EXTENDED'" +
+    fromColumnSamples("sp.sample_unique_id", study, samples) + "\n" +
+    "  UNION ALL\n" +
+    "  SELECT " + (unit === "sample" ? "sampleId" : "patientId") + ", `GENE.hugoGeneSymbol`, tumorAltCount / (tumorAltCount + tumorRefCount), 1\n" +
+    "  FROM " + db + ".mutation_derived\n" +
+    "  WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ")\n" +
+    "    AND tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0 AND molecularProfileId NOT LIKE '%uncalled%'" +
+    (samples ? "\n    AND sampleId IN (" + samples + ")" : "") + "\n" +
+    ")\nGROUP BY pid, gene HAVING countIf(ok = 0) > 0";
 }
 
 /**
@@ -983,7 +994,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
       ({ s, r: peers.has(s) ? await peerRows(s, (i) => i.heatmap[hi].values)
         : await lqRows(isVaf ? "oncoprint:vaf" : "oncoprint:heatmap", isVaf ? vafSql(h.genes, s, dbOf(s), unit, samplesOf(s)) : heatmapSql(h.profileType, h.genes, s, dbOf(s), unit, samplesOf(s)), s) })));
     for (const { s, r } of hFetched)
-      for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
+      for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), row[2] == null ? NaN : Number(row[2]));
     const kinds = await Promise.all(okStudies.map(async (s) => peers.has(s) ? (await peerShare(s)).heatmap[hi].kind
       : isVaf ? undefined : (await studyProfileKinds(s, dbOf(s), connOf(s))).get(h.profileType)));
     const profileKind = kinds.find((k) => k);
