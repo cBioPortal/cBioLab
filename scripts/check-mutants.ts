@@ -1022,7 +1022,9 @@ const PLANT_ALL_ON = ["scripts/check-mutants.ts", ".github/workflows/verify.yml"
 
 /** the files a guard runs from: its script, or for the unit guard the suites that import the bug's file */
 function guardFiles(m: Mutant): string[] {
-  return m.guard === "unit" ? suitesImporting(ROOT, m.file) : GUARD_CMD[m.guard].filter((a) => a.startsWith("scripts/"));
+  if (m.guard !== "unit") return GUARD_CMD[m.guard].filter((a) => a.startsWith("scripts/"));
+  // a bug no suite imports is reported, with every other unplantable one, before any guard runs
+  try { return suitesImporting(ROOT, m.file); } catch { return []; }
 }
 
 /** the bugs to plant, and why: all of them, or those MUTANT_CHANGED's diff could affect */
@@ -1047,6 +1049,18 @@ function plantAll(): number {
   const planted = sel.mutants.filter((m) => !ONLY || m.id === ONLY);
   console.log(`Planting ${planted.length} of ${MUTANTS.length} bugs: ${sel.reason}`);
   if (!planted.length) console.log("No planted bug is in, or guarded by, a changed file: nothing to plant.");
+
+  // what can be known without running anything is checked before the guards' baselines, which take minutes
+  const unplantable = planted.flatMap((m) => {
+    const hits = readFileSync(join(dir, m.file), "utf8").split(m.find).length - 1;
+    const site = hits === 1 ? [] : [`${m.id}: expected the bug's site exactly once in ${m.file}, found ${hits}`];
+    if (m.guard !== "unit") return site;
+    try { suitesImporting(dir, m.file); return site; } catch (e) { return [...site, `${m.id}: ${(e as Error).message}`]; }
+  });
+  if (unplantable.length) {
+    for (const u of unplantable) console.log("FAIL " + u);
+    return 1;
+  }
 
   const guards = [...new Set(planted.map((m) => m.guard))];
   for (const g of guards) {
