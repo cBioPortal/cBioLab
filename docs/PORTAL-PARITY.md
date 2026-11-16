@@ -194,7 +194,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
         - a case with no MUTATION_COUNT shows no value; the portal shows 0 (fillNoDataValue). That is 74,489 patients in 337 studies, many perhaps never sequenced, and not profiled is never wild-type (invariant 7).
         - a BOOLEAN attribute (5 in the warehouse) is shown as its value, or "Mixed"; the portal's fillClinicalTrackDatum has no branch for it and draws nothing.
       - Known: values travel as float32, so two values equal to 7 significant digits tie where the portal's doubles would order them (two `todo` tests).
-    - [ ] ONC-TT-2's numeric typing by the attribute's datatype (ours: ≥90 % parse and >10 distinct values); "(average of n values)" zoomed out (ONC-STM-8)
+    - [x] ONC-TT-2's typing by the attribute's declared datatype: a NUMBER is bars, any other datatype categories, whatever the values (OncoprintUtils 1421-1470); an attribute no study declares keeps the old rule (≥90 % parse, >10 distinct). In the warehouse that rule drew 748 study–attribute pairs declared NUMBER as categories (astr_ut_2026 OS_MONTHS) and 148 declared STRING as bars (tmb_mskcc_2018 TUMOR_PURITY, prad_fhcrc PSA). Several studies: the first that declares the attribute decides (PR pending)
+    - [x] Zoomed out, several columns under the pointer: a number's mean "(average of n values)", a category's count of each value ("A: 2 samples"), a Profiled row's "No (k samples)", a heatmap's mean to 2 places, the spectrum's first column (TooltipUtils makeClinicalTrackTooltip, makeHeatmapTrackTooltip) (ONC-STM-8) (PR pending)
+      - Ours alone: a patient whose samples disagree counts once as "Mixed"; the portal counts each sample's value. Nothing under the pointer with a value: ours "no data", the portal "NaN"
   - [x] The mutation spectrum track (ONC-TT-3, ONC-STM-6) (#199)
     - [x] Its Freq in Tracks › Clinical (the portal's % of samples sequenced) (#258)
     - [ ] Edit Colors

@@ -283,13 +283,13 @@ export function profileInventorySql(study: string = STUDY, db: string = DB): str
     "WHERE cs.cancer_study_identifier = " + sq(study);
 }
 
-/** each attribute's display name in the study (attr, name): what the Tabular download names a row */
+/** each attribute's display name and datatype in the study (attr, name, datatype): the Tabular download's row name, and whether its track is bars or categories */
 export function clinicalNamesSql(attrs: string[], study: string = STUDY, db: string = DB): string | null {
   attrs = attrs.filter((a) => a !== SPECTRUM_TRACK);
   if (!attrs.length) return null;
-  return "SELECT cam.attr_id AS a, any(cam.display_name) AS n FROM " + clinicalMetaTable(db) + " cam\n" +
+  return "SELECT cam.attr_id AS a, any(cam.display_name) AS n, upper(any(cam.datatype)) AS d FROM " + clinicalMetaTable(db) + " cam\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ") AND cam.display_name != ''\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")\n" +
     "GROUP BY a";
 }
 
@@ -556,7 +556,7 @@ export interface StudyInputs {
   facts: unknown[][];
   /** pid, attribute, value */
   clinical: unknown[][];
-  /** attribute, display name (absent from an older peer) */
+  /** attribute, display name, datatype */
   clinicalNames?: unknown[][];
   /**
    * per heatmap spec: the study's generic assay of that profile type, if it has one; whether it has
@@ -692,7 +692,7 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
     ({ available: o?.available === true, values: table(o?.values, 3, "overlay values") }));
   return { genes: strings(r.genes, "genes"), groups, events: table(r.events, 11, "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
     facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"),
-    ...(r.clinicalNames === undefined ? {} : { clinicalNames: table(r.clinicalNames, 2, "clinical display names") }), heatmap, overlays,
+    ...(r.clinicalNames === undefined ? {} : { clinicalNames: table(r.clinicalNames, 3, "clinical display names and datatypes") }), heatmap, overlays,
     levels: table(r.levels, 4, "expression levels").map((x) => x[2] === "exp" || x[2] === "prot" ? x : bad("expression levels")),
     profileTypes: strings(r.profileTypes, "profile types"), assays: strings(r.assays, "assay profiles") };
 }
@@ -932,9 +932,14 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
     // each attribute's display name, as the first study that declares one names it
     const named = await Promise.all(studies.map(async (s) => peers.has(s) ? (await peerShare(s)).clinicalNames ?? []
       : await ((q) => q ? lqRows("oncoprint:clinicalNames", q, s).then((r) => r.rows) : [])(clinicalNamesSql(clinical, s, dbOf(s)))));
-    const nameOf = new Map<string, string>([[SPECTRUM_TRACK, SPECTRUM_NAME]]);
-    for (const rs of named) for (const x of rs) if (!nameOf.has(x[0] as string) && x[1]) nameOf.set(x[0] as string, String(x[1]));
-    for (const attr of clinical) clinicalIn.push({ attr, values: byAttr.get(attr)!, ...(nameOf.has(attr) ? { name: nameOf.get(attr)! } : {}) });
+    // and its datatype, as the first study that declares it does (the portal's uniqBy over the studies' attributes)
+    const nameOf = new Map<string, string>([[SPECTRUM_TRACK, SPECTRUM_NAME]]), typeOf = new Map<string, string>();
+    for (const rs of named) for (const x of rs) {
+      if (!nameOf.has(x[0] as string) && x[1]) nameOf.set(x[0] as string, String(x[1]));
+      if (!typeOf.has(x[0] as string) && x[2]) typeOf.set(x[0] as string, String(x[2]));
+    }
+    for (const attr of clinical) clinicalIn.push({ attr, values: byAttr.get(attr)!, ...(nameOf.has(attr) ? { name: nameOf.get(attr)! } : {}),
+      ...(typeOf.has(attr) ? { datatype: typeOf.get(attr)! } : {}) });
   }
 
   // ---- heatmap values per profile (validated against each study's inventory) ----

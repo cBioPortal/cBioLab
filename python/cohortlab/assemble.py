@@ -220,11 +220,14 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             clin.append(Track("clinical", attr, cells, {**named, "stack": list(STYLE["glyph"]["spectrum"]["categories"]), "values": stacked}))
             continue
         present = [val_by_pid[p] for p in all_pids if p in val_by_pid]
-        if not present:
+        nums = [x for x in (_finite_number(v) for v in present) if math.isfinite(x)]
+        # a NUMBER is bars, any other declared datatype categories (the portal's OncoprintUtils
+        # 1421-1470); an undeclared attribute is bars when 90% of its values parse and >10 differ
+        declared = str(c["datatype"]).upper() if c.get("datatype") else None
+        if not present or (declared == "NUMBER" and not nums):
             clin.append(Track("clinical", attr + " (no data)", np.full(n, -1, dtype=np.int32), {"categories": []}))
             continue
-        nums = [x for x in (_finite_number(v) for v in present) if math.isfinite(x)]
-        if present and len(nums) >= 0.9 * len(present) and len(set(nums)) > 10:
+        if declared == "NUMBER" if declared else len(nums) >= 0.9 * len(present) and len(set(nums)) > 10:
             # bars over the data's range, as the portal draws them: its fixed range for a fraction of
             # the genome, its log scale for mutation counts
             lo, hi = min(nums), max(nums)

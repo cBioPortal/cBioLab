@@ -164,7 +164,9 @@ export interface AssembleInput {
   /** clinical attributes in track order, each with its per-column value */
   clinical: { attr: string; values: Map<string, string>;
     /** the attribute's display name, when it has one: the Tabular download's row name */
-    name?: string }[];
+    name?: string;
+    /** its declared datatype ("NUMBER", "STRING", "BOOLEAN"), which alone decides a bar or a category track, as in the portal */
+    datatype?: string }[];
   /** continuous per-gene values per profile, keyed "<columnId>|<gene>" */
   /** `assay`: a generic-assay profile, whose `genes` are its entities */
   heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, number>;
@@ -442,7 +444,7 @@ export function assembleContract(input: AssembleInput): Contract {
   { const hidden = new Set(input.hideTracks || []);
     autoTracks.push(...clinTracks.map((t) => t.label));
     for (let i = clinTracks.length - 1; i >= 0; i--) if (hidden.has(clinTracks[i].label)) clinTracks.splice(i, 1); }
-  for (const { attr, values: valByPid, name } of clinical) {
+  for (const { attr, values: valByPid, name, datatype } of clinical) {
     const named = name && name !== attr ? { name } : {};
     if (attr === SPECTRUM_TRACK) {
       // each column's six substitution counts, as the engine's rows carry them ("a,b,c,d,e,f");
@@ -464,7 +466,9 @@ export function assembleContract(input: AssembleInput): Contract {
     // expensive phase of assembly.
     const val: (string | undefined)[] = new Array(allPids.length);
     for (let i = 0; i < allPids.length; i++) val[i] = valByPid.get(allPids[i]);
-    // numeric attribute (≥90% of present values parse, >10 distinct) -> continuous
+    // a NUMBER attribute is a bar track, any other declared datatype a category track (the portal's
+    // OncoprintUtils 1421-1470); an attribute no study declares is numeric when ≥90% of its values
+    // parse and it has >10 distinct
     // heat track: cells are the value scaled to 0..255 over the cohort's min..max
     // one pass over the columns: how many have a value, how many parse, their range and
     // distinct count. Never materialises a per-column array (a spread of 400k values throws).
@@ -481,11 +485,12 @@ export function assembleContract(input: AssembleInput): Contract {
       if (x > max) max = x;
       if (distinct.size <= 11) distinct.add(x);
     }
-    if (!nPresent) { // unknown attribute or none of these patients have it — say so
+    const declared = datatype ? datatype.toUpperCase() : null;
+    if (!nPresent || (declared === "NUMBER" && !nNumeric)) { // unknown attribute, or none of these patients has a value — say so
       clinTracks.push({ kind: "clinical", label: attr + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
       continue;
     }
-    if (nNumeric >= 0.9 * nPresent && distinct.size > 10) {
+    if (declared ? declared === "NUMBER" : nNumeric >= 0.9 * nPresent && distinct.size > 10) {
       // drawn as bars over the data's range, as the portal does; its fixed range for a fraction
       // of the genome, and its log scale for mutation counts
       const fraction = attr === "FRACTION_GENOME_ALTERED";

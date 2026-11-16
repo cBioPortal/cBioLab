@@ -9,6 +9,7 @@
 // changes cause a refetch; everything else is applied to the decoded arrays in place.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
+import { zoomedTip } from "./zoomed-tip.ts";
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
@@ -650,7 +651,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       let alt = 0, prof = 0;
       for (let k = hit.k; k < hit.k1; k++) { const c = t.cells[visible.order[k]]; if (c !== -1) prof++; if (c > 0) alt++; }
       lines.push({ text: rowName + alt + " altered of " + prof + " profiled" });
-    } else lines.push({ text: rowName + "zoom in for per-" + data.unit + " values" });
+    } else {
+      const cols: number[] = [];
+      for (let k = hit.k; k < hit.k1; k++) cols.push(visible.order[k]);
+      for (const text of zoomedTip(t, cols)) lines.push({ text });
+    }
     // the specifics, once they arrive
     const d = col ? detail[col] : undefined;
     if (d === "loading") lines.push({ text: "…", dim: true });
