@@ -23,6 +23,10 @@ let STATUS_META: { a: string; label: string; priority: number }[] = [];
 /** patients each study's database finds in more than one of the cohorts; a study listed as "remote" cannot be asked */
 let SHARED: Record<string, number | "remote"> = {};
 const sharedAsked: { study: string; label: string; cohorts: string[]; sql: string }[] = [];
+/** the partition query's answer per study and endpoint: rows of (mask over the cohorts asked, m, ev, n) */
+type PartRow = { mask: number; m: number | null; ev: number; n: number };
+let PARTS: Record<string, Record<string, PartRow[]>> = {};
+const partsAsked: { study: string; cohorts: string[]; endpoint: string; sql: string }[] = [];
 
 function site(study: string, answers: Answers, endpoints: string[] | "fail" = [], seen?: unknown[][]) {
   const aggregates = SHARED[study] === "remote" ? {} : {
@@ -33,7 +37,13 @@ function site(study: string, answers: Answers, endpoints: string[] | "fail" = []
       return STATUS_META;
     },
     viewAggregateMany: async (label: string, defs: { name: string }[], build: (sqls: string[], st: string, db: string) => string) => {
-      sharedAsked.push({ study, label, cohorts: defs.map((d) => d.name), sql: build(defs.map((d) => "SELECT pid, sid FROM " + d.name), study, "db") });
+      const sql = build(defs.map((d) => "SELECT pid, sid FROM " + d.name), study, "db");
+      if (/ AS mask/.test(sql)) {
+        const endpoint = /'([A-Z0-9_]+)_MONTHS'/.exec(sql)![1];
+        partsAsked.push({ study, cohorts: defs.map((d) => d.name), endpoint, sql });
+        return PARTS[study]?.[endpoint] ?? [];
+      }
+      sharedAsked.push({ study, label, cohorts: defs.map((d) => d.name), sql });
       return [{ n: SHARED[study] ?? 0 }];
     },
   };
@@ -213,55 +223,140 @@ describe("survival: Kaplan–Meier and the log-rank test", () => {
   });
 });
 
-describe("survival: cohorts that share patients get curves but, with noTestWhenShared (Include mode, CMP-SV-4, CMP-MD-2), no log-rank p", () => {
-  const run = async (counts: Record<string, Record<string, number>>, answers: Answers, shared: Record<string, number | "remote">, view: object = { noTestWhenShared: true }) => {
+describe("survival: cohorts that share patients — the count, and the approximate test without partitions", () => {
+  const run = async (counts: Record<string, Record<string, number>>, answers: Answers, shared: Record<string, number | "remote">, view: object = {}) => {
     SHARED = shared; sharedAsked.length = 0;
     try { return unwrap(await runSurvival({ kind: "survival", ...view } as never, ctx(counts, answers))) as Out; } finally { SHARED = {}; }
   };
-  test("two cohorts sharing 221 patients: both curves drawn, no test, the reason in the caveat and the method record", async () => {
-    const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 221 });
-    assert.equal(v.curves.length, 2);
-    assert.equal(v.logrank, undefined); assert.equal(v.logrankK, undefined);
-    assert.match(v.caveat!, /No log-rank p: 221 patients are in more than one cohort, so in more than one curve/);
-    assert.equal((v as { sharedPatients?: number }).sharedPatients, 221);
-    assert.equal((v as { testWithheld?: boolean }).testWithheld, true);
-    assert.ok(!/Log-rank on a single study/.test(v.caveat!));
-    const none = (v.method.steps as { title: string; detail?: string }[]).find((st) => st.title === "No log-rank test");
-    assert.match(none!.detail!, /221 patients are in more than one cohort/);
+  test("47 shared: the test is given, and the caveat says how many and that its p is approximate", async () => {
+    const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 47 });
+    close(v.logrank!.chi2, 19);
+    assert.equal((v as { sharedPatients?: number }).sharedPatients, 47);
+    assert.equal((v as { partitioned?: boolean }).partitioned, undefined);
+    assert.match(v.caveat!, /47 patients are in more than one cohort, so in more than one curve; the log-rank test assumes the groups share no one, so its p is approximate\./);
     assert.deepEqual(sharedAsked.map((a) => [a.study, a.label, a.cohorts]), [["s1", "survival", ["A", "B"]]]);
     assert.match(sharedAsked[0].sql, /GROUP BY pid HAVING count\(\) > 1/);
   });
-  test("one shared patient is enough, for three cohorts too (the k-group test is withheld)", async () => {
-    const v = await run({ A: { s1: 10 }, B: { s1: 10 }, C: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() }, C: { s1: LIVE() } }, { s1: 1 });
-    assert.equal(v.logrankK, undefined);
-    assert.match(v.caveat!, /No log-rank p: 1 patient is in more than one cohort/);
-  });
-  test("no shared patient: the test as before (χ² 19)", async () => {
+  test("no shared patient: nothing said", async () => {
     const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 0 });
     close(v.logrank!.chi2, 19);
-    assert.ok(!/No log-rank p/.test(v.caveat!));
+    assert.ok(!/more than one cohort/.test(v.caveat!));
   });
   test("shared patients summed over studies; a study only one cohort reaches is not asked", async () => {
     const v = await run({ A: { s1: 10, s2: 10 }, B: { s1: 10 } }, { A: { s1: DIE(), s2: DIE() }, B: { s1: LIVE() } }, { s1: 2, s2: 5 });
     assert.deepEqual(sharedAsked.map((a) => a.study), ["s1"]);
-    assert.match(v.caveat!, /No log-rank p: 2 patients are in more than one cohort/);
+    assert.match(v.caveat!, /2 patients are in more than one cohort/);
   });
   test("a participant that cannot be asked is named, and the test still given", async () => {
     const v = await run({ A: { s1: 10, s2: 10 }, B: { s1: 10, s2: 10 } }, { A: { s1: DIE(), s2: DIE() }, B: { s1: LIVE(), s2: LIVE() } }, { s1: 0, s2: "remote" });
     close(v.logrank!.chi2, 38);
     assert.match(v.caveat!, /Whether the cohorts share patients could not be checked at s2 \(a remote peer/);
   });
-  test("without noTestWhenShared the test is given, and the caveat says how many are shared", async () => {
-    const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 47 }, {});
-    close(v.logrank!.chi2, 19);
-    assert.equal((v as { sharedPatients?: number }).sharedPatients, 47);
-    assert.equal((v as { testWithheld?: boolean }).testWithheld, undefined);
-    assert.match(v.caveat!, /47 patients are in more than one cohort, so in more than one curve; the log-rank test assumes the groups share no one, so its p is approximate\./);
-    assert.ok(!/No log-rank p/.test(v.caveat!));
-  });
   test("one cohort: nothing to ask", async () => {
     await run({ A: { s1: 10 } }, { A: { s1: DIE() } }, { s1: 5 });
     assert.equal(sharedAsked.length, 0);
+  });
+});
+
+// cBioPortal's Include mode (Survival.tsx analysisGroupsComputations): the patients are partitioned by
+// the set of groups each is in, one curve per set present, named "Only " + the groups in their order,
+// ordered by how many groups, then by the sum of their positions; logRankTest runs over every such
+// group with any patients (a group whose expected count is 0 is dropped), at any size.
+describe("survival: partitions — groups that share patients drawn as their overlaps (CMP-SV-4, CMP-MD-2)", () => {
+  const run = async (counts: Record<string, Record<string, number>>, answers: Answers, shared: Record<string, number | "remote">,
+    parts: Record<string, Record<string, PartRow[]>>, view: object = { partitions: true, testAnySize: true }) => {
+    SHARED = shared; PARTS = parts; sharedAsked.length = 0; partsAsked.length = 0;
+    try { return unwrap(await runSurvival({ kind: "survival", ...view } as never, ctx(counts, answers))); } finally { SHARED = {}; PARTS = {}; }
+  };
+  // A, B, C as the G2 groups: Only A ten deaths at 1, Only B ten censored at 2, Only C one patient
+  // without OS, A∩C five censored at 2.
+  const G2 = { s1: { OS: [{ mask: 1, m: 1, ev: 1, n: 10 }, { mask: 2, m: 2, ev: 0, n: 10 }, { mask: 4, m: null, ev: 0, n: 1 }, { mask: 5, m: 2, ev: 0, n: 5 }] } };
+  const ABC = { A: { s1: 15 }, B: { s1: 10 }, C: { s1: 6 } };
+  // the cohorts' own counts, which say the study has the endpoint at all
+  const HAS_OS = { A: { s1: DIE() } };
+  test("one curve per set of cohorts, named and ordered as the portal's; each patient counted once", async () => {
+    const v = await run(ABC, HAS_OS, { s1: 5 }, G2) as Out;
+    assert.deepEqual(v.curves.map((c) => [c.cohort, c.n, c.events, c.missing]),
+      [["Only A", 10, 10, 0], ["Only B", 10, 0, 0], ["Only C", 0, 0, 1], ["Only A, C", 5, 0, 0]]);
+    assert.deepEqual(partsAsked.map((a) => [a.study, a.cohorts, a.endpoint]), [["s1", ["A", "B", "C"], "OS"]]);
+    assert.equal((v as { partitioned?: boolean }).partitioned, true);
+    assert.equal((v as { sharedPatients?: number }).sharedPatients, 5);
+    assert.match(v.caveat!, /Overlapping patients \(5\) are plotted as distinct groups/);
+    assert.ok(!/approximate/.test(v.caveat!));
+  });
+  test("the test runs over the groups with patients, at any size: 3 groups, χ² 24 on 2 df", async () => {
+    // one event time, N 25, d 10: died (10, 0, 0) of (10, 10, 5), so O − E = (6, −4, −2) and
+    // V_ij = d(N−d)/(N−1) · (n_i/N)(δ_ij − n_j/N); on the first two groups, V = [[1.5, −1], [−1, 1.5]],
+    // and (6, −4)·V⁻¹·(6, −4) = 24 (statsmodels survdiff on the same 25 patients: 24.0, p 6.144e-6)
+    const v = await run(ABC, HAS_OS, { s1: 5 }, G2) as Out;
+    assert.equal(v.logrank, undefined);
+    assert.equal(v.logrankK!.groups, 3); assert.equal(v.logrankK!.df, 2);
+    close(v.logrankK!.chi2, 24, 1e-4);
+    close(v.logrankK!.p, Math.exp(-24 / 2), 1e-3);
+  });
+  test("without testAnySize the floor of 10 still refuses it", async () => {
+    const v = await run(ABC, HAS_OS, { s1: 5 }, G2, { partitions: true }) as Out;
+    assert.equal(v.logrankK, undefined);
+    assert.match(v.caveat!, /Log-rank not computed: Only C \(n=0\), Only A, C \(n=5\) have fewer than 10 patients/);
+  });
+  test("the method record names the split and recounts from the partitions' rows", async () => {
+    const v = await run(ABC, HAS_OS, { s1: 5 }, G2) as Out;
+    const steps = v.method.steps as { title: string; detail?: string; params?: [string, string][] }[];
+    const split = steps.find((st) => st.title === "Split the patients by the cohorts they are in")!;
+    assert.match(split.detail!, /5 patients are in more than one of A, B, C/);
+    assert.deepEqual(split.params, [["Only A", "10 patients"], ["Only B", "10 patients"], ["Only C", "1 patient"], ["Only A, C", "5 patients"]]);
+    assert.ok(steps.some((st) => st.title === "3-group log-rank test"));
+    const py = (v.method as { python?: string }).python!;
+    assert.ok(py.includes('"\\"Only A, C\\",s1,2,0,5"'), "the partition's rows, its name quoted in the CSV");
+  });
+  test("no shared patient: the cohorts as they are, and the overlaps never asked for", async () => {
+    const v = await run({ A: { s1: 10 }, B: { s1: 10 } }, { A: { s1: DIE() }, B: { s1: LIVE() } }, { s1: 0 }, {}) as Out;
+    assert.deepEqual(v.curves.map((c) => c.cohort), ["A", "B"]);
+    close(v.logrank!.chi2, 19);
+    assert.equal(partsAsked.length, 0);
+  });
+  test("the order: fewer cohorts first, then by the sum of their positions (Only C before Only A, B; A, B before A, C before B, C)", async () => {
+    const rows = [6, 5, 4, 3, 1].map((mask) => ({ mask, m: 1, ev: 1, n: 2 }));
+    const v = await run(ABC, HAS_OS, { s1: 6 }, { s1: { OS: rows } }) as Out;
+    assert.deepEqual(v.curves.map((c) => c.cohort), ["Only A", "Only C", "Only A, B", "Only A, C", "Only B, C"]);
+  });
+  test("one group with patients: no test, said so", async () => {
+    const v = await run({ A: { s1: 10 }, B: { s1: 3 } }, HAS_OS, { s1: 3 }, { s1: { OS: [{ mask: 1, m: 1, ev: 1, n: 7 }, { mask: 3, m: null, ev: 0, n: 3 }] } }) as Out;
+    assert.deepEqual(v.curves.map((c) => [c.cohort, c.n]), [["Only A", 7], ["Only A, B", 0]]);
+    assert.equal(v.logrank, undefined); assert.equal(v.logrankK, undefined);
+    assert.match(v.caveat!, /No log-rank test: fewer than two groups have patients with OS data\./);
+  });
+  test("a study only one cohort reaches adds to that cohort's Only group from its own counts; the test is stratified", async () => {
+    const v = await run({ A: { s1: 10, s2: 10 }, B: { s1: 13 } }, { A: { s1: [], s2: DIE() } }, { s1: 3 },
+      { s1: { OS: [{ mask: 1, m: 1, ev: 1, n: 7 }, { mask: 2, m: 2, ev: 0, n: 10 }, { mask: 3, m: 2, ev: 0, n: 3 }] } }) as Out;
+    assert.deepEqual(v.curves.map((c) => [c.cohort, c.n]), [["Only A", 17], ["Only B", 10], ["Only A, B", 3]]);
+    assert.deepEqual(partsAsked.map((a) => a.study), ["s1"]);
+    assert.ok(v.logrankKPooled, "stratified by study, the pooled test beside it");
+  });
+  test("refused where the overlaps cannot be counted: a remote participant, an anchor, explicit columns", async () => {
+    const remote = await run({ A: { s1: 10, s2: 10 }, B: { s1: 10, s2: 10 } }, { A: { s1: DIE(), s2: DIE() }, B: { s1: LIVE(), s2: LIVE() } }, { s1: 2, s2: "remote" }, {});
+    assert.match(remote.error!, /the cohorts share 2 patients, and their overlaps \(partitions\) cannot be counted at s2/);
+    const anchored = await run({ A: { s1: 10 }, B: { s1: 10 } }, HAS_OS, { s1: 2 }, {}, { partitions: true, anchor: { eventType: "Treatment" } });
+    assert.match(anchored.error!, /drawn only for a study's own <X>_MONTHS\/<X>_STATUS endpoint/);
+  });
+});
+
+describe("survival: testAnySize — the test at any group size, as the portal gives it (CMP-MD-10, CMP-STM-3)", () => {
+  test("9 against 3: χ² 11 by hand, where the floor of 10 would refuse it", async () => {
+    // one event time, N 12, d 9: O_A − E_A = 9 − 6.75 = 2.25; V = 9·9·3·3/(144·11) = 729/1584; χ² = 5.0625·1584/729 = 11
+    const v = unwrap(await runSurvival({ kind: "survival", testAnySize: true } as never,
+      ctx({ A: { s1: 9 }, B: { s1: 3 } }, { A: { s1: DIE(9) }, B: { s1: LIVE(3) } }))) as Out;
+    close(v.logrank!.chi2, 11, 1e-4);
+    assert.ok(!/Log-rank not computed/.test(v.caveat!));
+  });
+  test("a cohort with no patients is left out of the test; with one left there is none", async () => {
+    const v = unwrap(await runSurvival({ kind: "survival", testAnySize: true } as never,
+      ctx({ A: { s1: 10 }, B: { s1: 4 }, C: { s1: 3 } }, { A: { s1: DIE() }, B: { s1: LIVE(4) } }))) as Out;
+    assert.equal(v.logrank!.df, 1);
+    const one = unwrap(await runSurvival({ kind: "survival", testAnySize: true } as never,
+      ctx({ A: { s1: 10 }, B: { s1: 4 } }, { A: { s1: DIE() } }))) as Out;
+    assert.equal(one.logrank, undefined);
+    assert.match(one.caveat!, /No log-rank test: fewer than two groups have patients with OS data\./);
   });
 });
 
@@ -298,9 +393,29 @@ describe("survival: the survival-type table (types, CMP-SV-1, CMP-SV-5, CMP-STM-
     const { v } = await run({ endpoint: "PFS" }, ["OS"], FOUR, META);
     assert.deepEqual(v.types!.map((x) => x.endpoint), ["OS", "PFS"]);
   });
-  test("cohorts that share patients under noTestWhenShared: no p on any type", async () => {
-    const { v } = await run({ noTestWhenShared: true }, ["OS", "PFS"], FOUR, META, { s1: 4 });
-    assert.ok(v.types!.every((x) => x.p === undefined && x.q === undefined && x.why === "the groups share 4 patients"));
+  test("testAnySize: DFS's 3 patients in B are tested, as the portal tests them", async () => {
+    const { v } = await run({ testAnySize: true }, ["DFS", "OS", "PFS", "RFS"], FOUR, META);
+    const dfs = v.types!.find((x) => x.endpoint === "DFS")!;
+    // one event time, N 13, d 10: O_A − E_A = 10 − 100/13; V = 10·3·10·3/(169·12); χ² = (30/13)²·169·12/900 = 12
+    // P(χ²₁ > 12) = erfc(√6) ≈ 5.3200e-4
+    close(dfs.p, 5.32e-4, 1e-3);
+    assert.equal(dfs.why, undefined);
+  });
+  test("partitions: each endpoint's groups are the overlaps, asked per endpoint", async () => {
+    PARTS = { s1: { OS: [{ mask: 1, m: 1, ev: 1, n: 7 }, { mask: 2, m: 2, ev: 0, n: 7 }, { mask: 3, m: 2, ev: 0, n: 3 }],
+      PFS: [{ mask: 1, m: 1, ev: 1, n: 7 }, { mask: 2, m: 1, ev: 1, n: 7 }, { mask: 3, m: null, ev: 0, n: 3 }] } };
+    partsAsked.length = 0;
+    try {
+      const { v } = await run({ partitions: true, testAnySize: true }, ["OS", "PFS"], FOUR, META, { s1: 3 });
+      const [os, pfs] = v.types!;
+      assert.deepEqual(os.groups.map((g: { cohort: string; n: number }) => [g.cohort, g.n]), [["Only A", 7], ["Only B", 7], ["Only A, B", 3]]);
+      assert.deepEqual(pfs.groups.map((g: { cohort: string; n: number }) => [g.cohort, g.n]), [["Only A", 7], ["Only B", 7], ["Only A, B", 0]]);
+      // PFS: both groups die at month 1, χ² 0, over the two with patients
+      close(pfs.p, 1, 1e-9);
+      assert.deepEqual(partsAsked.map((a) => a.endpoint).sort(), ["OS", "PFS"]);
+      const step = (v.method.steps as { title: string }[]).find((st) => st.title.startsWith("The survival-type table"));
+      assert.ok(step);
+    } finally { PARTS = {}; }
   });
   test("not computed for an anchored clock or explicit columns, nor without types", async () => {
     BY_ENDPOINT = FOUR;

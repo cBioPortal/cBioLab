@@ -142,9 +142,18 @@ describe("survival: the axis runs to the last follow-up, each curve to its own (
     assert.equal(paths.length, 2);
     assert.ok(endX(paths[0]) > endX(paths[1]) * 1.5, "A (to 40 mo) runs well past B (to 20 mo): " + endX(paths[0]) + " vs " + endX(paths[1]));
   });
-  test("cohorts that share patients: the line under the figure says why there is no p", () => {
-    const svg = viewToSvg({ ...tail(), sharedPatients: 221, testWithheld: true } as any, { width: 900 })!;
-    assert.match(svg, /No log-rank p: 221 patients are in more than one curve/);
+  test("a group with no patients (an overlap without the endpoint's data) draws no line, and its legend says so", () => {
+    const v = tail();
+    v.curves!.push({ cohort: "Only C", points: [], median: null, n: 0, events: 0, tLast: 0, atRisk: Array.from({ length: 41 }, () => 0) } as any);
+    const svg = viewToSvg(v, { width: 900 })!;
+    assert.equal([...svg.matchAll(/<path d="([^"]+)" fill="none" stroke="[^"]+" stroke-width/g)].length, 2, "a line for A and B only");
+    assert.match(svg, />Only C</);
+    assert.match(svg, /no patients with data/);
+    assert.ok(!/Only C[^<]*<\/text>[^]*?median not reached · n = 0/.test(svg));
+  });
+  test("cohorts that share patients: the line under the figure says how they are drawn", () => {
+    const svg = viewToSvg({ ...tail(), sharedPatients: 221, partitioned: true } as any, { width: 900 })!;
+    assert.match(svg, /Overlapping patients \(221\) are plotted as distinct groups/);
     const kept = viewToSvg({ ...tail(), sharedPatients: 47 } as any, { width: 900 })!;
     assert.match(kept, /47 patients are in more than one curve; the test assumes the groups share no one, so its p is approximate/);
   });
