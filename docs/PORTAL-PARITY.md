@@ -320,7 +320,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Compare from a chart: groups from every value whatever is checked; Quartiles / Median across studies (ours one study only) (STS-HD-7, STS-STM-12)
   - [ ] Density drag adds its ranges as custom bins on the Mutation Count and FGA bars (STS-SC-6)
   - [ ] An attribute stored at both levels charted once, counted per sample (ours two facets) (STS-MD-5)
-  - [ ] Loading: the per-chart progress list and per-chart error text; the alert for sample ids in the URL that don't exist (STS-LY-10, STS-LY-11)
+  - [ ] Loading: the per-chart progress list and per-chart error text; the alert for sample ids in the URL that don't exist (STS-LY-10, STS-LY-11, STV-LD-4)
   - [ ] The case-lists chart only once a case list is filtered on (ours always shown) (STS-OT-2)
   - [ ] Gene tables: the SV-pair table; the header tooltips' Alteration Filter variant, with the Alteration Filter menu (STS-GT-1, STS-GT-4)
   - [ ] Manual submit: stage filters and apply them together (STS-FL-3, STS-MD-12)
@@ -340,22 +340,30 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Empty selection: the "filtered out all the samples" message in place of the charts, the filter bar kept (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (#260)
   - [x] Case lists: all of them, by kind across studies, counted in samples, Freq of the selected samples (STS-OT-2; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (#260)
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
-  - [ ] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12)
+  - [ ] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12, STV-MD-13)
   - [ ] "Download clinical data" (⤓) for the selection (STV-AB-4, STV-STM-5, STV-HD-2)
   - [x] Filters in the URL: the bookmark, `#filterJson`, `filterAttributeId` / `filterValues` (STV-URL-2, STV-URL-3, STV-BM-1…3, STV-FB-7; see bugs) (#189)
     - [ ] A bookmark icon in the filter bar (STV-FB-7): the header's Copy link carries the filters instead
     - [ ] `sharedGroups`, `sharedCustomData` and the Plots tab's parameters (STV-URL-2): no Groups manager or Plots tab yet
+    - [ ] The "Bookmark this filter" modal with a shortened URL; a link too long for the address bar offers a virtual study (STV-BM-2, STV-BM-3)
+  - [ ] URL: a path per tab (ours `?tab=`); a study change in the page re-reads the URL; the hand-off to the patient view and the query through browser storage, with its "query is too large" alert (STV-URL-1, STV-URL-4, STV-URL-5)
   - [ ] The Groups manager: a group from the selection, its colour, share, Filter by union, compare 2–20 saved groups ("Save as a Cohort" stands in) (STV-GR-1…9, STV-STM-10)
-  - [ ] Virtual study: description and its auto-text, static or dynamic, a shareable `/study?id=` (ours "Save as a Cohort": a name, always a definition) (STV-VS-1…6, STV-STM-9, STV-MD-3, STV-MD-4)
+  - [ ] Virtual study: description and its auto-text, a name built from the filters, static or dynamic, a shareable `/study?id=`, saved signed out as well (ours "Save as a Cohort": a name, always a definition) (STV-VS-1…6, STV-STM-8, STV-STM-9, STV-AB-3, STV-MD-3, STV-MD-4, STV-MD-8)
   - [ ] Custom Selection by sample or patient ids on the page (Analysis has it, signed-in only) (STV-CS-1…9)
-  - [ ] Header: the study's name, description, PubMed link and download (ours id chips) (STV-HD-2, STV-HD-3)
+  - [ ] Header: the study's name, description, PubMed link and download (ours id chips) (STV-HD-2, STV-HD-3, STV-MD-1)
+  - [ ] An unknown study id: a banner naming it and the page drawn on the valid ones (ours refuses the whole request, invariant 1) (STV-HD-1, STV-LD-3)
+  - [ ] Query hand-off: an inline gene box in the header; the selection passed as sample ids (ours the filters as case clauses) (STV-HD-4, STV-MD-5, STV-STM-6)
+  - [ ] View patients in a new window (ours the same tab) (STV-AB-2)
+  - [ ] The ⚙ settings: manual submit (a Submit button, pending pills) and the Alteration Filter menu (ours "Alterations: all / OncoKB drivers only") (STV-AB-5, STV-AB-6, STV-FB-1, STV-FB-6, STV-MD-7)
   - [x] Filter pills named by chart ("Diagnosis Age : 50 < x ≤ 55 or 70 < x ≤ 75", "Sex : Female"), a value or range per pill with its ×, interval ends edited in place, "Clear All Filters" (STV-FB-1…5) (#191)
     - [x] An edited end makes custom bins on the chart (STV-FB-4): its ends join the chart's edges, so the filter is drawn as bars (#203)
     - [ ] Gene-chart, generic-assay and gene-table pills named by chart and coloured by alteration (STV-FB-3 #5, #9, #13, #14): ours the generic clause pills
-    - [ ] Several separate ranges of one chart show as one pill each; the portal merges them into one interval from the first bar's start to the last's end (which reads wider than the filter)
+    - [ ] Survival-attribute pills; a density drag shown on the chart only, not as two range pills (STV-FB-3a, STV-FB-3b)
+    - [ ] Several separate ranges of one chart show as one pill each (STV-FB-4); the portal merges them into one interval from the first bar's start to the last's end (which reads wider than the filter)
   - [ ] Add chart: the "% samples with data" column, Select all, the X vs Y and Genomic tabs; turning a chart off clears its filter (STV-AC-2, STV-AC-3, STV-AC-7, STV-STM-3)
+    - [ ] Its frequencies, the gene tab's profile select with sample counts, gene sets and chart-type radios, a tab per generic-assay type; custom data with the portal's sign-in rules and "Unselected" for cases without a value (STV-AC-4…6, STV-AC-8, STV-STM-4, STV-STM-7)
   - [ ] CN Segments and Plots tabs on the Study View (STV-CN-1…3, STV-PL-1, STV-STM-13)
-  - [ ] Per-user layout: Save settings, the restore banner, reset charts (STV-LP-1…6, STS-MD-13)
+  - [ ] Per-user layout: Save settings, the restore banner, reset charts (STV-LP-1…6, STV-AC-1, STV-MD-9, STS-MD-13)
 - [ ] **Comparison → page, Overlap, Survival and Clinical tabs** ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
   - [ ] The Clinical tab tests every attribute (coadread 45; ours the 8 best covered, so a Sex comparison does not test SEX), as a table with p, q, type and test, sort, filter, download and a click-through plot (ours a −log₁₀ q bar chart of raw ids) (CMP-CL-2…4, CMP-STM-8; see bugs)
     - [x] Every attribute, by display name, in the portal's table (Clinical Attribute, Attribute Type, Statistical Test, p, q; sorted by q, bold below 0.05, 20 a page, search, "Significant only"); untested ones listed with their reason and left out of q; the Results page's Clinical sub-tab too (CMP-CL-2, CMP-STM-6, CMP-STM-8) (PR #224 open)
@@ -492,7 +500,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 
 ## Lower — resources, tools and niche features
 
-- [ ] **Files & Links and resource tabs** — pathology reports, slides, imaging; the importer must load resource data first
+- [ ] **Files & Links and resource tabs** — pathology reports, slides, imaging; the importer must load resource data first (STV-RS-1…4, [31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
 - [ ] **Patient → Clinical Trials** — needs an outside trial source
   - [ ] The Matched Trials tab (PTB-TM) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
 - [ ] **Patient → mRNA** — one patient against a reference cohort (behind a feature flag on the portal)
@@ -505,7 +513,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 ## Running cBioLab as an institution's portal (from the configuration docs)
 
 - [ ] **Per-user, per-study access control** — the largest gap for any private instance; today a study is allowed or denied for the whole deployment (`STUDY_DENY`, `STUDY_ALLOW_RESTRICTED`)
-- [ ] **Data-governance switches** — an equivalent of `skin.hide_download_controls` and `download_custom_buttons_json`; and "Clear cache" restricted (open to every visitor today) (ONC-DL-1, [01-oncoprint](legacy-spec/parity/01-oncoprint.md))
+- [ ] **Data-governance switches** — an equivalent of `skin.hide_download_controls` and `download_custom_buttons_json`; and "Clear cache" restricted (open to every visitor today) (ONC-DL-1, STV-MD-11, STS-DL-2, [01-oncoprint](legacy-spec/parity/01-oncoprint.md))
 - [x] **Custom driver annotations** — `cbp_driver` / `cbp_driver_tiers` call drivers on the oncoprint and plots, and show in the oncoprint's tooltip (#168)
   - [ ] The mutation table's Custom Driver and Custom Driver Tier columns
   - [ ] The menu labels from deployment config (`oncoprint.custom_driver_annotation.*.menu_label`); ours are the portal's defaults
