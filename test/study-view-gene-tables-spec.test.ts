@@ -1,16 +1,22 @@
-// Written from docs/legacy-spec/parity/gene-tables-cases.md, rows GT1–GT7, GS1–GS4, GH1–GH4 and
-// GD1–GD11 (one or more tests per row, named by its id), and the legacy source each row cites
+// Written from docs/legacy-spec/parity/gene-tables-cases.md, rows GT1–GT7, GS1–GS4, GH1–GH4,
+// GD1–GD11, GP1–GP2, GU1–GU2, GU4, GU6, GQ1–GQ3 and GI1–GI2 (one or more tests per row, named by its id), and the legacy source each row cites
 // (~/cbioportal-frontend at cd8c6df), without reference to the implementation.
 // Covered elsewhere, not here:
 //   GR1–GR3 the rows themselves (geneTables / mergeExplore in lib/explore.ts) and the search box
 //   GT7     the per-study sum of each profile kind's count happens upstream; profiledSamples is
 //           handed counts already summed, and the tests below check it reads them by kind
 //   GD1     the menu's Download ▸ Data entry (UI wiring); the file name is checked here
+//   GP3     which panels a row holds: scripts/check-gene-panels.ts, against the fixture study
+//   GP4, GP5 the panels' order and their merge across connections: test/explore-facets.test.ts
+//   GP6, GQ4 UI only, not built
+//   GU3, GU5 the Union/Intersection control and appending to the draft (UI wiring)
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   geneTableName, geneTableTitle, profiledSamples, defaultGeneSort, nextGeneSort,
   geneRowOrder, sortGeneRows, geneHeaderTips, geneTableTsv,
+  freqTipLines, geneSelection, appliedLines, toggleQueued, queuedQuery, alteredHeaderTip,
+  intersectionRefusal,
   type GeneTableKind, type GeneSort, type GeneSortColumn,
 } from "../lib/study-view-gene-tables.ts";
 import { chartFileName } from "../lib/study-view-download.ts";
@@ -552,4 +558,194 @@ test("GD10: plain integers, no thousands separator", () => {
 
 test("GD11: no rows gives the header alone, with no trailing LF", () => {
   for (const k of KINDS) assert.equal(geneTableTsv(k, []), HEADER[k], k);
+});
+
+// ---- GP1–GP2. The Freq cell's tooltip (TableUtils.tsx:110-131, StudyViewGenePanelModal.tsx:20-44) ----
+
+test("GP1: mutated — three lines, N the altered samples on a covering panel, M the profiled", () => {
+  const row = r("TP53", 9, 7, 40, { alteredOnPanel: 5, panels: ["IMPACT341", "IMPACT468"] });
+  assert.deepEqual(freqTipLines("mutated", row), [
+    "# of samples with a mutation in this gene that are also profiled for mutations: 5",
+    "# of samples profiled for mutations in this gene: 40",
+    "Gene panels: IMPACT341, IMPACT468",
+  ]);
+});
+
+test("GP1: sv and cna name their alteration type, singular then plural (type.replace(/s$/, ''))", () => {
+  const row = r("ALK", 3, 2, 10, { panels: ["WES"] });
+  assert.deepEqual(freqTipLines("sv", row).slice(0, 2), [
+    "# of samples with a structural variant in this gene that are also profiled for structural variants: 2",
+    "# of samples profiled for structural variants in this gene: 10",
+  ]);
+  assert.deepEqual(freqTipLines("cna", r("MYC", 3, 2, 10, { cna: 2, panels: ["WES"] })).slice(0, 2), [
+    "# of samples with a copy number alteration in this gene that are also profiled for copy number alterations: 2",
+    "# of samples profiled for copy number alterations in this gene: 10",
+  ]);
+});
+
+test("GP1: without alteredOnPanel (a peer that predates it) N is the altered count", () => {
+  const [first] = freqTipLines("mutated", r("KRAS", 4, 3, 12, { panels: ["A"] }));
+  assert.equal(first, "# of samples with a mutation in this gene that are also profiled for mutations: 3");
+});
+
+test("GP1: N of 0 is written, not dropped", () => {
+  const [first] = freqTipLines("mutated", r("EGFR", 3, 3, 7, { alteredOnPanel: 0, panels: [] }));
+  assert.equal(first, "# of samples with a mutation in this gene that are also profiled for mutations: 0");
+});
+
+test("GP1: numbers carry thousands separators (toLocaleString)", () => {
+  const lines = freqTipLines("mutated", r("TTN", 12345, 4974, 1234567, { alteredOnPanel: 4974, panels: ["WES"] }));
+  assert.equal(lines[0], "# of samples with a mutation in this gene that are also profiled for mutations: 4,974");
+  assert.equal(lines[1], "# of samples profiled for mutations in this gene: 1,234,567");
+});
+
+test("GP2: the panel line lists the row's panels as given, comma-separated", () => {
+  assert.equal(freqTipLines("cna", r("MYC", 1, 1, 1, { cna: 2, panels: ["A", "B", "WES"] }))[2], "Gene panels: A, B, WES");
+  assert.equal(freqTipLines("mutated", r("KRAS", 1, 1, 1, { panels: ["ONLY"] }))[2], "Gene panels: ONLY");
+  // the row's list is sorted upstream (GP4); the tooltip does not re-sort it
+  assert.equal(freqTipLines("mutated", r("KRAS", 1, 1, 1, { panels: ["Z", "A"] }))[2], "Gene panels: Z, A");
+});
+
+test("GP2: no panels, or no panels field, gives \"Gene panels: none\"", () => {
+  assert.equal(freqTipLines("mutated", r("EGFR", 1, 1, 1, { panels: [] }))[2], "Gene panels: none");
+  assert.equal(freqTipLines("sv", r("EGFR", 1, 1, 1))[2], "Gene panels: none");
+  assert.equal(freqTipLines("cna", r("EGFR", 1, 1, 1, { cna: -2 })).length, 3);
+});
+
+// ---- GU1–GU2. Union / Intersection (STS-GT-9; MultiSelectionTable.tsx) ----
+
+test("GU1: union of several lines is one OQL clause, the lines joined by \"; \"", () => {
+  assert.deepEqual(geneSelection(["TP53: MUT", "KRAS: MUT", "EGFR: MUT"], "union"),
+    [{ kind: "oql", q: "TP53: MUT; KRAS: MUT; EGFR: MUT" }]);
+  assert.deepEqual(geneSelection(["MYC: AMP", "CDKN2A: HOMDEL"], "union"),
+    [{ kind: "oql", q: "MYC: AMP; CDKN2A: HOMDEL" }]);
+});
+
+test("GU2: intersection is one OQL clause per line, in the given order", () => {
+  assert.deepEqual(geneSelection(["TP53: MUT", "KRAS: MUT", "EGFR: MUT"], "intersection"), [
+    { kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "KRAS: MUT" }, { kind: "oql", q: "EGFR: MUT" },
+  ]);
+});
+
+test("GU1/GU2: one line is the same single clause either way", () => {
+  for (const op of ["union", "intersection"] as const)
+    assert.deepEqual(geneSelection(["MYC: AMP"], op), [{ kind: "oql", q: "MYC: AMP" }], op);
+});
+
+test("GU1/GU2: no lines, no clauses (never an empty query)", () => {
+  for (const op of ["union", "intersection"] as const) assert.deepEqual(geneSelection([], op), [], op);
+});
+
+// ---- GU4. Applied rows (STS-GT-9: pinned, checked, disabled, in the filter's order) ----
+
+test("GU4: the lines a top-level OQL clause already holds, in clause order then line order", () => {
+  const clauses = [
+    { kind: "clinical", attribute: "SEX", op: "=", value: "Female" },
+    { kind: "oql", q: "KRAS: MUT; TP53: MUT" },
+    { kind: "oql", q: "EGFR: MUT" },
+  ];
+  assert.deepEqual(appliedLines(clauses, ["EGFR: MUT", "TP53: MUT", "KRAS: MUT", "BRAF: MUT"]),
+    ["KRAS: MUT", "TP53: MUT", "EGFR: MUT"]);
+});
+
+test("GU4: a line in two clauses is listed once, where it first appears", () => {
+  const clauses = [{ kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "KRAS: MUT; TP53: MUT" }];
+  assert.deepEqual(appliedLines(clauses, ["KRAS: MUT", "TP53: MUT"]), ["TP53: MUT", "KRAS: MUT"]);
+});
+
+test("GU4: the clause's lines are trimmed before matching", () => {
+  assert.deepEqual(appliedLines([{ kind: "oql", q: "  KRAS: MUT ;TP53: MUT  " }], ["TP53: MUT", "KRAS: MUT"]),
+    ["KRAS: MUT", "TP53: MUT"]);
+});
+
+test("GU4: a line matches whole — another call of the same gene is not applied", () => {
+  assert.deepEqual(appliedLines([{ kind: "oql", q: "MYC: HOMDEL" }], ["MYC: AMP"]), []);
+  assert.deepEqual(appliedLines([{ kind: "oql", q: "KRAS: MUT = G12C" }], ["KRAS: MUT"]), []);
+});
+
+test("GU4: only top-level OQL clauses count — negated, nested and other kinds do not", () => {
+  const clauses = [
+    { not: { kind: "oql", q: "TP53: MUT" } },
+    { any: [{ kind: "oql", q: "KRAS: MUT" }] },
+    { kind: "profiled", type: "MUTATION", gene: "EGFR" },
+    { kind: "clinical", attribute: "q", op: "=", value: "EGFR: MUT" },
+  ];
+  assert.deepEqual(appliedLines(clauses, ["TP53: MUT", "KRAS: MUT", "EGFR: MUT"]), []);
+});
+
+test("GU4: no clauses, or no lines, gives nothing; junk entries are passed over", () => {
+  assert.deepEqual(appliedLines([], ["TP53: MUT"]), []);
+  assert.deepEqual(appliedLines([{ kind: "oql", q: "TP53: MUT" }], []), []);
+  assert.deepEqual(appliedLines([null, "TP53: MUT", 3, { kind: "oql" }, { kind: "oql", q: "TP53: MUT" }], ["TP53: MUT"]), ["TP53: MUT"]);
+});
+
+// ---- GU6. Intersection past the 8-clause limit (lib/cohort2.ts all: 0-8 clauses) ----
+
+test("GU6: fits when filters + genes stay at or under 8", () => {
+  assert.equal(intersectionRefusal(0, 8), null);
+  assert.equal(intersectionRefusal(6, 2), null);
+  assert.equal(intersectionRefusal(7, 1), null);
+  assert.equal(intersectionRefusal(0, 1), null);
+});
+
+test("GU6: refused past 8, naming the count it would make and the limit", () => {
+  for (const [filters, genes] of [[0, 9], [6, 3], [8, 1]] as const) {
+    const msg = intersectionRefusal(filters, genes);
+    assert.equal(typeof msg, "string", `${filters} + ${genes}`);
+    assert.match(msg!, new RegExp("\\b" + (filters + genes) + "\\b"), `${filters} + ${genes}: the count`);
+    assert.match(msg!, /\b8\b/, `${filters} + ${genes}: the limit`);
+  }
+});
+
+// ---- GQ1–GQ3. The query queue (GeneCell.tsx; StudyViewPageStore.ts:3174-3189; StudyViewUtils.tsx:617-635) ----
+
+test("GQ1/GQ2: a gene not queued is appended, with the queued message", () => {
+  assert.deepEqual(toggleQueued([], "TP53"),
+    { queue: ["TP53"], message: "TP53 queued for query (see top right of page for submit)" });
+  assert.deepEqual(toggleQueued(["TP53", "KRAS"], "EGFR"),
+    { queue: ["TP53", "KRAS", "EGFR"], message: "EGFR queued for query (see top right of page for submit)" });
+});
+
+test("GQ1/GQ2: a queued gene is removed, the others keeping their order, with the removed message", () => {
+  assert.deepEqual(toggleQueued(["TP53", "KRAS", "EGFR"], "KRAS"),
+    { queue: ["TP53", "EGFR"], message: "KRAS removed from query queue" });
+  assert.deepEqual(toggleQueued(["TP53"], "TP53"), { queue: [], message: "TP53 removed from query queue" });
+});
+
+test("GQ1: toggling twice restores the queue; the input is not changed", () => {
+  const q = ["TP53", "KRAS"];
+  const once = toggleQueued(q, "EGFR");
+  assert.deepEqual(q, ["TP53", "KRAS"]);
+  assert.deepEqual(toggleQueued(once.queue, "EGFR").queue, q);
+});
+
+test("GQ1: gene symbols match exactly (case-sensitive)", () => {
+  assert.deepEqual(toggleQueued(["TP53"], "tp53").queue, ["TP53", "tp53"]);
+});
+
+test("GQ3: the query is the queued genes one per line, in queue order", () => {
+  assert.equal(queuedQuery(["TP53", "KRAS", "EGFR"]), "TP53\nKRAS\nEGFR");
+  assert.equal(queuedQuery(["MYC"]), "MYC");
+  assert.equal(queuedQuery([]), "");
+});
+
+// ---- GI1–GI2. The "#" header under the Alteration Filter (ChartContainer.tsx:728-1066) ----
+
+const FILTER_NOTE = "This table is filtered based on selections in the Alteration Filter menu.";
+
+test("GI2: unfiltered, the plain \"#\" tooltip (GH1–GH3)", () => {
+  for (const k of KINDS) assert.equal(alteredHeaderTip(k, false), geneHeaderTips(k).altered, k);
+  assert.equal(alteredHeaderTip("mutated", false), "Number of samples with one or more mutations");
+});
+
+test("GI1: filtered, the portal's first line then the filter note on a line of its own", () => {
+  // the first lines are the portal's own (ChartContainer.tsx:733-739 mutated, 879-885 SV,
+  // 1056-1063 CNA), including its "Total number of …" on the mutated and SV "#" column
+  assert.equal(alteredHeaderTip("mutated", true), "Total number of mutations\n" + FILTER_NOTE);
+  assert.equal(alteredHeaderTip("sv", true), "Total number of fusions\n" + FILTER_NOTE);
+  assert.equal(alteredHeaderTip("cna", true), "Number of samples with one or more copy number alterations\n" + FILTER_NOTE);
+});
+
+test("GI1: every filtered tooltip ends with the note", () => {
+  for (const k of KINDS) assert.ok(alteredHeaderTip(k, true).endsWith("\n" + FILTER_NOTE), k);
 });

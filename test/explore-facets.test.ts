@@ -1,4 +1,4 @@
-// Explore's facets (lib/explore.ts) beyond the gene tables: the portal's numeric bin edges, how
+// Explore's facets (lib/explore.ts) beyond the gene tables (whose merge, GR2 and GP5, is here too): the portal's numeric bin edges, how
 // participants' facets merge (counts summed before dividing, overlap not deduplicated), a single
 // study's clinical / derived / per-gene facets with their disjunctive counting, the draft resolved
 // once and shipped as a table (or inlined past the bound), the multi-study pass pooled per
@@ -272,6 +272,52 @@ describe("merging participants' facets", () => {
       ]);
       assert.deepEqual(m.caseLists.map((l) => [l.id, l.n]), [["cnaseq", 6], ["mrna", 6]]);
     });
+  });
+
+  // ---- docs/legacy-spec/parity/gene-tables-cases.md GP4–GP5: a row's gene panels across connections ----
+  const prow = (gene: string, panels?: string[], extra: Record<string, unknown> = {}) =>
+    ({ gene, altered: 1, alteredOnPanel: 1, events: 1, profiled: 10, freqPct: 10, ...(panels ? { panels } : {}), ...extra });
+
+  for (const key of ["mutatedGenes", "cnaGenes", "svGenes"] as const) {
+    const extra = key === "cnaGenes" ? { cna: 2, cytoband: "1p" } : {};
+    test(`GP5: ${key} — a gene in both parts holds every part's panels, each once, A to Z`, () => {
+      const m = mergeExplore([
+        part({ study: "x", [key]: [prow("KRAS", ["B", "WES"], extra)] } as never),
+        part({ study: "y", [key]: [prow("KRAS", ["A", "B"], extra)] } as never),
+      ]);
+      const kras = m[key]!.find((g) => g.gene === "KRAS")!;
+      assert.deepEqual((kras as { panels?: string[] }).panels, ["A", "B", "WES"]);
+    });
+
+    test(`GP5: ${key} — a part whose row has no panels keeps the other part's`, () => {
+      for (const order of [0, 1]) {
+        const ps = [part({ study: "x", [key]: [prow("TP53", undefined, extra)] } as never),
+          part({ study: "y", [key]: [prow("TP53", ["P1", "P2"], extra)] } as never)];
+        const m = mergeExplore(order ? ps.reverse() : ps);
+        const tp53 = m[key]!.find((g) => g.gene === "TP53")!;
+        assert.deepEqual((tp53 as { panels?: string[] }).panels, ["P1", "P2"], order ? "panel-less part second" : "panel-less part first");
+      }
+    });
+  }
+
+  test("GP5: panels do not leak between genes, or between a CNA gene's AMP and HOMDEL rows", () => {
+    const m = mergeExplore([
+      part({ study: "x", mutatedGenes: [prow("KRAS", ["K"]), prow("TP53", ["T"])], cnaGenes: [prow("MYC", ["AMP1"], { cna: 2 })] } as never),
+      part({ study: "y", mutatedGenes: [prow("KRAS", ["K2"])], cnaGenes: [prow("MYC", ["DEL1"], { cna: -2 })] } as never),
+    ]);
+    const panelsOf = (rows: unknown[] | undefined, gene: string, cna?: number) =>
+      (rows as { gene: string; cna?: number; panels?: string[] }[]).find((g) => g.gene === gene && g.cna === cna)!.panels;
+    assert.deepEqual(panelsOf(m.mutatedGenes, "KRAS"), ["K", "K2"]);
+    assert.deepEqual(panelsOf(m.mutatedGenes, "TP53"), ["T"]);
+    assert.deepEqual(panelsOf(m.cnaGenes, "MYC", 2), ["AMP1"]);
+    assert.deepEqual(panelsOf(m.cnaGenes, "MYC", -2), ["DEL1"]);
+  });
+
+  test("GP5: merging leaves the parts' own panel lists unchanged", () => {
+    const a = prow("KRAS", ["B", "WES"]), b = prow("KRAS", ["A", "B"]);
+    mergeExplore([part({ study: "x", mutatedGenes: [a] } as never), part({ study: "y", mutatedGenes: [b] } as never)]);
+    assert.deepEqual(a.panels, ["B", "WES"]);
+    assert.deepEqual(b.panels, ["A", "B"]);
   });
 });
 

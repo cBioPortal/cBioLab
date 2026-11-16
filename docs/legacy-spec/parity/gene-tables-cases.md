@@ -70,3 +70,41 @@ The pure rules are in `lib/study-view-gene-tables.ts`, and the rows come from `g
 | GD9 | No OncoKB column | No `Is Cancer Gene (source: OncoKB)` column: it appears on the portal only while its cancer-gene filter is on, which is not built here | SVU:5085-5128 |
 | GD10 | Layout | As Summary Data: tab-separated, LF, none after the last line, plain integers | download-cases SD10 |
 | GD11 | Empty table | Header only | SVU (`[]` → header only) |
+
+## The Freq tooltip's gene panels (GP)
+
+| # | Case | Rule | Source |
+|---|---|---|---|
+| GP1 | The tooltip | Three lines: "# of samples with a mutation in this gene that are also profiled for mutations: N" (N the altered samples on a covering panel), "# of samples profiled for mutations in this gene: M", then the panel line. "mutation"/"mutations" become "structural variant"/"structural variants" or "copy number alteration"/"copy number alterations". Numbers with thousands separators | TableUtils.tsx:110-131 |
+| GP2 | The panel line | "Gene panels: P1, P2", or "Gene panels: none" when there are none | StudyViewGenePanelModal.tsx:20-44 |
+| GP3 | Which panels | Each gene panel held by a selected sample for the table's alteration type that lists the gene, whole-exome (`WES`) among them | AM:127-149 (`getMatchingGenePanelIds`) |
+| GP4 | ⚠ Their order | A to Z. The portal's are a set, in no fixed order | AbstractAlterationCountByGeneUseCase.java:58-72 |
+| GP5 | Several connections | The panels of every connection, each once | `mergeExplore` |
+| GP6 | ⚠ A panel's genes | The portal opens a panel's gene list on a click of its name. Not built here | StudyViewGenePanelModal.tsx |
+
+## Selecting rows (GU)
+
+| # | Case | Rule | Source |
+|---|---|---|---|
+| GU1 | Union | The checked genes filter as one clause: the samples altered in any of them (one OQL query of a line per gene) | STS-GT-9; MST |
+| GU2 | Intersection | The checked genes filter as a clause per gene: the samples altered in every one | STS-GT-9 |
+| GU3 | The choice | Offered with two or more rows checked. Union by default for the gene tables. The choice is kept by the browser and shared by the three gene tables | STS-GT-9 (localStorage by table type) |
+| GU4 | Applied rows | A gene the selection already filters on in this table (a line of one of the draft's OQL clauses) is pinned to the top, checked and disabled, in the filter's order | STS-GT-9 |
+| GU5 | Appended | A new filter is added to the selection's other filters (AND), never replacing them | STS-GT-9 |
+
+## The gene-click query queue (GQ)
+
+| # | Case | Rule | Source |
+|---|---|---|---|
+| GQ1 | Queue | A gene's search icon (or Enter / Space on it) adds the gene to the genes queued for a query; again removes it | GeneCell.tsx; STS-GT-6 |
+| GQ2 | Message | "<G> queued for query (see top right of page for submit)" or "<G> removed from query queue" | STS-GT-6 |
+| GQ3 | ⚠ The query | The page's Query genes… dialog opens with the queued genes, one per line (the dialog's form), in the order they were queued. The portal joins them with spaces in its query box | StudyViewPageStore.ts:3174-3189 |
+| GQ4 | Queued state | The icon is drawn selected while its gene is queued; the queue is the page's, so a gene queued from one table shows queued in another | STS-GT-6 |
+
+## The alteration-filter indicator (GI)
+
+| # | Case | Rule | Source |
+|---|---|---|---|
+| GI1 | Indicator | With Alterations: OncoKB drivers only (the page's alteration filter), the `#` header's filter icon is drawn dark and its tooltip is the portal's filtered text: "Total number of mutations" (mutated), "Total number of fusions" (SV) or "Number of samples with one or more copy number alterations" (CNA), then "This table is filtered based on selections in the Alteration Filter menu." | ChartContainer.tsx:733-739, 879-885, 1056-1063 |
+| GI2 | Off | With every alteration counted, the icon is drawn grey and the tooltip is the plain one (GH1–GH3) | TableHeaderCellFilterIcon.tsx:29; MST:341-342 |
+| GU6 | ⚠ Past the filter limit | A selection holds at most 8 filters, and Intersection adds one per gene (OQL can't AND genes in one query). When the checked genes would take the selection past 8, Intersection is offered but disabled, saying how many filters it would make. Union, one filter, is unaffected. The portal has no limit | `lib/cohort2.ts` (all: 0–8 clauses) |

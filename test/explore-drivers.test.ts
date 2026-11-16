@@ -61,7 +61,7 @@ describe("gene tables", () => {
       ? [{ g: "KRAS", altered: 168, on_panel: 168, events: 171 }]
       : /gene_panel_id = 'WES'/.test(q) ? [{ n: 566 }] : [];
     const r = await geneTables({ studies: [STUDY], db: "cbio_a", conn: PRIMARY, driverPin: "v7.5" });
-    assert.equal(eventReads().length, 6, "altered and distinct-gene reads for mutations, CNA and SVs");
+    assert.equal(eventReads().length, 9, "altered, distinct-gene and panel-gene reads for mutations, CNA and SVs");
     for (const q of eventReads()) assert.ok(q.includes(driverEventSql("v7.5")), "event read without the driver condition:\n" + q);
     assert.ok(panelReads().length > 0);
     for (const q of panelReads()) assert.doesNotMatch(q, /annotation\.oncokb/, "a denominator must not depend on driver status");

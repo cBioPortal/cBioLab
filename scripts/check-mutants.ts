@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -43,6 +43,8 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "density": ["node", "--env-file=.env.local", "scripts/check-density.ts"],
   // the Case Lists chart's counts, run on the fixture study's connection b
   "case-lists": ["node", "--env-file=.env.local", "scripts/check-case-lists.ts"],
+  // the gene tables' Freq-tooltip panels, run on the fixture study's connection b
+  "gene-panels": ["node", "--env-file=.env.local", "scripts/check-gene-panels.ts"],
   "plot-stats": ["node", "--env-file=.env.local", "scripts/check-plot-stats.ts"],
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
@@ -234,6 +236,26 @@ const MUTANTS: Mutant[] = [
     effect: "Sorting a gene table by Freq puts the genes with no profiled sample first.",
     find: "if (fa == null || fb == null) return fa == null ? (fb == null ? 0 : 1) : -1;",
     replace: "if (fa == null || fb == null) return fa == null ? (fb == null ? 0 : -1) : 1;" },
+  { id: "gene-panels-any-sample", layer: "counts", guard: "gene-panels", file: "lib/explore.ts",
+    effect: "A gene table's Freq tooltip lists the panels of every sample in the study, not only the selected ones.",
+    find: "  WHERE \" + studyIn(studies) + \" AND alteration_type = \" + sq(alterationType) + inSamples(set) + \"\\n\" +\n        \")\\n\" +",
+    replace: "  WHERE \" + studyIn(studies) + \" AND alteration_type = \" + sq(alterationType) + \"\\n\" +\n        \")\\n\" +" },
+  { id: "gene-panels-not-merged", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "A gene table over several connections lists only the first connection's panels for a gene.",
+    find: "      if (r.panels?.length) cur.panels = [...new Set([...(cur.panels || []), ...r.panels])].sort();\n",
+    replace: "" },
+  { id: "gene-intersection-as-union", layer: "counts", guard: "unit", file: "lib/study-view-gene-tables.ts",
+    effect: "Intersection of checked genes keeps the samples altered in any of them, as Union does.",
+    find: "return op === \"union\" ? [{ kind: \"oql\", q: lines.join(\"; \") }] : lines.map((q) => ({ kind: \"oql\", q }));",
+    replace: "return [{ kind: \"oql\", q: lines.join(\"; \") }];" },
+  { id: "gene-applied-first-line-only", layer: "counts", guard: "unit", file: "lib/study-view-gene-tables.ts",
+    effect: "Of a Union filter on several genes, only the first is pinned as applied.",
+    find: "for (const l of q.split(\";\").map((x) => x.trim()))",
+    replace: "for (const l of q.split(\";\").map((x) => x.trim()).slice(0, 1))" },
+  { id: "gene-queue-never-removes", layer: "counts", guard: "unit", file: "lib/study-view-gene-tables.ts",
+    effect: "A second click on a gene's search icon queues it again instead of removing it.",
+    find: "return queue.includes(gene)\n    ? {",
+    replace: "return false\n    ? {" },
   { id: "density-index-not-portal", layer: "counts", guard: "density", file: "lib/plot.ts",
     effect: "The density chart puts a value on a cell edge in the cell above, not the one the portal's rounded interval gives (FGA 3/44 in cell 3, not 2).",
     find: "floor((\" + col + \" - \" + lo + \") / ((\" + hi + \" - \" + lo + \") / \" + n + \"))",
