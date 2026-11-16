@@ -154,7 +154,7 @@ Data version: every n, every point set and every value compared is identical (Q2
 | PLT-AX-1c | ❌ | C | No "Same gene" option |
 | PLT-AX-2 | 🟡 | BC | Profiles by name ✅; attributes by raw id (`MUTATION_COUNT`), not display name/priority; "Plot mutations by": mutation type / mutated vs not only; no SV "by" select; no ⓘ description |
 | PLT-AX-3 | ❌ | C | No waterfall |
-| PLT-AX-4 | 🔶 | BC | Shown on any numeric axis; never disabled (negatives dropped, NULL, `plot.ts:274`); log10(v+1); not auto-on for `rna_seq`; title "(log scale)"; kept in the document |
+| PLT-AX-4 | ✅ | BC | Offered on a numeric axis; with values below 0 shown unchecked and disabled (reason in its tooltip, the choice kept in the document) except an `rna_seq` non-z-score profile; on when an `rna_seq` mRNA profile is chosen; title " (log2(value + 1))" / " (log10)" (#254) |
 | PLT-AX-5 | ❌ | C | No limit-value checkbox (limit values are dropped; LV) |
 | PLT-AX-6 | 🟡 | BC | Free gene field (any gene, `QueryField`), not the queried genes; no "(Not profiled)" suffix; no localStorage fallback; default gene 1 ✅; several genes on a mutation axis become an OQL axis |
 | PLT-AX-7 | ❌ | C | No gene sets (tracked: GSVA gene sets) |
@@ -363,7 +363,7 @@ Data version: every n, every point set and every value compared is identical (Q2
 | PLT-MD-8 | ❌ | C | No limit-value mode |
 | PLT-MD-9 | ❌ | C | No waterfall |
 | PLT-MD-10 | 🟡 | B | Table only; no colour toolbar ✅, no search ✅; no Plot Type / Sort By / Horizontal Bars |
-| PLT-MD-11 | 🔶 | C | Negatives: log still offered, negative values dropped (NULL), all profiles alike |
+| PLT-MD-11 | ✅ | C | Negatives: log scale off, axis drawn linear and the caption says so; `rna_seq` (not z-score) keeps it, negatives drawn at 0 and counted (#254) |
 | PLT-MD-12 | 🔶 | C | One value per sample: molecular `argMax(value, 1)` (any one), assay `avg`; no VAF multi-value axes |
 | PLT-MD-13 | 🟡 | C | Explore / lab plot card (`app/lab/kinds/plot.tsx`) defaults to two numeric attributes, else mutation type × a categorical; gene from a free field |
 | PLT-MD-14 | 🟡 | C | Custom data uploads appear as clinical attributes (`custom-data.ts`), no login needed |
@@ -384,7 +384,7 @@ Data version: every n, every point set and every value compared is identical (Q2
 | PLT-STM-8 | 🔶 | BC | `quantilesExact(0.25,0.5,0.75)` = sorted[floor(p·n)]: q1/q3 differ from legacy sorted[round(p·n)−1] whenever p·n has fraction ≥ .5 or is integral; median = upper middle for even n (Q1 Amp 2722.74 vs 2668.88). Whiskers `min(hi, q3+1.5·IQR)` = legacy's fence rule ✅ (comment and caption call it "Tukey") |
 | PLT-STM-9 | ❌ | C | No sort by median |
 | PLT-STM-10 | 🟡 | C | Deterministic per sample (FNV-1a hash → sin, `plot-draw.ts:14`) ✅; different hash, ±0.9 × half-width |
-| PLT-STM-11 | 🔶 | BC | log10(v+1), negatives → NULL (legacy log2(max(v,0)+1)); before Pearson/box ✅, Spearman unaffected ✅; GA axes same log10(v+1) (legacy log10(v+offset)) |
+| PLT-STM-11 | ✅ | BC | log2(max(v,0)+1), generic assay log10(v) with 0 → 0, before Pearson/box/regression; Q1-log Diploid quartiles = portal (#254) |
 | PLT-STM-12 | ❌ | C | No bar counts |
 | PLT-STM-13 | ✅ | BC | Q6: all 15 cells identical |
 | PLT-STM-14 | 🔶 | C | Colouring by mutation type uses the axis value: a sample with two classes is "Multiple", not the top-priority class |
