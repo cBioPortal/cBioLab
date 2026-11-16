@@ -7,7 +7,8 @@
 # logic, the pooled paths, the gallery examples and their method scripts, the denominator, facet,
 # value-folding, oncoprint patient-value and splitBy checks) and `e2e` (the build, then the browser suite and federation
 # against it). The planted-bug check follows the warehouse lane rather than running beside it, so
-# no more than two jobs query the warehouse at once, each with its ClickHouse concurrency halved.
+# no more than two jobs query the warehouse at once, each with its ClickHouse concurrency halved. On
+# a pull request it plants only the bugs the pull request's diff could affect; on master, every one.
 # The report /verification displays (docs/verification/*.json) is kept as this run's
 # verification-report artifact, merged from the jobs that write it.
 #
@@ -240,6 +241,15 @@ jobs:
       # the oncoprint-values guard reads the fixture study on connection b
       - name: Peer database (test/fixtures/peer-study)
         run: node --env-file=.env.local scripts/peer-db.ts --port 21999 >> "$GITHUB_ENV"
+
+      # a pull request's changed files: the checkout is its merge commit, whose first parent is the base
+      - name: Changed files
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=2 origin "$GITHUB_SHA"
+          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+          echo "MUTANT_CHANGED=$RUNNER_TEMP/changed.txt" >> "$GITHUB_ENV"
+          cat "$RUNNER_TEMP/changed.txt"
 
       - name: Planted bugs
         run: npm run check:mutants

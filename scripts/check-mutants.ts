@@ -11,6 +11,10 @@
  * database checks), so the working tree and its dev server are never touched.
  *
  * Run: npm run check:mutants (about three minutes).
+ * With MUTANT_CHANGED set to a file listing changed paths, one per line (a pull request's diff, as CI
+ * gives it), only the bugs that diff could affect are planted: those in a changed file, and those
+ * whose guard's own files changed. A diff that touches this script, the workflow or the dependencies
+ * plants every bug, as does a run without MUTANT_CHANGED (master, and locally).
  * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads
  * (or REPORT_DIR/mutants.json when REPORT_DIR is set, as in CI).
  */
@@ -988,6 +992,25 @@ function run(dir: string, guard: Guard, file?: string): { ok: boolean; failures:
 
 const dir = mkdtempSync(join(tmpdir(), "cohort-lab-mutants-"));
 const ONLY = process.env.MUTANT_ONLY;
+
+/** a change to any of these can change every planted bug's outcome */
+const PLANT_ALL_ON = ["scripts/check-mutants.ts", ".github/workflows/verify.yml", "package.json", "package-lock.json"];
+
+/** the files a guard runs from: its script, or for the unit guard the suites that import the bug's file */
+function guardFiles(m: Mutant): string[] {
+  return m.guard === "unit" ? suitesImporting(ROOT, m.file) : GUARD_CMD[m.guard].filter((a) => a.startsWith("scripts/"));
+}
+
+/** the bugs to plant, and why: all of them, or those MUTANT_CHANGED's diff could affect */
+function selection(): { mutants: Mutant[]; changed: number | null; reason: string } {
+  const list = process.env.MUTANT_CHANGED;
+  if (!list) return { mutants: MUTANTS, changed: null, reason: "every bug (no MUTANT_CHANGED)" };
+  const changed = new Set(readFileSync(list, "utf8").split("\n").map((l) => l.trim()).filter(Boolean));
+  const all = PLANT_ALL_ON.filter((f) => changed.has(f));
+  if (all.length) return { mutants: MUTANTS, changed: changed.size, reason: "every bug (the diff changes " + all.join(", ") + ")" };
+  const mutants = MUTANTS.filter((m) => changed.has(m.file) || guardFiles(m).some((f) => changed.has(f)));
+  return { mutants, changed: changed.size, reason: "the bugs in, or guarded by, the " + changed.size + " changed files" };
+}
 /** every planted bug run against its guard in the copy at `dir`; the exit code */
 function plantAll(): number {
   const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".venv"]);
@@ -996,7 +1019,12 @@ function plantAll(): number {
   mkdirSync(join(dir, "docs/verification"), { recursive: true });
   mkdirSync(join(dir, ".ch-cache"));
 
-  const guards = [...new Set(MUTANTS.map((m) => m.guard))];
+  const sel = selection();
+  const planted = sel.mutants.filter((m) => !ONLY || m.id === ONLY);
+  console.log(`Planting ${planted.length} of ${MUTANTS.length} bugs: ${sel.reason}`);
+  if (!planted.length) console.log("No planted bug is in, or guarded by, a changed file: nothing to plant.");
+
+  const guards = [...new Set(planted.map((m) => m.guard))];
   for (const g of guards) {
     const base = run(dir, g);
     console.log(`${base.ok ? "PASS" : "FAIL"} baseline: ${g} passes on the unmodified code`);
@@ -1004,7 +1032,7 @@ function plantAll(): number {
   }
 
   const results = [];
-  for (const m of MUTANTS.filter((m) => !ONLY || m.id === ONLY)) {
+  for (const m of planted) {
     const path = join(dir, m.file);
     const original = readFileSync(path, "utf8");
     const hits = original.split(m.find).length - 1;
@@ -1025,6 +1053,7 @@ function plantAll(): number {
     ranAt: new Date().toISOString(),
     commit: execSync("git rev-parse --short HEAD", { cwd: ROOT }).toString().trim(),
     total: results.length, caught,
+    ...(sel.changed == null ? {} : { selection: { changedFiles: sel.changed, of: MUTANTS.length, reason: sel.reason } }),
     mutants: results,
   }, null, 1) + "\n");
   console.log(`\n${caught} of ${results.length} planted bugs caught`);
