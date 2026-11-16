@@ -16,6 +16,7 @@ import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
+import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { cn } from "../../lib/cn.ts";
@@ -629,6 +630,21 @@ const forBoth = (make: (t: GroupsTarget) => ChartAction | null): ChartAction[] =
   (["comparison", "analysis"] as const).map(make).filter((a): a is ChartAction => !!a);
 
 /**
+ * A categorical chart's "Download ▸ Summary Data", the portal's last chart-menu item: a row per
+ * value with its count and share (docs/legacy-spec/parity/download-cases.md). Disabled, saying
+ * why, when the chart holds only its most frequent values.
+ */
+function summaryDownload(name: string, unit: DownloadUnit, values: CategoryCount[], na: number, distinct?: number): ChartAction {
+  const cut = summaryCut(values.length, distinct);
+  const counts = na > 0 ? [...values, { value: "NA", count: na }] : values;
+  const file = chartFileName(name, "summary");
+  return { label: "Download", title: "save this chart's data as a file", sub: [
+    { label: "Summary Data", disabled: !!cut, title: cut || "each value with its count and percentage, as " + file,
+      onClick: () => saveText(file, summaryDataTsv(counts, unit)) }
+  ] };
+}
+
+/**
  * A chart menu's "Compare groups" (or "Analyze groups"), as the portal's study view opens group
  * comparison from a chart: the rows the reader checked, each a group, or — with none checked — the
  * chart's values, the most frequent first, up to the most groups the target takes (20 for the comparison
@@ -735,9 +751,10 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 const selected = n > 1 ? forBoth((t) => ({ label: GROUPS[t].verb + " selected (" + (n > 8 ? "8+" : n) + ")",
                   title: GROUPS[t].opens + " each selected " + (c.kind === "num" ? "range" : "value") + " of " + label + " as a group, over the rest of your selection",
                   onClick: () => compareSelection(chart, t) })) : [];
-                if (c.kind === "cat") return <ChartMenu label={label} actions={addMode ? [] : [
+                if (c.kind === "cat") return <ChartMenu label={label} actions={[...(addMode ? [] : [
                   ...forBoth((t) => compareAction(c.values.map(valueArm), PIE_ATTRIBUTES.has(c.attribute) ? null : checked.map(valueArm), "value of " + label, (arms) => compareItems(chart, arms, t), t)),
-                  ...selected]} />;
+                  ...selected]),
+                  summaryDownload(label, c.per, c.values.map((v: any) => ({ value: String(v.v), count: v.n })), c.na || 0, c.distinct)]} />;
                 const bins = (c.bins || []).filter((b: any) => b.count > 0).map((b: any) => ({ name: armLabel(c.attribute + " " + binLabel(b)), where: binClause(c.attribute, b) as Leaf }));
                 const fixed = oneValueBars(c.bins);
                 return <ChartMenu label={label} actions={[
@@ -931,10 +948,11 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
         <span className="min-w-0 flex-1 truncate" data-tip={f.entity}>{title}</span>
-        <ChartMenu label={title} actions={addMode || exStudies.length > 1 ? [] : f.kind === "cat"
+        <ChartMenu label={title} actions={[...(addMode || exStudies.length > 1 ? [] : f.kind === "cat"
           ? forBoth((t) => compareAction((f.values || []).map((v) => ({ ...valueArm(v.v), n: v.n })), checked.map(valueArm), "value of " + title, (arms) => compareItems(chart, arms, t), t))
           : forBoth((t) => compareNumeric(title, true, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title, t),
-            binArms, () => compareItems(chart, binArms, t), t))} />
+            binArms, () => compareItems(chart, binArms, t), t))),
+          ...(f.kind === "cat" && f.values && f.unit ? [summaryDownload(title, f.unit, f.values.map((v) => ({ value: v.v, count: v.n })), f.total - f.measured, f.distinct)] : [])]} />
         <Button variant="ghost" size="icon-xs" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
           onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
       </div>
@@ -985,6 +1003,8 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
           <div className="facettitle">
             {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
             <span className="meta"> · sample-level · {f.total.toLocaleString()} samples</span>
+            <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
+              f.states.map((st) => ({ value: st.label, count: st.n })), 0)]} />
           </div>
           <ValueList hint={"keep the samples in any of the checked states of " + f.gene}
             rows={f.states.map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",

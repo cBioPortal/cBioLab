@@ -20,7 +20,8 @@ test("Remove track is offered only where it changes the view", () => {
   assert.equal(canRemoveTrack({ genes: ["KRAS"] }, "KRAS"), false);
   assert.equal(canRemoveTrack({ genes: ["KRAS", "TP53"] }, "KRAS"), true);
   assert.equal(canRemoveTrack({ genes: ["KRAS"], clinical: ["AGE"] }, "AGE"), true);
-  assert.equal(canRemoveTrack({ genes: ["KRAS"] }, "Study of origin"), false);
+  assert.equal(canRemoveTrack({ genes: ["KRAS"] }, "Study of origin"), true, "an automatic row is hidden (hideTracks)");
+  assert.equal(canRemoveTrack({ genes: ["KRAS"], hideTracks: ["Study of origin"] }, "Study of origin"), false, "already hidden");
   assert.equal(canRemoveTrack({ genes: [{ genes: ["BRAF", "NRAS"] }] }, "BRAF / NRAS"), false);
 });
 

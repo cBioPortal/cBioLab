@@ -1,7 +1,7 @@
 // The oncoprint's track edits on a view (the document): pure functions, each returning the next view.
 import { portalFreq } from "../../lib/chart/format.ts";
 import { normalizeGeneTracks, geneRowKeys, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
-import { heatmapTrackLabel, assayTrackLabel, STUDY_TRACK } from "../../lib/profile-names.ts";
+import { heatmapTrackLabel, assayTrackLabel, isAutoTrack, AUTO_TRACKS, SPECTRUM_TRACK, SPECTRUM_NAME } from "../../lib/profile-names.ts";
 
 type V = Record<string, any>;
 
@@ -15,7 +15,8 @@ export const heatmapLabels = (v: V): string[] => (v.heatmap || []).flatMap((h: V
 
 /** drop sort keys whose track no longer exists; a cluster key lives as long as its heatmap profile */
 export const pruneSort = (v: V): V => {
-  const keep = new Set(["genomic", "id", STUDY_TRACK, ...(v.clinical || []), ...heatmapLabels(v),
+  const hidden: string[] = v.hideTracks || [];
+  const keep = new Set(["genomic", "id", ...AUTO_TRACKS.filter((l) => !hidden.includes(l)), ...(v.clinical || []), ...heatmapLabels(v),
     ...(v.heatmap || []).map((h: V) => "cluster:" + h.profileType)]);
   const sort = (v.sort || []).filter((s: unknown) => keep.has(sortKeyText(s).replace(/^-/, "")));
   const next = { ...v };
@@ -30,8 +31,9 @@ const rowKeys = (v: V): (string | null)[] => { try { return geneRowKeys(v.genes 
 export const geneRowCount = (v: V): number => { try { return normalizeGeneTracks(v.genes || []).tracks.length; } catch { return (v.genes || []).length; } };
 
 /** a track's label back to what produced it: the genes, a heatmap profile, or a clinical attribute */
-export const trackOwner = (v: V, label: string): "genes" | "clinical" | "heatmap" | null => {
+export const trackOwner = (v: V, label: string): "genes" | "clinical" | "heatmap" | "auto" | null => {
   if (rowKeys(v).includes(label)) return "genes";
+  if (isAutoTrack(label)) return "auto";
   if ((v.clinical || []).includes(label)) return "clinical";
   if (heatmapLabels(v).includes(label)) return "heatmap";
   return null;
@@ -61,6 +63,7 @@ export const removeTrack = (v: V, label: string): V => {
   }
   if (owner === "clinical") return pruneSort({ ...v, clinical: (v.clinical || []).filter((a: string) => a !== label) });
   if (owner === "heatmap") return withHeatmap(v, (v.heatmap || []).filter((h: V) => !heatmapLabels({ ...v, heatmap: [h] }).includes(label)));
+  if (owner === "auto") return (v.hideTracks || []).includes(label) ? v : pruneSort({ ...v, hideTracks: [...(v.hideTracks || []), label] });
   return v;
 };
 
@@ -133,4 +136,40 @@ export function clinicalTrackRows(attrs: TrackAttr[], totals?: { patients: numbe
 /** lodash sortBy's order of strings: by UTF-16 code unit, not locale */
 function byCodeUnit(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * The Clinical tab's rows in the portal's order (TracksMenu 185-213): Study of origin, then the
+ * mutation spectrum, then the "Profiled for" rows, then the rest (attributes and # Samples per
+ * Patient) by Freq, priority and name. The automatic rows count every queried sample (100%), the
+ * spectrum the queried samples profiled for mutations (ResultsViewPageStore 1300-1316).
+ * `autoTracks` are the rows the figure draws by itself (the contract's conventions.autoTracks).
+ */
+export function tracksMenuRows({ attrs, totals, spectrum, sequenced, autoTracks }: {
+  attrs: TrackAttr[]; totals?: { patients: number; samples: number }; spectrum?: boolean; sequenced?: number; autoTracks: string[];
+}) {
+  type Row = TrackAttr & { label: string; pct: number | null; unit: "patients" | "samples" };
+  const auto = (l: string): Row => ({ attribute: l, kind: "auto", patients: 0, label: l, pct: 100, unit: "samples" });
+  const group = (r: Row) => r.attribute === "Study of origin" ? 0 : r.kind === "spectrum" ? 1 : r.attribute.startsWith("Profiled for ") ? 2 : 3;
+  const rows: Row[] = [
+    ...autoTracks.filter(isAutoTrack).map(auto),
+    ...(spectrum ? [{ attribute: SPECTRUM_TRACK, kind: "spectrum", patients: 0, label: SPECTRUM_NAME, unit: "samples" as const,
+      pct: totals?.samples && sequenced != null ? Math.min(100, 100 * sequenced / totals.samples) : null }] : []),
+    ...clinicalTrackRows(attrs, totals),
+  ];
+  return rows.sort((a, b) => group(a) - group(b) || (b.pct ?? -1) - (a.pct ?? -1) || (b.priority ?? 0) - (a.priority ?? 0) ||
+    byCodeUnit(a.label.toLowerCase(), b.label.toLowerCase()));
+}
+
+/**
+ * The view after Update tracks (or Select / Deselect all) on the Clinical tab: the ticked
+ * attributes become `clinical`, in the order given; the automatic rows left unticked become
+ * `hideTracks`, in the figure's order.
+ */
+export function withClinicalTab(v: V, ticked: string[], autoTracks: string[]): V {
+  const hidden = [...autoTracks.filter((l) => !ticked.includes(l)),
+    ...(v.hideTracks || []).filter((l: string) => !autoTracks.includes(l) && !ticked.includes(l))];
+  const next: V = { ...v, clinical: ticked.filter((n) => !isAutoTrack(n)) };
+  if (hidden.length) next.hideTracks = hidden; else delete next.hideTracks;
+  return pruneSort(next);
 }

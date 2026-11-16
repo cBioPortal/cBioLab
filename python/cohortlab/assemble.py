@@ -69,7 +69,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                       clinical: list[dict[str, Any]], heatmap: list[dict[str, Any]] | None = None, z_reference: dict[str, Any] | None = None,
                       derived: list[dict[str, Any]] | None = None, sort: list[dict[str, str]] | None = None, line_gap: int = 90,
                       study_of: dict[str, str] | None = None, display: dict[str, Any] | None = None,
-                      unit: str = "patient") -> Contract:
+                      unit: str = "patient", hide_tracks: list[str] | None = None) -> Contract:
     heatmap = heatmap or []
     derived = derived or []
     sort = sort or [{"track": "genomic", "dir": "asc"}]
@@ -191,7 +191,8 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
 
     # ---- clinical tracks -------------------------------------------------
     clin: list[Track] = []
-    if multi:
+    # the automatic rows the reader switched off (lib/profile-names.ts AUTO_TRACKS); this port draws only Study of origin
+    if multi and "Study of origin" not in (hide_tracks or []):
         cat_idx = {s: i for i, s in enumerate(studies)}
         cells = np.full(n, -1, dtype=np.int32)
         for i, p in enumerate(all_pids):

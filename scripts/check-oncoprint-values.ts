@@ -43,11 +43,11 @@
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines; scripts/gate.sh sets them).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
-import { assayHeatmapSql, clinicalNamesSql, clinicalSql, genomicEventsSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
+import { assayHeatmapSql, buildContract, clinicalNamesSql, clinicalSql, genomicEventsSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
 import { oqlCasesSql, oqlEventsSql, parseOql } from "../lib/oql.ts";
 import { eventWanted } from "../lib/oql-match.ts";
 import { buildExplore } from "../lib/explore.ts";
-import { clinicalTrackRows, trackAttrs, trackFreqText } from "../app/_oncoprint/track-edits.ts";
+import { clinicalTrackRows, trackAttrs, trackFreqText, tracksMenuRows } from "../app/_oncoprint/track-edits.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 
@@ -250,6 +250,28 @@ ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(w
 const top = whole.slice(0, 3).map((r) => r.attribute).join(", ");
 ok("tracks menu order: stored priority, then name", top === "MUTATION_COUNT, AGE, DEAD", top);
 
+// ---- the automatic rows: listed, counted and hidden ----------------------------------------------
+// every fixture sample has a mutations panel in data_gene_panel_matrix.txt (59 of 59), and its
+// patients hold one or two samples, so the figure draws # Samples per Patient by itself
+let autoChecks = 0;
+const autoOk = (name: string, pass: boolean, detail: string) => { autoChecks++; ok(name, pass, detail); };
+{
+  const r = await buildExplore({ study: STUDY, conn, skipGenes: true, skipBins: true } as never) as { totals: { patients: number; samples: number }; dataTypes: { alterationType: string; n: number }[] };
+  const sequenced = Math.max(0, ...r.dataTypes.filter((d) => d.alterationType === "MUTATION_EXTENDED").map((d) => d.n));
+  autoOk("samples profiled for mutations (the spectrum's Freq)", sequenced === 59, "ours " + sequenced);
+  const shown = await buildContract({ study: STUDY, genes: ["KRAS"] } as never);
+  const hidden = await buildContract({ study: STUDY, genes: ["KRAS"], hideTracks: ["# Samples per Patient"] } as never);
+  const labels = (c: typeof shown) => c.tracks.map((t) => t.label).join(" | ");
+  autoOk("# Samples per Patient drawn by itself, and named in conventions.autoTracks",
+    labels(shown) === "# Samples per Patient | KRAS" && JSON.stringify(shown.conventions.autoTracks) === '["# Samples per Patient"]', labels(shown));
+  autoOk("hideTracks leaves it out of the figure, still named in conventions.autoTracks",
+    labels(hidden) === "KRAS" && JSON.stringify(hidden.conventions.autoTracks) === '["# Samples per Patient"]', labels(hidden));
+  const rows = tracksMenuRows({ attrs: trackAttrs(r as never), totals: r.totals, spectrum: true, sequenced, autoTracks: shown.conventions.autoTracks || [] });
+  const head = rows.slice(0, 2).map((x) => x.label + " " + trackFreqText(x.pct)).join(", ");
+  // the spectrum first; then MUTATION_COUNT (100%, stored priority 30) ahead of # Samples per Patient (100%, priority 0)
+  autoOk("tracks menu leads with the spectrum, then by Freq and priority", head === "Mutation spectrum 100.0%, Mutation Count 100.0%", head);
+}
+
 // ---- the Tabular download's row names and types -------------------------------------------------
 /** [attribute, display name from the fixture's data_clinical_*.txt header; null = none] */
 const NAMES: [string, string | null][] = [
@@ -306,6 +328,6 @@ const evLabels = async (line: string) => (await chQuery<{ ev: string }>(oqlEvent
 oqlOk("cohort events EGFR: MUT leave out the Fusion-typed mutation; a bare EGFR keeps it",
   !(await evLabels("EGFR: MUT")).includes("EGFR-SEPT14") && (await evLabels("EGFR")).includes("EGFR-SEPT14"), "");
 
-const total = exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
+const total = autoChecks + exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

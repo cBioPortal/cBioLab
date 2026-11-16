@@ -82,6 +82,48 @@ describe("merging participants' facets", () => {
     assert.equal(mergeExplore([p]), p);
   });
 
+  describe("SD15: values cut across studies", () => {
+    const cat = (study: string, vals: string[], distinct: number, base = 1000): ExploreResult => part({
+      study, totals: { patients: 10000, samples: 10000 },
+      clinical: [{ attribute: "SUBTYPE", per: "patient", kind: "cat", patients: vals.length * 10, distinct,
+        values: vals.map((v, i) => ({ v, n: base - i })) }],
+    });
+    const range = (pfx: string, from: number, n: number) => Array.from({ length: n }, (_, i) => pfx + String(from + i).padStart(4, "0"));
+    const merged = (...ps: ExploreResult[]) => {
+      const f = mergeExplore(ps).clinical.find((c) => c.attribute === "SUBTYPE")!;
+      assert.ok(f.kind === "cat");
+      return f;
+    };
+
+    test("SD15 a union past 200 keeps the 200 most frequent, and distinct counts the whole union", () => {
+      const f = merged(cat("s1", range("v", 0, 150), 150), cat("s2", range("v", 150, 150), 150, 999));
+      assert.equal(f.values.length, 200);
+      assert.ok(f.distinct! >= 300, `distinct ${f.distinct} must be at least the union's 300`);
+      assert.ok(f.distinct! > f.values.length, "the cut shows");
+    });
+
+    test("SD15 a mostly-different union past 200 still reports at least its size", () => {
+      // 20 values shared, 130 each own: a union of 280
+      const a = range("v", 0, 150), b = [...range("v", 0, 20), ...range("w", 0, 130)];
+      const f = merged(cat("s1", a, 150), cat("s2", b, 150, 999));
+      assert.equal(f.values.length, 200);
+      assert.ok(f.distinct! >= 280);
+    });
+
+    test("SD15 a union within 200 is not cut, and distinct is not below the values shown", () => {
+      // 2 × 50 overlapping by 25: a union of 75
+      const f = merged(cat("s1", range("v", 0, 50), 50), cat("s2", range("v", 25, 50), 50));
+      assert.equal(f.values.length, 75);
+      assert.ok(f.distinct! >= f.values.length, `distinct ${f.distinct} below ${f.values.length} values`);
+    });
+
+    test("SD15 a study's own larger distinct is kept", () => {
+      const f = merged(cat("s1", range("v", 0, 150), 5000), cat("s2", range("v", 150, 150), 150, 999));
+      assert.equal(f.values.length, 200);
+      assert.ok(f.distinct! >= 5000);
+    });
+  });
+
   test("counts are summed across participants, frequencies divided only after summing", () => {
     const a = part({
       study: "s1", draftCount: 10, totals: { patients: 100, samples: 110 },
@@ -777,6 +819,24 @@ describe("generic-assay charts", () => {
     assert.deepEqual(f.values, [{ v: "High", n: 6 }, { v: "Low", n: 5 }]);
     assert.equal(f.measured, 12);
     for (const q of sent.filter((x) => /trimBoth\(value\) AS v/.test(x))) assert.match(q, /NOT IN \('','NA','N\/A'/);
+  });
+
+  test("SD16: a categorical entity keeps its 30 most frequent values and reports how many it has", async () => {
+    on(/AS total_p/, [stats({ dt: "CATEGORICAL" })]);
+    on(/trimBoth\(value\) AS v, uniqExact/, Array.from({ length: 45 }, (_, i) => ({ v: "V" + String(i).padStart(2, "0"), n: 100 - i })));
+    on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_\w\.generic_assay_data_derived/, [{ n: 45 }]);
+    const [many] = await buildAssayFacets({ studies: ["st1"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "MSI" }] });
+    assert.ok(many.kind === "cat");
+    assert.equal(many.values!.length, 30, "ASSAY_VALUE_LIMIT");
+    assert.equal(many.distinct, 45, "the true number of distinct values, so the cut shows");
+    answers = [];
+    on(/AS total_p/, [stats({ dt: "CATEGORICAL" })]);
+    on(/trimBoth\(value\) AS v, uniqExact/, Array.from({ length: 12 }, (_, i) => ({ v: "W" + i, n: 20 - i })));
+    on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_\w\.generic_assay_data_derived/, [{ n: 12 }]);
+    const [few] = await buildAssayFacets({ studies: ["st1"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "MSI" }] });
+    assert.ok(few.kind === "cat");
+    assert.equal(few.values!.length, 12);
+    assert.equal(few.distinct, few.values!.length, "nothing cut");
   });
 
   test("a chart the draft filters on is counted without its own clause; at most six charts", async () => {

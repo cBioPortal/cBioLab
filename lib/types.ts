@@ -884,6 +884,8 @@ export interface Contract {
     cluster?: ClusterMethod;
     /** the study's own driver calls among the figure's alterations: any cbp_driver value, and the cbp_driver_tiers values */
     customDrivers?: { binary: boolean; tiers: string[] };
+    /** the automatic rows (lib/profile-names.ts AUTO_TRACKS) this figure draws, those the view hides included, in draw order */
+    autoTracks?: string[];
   };
   /** resolved viewing options — renderers read these, never their own defaults */
   display: ResolvedDisplay;
@@ -956,6 +958,8 @@ export interface AssayFacet {
   bins?: NumericBin[];
   min?: number; max?: number; median?: number;
   values?: { v: string; n: number }[];
+  /** categorical: how many values the entity takes; more than `values` when only the most frequent are kept */
+  distinct?: number;
   studies: string[];
   /** counted against the draft without its own clauses on this entity */
   disjunctive?: true;

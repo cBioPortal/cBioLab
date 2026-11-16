@@ -254,6 +254,22 @@ const MUTANTS: Mutant[] = [
     effect: "When every cell holds the same number of samples, the chart draws them in the lowest colour with no legend, where the portal scales from 1.",
     find: "  if (min === max) min = 1;\n",
     replace: "" },
+  { id: "summary-na-not-last", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "A chart's Summary Data file sorts NA by its count instead of writing it last.",
+    find: "isNa(a.value) ? (isNa(b.value) ? 0 : 1) : isNa(b.value) ? -1 : b.count - a.count",
+    replace: "b.count - a.count" },
+  { id: "summary-share-without-na", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "Summary Data's percentages are of the cases with a value, so they no longer match the chart's (NA left out of the sum).",
+    find: "const sum = counts.reduce((n, c) => n + c.count, 0);",
+    replace: "const sum = counts.reduce((n, c) => n + (isNa(c.value) ? 0 : c.count), 0);" },
+  { id: "summary-file-name-tabs-kept", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "A chart's download file name keeps its tabs, where the portal writes _.",
+    find: "chartName.replace(/[ \\t]/g, \"_\")",
+    replace: "chartName.replace(/ /g, \"_\")" },
+  { id: "summary-cut-not-said", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "A categorical chart over several studies whose merged values were cut to 200 reads as complete, so its Summary Data is offered as if whole.",
+    find: "const distinct = Math.max(base.distinct ?? 0, vals.size) || undefined;",
+    replace: "const distinct = base.distinct;" },
   { id: "density-swap-keeps-log", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
     effect: "Swap Axes leaves Log Scale on the axis position rather than moving it with mutation count.",
     find: "return { swapped: !s.swapped, xLog: !!s.yLog, yLog: !!s.xLog };",
@@ -620,6 +636,30 @@ const MUTANTS: Mutant[] = [
     effect: "The Tracks menu breaks ties by the Study View's chart priority (Cancer Type 3000) instead of the attribute's stored one, so equal-Freq rows are in a different order from the portal's.",
     find: "patients: f?.patients || 0, per: f?.per || d.per, priority: d.priority,",
     replace: "patients: f?.patients || 0, per: f?.per || d.per, priority: f?.priority ?? d.priority," },
+  { id: "tracks-special-rows-by-freq", layer: "counts", guard: "unit", file: "app/_oncoprint/track-edits.ts",
+    effect: "The Tracks menu sorts Study of origin, the spectrum and the Profiled-for rows by Freq with the rest, so the spectrum (at its sequenced share) falls below 100% attributes instead of leading as in the portal.",
+    find: "return rows.sort((a, b) => group(a) - group(b) ||",
+    replace: "return rows.sort((a, b) =>" },
+  { id: "tracks-spectrum-freq-all-samples", layer: "counts", guard: "unit", file: "app/_oncoprint/track-edits.ts",
+    effect: "The spectrum row's Freq is always 100% rather than the queried samples profiled for mutations.",
+    find: "pct: totals?.samples && sequenced != null ? Math.min(100, 100 * sequenced / totals.samples) : null",
+    replace: "pct: 100" },
+  { id: "tracks-untick-auto-not-hidden", layer: "counts", guard: "unit", file: "app/_oncoprint/track-edits.ts",
+    effect: "Unticking Study of origin, # Samples per Patient or a Profiled-for row in the Tracks menu does nothing: the row stays drawn.",
+    find: "const hidden = [...autoTracks.filter((l) => !ticked.includes(l)),",
+    replace: "const hidden = [...autoTracks.filter(() => false)," },
+  { id: "oncoprint-hidetracks-ignored", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint-assemble.ts",
+    effect: "A view's hideTracks is ignored: the automatic rows it names are drawn anyway.",
+    find: "if (hidden.has(clinTracks[i].label)) clinTracks.splice(i, 1);",
+    replace: "if (hidden.has(clinTracks[i].label + \"!\")) clinTracks.splice(i, 1);" },
+  { id: "oncoprint-autotracks-drop-hidden", layer: "counts", guard: "unit", file: "lib/oncoprint-assemble.ts",
+    effect: "A hidden automatic row is missing from the contract's autoTracks, so the Tracks menu can no longer list it to switch it back on.",
+    find: "autoTracks.push(...clinTracks.map((t) => t.label));",
+    replace: "autoTracks.push(...clinTracks.map((t) => t.label).filter((l) => !hidden.has(l)));" },
+  { id: "oncoprint-hidetracks-unchecked", layer: "counts", guard: "unit", file: "lib/oncoprint.ts",
+    effect: "hideTracks takes any label, so a misspelt row is silently not hidden instead of refused.",
+    find: "for (const x of v) if (typeof x !== \"string\" || !isAutoTrack(x))",
+    replace: "for (const x of v) if (typeof x !== \"string\")" },
   { id: "tracks-name-locale", layer: "counts", guard: "unit", file: "app/_oncoprint/track-edits.ts",
     effect: "Rows tied on Freq and priority are ordered by locale, so \"Éclair\" comes before \"zeta\" where the portal's code-unit order puts it after.",
     find: "byCodeUnit(x.label.toLowerCase(), y.label.toLowerCase())",
@@ -1041,7 +1081,9 @@ const PLANT_ALL_ON = ["scripts/check-mutants.ts", ".github/workflows/verify.yml"
 
 /** the files a guard runs from: its script, or for the unit guard the suites that import the bug's file */
 function guardFiles(m: Mutant): string[] {
-  return m.guard === "unit" ? suitesImporting(ROOT, m.file) : GUARD_CMD[m.guard].filter((a) => a.startsWith("scripts/"));
+  if (m.guard !== "unit") return GUARD_CMD[m.guard].filter((a) => a.startsWith("scripts/"));
+  // a bug no suite imports is reported, with every other unplantable one, before any guard runs
+  try { return suitesImporting(ROOT, m.file); } catch { return []; }
 }
 
 /** the bugs to plant, and why: all of them, or those MUTANT_CHANGED's diff could affect */
@@ -1066,6 +1108,18 @@ function plantAll(): number {
   const planted = sel.mutants.filter((m) => !ONLY || m.id === ONLY);
   console.log(`Planting ${planted.length} of ${MUTANTS.length} bugs: ${sel.reason}`);
   if (!planted.length) console.log("No planted bug is in, or guarded by, a changed file: nothing to plant.");
+
+  // what can be known without running anything is checked before the guards' baselines, which take minutes
+  const unplantable = planted.flatMap((m) => {
+    const hits = readFileSync(join(dir, m.file), "utf8").split(m.find).length - 1;
+    const site = hits === 1 ? [] : [`${m.id}: expected the bug's site exactly once in ${m.file}, found ${hits}`];
+    if (m.guard !== "unit") return site;
+    try { suitesImporting(dir, m.file); return site; } catch (e) { return [...site, `${m.id}: ${(e as Error).message}`]; }
+  });
+  if (unplantable.length) {
+    for (const u of unplantable) console.log("FAIL " + u);
+    return 1;
+  }
 
   const guards = [...new Set(planted.map((m) => m.guard))];
   for (const g of guards) {

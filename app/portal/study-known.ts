@@ -35,6 +35,8 @@ export interface StudyKnown extends StudyBasics {
   attrs: { attribute: string; kind: string; patients: number; displayName?: string; per?: "patient" | "sample"; priority?: number }[];
   /** the selection's size: the whole studies', or what the filters keep */
   patients: number; samples: number;
+  /** the queried samples profiled for mutations (the study's mutation profile), the Tracks menu's spectrum Freq */
+  sequenced?: number;
 }
 
 const CAPS: [ProfileType, string][] = [["MUTATION", "mut"], ["CNA", "cna"], ["SV", "sv"]];
@@ -87,6 +89,8 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
           clinical: sorted.map((c) => c.attribute),
           attrs: trackAttrs(j),
           patients: j.totals?.patients || 0, samples: j.totals?.samples || 0,
+          sequenced: Math.max(0, ...((j.dataTypes || []) as { alterationType: string; n: number }[])
+            .filter((d) => d.alterationType === "MUTATION_EXTENDED").map((d) => d.n)),
         });
       })
       .catch((e) => fail(String(e)));
