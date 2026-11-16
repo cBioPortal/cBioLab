@@ -31,7 +31,7 @@ import { forData } from "./driver-settings.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { clusterHeatmap } from "./oncoprint-cluster.ts";
 
-import { PROFILED_TYPES, SPECTRUM_TRACK, SPECTRUM_NAME, type ProfiledType } from "./profile-names.ts";
+import { PROFILED_TYPES, SPECTRUM_TRACK, SPECTRUM_NAME, AUTO_TRACKS, isAutoTrack, type ProfiledType } from "./profile-names.ts";
 import { inGeneticAlterationDerived } from "./profile-catalog.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
@@ -454,7 +454,18 @@ export function normalizeSpec(spec: OncoprintSpec) {
     const threshold = Number(o && o.threshold);
     return { kind, profileType, threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 2 };
   }).filter((o) => o.profileType);
-  return { genes, geneList, rangeGenes, levelGenes, levelPins, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays, display: normalizeDisplay(spec.display, spec.drivers) };
+  return { genes, geneList, rangeGenes, levelGenes, levelPins, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays,
+    hideTracks: specHideTracks(spec.hideTracks), display: normalizeDisplay(spec.display, spec.drivers) };
+}
+
+/** the automatic rows a view switches off: labels from AUTO_TRACKS, anything else refused */
+function specHideTracks(v: unknown): string[] {
+  if (v == null) return [];
+  const takes = "it takes " + AUTO_TRACKS.map((l) => "\"" + l + "\"").join(", ");
+  if (!Array.isArray(v)) throw new Error("hideTracks: a list of automatic rows; " + takes);
+  for (const x of v) if (typeof x !== "string" || !isAutoTrack(x))
+    throw new Error("hideTracks: \"" + String(x).slice(0, 60) + "\" is not an automatic row; " + takes);
+  return [...new Set(v as string[])];
 }
 
 /** the profiles a row's EXP / PROT read, as an oql clause names them (ids without the study prefix) */
@@ -755,7 +766,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   }));
   const connOf = (s: string): ChConn => conns.get(s)!;
   const dbOf = (s: string): string => connOf(s).db;
-  const { genes, geneList, rangeGenes, levelGenes, levelPins, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays } = normalizeSpec(spec);
+  const { genes, geneList, rangeGenes, levelGenes, levelPins, clinical, derivedEvents, lineGap, sort, heatmap, display, unit, overlays, hideTracks } = normalizeSpec(spec);
   if (multi && derivedEvents.length) throw new Error("derived-event tracks are single-study; drop them or the extra studies");
   if (unit === "sample" && derivedEvents.length)
     throw new Error("cohort rows are patient-level: a cohort selects patients, so drawing one per sample would repeat a patient's answer across their samples. Drop the rows or switch columns back to patients.");
@@ -1038,7 +1049,8 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   const contract = assembleContract({
     genes: geneList, groups, studies, studyOf, events, coverage, profiled: { types: profiledTypes, masks: profiledMasks }, samples: samplesPer,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
-    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank, clusterMethod
+    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank, clusterMethod,
+    ...(hideTracks.length ? { hideTracks } : {})
   });
   contract.stats.ms = Date.now() - t0;
   contract.stats.queryMs = queryMs;

@@ -4,6 +4,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assembleContract, normalizeDisplay, BITS, NOT_PROFILED, type AssembleInput, type EventRow } from "../lib/oncoprint-assemble.ts";
+import { tracksMenuRows } from "../app/_oncoprint/track-edits.ts";
+import { SPECTRUM_TRACK } from "../lib/profile-names.ts";
 
 const ev = (pid: string, gene: string, vt: string, mt?: string, cna?: number, driver = false) => ({ pid, gene, vt, mt, cna, driver });
 const input = (): AssembleInput => ({
@@ -560,7 +562,8 @@ test("#199 S3: two columns equal on the spectrum go to the next sort key", () =>
   }
 });
 
-test("#199 F1: the Tracks menu's Freq for the mutation spectrum counts samples sequenced, not samples with a spectrum (ResultsViewPageStore 1306-1312)",
-  { todo: "known missing: no Freq for the spectrum in the Tracks menu" }, () => {
-    assert.fail("not implemented");
-  });
+test("#199 F1: the Tracks menu's Freq for the mutation spectrum counts samples sequenced, not samples with a spectrum (ResultsViewPageStore 1306-1312)", () => {
+  const spectrumRow = tracksMenuRows({ attrs: [], totals: { patients: 8, samples: 10 }, spectrum: true, sequenced: 9, autoTracks: [] })[0];
+  assert.equal(spectrumRow.attribute, SPECTRUM_TRACK);
+  assert.equal(spectrumRow.pct, 90);
+});
