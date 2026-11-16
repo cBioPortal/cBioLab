@@ -250,6 +250,20 @@ ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(w
 const top = whole.slice(0, 3).map((r) => r.attribute).join(", ");
 ok("tracks menu order: stored priority, then name", top === "MUTATION_COUNT, AGE, DEAD", top);
 
+// ---- clinical tracks typed by the declared datatype ---------------------------------------------
+// data_clinical_sample.txt: KI67_INDEX is declared NUMBER, its values 10, 20, 30, ">90", "high", "high"
+// (3 numbers, so the old ">10 distinct" rule drew categories); TUMOR_GRADE is declared STRING, "1" once, "2" three times
+let typeChecks = 0;
+const typeOk = (name: string, pass: boolean, detail: string) => { typeChecks++; ok(name, pass, detail); };
+{
+  const c = await buildContract({ study: STUDY, genes: ["KRAS"], unit: "sample", clinical: ["KI67_INDEX", "TUMOR_GRADE"] } as never);
+  const ki = c.tracks.find((t) => t.label === "KI67_INDEX")!, tg = c.tracks.find((t) => t.label === "TUMOR_GRADE")!;
+  const drawn = (ki.values || []).filter((x) => x != null && !Number.isNaN(x as number)).map(Number).sort((x, y) => x - y);
+  typeOk("a NUMBER with 3 distinct numbers is a bar track, its text values no data",
+    ki.numeric === true && ki.min === 10 && ki.max === 30 && JSON.stringify(drawn) === "[10,20,30]", JSON.stringify({ numeric: ki.numeric, min: ki.min, max: ki.max, drawn }));
+  typeOk("a STRING of numbers is a category track", !tg.numeric && JSON.stringify(tg.categories) === '["2","1"]', JSON.stringify(tg.categories));
+}
+
 // ---- the automatic rows: listed, counted and hidden ----------------------------------------------
 // every fixture sample has a mutations panel in data_gene_panel_matrix.txt (59 of 59), and its
 // patients hold one or two samples, so the figure draws # Samples per Patient by itself
@@ -347,6 +361,6 @@ const evLabels = async (line: string) => (await chQuery<{ ev: string }>(oqlEvent
 oqlOk("cohort events EGFR: MUT leave out the Fusion-typed mutation; a bare EGFR keeps it",
   !(await evLabels("EGFR: MUT")).includes("EGFR-SEPT14") && (await evLabels("EGFR")).includes("EGFR-SEPT14"), "");
 
-const total = vafChecks + autoChecks + exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
+const total = typeChecks + vafChecks + autoChecks + exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
