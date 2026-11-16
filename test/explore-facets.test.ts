@@ -226,6 +226,53 @@ describe("merging participants' facets", () => {
     assert.equal(m.derived, undefined);
     assert.deepEqual(m.mutatedGenes, []);
   });
+
+  // docs/legacy-spec/parity/empty-caselists-cases.md, Case Lists rows CL5, CL6, CL8
+  describe("CL5/CL6/CL8: case lists merged across studies", () => {
+    test("CL6: lists of one kind are one row, counts added, named after the first study's list", () => {
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: [{ id: "all", name: "All samples", n: 30 }, { id: "cna", name: "CNA", n: 5 }] }),
+        part({ study: "s2", caseLists: [{ id: "all", name: "All tumors", n: 20 }, { id: "rppa", name: "RPPA", n: 7 }] }),
+      ]);
+      assert.deepEqual(m.caseLists, [
+        { id: "all", name: "All samples", n: 50 },
+        { id: "rppa", name: "RPPA", n: 7 },
+        { id: "cna", name: "CNA", n: 5 },
+      ]);
+    });
+
+    test("CL5: no cap on the number of rows (twelve lists in one study, all kept)", () => {
+      const twelve = Array.from({ length: 12 }, (_, i) => ({ id: "l" + String(i).padStart(2, "0"), name: "List " + i, n: 100 - i }));
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: twelve }),
+        part({ study: "s2", caseLists: [{ id: "all", name: "All samples", n: 1 }] }),
+      ]);
+      assert.equal(m.caseLists.length, 13, "every list of every study is a row");
+      assert.deepEqual(m.caseLists.slice(0, 12).map((l) => l.id), twelve.map((l) => l.id));
+      assert.deepEqual(m.caseLists[12], { id: "all", name: "All samples", n: 1 });
+    });
+
+    test("CL8: by count descending, ties by id A to Z", () => {
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: [
+          { id: "sv", name: "SV", n: 4 }, { id: "cna", name: "CNA", n: 4 }, { id: "zeta", name: "Zeta", n: 9 },
+        ] }),
+        part({ study: "s2", caseLists: [
+          { id: "sequenced", name: "Sequenced", n: 4 }, { id: "all", name: "All", n: 4 }, { id: "beta", name: "Beta", n: 1 },
+        ] }),
+      ]);
+      assert.deepEqual(m.caseLists.map((l) => [l.id, l.n]),
+        [["zeta", 9], ["all", 4], ["cna", 4], ["sequenced", 4], ["sv", 4], ["beta", 1]]);
+    });
+
+    test("CL8: a tie formed by summing is ordered by id too", () => {
+      const m = mergeExplore([
+        part({ study: "s1", caseLists: [{ id: "mrna", name: "mRNA", n: 6 }, { id: "cnaseq", name: "CNA seq", n: 3 }] }),
+        part({ study: "s2", caseLists: [{ id: "cnaseq", name: "CNA seq", n: 3 }] }),
+      ]);
+      assert.deepEqual(m.caseLists.map((l) => [l.id, l.n]), [["cnaseq", 6], ["mrna", 6]]);
+    });
+  });
 });
 
 // ---- one study -----------------------------------------------------------------------------

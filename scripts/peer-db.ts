@@ -59,7 +59,9 @@ async function stop(): Promise<void> {
 /** The fixture's files and the reference data they are imported against, as one hash. */
 async function fixtureHash(): Promise<string> {
   const h = createHash("sha256").update(CBIOPORTAL_COMMIT);
-  for (const f of (await readdir(FIXTURE)).sort()) h.update(f).update(await readFile(path.join(FIXTURE, f)));
+  const files = (await readdir(FIXTURE, { recursive: true, withFileTypes: true })).filter((e) => e.isFile())
+    .map((e) => path.relative(FIXTURE, path.join(e.parentPath, e.name))).sort();
+  for (const f of files) h.update(f).update(await readFile(path.join(FIXTURE, f)));
   return h.digest("hex");
 }
 

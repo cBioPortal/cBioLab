@@ -180,6 +180,7 @@ checks assert rather than whatever a real warehouse happens to contain:
 - **Single-base substitutions of every kind** on `FX-P21`–`FX-P30` (both strands of each class, a
   second row at one locus, a DNP and an insertion, a lowercase allele, germline and UNCALLED rows,
   ref = alt), each on a gene the patient already had mutated, for `check:oncoprint-spectrum`.
+- **A case list of three samples** (`cbiolab_peer_fixture_subset`: both samples of `FX-P01` and one of `FX-P02`) beside the importer's standard lists, which hold every sample, for `check:case-lists`: a list counted in samples, not patients, and one a filter can empty.
 - **OncoKB calls** for its variants (`test/fixtures/peer-oncokb.tsv`, a hand-written subset of
   OncoKB's public calls; some variants are left unannotated). A peer annotates with its caller's pin,
   so they are stored under the version the app pins (`ONCOKB_PIN`, else the warehouse's latest) and

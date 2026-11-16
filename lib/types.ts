@@ -1086,6 +1086,7 @@ export interface ExploreResult {
   /** per-attribute numeric stats, used to derive shared bins when federating */
   /** cohort size in both units, as the portal's header reports it */
   totals?: { patients: number; samples: number };
+  /** every case list holding a selected sample, by kind (the id less its study prefix), counted in samples; the most first */
   caseLists: { id: string; name: string; n: number }[];
   profiles: string[]; gaProfiles: string[];
   /** every profile as the studies describe them (genetic_profile), for a plot axis's Data picker */

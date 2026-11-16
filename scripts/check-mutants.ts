@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -41,6 +41,8 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "results-oql": ["node", "--env-file=.env.local", "scripts/check-results-oql.ts"],
   // the density chart's bins, run on the fixture study's connection b
   "density": ["node", "--env-file=.env.local", "scripts/check-density.ts"],
+  // the Case Lists chart's counts, run on the fixture study's connection b
+  "case-lists": ["node", "--env-file=.env.local", "scripts/check-case-lists.ts"],
   "plot-stats": ["node", "--env-file=.env.local", "scripts/check-plot-stats.ts"],
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
@@ -196,6 +198,22 @@ const MUTANTS: Mutant[] = [
     effect: "An edge typed twice in Custom Bins draws an extra one-value bar, so that value is counted in two bars.",
     find: "return { edges: [...new Set(parts.map(Number))].sort((a, b) => a - b) };",
     replace: "return { edges: parts.map(Number).sort((a, b) => a - b) };" },
+  { id: "case-lists-count-patients", layer: "counts", guard: "case-lists", file: "lib/explore.ts",
+    effect: "The Case Lists chart counts each list's patients, where the portal counts its samples (a patient with two samples counts once).",
+    find: "any(sl.name) AS name, uniqExact(s.internal_id) AS n",
+    replace: "any(sl.name) AS name, uniqExact(s.patient_id) AS n" },
+  { id: "case-lists-no-selection", layer: "counts", guard: "case-lists", file: "lib/explore.ts",
+    effect: "The Case Lists chart counts each list's samples in the whole study, whatever the filters select.",
+    find: "(set.samples ? \"\\n  AND concat(cs.cancer_study_identifier, '_', s.stable_id) IN \" + set.samples : \"\")",
+    replace: "\"\"" },
+  { id: "case-lists-ties-unordered", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "Case lists with the same count come in whatever order the database returns them, so the chart reorders between loads.",
+    find: "lists.sort((x, y) => y.n - x.n || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));",
+    replace: "lists.sort((x, y) => y.n - x.n);" },
+  { id: "case-lists-capped", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "The Case Lists chart across studies shows only the ten largest kinds of list.",
+    find: "caseLists: byCount([...lm.values()]),",
+    replace: "caseLists: byCount([...lm.values()]).slice(0, 10)," },
   { id: "gene-tables-capped", layer: "counts", guard: "unit", file: "lib/explore.ts",
     effect: "A gene table over several connections keeps only its 500 most mutated genes, so the rest can't be found or downloaded.",
     find: "      .sort((a, b) => b.events - a.events || (a.gene < b.gene ? -1 : a.gene > b.gene ? 1 : 0));",

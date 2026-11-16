@@ -372,7 +372,7 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     clinical, derived, declaredAttributes,
     ...(unknownAttributes.length ? { unknownAttributes } : {}),
     events: ev.data.map((r) => ({ type: r.t, n: Number(r.n) })),
-    caseLists: lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) })),
+    caseLists: byCount(lists.data.map((r) => ({ id: r.id.replace(study + "_", ""), name: r.name, n: Number(r.n) }))),
     mutatedGenes, cnaGenes, svGenes, geneTotals, geneFacets, totals, dataTypes,
     profiles: profiles || [], gaProfiles: gaProfiles || [],
     ...(driverPin ? { drivers: driverPin } : {}),
@@ -1272,6 +1272,10 @@ function resolvedFromRows(study: string, rows: [string, string][]): Awaited<Retu
   return { set: studySet(study, cohortTable(study)), rows, count: new Set(rows.map((x) => x[0])).size, sampleCount: rows.length };
 }
 
+/** case lists in the Case Lists chart's order: the most samples first, ties by the list's id */
+const byCount = <T extends { id: string; n: number }>(lists: T[]): T[] =>
+  lists.sort((x, y) => y.n - x.n || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
+
 /** How many patients (owners of a sample) and samples these studies hold within `set`. */
 async function cohortSize(studies: string[], db: string, conn: ChConn, set: CohortSet): Promise<{ patients: number; samples: number }> {
   const r = await chQuery<ChRow>(
@@ -1407,16 +1411,15 @@ async function prefetchFacets(opts: {
       (set.samples ? "\n  AND sd.sample_unique_id IN " + set.samples : "") + "\n" +
       "GROUP BY gp.stable_id, sd.cancer_study_identifier, atype ORDER BY n DESC", conn),
     chQuery<ChRow>(
-      "SELECT cs.cancer_study_identifier AS s, sl.stable_id AS id, any(sl.name) AS name, uniqExact(p.stable_id) AS n\n" +
+      "SELECT cs.cancer_study_identifier AS s, sl.stable_id AS id, any(sl.name) AS name, uniqExact(s.internal_id) AS n\n" +
       "FROM " + db + ".sample_list sl\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = sl.cancer_study_id\n" +
       "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
       "JOIN " + db + ".sample s ON s.internal_id = sll.sample_id\n" +
-      "JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
       "WHERE cs.cancer_study_identifier IN " + IN +
-      // a list's members are samples: only the cohort's own count, each list sized by their owners
+      // a list's members are samples, counted as samples: only the cohort's own
       (set.samples ? "\n  AND concat(cs.cancer_study_identifier, '_', s.stable_id) IN " + set.samples : "") + "\n" +
-      "GROUP BY s, id ORDER BY n DESC LIMIT 10 BY s", conn),
+      "GROUP BY s, id", conn),
   ]);
   const metaRows = groupByStudy(meta.data);
   const metaOf = new Map(studies.map((st) => [st, new Map((metaRows.get(st) || []).map((r) => [r.a, r]))]));
@@ -1658,7 +1661,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     declaredAttributes: [...new Map(parts.flatMap((p) => p.declaredAttributes || []).reverse().map((d) => [d.attribute, d])).values()].reverse(),
     ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
-    caseLists: [...lm.values()].sort((x, y) => y.n - x.n).slice(0, 10),
+    caseLists: byCount([...lm.values()]),
     geneFacets: [...gfMap.values()],
     mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),
     cnaGenes: mergeGeneTable((p) => p.cnaGenes),
