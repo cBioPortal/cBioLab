@@ -137,7 +137,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-AB-1 | ✅ | B | Header counts patients and samples, `toLocaleString`; skeleton while counting; filter bar "N patients match" |
 | STV-AB-2 | 🟡 | BC | "View patients" opens `/portal/patient` on the first patient with the cohort definition for stepping (`use-explore-state.ts:189-197`); same tab, not a new window; disabled reason shown |
 | STV-AB-3 | 🔶 | B | "Save as a Cohort" (filter bar, only once filtered) — see §8 |
-| STV-AB-4 | ❌ | B | No clinical-data download |
+| STV-AB-4 | ✅ | B | "Download clinical data" beside View patients: `<study>_clinical_data.tsv` / `combined_study_clinical_data.tsv`, through the patient-level table route ([download-cases](download-cases.md) PC2, PC9). Shown always (no `skin_hide_download_controls`) |
 | STV-AB-5 | ❌ | B | No ⚙ / autosubmit setting |
 | STV-AB-6 | 🔶 | B | "Alterations: all / OncoKB drivers only" select instead of the Alteration Filter menu (tracked: Driver-annotation settings) |
 
@@ -275,7 +275,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-STM-2 | ✅ | B | Samples = distinct sample ids, patients = distinct patients owning a selected sample, per study (594/594, 280/280, 1,678/1,678) |
 | STV-STM-3 | ❌ | B | No Add-chart Freq (legacy multi-study 190.7 % bug therefore not reproduced) |
 | STV-STM-4 | ❌ | B | No profile select with sample counts |
-| STV-STM-5 | ❌ | B | No download |
+| STV-STM-5 | 🟡 | B | Study ID, Patient ID, Sample ID, then every attribute by display name, NA where missing; checked cell by cell against the portal's API for brca_tcga_pan_can_atlas_2018 (1,084 × 60, no difference). Attributes in priority order and rows by patient id, not the API's order (PC9, PC10) |
 | STV-STM-6 | 🟡 | BC | Query hand-off: studies + filters as the Results page's case clauses (`StudyPicker`, `explore-sections.tsx:83-86`); profiles from the dialog |
 | STV-STM-7 | 🔶 | C | Custom data is uploaded per dataset (id, value rows) and joined to clinical reads; no "Unselected"/`custom_value` defaulting |
 | STV-STM-8 | ❌ | C | Default name "explored cohort" / "all of <study>" (`use-explore-state.ts:172-174`), not built from the filters |

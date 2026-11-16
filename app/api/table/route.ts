@@ -3,7 +3,8 @@ import { runAnalysis } from "../../../lib/analysis.ts";
 import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts";
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
-import { isDrawn, type AnalysisDoc, type ViewResult } from "../../../lib/types.ts";
+import { isDrawn, type AnalysisDoc, type TableRows, type ViewResult } from "../../../lib/types.ts";
+import { caseFileHeader, caseFileLine, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
 
 export const maxDuration = 300;
 
@@ -39,8 +40,9 @@ export async function POST(req: Request) {
   const v = first.views[0];
   const t = pagedTable(v, table);
   if (!t || !isDrawn(v)) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
-  const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   const enc = new TextEncoder();
+  if (body.format) return portalFile(t, body.format as CaseFileFormat, (offset) => run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table })), table);
+  const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   // the header row comes first, so the file opens as a table anywhere; what the query kept and who
   // was left out are on screen and in the view's caveat, and the file name says it was filtered
   const filtered = !!describeQuery(t.query, t.columns);
@@ -77,5 +79,37 @@ export async function POST(req: Request) {
   return new Response(stream, { headers: {
     "content-type": "text/csv; charset=utf-8",
     "content-disposition": "attachment; filename=\"" + name.replace(/[^A-Za-z0-9._-]/g, "_") + "\""
+  } });
+}
+
+/**
+ * The table's shown columns as a cBioPortal Study View file (download-cases.md PC): TSV, a line per
+ * row, no line ending after the last. The studies left out, that may not list their patients, are
+ * named in the x-left-out header. A download cut short ends with a # line, as the CSV does.
+ */
+function portalFile(t: TableRows<unknown>, format: CaseFileFormat, page: (offset: number) => Promise<{ views: ViewResult[] }>, table: string | undefined): Response {
+  const shown = t.shown.filter((id) => id !== "cohort" && id !== "study" && id !== "samples");
+  const at = shown.map((id) => t.columns.findIndex((c) => c.id === id));
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      controller.enqueue(enc.encode(caseFileHeader(at.map((i) => t.columns[i]), format)));
+      try {
+        for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
+          const r = await page(offset);
+          const p = pagedTable(r.views[0], table);
+          if (!p) throw new Error(r.views[0].error || "the page at row " + offset + " returned nothing");
+          controller.enqueue(enc.encode(p.rows.map((row) => "\n" + caseFileLine(row.study, at.map((i) => String(row.values[i] ?? "")))).join("")));
+        }
+      } catch (e) {
+        controller.enqueue(enc.encode("\n# DOWNLOAD INCOMPLETE: " + String((e as Error)?.message || e).replace(/\s+/g, " ")));
+      }
+      controller.close();
+    }
+  });
+  const left = (t.excluded || []).map((e) => e.study + ": " + e.reason).join("; ");
+  return new Response(stream, { headers: {
+    "content-type": "text/tab-separated-values; charset=utf-8",
+    ...(left ? { "x-left-out": encodeURIComponent(left) } : {}),
   } });
 }
