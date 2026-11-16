@@ -168,7 +168,7 @@ checks assert rather than whatever a real warehouse happens to contain:
 - **Timelines** (treatment and specimen events) for every patient but the structural-variant ones (`FX-P45`–`FX-P53`), and TP53-mutant and wild-type
   patients both, for the timeline, plot and oncoprint checks.
 - **Two gene panels**: `FX-P31`–`FX-P40` are on `PEERFIX_NO_EGFR`, and `FX-P33`, `FX-P35`, `FX-P37` are
-  EGFR-mutant there — mutated on no panel covering the gene, the case `check:genefacets` exists for.
+  EGFR-mutant there — mutated on no panel covering the gene, the case `check:genefacets` exists for, and the panels `check:gene-panels` lists in the gene tables' Freq tooltip.
   `FX-P02` is FAT1-amplified in one sample and FAT1-deleted in the other, its other case.
 - **`DEAD` spelled `False`/`FALSE` and `True`/`TRUE`**, for `check:values`.
 - **Two samples each for `FX-P01`–`FX-P04`**, whose values agree (`CANCER_TYPE`), differ

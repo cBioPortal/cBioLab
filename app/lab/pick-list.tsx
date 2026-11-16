@@ -54,13 +54,15 @@ export function VirtualRows<T>({ items, rowKey, estimate, className, header, chi
 }
 
 /** one row: the whole row toggles its checkbox; `on` marks a row whose value is already in the draft */
-export function PickRow({ className, picks, k, on, disabled, title, label, children }: {
-  className: string; picks: Picks; k: string; on?: boolean; disabled?: boolean; title?: string; label: string;
+export function PickRow({ className, picks, k, on, disabled, applied, title, label, children }: {
+  className: string; picks: Picks; k: string; on?: boolean; disabled?: boolean;
+  /** already in the selection's filter: checked and fixed, as the portal pins its applied rows */
+  applied?: boolean; title?: string; label: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className={cn(className, on && "on", disabled && "is-static")} data-tip={title}>
-      <Checkbox checked={picks.has(k)} disabled={disabled} onCheckedChange={() => picks.toggle(k)} aria-label={label} />
+    <label className={cn(className, on && "on", (disabled || applied) && "is-static", applied && "applied")} data-tip={title}>
+      <Checkbox checked={applied || picks.has(k)} disabled={disabled || applied} onCheckedChange={() => picks.toggle(k)} aria-label={label} />
       {children}
     </label>
   );
@@ -70,8 +72,10 @@ export function PickRow({ className, picks, k, on, disabled, title, label, child
  * Under a list once anything is checked: how many, a way to uncheck them, and the button that
  * applies them. `why` is the reason they cannot be applied as they are, said beside the button.
  */
-export function PickBar({ picks, onApply, why, action = "Apply filter", hint }: {
+export function PickBar({ picks, onApply, why, action = "Apply filter", hint, children }: {
   picks: Picks; onApply: (keys: string[]) => void; why?: string | null; action?: string; hint?: string;
+  /** a choice of how the checked rows apply, beside the button */
+  children?: React.ReactNode;
 }) {
   const n = picks.picked.length;
   if (!n) return null;
@@ -80,6 +84,7 @@ export function PickBar({ picks, onApply, why, action = "Apply filter", hint }: 
       <span className="meta">{n.toLocaleString()} checked{why ? " · " + why : ""}</span>
       <span className="spacer" />
       <Button variant="ghost" size="xs" onClick={picks.clear}>Clear</Button>
+      {children}
       <Button size="xs" disabled={!!why} data-tip={hint} onClick={() => { onApply(picks.picked); picks.clear(); }}>{action}</Button>
     </div>
   );

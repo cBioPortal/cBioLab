@@ -2,7 +2,7 @@
 // titles, column sort, header tooltips and Data file. The rules, case by case with the portal's
 // source lines, are in docs/legacy-spec/parity/gene-tables-cases.md. Browser-safe.
 import type { GeneTableRow } from "./types.ts";
-import { portalFreq } from "./chart/format.ts";
+import { fmtInt, portalFreq } from "./chart/format.ts";
 
 export type GeneTableKind = "mutated" | "cna" | "sv";
 
@@ -111,4 +111,64 @@ export function geneTableTsv(kind: GeneTableKind, rows: GeneTableRow[]): string 
     : kind === "sv" ? [r.gene, r.events, r.altered, r.profiled, freq(r)]
     : [r.gene, "", r.cytoband || "", CALL[r.cna ?? 0] || "", r.profiled, r.altered, freq(r)];
   return [header.join("\t"), ...geneRowOrder(rows).map((r) => line(r).join("\t"))].join("\n");
+}
+
+const EVENT: Record<GeneTableKind, string> = { mutated: "mutation", sv: "structural variant", cna: "copy number alteration" };
+
+/** the Freq cell's tooltip: the altered samples on a covering panel, the profiled samples, the gene panels */
+export function freqTipLines(kind: GeneTableKind, row: GeneTableRow): string[] {
+  const panels = row.panels || [];
+  return [
+    "# of samples with a " + EVENT[kind] + " in this gene that are also profiled for " + WHAT[kind] + ": " + fmtInt(row.alteredOnPanel ?? row.altered),
+    "# of samples profiled for " + WHAT[kind] + " in this gene: " + fmtInt(row.profiled),
+    "Gene panels: " + (panels.length ? panels.join(", ") : "none")
+  ];
+}
+
+/** the filter checking genes makes: union, one clause of a line per gene; intersection, a clause per gene */
+export function geneSelection(lines: string[], op: "union" | "intersection"): { kind: "oql"; q: string }[] {
+  if (!lines.length) return [];
+  return op === "union" ? [{ kind: "oql", q: lines.join("; ") }] : lines.map((q) => ({ kind: "oql", q }));
+}
+
+/** which of the table's lines the selection already filters on, in the filter's order */
+export function appliedLines(clauses: unknown[], lines: string[]): string[] {
+  const mine = new Set(lines), out: string[] = [];
+  for (const c of clauses) {
+    const q = c && typeof c === "object" && (c as { kind?: unknown }).kind === "oql" ? (c as { q?: unknown }).q : null;
+    if (typeof q !== "string") continue;
+    for (const l of q.split(";").map((x) => x.trim())) if (mine.has(l) && !out.includes(l)) out.push(l);
+  }
+  return out;
+}
+
+/** the most filters a selection holds (lib/cohort2.ts) */
+const MAX_FILTERS = 8;
+
+/** why Intersection can't be offered: one filter per gene would take the selection past its limit */
+export function intersectionRefusal(filters: number, genes: number): string | null {
+  const after = filters + genes;
+  if (after <= MAX_FILTERS) return null;
+  return "Intersection adds a filter per gene, which would make " + after + " filters; a selection holds at most " + MAX_FILTERS + " (Union adds one)";
+}
+
+/** a gene toggled in the genes queued for a query, with the message the portal shows */
+export function toggleQueued(queue: string[], gene: string): { queue: string[]; message: string } {
+  return queue.includes(gene)
+    ? { queue: queue.filter((g) => g !== gene), message: gene + " removed from query queue" }
+    : { queue: [...queue, gene], message: gene + " queued for query (see top right of page for submit)" };
+}
+
+/** the query text for the queued genes, one per line */
+export function queuedQuery(queue: string[]): string {
+  return queue.join("\n");
+}
+
+const FILTERED: Record<GeneTableKind, string> = {
+  mutated: "Total number of mutations", sv: "Total number of fusions", cna: "Number of samples with one or more copy number alterations"
+};
+
+/** the "#" header's tooltip; under the page's alteration filter, the portal's filtered text */
+export function alteredHeaderTip(kind: GeneTableKind, filtered: boolean): string {
+  return filtered ? FILTERED[kind] + "\nThis table is filtered based on selections in the Alteration Filter menu." : geneHeaderTips(kind).altered!;
 }

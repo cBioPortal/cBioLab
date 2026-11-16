@@ -568,7 +568,7 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
       (driverPin ? "\n  AND " + driverEventSql(driverPin) : "") +
       inSamples(set);
 
-    const [altered, panelProfiled, wes, distinct, surplus] = await Promise.all([
+    const [altered, panelProfiled, wes, distinct, surplus, panelsOf] = await Promise.all([
       chQuery<ChRow>(
         "SELECT hugo_gene_symbol AS g," + (isCna ? " cna_alteration AS cna, any(cna_cytoband) AS cytoband," : "") + "\n" +
         "       uniqExact(sample_unique_id) AS altered, uniqExactIf(sample_unique_id, NOT off_panel) AS on_panel, count() AS events\n" +
@@ -631,16 +631,27 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
         "  INNER JOIN " + db + ".gene_panel_to_gene_derived gptg ON gptg.gene_panel_id = m.panel\n" +
         "  GROUP BY s, g\n" +
         ") WHERE extra > 0 GROUP BY g", conn),
+      // the panels a selected sample holds for this alteration type, by the genes altered here
+      chQuery<ChRow>(
+        "SELECT gptg.gene AS g, arraySort(groupUniqArray(gptg.gene_panel_id)) AS panels\n" +
+        "FROM " + db + ".gene_panel_to_gene_derived gptg\n" +
+        "WHERE gptg.gene_panel_id IN (\n" +
+        "  SELECT DISTINCT gene_panel_id FROM " + db + ".sample_to_gene_panel_derived\n" +
+        "  WHERE " + studyIn(studies) + " AND alteration_type = " + sq(alterationType) + inSamples(set) + "\n" +
+        ")\n" +
+        "  AND gptg.gene IN (SELECT hugo_gene_symbol FROM " + db + ".genomic_event_derived\n" + where + ")\n" +
+        "GROUP BY g", conn),
     ]);
 
     const panelMap = new Map<string, number>(panelProfiled.data.map((r) => [r.g, Number(r.n)]));
     const wesN = Number(wes.data[0]?.n || 0);
     const surplusOf = new Map<string, number>(surplus.data.map((r) => [r.g, Number(r.n)]));
+    const panelsByGene = new Map<string, string[]>(panelsOf.data.map((r) => [r.g, (r.panels as unknown as unknown[]).map(String)]));
     const rows = altered.data.map((r): GeneTableRow => {
       const profiled = (panelMap.get(r.g) || 0) + wesN - (surplusOf.get(r.g) || 0);
       const alt = Number(r.altered), onPanel = Number(r.on_panel);
       return {
-        gene: r.g, altered: alt, alteredOnPanel: onPanel, events: Number(r.events), profiled,
+        gene: r.g, altered: alt, alteredOnPanel: onPanel, events: Number(r.events), profiled, panels: panelsByGene.get(r.g) || [],
         freqPct: profiled ? Math.round(1000 * onPanel / profiled) / 10 : null,
         ...(isCna ? { cna: Number(r.cna), cytoband: r.cytoband } : {})
       };
@@ -1620,6 +1631,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
       cur.altered += r.altered; cur.events += r.events; cur.profiled += r.profiled;
       cur.alteredOnPanel = (cur.alteredOnPanel ?? 0) + (r.alteredOnPanel ?? r.altered);
       cur.cytoband = cur.cytoband || r.cytoband;
+      if (r.panels?.length) cur.panels = [...new Set([...(cur.panels || []), ...r.panels])].sort();
     }
     return [...m.values()]
       .map((r) => ({ ...r, freqPct: r.profiled ? Math.round(1000 * (r.alteredOnPanel ?? r.altered) / r.profiled) / 10 : null }))
