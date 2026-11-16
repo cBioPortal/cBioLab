@@ -61,9 +61,9 @@ export function densityAxisLabel(name: string, log: boolean): string {
   return name + (log ? " (log)" : "");
 }
 
-/** an engine log value, log10(1 + v), as the portal's ln(1 + v) */
+/** an engine log value, log2(1 + v), as the portal's ln(1 + v) */
 export function lnFromEngine(v: number): number {
-  return v * Math.LN10;
+  return v * Math.LN2;
 }
 
 export interface DensityLegend { max: number; mid: number | null; min: number }

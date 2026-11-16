@@ -7,7 +7,7 @@ import { ViewFigure } from "../figure.tsx";
 import { ViewHead } from "../view-chrome.tsx";
 import { placement } from "./parts.tsx";
 
-/** a numeric plot axis on a log scale: log10(v + 1), so a zero stays on the axis (lib/plot.ts) */
+/** the plot view's card: the axis controls beside the figure */
 function PlotCard({ ctx, v, vi }: CardProps) {
   const { attrsLoading, busy, catalogAttrs, cohortChoice, docView, menuOpenRef, profileCatalog, updateView } = ctx;
   // every cohort the document evaluates, but the plotted one and a split (which stands for several groups, not one set of cases)

@@ -217,17 +217,17 @@ test("a plot says how many cases the pair left out, and on which axis", () => {
   assert.equal(coverageNote({ ...d, coverage: undefined }, "patient"), "", "no coverage known, no claim made");
 });
 
-test("log: true reads log10(v + 1), leaves out what has no such log, and says so in the label", () => {
+test("log: true reads the portal's log2(max(v, 0) + 1), a generic assay's log10(v), and the label says which", () => {
   const ctx = { study: "s", db: "db", unit: "sample" as const, cohortSql: "SELECT '' AS pid" };
   const clin = axisSelect({ source: "clinical", attribute: "MUTATION_COUNT", log: true }, ctx, "num");
   const v = finiteSql("attribute_value");
-  assert.ok(clin.includes("if(" + v + " >= 0, log10(" + v + " + 1), NULL) IS NOT NULL"), clin);
-  assert.doesNotMatch(axisSelect({ source: "clinical", attribute: "MUTATION_COUNT" }, ctx, "num"), /log10/);
+  assert.ok(clin.includes("log2(greatest(" + v + ", 0) + 1)"), clin);
+  assert.doesNotMatch(axisSelect({ source: "clinical", attribute: "MUTATION_COUNT" }, ctx, "num"), /log2|log10/);
   const mol = axisSelect({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }, ctx, "num");
-  assert.match(mol, /^SELECT id, v FROM \(/);
-  assert.match(mol, /\) WHERE v IS NOT NULL$/);
-  assert.equal(axisLabel({ source: "clinical", attribute: "MUTATION_COUNT", log: true }), "log10(MUTATION_COUNT + 1)");
-  assert.equal(axisLabel({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }), "log10(ESR1 mrna + 1)");
+  assert.match(mol, /log2\(greatest\(/);
+  assert.equal(axisLabel({ source: "clinical", attribute: "MUTATION_COUNT", log: true }), "MUTATION_COUNT (log2(value + 1))");
+  assert.equal(axisLabel({ source: "molecular", profileType: "mrna", gene: "ESR1", log: true }), "ESR1 mrna (log2(value + 1))");
+  assert.equal(axisLabel({ source: "assay", profileType: "mutational_signature", entity: "SBS1", log: true }), "SBS1 mutational_signature (log10)");
 });
 
 test("an OQL axis: Altered when a case matches any statement, Unaltered only when it is profiled for every one", () => {

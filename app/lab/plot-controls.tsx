@@ -26,12 +26,16 @@ const SEG = "h-ctl flex-1 rounded-none px-2 text-md font-normal first:rounded-l-
 /** the points cap as the controls print it */
 const CAP = POINTS_CAP.toLocaleString("en-US");
 
-function LogToggle({ spec, side, numeric, busy, update }: { spec: any; side: "x" | "y"; numeric: boolean; busy: boolean; update: Update }) {
+function LogToggle({ spec, side, numeric, off, busy, update }: { spec: any; side: "x" | "y"; numeric: boolean; off?: number; busy: boolean; update: Update }) {
   const axis = spec[side];
   if (!numeric || !axis || !("source" in axis) || (axis.source !== "clinical" && axis.source !== "molecular" && axis.source !== "assay" && axis.source !== "profile")) return null;
+  // as on cBioPortal's Plots tab: unchecked and disabled while the axis has values below 0, the document keeping the choice
+  const tip = off != null ? "no log scale here: this axis has values below 0 (the lowest " + off + "), and cBioPortal offers a log scale on such an axis only for an RNA-seq profile"
+    : axis.source === "assay" ? "draw this axis on a log scale — log10(value), as cBioPortal draws a generic assay"
+    : "draw this axis on a log scale — log2(max(value, 0) + 1), as cBioPortal draws it";
   return (
-    <label className="chk text-md text-foreground" data-tip="draw this axis on a log scale — log10(value + 1), so zero stays on the axis and a negative value is left out">
-      <Checkbox checked={!!axis.log} disabled={busy}
+    <label className="chk text-md text-foreground" data-tip={tip}>
+      <Checkbox checked={!!axis.log && off == null} disabled={busy || off != null}
         onCheckedChange={(c) => update((vv) => {
           const a = { ...vv[side] };
           if (c === true) a.log = true; else delete a.log;
@@ -40,6 +44,13 @@ function LogToggle({ spec, side, numeric, busy, update }: { spec: any; side: "x"
       Log scale
     </label>
   );
+}
+
+/** cBioPortal turns the log scale on when an RNA-seq mRNA profile is chosen for an axis (maybeSetLogScale) */
+function withRnaSeqLog(next: any, prev: any, catalog: ProfileInfo[]): any {
+  if (!next || next.source !== "profile" || (prev && prev.source === "profile" && prev.profile === next.profile)) return next;
+  const p = catalog.find((x) => x.profile === next.profile);
+  return p && p.type.toUpperCase() === "MRNA_EXPRESSION" && next.profile.includes("rna_seq") ? { ...next, log: true } : next;
 }
 
 /** one axis's definition in the sidebar: its name down the side, its fields stacked beside it */
@@ -183,8 +194,8 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
   const unit = spec.unit || "sample";
   const axisFields = (side: "x" | "y") => <>
     <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} catalog={catalog} loading={loading} busy={busy}
-      onChange={(a) => update((vv) => ({ ...vv, [side]: a }))} />
-    <LogToggle spec={spec} side={side} numeric={plot?.[side].kind === "num"} busy={busy} update={update} />
+      onChange={(a) => update((vv) => ({ ...vv, [side]: withRnaSeqLog(a, vv[side], catalog) }))} />
+    <LogToggle spec={spec} side={side} numeric={plot?.[side].kind === "num"} off={plot?.logOff?.[side]} busy={busy} update={update} />
   </>;
   const total = plot?.coverage?.total;
   // Points is a choice only where the cases can be drawn: past the cap, or where a study may not
