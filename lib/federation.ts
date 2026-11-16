@@ -646,14 +646,14 @@ export function lollipopTypesSql(cohortSql: string, genes: string[], study: stri
 /**
  * Per gene: mutated patients and distinct (patient, change) pairs (mutations only: a fusion has no
  * stem), and samples with a somatic mutation or fusion — a fusion under site 1's gene only, as the
- * portal counts its rows by their gene (MutationUtils somaticMutationRate), and germline when its
- * status says so without regard to case.
+ * portal counts its rows by their gene (MutationUtils somaticMutationRate). A row is germline when its
+ * status contains "germline" in any case (/germline/i), somatic otherwise, a missing status included.
  */
 export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB, filters?: MutationFilters,
   fusions?: { lines: string[]; pin: string | null }): AggregateSql {
   return aggregateSql(lollipopCte(cohortSql, genes, study, 1, fusions?.pin ?? null, db, null, filters, fusions?.lines) +
     "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
-    "       uniqExactIf(sid, if(sv = 1, rgene = gene AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0, status != 'GERMLINE')) AS somatic_samples\n" +
+    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples\n" +
     "FROM m GROUP BY gene");
 }
 /** A compiled cohort's size: its patients (the owners of its samples) and its samples. */

@@ -7,7 +7,7 @@
 // carries the summary and the selection in its caption instead.
 import React, { useMemo, useRef, useState } from "react";
 import type { ViewResultOf } from "../../lib/types.ts";
-import { filterHotspotGene, clickCodon, type CodonSelection } from "../../lib/lollipop.ts";
+import { filterHotspotGene, clickCodon, lollipopGeneEmpty, type CodonSelection } from "../../lib/lollipop.ts";
 import { AlterationGrid, classesOf } from "./AlterationGrid.tsx";
 import { TranscriptSummary } from "./TranscriptSummary.tsx";
 import { ColorLegend } from "./ColorLegend.tsx";
@@ -22,16 +22,17 @@ import { TB } from "../_ui/toolbar.ts";
 import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
 
 /** The transcript and its ids, and the somatic mutation frequency — the portal's GeneSummary. */
-function GeneSummary({ g }: { g: HotspotGene }) {
+function GeneSummary({ g, grch38 }: { g: HotspotGene; grch38: boolean }) {
   const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
   return (
     <>
-      <TranscriptSummary ids={g.ids} gene={g.gene} />
-      <div className="lp-summary">
+      <TranscriptSummary ids={g.ids} gene={g.gene} grch38={grch38} />
+      {/* the portal shows no frequency for a gene with no mutation (ResultsViewMutationMapper) */}
+      {!lollipopGeneEmpty(g) && <div className="lp-summary">
         <div className="lp-freq" data-tip={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
           <span>Somatic Mutation Frequency</span> <b>{freq}</b>
         </div>
-      </div>
+      </div>}
     </>
   );
 }
@@ -118,7 +119,7 @@ export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons }: { 
         <div key={d.gene.gene} className="lp-gene">
           <GenePlot gene={d.gene} selected={picked(d.gene.gene)} onSelect={(next) => pick(d.gene.gene, next)} />
           <div className="lp-side">
-            <GeneSummary g={genes[i]} />
+            <GeneSummary g={genes[i]} grch38={!!v.grch38} />
             <AlterationGrid tally={genes[i].tally} classes={classes} hide={hide} onHide={set} />
           </div>
         </div>

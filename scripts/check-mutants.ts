@@ -23,7 +23,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "plot-stats" | "mutation-fusions" | "mutation-columns";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -40,6 +40,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "plot-stats": ["node", "--env-file=.env.local", "scripts/check-plot-stats.ts"],
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
+  "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
 };
 
 interface Mutant {
@@ -349,7 +350,7 @@ const MUTANTS: Mutant[] = [
     find: "\" AND vn.tumor_type = ''\\n\" : \"\")", replace: "\" AND vn.tumor_type = vk.tumorType\\n\" : \"\")" },
   { id: "fusion-frequency-site2", layer: "counts", guard: "mutation-fusions", file: "lib/federation.ts",
     effect: "A sample whose only event in a gene is a fusion with the gene as site 2 counts in that gene's somatic mutation frequency, where the portal counts a fusion only under its site 1 gene.",
-    find: "if(sv = 1, rgene = gene AND ", replace: "if(sv = 1, " },
+    find: "uniqExactIf(sid, (sv = 0 OR rgene = gene) AND ", replace: "uniqExactIf(sid, (sv = 0 OR sv = 1) AND " },
   { id: "fusion-stem-counted", layer: "counts", guard: "mutation-fusions", file: "lib/federation.ts",
     effect: "Fusions join the lollipop's per-change counts, so they are reported as mutations with no protein position and raise the withheld count.",
     find: "\"FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= \"", replace: "\"FROM m GROUP BY gene, pos, change HAVING n >= \"" },
@@ -391,7 +392,19 @@ const MUTANTS: Mutant[] = [
     find: "upper(m.variantType) AS variantType", replace: "m.variantType AS variantType" },
   { id: "fusion-only-gene-dropped", layer: "counts", guard: "mutation-fusions", file: "lib/views/hotspots/run.ts",
     effect: "A gene with fusions but no mutations disappears from the Mutations tab's lollipop, with its Fusion badge and frequency, where the portal keeps it.",
-    find: ".filter((h) => h.mutated > 0 || h.tally.fusion.driver + h.tally.fusion.vus > 0);", replace: ".filter((h) => h.mutated > 0);" },
+    find: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));", replace: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i])).filter((h) => h.mutated > 0);" },
+  { id: "germline-case-sensitive", layer: "counts", guard: "mutation-tab-states", file: "lib/federation.ts",
+    effect: "A mutation whose status is spelled 'Germline' or 'germline' counts as somatic in the Somatic Mutation Frequency, where the portal matches germline in any case.",
+    find: "AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "AND ifNull(status, '') != 'GERMLINE') AS somatic_samples" },
+  { id: "ensembl-always-grch37", layer: "counts", guard: "unit", file: "lib/mutation-cell-text.ts",
+    effect: "A GRCh38 study's transcript links to the GRCh37 Ensembl archive, where the portal links its GRCh38 page.",
+    find: "(grch38 ? \"https://www.ensembl.org\" : \"https://grch37.ensembl.org\")", replace: "\"https://grch37.ensembl.org\"" },
+  { id: "legend-splice-under-truncating", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "The lollipop's legend lists splice sites under Truncating, though their stems and badges are drawn orange as Splice.",
+    find: "truncating: [\"Nonsense\", \"Nonstop\", \"Frameshift deletion\", \"Frameshift insertion\"],", replace: "truncating: [\"Nonsense\", \"Nonstop\", \"Frameshift deletion\", \"Frameshift insertion\", \"Splice site\"]," },
+  { id: "empty-gene-not-recognised", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "A gene with no mutations is drawn as one with some: a Somatic Mutation Frequency of 0% where the portal shows none, and no word that it has none.",
+    find: "g.mutated === 0 && Object.values(g.tally).every((t) => t.driver + t.vus === 0)", replace: "false" },
   { id: "hotspot-3d-counted", layer: "counts", guard: "hotspot-drivers", file: "lib/hotspots.ts",
     effect: "A mutation at a 3D-clustered hotspot alone is called a putative driver, which cBioPortal never does, so driver counts rise.",
     find: "has([\"single\", \"indel\"])", replace: "has([\"single\", \"indel\", \"3d\"])" },

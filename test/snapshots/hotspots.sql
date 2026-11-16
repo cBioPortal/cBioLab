@@ -12,6 +12,11 @@
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))
 
+-- view 0 hotspots: genome:build · msk_chord_2024
+SELECT rg.name AS build FROM snapshot_db.cancer_study cs
+JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
+WHERE cs.cancer_study_identifier = 'msk_chord_2024'
+
 -- view 0 hotspots: lollipop:changes · msk_chord_2024
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -134,7 +139,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
            FROM v),
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,
-       uniqExactIf(sid, if(sv = 1, rgene = gene AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0, status != 'GERMLINE')) AS somatic_samples
+       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples
 FROM m GROUP BY gene
 
 -- view 0 hotspots: lollipop:types · msk_chord_2024
