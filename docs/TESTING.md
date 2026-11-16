@@ -289,7 +289,10 @@ named in the scripts).
   arithmetic over patient ids, and fast-check-generated definitions compared with a reference
   evaluator over the raw rows.
 - `check:mutants` — plants each bug in `scripts/check-mutants.ts` into a temp copy and requires a
-  check to fail.
+  check to fail. On a pull request CI sets `MUTANT_CHANGED` to the diff's file list and only the bugs
+  it could affect are planted: those in a changed file, and those whose guard's script or unit suites
+  changed. A diff touching the script itself, `verify.yml` or the dependencies plants every bug, as
+  does every push to master, so a test weakened far from the bug it guards is caught there.
 
 The first two are gate stages. A new statistic gets a row in `lib/verification.ts`
 (`test/verification.test.ts` fails otherwise); new cohort or count logic should get a planted bug
