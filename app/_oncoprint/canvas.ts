@@ -10,7 +10,7 @@
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { STUDY_TRACK } from "../../lib/profile-names.ts";
 
-import { STYLE, heatColor, stackCompare, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, trackSublabelText, fitSublabel, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
+import { STYLE, heatColor, stackCompare, stackColor, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, trackSublabelText, fitSublabel, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
 
@@ -169,7 +169,7 @@ function drawCell(ctx: CanvasRenderingContext2D, t: TrackLike, code: number, x: 
     let y0 = y;
     for (let j = 0; j < k; j++) {
       const hj = total ? h * v[code * k + j] / total : 0;
-      ctx.fillStyle = S.glyph.spectrum.colors[j % S.glyph.spectrum.colors.length]; ctx.fillRect(x, y0, w, hj); y0 += hj;
+      ctx.fillStyle = stackColor(t, j, S, colors); ctx.fillRect(x, y0, w, hj); y0 += hj;
     }
     return;
   }

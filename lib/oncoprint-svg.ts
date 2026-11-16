@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { heatColor, barBand, cellLayers, clinicalLegend, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackSublabelText, fitSublabel, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { stackColor, heatColor, barBand, cellLayers, clinicalLegend, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackSublabelText, fitSublabel, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 import { textWidth } from "./chart/text.ts";
 
@@ -110,7 +110,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
           const k = t.stack.length, v = t.values;
           let total = 0; for (let j = 0; j < k; j++) total += v[code * k + j] ?? 0;
           let y0 = y;
-          for (let j = 0; j < k; j++) { const hj = total ? ROW_H * (v[code * k + j] ?? 0) / total : 0; parts.push(rect(x, y0, w, hj, S.glyph.spectrum.colors[j])); y0 += hj; }
+          for (let j = 0; j < k; j++) { const hj = total ? ROW_H * (v[code * k + j] ?? 0) / total : 0; parts.push(rect(x, y0, w, hj, stackColor(t, j, S, colors))); y0 += hj; }
         }
         else if (t.bar) { const { band, negative } = barBand(t, code); parts.push(rect(x, y + ROW_H * band[0], w, ROW_H * (band[1] - band[0]), negative ? S.glyph.bar.negative : S.glyph.bar.color)); }
         else if (t.numeric) parts.push(rect(x, y, w, ROW_H, heatColor(t, code, S)));
@@ -174,7 +174,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
     }
     if (t.stack) {
       t.stack.forEach((c, i) => {
-        parts.push(rect(cx, cy - 9, 10, 10, S.glyph.spectrum.colors[i]));
+        parts.push(rect(cx, cy - 9, 10, 10, stackColor(t, i, S, colors)));
         parts.push(`<text x="${cx + 14}" y="${cy}" fill="${P.muted}">${esc(c)}</text>`);
         cx += 14 + c.length * 6.2 + 16;
       });
