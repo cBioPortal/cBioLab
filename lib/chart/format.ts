@@ -82,6 +82,17 @@ export const portalAlteredPct = (f: number): string => (f * 100).toFixed(2) + "%
 export const portalCorr = (r: number): string => r.toFixed(2);
 
 /**
+ * A regression line as cBioPortal's Plots tab labels it (regression@2.0.1 linear's `string`,
+ * PLT-STM-7): "y = -0.1x + 11.91", or "y = 0.5x" when the intercept is 0, the numbers as JavaScript
+ * prints them after rounding. A negative intercept reads "- 1.2", where the portal prints "+ -1.2".
+ */
+export function portalEquation(slope: number, intercept: number): string {
+  const n = (x: number) => String(x === 0 ? 0 : x);
+  if (intercept === 0) return "y = " + n(slope) + "x";
+  return "y = " + n(slope) + "x " + (intercept < 0 ? "- " + n(-intercept) : "+ " + n(intercept));
+}
+
+/**
  * A Kaplan–Meier median with its 95% interval as cBioPortal's survival summary writes it
  * (SurvivalUtil.getMedian): months to 2 decimals, an end the band never reaches "NA" —
  * "62.79 (56.25 - NA)", "65.85 (51.48 - 80.20)", "NA" when the median is not reached.

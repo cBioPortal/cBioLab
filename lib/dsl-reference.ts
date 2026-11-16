@@ -371,7 +371,7 @@ const GUIDE_EXAMPLES: DslExample[] = [
         "TP53 mut": { all: [{ kind: "oql", q: "TP53: MUT" }] }
       },
       views: [
-        { kind: "plot", cohorts: ["TP53 mut"], unit: "sample",
+        { kind: "plot", cohorts: ["TP53 mut"], unit: "sample", regression: true,
           x: { source: "clinical", attribute: "MUTATION_COUNT" },
           y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" } },
         { kind: "plot", cohorts: ["TP53 mut"], unit: "sample",

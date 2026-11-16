@@ -4,7 +4,7 @@ import type { ViewResult } from "../../types.ts";
 import { pearsonFromMoments, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
 import { plotExtent, plotRangeOf, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
-import { DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
+import { fitOf, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
@@ -593,6 +593,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
     if (sites.length === 1) {
       const r0 = resolvers[sites[0]];
       const data = await r0.plot(doc.cohorts[cn], { ...spec, bins: pv.bins ? bins : undefined });
+      if (!pv.regression) delete data.fit;
       orderLevels(data, spec);
       await basePoints(pv, r0, doc.cohorts[cn], spec, data, sites[0]);
       const ls = await pointLayers(pv, data, c, cn, sites, spec);
@@ -650,7 +651,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
             sxy: a.sxy + m.sxy, sxx: a.sxx + m.sxx, syy: a.syy + m.syy }),
             { n: 0, sx: 0, sy: 0, sxy: 0, sxx: 0, syy: 0 } as Moments);
           const corr = pearsonFromMoments(pooledM), reg = regressionFromMoments(pooledM);
-          data = { shape, n, ...label, extent, grid: bins,
+          data = { shape, n, ...label, extent, grid: bins, ...(pv.regression ? fitOf(pooledM) : {}),
             bins: [...cells.values()],
             stats: { pearson: corr.r, spearman: null, slope: reg.slope, intercept: reg.intercept,
               pPearson: corr.r != null ? corr.p : null, pSpearman: null },

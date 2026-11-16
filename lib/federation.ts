@@ -26,7 +26,7 @@ import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
-import { axisKind, axisLabel, axisSelect, corrPValue, plotShape, tukey, validateAxis,
+import { axisKind, axisLabel, axisSelect, corrPValue, fitOf, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
@@ -1802,7 +1802,8 @@ abstract class BaseResolver implements AggregateCapable {
         grid: [spec.bins?.[0] ?? DEFAULT_BINS[0], spec.bins?.[1] ?? DEFAULT_BINS[1]],
         bins: bins.data.map(binOf),
         stats: { pearson, spearman, slope: num(r.slope), intercept: num(r.intercept),
-          pPearson: corrPValue(pearson, n), pSpearman: corrPValue(spearman, n) }
+          pPearson: corrPValue(pearson, n), pSpearman: corrPValue(spearman, n) },
+        ...fitOf({ n, sx: Number(r.sx), sy: Number(r.sy), sxy: Number(r.sxy), sxx: Number(r.sxx), syy: Number(r.syy) })
       });
     }
 

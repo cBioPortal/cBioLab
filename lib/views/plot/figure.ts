@@ -13,7 +13,7 @@ import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, bandLabels, legend, label,
   textWidth, fmtInt, fmtNum, FS, SW, SERIES, OTHER, type Scale, type SvgOpts, type LegendItem
 } from "../../svg-kit.ts";
-import { portalCorr, portalP } from "../../chart/format.ts";
+import { portalCorr, portalEquation, portalP } from "../../chart/format.ts";
 
 type Pal = ReturnType<typeof palette>;
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -147,22 +147,39 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
       out.push(sharedGroups(h, key, (pt) => "x" in pt ? [dot(pt, h.color)] : []));
     }
   }
-  // the fitted line, over every case rather than over what is visible, clipped to the frame
-  if (st && st.slope != null && st.intercept != null && x1 > x0) {
-    const yAt = (xv: number) => st.intercept! + st.slope! * xv;
-    const ya = Math.max(y0, Math.min(y1, yAt(x0))), yb = Math.max(y0, Math.min(y1, yAt(x1)));
-    out.push(`<line x1="${r1(xs(x0))}" y1="${r1(ys(ya))}" x2="${r1(xs(x1))}" y2="${r1(ys(yb))}" ` +
-      `stroke="${hs.length ? p.ink : SERIES[4]}" stroke-width="1.5" stroke-dasharray="5 3"/>`);
+  // the regression line the view asks for, fitted over every case rather than over what is visible,
+  // clipped to the frame: the line its label describes, coefficients rounded as the portal rounds them
+  const fit = d.fit, fitColor = hs.length ? p.ink : SERIES[4];
+  if (fit && x1 > x0) {
+    const yAt = (xv: number) => fit.intercept + fit.slope * xv;
+    // the part of the line inside the frame: where it crosses y0 and y1, if it does
+    const xAt = (yv: number) => fit.slope ? (yv - fit.intercept) / fit.slope : NaN;
+    const ends = [[x0, yAt(x0)], [x1, yAt(x1)], [xAt(y0), y0], [xAt(y1), y1]]
+      .filter(([xv, yv]) => xv >= x0 - 1e-12 && xv <= x1 + 1e-12 && yv >= y0 - 1e-12 && yv <= y1 + 1e-12)
+      .sort((a, b) => a[0] - b[0]);
+    if (ends.length >= 2) {
+      const [a, b] = [ends[0], ends[ends.length - 1]];
+      out.push(`<line x1="${r1(xs(a[0]))}" y1="${r1(ys(a[1]))}" x2="${r1(xs(b[0]))}" y2="${r1(ys(b[1]))}" ` +
+        `stroke="${fitColor}" stroke-width="1.5" stroke-dasharray="5 3"/>`);
+    }
   }
+
   out.push(`<rect x="${L}" y="${T}" width="${r1(plotW)}" height="${PLOT}" fill="none" stroke="${p.line}" stroke-width="${SW.line}"/>`);
 
   let y = T + PLOT + bottomAxisHeight(xTitle) + 8;
+  if (fit) {
+    // the line's swatch and label, as the portal's gutter gives them (PLT-SC-3)
+    out.push(`<line x1="${L}" y1="${y + FS.body * 0.6}" x2="${L + 18}" y2="${y + FS.body * 0.6}" stroke="${fitColor}" stroke-width="1.5" stroke-dasharray="5 3"/>`);
+    out.push(label(L + 24, y + FS.body, portalEquation(fit.slope, fit.intercept) + (fit.r2 != null ? "   R² = " + String(fit.r2) : ""),
+      { size: FS.body, fill: p.ink, maxW: W - L - 32 }));
+    y += FS.body + 10;
+  }
   const hk = layerItems(d);
   if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "point layers" }); out.push(lg.svg); y += lg.height + 4; }
   const cap = caption((v.note ? v.note + "  " : "") + (shaded.length
     ? "Darker is more " + (d.n > 1 ? "cases" : "case") + "; the shade is logarithmic." + (own.length ? " Each dot is one case." : "")
     : "Each dot is one case.") +
-    (st && st.slope != null ? " The dashed line is the least-squares fit over every case." : ""), W, y, p.muted);
+    (fit ? " The dashed line is the least-squares fit over every case, its slope and intercept rounded to two decimals as cbioportal.org rounds them, R² from those." : ""), W, y, p.muted);
   return frame(W, y + cap.height + 8, out.join("") + cap.svg, p.bg, false, "Plot — " + yTitle + " against " + xTitle, NO_FIGURE_TIP);
 }
 

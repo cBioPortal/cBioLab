@@ -217,6 +217,14 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
                 onChange={(u) => update((vv) => ({ ...vv, unit: u }))}
                 options={[["sample", "sample"], ["patient", "patient"]]} />
             </div>
+            {plot?.shape === "scatter" && (
+              <label className="chk plot-regression text-md text-foreground"
+                data-tip="draw the least-squares line and label it y = mx + b with its R², rounded to two decimals as cBioPortal rounds them">
+                <Checkbox checked={!!spec.regression} disabled={busy}
+                  onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) n.regression = true; else delete n.regression; return n; })} />
+                Show Regression Line
+              </label>
+            )}
             {plot?.shape !== "table" && (
               <div className="axfield flex flex-col gap-1">
                 <span className="axfield-name text-sm font-semibold text-foreground">Draw each {unit} as</span>
