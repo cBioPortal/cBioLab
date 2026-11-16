@@ -4,6 +4,7 @@
 // the figure was drawn from, so it is never a second query; the page finds what is under the
 // pointer (app/lab/plot-hover.tsx).
 import type { PlotData } from "../../plot.ts";
+import { fromLog } from "../../plot-log.ts";
 import { axisTitle } from "./figure.ts";
 
 export interface PointTip {
@@ -17,7 +18,7 @@ export interface PointTip {
 
 /** a value as the portal's tooltip prints it: two decimals at most, no trailing zeros; a log axis's value in its own units */
 function value(a: PlotData["x"], t: number): string {
-  const v = a.log ? 10 ** t - 1 : t;
+  const v = a.log ? fromLog(a.log, t) : t;
   return String(Math.round(v * 100) / 100);
 }
 

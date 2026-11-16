@@ -6,6 +6,7 @@
 // the points the engine chose (every case under the cap, the outliers over it), at most POINTS_CAP.
 import type { DrawnResultOf } from "../../types.ts";
 import type { HighlightPoint, PlotData, PlotLayer } from "../../plot.ts";
+import { fromLog, toLog, type LogRule } from "../../plot-log.ts";
 import { isAbsent, jitterFor } from "../../plot-draw.ts";
 import { LAYER_BASE } from "../../plot-layers.ts";
 import {
@@ -40,27 +41,27 @@ const NO_FIGURE_TIP = { tip: false };
 /** the plot's height for a figure `w` wide */
 const plotHeight = (w: number) => Math.round(Math.max(240, Math.min(420, w * 0.36)));
 
-/** an axis's title: a log axis names its attribute and says it is logarithmic, rather than "log10(X + 1)" */
+/** an axis's title: its label, which on a log axis ends as the portal's does, " (log2(value + 1))" or " (log10)" */
 export function axisTitle(a: PlotData["x"]): string {
-  const m = /^log10\((.*) \+ 1\)$/.exec(a.label);
-  return a.log && m ? m[1] + " (log scale)" : a.label;
+  return a.label;
 }
 
 /**
- * A numeric axis over [lo, hi] onto [r0, r1]. A log axis carries log10(v + 1), so its ticks are
- * placed at round values of v (0, 1, 10, 100 …, with 3s between when there is room) and labelled
- * as v, not as the logarithm.
+ * A numeric axis over [lo, hi] onto [r0, r1]. A log axis carries its values by its LogRule, so its
+ * ticks are placed at round values of v (0, 1, 10, 100 …, with 3s between when there is room; a
+ * log10 axis also below 1) and labelled as v, not as the logarithm.
  */
-function numScale(lo: number, hi: number, r0: number, r1: number, isLog: boolean | undefined, nice: boolean): Scale {
-  const s = linear(lo, hi, r0, r1, { nice: nice && !isLog });
-  if (!isLog) return s;
+function numScale(lo: number, hi: number, r0: number, r1: number, rule: LogRule | undefined, nice: boolean): Scale {
+  const s = linear(lo, hi, r0, r1, { nice: nice && !rule });
+  if (!rule) return s;
   const [d0, d1] = s.domain;
-  const vals: number[] = [];
-  for (let p = 1; p <= 1e12; p *= 10) vals.push(p, 3 * p);
-  let ticks = [0, ...vals].map((v) => Math.log10(v + 1)).filter((t) => t >= d0 - 1e-9 && t <= d1 + 1e-9);
-  if (ticks.length > 7) ticks = ticks.filter((t) => { const v = Math.round(10 ** t - 1); return v === 0 || /^10*$/.test(String(v)); });
+  const vals: number[] = rule === "log2" ? [0] : [];
+  for (let p = rule === "log2" ? 1 : 1e-6; p <= 1e12; p *= 10) vals.push(p, 3 * p);
+  const back = (t: number) => fromLog(rule, t);
+  let ticks = vals.map((v) => toLog(rule, v)).filter((t) => t >= d0 - 1e-9 && t <= d1 + 1e-9);
+  if (ticks.length > 7) ticks = ticks.filter((t) => { const v = back(t); return Math.abs(v) < 1e-9 || Math.abs(Math.log10(v) - Math.round(Math.log10(v))) < 1e-6; });
   s.ticks = ticks;
-  s.fmt = (t: number) => fmtNum(Math.round((10 ** t - 1) * 1000) / 1000);
+  s.fmt = (t: number) => { const v = back(t); return fmtNum(Math.round(v * (v < 1 ? 1e6 : 1e3)) / (v < 1 ? 1e6 : 1e3)); };
   return s;
 }
 

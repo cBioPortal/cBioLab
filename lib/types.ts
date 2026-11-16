@@ -958,6 +958,8 @@ export interface AssayFacet {
   bins?: NumericBin[];
   min?: number; max?: number; median?: number;
   values?: { v: string; n: number }[];
+  /** categorical: how many values the entity takes; more than `values` when only the most frequent are kept */
+  distinct?: number;
   studies: string[];
   /** counted against the draft without its own clauses on this entity */
   disjunctive?: true;

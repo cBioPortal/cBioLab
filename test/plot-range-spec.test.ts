@@ -72,7 +72,7 @@ const binsExtentCte = () => {
 // ---- R1 ----
 
 describe("R1 range checked", () => {
-  const LIN = { x: false, y: false };
+  const LIN = {};
 
   test("R1 absent: none", () => {
     assert.equal(plotRangeOf(undefined, LIN), undefined);
@@ -87,7 +87,7 @@ describe("R1 range checked", () => {
     assert.deepEqual(plotRangeOf({ x: { min: 0, max: 1 }, y: { min: 0 } }, LIN), { x: { min: 0, max: 1 }, y: { min: 0 } });
     assert.deepEqual(plotRangeOf({ x: { max: 5 } }, LIN), { x: { max: 5 } });
     // the ends are in the attribute's own units even on a log axis: not converted here
-    assert.deepEqual(plotRangeOf({ y: { min: 0, max: 99 } }, { x: false, y: true }), { y: { min: 0, max: 99 } });
+    assert.deepEqual(plotRangeOf({ y: { min: 0, max: 99 } }, { y: "log2" as const }), { y: { min: 0, max: 99 } });
   });
 
   test("R1 an end that is not a finite number is refused, naming it", () => {
@@ -107,11 +107,11 @@ describe("R1 range checked", () => {
   });
 
   test("R1 an end below 0 on a log axis is refused (and allowed on a linear one)", () => {
-    assert.throws(() => plotRangeOf({ y: { min: -1 } }, { x: false, y: true }), (e: Error) => /range\.y/.test(e.message), "y.min −1 on log y");
-    assert.throws(() => plotRangeOf({ x: { min: -5, max: -1 } }, { x: true, y: false }), (e: Error) => /range\.x/.test(e.message), "x on log x");
-    assert.deepEqual(plotRangeOf({ y: { min: 0 } }, { x: false, y: true }), { y: { min: 0 } }, "0 is not below 0");
+    assert.throws(() => plotRangeOf({ y: { min: -1 } }, { y: "log2" as const }), (e: Error) => /range\.y/.test(e.message), "y.min −1 on log y");
+    assert.throws(() => plotRangeOf({ x: { min: -5, max: -1 } }, { x: "log2" as const }), (e: Error) => /range\.x/.test(e.message), "x on log x");
+    assert.deepEqual(plotRangeOf({ y: { min: 0 } }, { y: "log2" as const }), { y: { min: 0 } }, "0 is not below 0");
     assert.deepEqual(plotRangeOf({ y: { min: -1 } }, LIN), { y: { min: -1 } }, "a linear axis may start below 0");
-    assert.deepEqual(plotRangeOf({ y: { min: -1 } }, { x: true, y: false }), { y: { min: -1 } }, "only the log axis is held to 0");
+    assert.deepEqual(plotRangeOf({ y: { min: -1 } }, { x: "log2" as const }), { y: { min: -1 } }, "only the log axis is held to 0");
   });
 
   test("R1 a refused range refuses the view, before anything runs", async () => {
@@ -310,7 +310,7 @@ describe("R4 a plot sent to a peer", () => {
 });
 
 test("R1 an axis other than x or y, or one that is not {min, max}, is refused", () => {
-  assert.throws(() => plotRangeOf({ z: { min: 1 } }, { x: false, y: false }), /range: no axis z/);
-  assert.throws(() => plotRangeOf({ x: null }, { x: false, y: false }), /range\.x: give \{min, max\}/);
-  assert.throws(() => plotRangeOf({ y: [0, 1] }, { x: false, y: false }), /range\.y: give \{min, max\}/);
+  assert.throws(() => plotRangeOf({ z: { min: 1 } }, {}), /range: no axis z/);
+  assert.throws(() => plotRangeOf({ x: null }, {}), /range\.x: give \{min, max\}/);
+  assert.throws(() => plotRangeOf({ y: [0, 1] }, {}), /range\.y: give \{min, max\}/);
 });

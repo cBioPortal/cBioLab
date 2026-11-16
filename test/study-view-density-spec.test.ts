@@ -45,7 +45,7 @@ test("B2 an FGA axis runs from 0 to 1 whatever the data (data 0.2 and 0.4)", () 
   // the view fixes both ends; plotExtent puts them in place of the data's own
   const v = densityView({}) as any;
   assert.deepEqual(v.range.x, { min: 0, max: 1 });
-  extentClose(plotExtent({ x0: 0.2, x1: 0.4, y0: 1, y1: 2 }, v.range, { x: false, y: false }),
+  extentClose(plotExtent({ x0: 0.2, x1: 0.4, y0: 1, y1: 2 }, v.range, {}),
     { x0: 0, x1: 1, y0: 0, y1: 2 });
   // bin 8 starts at 8/44: 0.2 lies in [8/44, 9/44), 0.4 in [17/44, 18/44)
   assert.equal(Math.trunc(0.2 / (1 / 44)), 8);
@@ -55,35 +55,35 @@ test("B2 an FGA axis runs from 0 to 1 whatever the data (data 0.2 and 0.4)", () 
 test("B3 an MC axis starts at 0 and ends at the largest value (data 5, 10, 38)", () => {
   const v = densityView({}) as any;
   assert.deepEqual(v.range.y, { min: 0 }, "no fixed end on the MC axis");
-  extentClose(plotExtent({ x0: 0.1, x1: 0.3, y0: 5, y1: 38 }, v.range, { x: false, y: false }),
+  extentClose(plotExtent({ x0: 0.1, x1: 0.3, y0: 5, y1: 38 }, v.range, {}),
     { x0: 0, x1: 1, y0: 0, y1: 38 });
   // and with the axes swapped the same ends go to the other axis
   const s = densityView({ swapped: true }) as any;
-  extentClose(plotExtent({ x0: 5, x1: 38, y0: 0.1, y1: 0.3 }, s.range, { x: false, y: false }),
+  extentClose(plotExtent({ x0: 5, x1: 38, y0: 0.1, y1: 0.3 }, s.range, {}),
     { x0: 0, x1: 38, y0: 0, y1: 1 });
 });
 
 test("B3 plotExtent: no range leaves the data's extent; an end fixed on one side only replaces that end", () => {
   const data = { x0: 0.2, x1: 0.4, y0: 5, y1: 38 };
-  extentClose(plotExtent(data, undefined, { x: false, y: false }), data);
-  extentClose(plotExtent(data, {}, { x: false, y: false }), data);
-  extentClose(plotExtent(data, { x: { max: 1 } }, { x: false, y: false }), { x0: 0.2, x1: 1, y0: 5, y1: 38 });
-  extentClose(plotExtent(data, { y: { max: 76 } }, { x: false, y: false }), { x0: 0.2, x1: 0.4, y0: 5, y1: 76 });
+  extentClose(plotExtent(data, undefined, {}), data);
+  extentClose(plotExtent(data, {}, {}), data);
+  extentClose(plotExtent(data, { x: { max: 1 } }, {}), { x0: 0.2, x1: 1, y0: 5, y1: 38 });
+  extentClose(plotExtent(data, { y: { max: 76 } }, {}), { x0: 0.2, x1: 0.4, y0: 5, y1: 76 });
 });
 
-test("B12 Log Scale on MC: the range's ends are log10(1 + v), as the engine's axis carries", () => {
-  // data 0, 4 and 99 on a log axis, in the engine's units: log10(1), log10(5), log10(100)
-  const data = { x0: 0.1, x1: 0.3, y0: Math.log10(5), y1: Math.log10(100) };
+test("B12 Log Scale on MC: the range's ends are log2(1 + v), as the engine's axis carries", () => {
+  // data 0, 4 and 99 on a log axis, in the engine's units: log2(1), log2(5), log2(100)
+  const data = { x0: 0.1, x1: 0.3, y0: Math.log2(5), y1: Math.log2(100) };
   const v = densityView({ yLog: true }) as any;
   assert.equal(v.y.log, true);
   assert.deepEqual(v.range.y, { min: 0 }, "the range stays in counts; plotExtent converts it");
-  extentClose(plotExtent(data, v.range, { x: false, y: true }), { x0: 0, x1: 1, y0: 0, y1: 2 });
-  // a fixed end on a log axis is converted too: 99 → log10(100) = 2, 9 → 1
-  extentClose(plotExtent({ x0: 0, x1: 1, y0: 0, y1: 0.5 }, { y: { min: 9, max: 99 } }, { x: false, y: true }),
-    { x0: 0, x1: 1, y0: 1, y1: 2 });
+  extentClose(plotExtent(data, v.range, { y: "log2" }), { x0: 0, x1: 1, y0: 0, y1: Math.log2(100) });
+  // a fixed end on a log axis is converted too: 99 → log2(100), 9 → log2(10)
+  extentClose(plotExtent({ x0: 0, x1: 1, y0: 0, y1: 0.5 }, { y: { min: 9, max: 99 } }, { y: "log2" }),
+    { x0: 0, x1: 1, y0: Math.log2(10), y1: Math.log2(100) });
   // in the portal's units: ln(1 + 0) = 0 to ln(100) = 4.605; 4 is in bin 13 of 38, which starts at 1.5755
-  close(lnFromEngine(2), Math.log(100), 1e-12);
-  const interval = lnFromEngine(2) / 38;
+  close(lnFromEngine(Math.log2(100)), Math.log(100), 1e-12);
+  const interval = lnFromEngine(Math.log2(100)) / 38;
   assert.equal(Math.trunc(Math.log(5) / interval), 13);
   close(13 * interval, 1.5755, 1e-4);
 });
@@ -235,10 +235,10 @@ test("A3 axis range: FGA 0 to 1, MC from 0; on Log Scale the MC axis is ln(1 + c
   assert.deepEqual((densityView({}) as any).range, { x: { min: 0, max: 1 }, y: { min: 0 } });
   assert.deepEqual((densityView({ swapped: true }) as any).range, { x: { min: 0 }, y: { min: 0, max: 1 } });
   assert.deepEqual((densityView({ swapped: true, xLog: true }) as any).range, { x: { min: 0 }, y: { min: 0, max: 1 } });
-  // the engine's log10(1 + v) as the portal's ln(1 + v)
+  // the engine's log2(1 + v) as the portal's ln(1 + v)
   close(lnFromEngine(0), 0, 0);
-  close(lnFromEngine(Math.log10(5)), Math.log(5), 1e-12);
-  close(lnFromEngine(1), Math.LN10, 1e-12);
+  close(lnFromEngine(Math.log2(5)), Math.log(5), 1e-12);
+  close(lnFromEngine(1), Math.LN2, 1e-12);
 });
 
 // A4 ("No data to plot.") is the figure's empty state: not testable here.

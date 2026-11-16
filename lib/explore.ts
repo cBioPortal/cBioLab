@@ -1563,7 +1563,9 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     // otherwise everyone the merged selection holds at its level, less those with a value
     const total = (mergedTotals[base.per === "sample" ? "samples" : "patients"]);
     const na = disjunctive ? (cats.some((i) => i.na != null) ? cats.reduce((n, i) => n + (i.na || 0), 0) : undefined) : Math.max(0, total - patients);
-    return { ...base, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), ...(na != null ? { na } : {}),
+    // at least the values the studies' lists hold between them, so a list cut here reads as cut
+    const distinct = Math.max(base.distinct ?? 0, vals.size) || undefined;
+    return { ...base, distinct, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), ...(na != null ? { na } : {}),
       values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n || x.v.localeCompare(y.v)).slice(0, FACET_VALUE_LIMIT) };
   }).sort(chartOrder);
 
@@ -1763,7 +1765,7 @@ export async function buildAssayFacets(o: {
         return Number(m.data[0]?.n || 0);
       }));
       const values = [...counts].map(([v, n]) => ({ v, n })).sort((a, b) => b.n - a.n || (a.v < b.v ? -1 : 1)).slice(0, ASSAY_VALUE_LIMIT);
-      return { ...base, kind: "cat", measured: measured.reduce((a, b) => a + b, 0), values };
+      return { ...base, kind: "cat", measured: measured.reduce((a, b) => a + b, 0), values, distinct: counts.size };
     }
     const measured = st.reduce((n, r) => n + Number(r["nnum" + sfx] || 0), 0);
     const live = st.filter((r) => Number(r.nv) > 0);

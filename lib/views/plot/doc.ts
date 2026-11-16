@@ -25,6 +25,8 @@ export const plotDoc: KindDoc = {
   //            // any: Altered / Unaltered / Not profiled; statement: one group per statement (max 6)
   //        | {"source":"cohort"}  // x only: one box (or column) per cohort of the view's cohorts, a case in two in both;
   //            // each cohort is plotted on its own, so colorBy, ringBy and point layers are refused with it
+  // "log":true draws a numeric axis as cBioPortal does: log2(max(v, 0) + 1), a generic assay's log10(v);
+  //   an axis with values below 0 is drawn linear instead, said in the caption, except an RNA-seq (not z-score) profile
   // two numeric axes -> scatter (binned; every case a point up to ${POINTS_CAP_TEXT}, else sparse-cell outliers); one categorical -> box;
   // two categorical -> a contingency table`,
 };

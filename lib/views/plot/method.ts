@@ -9,6 +9,7 @@ import { type MethodRecord, type MethodStep, VERIFIED, RESULT_INIT, withResult, 
 import { BUILD_COMMIT } from "../../build-info.ts";
 import type { Moments } from "../../stats.ts";
 import type { PlotData } from "../../plot.ts";
+import { fmtNum } from "../../chart/format.ts";
 
 export interface PlotTrace {
   cohort: string;
@@ -33,6 +34,8 @@ export function plotMethod(t: PlotTrace): MethodRecord {
   ];
   let check: MethodRecord["check"];
   const functions: string[] = [];
+  const logs = logSteps(d);
+  if (logs) steps.push({ kind: "transform", title: "Log scale, by cBioPortal's rule", scope, detail: logs });
 
   if (d.shape === "scatter" && d.stats) {
     const st = d.stats;
@@ -154,3 +157,16 @@ export function plotMethod(t: PlotTrace): MethodRecord {
 }
 
 const fmtN = (n: number) => n.toLocaleString("en-US");
+
+/** what the log scale did to each axis, in words: the portal's transform, or why it was turned off (PLT-AX-4, PLT-STM-11) */
+function logSteps(d: PlotData): string {
+  return (["x", "y"] as const).map((side) => {
+    const a = d[side];
+    const off = d.logOff?.[side];
+    if (off != null) return a.label + ": a log scale was asked for, but the axis has values below 0 (the lowest " + fmtNum(off) +
+      "), and cBioPortal's Plots tab offers none on such an axis except an RNA-seq profile's; it is drawn linear.";
+    if (a.log === "log2") return a.label + ": each value v is drawn as log2(max(v, 0) + 1), cBioPortal's transform for every axis but a generic assay's; a value below 0 (kept only on an RNA-seq profile) is drawn at 0.";
+    if (a.log === "log10") return a.label + ": each value v is drawn as log10(v), cBioPortal's transform for a generic assay, with 0 drawn at 0.";
+    return "";
+  }).filter(Boolean).join(" ");
+}

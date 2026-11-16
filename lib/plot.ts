@@ -114,6 +114,8 @@ import { POINTS_CAP, POINT_RULE_N_MAX } from "./plot-layers.ts";
 export { isAbsent, jitterFor } from "./plot-draw.ts";
 import { isAbsent } from "./plot-draw.ts";
 import { finiteSql } from "./sql-number.ts";
+import { LOG_SUFFIX, logRuleOf, toLog, type LogRule } from "./plot-log.ts";
+export { LOG_SUFFIX, fromLog, logRuleOf, logScaleExempt, toLog, type LogRule } from "./plot-log.ts";
 import { assayEntityRowsSql, assayInCohortSql, ENTITY_RE } from "./generic-assay.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql, cohortSubquery, type CohortSql } from "./sql-kinds.ts";
 /**
@@ -176,14 +178,14 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 
 /** what an axis is called on the figure */
 export function axisLabel(a: PlotAxis): string {
-  if (a.source === "clinical") return a.log ? "log10(" + a.attribute + " + 1)" : a.attribute;
+  if (a.source === "clinical") return a.log ? a.attribute + LOG_SUFFIX.log2 : a.attribute;
   if (a.source === "molecular") {
     const name = a.label || a.gene + " " + a.profileType;
-    return a.log ? "log10(" + name + " + 1)" : name;
+    return a.log ? name + LOG_SUFFIX.log2 : name;
   }
   if (a.source === "assay") {
     const name = a.label || a.entity + " " + a.profileType;
-    return a.log ? "log10(" + name + " + 1)" : name;
+    return a.log ? name + LOG_SUFFIX.log10 : name;
   }
   if (a.source === "profile") return (a.entity || a.gene) + " " + a.profile;
   if (isOqlAxis(a)) {
@@ -287,14 +289,11 @@ const strip = (col: string, study: string) => "replaceOne(" + col + ", " + sq(st
  * SELECT id, v — one value per case. A case with no value simply has no row, which is how a
  * pair becomes an inner join and only cases measured on BOTH axes are plotted.
  */
-/**
- * A numeric axis with `log: true` reads log10(v + 1): a count of zero stays on the axis, and a
- * value below zero has no such log, so it is left out — NULL, which every caller already treats as
- * "no value" and the plot's coverage line counts.
- */
 function logOf(a: PlotAxis, expr: string): string {
-  if (!("log" in a && a.log)) return expr;
-  return "if(" + expr + " >= 0, log10(" + expr + " + 1), NULL)";
+  const rule = logRuleOf(a);
+  if (!rule) return expr;
+  if (rule === "log2") return "log2(greatest(" + expr + ", 0) + 1)";
+  return "if(" + expr + " > 0, log10(" + expr + "), if(" + expr + " = 0, 0, NULL))";
 }
 
 export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): string {
@@ -504,6 +503,12 @@ export function plotCountSql(xSel: string, ySel: string, cohortSql: string, nume
     (numeric
       ? "SELECT count() AS n, min(x) AS x0, max(x) AS x1, min(y) AS y0, max(y) AS y1 FROM pair"
       : "SELECT count() AS n, uniqExact(x) AS kx, uniqExact(y) AS ky FROM pair"));
+}
+
+/** One numeric axis over the cohort: how many cases have it, its lowest value, and how many are below 0. Counts only. */
+export function plotNegativesSql(sel: string, cohortSql: string): AggregateSql {
+  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n     xs AS (" + sel + ")\n" +
+    "SELECT count() AS n, min(v) AS lo, countIf(v < 0) AS neg FROM xs WHERE v IS NOT NULL");
 }
 
 /**
@@ -1016,9 +1021,9 @@ export type ViolinBin = { g: string; b: number; n: number; c?: string };
 export interface PlotData {
   shape: "scatter" | "box" | "table";
   n: number;
-  /** `log`: the axis carries log10(v + 1), so the figure labels its ticks in the original units */
-  x: { label: string; kind: AxisKind; log?: boolean };
-  y: { label: string; kind: AxisKind; log?: boolean };
+  /** `log`: the rule the axis carries its values by (LogRule), so the figure labels its ticks in the original units */
+  x: { label: string; kind: AxisKind; log?: LogRule };
+  y: { label: string; kind: AxisKind; log?: LogRule };
   extent?: { x0: number; x1: number; y0: number; y1: number };
   grid?: [number, number];
   /** each cell's count and the smallest and largest value in it on each axis, in the axes' units */
@@ -1048,6 +1053,8 @@ export interface PlotData {
   /** a contingency table's columns (x) and rows (y), top to bottom, in their axis's category order; an axis without one is by marginal total */
   order?: { x?: string[]; y?: string[] };
   note?: string;
+  /** an axis the view asks a log scale of that has values below 0, drawn linear (PLT-AX-4): its lowest value */
+  logOff?: { x?: number; y?: number };
   /** cases in the cohort, how many have each axis, and (patient mode) how many patients have several samples */
   coverage?: { total: number; nx: number; ny: number; multi?: number };
   /** the point layers drawn over the plot, in the view's order (the first holds a case two share) */
@@ -1056,17 +1063,17 @@ export interface PlotData {
 
 /**
  * The extent a scatter is binned over: the data's own, with each end the request fixes put in its
- * place, in the axis's units (log10(v + 1) on a log axis).
+ * place, in the axis's units (its LogRule's on a log axis).
  */
 export function plotExtent(data: { x0: number; x1: number; y0: number; y1: number }, range: PlotRange | undefined,
-  log: { x: boolean; y: boolean }): { x0: number; x1: number; y0: number; y1: number } {
-  const at = (v: number | undefined, isLog: boolean, own: number) => v == null ? own : isLog ? Math.log10(v + 1) : v;
+  log: { x?: LogRule; y?: LogRule }): { x0: number; x1: number; y0: number; y1: number } {
+  const at = (v: number | undefined, rule: LogRule | undefined, own: number) => v == null ? own : rule ? toLog(rule, v) : v;
   return { x0: at(range?.x?.min, log.x, data.x0), x1: at(range?.x?.max, log.x, data.x1),
     y0: at(range?.y?.min, log.y, data.y0), y1: at(range?.y?.max, log.y, data.y1) };
 }
 
 /** a view's `range` checked: finite ends, the start below the end, and nothing below 0 on a log axis */
-export function plotRangeOf(raw: unknown, log: { x: boolean; y: boolean }): PlotRange | undefined {
+export function plotRangeOf(raw: unknown, log: { x?: LogRule; y?: LogRule }): PlotRange | undefined {
   if (raw == null) return undefined;
   if (typeof raw !== "object") throw new Error("range: give {x: {min, max}, y: {min, max}}, each end optional");
   const out: PlotRange = {};
@@ -1081,7 +1088,7 @@ export function plotRangeOf(raw: unknown, log: { x: boolean; y: boolean }): Plot
       if (v != null && (typeof v !== "number" || !Number.isFinite(v))) throw new Error("range." + k + "." + name + " must be a finite number");
     if (typeof min === "number" && typeof max === "number" && !(min < max)) throw new Error("range." + k + ": min must be below max");
     if (log[k] && ((typeof min === "number" && min < 0) || (typeof max === "number" && max < 0)))
-      throw new Error("range." + k + ": a log axis reads log10(v + 1), which has no value below 0");
+      throw new Error("range." + k + ": a log axis reads " + (log[k] === "log2" ? "log2(max(v, 0) + 1)" : "log10(v)") + ", which has no value below 0");
     out[k] = { ...(typeof min === "number" ? { min } : {}), ...(typeof max === "number" ? { max } : {}) };
   }
   return out;

@@ -11,6 +11,10 @@
  * database checks), so the working tree and its dev server are never touched.
  *
  * Run: npm run check:mutants (about three minutes).
+ * With MUTANT_CHANGED set to a file listing changed paths, one per line (a pull request's diff, as CI
+ * gives it), only the bugs that diff could affect are planted: those in a changed file, and those
+ * whose guard's own files changed. A diff that touches this script, the workflow or the dependencies
+ * plants every bug, as does a run without MUTANT_CHANGED (master, and locally).
  * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads
  * (or REPORT_DIR/mutants.json when REPORT_DIR is set, as in CI).
  */
@@ -210,8 +214,20 @@ const MUTANTS: Mutant[] = [
     replace: "min(y) AS minX, max(y) AS maxX" },
   { id: "density-fixed-end-not-logged", layer: "counts", guard: "unit", file: "lib/plot.ts",
     effect: "On Log Scale the fixed end of the mutation-count axis is used as a raw count, so the cells are cut on the wrong scale.",
-    find: "isLog ? Math.log10(v + 1) : v",
+    find: "rule ? toLog(rule, v) : v",
     replace: "v" },
+  { id: "log-scale-kept-on-negatives", layer: "counts", guard: "unit", file: "lib/views/plot/run.ts",
+    effect: "A log scale on an axis with values below 0 is kept and they are drawn at 0, where cBioPortal turns the log scale off.",
+    find: "out[side] = logScaleExempt(a) ? { negatives } : { off: true, min: Math.min(...mins) };",
+    replace: "out[side] = { negatives };" },
+  { id: "log-scale-zscore-exempt", layer: "counts", guard: "unit", file: "lib/plot-log.ts",
+    effect: "An RNA-seq z-score axis keeps its log scale over its negative values, which cBioPortal does not offer.",
+    find: "return /rna_seq/i.test(id) && !/zscore/i.test(id);",
+    replace: "return /rna_seq/i.test(id);" },
+  { id: "log2-negatives-unclamped", layer: "counts", guard: "unit", file: "lib/plot-log.ts",
+    effect: "A value below 0 on a log2 axis is placed at log2(v + 1) instead of 0, so it lands below the axis or is undefined.",
+    find: "rule === \"log2\" ? Math.log2(Math.max(v, 0) + 1)",
+    replace: "rule === \"log2\" ? Math.log2(v + 1)" },
   { id: "density-plasma-not-capped", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
     effect: "The densest cells are drawn in the plasma ramp's pale yellow end, which the portal stops short of so they stay visible.",
     find: "const COLOR_MAX = 0.75;",
@@ -220,6 +236,22 @@ const MUTANTS: Mutant[] = [
     effect: "When every cell holds the same number of samples, the chart draws them in the lowest colour with no legend, where the portal scales from 1.",
     find: "  if (min === max) min = 1;\n",
     replace: "" },
+  { id: "summary-na-not-last", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "A chart's Summary Data file sorts NA by its count instead of writing it last.",
+    find: "isNa(a.value) ? (isNa(b.value) ? 0 : 1) : isNa(b.value) ? -1 : b.count - a.count",
+    replace: "b.count - a.count" },
+  { id: "summary-share-without-na", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "Summary Data's percentages are of the cases with a value, so they no longer match the chart's (NA left out of the sum).",
+    find: "const sum = counts.reduce((n, c) => n + c.count, 0);",
+    replace: "const sum = counts.reduce((n, c) => n + (isNa(c.value) ? 0 : c.count), 0);" },
+  { id: "summary-file-name-tabs-kept", layer: "counts", guard: "unit", file: "lib/study-view-download.ts",
+    effect: "A chart's download file name keeps its tabs, where the portal writes _.",
+    find: "chartName.replace(/[ \\t]/g, \"_\")",
+    replace: "chartName.replace(/ /g, \"_\")" },
+  { id: "summary-cut-not-said", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "A categorical chart over several studies whose merged values were cut to 200 reads as complete, so its Summary Data is offered as if whole.",
+    find: "const distinct = Math.max(base.distinct ?? 0, vals.size) || undefined;",
+    replace: "const distinct = base.distinct;" },
   { id: "density-swap-keeps-log", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
     effect: "Swap Axes leaves Log Scale on the axis position rather than moving it with mutation count.",
     find: "return { swapped: !s.swapped, xLog: !!s.yLog, yLog: !!s.xLog };",
@@ -994,7 +1026,8 @@ const MUTANTS: Mutant[] = [
  * shows as SURVIVED, a failure, never as a pass.
  */
 function suitesImporting(dir: string, file: string): string[] {
-  const imports = new RegExp("from \"(\\.\\./)+" + file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\"");
+  // a static import, or a dynamic one: a suite that sets the environment before loading the module awaits import()
+  const imports = new RegExp("(from |import\\()\"(\\.\\./)+" + file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\"");
   const suites = readdirSync(join(dir, "test")).filter((f) => f.endsWith(".test.ts"))
     .filter((f) => imports.test(readFileSync(join(dir, "test", f), "utf8"))).map((f) => "test/" + f);
   // `node --test` given no files runs every suite, which would hide that none guards this one
@@ -1024,6 +1057,27 @@ function run(dir: string, guard: Guard, file?: string): { ok: boolean; failures:
 
 const dir = mkdtempSync(join(tmpdir(), "cohort-lab-mutants-"));
 const ONLY = process.env.MUTANT_ONLY;
+
+/** a change to any of these can change every planted bug's outcome */
+const PLANT_ALL_ON = ["scripts/check-mutants.ts", ".github/workflows/verify.yml", "package.json", "package-lock.json"];
+
+/** the files a guard runs from: its script, or for the unit guard the suites that import the bug's file */
+function guardFiles(m: Mutant): string[] {
+  if (m.guard !== "unit") return GUARD_CMD[m.guard].filter((a) => a.startsWith("scripts/"));
+  // a bug no suite imports is reported, with every other unplantable one, before any guard runs
+  try { return suitesImporting(ROOT, m.file); } catch { return []; }
+}
+
+/** the bugs to plant, and why: all of them, or those MUTANT_CHANGED's diff could affect */
+function selection(): { mutants: Mutant[]; changed: number | null; reason: string } {
+  const list = process.env.MUTANT_CHANGED;
+  if (!list) return { mutants: MUTANTS, changed: null, reason: "every bug (no MUTANT_CHANGED)" };
+  const changed = new Set(readFileSync(list, "utf8").split("\n").map((l) => l.trim()).filter(Boolean));
+  const all = PLANT_ALL_ON.filter((f) => changed.has(f));
+  if (all.length) return { mutants: MUTANTS, changed: changed.size, reason: "every bug (the diff changes " + all.join(", ") + ")" };
+  const mutants = MUTANTS.filter((m) => changed.has(m.file) || guardFiles(m).some((f) => changed.has(f)));
+  return { mutants, changed: changed.size, reason: "the bugs in, or guarded by, the " + changed.size + " changed files" };
+}
 /** every planted bug run against its guard in the copy at `dir`; the exit code */
 function plantAll(): number {
   const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".venv"]);
@@ -1032,7 +1086,24 @@ function plantAll(): number {
   mkdirSync(join(dir, "docs/verification"), { recursive: true });
   mkdirSync(join(dir, ".ch-cache"));
 
-  const guards = [...new Set(MUTANTS.map((m) => m.guard))];
+  const sel = selection();
+  const planted = sel.mutants.filter((m) => !ONLY || m.id === ONLY);
+  console.log(`Planting ${planted.length} of ${MUTANTS.length} bugs: ${sel.reason}`);
+  if (!planted.length) console.log("No planted bug is in, or guarded by, a changed file: nothing to plant.");
+
+  // what can be known without running anything is checked before the guards' baselines, which take minutes
+  const unplantable = planted.flatMap((m) => {
+    const hits = readFileSync(join(dir, m.file), "utf8").split(m.find).length - 1;
+    const site = hits === 1 ? [] : [`${m.id}: expected the bug's site exactly once in ${m.file}, found ${hits}`];
+    if (m.guard !== "unit") return site;
+    try { suitesImporting(dir, m.file); return site; } catch (e) { return [...site, `${m.id}: ${(e as Error).message}`]; }
+  });
+  if (unplantable.length) {
+    for (const u of unplantable) console.log("FAIL " + u);
+    return 1;
+  }
+
+  const guards = [...new Set(planted.map((m) => m.guard))];
   for (const g of guards) {
     const base = run(dir, g);
     console.log(`${base.ok ? "PASS" : "FAIL"} baseline: ${g} passes on the unmodified code`);
@@ -1040,7 +1111,7 @@ function plantAll(): number {
   }
 
   const results = [];
-  for (const m of MUTANTS.filter((m) => !ONLY || m.id === ONLY)) {
+  for (const m of planted) {
     const path = join(dir, m.file);
     const original = readFileSync(path, "utf8");
     const hits = original.split(m.find).length - 1;
@@ -1061,6 +1132,7 @@ function plantAll(): number {
     ranAt: new Date().toISOString(),
     commit: execSync("git rev-parse --short HEAD", { cwd: ROOT }).toString().trim(),
     total: results.length, caught,
+    ...(sel.changed == null ? {} : { selection: { changedFiles: sel.changed, of: MUTANTS.length, reason: sel.reason } }),
     mutants: results,
   }, null, 1) + "\n");
   console.log(`\n${caught} of ${results.length} planted bugs caught`);

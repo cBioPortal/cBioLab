@@ -154,15 +154,15 @@ await row("B11 FGA 2.0E-4", async () => {
 });
 
 await row("B12 Log Scale on MC", async () => {
-  // the engine's log axis carries log10(1 + v): MC 0, 4, 99
+  // the engine's log axis carries log2(1 + v): MC 0, 4, 99
   const mc = [0, 4, 99];
-  const y = lit(mc.map((v) => Math.log10(1 + v)));
+  const y = lit(mc.map((v) => Math.log2(1 + v)));
   const x = lit([0.1, 0.5, 0.9]);
   const want = [{ bx: 4, by: 0, n: 1 }, { bx: 22, by: 13, n: 1 }, { bx: 39, by: 37, n: 1 }];
   const partial = await bins(x, y, DEFAULT_EXTENT);
   ok("B12 MC 0, 4, 99 on Log Scale: y bins 0, 13, 37", sameCells(partial, want), cellsText(partial));
   // the extent the engine passes when the range is converted by plotExtent
-  const full = plotExtent({ x0: 0.1, x1: 0.9, y0: 0, y1: 2 }, { x: { min: 0, max: 1 }, y: { min: 0 } }, { x: false, y: true });
+  const full = plotExtent({ x0: 0.1, x1: 0.9, y0: 0, y1: Math.log2(100) }, { x: { min: 0, max: 1 }, y: { min: 0 } }, { y: "log2" });
   const viaExtent = await bins(x, y, full);
   ok("B12 … the same with plotExtent's extent", sameCells(viaExtent, want), cellsText(viaExtent));
   // each cell's min/max, in the portal's units ln(1 + v)
@@ -182,8 +182,8 @@ await row("S1", async () => {
     st.n === 5 && near(st.pearson, 0.7563342336604849, 1e-9) && near(st.spearman, 0.9, 1e-9), JSON.stringify(st));
 });
 await row("S2", async () => {
-  const st = await stats(lit(S_X), lit([1, 3, 2, 5, 40].map((v) => Math.log10(1 + v))));
-  ok("S2 Log Scale on MC: Pearson 0.8669 (the same over log10 as over ln), Spearman 0.9000",
+  const st = await stats(lit(S_X), lit([1, 3, 2, 5, 40].map((v) => Math.log2(1 + v))));
+  ok("S2 Log Scale on MC: Pearson 0.8669 (the same over log2 as over ln), Spearman 0.9000",
     near(st.pearson, 0.8668601892675808, 1e-9) && near(st.spearman, 0.9, 1e-9), JSON.stringify(st));
 });
 await row("S3", async () => {
@@ -249,7 +249,7 @@ await row("fixture study", async () => {
     `got ${cellsText(got)}\n      want ${cellsText(want)}`);
   ok("fixture: … and each cell's min/max", sameCells(got, want), "");
 
-  // Log Scale on MC: the Java bins over ln(1 + v); the engine's over log10(1 + v), read back with lnFromEngine
+  // Log Scale on MC: the Java bins over ln(1 + v); the engine's over log2(1 + v), read back with lnFromEngine
   const wantLog = javaBins(fx, mc.map((v) => Math.log(1 + v)), 0, 1, 0, undefined);
   const gotLog = (await bins(fgaSel, mcLogSel, DEFAULT_EXTENT, cohortSql))
     .map((c) => ({ ...c, minY: lnFromEngine(c.minY), maxY: lnFromEngine(c.maxY) }));

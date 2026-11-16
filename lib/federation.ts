@@ -26,9 +26,9 @@ import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
-import { axisKind, axisLabel, axisSelect, corrPValue, fitOf, plotShape, tukey, validateAxis,
+import { axisKind, axisLabel, axisSelect, corrPValue, fitOf, logRuleOf, plotShape, tukey, validateAxis,
   categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
-  plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
+  plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotNegativesSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
   type PlotXYPoint, type SparseCells, type Whiskers, type PointRank, type ViolinBin, type PlotCell, plotExtent } from "./plot.ts";
@@ -1448,6 +1448,8 @@ export interface FederatedPlotCapable {
   plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }>;
   plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }>;
+  /** a numeric axis's lowest value here and how many values are below 0, before a log scale is drawn */
+  plotAxisNegatives?(def: CohortDef | null | undefined, axis: PlotAxis, unit: PlotRequest["unit"]): Promise<{ min: number | null; negatives: number }>;
   plotBinCounts(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]>;
   plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments>;
@@ -1777,7 +1779,7 @@ abstract class BaseResolver implements AggregateCapable {
     const shape = plotShape(xk, yk);
     if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
     const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
-    const logOf = (ax: PlotAxis) => "log" in ax && ax.log ? { log: true } : {};
+    const logOf = (ax: PlotAxis) => { const rule = logRuleOf(ax); return rule ? { log: rule } : {}; };
     const label = { x: { label: axisLabel(spec.x), kind: xk, ...logOf(spec.x) }, y: { label: axisLabel(spec.y), kind: yk, ...logOf(spec.y) } };
     // alongside the plot's own queries, never failing it: a missing coverage just means no note
     const coverage = this.runLogged<ChRow>("plot:coverage", plotCoverageSql(xSel, ySel, ctx), conn)
@@ -1790,7 +1792,7 @@ abstract class BaseResolver implements AggregateCapable {
       const n = Number(c.data[0]?.n || 0);
       if (!n) return done({ shape, n: 0, ...label, note: "no " + unit + " has a value on both axes" });
       const extent = plotExtent({ x0: Number(c.data[0].x0), x1: Number(c.data[0].x1), y0: Number(c.data[0].y0), y1: Number(c.data[0].y1) },
-        spec.range, { x: !!logOf(spec.x).log, y: !!logOf(spec.y).log });
+        spec.range, { x: logRuleOf(spec.x), y: logRuleOf(spec.y) });
       const [st, bins] = await Promise.all([
         this.runLogged<ChRow>("plot:stats", plotStatsSql(xSel, ySel, ctx.cohortSql), conn),
         this.runLogged<ChRow>("plot:bins", plotBinsSql(xSel, ySel, ctx.cohortSql, spec.bins, spec.range ? extent : undefined), conn)
@@ -1887,6 +1889,14 @@ abstract class BaseResolver implements AggregateCapable {
     const r = await this.runLogged<ChRow>("plot:coverage",
       plotCoverageSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx), this.instance.conn);
     return coverageOf(r.data[0] || {});
+  }
+
+  /** One numeric axis's lowest value over this site's cases and how many are below 0, read before a log scale is drawn (PLT-AX-4). */
+  async plotAxisNegatives(def: CohortDef | null | undefined, axis: PlotAxis, unit: PlotRequest["unit"]): Promise<{ min: number | null; negatives: number }> {
+    const ctx = (await this.plotCtx(def, { x: axis, y: axis, unit }));
+    const r = await this.runLogged<ChRow>("plot:negatives", plotNegativesSql(axisSelect(axis, ctx, "num"), ctx.cohortSql), this.instance.conn);
+    const row = r.data[0] || {};
+    return { min: Number(row.n) > 0 ? Number(row.lo) : null, negatives: Number(row.neg || 0) };
   }
 
   /** Pass 1 of a federated numeric pair: this site's count and extent (plotBinsSql's `extent` arg). */
