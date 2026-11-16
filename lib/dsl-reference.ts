@@ -1605,6 +1605,11 @@ about a gene is not an alteration of it, so overlays never enter the altered fra
 as a binary row, so a phenotype defined by the cohort DSL can be read against the genomics.
 Single-study and patient-mode only, because cohort rows are patient-level.
 
+**Oncoprint automatic rows** (\`hideTracks: [label]\`): the figure draws "Study of origin" (several
+studies), "# Samples per Patient" (a patient with several samples) and "Profiled for <type>" (some
+columns not profiled for it) by itself, as the portal does; naming one in \`hideTracks\` switches it
+off. Any other label is refused.
+
 **Oncoprint merged rows**: a \`genes\` entry may be a group — \`{"label"?: "TP53 pathway", "genes":
 ["TP53", "MDM2", "MDM4"]}\` — drawn as ONE row, cBioPortal's \`[TP53 MDM2 MDM4]\`. The row is altered
 where any member is altered and profiled where any member was profiled, so its percentage is over

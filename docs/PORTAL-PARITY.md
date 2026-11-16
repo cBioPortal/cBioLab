@@ -178,9 +178,10 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
       - Known: the library is not a consistent comparator for hex-like values (none in the warehouse); the portal's order of those depends on its input order, ours on the values' ranks
   - [x] Tracks › Clinical: display names, Freq %, Select / Deselect all, applied by Update tracks, no cap of 8 (ONC-TR-1, ONC-STM-4) (#196)
     - [ ] A patient-level attribute's Freq in samples, as the portal counts it (ours its patients; msk_impact_2017 OS_MONTHS 73.3 % vs 74.4 %): needs a samples count in Explore's facet query
-    - [ ] Mutation spectrum, Profiled-in and Study of origin listed first as rows of the tab
+    - [x] Study of origin, Mutation spectrum and the Profiled-for rows listed first as rows of the tab, then the rest (# Samples per Patient among them) by Freq; the automatic rows at 100%, the spectrum at the queried samples profiled for mutations; each automatic row ticked unless the reader unticks it, which the view keeps as `hideTracks` (the track's own Remove does the same) (TracksMenu 185-256, ResultsViewPageStore 1147-1316, ResultsViewOncoprint 356-400) (PR pending)
+      - Ours alone: the spectrum's Freq counts the queried samples in the study's mutation profile; the portal counts its `_sequenced` case list. They differ in 5 of 546 warehouse studies (rectal_msk_2022 788 vs 692, ccle_broad_2025 1,981 vs 1,854, pancan_pdx_uthsa_2023 92 vs 68, bowel_colitis_msk_2022, uec_msk_2024)
     - [x] Every attribute the studies declare is listed, at 0% where the selection has no value; ties broken by the attribute's stored priority (not the Study View's chart priority: SAMPLE_COUNT is stored 1 in all 552 studies, charted 40), then by name in code-unit order; "Select all (N)" counts every listed row, adds those with data and is not offered once all are on (ResultsViewPageStore clinicalAttributes, TracksMenu, FixedHeaderTable) (audit of #196)
-    - [ ] Cosmetic: the Freq column's header tooltip ("% samples with data") and the loading text ("Calculating data availability...")
+    - [x] Cosmetic: the Freq column's header tooltip ("% samples with data") and the loading text ("Calculating data availability...") (PR pending)
   - [ ] Clinical tracks (ONC-TT-1, ONC-TT-2, ONC-TT-12, ONC-TP-3, ONC-STM-5)
     - [x] Every value its own colour, the portal's list and reserved colours (ONC-TT-1) (#197)
       - [x] A patient's "Mixed" is none of the study's values, so the portal's oncoprint colours it itself: the list's first colour, darkened while another value has it (#3061c2 beside any other value), and it takes no slot from the values after it (oncoprintruleset makeUniqueColorGetter). 191,488 patient–attribute pairs in 231 studies have samples that disagree (audit of #197)
@@ -195,7 +196,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
       - Known: values travel as float32, so two values equal to 7 significant digits tie where the portal's doubles would order them (two `todo` tests).
     - [ ] ONC-TT-2's numeric typing by the attribute's datatype (ours: ≥90 % parse and >10 distinct values); "(average of n values)" zoomed out (ONC-STM-8)
   - [x] The mutation spectrum track (ONC-TT-3, ONC-STM-6) (#199)
-    - [ ] Its Freq in Tracks › Clinical (the portal's % of samples sequenced) and Edit Colors
+    - [x] Its Freq in Tracks › Clinical (the portal's % of samples sequenced) (PR pending)
+    - [ ] Edit Colors
     - [x] The Tabular download names clinical rows by display name (`Mutation spectrum (C>A)`, `Diagnosis Age`), as the portal (ONC-DL-4)
     - Not as the portal, on purpose: a case whose substitutions are all ref = alt (one row in the warehouse) has no spectrum here; the portal keeps six zeros, draws no data, and writes 0 in its TSV
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)

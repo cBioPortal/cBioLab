@@ -196,6 +196,8 @@ export interface AssembleInput {
   clusterRank?: Map<string, number>;
   /** how the clustering was done, echoed in the contract's conventions for the caption */
   clusterMethod?: ClusterMethod;
+  /** automatic rows (lib/profile-names.ts AUTO_TRACKS) the reader switched off */
+  hideTracks?: string[];
 }
 
 /**
@@ -401,6 +403,8 @@ export function assembleContract(input: AssembleInput): Contract {
 
   // ---- clinical tracks ---------------------------------------------------
   const clinTracks: Track[] = [];
+  // the automatic rows this figure draws, those the reader hid included, for the Tracks menu
+  const autoTracks: string[] = [];
   if (multi) {
     // synthetic per-column provenance track; also the honest caveat that clinical
     // vocabularies below it are merged by attribute name, not harmonized
@@ -435,6 +439,9 @@ export function assembleContract(input: AssembleInput): Contract {
     }
     clinTracks.push(...rows.sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true })));
   }
+  { const hidden = new Set(input.hideTracks || []);
+    autoTracks.push(...clinTracks.map((t) => t.label));
+    for (let i = clinTracks.length - 1; i >= 0; i--) if (hidden.has(clinTracks[i].label)) clinTracks.splice(i, 1); }
   for (const { attr, values: valByPid, name } of clinical) {
     const named = name && name !== attr ? { name } : {};
     if (attr === SPECTRUM_TRACK) {
@@ -734,6 +741,7 @@ export function assembleContract(input: AssembleInput): Contract {
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
       ...(input.clusterMethod ? { cluster: input.clusterMethod } : {}),
+      ...(autoTracks.length ? { autoTracks } : {}),
       ...customDriverReport(events) },
     display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false, showOql: true },
     stats: { nColumns: columns.length, ms: Date.now() - t0, ...(input.display?.hideVUS ? { hiddenVus } : {}), ...(hideGerm ? { hiddenGermline: hiddenGerm } : {}), ...(offPanel ? { offPanel } : {}) }

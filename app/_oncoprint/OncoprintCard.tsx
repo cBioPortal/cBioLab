@@ -10,10 +10,9 @@ import type { ProfileInfo } from "../../lib/profile-catalog.ts";
 import OncoprintFigure, { type ColumnSelection } from "./OncoprintFigure.tsx";
 import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, DRIVER_SCOPE } from "./view-display.ts";
 import { driversOf, withDrivers } from "../../lib/driver-settings.ts";
-import { assayTrackLabel, SPECTRUM_TRACK } from "../../lib/profile-names.ts";
-import { STYLE } from "../../lib/oncoprint-style.ts";
+import { assayTrackLabel, isAutoTrack } from "../../lib/profile-names.ts";
 import { CLINICAL_TRACK_LIMIT } from "../../lib/views/oncoprint/types.ts";
-import { clinicalTrackRows, selectAll, trackFreqText, type TrackAttr, geneRowCount, withClinical, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack } from "./track-edits.ts";
+import { tracksMenuRows, withClinicalTab, selectAll, trackFreqText, type TrackAttr, geneRowCount, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack } from "./track-edits.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
@@ -50,12 +49,16 @@ export function Waiting({ what }: { what: string }) {
  * first, because that is what decides whether a track is worth a row.
  */
 type HeatEntry = { profileType: string; genes?: string[]; entities?: string[] };
-export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
+export function TracksMenu({ attrs, totals, spectrum, sequenced, autoTracks = [], hidden = [], profiles, assays = [], clinical, heatmap, cohorts, derivedCohorts, busy, loading, onClinical, onHeatmap, onDerived }: {
   attrs: TrackAttr[];
   /** the queried patients and samples, each attribute's Freq denominator */
   totals?: { patients: number; samples: number };
   /** the studies hold mutations, so the mutation spectrum row can be drawn: listed first, as in the portal */
   spectrum?: boolean;
+  /** the queried samples profiled for mutations: the spectrum row's Freq */
+  sequenced?: number;
+  /** the rows the figure draws by itself (the contract's conventions.autoTracks), and those of them the view hides */
+  autoTracks?: string[]; hidden?: string[];
   /** the attribute/profile catalog is still being fetched */
   loading?: boolean;
   profiles: string[];
@@ -73,16 +76,18 @@ export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], cli
   const [tab, setTab] = useState<"clinical" | "custom" | "heatmap" | "cohorts">("clinical");
   // clinical ticks are staged, as the portal's are, and applied together by "Update tracks"
   const [staged, setStaged] = useState<string[] | null>(null);
-  const pending = staged ?? clinical;
-  const changed = staged !== null && (staged.length !== clinical.length || staged.some((x, i) => x !== clinical[i]));
-  const rows = [...(spectrum ? [{ attribute: SPECTRUM_TRACK, kind: "spectrum", patients: 0, label: STYLE.glyph.spectrum.label, pct: null, unit: "samples" as const }] : []),
-    ...clinicalTrackRows(attrs.filter((a) => !isCustomAttr(a.attribute)), totals)];
+  // the Clinical tab's ticks: the chosen attributes and the automatic rows not hidden
+  const shownAuto = autoTracks.filter((l) => !hidden.includes(l));
+  const clinicalOn = [...shownAuto, ...clinical];
+  const pending = staged ?? clinicalOn;
+  const changed = staged !== null && (staged.length !== clinicalOn.length || staged.some((x, i) => x !== clinicalOn[i]));
+  const rows = tracksMenuRows({ attrs: attrs.filter((a) => !isCustomAttr(a.attribute)), totals, spectrum, sequenced, autoTracks });
   const [q, setQ] = useState("");
   const match = (s: string) => s.toLowerCase().includes(q.trim().toLowerCase());
   const heatOptions = ["VAF", ...profiles, ...assays.map((p) => p.profile)];
   const assayOf = (name: string) => assays.find((p) => p.profile === name);
   // uploads get their own tab, but they are clinical tracks to the engine: one list, one cap of 8
-  const studyAttrs = [...(spectrum ? [{ attribute: SPECTRUM_TRACK, kind: "spectrum", patients: 0 }] : []), ...attrs.filter((a) => !isCustomAttr(a.attribute))];
+  const studyAttrs = rows;
   const customAttrs = attrs.filter((a) => isCustomAttr(a.attribute));
   const isClin = tab === "clinical" || tab === "custom";
   const chosen = isClin ? pending : tab === "heatmap" ? heatmap.map((h) => h.profileType) : derivedCohorts;
@@ -90,9 +95,9 @@ export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], cli
     : tab === "heatmap" ? heatOptions : cohorts).filter((n) => match(n) || match(attributeLabel(n)));
   const cap = isClin ? CLINICAL_TRACK_LIMIT : tab === "heatmap" ? 4 : 3;
   const rowOf = (name: string) => rows.find((r) => r.attribute === name);
-  const all = selectAll(shown, clinical, (n) => rowOf(n)?.pct, cap);
+  const all = selectAll(shown, clinicalOn, (n) => rowOf(n)?.pct, cap + autoTracks.length);
   const toggle = (name: string) => {
-    if (isClin) setStaged(pending.includes(name) ? pending.filter((x) => x !== name) : pending.length < cap ? [...pending, name] : pending);
+    if (isClin) setStaged(pending.includes(name) ? pending.filter((x) => x !== name) : pending.filter((x) => !isAutoTrack(x)).length < cap ? [...pending, name] : pending);
     else if (tab === "heatmap") {
       const ga = assayOf(name);
       if (chosen.includes(name)) onHeatmap(heatmap.filter((h) => h.profileType !== name));
@@ -128,8 +133,8 @@ export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], cli
           {/* Select all / Deselect all apply at once, as the portal's do; single ticks wait for Update tracks */}
           {all.offered && <Button variant="outline" size="xs" disabled={busy} onClick={() => { setStaged(null); onClinical(all.next); }}>
             Select all ({all.n})</Button>}
-          <Button variant="outline" size="xs" disabled={busy || !clinical.some((n) => shown.includes(n))}
-            onClick={() => { setStaged(null); onClinical(clinical.filter((n) => !shown.includes(n))); }}>Deselect all</Button>
+          <Button variant="outline" size="xs" disabled={busy || !clinicalOn.some((n) => shown.includes(n))}
+            onClick={() => { setStaged(null); onClinical(clinicalOn.filter((n) => !shown.includes(n))); }}>Deselect all</Button>
           {changed && <Button size="xs" className="ml-auto" disabled={busy} onClick={() => { onClinical(pending); setStaged(null); closeGearMenu("onco-tracks"); }}>Update tracks</Button>}
         </div>}
         <span className="meta">{chosen.length} chosen{
@@ -138,7 +143,9 @@ export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], cli
           : tab === "heatmap" ? " · a profile draws one row per gene (blank genes follow the figure); a generic assay one per entity"
           : " · any cohort in this document can be a binary row (patients only, one study)"}</span>
         <div style={{ maxHeight: 260, overflowY: "auto", marginTop: "0.3rem" }}>
-          {!shown.length && (loading && !attrs.length ? <Waiting what="tracks" />
+          {tab === "clinical" && shown.length > 0 && <div className="meta flex justify-between py-0.5 font-semibold">
+            <span>Name</span><span data-tip="% samples with data">Freq</span></div>}
+          {!shown.length && (loading && !attrs.length ? <span className="waiting" role="status"><span className="spinner" /> Calculating data availability...</span>
             : <span className="meta">{q.trim() ? "nothing matches"
               : tab === "custom" ? "no uploads for this study in this browser: add one under Explore → Custom data" : "nothing to choose from"}</span>)}
           {shown.map((name) => {
@@ -154,8 +161,10 @@ export function TracksMenu({ attrs, totals, spectrum, profiles, assays = [], cli
                   <span style={{ flex: 1 }} data-tip={tab === "custom" || ga || r ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : ga ? ga.name + " (generic assay)"
                     : r ? r.label : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
                     {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
-                  {r && r.pct != null ? <span style={{ fontVariantNumeric: "tabular-nums" }}
-                    data-tip={a!.patients.toLocaleString() + " of " + (r.unit === "samples" ? totals!.samples : totals!.patients).toLocaleString() + " queried " + r.unit + " have a value" +
+                  {r && (r.pct != null || r.kind === "spectrum") ? <span style={{ fontVariantNumeric: "tabular-nums" }}
+                    data-tip={r.kind === "auto" ? "drawn for every queried sample"
+                      : r.kind === "spectrum" ? (sequenced != null && totals ? sequenced.toLocaleString() + " of " + totals.samples.toLocaleString() + " queried samples were profiled for mutations" : "how many queried samples were profiled for mutations is not known here")
+                      : a!.patients.toLocaleString() + " of " + (r.unit === "samples" ? totals!.samples : totals!.patients).toLocaleString() + " queried " + r.unit + " have a value" +
                       (r.unit === "patients" ? " (a patient attribute: the portal counts these patients' samples)" : "")}>{trackFreqText(r.pct)}</span>
                     : a && a.kind !== "spectrum" && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
@@ -187,6 +196,8 @@ export interface TrackCatalog { attrs: TrackAttr[]; profiles: string[]; loading:
   totals?: { patients: number; samples: number };
   /** the studies hold mutations: the Tracks menu offers the mutation spectrum row */
   spectrum?: boolean;
+  /** the queried samples profiled for mutations: the spectrum row's Freq */
+  sequenced?: number;
   /** every profile as the studies describe them, for a plot axis's Data picker */
   profileCatalog?: ProfileInfo[] }
 
@@ -252,12 +263,13 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
             onChange={(d) => edit(withDrivers(view, d))} />
         </>}
         tracksMenu={<TracksMenu
-          attrs={catalog.attrs} totals={catalog.totals} spectrum={catalog.spectrum} profiles={catalog.profiles} loading={catalog.loading}
+          attrs={catalog.attrs} totals={catalog.totals} spectrum={catalog.spectrum} sequenced={catalog.sequenced}
+          autoTracks={c?.conventions?.autoTracks || []} hidden={view.hideTracks || []} profiles={catalog.profiles} loading={catalog.loading}
           assays={(catalog.profileCatalog || []).filter((p) => profileUse(p) === "assayNumber" && p.study)}
           clinical={view.clinical || []} heatmap={view.heatmap || []}
           cohorts={cohortNames} derivedCohorts={view.derivedCohorts || []}
           busy={busy}
-          onClinical={(next) => edit(withClinical(view, next))}
+          onClinical={(next) => edit(withClinicalTab(view, next, c?.conventions?.autoTracks || []))}
           onHeatmap={(next) => edit(withHeatmap(view, next))}
           onDerived={(next) => edit(withDerived(view, next))} />}
         footer={<>

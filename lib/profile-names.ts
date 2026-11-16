@@ -59,3 +59,12 @@ export const SAMPLES_TRACK = "# Samples per Patient";
 export const SPECTRUM_TRACK = "MUTATION_SPECTRUM";
 /** its display name, as the portal names the row (its clinical attribute has no metadata) */
 export const SPECTRUM_NAME = "Mutation spectrum";
+
+/**
+ * The rows an oncoprint draws by itself when they apply: Study of origin (several studies),
+ * # Samples per Patient (a patient with several samples) and each "Profiled for <type>" (some
+ * columns unprofiled). The portal lists them as clinical tracks the reader can untick; a view
+ * hides one by naming it in `hideTracks`.
+ */
+export const AUTO_TRACKS: readonly string[] = [STUDY_TRACK, SAMPLES_TRACK, ...PROFILED_TYPES.map(([t]) => profiledTrackLabel(t))];
+export const isAutoTrack = (label: string): boolean => AUTO_TRACKS.includes(label);

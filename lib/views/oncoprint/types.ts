@@ -28,6 +28,8 @@ export interface OncoprintView {
   /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
   kind: "oncoprint"; genes: GeneTrackSpec[]; cohorts?: string[]; splitBy?: SplitBy;
   clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
+  /** automatic rows switched off: "Study of origin", "# Samples per Patient", "Profiled for <type>" (lib/profile-names.ts AUTO_TRACKS) */
+  hideTracks?: string[];
   /** which sources call a driver, and whether VUS or germline mutations are left out (lib/driver-settings.ts) */
   drivers?: DriverSettings;
   /** what a column is (default "patient"); "sample" draws every sample of the cohort's patients */
@@ -48,6 +50,7 @@ export interface OncoprintSpec {
   study?: string; studies?: string[];
   /** rows: a gene symbol, or {label?, genes} for one merged row over several genes */
   genes: GeneTrackSpec[]; clinical?: string[]; heatmap?: HeatmapSpec[]; sort?: SortKeySpec[]; display?: DisplaySpec;
+  hideTracks?: string[];
   /** the view's driver settings */
   drivers?: DriverSettings;
   /**
