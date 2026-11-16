@@ -1,8 +1,8 @@
 # Parity audit — Study View › Summary charts (spec `30-study-summary.md`)
 
-- **Date:** 2026-11-11
-- **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
-- **Legacy:** cbioportal.org v7.2.3 (Playwright + its REST API called from the portal's origin, same day)
+- **Date:** 2026-11-11; re-scored 2026-11-16
+- **cBioLab:** master @ `3ff57c37`, `next dev` on `http://127.0.0.1:3000` (first audit: `session/spec` @ `f3197d75`)
+- **Legacy:** cbioportal.org v7.2.3 (Playwright + its REST API called from the portal's origin, 2026-11-11)
 - **Study View equivalent in cBioLab: Explore** — `/lab?tab=explore&study=<id[,id…]>`. The homepage's "Explore selected studies" and each study row's "explore" icon open it (`app/_home/query-flow.tsx:20`). There is no `/portal/study` route. Explore is one page of facet cards: no Summary/Clinical Data/CN Segments/Plots tabs.
 - **Code paths (cBioLab):** `app/lab/explore-sections.tsx` (picker, filter bar, Add chart dialog, clinical/gene/assay facets, gene tables, data types, case lists, events), `app/lab/explore-charts.tsx` (survival, mutation count vs FGA density), `app/lab/use-explore-state.ts` (draft, default charts, clause merging, URL), `app/lab/use-explore.ts`, `app/lab/page.tsx:506-581` (layout), `lib/explore.ts` (all counts), `lib/data-binner.ts` (DataBinner port), `app/api/explore/route.ts`, `/api/analysis` (survival, plot views)
 
@@ -23,36 +23,38 @@ Legacy numbers from `/api/clinical-data-counts`, `/api/clinical-data-bin-counts?
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 19 |
-| 🟡 partial | 38 |
-| 🔶 different | 35 |
-| ❌ missing | 38 |
+| ✅ match | 46 |
+| 🟡 partial | 40 |
+| 🔶 different | 15 |
+| ❌ missing | 29 |
 | 🐞 ok | 3 |
 | 🐞 copied | 0 |
 | N/A | 2 |
 | ? | 0 |
 | **Total IDs** | **135** |
 
-**Overall: 17.8 %** (✅ 19 + 🐞ok 3 + N/A 2 = 24 of 135). Counting 🟡 as half: 31.9 %.
+**Overall: 37.8 %** (✅ 46 + 🐞ok 3 + N/A 2 = 51 of 135). Counting 🟡 as half: 52.6 %. (2026-11-11: 17.8 % / 31.9 %.)
+
+Re-score of 2026-11-16: the rows PRs #203, #222, #257, #260, #261 and #266 had already updated were checked again, and 17 more verdicts changed, all for the better (#188, #190, #261). The default charts, NA slices and rows, % of every case, bins fixed for the study, two bars of a chart ORed and a second click unselecting all now match. Still open: the pie allowlist, slice labels and grey-out, list search and Select all, the missing chart kinds (violin, treatment, GA frequency, mutation-type, variant annotations) and the downloads beyond Summary Data.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
-| §1 Layout (LY) | 11 | 0 | 2 | 5 | 4 | 0 | 0 | Fixed CSS grid of cards; no drag/resize; default chart set chosen from raw DB priority, so different charts show |
-| §2 Header (HD) | 7 | 0 | 3 | 1 | 3 | 0 | 0 | Title + "…" menu with Compare/Analyze only; no reset, delete, info overlay, type switch |
-| §3 Pie (PIE) | 9 | 0 | 2 | 6 | 1 | 0 | 0 | Pie only for 9 allowlisted attributes; no NA slice; no grey-out; Okabe-Ito palette |
-| §4 Clinical table (TBL) | 7 | 0 | 3 | 2 | 2 | 0 | 0 | Value list with count + %; % excludes NA; staged checkboxes + Apply |
-| §5 Bar (BAR) | 9 | 1 | 3 | 2 | 2 | 1 | 0 | DataBinner port gives identical bins unfiltered; dynamic not STATIC; click, not drag; two bars AND to 0 |
-| §6 Gene tables (GT) | 11 | 2 | 4 | 2 | 3 | 0 | 0 | Counts and Freq identical; 500-row cap, no sort, no OncoKB/q-value, Union only |
-| §7 Other tables (OT) | 7 | 1 | 2 | 0 | 4 | 0 | 0 | Data types / case lists / timeline events counts match; no treatment, GA-frequency, mutation-type, VA tables |
-| §8 Density scatter (SC) | 8 | 1 | 2 | 3 | 1 | 1 | 0 | n and Spearman match; axes swapped, log x fixed, no correlation text |
+| §1 Layout (LY) | 11 | 2 | 3 | 3 | 3 | 0 | 0 | Fixed CSS grid of cards, no drag or resize (decided); default charts now the portal's (#188) |
+| §2 Header (HD) | 7 | 1 | 3 | 1 | 2 | 0 | 0 | Title + "…" menu: Compare / Analyze, Custom Bins, Show NA, Download on categorical charts; no reset, delete, info overlay or type switch |
+| §3 Pie (PIE) | 9 | 2 | 3 | 3 | 1 | 0 | 0 | NA slice and a second click unselecting fixed; pie only for allowlisted ids, no slice labels, no grey-out, Okabe-Ito palette |
+| §4 Clinical table (TBL) | 7 | 0 | 4 | 1 | 2 | 0 | 0 | % of every case with an NA row; no header, search or Select all |
+| §5 Bar (BAR) | 9 | 4 | 4 | 0 | 0 | 1 | 0 | Bins fixed for the study, the portal's bar menu; bars of a chart OR; click, not drag, no grey-out |
+| §6 Gene tables (GT) | 11 | 5 | 5 | 0 | 1 | 0 | 0 | Every gene, sort, panels, Union / Intersection, query queue; no OncoKB filter, q-values or panel gene list |
+| §7 Other tables (OT) | 7 | 1 | 2 | 0 | 4 | 0 | 0 | Data types and case lists match; no treatment, GA-frequency, mutation-type or VA tables |
+| §8 Density scatter (SC) | 8 | 4 | 2 | 1 | 0 | 1 | 0 | Drawn as the portal draws it (#222); no other X vs Y, no download |
 | §9 Violin (VI) | 8 | 0 | 0 | 0 | 8 | 0 | 0 | No violin/box tables |
-| §10 Survival (KM) | 6 | 1 | 1 | 2 | 1 | 1 | 0 | One OS/PFS/… chart with a picker; n / events / median match |
+| §10 Survival (KM) | 6 | 1 | 1 | 2 | 1 | 1 | 0 | One OS/PFS/… chart with a picker (kept on purpose); n / events / median match |
 | §11 Added charts (GS) | 7 | 1 | 3 | 1 | 2 | 0 | 0 | Gene mutation chart matches; CNA lacks GAIN/HETLOSS; GA one entity at a time |
-| §12 Special (SP) | 4 | 1 | 2 | 1 | 0 | 0 | 0 | Studies breakdown ≈ Cancer Studies (patients, not samples) |
-| §13 Downloads (DL) | 3 | 0 | 0 | 0 | 3 | 0 | 0 | No chart download |
-| §14 Filters (FL) | 3 | 1 | 1 | 0 | 0 | 0 | 1 | AND across charts ✅; filters not in URL as legacy |
-| §15 Modes (MD) | 16 | 4 | 4 | 6 | 1 | 0 | 1 | Single/multi study fine; own-filter exclusion only for categorical |
-| §17 Statistics (STM) | 19 | 6 | 6 | 4 | 3 | 0 | 0 | Every count matches; Freq denominators exclude NA; bins dynamic; Pearson not shown |
+| §12 Special (SP) | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Studies breakdown ≈ Cancer Studies, also shown for one study; constant charts hidden |
+| §13 Downloads (DL) | 3 | 0 | 1 | 0 | 2 | 0 | 0 | Summary Data on categorical charts and the gene tables' Data; no Full Data, SVG or PDF |
+| §14 Filters (FL) | 3 | 1 | 1 | 0 | 0 | 0 | 1 | AND across charts, OR within; no manual submit |
+| §15 Modes (MD) | 16 | 8 | 4 | 2 | 1 | 0 | 1 | Single and multi study; own filter excluded for every chart kind |
+| §17 Statistics (STM) | 19 | 14 | 2 | 1 | 2 | 0 | 0 | Counts, NA and Freq denominators match; bins fixed for the study |
 
 ---
 
@@ -60,21 +62,21 @@ Legacy numbers from `/api/clinical-data-counts`, `/api/clinical-data-bin-counts?
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **Different default charts.** DB priority 1 is taken as-is (legacy replaces it from its config table), then ranked by coverage: Q1 shows Cancer Type, Sample Type, Somatic Status, # Samples per Patient (one value each), Form completion date, "Last Alive Less Initial…" (all 0), Tissue Source Site…; Sex, Race, Ethnicity, Subtype, T/M stage, Aneuploidy, Days to Birth, DFS/DSS/PFS KM are hidden. Legacy 29 charts vs cBioLab 20 clinical + 9 fixed cards; 8 of legacy's 17 clinical charts overlap | LY-7, LY-8, MD-1 | not tracked (PORTAL-PARITY has no Study View item at all) |
-| 2 | **Categorical % leaves NA out.** NA is never a slice/row, and Freq = count ÷ Σ non-NA values: Sex Male 52.7 % (legacy 52.5 %); Race White 78.7 % of 362 (legacy 48.0 % of 594, NA 232) | PIE-9, TBL-1, STM-1, STM-3, MD-9 | not tracked |
-| 3 | **Numeric bins are dynamic, and a numeric chart is not freed of its own filter.** Edges recomputed on the filtered cohort (Q2: MSI MANTIS 0.02-wide bars vs legacy's stable 0.01; MSIsensor ">2.8" vs ">2.2"; TBL ">170" vs ">160"); Q3 AGE (50,60] collapses the AGE chart to ten one-value bars 51…60 (legacy keeps all bins, own filter excluded) | BAR-1, STM-2, STM-8, MD-6 | not tracked |
-| 4 | **Clicking a second bar of one histogram ANDs the ranges → 0 patients** (AGE (50,60] + (70,75] = 0); categorical values OR correctly | BAR-5 (cBioLab bug) | not tracked |
-| 5 | **No bar-chart menu**: no Custom Bins / Quartiles / Median / Generate, no Log Scale toggle, no Show NA; no default MSI custom bins (legacy MANTIS 468/22/67, MSIsensor 496/10/78) | BAR-1, BAR-6…8, HD-5 | fixed (PR #203) |
-| 6 | **Gene tables**: 500-row cap ("500 of 18,275 genes"), no column sort, title lacks "(N profiled samples)", no OncoKB cancer-gene icon/filter, no MutSig/GISTIC q-value, no gene-panel tooltip, no query-queue on gene click, Union only, SV default sort by # altered not # SV | GT-2, GT-3, GT-5…GT-9 | not tracked |
-| 7 | **No chart downloads** (Summary/Full data, SVG, PDF, gene-table TSV) | DL-*, HD-5 | Summary Data done (PR #257); the rest tracked in PORTAL-PARITY |
-| 8 | **Missing chart kinds**: treatment tables, GA frequency table (arm-level CNA shown by default in legacy), mutation-type counts, variant annotations, X-vs-Y density/violin, gene-specific violin, continuous gene bar | OT-3…6, VI-*, GS-4, SC-1 | not tracked |
-| 9 | **Pie behaviour**: pie only for 9 allowlisted ids (else a list, even for 2 values); legend beside pie instead of slice labels; unselected slices not greyed; clicking a selected value does not remove it (turns "=" into "∈ {…}"); Okabe-Ito colours | LY-9, PIE-3, PIE-6…8 | not tracked |
-| 10 | **Survival**: one chart with an endpoint picker instead of one KM tile per endpoint; numbers match | KM-1 | not tracked |
-| 11 | **Density**: x = log10(MC+1), y = FGA (legacy x = FGA, y = MC, linear); 48×32 grid (legacy 44×38); no Pearson/Spearman text, no Swap Axes / Log menu, tooltip "n samples" only | SC-2…5, STM-15 | not tracked |
-| 12 | **Chart chrome**: no drag, resize, ✕ delete (hide via Add chart), ↶ reset (remove pill instead), ⓘ overlay (title tooltip only) | LY-1…6, HD-2…4 | not tracked |
+| 1 | **Different default charts.** DB priority 1 is taken as-is (legacy replaces it from its config table), then ranked by coverage: Q1 shows Cancer Type, Sample Type, Somatic Status, # Samples per Patient (one value each), Form completion date, "Last Alive Less Initial…" (all 0), Tissue Source Site…; Sex, Race, Ethnicity, Subtype, T/M stage, Aneuploidy, Days to Birth, DFS/DSS/PFS KM are hidden. Legacy 29 charts vs cBioLab 20 clinical + 9 fixed cards; 8 of legacy's 17 clinical charts overlap | LY-7, LY-8, MD-1 | fixed (#188); the single-study Studies card is still shown (MD-1) |
+| 2 | **Categorical % leaves NA out.** NA is never a slice/row, and Freq = count ÷ Σ non-NA values: Sex Male 52.7 % (legacy 52.5 %); Race White 78.7 % of 362 (legacy 48.0 % of 594, NA 232) | PIE-9, TBL-1, STM-1, STM-3, MD-9 | fixed (#190) |
+| 3 | **Numeric bins are dynamic, and a numeric chart is not freed of its own filter.** Edges recomputed on the filtered cohort (Q2: MSI MANTIS 0.02-wide bars vs legacy's stable 0.01; MSIsensor ">2.8" vs ">2.2"; TBL ">170" vs ">160"); Q3 AGE (50,60] collapses the AGE chart to ten one-value bars 51…60 (legacy keeps all bins, own filter excluded) | BAR-1, STM-2, STM-8, MD-6 | fixed (#188, #190); generic-assay bars still cut by `numericBinEdges` (BAR-1) |
+| 4 | **Clicking a second bar of one histogram ANDs the ranges → 0 patients** (AGE (50,60] + (70,75] = 0); categorical values OR correctly | BAR-5 (cBioLab bug) | fixed (#188) |
+| 5 | **No bar-chart menu**: no Custom Bins / Quartiles / Median / Generate, no Log Scale toggle, no Show NA; no default MSI custom bins (legacy MANTIS 468/22/67, MSIsensor 496/10/78) | BAR-1, BAR-6…8, HD-5 | fixed (#203) |
+| 6 | **Gene tables**: 500-row cap ("500 of 18,275 genes"), no column sort, title lacks "(N profiled samples)", no OncoKB cancer-gene icon/filter, no MutSig/GISTIC q-value, no gene-panel tooltip, no query-queue on gene click, Union only, SV default sort by # altered not # SV | GT-2, GT-3, GT-5…GT-9 | mostly fixed (#261, #266); OncoKB cancer-gene icon and filter, q-values, a panel's gene list tracked |
+| 7 | **No chart downloads** (Summary/Full data, SVG, PDF, gene-table TSV) | DL-*, HD-5 | Summary Data done (#257); the rest tracked in PORTAL-PARITY |
+| 8 | **Missing chart kinds**: treatment tables, GA frequency table (arm-level CNA shown by default in legacy), mutation-type counts, variant annotations, X-vs-Y density/violin, gene-specific violin, continuous gene bar | OT-3…6, VI-*, GS-4, SC-1 | tracked (Chart kinds) |
+| 9 | **Pie behaviour**: pie only for 9 allowlisted ids (else a list, even for 2 values); legend beside pie instead of slice labels; unselected slices not greyed; clicking a selected value does not remove it (turns "=" into "∈ {…}"); Okabe-Ito colours | LY-9, PIE-3, PIE-6…8 | second click fixed (#188); the rest tracked (Pie) |
+| 10 | **Survival**: one chart with an endpoint picker instead of one KM tile per endpoint; numbers match | KM-1 | kept on purpose (decided 2026-11-13) |
+| 11 | **Density**: x = log10(MC+1), y = FGA (legacy x = FGA, y = MC, linear); 48×32 grid (legacy 44×38); no Pearson/Spearman text, no Swap Axes / Log menu, tooltip "n samples" only | SC-2…5, STM-15 | fixed (#222) |
+| 12 | **Chart chrome**: no drag, resize, ✕ delete (hide via Add chart), ↶ reset (remove pill instead), ⓘ overlay (title tooltip only) | LY-1…6, HD-2…4 | decided against (2026-11-13): fixed layout |
 | 13 | **Gene CNA chart**: Amplified / Deleted / Diploid / Not profiled; GAIN and HETLOSS fold into Diploid (KRAS: 585 vs legacy 390 + 128 + 67) | GS-3 | (tracked) OQL coverage: "only high-level ±2 calls are loaded" |
-| 14 | **Empty selection**: facets still drawn (filtered attribute only), "0 patients match"; no "filtered out all the samples" message | LY-11, MD-14 | not tracked |
-| 15 | **Case lists** limited to 10 (`LIMIT 10 BY s`): coad, read, protein_quantification, methylation_hm450 missing; counted in patients, not samples | OT-2 | not tracked |
+| 14 | **Empty selection**: facets still drawn (filtered attribute only), "0 patients match"; no "filtered out all the samples" message | LY-11, MD-14 | fixed (#260) |
+| 15 | **Case lists** limited to 10 (`LIMIT 10 BY s`): coad, read, protein_quantification, methylation_hm450 missing; counted in patients, not samples | OT-2 | fixed (#260) |
 
 ---
 
@@ -142,8 +144,8 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-LY-4 | ❌ | B | No drag |
 | STS-LY-5 | ❌ | B | No resize |
 | STS-LY-6 | ❌ | C | No highlight of a newly added chart |
-| STS-LY-7 | 🔶 | BC | Top `DEFAULT_CLINICAL_CHARTS` = 20 with priority > 0 (`use-explore-state.ts:366-371`) ✅, drafted attributes always shown ✅; no `shouldShowChart` (single-value Cancer Type, Sample Type, Somatic Status, # Samples per Patient, all-zero DAYS_TO_INITIAL… shown); Sex/Race/Ethnicity/Subtype hidden on Q1 |
-| STS-LY-8 | 🔶 | C | DB priority used raw (`explore.ts:283`); no config table, no "1 → config" replacement; priority < 0 not dropped specially |
+| STS-LY-7 | ✅ | BC | The portal's defaults (#188): coadread charts 17 of 59, Sex, Race, Ethnicity and Subtype among them; constant charts (Cancer Type, Samples per Patient) hidden |
+| STS-LY-8 | ✅ | C | The portal's priorities from its config table, then coverage (#188) |
 | STS-LY-9 | 🔶 | BC | Pie only for `PIE_ATTRIBUTES` (SEX, GENDER, *_STATUS, SAMPLE_TYPE, SOMATIC_STATUS; `explore-sections.tsx:57`), every other STRING a list; NUMBER → histogram ✅ |
 | STS-LY-10 | 🟡 | B | Skeleton grid while building, "updating…" over survival/density, busy class on the grid; no progress list, no per-chart error text beyond the API error |
 | STS-LY-11 | 🟡 | BC | 0 samples: the portal's message, no charts, the filter bar kept ([empty-caselists-cases](empty-caselists-cases.md) EM1–EM5). No invalid-sample alert, no saved-layout banner |
@@ -152,7 +154,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-HD-1 | 🟡 | B | displayName + "· sample-level · N samples" / "· N patients" (+ "not narrowed by its own filter"); gene tables lack "(N profiled samples)" |
+| STS-HD-1 | ✅ | B | displayName + "· sample-level · N samples" / "· N patients"; gene tables "Mutated Genes (534 profiled samples)" (#261) |
 | STS-HD-2 | 🔶 | B | "…" menu button always visible, not hover-only |
 | STS-HD-3 | ❌ | B | No ⓘ, ↶ reset, ✕ delete buttons; only the "…" menu (remove a filter via its pill, hide a chart via Add chart) |
 | STS-HD-4 | 🟡 | B | Title `data-tip` = "ID — description"; no survival unit lines |
@@ -164,21 +166,21 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-PIE-1 | 🔶 | BC | Values ordered by `naturalOrder` (ordinal-aware), not count desc + NA last; no NA |
+| STS-PIE-1 | 🟡 | BC | Count order, NA last ✅ (`explore-sections.tsx:790-792`); ordinal attributes in their own order (`naturalOrder`), where the portal keeps count order |
 | STS-PIE-2 | 🔶 | B | 72-unit SVG pie with an always-visible legend (swatch, value, count) beside it |
 | STS-PIE-3 | ❌ | B | No slice labels |
-| STS-PIE-4 | 🟡 | B | Slice tip "Female — 280 (47.3%)" (`data-tip`, not `<title>`) |
+| STS-PIE-4 | 🟡 | B | Slice tip "Male — 806 (74.1%)", % of every patient (`data-tip`, not `<title>`) |
 | STS-PIE-5 | 🟡 | B | No hover table; legend gives value + count; no %, no Select all/Compare in tooltip |
-| STS-PIE-6 | 🔶 | B | Click slice or legend adds the value (OR within attribute ✅); a second click on a selected value does not remove it — clause becomes `SEX ∈ {Female}` |
+| STS-PIE-6 | ✅ | B | Click a slice or legend row adds the value (OR within the chart); a second click takes it out (`aria-pressed`) (#188) |
 | STS-PIE-7 | 🔶 | B | Selected slice gets class `on`; unselected slices keep their colour (no #D3D3D3 grey); counts stay (own filter excluded ✅) |
 | STS-PIE-8 | 🔶 | BC | `CAT_COLORS` Okabe-Ito by position (Male #0072B2, Female #E69F00); no reserved-value colours, no pinning |
-| STS-PIE-9 | 🔶 | B | No NA slice (Sex NA 2, OS Status NA 3 dropped); NA not selectable from the pie |
+| STS-PIE-9 | ✅ | B | NA its own slice in #D3D3D3 and legend row, selectable (Sex NA 2) (#190) |
 
 ### §4 Clinical table
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-TBL-1 | 🔶 | B | Value list: checkbox, value, bar, count, % ; no header row, no swatch; % excludes NA (Race White 78.7 % vs 48.0 %) |
+| STS-TBL-1 | 🟡 | B | Value list: checkbox, value, bar, count, % of every patient, NA row (Race White 48.0 %, NA 232; #190); no header row, no swatch |
 | STS-TBL-2 | 🟡 | BC | Count order (ordinal attributes in natural order); selected rows marked, not pinned |
 | STS-TBL-3 | ❌ | B | No search box under a list |
 | STS-TBL-4 | 🟡 | B | Checkboxes stage; [Apply filter] writes one OR clause (`ValueList`) |
@@ -194,7 +196,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-BAR-2 | 🟡 | B | Numeric bins then category bins ✅; HTML bars, NA as a right-hand "NA n" note; no y axis |
 | STS-BAR-3 | 🟡 | B | Tick = bin start ("≤35 40 50 …", thinned to fit); no trailing end tick, no 10^n superscripts |
 | STS-BAR-4 | 🐞 ok | B | Tip "35–40 · 11 patients — click to filter": unit follows the attribute's level (legacy bug says "samples"); range "35–40" not "(35, 40]" |
-| STS-BAR-5 | 🔶 | BC | Click one bar adds a range clause; no drag; bars not greyed. **Bug:** a second bar of the same attribute is ANDed (`use-explore-state.ts:471`), AGE (50,60] + (70,75] → 0 patients |
+| STS-BAR-5 | 🟡 | BC | Click a bar adds its range; a second bar of the chart ORs (Mutation Count 60–80 + 120–140 → 131 samples) and a click takes it out (#188); no drag, unselected bars not greyed |
 | STS-BAR-6 | ✅ | B | Show NA [off]: off the "NA n" note, on an NA bar last (clicking it filters to NA); the y-max takes it in only when drawn; kept per chart by the browser |
 | STS-BAR-7 | ✅ | C | Log Scale [checked] offered when the bars look logarithmic or it is off (`looksLogarithmic`); unchecking gives linear bars (Days to Birth ≤-32000 … >-12000, = the portal's). It does not clear the chart's filter (ours are ranges, valid on any bars) |
 | STS-BAR-8 | ✅ | C | Custom Bins dialog: Quartiles / Median split / Generate bins (size, min value) / Custom bins [default], the box starting from the bars' edges (0 kept, unlike legacy); a non-number refused by name. Disabled, saying why, on a chart of ≤10 values (legacy shows it and ignores it) |
@@ -282,8 +284,8 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-SP-1 | 🟡 | B | "Studies" card (study ids, %, n) on multi-study, "Explore only these" on pick; counts patients, not samples; shown for one study too |
-| STS-SP-2 | 🔶 | B | Cancer Type / Detailed are lists ✅, but shown with one value on a single study |
-| STS-SP-3 | 🟡 | B | "Number of Samples Per Patient" list (not pie); shown by default |
+| STS-SP-2 | ✅ | B | Cancer Type / Detailed are lists; a one-value Cancer Type is hidden (#188) |
+| STS-SP-3 | 🟡 | B | "Number of Samples Per Patient" a list (not a pie); hidden when every patient has one sample (coadread) |
 | STS-SP-4 | ✅ | C | No mutation-spectrum chart, as legacy |
 
 ### §13 Downloads
@@ -306,15 +308,15 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-MD-1 | 🔶 | B | Single study: no studies pie needed but "Studies" card shown; one-value Cancer Type shown; no q-values |
+| STS-MD-1 | 🟡 | B | Single study: one-value Cancer Type and Samples per Patient hidden (#188); the "Studies" card still shown (coadread 100 %); no q-values |
 | STS-MD-2 | 🟡 | B | Multi: Studies breakdown, merged facets with "*" on partial attributes, panel-aware Freq ✅ (TP53 41.3 %); header "(overlap not deduplicated)" (invariant 3) |
 | STS-MD-3 | ✅ | C | Freq = on-panel altered ÷ samples profiled for that gene + WES (`explore.ts:597-602`, invariant 7) |
 | STS-MD-4 | ✅ | B | Patient attributes count patients ("Diagnosis Age · 592 patients", bar tip "patients") |
 | STS-MD-5 | 🔶 | C | Conflicting-level attributes become two facets keyed `per|attribute`, not one per-sample count |
-| STS-MD-6 | 🔶 | BC | Categorical own filter excluded (disjunctive) ✅; numeric, scatter own filter included and re-binned (Q3) |
+| STS-MD-6 | ✅ | BC | Categorical and numeric charts both exclude their own filter (#188) |
 | STS-MD-7 | ✅ | C | ≤10 distinct values → one bar per value (`DISTINCT_VALUE_THRESHOLD`) |
 | STS-MD-8 | ✅ | B | Log bins chosen automatically (Days to Birth); the Log Scale item switches them off |
-| STS-MD-9 | 🔶 | B | Bar "NA n" ✅; pie/list has no NA |
+| STS-MD-9 | ✅ | B | Bar "NA n", pie NA slice, list NA row (#190) |
 | STS-MD-10 | 🔶 | C | Shape from allowlist, not >20 categories |
 | STS-MD-11 | N/A | C | cBioLab never shows cancer-gene icons, so there is nothing for this mode to hide (the gap is GT-6) |
 | STS-MD-12 | 🟡 | C | No manual submit |
@@ -331,15 +333,15 @@ Filters not in the URL (as legacy); study list and drivers toggle are (`?study=`
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-STM-1 | 🟡 | BC | count by folded value (`clinicalValueFoldSql`, most frequent spelling kept; legacy greatest) at the attribute's level ✅, numbers identical; no NA row |
-| STS-STM-2 | 🟡 | BC | Disjunctive counts for categorical, derived, gene and assay facets (`explore.ts:247-254`); not numeric histograms |
-| STS-STM-3 | 🔶 | B | % = count ÷ Σ non-NA values (`explore-sections.tsx:718`); 1 decimal; Sex 52.7 vs 52.5 |
+| STS-STM-1 | ✅ | BC | Count by folded value (`clinicalValueFoldSql`, most frequent spelling kept; legacy greatest) at the attribute's level, numbers identical, NA row (#190) |
+| STS-STM-2 | ✅ | BC | Disjunctive counts for categorical, derived, gene and assay facets; numeric charts counted over the other filters too (#188) |
+| STS-STM-3 | ✅ | B | % of every case (Race White 48.0 % of 594) (#190) |
 | STS-STM-4 | ✅ | C | The whole dispatch: discrete first, then CUSTOM (adjustCustomBins), GENERATE, MEDIAN, QUARTILE (median fallback), log unless disabled, scientific, linear. 29 recorded cases match the portal's bars (`test/fixtures/data-binner-methods.json`) |
 | STS-STM-5 | ✅ | BC | Linear bins identical on every Q1 attribute (incl. AGE ≤35) |
 | STS-STM-6 | ✅ | BC | Days to Birth log bins identical |
 | STS-STM-7 | ✅ | C | Scientific-small binner ported (`lib/data-binner.ts`) |
-| STS-STM-8 | 🔶 | BC | Edges from the filtered cohort (DYNAMIC), so they move with filters (Q2 MANTIS, MSIsensor, TBL) |
-| STS-STM-9 | 🟡 | C | Range clause `gt/lte` = (start, end] ✅; one value `=`; bars of one attribute AND (bug) instead of OR |
+| STS-STM-8 | ✅ | BC | Bins fixed for the study, not recomputed on the filtered cohort (#190) |
+| STS-STM-9 | ✅ | C | Range clause `gt/lte` = (start, end]; bars of one chart OR (#188) |
 | STS-STM-10 | ✅ | C | An empty Custom box is the default bars (sent as `bins: null`, which also overrides the MSI initial bins) |
 | STS-STM-11 | ✅ | B | NA n = cohort − counted values (`explore.ts:965`): AGE 2, MC 60, FGA 11 match |
 | STS-STM-12 | 🟡 | C | Quartiles/Median cut by the server over the selection's values (`compareQuantiles`); Current bins one group per bar ✅; quartiles single study only |
