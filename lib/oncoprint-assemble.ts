@@ -23,6 +23,10 @@ const PRIORITY_BITS = STYLE.glyph.mutation.priority.map((m) => BITS[m.bit as key
 /** the mutation class bit a cell draws (the first by display priority), 0 for none */
 const shownMutation = (c: number): number => { for (const b of PRIORITY_BITS) if (c & b) return b; return 0; };
 export const NOT_PROFILED = -1;
+/** a heatmap cell profiled but without a value: a VAF row's "Not mutated/no VAF data", drawn in the portal's null colour */
+export const HEAT_NULL = -2;
+/** of two cells with no value, the one profiled (HEAT_NULL) first: 1 for it, 0 for not profiled */
+const missingRank = (cell: number): number => cell === HEAT_NULL ? 1 : 0;
 
 
 export function mutClassBit(mt: string | undefined): number {
@@ -533,8 +537,9 @@ export function assembleContract(input: AssembleInput): Contract {
       const usingRef = !!(ref && ref.sd > 0);
       const tx = (v: number) => usingRef ? (v - ref!.mean) / ref!.sd : v;
       const vals: number[] = [];
-      for (const p of allPids) { const v = h.values.get(p + "|" + gene); if (v !== undefined) vals.push(tx(v)); }
-      if (!vals.length) {
+      let profiledNoValue = false;
+      for (const p of allPids) { const v = h.values.get(p + "|" + gene); if (v !== undefined) { if (Number.isNaN(v)) profiledNoValue = true; else vals.push(tx(v)); } }
+      if (!vals.length && !profiledNoValue) {
         heatTracks.push({ kind: "clinical", label: label + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
         continue;
       }
@@ -550,7 +555,9 @@ export function assembleContract(input: AssembleInput): Contract {
       const cells = new Int32Array(allPids.length).fill(-1), values = new Float32Array(allPids.length).fill(NaN);
       allPids.forEach((p, i) => {
         const v = h.values.get(p + "|" + gene);
-        if (v !== undefined) { cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span); values[i] = tx(v); }
+        if (v === undefined) return;
+        if (Number.isNaN(v)) { cells[i] = HEAT_NULL; return; }
+        cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span); values[i] = tx(v);
       });
       heatTracks.push({ kind: "heatmap", numeric: true, ...(ramp ? { ramp } : {}), label, gene, profileType: h.profileType,
         ...(h.profileKind ? { profileKind: h.profileKind } : h.isVaf ? { profileKind: "MUTATION_EXTENDED VAF" } : {}),
@@ -637,9 +644,9 @@ export function assembleContract(input: AssembleInput): Contract {
     if (a === -1 || b === -1) return a === b ? 0 : a === -1 ? 1 : -1;
     return sign * stackCompare(t.values!, t.stack!.length, x, y);
   } : t.values ? (x: number, y: number): number => {
-    // a numeric track sorts by its exact values, missing last
+    // a numeric track sorts by its exact values; then the profiled cells without one (HEAT_NULL), then not profiled
     const a = t.values![x], b = t.values![y], na = Number.isNaN(a), nb = Number.isNaN(b);
-    if (na || nb) return na === nb ? 0 : na ? 1 : -1;
+    if (na || nb) return na !== nb ? (na ? 1 : -1) : -missingRank((t.cells as number[])[x]) + missingRank((t.cells as number[])[y]);
     return sign * (a - b);
   } : ((rank) => (x: number, y: number): number => {
     const a = (t.cells as number[])[x], b = (t.cells as number[])[y];

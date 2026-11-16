@@ -229,6 +229,8 @@ pre {
    tall. The tiles in a row share its height, so the grid reads as rows rather than a ragged
    edge; the reading order stays left to right. */
 .facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.8rem; align-items: stretch; }
+.nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
+.nosamples p + p { margin-top: 0.6rem; }
 .facetgrid > .card { margin-bottom: 0; min-width: 0; }
 /* A tile whose body is a scrolling list fills the height its row gives it: the list's flex-basis
    of 0 keeps its rows out of the row's height (its min-height is the least it shows), and it
@@ -489,6 +491,10 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .vrowshead { position: sticky; top: 0; z-index: 1; background: var(--card); border-bottom: 1px solid var(--line); }
 .generow.ghead { border-top: none; cursor: default; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
 .generow.ghead:hover { background: none; }
+.generow.ghead .gsort { all: unset; cursor: pointer; white-space: nowrap; }
+.generow.ghead .gsort.gnum { text-align: right; }
+.generow.ghead .gsort:hover, .generow.ghead .gsort.on { color: var(--ink); }
+.generow.ghead .gsort:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .generow .gnum { text-align: right; font-variant-numeric: tabular-nums; }
 .generow .gname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .generow .cnatag { font-size: var(--t-xs); padding: 0.05rem 0.2rem; border-radius: 3px; text-align: center; }

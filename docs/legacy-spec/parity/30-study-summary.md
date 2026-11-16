@@ -146,7 +146,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-LY-8 | 🔶 | C | DB priority used raw (`explore.ts:283`); no config table, no "1 → config" replacement; priority < 0 not dropped specially |
 | STS-LY-9 | 🔶 | BC | Pie only for `PIE_ATTRIBUTES` (SEX, GENDER, *_STATUS, SAMPLE_TYPE, SOMATIC_STATUS; `explore-sections.tsx:57`), every other STRING a list; NUMBER → histogram ✅ |
 | STS-LY-10 | 🟡 | B | Skeleton grid while building, "updating…" over survival/density, busy class on the grid; no progress list, no per-chart error text beyond the API error |
-| STS-LY-11 | ❌ | BC | 0 samples: facets still drawn, "0 patients match"; no message; no invalid-sample alert; no saved-layout banner |
+| STS-LY-11 | 🟡 | BC | 0 samples: the portal's message, no charts, the filter bar kept ([empty-caselists-cases](empty-caselists-cases.md) EM1–EM5). No invalid-sample alert, no saved-layout banner |
 
 ### §2 Chart header
 
@@ -204,16 +204,16 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-GT-1 | 🟡 | B | Mutated, CNA, SV tables per alteration type ✅; no SV-pair table; 500-row cap |
-| STS-GT-2 | ❌ | B | Titles "MUTATED GENES" etc. without "(N profiled samples)" |
-| STS-GT-3 | 🔶 | B | Columns ✅ (Gene · # Mut · # · Freq; Gene · Cytoband · CNA · # · Freq; Gene · # SV · # · Freq); no column sort; order = # altered desc, gene asc (SV legacy # SV desc) |
-| STS-GT-4 | 🟡 | B | No header tooltips; cell tips explain (`"639 events across 387 samples"`, off-panel note) |
+| STS-GT-1 | 🟡 | B | Mutated, CNA, SV tables per alteration type, every gene (coadread 18,275 / 23,770 / 810) ([gene-tables-cases](gene-tables-cases.md)); no SV-pair table |
+| STS-GT-2 | ✅ | B | "Mutated Genes (534 profiled samples)", "CNA Genes (592 …)", "Structural Variant Genes (534 …)" on coadread, as the portal ([gene-tables-cases](gene-tables-cases.md)) |
+| STS-GT-3 | ✅ | B | Columns ✅; a header click sorts by any column, a second reverses; default Freq desc (SV # SV desc), ties by events then gene ([gene-tables-cases](gene-tables-cases.md)) |
+| STS-GT-4 | 🟡 | B | The portal's header tooltips ([gene-tables-cases](gene-tables-cases.md)); the alteration-filter variant not built (no Alteration Filter menu) |
 | STS-GT-5 | 🟡 | B | # Mut/# SV = events ✅, # = altered ✅, Freq ✅; CNA AMP/HOMDEL tag ✅; Freq tip "387 altered of 534 samples profiled for APC — …" but no "Gene panels:" list/modal |
 | STS-GT-6 | ❌ | B | No gene-symbol query queue, no OncoKB cancer-gene tooltip, no q-value icon |
 | STS-GT-7 | ❌ | C | No OncoKB cancer-gene filter |
 | STS-GT-8 | 🔶 | B | "Alterations: all / OncoKB drivers only" page-level select instead of the alteration-filter indicator |
 | STS-GT-9 | 🟡 | B | Check rows → [Apply filter] = one OQL clause (Union only, no Intersection, no ∪/∩ choice); applied rows not pinned; compare via "…" ("Compare checked groups") |
-| STS-GT-10 | ✅ | B | "find gene" filters the loaded rows by symbol (substring); legacy Freq-search bug not reproduced |
+| STS-GT-10 | ✅ | B | "find gene" filters every row by symbol (substring); legacy Freq-search bug not reproduced |
 | STS-GT-11 | ✅ | B | Own gene filter included; driver toggle changes counts (OncoKB only, see 01 RV-2) |
 
 ### §7 Other table charts
@@ -221,7 +221,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-OT-1 | 🟡 | B | "Data types" card: profile id + name + count; counts identical; no Freq column; pick → `profiled` clause for MUT/CNA/SV only, OR (legacy Intersection default) |
-| STS-OT-2 | 🟡 | BC | "Case lists" always shown; top 10 only; n counts patients (`explore.ts:1093` uniqExact p.stable_id), legacy samples; OR on pick |
+| STS-OT-2 | 🟡 | BC | Every case list, by kind across studies, counted in samples, Freq of the selected samples; coadread's 14 lists match cbioportal.org's counts ([empty-caselists-cases](empty-caselists-cases.md) CL1–CL10). Always shown (the portal only when filtered on one) |
 | STS-OT-3 | ❌ | C | No mutation-type counts table |
 | STS-OT-4 | ❌ | C | No variant-annotations table |
 | STS-OT-5 | ❌ | B | No GA frequency table; Add chart › Generic assays charts one entity at a time (see GS-5/6) |
@@ -319,7 +319,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-MD-11 | N/A | C | cBioLab never shows cancer-gene icons, so there is nothing for this mode to hide (the gap is GT-6) |
 | STS-MD-12 | 🟡 | C | No manual submit |
 | STS-MD-13 | ❌ | C | Chart picks, layout not saved per user |
-| STS-MD-14 | 🔶 | B | Empty: facets drawn, no message (see LY-11) |
+| STS-MD-14 | ✅ | B | Empty: the message, no charts (see LY-11) |
 | STS-MD-15 | ✅ | C | No host-specific priorities, as cbioportal.org |
 | STS-MD-16 | 🟡 | B | Grid reflows by width; cards don't resize |
 

@@ -1,0 +1,5 @@
+cancer_study_identifier: cbiolab_peer_fixture
+stable_id: cbiolab_peer_fixture_subset
+case_list_name: A three-sample subset
+case_list_description: Two samples of FX-P01 and one of FX-P02, for the Case Lists chart (samples, not patients; a list most filters leave empty).
+case_list_ids: FX-P01-T1	FX-P01-T2	FX-P02-T1
