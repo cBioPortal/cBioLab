@@ -1460,10 +1460,12 @@ question rather than its own complete plot: its own extent, its own bin counts a
 grid (a scatter's bins would otherwise mean a different range at every site — the reason this was
 refused outright before), its own six sums (n, Σx, Σy, Σxy, Σx², Σy²) for Pearson and the
 regression line, and its own contingency cells or per-group quartiles. All of that pools exactly
-except one thing: **Spearman rank correlation is not reported for a federated plot**, because a
-rank needs the pooled *global* ordering, which no per-site aggregate can reconstruct — reported
-as absent, not approximated. A federated box plot's quartiles are a size-weighted approximation
-across sites. When it draws
+except Spearman's rank correlation, which needs the pooled *global* ordering that no per-site
+aggregate can reconstruct: where every study may show its cases, each hands over its (x, y) pairs
+(up to 50,000) and ρ is computed over them ranked together, as the portal does; otherwise **it is
+not reported**, absent rather than approximated, and the caption says why. A federated box plot's quartiles
+are computed the same way, over every study's values together; where a study may not show its values they are
+a size-weighted approximation across sites, and the caption says so. When it draws
 no points, its violin is binned the way a scatter's grid is: every site cuts the same bins over one
 shared range (the pooled whiskers, reaching at most one whisker span past them, which is the axis
 the figure draws), so the counts add exactly; a value past that range is off the figure and left
