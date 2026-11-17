@@ -5,7 +5,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { GENOME_NEXUS_SOURCES, ONCOKB_CANCER_GENE_TABLE, ONCOKB_SV_TABLE, ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE, SYNC_RUN_TABLE, VARIANT_TABLE, oncokbCancerGeneSql, oncokbCancerGenesStoredSql, syncedStudiesSql } from "../lib/annotation-store.ts";
+import { GENOME_NEXUS_SOURCES, ONCOKB_CANCER_GENE_TABLE, ONCOKB_SV_TABLE, ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE, SYNC_RUN_TABLE, VARIANT_TABLE, oncokbCancerGeneSql, oncokbCancerGenesCompleteSql, syncedStudiesSql } from "../lib/annotation-store.ts";
+import { sq } from "../lib/compiler.ts";
 import { ANNOTATION_SOURCES, SYNC_RUN_TABLE as SYNC_RUN_WRITTEN, VARIANT_TABLE as VARIANT_WRITTEN, annotationSource, annotationStoreDdl } from "@cbiolab/annotation-sync";
 
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -86,10 +87,12 @@ test("which studies a source covers, from the shared log", () => {
   assert.match(syncedStudiesSql("genome_nexus_grch38"), /source = 'genome_nexus_grch38' AND/, "digits and all");
 });
 
-// what these return is run against the fixture by scripts/check-oncokb-cancer-gene.ts; here only that a pin is quoted
-test("the cancer gene reads quote the pin", () => {
-  for (const sql of [oncokbCancerGeneSql("v'1"), oncokbCancerGenesStoredSql("v'1")]) {
-    assert.ok(sql.includes("FROM " + ONCOKB_CANCER_GENE_TABLE), sql);
-    assert.ok(sql.includes("oncokb_version = 'v''1'"), sql);
-  }
+// what these return is run against the fixture by scripts/check-oncokb-cancer-gene.ts; here only that a pin is quoted by sq()
+test("the cancer gene reads quote the pin with sq()", () => {
+  const read = oncokbCancerGeneSql("v'1");
+  assert.ok(read.includes("FROM " + ONCOKB_CANCER_GENE_TABLE), read);
+  assert.ok(read.includes("oncokb_version = " + sq("v'1")), read);
+  const complete = oncokbCancerGenesCompleteSql("v'1");
+  assert.ok(complete.includes("FROM " + SYNC_RUN_TABLE), complete);
+  assert.ok(complete.includes("version = " + sq("v'1")), complete);
 });

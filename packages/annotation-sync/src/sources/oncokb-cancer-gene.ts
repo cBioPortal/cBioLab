@@ -4,10 +4,10 @@
 // (any entry: react-mutation-mapper Annotation.tsx 170-187, the last element of the Annotation sort,
 // and Study View's gene-table icon) and whether OncoKB curates it (`oncokbAnnotated`).
 //
-// The list is one request, not a key per query; its key space is every gene of the portal's gene table,
-// so each gene gets a row at the release, `cancer_gene` false for one not listed, and the sync does not
+// The list is one request, not a key per query; its key space is the genes the warehouse's alterations
+// name, so each gets a row at the release, `cancer_gene` false for one not listed, and the sync does not
 // pick it up again. `data` is the list's entry for the gene as JSON ('' for one not listed).
-import type { Row } from "@cbiolab/clickhouse";
+import { sq, type Row } from "@cbiolab/clickhouse";
 import type { AnnotationSource } from "../source.ts";
 import { oncokbFetch, oncokbSource } from "./oncokb.ts";
 
@@ -25,6 +25,10 @@ export function cancerGeneList(): Promise<Map<number, CancerGene>> {
   list ??= (oncokbFetch("/utils/cancerGeneList") as Promise<CancerGene[]>).then((genes) => {
     if (!Array.isArray(genes) || !genes.length) throw new Error("OncoKB's cancer gene list came back empty: nothing to store");
     return new Map(genes.filter((g) => Number.isInteger(g?.entrezGeneId)).map((g) => [g.entrezGeneId, g]));
+  }).catch((e: unknown) => {
+    // a failed request is not the list: the next batch asks again rather than failing on this one's answer
+    list = null;
+    throw e;
   });
   return list;
 }
@@ -62,10 +66,11 @@ export const oncokbCancerGeneSource: AnnotationSource = {
       "api_version LowCardinality(String), resolved_at DateTime DEFAULT now()) ENGINE = ReplacingMergeTree(resolved_at) " +
       "PARTITION BY oncokb_version ORDER BY (oncokb_version, entrez_gene_id)"
   ],
-  // every gene the portal knows, whatever the study: the list is about genes, not variants
-  keySpace: (portalDb: string) =>
-    // the column qualified: ClickHouse lets an alias shadow a column in WHERE
-    "SELECT DISTINCT toString(g.entrez_gene_id) AS entrez_gene_id FROM " + portalDb + ".gene AS g WHERE g.entrez_gene_id > 0",
+  // the genes the study's alterations name (every study's, for the portal-wide count), so a study's run
+  // stores only its own and the next finds them stored; the column qualified, as an alias shadows it in WHERE
+  keySpace: (portalDb: string, study: string | null) =>
+    "SELECT DISTINCT toString(g.entrez_gene_id) AS entrez_gene_id FROM " + portalDb + ".genomic_event_derived AS g WHERE g.entrez_gene_id > 0" +
+    (study == null ? "" : " AND g.cancer_study_identifier = " + sq(study)),
   release: () => oncokbSource.release(),
 
   async annotate(keys: Row[]): Promise<Row[]> {

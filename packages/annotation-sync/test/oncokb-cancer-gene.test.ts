@@ -113,6 +113,30 @@ test("C4 an empty list rejects rather than storing every gene as not a cancer ge
   await assert.rejects(src.annotate([{ entrez_gene_id: String(KRAS) }]), /empty/);
 });
 
+test("C4 a failed request is not kept: the next batch asks for the list again and succeeds", async () => {
+  const asked = oncokb();
+  const stub = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    if (calls++ === 0) throw new TypeError("fetch failed");
+    return stub(input, init);
+  }) as typeof fetch;
+  await assert.rejects(src.annotate([{ entrez_gene_id: String(KRAS) }]), /fetch failed/);
+  const rows = await src.annotate([{ entrez_gene_id: String(KRAS) }, { entrez_gene_id: String(TTN) }]);
+  assert.equal(calls, 2, "asked again after the failure");
+  assert.deepEqual(asked, ["/utils/cancerGeneList"], "the second request reached OncoKB");
+  assert.deepEqual(rows.map((r) => [r.entrez_gene_id, r.cancer_gene]), [["3845", true], ["7273", false]]);
+});
+
+test("C4 an empty list is not kept either: a later batch asks again", async () => {
+  const asked = oncokb([]);
+  await assert.rejects(src.annotate([{ entrez_gene_id: String(KRAS) }]), /empty/);
+  oncokb();
+  const [r] = await src.annotate([{ entrez_gene_id: String(KRAS) }]);
+  assert.equal(r.cancer_gene, true);
+  assert.deepEqual(asked, ["/utils/cancerGeneList"]);
+});
+
 // ---- C5: the source as the sync sees it ---------------------------------------------------------
 
 test("C5 the source: id oncokb_cancer_gene, registered, its table, OncoKB's writer and token, keyed by Entrez id", () => {
@@ -133,12 +157,14 @@ test("C5 its table holds every column a row has, beside the version and the API 
     assert.match(create, new RegExp("[(,] ?" + col + " "), col);
 });
 
-test("C5 the key space is the portal's gene table, positive Entrez ids, whatever the study", () => {
-  const sql = src.keySpace("cbioportal", "some_study");
-  assert.match(sql, /FROM cbioportal\.gene\b/);
-  assert.match(sql, /entrez_gene_id > 0/);
-  assert.ok(!sql.includes("some_study"));
-  assert.equal(src.keySpace("cbioportal", null), sql);
+test("C5 the key space is the genes the warehouse's alterations name, positive Entrez ids; a study scopes it, quoted", () => {
+  const all = src.keySpace("cbioportal", null);
+  assert.match(all, /FROM cbioportal\.genomic_event_derived AS g\b/);
+  assert.match(all, /g\.entrez_gene_id > 0/, "the column qualified: the String alias would shadow it in WHERE");
+  assert.ok(!all.includes("cancer_study_identifier"), "no study, no filter");
+  const one = src.keySpace("cbioportal", "o'brien_2024");
+  assert.ok(one.startsWith(all), one);
+  assert.ok(one.endsWith(" AND g.cancer_study_identifier = 'o\\'brien_2024'"), one);
 });
 
 test("C5 its release is OncoKB's: the data version, with the API version alongside", async () => {
