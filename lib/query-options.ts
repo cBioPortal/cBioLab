@@ -211,6 +211,27 @@ export function resolveQuery(o: QueryOptions | null, entries: string[], studies:
   return { ...out, entries: entries.map((e) => (isBare(e) ? e.replace(/:\s*$/, "").trim() + ": " + def : e)) };
 }
 
+/** a profile the query selects: one of a study's profiles (by id without the study prefix; with
+ *  `ifHeld`, read in each study holding it), or a data type (several studies: each one's profile of it) */
+export type SelectedProfile = { type: "MUTATION" | "CNA" | "SV" } | { profile: string; ifHeld?: boolean };
+const KIND_TYPE: Partial<Record<ProfileKind, "MUTATION" | "CNA" | "SV">> = { mut: "MUTATION", cna: "CNA", sv: "SV" };
+
+/**
+ * The profiles a query selects, as the portal's selectedMolecularProfiles: each chosen kind's profile
+ * (one study), or its data type across several studies; a kind the query itself asks for (an AMP in
+ * the gene list) by its data type. mRNA and protein are one profile id, read in each study holding it
+ * when several are queried. DNA methylation across studies names no profile and is left out.
+ */
+export function selectedProfiles(o: QueryOptions, kinds: Set<ProfileKind>, studies: number): SelectedProfile[] {
+  const out: SelectedProfile[] = [];
+  for (const k of PROFILE_KINDS.map((p) => p.key)) {
+    const v = o.profiles[k];
+    if (v && v !== EVERY_STUDY) out.push(studies > 1 ? { profile: v, ifHeld: true } : { profile: v });
+    else if ((v === EVERY_STUDY || kinds.has(k)) && KIND_TYPE[k]) out.push({ type: KIND_TYPE[k]! });
+  }
+  return out;
+}
+
 /** an entry that names a gene and no alterations ("TP53", or "TP53:"), which the defaults fill */
 const isBare = (e: string) => !/:\s*\S/.test(e);
 
@@ -452,6 +473,8 @@ export interface ChosenQuery {
   exp?: string;
   prot?: string;
   ifHeld?: boolean;
+  /** the profiles the options select (the portal's selectedMolecularProfiles): what the Results page's Unaltered group checks profiling in */
+  selected?: SelectedProfile[];
   /** the case set as a clause every group keeps, or null */
   clause: Clause | null;
   /** the header's case set and profiles, in words */
@@ -488,6 +511,7 @@ export function chosenQuery(o: QueryOptions | null, data: (QueryOptionsData & { 
   const without = studies.length > 1 ? studiesWithoutCaseSet(full.caseSet, studies, data.caseSets) : [];
   return {
     waiting: false, entries: r.entries, exp: r.exp, prot: r.prot, ...(r.ifHeld ? { ifHeld: true } : {}),
+    selected: selectedProfiles(full, effectiveKinds(full, typed, studies.length, heldKinds(data.profiles)), studies.length),
     clause: caseSetClause(full, studies),
     summary: { caseSet, profiles: named.join(", ") },
     notes: [

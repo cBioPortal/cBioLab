@@ -14,7 +14,7 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
 
-type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; mutations?: Record<string, unknown> } & Record<string, unknown>;
+type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; expandGaps?: boolean; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
 export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: {
   v: { evolution: EvolutionResult; caveat?: string } & Record<string, unknown>; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
@@ -118,6 +118,9 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               </label>
               <label className="chk" data-tip={chart === "heatmap" ? "the heatmap's colours always run from 0 to 1" : "the y axis spans the VAFs drawn rather than 0 to 1"}>
                 <Checkbox checked={!!spec.dataRange} disabled={chart === "heatmap"} onCheckedChange={(on) => patch({ dataRange: (on === true) || undefined })} /> y axis to data range
+              </label>
+              <label className="chk" data-tip={chart === "heatmap" || e.x !== "time" ? "only the line chart placed by collection day has a time axis" : "draw every year on the time axis; by default runs of four or more years with no event are cut to a squiggle, as on the timeline"}>
+                <Checkbox checked={!!spec.expandGaps} disabled={chart === "heatmap" || e.x !== "time"} onCheckedChange={(on) => patch({ expandGaps: (on === true) || undefined })} /> every year
               </label>
             </div>
           </div>

@@ -2,7 +2,7 @@
 // patient-view timeline — and the figure's promises about what it draws (lib/timeline-svg.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel } from "../lib/timeline-tracks.ts";
+import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
 import { timelineSvg, timelineSummary } from "../lib/timeline-svg.ts";
 import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
@@ -134,6 +134,50 @@ describe("timeline queries", () => {
   });
 });
 
+describe("monthTicks (PAT-TL-ZM-1)", () => {
+  const lab = (t: { label: string | null }[]) => t.map((x) => x.label);
+  const at = (t: { label: string | null }[], i: number) => t[i - 1].label;
+
+  test("M1 PAT-TL-ZM-1: no month ticks at 150 px/year or less", () => {
+    assert.deepEqual(monthTicks(0, 150), []);
+    assert.deepEqual(monthTicks(0, 100), []);
+  });
+
+  test("M2 PAT-TL-ZM-1: 200 px/year labels only months 4 and 8", () => {
+    const t = monthTicks(0, 200);
+    assert.equal(t.length, 11);
+    t.forEach((x, k) => assert.ok(Math.abs(x.day - MONTH * (k + 1)) < 1e-9));
+    assert.deepEqual(lab(t), [null, null, null, "4m", null, null, null, "8m", null, null, null]);
+  });
+
+  test("M3 PAT-TL-ZM-1: 800 px/year labels every month", () => {
+    assert.deepEqual(lab(monthTicks(0, 800)), Array.from({ length: 11 }, (_, k) => `${k + 1}m`));
+  });
+
+  test("M4 PAT-TL-ZM-1: year 2 prefixes the year", () => {
+    const t = monthTicks(730, 200);
+    assert.equal(at(t, 4), "2y 4m");
+    assert.equal(at(t, 8), "2y 8m");
+    t.forEach((x, k) => assert.ok(Math.abs(x.day - (730 + MONTH * (k + 1))) < 1e-9));
+  });
+
+  test("M5 PAT-TL-ZM-1: count -1 counts months back from the year", () => {
+    const t = monthTicks(-365, 200);
+    assert.equal(at(t, 4), "-8m");
+    assert.equal(at(t, 8), "-4m");
+  });
+
+  test("M6 PAT-TL-ZM-1: count -2 gives -1y labels", () => {
+    const t = monthTicks(-730, 200);
+    assert.equal(at(t, 4), "-1y 8m");
+    assert.equal(at(t, 8), "-1y 4m");
+  });
+
+  test("M7 PAT-TL-ZM-1: negative year at 800 px/year", () => {
+    assert.equal(at(monthTicks(-730, 800), 1), "-1y 11m");
+  });
+});
+
 describe("PAT-TL-TT-3: a sample event's tooltip rows", () => {
   const tip = (attrs: [string, string][], own: [string, string][]) => sampleTipRows({ type: "Specimen", start: 0, end: null, attrs }, own);
   test("ST1 PAT-TL-TT-3: merged, keys upper-cased with spaces for _, sorted, SAMPLE_ID left out", () => {
@@ -175,5 +219,115 @@ describe("timeline download PAT-TL-ZM-4: the portal's timeline download", () => 
   test("D4: collapsed tracks and expanded gaps change the saved figure", () => {
     assert.notEqual(file({ collapsed: ["treatment"] }), file({}), "collapsed");
     assert.notEqual(file({ expandGaps: false }), file({ expandGaps: true }), "expandGaps");
+  });
+});
+
+describe("axisMarks: the timeline's axis layout", () => {
+  const W10 = () => 10;
+  const years = (ms: AxisMark[]) => ms.filter((m): m is Extract<AxisMark, { kind: "year" }> => m.kind === "year");
+  const months = (ms: AxisMark[]) => ms.filter((m): m is Extract<AxisMark, { kind: "month" }> => m.kind === "month");
+  // like lgg_ucsf_2014 P04: samples at 0/461/1075/1343, an event at 1854
+  const P04 = timelineAxisItems([0, 461, 1075, 1343].map((d, i) => ev("Specimen", d, { SAMPLE_ID: "S" + i })).concat([ev("Treatment", 1854)]));
+
+  test("AX1 R5: a year wider than 150 px (X(d + YEAR) − X(d)) gets month marks", () => {
+    const { ticks } = axisTicks(P04, true);
+    assert.equal(ticks[ticks.length - 1].end, 1874);
+    const k = 151 / YEAR;
+    const ms = axisMarks(ticks, (d) => d * k, -20 * k, 1874 * k, W10);
+    assert.ok(months(ms).length > 0);
+    // every year whose month falls in the axis has its 11 months, except the last one, cut at its end
+    assert.equal(months(ms).filter((m) => m.x < 365 * k).length, 11);
+  });
+
+  test("AX2 R5: a year of 150 px or less gets none", () => {
+    const { ticks } = axisTicks(P04, true);
+    for (const px of [150, 100]) {
+      const k = px / YEAR;
+      assert.deepEqual(months(axisMarks(ticks, (d) => d * k, -20 * k, 1874 * k, W10)), [], px + " px");
+    }
+  });
+
+  test("AX3 R5: month density follows each year's real width, not the axis's average", () => {
+    // year 0 is wide (200 px), the rest narrow (50 px)
+    const X = (d: number) => (d <= YEAR ? d * 200 / YEAR : 200 + (d - YEAR) * 50 / YEAR);
+    const ticks: AxisTick[] = [{ start: 0, end: 364 }, { start: 365, end: 729 }, { start: 730, end: 1094 }];
+    const ms = months(axisMarks(ticks, X, 0, X(1094), W10));
+    assert.equal(ms.length, 11);
+    assert.ok(ms.every((m) => m.x > 0 && m.x < 200));
+  });
+
+  test("AX4 R6: marks come in drawing order, left to right per tick", () => {
+    const { ticks } = axisTicks(P04, true);
+    const k = 800 / YEAR;
+    const ms = axisMarks(ticks, (d) => d * k, -20 * k, 1874 * k, (s) => s.length * 6);
+    for (let i = 1; i < ms.length; i++) assert.ok(ms[i].x > ms[i - 1].x, "mark " + i + " left of the one before");
+    assert.deepEqual(years(ms).map((m) => m.day), [0, 365, 730, 1095, 1460, 1825]);
+    assert.equal(ms[0].kind, "year");
+    assert.equal(ms[1].kind, "month");
+  });
+
+  test("AX5 R6: a cut yields {kind: 'cut', years}, in its place in the order", () => {
+    const { ticks } = axisTicks([{ i: 0, start: 0, end: 10 }, { i: 1, start: 3000, end: 3000 }], true);
+    const cutTick = ticks.find((t) => t.trim)!;
+    const { x } = dayScale(ticks, 600);
+    const ms = axisMarks(ticks, x, 0, 600, W10);
+    const cuts = ms.filter((m) => m.kind === "cut");
+    assert.equal(cuts.length, 1);
+    assert.deepEqual(cuts[0], { kind: "cut", x: x(cutTick.start), years: cutTick.trim!.years });
+    const at = ms.indexOf(cuts[0]);
+    assert.ok(ms.slice(0, at).every((m) => m.x < cuts[0].x) && ms.slice(at + 1).every((m) => m.x > cuts[0].x));
+  });
+
+  test("AX6 R6: a year label within 6 px of the previous label is left out; its year line stays", () => {
+    const ticks: AxisTick[] = [{ start: 0, end: 364 }, { start: 365, end: 729 }, { start: 730, end: 1094 }];
+    // label "0" clamps to [0, 10]; "1y" at 20 starts at 15, within 6 px of 10
+    const close = years(axisMarks(ticks, (d) => d * 20 / YEAR, 0, 1000, W10));
+    assert.equal(close.length, 3);
+    assert.ok(close[0].label);
+    assert.equal(close[1].label, undefined);
+    assert.equal(close[1].day, 365);
+    assert.ok(close[2].label, "2y at 40 starts at 35: clear of 10");
+    // at 22 it starts at 17, clear
+    assert.ok(years(axisMarks(ticks, (d) => d * 22 / YEAR, 0, 1000, W10))[1].label);
+  });
+
+  test("AX7 R6: a year label within w/2 + 8 of a cut is left out; its year line stays", () => {
+    const ticks: AxisTick[] = [{ start: 0, end: 364 }, { start: 365, end: 729 }, { start: 730, end: 1094, trim: { realEnd: 1824, years: 3 } }, { start: 1825, end: 2189 }];
+    // year 1y sits g px left of the cut at day 730
+    const mk = (g: number) => (d: number) => {
+      if (d <= YEAR) return d * 100 / YEAR;
+      if (d <= 730) return 100 + (d - YEAR) * g / YEAR;
+      return 100 + g + 60 + (d - 1825) * 100 / YEAR;
+    };
+    const near = axisMarks(ticks, mk(12), 0, 1000, W10);
+    const y1 = years(near).find((m) => m.day === 365)!;
+    assert.equal(y1.label, undefined, "12 px from the cut: within 5 + 8");
+    assert.ok(near.some((m) => m.kind === "cut"));
+    const far = years(axisMarks(ticks, mk(14), 0, 1000, W10)).find((m) => m.day === 365)!;
+    assert.ok(far.label, "14 px from the cut: clear");
+  });
+
+  test("AX8 R6: end labels are clamped inside [lo, hi]", () => {
+    const ticks: AxisTick[] = [{ start: 0, end: 364 }, { start: 365, end: 729 }];
+    const ms = years(axisMarks(ticks, (d) => 50 + d * 100 / YEAR, 50, 150, (s) => s.length * 10));
+    assert.deepEqual(ms.map((m) => m.x), [50, 150]);
+    assert.deepEqual(ms.map((m) => m.label), [{ x: 55, text: "0" }, { x: 140, text: "1y" }]);
+  });
+
+  test("AX9 R6: month labels need clearance from the label before them", () => {
+    const ticks: AxisTick[] = [{ start: 0, end: 364 }];
+    const k = 200 / YEAR;
+    const roomy = months(axisMarks(ticks, (d) => d * k, 0, 1000, W10));
+    assert.equal(roomy.length, 11);
+    assert.deepEqual(roomy.filter((m) => m.label).map((m) => m.label), ["4m", "8m"]);
+    // a 120-px-wide "0" label covers [0, 120]: "4m" at ~66 has no room, "8m" at ~133 neither (within 6 px)
+    const wide = (s: string) => (s === "0" ? 120 : 10);
+    const crowded = months(axisMarks(ticks, (d) => d * k, 0, 1000, wide));
+    assert.equal(crowded.length, 11, "the ticks stay");
+    assert.equal(crowded[3].label, undefined);
+    assert.ok(crowded[3].x - 5 <= 120 + 6);
+    // a month label running past hi is left out
+    const clipped = months(axisMarks(ticks, (d) => d * k, 0, 135, W10));
+    assert.equal(clipped.find((m) => m.label === "8m"), undefined);
   });
 });

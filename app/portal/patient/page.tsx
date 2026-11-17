@@ -9,7 +9,7 @@
 // between patient and sample remounts it, as the portal's page is keyed by its ids. With ?cohort=
 // (Explore's "View patients") it steps through that cohort's patients (cohort-nav.tsx); with a
 // cohort and no patient it opens the cohort's first.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { useAddressLink, useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
@@ -21,10 +21,17 @@ import { SiteHeader } from "../../_ui/site-header.tsx";
 import { api } from "../../lab/api.ts";
 import type { ViewPageBody } from "../../../lib/api-schemas.ts";
 import { PatientHeader, usePatientRecord } from "../patient-header.tsx";
-import { CohortNav, useCohortPosition } from "../cohort-nav.tsx";
-import { navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
+import { CohortNav, navLink, useCohortPosition } from "../cohort-nav.tsx";
+import { navigationFromHash, navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
 
 const ID = /[^A-Za-z0-9._-]/g;
+
+/** the page's hash changes: a link followed within the page, Back and Forward */
+function subscribeHash(on: () => void): () => void {
+  window.addEventListener("hashchange", on);
+  window.addEventListener("popstate", on);
+  return () => { window.removeEventListener("hashchange", on); window.removeEventListener("popstate", on); };
+}
 
 /** The patient a sample belongs to, read through the sample table view; null while it loads. */
 function useSamplePatient(study: string, sample: string): { patient: string | null; error: string | null } {
@@ -95,10 +102,29 @@ export default function PatientPage() {
   // as on the portal, a sample in the link makes it the sample view, whatever patient is named too
   const patient = sample ? "" : (q.get("patient") || q.get("caseId") || "").replace(ID, "");
   const link = useAddressLink();
-  const { nav, error } = useMemo(() => readNavigation(q, link), [q, link]);
+  // a cbioportal.org link's cohort rides in the hash (#navCaseIds=), which only the browser sees; read on every render
+  // (a client navigation fires no hashchange), null until the page runs in the browser
+  const hash = useSyncExternalStore(subscribeHash, () => window.location.hash, () => null);
+  const router = useRouter();
+  const { nav, error, hashNote } = useMemo(() => {
+    const fromQuery = readNavigation(q, link);
+    if (fromQuery.nav || fromQuery.error || !hash) return { ...fromQuery, hashNote: null };
+    const h = navigationFromHash(hash);
+    return { nav: h.nav, error: null, hashNote: h.error };
+  }, [q, link, hash]);
+  const fromHash = !!nav && !q.get("cohort") && !!hash?.includes("navCaseIds");
+  // the link's patients become the page's own cohort link once, stored past the address's limit, so every link after carries it short
+  const [hashFailed, setHashFailed] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fromHash || !nav) return;
+    const to = { ...(study ? { study } : {}), ...(sample ? { sample } : patient ? { patient } : {}), ...(q.get("tab") ? { tab: q.get("tab")! } : {}) };
+    navLink("/portal/patient", nav, to).then((href) => router.replace(href)).catch((e) => setHashFailed(String((e as Error)?.message || e)));
+  }, [fromHash]);   // eslint-disable-line react-hooks/exhaustive-deps -- once, for the link the page opened with
   if (error) return <><SiteHeader page="patient" /><main className="analysis-main"><div className="error">{error}</div></main></>;
+  if (hash === null || (fromHash && !hashFailed)) return <><SiteHeader page="patient" /><main className="analysis-main"><PortalLoading /></main></>;
+  if (hashFailed) return <><SiteHeader page="patient" /><main className="analysis-main"><div className="error">this link's patients could not be opened: {hashFailed}</div></main></>;
   if (nav && !patient && !sample) return <CohortStart nav={nav} tab={q.get("tab")} />;
-  return <PatientView key={study + "|" + patient + "|" + sample} study={study} patient={patient} sample={sample} nav={nav} tab={q.get("tab")} />;
+  return <PatientView key={study + "|" + patient + "|" + sample} study={study} patient={patient} sample={sample} nav={nav} tab={q.get("tab")} note={hashNote} />;
 }
 
 /** A cohort with no patient named yet: open its first patient. */
@@ -118,7 +144,9 @@ function hrefFor(study: string, to: { patient: string } | { sample: string }, na
   return "/portal/patient?" + new URLSearchParams({ study, ...to, ...(tab ? { tab } : {}), ...navigationParams(nav) }).toString();
 }
 
-function PatientView({ study, patient, sample, nav, tab }: { study: string; patient: string; sample: string; nav: CohortNavigation | null; tab: string | null }) {
+function PatientView({ study, patient, sample, nav, tab, note }: { study: string; patient: string; sample: string; nav: CohortNavigation | null; tab: string | null;
+  /** why the link's cohort is not stepped through (an unreadable #navCaseIds): the patient is shown without the pager */
+  note?: string | null }) {
   const { basics, known, error } = useStudyKnown(study && (patient || sample) ? study : "");
   const owner = useSamplePatient(study, sample);
   const owned = sample ? owner.patient : patient;
@@ -147,6 +175,7 @@ function PatientView({ study, patient, sample, nav, tab }: { study: string; pati
         : recordError ? <p className="note">{recordError}</p>
         : <div data-tw className="mt-3 flex flex-col gap-1.5" role="status" aria-label="loading the patient's header"><span className="skeleton h-5 w-96" /><span className="skeleton h-5 w-80" /></div>}
     </PortalSummary>
+    {note && <p className="note" role="status">The pager is not shown: {note}.</p>}
     {page.note && <p className="note">{page.note}</p>}
     {!ready
       ? <PortalLoading />
