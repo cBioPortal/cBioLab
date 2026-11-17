@@ -39,7 +39,7 @@ sg AS (
 ),
 sg2 AS (SELECT suid, gene, types FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types FROM sg GROUP BY suid),
 u AS (
-  SELECT samp.puid AS k, ifNull(grp.g, '') AS g, any(ifNull(grp.label, '')) AS label, sg2.gene AS gene,
+  SELECT samp.puid AS k, ifNull(grp.g, '') AS g, min(ifNull(grp.label, '')) AS label, sg2.gene AS gene,
          arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types
   FROM sg2 JOIN samp ON samp.suid = sg2.suid LEFT JOIN grp ON grp.suid = sg2.suid
   GROUP BY k, g, gene
@@ -48,7 +48,7 @@ uall AS (SELECT k, '\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten
 uu AS (SELECT k, g, label, gene, types FROM u UNION ALL SELECT k, g, label, gene, types FROM uall),
 uk AS (SELECT grp_, gene, label, types, arrayDistinct(arrayMap((t) -> multiIf(t IN ('amp', 'homdel'), 'cna', t IN ('mrnaHigh', 'mrnaLow'), 'mrna',
          t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds FROM (SELECT g AS grp_, gene, label, types FROM uu))
-SELECT grp_ AS grp, gene, any(label) AS label, count() AS profiled,
+SELECT grp_ AS grp, gene, min(label) AS label, count() AS profiled,
        countIf(length(types) > 0) AS altered,
        countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND has(types, 'amp')) AS amp,
        countIf(kinds = ['cna'] AND NOT has(types, 'amp')) AS homdel, countIf(kinds = ['sv']) AS sv,
@@ -68,7 +68,7 @@ prof AS (
   SELECT sample_unique_id AS suid, groupUniqArray(alteration_type) AS types FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
 )
-SELECT ifNull(grp.g, '') AS grp, any(ifNull(grp.label, '')) AS label, uniqExact(samp.puid) AS samples,
+SELECT ifNull(grp.g, '') AS grp, min(ifNull(grp.label, '')) AS label, uniqExact(samp.puid) AS samples,
        uniqExactIf(samp.puid, has(prof.types, 'MUTATION_EXTENDED')) AS mut,
        uniqExactIf(samp.puid, has(prof.types, 'COPY_NUMBER_ALTERATION')) AS cna,
        uniqExactIf(samp.puid, has(prof.types, 'STRUCTURAL_VARIANT')) AS sv
