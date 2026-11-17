@@ -95,8 +95,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -223,8 +225,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -272,8 +276,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -322,8 +328,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -369,7 +377,10 @@ LIMIT 1000 OFFSET 0
 
 -- view 0 alterations: alterations:sv:counts · msk_chord_2024
 WITH s AS (
-  SELECT smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
+  SELECT smp.stable_id AS sid, if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], smp.stable_id) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], smp.stable_id)) AS o,
+         arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_') AS k,
+         tuple(o, sv.internal_id) AS r, tuple(gene1, gene2, class, eventInfo, pos1, pos2, breakpointType, connectionType, frame, site1, site2, length, dnaSupport, rnaSupport, status, svAnnotation, comments) AS rec0,
+         ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
          ifNull(sv.class, '') AS class, ifNull(sv.event_info, '') AS eventInfo, sv.breakpoint_type AS breakpointType, sv.connection_type AS connectionType,
          sv.site2_effect_on_frame AS frame, sv.site1_description AS site1, sv.site2_description AS site2,
          if(sv.site1_position IS NULL, '', concat(ifNull(sv.site1_chromosome, ''), ':', toString(sv.site1_position))) AS pos1,
@@ -385,18 +396,20 @@ WITH s AS (
     WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND p.stable_id = 'P-0024249')
 ),
 g AS (
-  SELECT gene1, gene2, class, eventInfo, pos1, pos2, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
-         any(breakpointType) AS breakpointType, any(connectionType) AS connectionType, any(frame) AS frame, any(site1) AS site1, any(site2) AS site2,
-         any(length) AS length, max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount,
-         any(dnaSupport) AS dnaSupport, any(rnaSupport) AS rnaSupport, any(status) AS status, any(svAnnotation) AS svAnnotation, any(comments) AS comments
-  FROM s GROUP BY gene1, gene2, class, eventInfo, pos1, pos2
+  SELECT k, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
+         argMin(rec0, r) AS rec, tupleElement(rec, 1) AS gene1, tupleElement(rec, 2) AS gene2, tupleElement(rec, 3) AS class, tupleElement(rec, 4) AS eventInfo, tupleElement(rec, 5) AS pos1, tupleElement(rec, 6) AS pos2, tupleElement(rec, 7) AS breakpointType, tupleElement(rec, 8) AS connectionType, tupleElement(rec, 9) AS frame, tupleElement(rec, 10) AS site1, tupleElement(rec, 11) AS site2, tupleElement(rec, 12) AS length, tupleElement(rec, 13) AS dnaSupport, tupleElement(rec, 14) AS rnaSupport, tupleElement(rec, 15) AS status, tupleElement(rec, 16) AS svAnnotation, tupleElement(rec, 17) AS comments,
+         max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount
+  FROM s GROUP BY k
 ),
-rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* FROM g)
+rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec) FROM g)
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 0 alterations: alterations:sv:rows · msk_chord_2024
 WITH s AS (
-  SELECT smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
+  SELECT smp.stable_id AS sid, if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], smp.stable_id) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], smp.stable_id)) AS o,
+         arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_') AS k,
+         tuple(o, sv.internal_id) AS r, tuple(gene1, gene2, class, eventInfo, pos1, pos2, breakpointType, connectionType, frame, site1, site2, length, dnaSupport, rnaSupport, status, svAnnotation, comments) AS rec0,
+         ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
          ifNull(sv.class, '') AS class, ifNull(sv.event_info, '') AS eventInfo, sv.breakpoint_type AS breakpointType, sv.connection_type AS connectionType,
          sv.site2_effect_on_frame AS frame, sv.site1_description AS site1, sv.site2_description AS site2,
          if(sv.site1_position IS NULL, '', concat(ifNull(sv.site1_chromosome, ''), ':', toString(sv.site1_position))) AS pos1,
@@ -412,14 +425,13 @@ WITH s AS (
     WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND p.stable_id = 'P-0024249')
 ),
 g AS (
-  SELECT gene1, gene2, class, eventInfo, pos1, pos2, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
-         any(breakpointType) AS breakpointType, any(connectionType) AS connectionType, any(frame) AS frame, any(site1) AS site1, any(site2) AS site2,
-         any(length) AS length, max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount,
-         any(dnaSupport) AS dnaSupport, any(rnaSupport) AS rnaSupport, any(status) AS status, any(svAnnotation) AS svAnnotation, any(comments) AS comments
-  FROM s GROUP BY gene1, gene2, class, eventInfo, pos1, pos2
+  SELECT k, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
+         argMin(rec0, r) AS rec, tupleElement(rec, 1) AS gene1, tupleElement(rec, 2) AS gene2, tupleElement(rec, 3) AS class, tupleElement(rec, 4) AS eventInfo, tupleElement(rec, 5) AS pos1, tupleElement(rec, 6) AS pos2, tupleElement(rec, 7) AS breakpointType, tupleElement(rec, 8) AS connectionType, tupleElement(rec, 9) AS frame, tupleElement(rec, 10) AS site1, tupleElement(rec, 11) AS site2, tupleElement(rec, 12) AS length, tupleElement(rec, 13) AS dnaSupport, tupleElement(rec, 14) AS rnaSupport, tupleElement(rec, 15) AS status, tupleElement(rec, 16) AS svAnnotation, tupleElement(rec, 17) AS comments,
+         max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount
+  FROM s GROUP BY k
 ),
-rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* FROM g)
-SELECT *, count() OVER () AS total FROM rows
+rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec) FROM g)
+SELECT * EXCEPT (k), count() OVER () AS total FROM rows
 WHERE 1
-ORDER BY gene1, so, gene2, gene1, gene2, pos1, pos2, class, eventInfo
+ORDER BY gene1, so, gene2, gene1, gene2, pos1, pos2, class, eventInfo, k
 LIMIT 25 OFFSET 0

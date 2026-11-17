@@ -22,9 +22,9 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 38 |
+| ✅ match | 39 |
 | 🟡 partial | 27 |
-| 🔶 different | 8 |
+| 🔶 different | 7 |
 | ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -246,9 +246,9 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-SV-1 | 🟡 | C | All SV rows of the patient; merged by (gene1, gene2, class, event, pos1, pos2), unsorted — A–B and B–A stay apart (`patient-alterations.ts:221`) |
+| PAT-SV-1 | ✅ | BC | One row per the portal's key, both genes, positions and chromosomes and the class sorted (generateStructuralVariantId), so A–B and B–A merge; the row's fields one record's: paad_msk_2025 C-873T8K's 4 FGFR2/MYOF records (both orders, 2 samples) are 1 row on both sides (`check:patient-sv`) |
 | PAT-SV-2 | 🟡 | B | Empty: "0 Structural Variants … no rows" ✅; no "not profiled" alert (lgg) |
-| PAT-SV-3 | 🔶 | B | Samples · Gene 1 · Gene 2 · Variant Class · Event Info · Breakpoint Type · Connection Type; no Status badge, no Annotation (tracked), +13 optional columns |
+| PAT-SV-3 | 🟡 | B | Samples · Gene 1 · Gene 2 · Status (s / g badge, not sortable) · Variant Class · Event Info · Connection Type ✅; Breakpoint Type hidden ✅; no Annotation (tracked), +13 optional columns |
 | PAT-SV-4 | 🐞 ok | C | No SV gene filter |
 | PAT-SV-5 | ❌ | C | No server column config (tracked: Instance defaults) |
 

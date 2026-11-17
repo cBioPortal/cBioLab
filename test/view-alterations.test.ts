@@ -5,6 +5,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { vafSort } from "../lib/patient-alterations.ts";
 import { runAlterations } from "../lib/views/alterations/run.ts";
+import { ALTERATION_COLUMNS, ALTERATION_DEFAULT_COLUMNS } from "../lib/patient-alterations.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
@@ -331,6 +332,35 @@ describe("alterations: a federation peer that serves patient alterations", () =>
     p.patientRows = async (req) => { const a = await answer(req) as Record<string, unknown>; delete a.oncokbPin; return a as never; };
     const a = alt(await run({}, ctx({ A: cohort({ p: 2 }) }, { p }, { pin: "local-v1" })));
     assert.equal(a.oncokbPin, null);
+  });
+});
+
+describe("PAT-SV-3: the structural variant table's columns", () => {
+  const P1 = { study: "s1", id: "P1" };
+  test("PAT-SV-3 SV1: the default SV columns, in the portal's order, without Breakpoint Type", () => {
+    assert.deepEqual(ALTERATION_DEFAULT_COLUMNS.sv, ["samples", "gene1", "gene2", "status", "class", "eventInfo", "connectionType"]);
+    assert.ok(!ALTERATION_DEFAULT_COLUMNS.sv.includes("breakpointType"));
+  });
+
+  test("PAT-SV-3 SV2: column order gene1 < gene2 < status < class < eventInfo < connectionType < breakpointType", () => {
+    const ids: string[] = ALTERATION_COLUMNS.sv.map((c) => c.id);
+    const order = ["gene1", "gene2", "status", "class", "eventInfo", "connectionType", "breakpointType"].map((id) => ids.indexOf(id));
+    assert.ok(order.every((i) => i >= 0), "all present");
+    assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  });
+
+  test("PAT-SV-3 SV3: Status is the one SV column that is not sortable", async () => {
+    const unsorted = (cols: { id: string; unsorted?: boolean }[]) => cols.filter((c) => c.unsorted).map((c) => c.id);
+    assert.deepEqual(unsorted(ALTERATION_COLUMNS.sv), ["status"]);
+    const a = alt(await run({ patient: P1 }, one()));
+    const cols = a.tables.sv!.columns as { id: string; unsorted?: boolean }[];
+    assert.equal(cols.find((c) => c.id === "status")!.unsorted, true);
+    assert.deepEqual(unsorted(cols), ["status"]);
+  });
+
+  test("PAT-SV-3 SV4: sorting SV by status is refused", async () => {
+    const v = await run({ patient: P1, sv: { sort: { column: "status" } } } as never, one());
+    assert.match(v.error!, /status is not sortable/);
   });
 });
 

@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "sv-levels" | "enrichment-events";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "sv-levels" | "enrichment-events" | "patient-sv";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -53,6 +53,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "patient-vaf": ["node", "--env-file=.env.local", "scripts/check-patient-vaf.ts"],
   // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
   "enrichment-events": ["node", "--env-file=.env.local", "scripts/check-enrichment-events.ts"],
+  "patient-sv": ["node", "--env-file=.env.local", "scripts/check-patient-sv.ts"],
 };
 
 interface Mutant {
@@ -770,6 +771,22 @@ const MUTANTS: Mutant[] = [
     effect: "The Patient page offers Genomic Evolution to a patient with several samples but no mutation with a VAF, where the portal hides the tab (PTB-MD-3).",
     find: " || data.vaf !== true ? [] :",
     replace: " ? [] :" },
+  { id: "patient-sv-key-unsorted", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table keys a row by its fields in order, so a fusion recorded A–B in one sample and B–A in another is two rows, where the portal shows one.",
+    find: "return \"arrayStringConcat(arraySort([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"]), '_')\";",
+    replace: "return \"arrayStringConcat([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"], '_')\";" },
+  { id: "patient-sv-row-per-sample", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table lists an event once per sample carrying it, where the portal lists it once naming the samples.",
+    find: "  FROM s GROUP BY k\\n",
+    replace: "  FROM s GROUP BY k, sid\\n" },
+  { id: "patient-sv-list-counts-records", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient list counts a patient's structural-variant records, not the rows the table lists, so a fusion in two samples counts twice.",
+    find: "\"  SELECT p.stable_id AS pid, uniqExact(\" + svRowKey(",
+    replace: "\"  SELECT p.stable_id AS pid, count(\" + svRowKey(" },
+  { id: "patient-sv-status-sortable", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table offers a sort by Status, which the portal does not sort.",
+    find: "{ ...text(\"status\", \"Status\"), unsorted: true },",
+    replace: "text(\"status\", \"Status\")," },
   { id: "patient-vaf-sample-repeated", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
     effect: "A mutation recorded twice in one sample draws two bars in that sample's slot and two tooltip lines.",
     find: "indexOf(arrayMap(y -> y.1, \" + arr + \"), x.1) = i",
