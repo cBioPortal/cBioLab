@@ -305,3 +305,56 @@ describe("cancertypes filters — E: nothing shown", () => {
     assert.ok(figure(r2).includes("No category passes the filters."));
   });
 });
+
+// ---- RF: review fixes ---------------------------------------------------------------------------
+
+describe("cancertypes filters — RF: review fixes", () => {
+  test("RF1 a gene tab counts every category of the panel, though the gene has rows for only some", async () => {
+    const r = await run({
+      groups: [g("G1", 50, 5), g("G2", 40, 4), g("G3", 30, 3)],
+      perGene: { KRAS: [g("G1", 50, 5), g("G2", 40, 4), g("G3", 30, 3)], EGFR: [g("G1", 50, 1), g("G2", 40, 1)] },
+    }, { genes: ["KRAS", "EGFR"] });
+    assert.equal(panel(r).categories, 3);
+    assert.equal(tab(r, "EGFR").categories, 3, "G3 has nobody profiled for EGFR, still a category");
+    assert.equal(tab(r, "EGFR").categories, panel(r).categories);
+  });
+
+  test("RF2 Min. % Altered compares the portal's float: 29 of 100 hidden at 29, 30 of 100 shown at 30", async () => {
+    // cbioportal-frontend cd8c6df CancerSummaryContent.tsx: calculatePercentage (137-139) is (part / whole) * 100,
+    // compared `>= altCasesValue` (269-282, 350-365); in JS (29 / 100) * 100 is 28.999999999999996
+    assert.equal((29 / 100) * 100 < 29, true);
+    const r29 = await run({ groups: [g("At29", 100, 29), g("At50", 100, 50)] }, { minSamples: 1, minAltered: 29 });
+    assert.deepEqual(shownSet(panel(r29)), ["At50"]);
+    const r30 = await run({ groups: [g("At30", 100, 30), g("At10", 100, 10)] }, { minSamples: 1, minAltered: 30 });
+    assert.deepEqual(shownSet(panel(r30)), ["At30"]);
+  });
+
+  test("RF3 a blank groupBy takes the default category and the caveat says so", async () => {
+    for (const groupBy of ["", "  "]) {
+      const asked: string[] = [];
+      const r = await run({ groups: [g("Lung", 50, 5), g("Breast", 40, 4)] }, { groupBy }, asked);
+      assert.equal(err(r), undefined, JSON.stringify(groupBy));
+      assert.ok(asked.some((l) => l.startsWith("cancertypes:default:")), "the default category's query: " + JSON.stringify(groupBy));
+      assert.match(String((r as { caveat?: string }).caveat), /the portal's default category/, JSON.stringify(groupBy));
+    }
+  });
+
+  test("RF4 refusals that need no data come before the default category's query", async () => {
+    const views: Record<string, unknown>[] = [{ minSamples: -1 }, { minAltered: -1 }, { measure: "driver" }];
+    for (const view of views) {
+      const asked: string[] = [];
+      const r = await run({ groups: [g("Lung", 50, 5)] }, { groupBy: undefined, ...view }, asked);
+      assert.ok(err(r), "refused: " + JSON.stringify(view));
+      assert.equal(asked.filter((l) => l.startsWith("cancertypes:default:")).length, 0, "no default query: " + JSON.stringify(view));
+    }
+  });
+
+  test("RF5 alphabetical sort with equal labels is ordered by key, whichever order the rows arrive in", async () => {
+    const a = g("breast cancer", 50, 5, { label: "Breast Cancer" });
+    const b = g("breast  cancer2", 50, 10, { label: "Breast Cancer" });
+    for (const groups of [[a, b], [b, a]]) {
+      const r = await run({ groups }, { minSamples: 1, sort: "alphabetical" });
+      assert.deepEqual(keys(panel(r)), ["breast  cancer2", "breast cancer"], groups.map((x) => x.key).join(" | "));
+    }
+  });
+});

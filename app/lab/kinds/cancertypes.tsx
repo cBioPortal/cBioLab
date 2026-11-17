@@ -6,7 +6,7 @@ import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 import { SEG_TAB, SEG_TABS } from "../../_ui/toolbar.ts";
 import { Tabs, TabsList, TabsTrigger } from "../../_ui/tabs";
-import { cancertypesPanelSvg } from "../../../lib/views/cancertypes/figure.ts";
+import { cancertypesPanelSvg, categoryLabel } from "../../../lib/views/cancertypes/figure.ts";
 import { frame, palette } from "../../../lib/svg-kit";
 import { useState } from "react";
 import { DraftInput } from "./parts.tsx";
@@ -47,7 +47,6 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   );
 }
 
-const CATEGORY_NAMES: Record<string, string> = { study: "Cancer Study", CANCER_TYPE: "Cancer Type", CANCER_TYPE_DETAILED: "Cancer Type Detailed" };
 
 /** the cancertypes view's settings row */
 function Controls({ c }: { c: KindCardCtx }) {
@@ -58,14 +57,15 @@ function Controls({ c }: { c: KindCardCtx }) {
   const chosen: string | undefined = !by ? c.v?.cancertypes?.groupBy : undefined;
   const freq = spec.show !== "count";
   const units = spec.unit === "sample" ? "samples" : "patients", Units = spec.unit === "sample" ? "Samples" : "Patients";
-  // the Min. # Total the first panel applied, which the default leaves to the data
-  const applied: number | undefined = c.v?.cancertypes?.panels?.[0]?.minSamples;
+  // a commit that leaves the document as it was still resets the boxes to what is applied
+  const [commits, setCommits] = useState(0);
+  const commit = (p: Record<string, unknown>) => { setCommits((n) => n + 1); patch(p); };
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" data-tip="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute. Until one is chosen, the portal's default: the study for several studies, the detailed cancer type for a study of one cancer type, else the cancer type">
           category <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v || undefined, minSamples: undefined, minAltered: undefined })}>
-            <option value="">{"portal default" + (chosen ? " (" + (CATEGORY_NAMES[chosen] || chosen) + ")" : "")}</option>
+            <option value="">{"portal default" + (chosen ? " (" + categoryLabel(chosen) + ")" : "")}</option>
             <option value="study">Cancer Study</option>
             <option value="CANCER_TYPE">Cancer Type</option>
             <option value="CANCER_TYPE_DETAILED">Cancer Type Detailed</option>
@@ -86,15 +86,16 @@ function Controls({ c }: { c: KindCardCtx }) {
         </label>
       </div>
       <div className="tbz"><span className="tbl">filter</span>
-        <label className="tbfield" data-tip={"the portal's Min. # Total: a category is shown only with at least this many profiled " + units + "; by default 10, or 0 when no category has more than 10. Applies on Enter"}>
+        <label className="tbfield" data-tip={"the portal's Min. # Total: a category is shown only with at least this many profiled " + units + "; empty, the portal's default: 10, or 0 when no category of the chart has more than 10. Applies on Enter"}>
           Min. # Total {Units}
-          <DraftInput value={String(spec.minSamples ?? applied ?? "")} disabled={busy} width="4.5rem" title={"Min. # Total " + Units}
-            onCommit={(t) => { const n = thresholdOf(t); patch({ minSamples: n === null ? undefined : Math.ceil(n) }); }} />
+          {/* unset, each panel and gene tab works out its own default, so the box names none */}
+          <DraftInput key={"total" + commits} value={spec.minSamples == null ? "" : String(spec.minSamples)} placeholder="default" disabled={busy} width="4.5rem" title={"Min. # Total " + Units}
+            onCommit={(t) => { const n = thresholdOf(t); commit({ minSamples: n === null ? undefined : Math.ceil(n) }); }} />
         </label>
         <label className="tbfield" data-tip={(freq ? "the portal's Min. % Altered: a category is shown only with at least this share of its profiled " : "the portal's Min. # Altered: a category is shown only with at least this many altered ") + units + ". Applies on Enter"}>
           {freq ? "Min. % Altered " : "Min. # Altered "}{Units}
-          <DraftInput value={String(spec.minAltered ?? 0) + (freq ? "%" : "")} disabled={busy} width="4.5rem" title={(freq ? "Min. % Altered " : "Min. # Altered ") + Units}
-            onCommit={(t) => { const n = thresholdOf(t); patch({ minAltered: n ? n : undefined }); }} />
+          <DraftInput key={"altered" + commits} value={String(spec.minAltered ?? 0) + (freq ? "%" : "")} disabled={busy} width="4.5rem" title={(freq ? "Min. % Altered " : "Min. # Altered ") + Units}
+            onCommit={(t) => { const n = thresholdOf(t); commit({ minAltered: n ? n : undefined }); }} />
         </label>
       </div>
       <div className="tbz"><span className="tbl">view</span>

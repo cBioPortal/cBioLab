@@ -39,7 +39,19 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   const { ok, excluded } = answering(ctx);
   if (!Object.keys(ok).length) return refuse("cancertypes", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const unit: "patient" | "sample" = view.unit === "sample" ? "sample" : "patient";
+  const measure: "driver" | "any" = view.measure === "driver" ? "driver" : "any";
+  if (measure === "driver" && !pin) return refuse("cancertypes", ctx, "no OncoKB annotation pin is available here, so drivers cannot be called — use measure: \"any\"");
+  const minSamples = view.minSamples == null ? null : Number(view.minSamples);
+  if (minSamples !== null && !(Number.isInteger(minSamples) && minSamples >= 0 && minSamples <= 1e9))
+    return refuse("cancertypes", ctx, "minSamples (Min. # Total) is a whole number, 0 or more; got " + JSON.stringify(view.minSamples).slice(0, 20));
+  const minAltered = view.minAltered == null ? 0 : Number(view.minAltered);
+  if (!(Number.isFinite(minAltered) && minAltered >= 0))
+    return refuse("cancertypes", ctx, "minAltered (Min. % or # Altered) is a number, 0 or more; got " + JSON.stringify(view.minAltered).slice(0, 20));
+  const alphabetical = view.sort === "alphabetical";
+  const show: "frequency" | "count" = view.show === "count" ? "count" : "frequency";
   let groupBy = String(view.groupBy ?? "").trim();
+  // what can be refused without asking anyone is refused before the default category's query
+  if (groupBy && groupBy !== "study" && !ATTR_NAME.test(groupBy)) return refuse("cancertypes", ctx, "groupBy is a sample attribute name or \"study\"; got " + JSON.stringify(groupBy).slice(0, 40));
   // the portal's default (CancerSummaryContainer groupAlterationsBy), as the method record states it
   let byDefault: { studies: number; cancerTypes?: number } | undefined;
   // the per-group samples answers by CANCER_TYPE, kept when that is the category chosen
@@ -54,17 +66,6 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
     groupBy = distinct.size === 1 ? "CANCER_TYPE_DETAILED" : "CANCER_TYPE";
     byDefault = { studies: 1, cancerTypes: distinct.size };
   }
-  if (groupBy !== "study" && !ATTR_NAME.test(groupBy)) return refuse("cancertypes", ctx, "groupBy is a sample attribute name or \"study\"; got " + JSON.stringify(groupBy).slice(0, 40));
-  const measure: "driver" | "any" = view.measure === "driver" ? "driver" : "any";
-  if (measure === "driver" && !pin) return refuse("cancertypes", ctx, "no OncoKB annotation pin is available here, so drivers cannot be called — use measure: \"any\"");
-  const minSamples = view.minSamples == null ? null : Number(view.minSamples);
-  if (minSamples !== null && !(Number.isInteger(minSamples) && minSamples >= 0 && minSamples <= 1e9))
-    return refuse("cancertypes", ctx, "minSamples (Min. # Total) is a whole number, 0 or more; got " + JSON.stringify(view.minSamples).slice(0, 20));
-  const minAltered = view.minAltered == null ? 0 : Number(view.minAltered);
-  if (!(Number.isFinite(minAltered) && minAltered >= 0))
-    return refuse("cancertypes", ctx, "minAltered (Min. % or # Altered) is a number, 0 or more; got " + JSON.stringify(view.minAltered).slice(0, 20));
-  const alphabetical = view.sort === "alphabetical";
-  const show: "frequency" | "count" = view.show === "count" ? "count" : "frequency";
   const attribute = groupBy === "study" ? null : groupBy;
 
   const perSite: { cohort: string; study: string; groups: number; profiled: number }[] = [];
@@ -75,13 +76,15 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   // least the Min. # Total of them (unset: 10 when its largest group has more than 10, else 0) and at least
   // the Min. % / # Altered; drawn highest first by the y-axis value, or by name
   const share = (g: CancertypesGroup) => show === "count" ? g.altered : (g.altered / g.profiled) * 100;
+  // alphabetically: by the value as written (the portal's group key), a study by its id; the folded key settles ties
   const byName = (g: CancertypesGroup) => attribute ? g.label : g.key;
+  const order = (a: CancertypesGroup, b: CancertypesGroup) => byName(a) < byName(b) ? -1 : byName(a) > byName(b) ? 1 : a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
   const arrange = (all: CancertypesGroup[]) => {
     const named = all.map((g) => ({ ...g, label: g.key === "" ? "(no " + (attribute || "study") + " value)" : g.label }));
     const withData = named.filter((g) => g.profiled > 0);
     const floor = minSamples ?? (Math.max(0, ...withData.map((g) => g.profiled)) > 10 ? 10 : 0);
     const groups = withData.filter((g) => g.profiled >= floor && share(g) >= minAltered).sort(alphabetical
-      ? (a, b) => byName(a) < byName(b) ? -1 : byName(a) > byName(b) ? 1 : 0
+      ? order
       : (a, b) => share(b) - share(a) || b.profiled - a.profiled);
     const filtered = groups.length < named.length && (floor > 0 || minAltered > 0);
     return { groups, categories: named.length, minSamples: floor, ...(filtered ? { filtered: true as const } : {}) };
@@ -127,7 +130,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
       perSite.push({ cohort: n, study: st, groups: rows.filter((r) => r.gene === "*").length, profiled });
     }
     // every group with units appears, profiled or not; each carries its totals
-    for (const [k, t] of totals) get("*", k, t.label);
+    for (const [k, t] of totals) for (const gene of ["*", ...genes]) get(gene, k, t.label);
     for (const m of byGene.values()) for (const g of m.values()) {
       const t = totals.get(g.key);
       if (t) { g.samples = t.samples; g.profiledFor = { ...t.profiledFor }; }
@@ -156,7 +159,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
         : measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. ") +
       "A " + unit + " with more than one kind of alteration across the genes counts once, under \"multiple\"; an amplification and a deep deletion are one kind (copy number), shown as the amplification. " +
       (unit === "patient" ? "A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. " : "Samples are counted, not patients: a patient with two samples counts twice. ") +
-      (view.groupBy == null ? "Grouped by " + groupWord + ", the portal's default category for " + (groupBy === "study" ? "several studies" : groupBy === "CANCER_TYPE_DETAILED" ? "a cohort of one cancer type" : "a cohort of several cancer types") + ". " : "") +
+      (byDefault ? "Grouped by " + groupWord + ", the portal's default category for " + (groupBy === "study" ? "several studies" : groupBy === "CANCER_TYPE_DETAILED" ? "a cohort of one cancer type" : "a cohort of several cancer types") + ". " : "") +
       (attribute === "CANCER_TYPE" ? "CANCER_TYPE is read per sample and folded on case and whitespace; a sample without one takes its study's type of cancer, as the portal's. "
         : attribute === "CANCER_TYPE_DETAILED" ? "CANCER_TYPE_DETAILED is read per sample and folded on case and whitespace; a sample without one takes its CANCER_TYPE, else its study's type of cancer, as the portal's. "
         : attribute ? attribute + " is read per sample and folded on case and whitespace; samples with no value form their own group. " : "Each study is labelled by its name. ") +
