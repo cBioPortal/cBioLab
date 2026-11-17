@@ -251,6 +251,13 @@ export function portalKeptUnits(samples: number, patients: number): string {
 }
 
 /**
+ * The portal's note on a table's count for one patient's rows repeated across samples, as MutationMapper
+ * multipleMutationInfo writes it (the bare number); undefined when there are none.
+ */
+export const portalDuplicatesNote = (n: number | undefined, one: string, many: string): string | undefined =>
+  n ? "includes " + String(n) + " duplicate " + (n === 1 ? one : many) + " in patients with multiple samples" : undefined;
+
+/**
  * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",
  * "<1%" below one percent, else the whole percent, Math.round's (2.5 → "3%").
  */

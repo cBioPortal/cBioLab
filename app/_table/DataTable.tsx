@@ -332,6 +332,8 @@ export interface DataTableProps<V> {
   table?: string;
   /** what a row is, plural: "mutations", "samples" */
   unit: string;
+  /** said after the count ("includes 38 duplicate mutations in patients with multiple samples") */
+  countNote?: string;
   /** when the query keeps fewer rows than there are: the distinct samples and patients of those it keeps, said after the count */
   kept?: { samples: number; patients: number };
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
@@ -362,7 +364,7 @@ export interface DataTableProps<V> {
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -422,7 +424,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     <div className="dt">
       <div className="dt-bar">
         <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}{kept ? " (" + portalKeptUnits(kept.samples, kept.patients) + ")" : null}</> : <>{t.total.toLocaleString()} {unit}</>}
-          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}</span>
+          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}{countNote ? ": " + countNote : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>

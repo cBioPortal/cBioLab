@@ -397,6 +397,8 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     // the portal's default: Annotation, descending (skin_results_view_tables_default_sort_column)
     defaultOrder: MUTATION_ANNOTATION_ORDER + " DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",
+    // the same change in one patient's several samples (MutationUtils groupMutationsByGeneAndPatientAndProteinChange; one gene per table)
+    duplicateKey: "(study, patient, ifNull(proteinChange, ''))",
     units: { sample: "sid", patient: "patient" },
   };
 }

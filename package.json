@@ -42,6 +42,7 @@
     "check:mutation-fusions": "node --env-file=.env.local scripts/check-mutation-fusions.ts",
     "check:mutation-columns": "node --env-file=.env.local scripts/check-mutation-columns.ts",
     "check:mutation-tab-states": "node --env-file=.env.local scripts/check-mutation-tab-states.ts",
+    "check:table-duplicates": "node --env-file=.env.local scripts/check-table-duplicates.ts",
     "check:table-kept-units": "node --env-file=.env.local scripts/check-table-kept-units.ts",
     "check:sv-levels": "node --env-file=.env.local scripts/check-sv-levels.ts",
     "check:patient-vaf": "node --env-file=.env.local scripts/check-patient-vaf.ts",

@@ -444,10 +444,12 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * co-occurrence is more correct than one computed from pooled exports.
  */
 /**
- * A table's rows per cohort and study: kept by the query (`n`) and every one (`all`); with RowSource.units,
- * the distinct samples (`ns`) and patients (`np`) among those kept.
+ * A table's rows per cohort and study: kept by the query (`n`), every one (`all`), and duplicates among
+ * every one (`dup`, RowSource.duplicateKey); with RowSource.units, the distinct samples (`ns`) and
+ * patients (`np`) among those kept. The Mutations and SV tables page only their own instances' rows (no
+ * `remote`), so today a peer's counts never carry `dup`.
  */
-export interface RowCounts { cohort: string; study: string; n: number; all: number; ns?: number; np?: number }
+export interface RowCounts { cohort: string; study: string; n: number; all: number; dup?: number; ns?: number; np?: number }
 /** the query's lines a Mutations tab follows, and how their DRIVER reads */
 export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
 /**
@@ -2416,7 +2418,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   /** per part: the rows the query keeps and every row. Counts only. */
   async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]> {
     const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db), q, defaults), this.instance.conn);
-    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all),
+    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all), ...(x.dup != null ? { dup: Number(x.dup) } : {}),
       ...(x.ns != null && x.np != null ? { ns: Number(x.ns), np: Number(x.np) } : {}) }));
   }
   /** a column's distinct values with counts, or its range — what its filter offers */
