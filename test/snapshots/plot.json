@@ -504,11 +504,11 @@
         "shape": "box",
         "n": 1068,
         "x": {
-          "label": "TP53 mutation type",
+          "label": "TP53: Mutations",
           "kind": "cat"
         },
         "y": {
-          "label": "FRACTION_GENOME_ALTERED",
+          "label": "Fraction Genome Altered",
           "kind": "num"
         },
         "groups": [
@@ -923,7 +923,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: 15 values beyond the whiskers. The statistics are over the whole plotted cohort.",
+      "note": "1,068 of 1,084 samples have a value on both axes (16 have no Fraction Genome Altered); only those are drawn. Point layers — outliers: 15 values beyond the whiskers. The statistics are over the whole plotted cohort.",
       "method": {
         "steps": [
           {

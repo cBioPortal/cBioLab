@@ -10,12 +10,14 @@ samp AS (
   SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') IN (SELECT sid FROM cohort)
 ),
-grp AS (
-  SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS g, any(attribute_value) AS label FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+grp AS (SELECT suid, lowerUTF8(trimBoth(v)) AS g, v AS label FROM (
+  SELECT samp.suid AS suid, if(ifNull(c.ct, '') != '', c.ct, (SELECT ifNull(nullIf(any(t.name), ''), 'Unknown') FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+     WHERE cs.cancer_study_identifier = 'msk_impact_50k_2026')) AS v FROM samp LEFT JOIN (
+    SELECT sample_unique_id AS suid, anyIf(attribute_value, attribute_name = 'CANCER_TYPE') AS ct FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'CANCER_TYPE'
-    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
-),
+    WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE')
+      AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
+  ) c ON c.suid = samp.suid)),
 alt AS (
   SELECT g.sample_unique_id AS suid, g.hugo_gene_symbol AS gene,
          multiIf(g.variant_type = 'mutation', 'mutation', g.variant_type = 'cna' AND g.cna_alteration >= 2, 'amp',
@@ -37,7 +39,7 @@ sg AS (
 ),
 sg2 AS (SELECT suid, gene, types FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types FROM sg GROUP BY suid),
 u AS (
-  SELECT samp.puid AS k, ifNull(grp.g, '') AS g, any(ifNull(grp.label, '')) AS label, sg2.gene AS gene,
+  SELECT samp.puid AS k, ifNull(grp.g, '') AS g, min(ifNull(grp.label, '')) AS label, sg2.gene AS gene,
          arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types
   FROM sg2 JOIN samp ON samp.suid = sg2.suid LEFT JOIN grp ON grp.suid = sg2.suid
   GROUP BY k, g, gene
@@ -46,7 +48,7 @@ uall AS (SELECT k, '\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten
 uu AS (SELECT k, g, label, gene, types FROM u UNION ALL SELECT k, g, label, gene, types FROM uall),
 uk AS (SELECT grp_, gene, label, types, arrayDistinct(arrayMap((t) -> multiIf(t IN ('amp', 'homdel'), 'cna', t IN ('mrnaHigh', 'mrnaLow'), 'mrna',
          t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds FROM (SELECT g AS grp_, gene, label, types FROM uu))
-SELECT grp_ AS grp, gene, any(label) AS label, count() AS profiled,
+SELECT grp_ AS grp, gene, min(label) AS label, count() AS profiled,
        countIf(length(types) > 0) AS altered,
        countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND has(types, 'amp')) AS amp,
        countIf(kinds = ['cna'] AND NOT has(types, 'amp')) AS homdel, countIf(kinds = ['sv']) AS sv,
@@ -55,7 +57,7 @@ SELECT grp_ AS grp, gene, any(label) AS label, count() AS profiled,
        countIf(length(kinds) > 1) AS multiple
 FROM uk GROUP BY grp, gene
 
--- view 0 cancertypes: cancertypes:samples:all patients · msk_impact_50k_2026
+-- view 0 cancertypes: cancertypes:default:all patients · msk_impact_50k_2026
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'),
 samp AS (
@@ -66,18 +68,20 @@ prof AS (
   SELECT sample_unique_id AS suid, groupUniqArray(alteration_type) AS types FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
 )
-SELECT ifNull(grp.g, '') AS grp, uniqExact(samp.puid) AS samples,
+SELECT ifNull(grp.g, '') AS grp, min(ifNull(grp.label, '')) AS label, uniqExact(samp.puid) AS samples,
        uniqExactIf(samp.puid, has(prof.types, 'MUTATION_EXTENDED')) AS mut,
        uniqExactIf(samp.puid, has(prof.types, 'COPY_NUMBER_ALTERATION')) AS cna,
        uniqExactIf(samp.puid, has(prof.types, 'STRUCTURAL_VARIANT')) AS sv
 FROM samp LEFT JOIN prof ON prof.suid = samp.suid
-LEFT JOIN (
-  SELECT sample_unique_id AS suid, any(lowerUTF8(trimBoth(attribute_value))) AS g FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+LEFT JOIN (SELECT suid, lowerUTF8(trimBoth(v)) AS g, v AS label FROM (
+  SELECT samp.suid AS suid, if(ifNull(c.ct, '') != '', c.ct, (SELECT ifNull(nullIf(any(t.name), ''), 'Unknown') FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+     WHERE cs.cancer_study_identifier = 'msk_impact_50k_2026')) AS v FROM samp LEFT JOIN (
+    SELECT sample_unique_id AS suid, anyIf(attribute_value, attribute_name = 'CANCER_TYPE') AS ct FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name = 'CANCER_TYPE'
-    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
-) grp ON grp.suid = samp.suid
+    WHERE cancer_study_identifier = 'msk_impact_50k_2026' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE')
+      AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid
+  ) c ON c.suid = samp.suid)) grp ON grp.suid = samp.suid
 GROUP BY grp
-UNION ALL SELECT '\x01all' AS grp, uniqExact(samp.puid), uniqExactIf(samp.puid, has(prof.types, 'MUTATION_EXTENDED')),
+UNION ALL SELECT '\x01all' AS grp, '' AS label, uniqExact(samp.puid), uniqExactIf(samp.puid, has(prof.types, 'MUTATION_EXTENDED')),
        uniqExactIf(samp.puid, has(prof.types, 'COPY_NUMBER_ALTERATION')), uniqExactIf(samp.puid, has(prof.types, 'STRUCTURAL_VARIANT'))
 FROM samp LEFT JOIN prof ON prof.suid = samp.suid

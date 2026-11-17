@@ -18,7 +18,7 @@ Plot (box): ERBB2: mRNA expression z-scores relative to all samples (log RNA Seq
     - Whiskers: The portal's rule (PLT-STM-8): each whisker ends at its fence, q1 − 1.5 × IQR or q3 + 1.5 × IQR, when some value lies beyond it, else at the extreme value. Not Tukey's furthest value inside the fence, so a whisker may end where no case lies.
     In the database, the coefficients and quartiles are checked against scipy 1.18.1 (pearsonr, spearmanr) and the portal's jStat rule on known values by scripts/check-plot-stats.ts.
 
-Plot (box): FRACTION_GENOME_ALTERED by TP53 mutation type — 1,068 samples.
+Plot (box): Fraction Genome Altered by TP53: Mutations — 1,068 samples.
   Missense: median 0.38 (IQR 0.261–0.522, whiskers 0–0.915, n=209)
   Inframe: median 0.274 (IQR 0.249–0.481, whiskers 0.249–0.56, n=5)
   Truncating: median 0.464 (IQR 0.298–0.618, whiskers 0.0002–0.947, n=102)
@@ -27,7 +27,7 @@ Plot (box): FRACTION_GENOME_ALTERED by TP53 mutation type — 1,068 samples.
   No mutation: median 0.195 (IQR 0.105–0.346, whiskers 0–0.708, n=706)
   Not profiled: median 0.106 (IQR 0.0052–0.168, whiskers 0–0.411, n=18)
   Values are drawn as individual points.
-  1,068 of 1,084 samples have a value on both axes (16 have no FRACTION_GENOME_ALTERED); only those are drawn. Point layers — outliers: 15 values beyond the whiskers. The statistics are over the whole plotted cohort.
+  1,068 of 1,084 samples have a value on both axes (16 have no Fraction Genome Altered); only those are drawn. Point layers — outliers: 15 values beyond the whiskers. The statistics are over the whole plotted cohort.
   METHOD:
     - Each group's quartiles, in the database [all samples · brca_tcga_pan_can_atlas_2018]: The plot:box query above: per category, the count, the extremes and the quartiles of the numeric axis's values (log-transformed first where it is on a log scale).
         quartiles: the portal's rule (jStat.quartiles, PLT-STM-8): of the n sorted values, q1 is the round(n/4)-th and q3 the round(3n/4)-th, halves rounded up, no interpolation

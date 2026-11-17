@@ -24,12 +24,20 @@
  *       L4 KRAS gistic: Deep Deletion 1, Shallow Deletion 67, Diploid 390, Gain 128, Amplification 6
  *       L5 L2 with labels "model": {Mutated, Not mutated, Not profiled}
  *       L6 L3 with labels "model": ⊆ {Structural variant, No structural variant, Not profiled}
+ *   T*  lib/federation.ts plotAxisKinds / plot — an axis's title as the portal writes it (PLT-DT-19;
+ *       cbioportal-frontend cd8c6df PlotsTabUtils.tsx getAxisLabel): a clinical attribute by its
+ *       display name, " (log2(value + 1))" after it on a log scale, and the colour axis likewise.
+ *       Read against the warehouse's coadread_tcga_pan_can_atlas_2018, all samples; the names are
+ *       cbioportal.org's for that study (REST clinical-attributes). Case table rows T7–T10.
  *
  * Run: node --env-file=.env.local scripts/check-plot-stats.ts
  */
 import { chQuery } from "../lib/ch.ts";
 import { axisSelect, plotBoxSql, plotStatsSql, type AxisCtx, type PlotAxis } from "../lib/plot.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
+import { resolverFor, hasFederatedPlot } from "../lib/federation.ts";
+import { studyProfiles } from "../lib/analysis.ts";
+import { oncokbPin } from "../lib/annotation.ts";
 
 /** [row id, values, expected q1, median, q3, lo, hi] */
 type BoxCase = [string, number[], number, number, number, number, number];
@@ -120,6 +128,32 @@ const LABELS: LabelCase[] = [
         (off.length ? " — expected " + off.map(([l, n]) => l + " " + n).join(", ") : ""));
     } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
   }
+}
+
+{
+  const STUDY = "coadread_tcga_pan_can_atlas_2018";
+  const r = await resolverFor(STUDY, { oncokbPin: await oncokbPin(), ...(await studyProfiles(STUDY)) });
+  const clin = (attribute: string, log?: boolean): PlotAxis => ({ source: "clinical", attribute, ...(log ? { log: true } : {}) });
+  const FGA = clin("FRACTION_GENOME_ALTERED");
+  const is = (id: string, what: string, got: unknown, want: string) => ok(got === want, id + " " + what, JSON.stringify(got) + " — expected " + JSON.stringify(want));
+
+  if (!hasFederatedPlot(r)) ok(false, "T7 plotAxisKinds", STUDY + "'s resolver has no plotAxisKinds");
+  else {
+    const k = await r.plotAxisKinds({ x: clin("MUTATION_COUNT"), y: FGA });
+    is("T7", "plotAxisKinds xLabel", k.xLabel, "Mutation Count");
+    is("T7", "plotAxisKinds yLabel", k.yLabel, "Fraction Genome Altered");
+  }
+
+  const t8 = await r.plot(null, { x: clin("CANCER_TYPE_DETAILED"), y: FGA, unit: "sample" });
+  is("T8", "plot x.label", t8.x.label, "Cancer Type Detailed");
+  is("T8", "plot y.label", t8.y.label, "Fraction Genome Altered");
+
+  const t9 = await r.plot(null, { x: clin("AGE"), y: clin("FRACTION_GENOME_ALTERED", true), unit: "sample" });
+  is("T9", "plot x.label", t9.x.label, "Diagnosis Age");
+  is("T9", "plot y.label (log)", t9.y.label, "Fraction Genome Altered (log2(value + 1))");
+
+  const t10 = await r.plot(null, { x: clin("CANCER_TYPE_DETAILED"), y: FGA, unit: "sample", colorBy: clin("SEX") });
+  is("T10", "plot colorLabel (" + t10.shape + ")", t10.colorLabel, "Sex");
 }
 
 console.log(failures ? "\n" + failures + " of " + checks + " plot statistics checks FAILED" : "\nall " + checks + " plot statistics checks passed");
