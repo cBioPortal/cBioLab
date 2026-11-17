@@ -86,5 +86,16 @@ for (const [label, sel, draft] of [
   } catch (e) { ok(label, false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
 }
 
+// AC9: only an attribute the clinical query counted can read as "no data"
+try {
+  const r = await buildExplore({ study: STUDY, conn, skipGenes: true, skipBins: true, attributes: ["SEX"] });
+  const d = new Map((r.declaredAttributes || []).map((x) => [x.attribute, x.counted]));
+  ok("AC9 asked for SEX alone: SEX is counted, AGE (not asked for) is not", d.get("SEX") === true && d.get("AGE") === false,
+    `SEX ${d.get("SEX")}, AGE ${d.get("AGE")}`);
+  const all = await buildExplore({ study: STUDY, conn, skipGenes: true, skipBins: true });
+  ok("AC9 asked for every attribute: every declared attribute is counted", (all.declaredAttributes || []).length > 0 && (all.declaredAttributes || []).every((x) => x.counted === true),
+    (all.declaredAttributes || []).filter((x) => x.counted !== true).map((x) => x.attribute).join(", ") || "all counted");
+} catch (e) { ok("AC9", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+
 console.log(failures ? `\n${failures} failure(s)` : "\nall passed");
 process.exit(failures ? 1 : 0);

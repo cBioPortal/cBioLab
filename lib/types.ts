@@ -1067,7 +1067,9 @@ export interface ExploreResult {
    * selection has a value for it, with its stored priority: what the oncoprint's Tracks menu lists.
    * Across studies, the first study's name and priority.
    */
-  declaredAttributes?: { attribute: string; per: "patient" | "sample"; displayName?: string; priority: number }[];
+  declaredAttributes?: { attribute: string; per: "patient" | "sample"; displayName?: string; priority: number;
+    /** whether Explore's clinical query counted it (asked for it, not cut at the limit): only then is its absence from `clinical` "no data" */
+    counted?: boolean }[];
   events: { type: string; n: number }[];
   derived?: DerivedFacet[];
   /**

@@ -311,9 +311,10 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         </Tabs>
         {(() => {
           const custom = explore.clinical.filter((c) => isCustomAttr(c.attribute));
-          // with the declared attributes no selected sample has data for: the portal lists them, 0% and disabled
+          // with the declared attributes no selected sample has data for: the portal lists them, 0% and disabled;
+          // only those the query counted (one it was not asked for, or cut at its limit, is unknown, not 0%)
           const builtin = [...explore.clinical.filter((c) => !isCustomAttr(c.attribute)),
-            ...(explore.declaredAttributes || []).filter((d) => !isCustomAttr(d.attribute) && !explore.clinical.some((c) => c.attribute === d.attribute))
+            ...(explore.declaredAttributes || []).filter((d) => d.counted !== false && !isCustomAttr(d.attribute) && !explore.clinical.some((c) => c.attribute === d.attribute))
               .map((d) => ({ ...d, kind: "cat" as const, values: [], patients: 0, samples: 0, absent: true }))] as typeof explore.clinical;
           const keysOf = (list: typeof explore.clinical) => list.map(attrKey);
           const checkedOf = (list: typeof explore.clinical) => list.filter((c) => chartChecked(attrKey(c))).length;
