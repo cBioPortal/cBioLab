@@ -67,8 +67,8 @@ describe("OQL position range: SQL", () => {
   test("a mutation without a usable position never matches (the portal's mut_position)", () => {
     assert.match(sql("APC: MUT_(1400-)"), /g\.pos_start IS NOT NULL AND g\.pos_end IS NOT NULL AND g\.pos_start != -1 AND g\.pos_end != -1 AND g\.pos_start <= g\.pos_end/);
   });
-  test("DRIVER still joins the pinned OncoKB store", () => {
-    assert.match(sql("APC: TRUNC_(1400-)_DRIVER"), /FROM annotation\.oncokb\s+WHERE oncokb_version = '[^']+' AND is_driver\) ann/);
+  test("DRIVER still reads the pinned OncoKB store", () => {
+    assert.match(sql("APC: TRUNC_(1400-)_DRIVER"), /FROM annotation\.oncokb\s+WHERE oncokb_version = '[^']+' AND is_driver\)/);
   });
   test("an entry without a range is unchanged", () => {
     assert.match(sql("APC: TRUNC"), /FROM db\.genomic_event_derived g/);

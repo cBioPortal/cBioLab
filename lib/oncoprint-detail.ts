@@ -8,6 +8,7 @@ import { chQueryRows, STUDY } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
 import { driverAnnotation } from "./annotation.ts";
 import { germlineCondSql } from "./driver-sql.ts";
+import { SV_EVENT_KEY } from "./sv-oncokb.ts";
 import { forData } from "./driver-settings.ts";
 import { normalizeDisplay } from "./oncoprint-assemble.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
@@ -58,12 +59,14 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
 
   const ev = await chQueryRows(
     "SELECT hugo_gene_symbol AS gene, variant_type AS vt, mutation_type AS mt, mutation_variant AS mv, cna_alteration AS cna,\n" +
-    "       driver_filter AS df, driver_filter_annotation AS dfa, driver_tiers_filter AS dt, driver_tiers_filter_annotation AS dta, toUInt8(" + germlineCondSql() + ") AS germ\n" +
+    "       driver_filter AS df, driver_filter_annotation AS dfa, driver_tiers_filter AS dt, driver_tiers_filter_annotation AS dta, toUInt8(" + germlineCondSql() + ") AS germ,\n" +
+    "       if(variant_type = 'structural_variant', " + SV_EVENT_KEY + ", '') AS svk\n" +
     "FROM " + db + ".genomic_event_derived\n" +
     "WHERE " + genomicStudySql(study) + " AND " + idCol + " = " + uid + "\n" +
     "  AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")", conn);
   const rows = ev.rows.map((r) => ({ pid: id, gene: r[0] as string, vt: r[1] as string, mt: r[2] as string, mv: r[3] as string, cna: r[4] as string,
-    df: (r[5] as string) || "", dfa: (r[6] as string) || "", dt: (r[7] as string) || "", dta: (r[8] as string) || "", germ: Number(r[9]) === 1 }));
+    df: (r[5] as string) || "", dfa: (r[6] as string) || "", dt: (r[7] as string) || "", dta: (r[8] as string) || "", germ: Number(r[9]) === 1,
+    ...(r[10] ? { svk: r[10] as string } : {}) }));
 
   const panelRows = await chQueryRows(
     "SELECT sp.gene_panel_id AS panel, groupUniqArray(pg.gene) AS covers\n" +
@@ -80,7 +83,7 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
   const settings = forData(normalizeDisplay(spec.display, spec.drivers).drivers!, rows.some((r) => r.dt));
   // a germline mutation the settings hide is not in the figure, so not in its tooltip
   const shown = rows.filter((r) => !(settings.hideGermline && r.vt === "mutation" && r.germ));
-  const annotation = await driverAnnotation(settings, shown, genes, study);
+  const annotation = await driverAnnotation(settings, shown, genes, study, () => conn);
 
   const label = (r: typeof rows[number]): { kind: string; alteration: string } => {
     if (r.vt === "mutation") return { kind: r.mt || "Mutation", alteration: r.mv || "" };

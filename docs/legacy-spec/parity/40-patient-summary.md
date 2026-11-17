@@ -22,10 +22,10 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 35 |
-| 🟡 partial | 25 |
-| 🔶 different | 12 |
-| ❌ missing | 15 |
+| ✅ match | 41 |
+| 🟡 partial | 26 |
+| 🔶 different | 6 |
+| ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
@@ -123,7 +123,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-SH-1 | ❌ | B | Title "cbio-lab" on every patient; no meta description |
+| PAT-SH-1 | ✅ | B | "Patient: P04" / "Sample: P04_Pri", description "P04 from Low-Grade Gliomas (UCSF, Science 2014)" (set while the page shows them, put back on leaving) |
 | PAT-SH-2 | 🟡 | B | "Patient:" / "Samples:" rows ✅; no user-circle icon; study is id + name text in a summary card, not a link to the study; pager right ✅ |
 | PAT-SH-3 | ✅ | B | Skeleton rows while the header loads; tabs load separately |
 | PAT-SH-4 | 🟡 | B | Unknown patient → "no patient NOPE in lgg_ucsf_2014", but tabs still render with "cohort's patient list is empty" refusals |
@@ -192,10 +192,10 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-TL-TT-1 | 🔶 | C | Hover only; no click-to-pin, no Esc, no 100 ms linger |
+| PAT-TL-TT-1 | ✅ | B | Hover shows it; gone 100 ms after the pointer leaves (the pointer may rest on it); a click pins it, a second click or × lets it go; Esc and leaving the page close it |
 | PAT-TL-TT-2 | 🟡 | C | Attributes with `_`→space, DATE / START / END formatted + "(day n)" ✅; no Markdown links / iframe |
-| PAT-TL-TT-3 | 🔶 | C | Sample row: event attributes + "· sample n"; no sample clinical attributes |
-| PAT-TL-TT-4 | 🔶 | C | Up to 4 events stacked + "and N more"; no `[<] i of n [>]` paging or keys |
+| PAT-TL-TT-3 | ✅ | B | Sample row: SAMPLE ID, then the event's attributes merged with the sample's own clinical attributes, keys upper-cased with spaces, sorted, then START DATE (lgg P04_Pri: CANCER TYPE Glioma … TMB NONSYNONYMOUS 0.4); SAMPLE ID once, the portal's repeat not copied; a peer's patient has no sample attributes to add |
+| PAT-TL-TT-4 | 🟡 | B | One event at a time, "‹ i of n events ›", ←/↓ previous and →/↑/space next, wrapping ✅ (msk_chord P-0000012 Treatment: 1 of 2 → 2 of 2); no "Plotted y value is the max of simultaneous events" on line-chart rows |
 
 ### §3 Timeline — axis, zoom, download
 
@@ -227,7 +227,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 |---|---|---|---|
 | PAT-MT-1 | 🟡 | BC | Same rows (80/64/16); uncalled not listed (lgg has none); header "80 Mutations" ✅; 25 rows/page (legacy 10); default sort gene-grouped, driver genes first (`patient-alterations.ts:149`) vs Annotation desc; no "not profiled for mutations" alert |
 | PAT-MT-2 | 🔶 | B | Default: Samples · Gene · Protein Change · Annotation (OncoKB) · Mutation Type · Copy # · Cohort % · Allele Freq; Samples shown with 1 sample; Copy # shown with >1 sample; no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅ (17 columns) |
-| PAT-MT-3 | 🔶 | B | One value = highest VAF among samples (`patient-alterations.ts:127`), 2 decimals; no bars, no reads tooltip, no header VAF plot |
+| PAT-MT-3 | 🟡 | B | One sample in view: the VAF as text ✅; several: a 6-px bar per sample, VAF × 12 px, sample colour ✅ (lgg P04 IDH1 R132C four bars); tooltip "0.38 (46 variant reads out of 121 total)" per sample ✅; sort by the samples' VAFs in sample order, null last ✅ (`check:patient-vaf`); no header VAF plot; download keeps the highest VAF, not the per-sample list |
 | PAT-MT-4 | 🟡 | B | Marker per carrying sample, "--" where not (equal-width slots) ✅; no grey not-profiled pill, no uncalled opacity |
 | PAT-MT-5 | ❌ | B | No mRNA Expr. column (P3 legacy 25 %, 29 % …) |
 | PAT-MT-6 | ❌ | C | No gene filter menu |
@@ -246,9 +246,9 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-SV-1 | 🟡 | C | All SV rows of the patient; merged by (gene1, gene2, class, event, pos1, pos2), unsorted — A–B and B–A stay apart (`patient-alterations.ts:221`) |
+| PAT-SV-1 | ✅ | BC | One row per the portal's key, both genes, positions and chromosomes and the class sorted (generateStructuralVariantId), so A–B and B–A merge; the row's fields one record's: paad_msk_2025 C-873T8K's 4 FGFR2/MYOF records (both orders, 2 samples) are 1 row on both sides (`check:patient-sv`) |
 | PAT-SV-2 | 🟡 | B | Empty: "0 Structural Variants … no rows" ✅; no "not profiled" alert (lgg) |
-| PAT-SV-3 | 🔶 | B | Samples · Gene 1 · Gene 2 · Variant Class · Event Info · Breakpoint Type · Connection Type; no Status badge, no Annotation (tracked), +13 optional columns |
+| PAT-SV-3 | 🟡 | B | Samples · Gene 1 · Gene 2 · Status (s / g badge, not sortable) · Variant Class · Event Info · Connection Type ✅; Breakpoint Type hidden ✅; no Annotation (tracked), +13 optional columns |
 | PAT-SV-4 | 🐞 ok | C | No SV gene filter |
 | PAT-SV-5 | ❌ | C | No server column config (tracked: Instance defaults) |
 
@@ -268,16 +268,16 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-STM-1 | 🔶 | BC | alt/(alt+ref) identical per sample (88/88); table shows max over samples; 2 decimals always (no 4-decimal <0.01); double rounding misprints 5/64 (bug); VAF 0 legacy bugs not copied |
-| PAT-STM-2 | 🟡 | BC | Numerator any mutation (not uncalled) ✅; denominator = samples profiled for the gene (invariant 7; equals the sequenced list on WES and IMPACT341 genes); "x.x%" not integer / "<1%"; no keyword numerator B, bar, tooltip, MutSig badge |
-| PAT-STM-3 | 🟡 | BC | Same alteration (±2) ÷ samples profiled for the gene by the CNA panel; numbers equal; "0.6%" vs "<1%"; no tooltip, no GISTIC |
+| PAT-STM-1 | ✅ | BC | alt/(alt+ref) per sample, each drawn (P04's four IDH1 reads equal the portal API's: 46/75, 61/101, 38/61, 62/94); 4 decimals below 0.01, else 2 (`portalVaf`); TCGA-A6-2671 APC 10/57 shows 0.18; VAF 0 legacy bugs not copied |
+| PAT-STM-2 | 🟡 | BC | Numerator any mutation (not uncalled) ✅; denominator = samples profiled for the gene (invariant 7; equals the sequenced list on WES and IMPACT341 genes); "72%", "<1%", "0%" as getPercentage ✅ (APC on TCGA-A6-2671: portal 387/534 "72%", ours 72.47 → "72%"); no keyword numerator B, bar, tooltip, MutSig badge |
+| PAT-STM-3 | 🟡 | BC | Same alteration (±2) ÷ samples profiled for the gene by the CNA panel; numbers equal; "<1%" and rounded % as getPercentage ✅ (ANK1 27/592 "5%"); no tooltip, no GISTIC |
 | PAT-STM-4 | ❌ | B | No mRNA percentile |
 | PAT-STM-5 | ✅ | BC | ≥50 kb and \|mean\| ≥ 0.2, toFixed(1) (`igv.ts:75-84`); 48.8 %, 27.8 % |
 | PAT-STM-6 | ✅ | B | 12/28/18/55, 64, 16 |
 | PAT-STM-7 | ❌ | C | No VAF histogram / KDE plot |
 | PAT-STM-8 | ❌ | C | No header signature bar (tracked) |
 | PAT-STM-9 | ❌ | B | No TMB-H / MSI-H badges |
-| PAT-STM-10 | 🟡 | C | Span floors ✅; tooltip tables show raw values (no 1-decimal rounding, e.g. TMB 0.933333333333) |
+| PAT-STM-10 | ✅ | BC | Span floors ✅; the header's tooltip tables write a non-integer to one decimal, "< 0.1" when it rounds to 0 (`portalClinicalValue`): TCGA-A6-2671-01 Fraction Genome Altered 0.4881 → "0.5" |
 | PAT-STM-11 | 🟡 | C | `formatDays` identical (`timeline-tracks.ts:215`); 365-day ticks, trims ✅; line-chart y rule not checked |
 | PAT-STM-12 | 🟡 | BC | Header/timeline: collection day, type rank, natural id ✅ (`timeline-tracks.ts:196`); tables number without days (`alterations/run.ts:101`, tracked known issue) |
 | PAT-STM-13 | ✅ | BC | Sorted panel ids → P1…Pn, W for WES (`igv.ts:100-107`) |

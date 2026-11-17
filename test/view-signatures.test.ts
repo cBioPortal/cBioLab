@@ -6,7 +6,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runSignatures } from "../lib/views/signatures/run.ts";
 import { signaturePatientsSource, signatureValuesSource } from "../lib/views/signatures/sql.ts";
-import { SIGNIFICANT_P, channelClass, defaultVersion, natural, pairsOf, pctText, signatureFamilies, signatureRows, spectrumOf, spectrumUnit, versionLabel } from "../lib/views/signatures/data.ts";
+import { SIGNIFICANT_P, channelClass, defaultVersion, natural, pairsOf, pctText, signatureFamilies, signatureRows, spectrumOf, spectrumPct, spectrumUnit, versionLabel } from "../lib/views/signatures/data.ts";
 import { COUNT_TIP, ROW_CLICK_HINT, channelColor, channelTick, countAxisMax, countLabel, indelBox, percentAxisMax, referenceAxisMax, referenceTick,
   spectrumAxisTitle, spectrumTick, typeOption } from "../lib/views/signatures/data.ts";
 import { REFERENCE_SOURCE, referenceChannel, referenceKey, referenceProfile, referenced } from "../lib/views/signatures/reference.ts";
@@ -278,7 +278,7 @@ describe("the figure, text and method", () => {
     const out = kindText(signaturesKind, v);
     assert.match(out[0], /SBS7a \(UV\): 75% \* \| 40%/);
     assert.match(out[0], /… 1 more signatures at 0/);
-    assert.match(out[0], /T1's spectrum: 40 mutations in 2 channels; largest: T\[C>T\]G 30 \(75\.0%\)/);
+    assert.match(out[0], /T1's spectrum: 40 mutations in 2 channels; largest: T\[C>T\]G 30 \(75%\)/);
     assert.match(out[0], /Not profiled for mutational signatures: T3/);
     assert.equal(signaturesKind.title!(v as never), "Mutational signatures — P1");
     assert.match(kindText(signaturesKind, { ...v, signatures: { ...v.signatures, patient: null } })[0], /patients to choose from/);
@@ -407,7 +407,7 @@ describe("the portal's spectrum chart: colours, labels, axes and the COSMIC refe
     assert.match(svg, />&gt;=40</, "the spectrum axis cut at 40");
     assert.match(svg, /T<tspan fill="red">C<\/tspan>G/, "the mutated base in its class's colour");
     assert.match(svg, /SBS1 · T\[C&gt;T\]G: [\d.]+% of the signature's mutations \(COSMIC v3\.3 \(GRCh37\)\)/);
-    assert.match(svg, /T\[C&gt;T\]G: 30 of 40 single base substitutions \(75\.0%\), past the axis/);
+    assert.match(svg, /T\[C&gt;T\]G: 30 of 40 single base substitutions \(75%\), past the axis/);
     assert.match(svg, /Y-axis Max 40/);
     assert.match(svg, /Below: SBS1.s reference/);
     assert.ok(svg.indexOf("Sample: T1") < svg.indexOf("Signature contributions"), "the spectrum comes first");
@@ -422,4 +422,30 @@ describe("the portal's spectrum chart: colours, labels, axes and the COSMIC refe
     assert.deepEqual(lintSvg(ids), []);
     for (const re of [/Indels \(%\)/, />Homopolymer length</, />Number of repeat units</, />Microhomology</, />6\+</, />5\+</, /Small insertions and deletions \(ID\) count: 4/]) assert.match(ids, re);
   });
+});
+
+test("S1 (PTB-STM-6): spectrumPct is Math.round(100*count/total), 0 when total is 0", () => {
+  const cases: [number, number, number][] = [[1, 3, 33], [2, 3, 67], [1, 8, 13], [0, 0, 0], [5, 0, 0]];
+  for (const [c, t, want] of cases) assert.equal(spectrumPct(c, t), want, c + "/" + t);
+});
+
+test("S1 (PTB-STM-6): the method record's percent check values are whole numbers", () => {
+  const common = { cohorts: ["A"], queryText: "", sortName: "Samples", desc: true, shown: 1, lists: [], excluded: [], instances: 1, patient: { study: "s1", id: "P1" }, version: "SBS",
+    profiles: { contribution: "c", pvalue: "p", counts: "n" }, profiled: ["T1"], signatures: 2 };
+  const channels = [1, 2, 5].map((count, i) => ({ entity: "e" + i, label: "C" + i, group: "C>A", count }));
+  const m = signaturesMethod({ ...common, spectrum: { sample: "T1", total: 8, channels } });
+  const want = [13, 25, 63];
+  channels.forEach((c, i) => {
+    const v = m.check![`signatures:${c.label}:percent`].v;
+    assert.ok(Number.isInteger(v), c.label + " " + v);
+    assert.equal(v, want[i]);
+  });
+});
+
+test("S1 (PTB-STM-6): the figure's channel tooltips state whole percents", async () => {
+  const v = await run({}) as ViewResult & { signatures: SignaturesResult };
+  const svg = signaturesSvg(v as never, { width: 800, theme: "light" })!;
+  const tips = [...svg.matchAll(/<title>[^<]* of 40 single base substitutions \(([^)]*)\)/g)].map((m) => m[1]);
+  assert.ok(tips.length > 0);
+  for (const t of tips) assert.match(t, /^\d+%/, t);
 });

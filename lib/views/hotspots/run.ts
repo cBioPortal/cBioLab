@@ -8,6 +8,7 @@ import { isGrch38 } from "../../mutation-cell-text.ts";
 import { studyGenomeSql } from "../../federation-views.ts";
 import { hasViewAggregates } from "../../federation.ts";
 import type { HotspotsView, HotspotGene } from "./types.ts";
+import { driverSourceText, resolveDrivers } from "../../driver-settings.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
@@ -22,11 +23,12 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const hide = [...new Set(hv.hide || [])];
   { const e = checkCodons(hv.codons, uniq); if (e) return untimed({ kind: "hotspots", error: e }); }
   const codons = pruneCodons(hv.codons && Object.fromEntries(Object.entries(hv.codons).map(([g, ps]) => [g, [...new Set(ps)].sort((a, b) => a - b)])), uniq);
+  if (hv.drivers !== undefined) { try { resolveDrivers(hv.drivers); } catch (e) { return untimed({ kind: "hotspots", error: (e as Error).message }); } }
   const cn = vNames[0];
   const studies = cohorts[cn].studies;
   // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
   const [reports, proteins] = await Promise.all([
-    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql))),
+    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql, hv.drivers))),
     Promise.all(uniq.map((g) => fetchProteinInfo(g)))
   ]);
   // every queried gene, an empty one included: the portal keeps its tab and draws its plot empty
@@ -45,14 +47,16 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const annotated = reports.every((r) => r.annotated);
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
-  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
+  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(annotated ? {} : { annotated: false }), ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
     participation: participationFor(studies, false),
     note: (vNames.length > 1 ? "A lollipop draws one cohort: this shows “" + cn + "” only; " +
         vNames.slice(1).map((n) => "“" + n + "”").join(", ") + (vNames.length === 2 ? " is" : " are") + " not drawn. " : "") +
       "Mutations in “" + cn + "” by protein position, as cBioPortal's mutation tab draws them: one stem per codon" +
       " (the stored protein start position), its height the number of distinct patient + protein change pairs there." +
       " Colour is the codon's dominant mutation type, putative drivers before VUS" +
-      (annotated ? " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
+      (!annotated ? (hv.drivers ? " (no driver source is switched on or offered here, so mutations are counted by type alone, as the portal does with annotation off)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).")
+        : hv.drivers ? " (driver = any switched-on source of the page's driver settings: " + driverSourceText(resolveDrivers(hv.drivers), "OncoKB, pinned", "a Cancer Hotspot of its kind in the stored Genome Nexus annotation") + ")."
+        : " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
       (empty.length ? " " + empty.join(", ") + (empty.length === 1 ? " has" : " have") + " no mutations in “" + cn + "”: " + (empty.length === 1 ? "its plot is" : "their plots are") +
         " drawn empty, with no somatic mutation frequency, as the portal draws a gene with none." : "") +
