@@ -15,9 +15,10 @@ import { patientSql, type PatientSql } from "./sql-kinds.ts";
 export type TextFilterOp = "contains" | "notContains" | "equals" | "notEquals" | "startsWith" | "endsWith" | "regex";
 export const TEXT_FILTER_OPS: readonly TextFilterOp[] = ["contains", "notContains", "equals", "notEquals", "startsWith", "endsWith", "regex"];
 
-/** One column's filter: a text condition, a set of exact values, or a numeric range (inclusive). */
+/** One column's filter: a text condition, a set of exact values, a numeric range (inclusive), or "has a value". */
 export type ColumnFilter =
   | { op: TextFilterOp; value: string }
+  | { present: true }
   | { values: string[] }
   | { min?: number; max?: number };
 
@@ -58,6 +59,8 @@ export interface RowSource {
   defaultOrder: string;
   /** after any sort, so the order is total and every page and the download agree */
   tiebreak: string;
+  /** the columns of `rows` naming a row's sample and patient: the counts then say how many of each the query keeps */
+  units?: { sample: string; patient: string };
 }
 
 export const SEARCH_MAX = 200;
@@ -103,9 +106,10 @@ export function checkQuery(q: TableQuery, all: { id: string; numeric: boolean; u
 }
 
 function checkFilter(f: unknown, numeric: boolean): string | null {
-  const shape = "a filter is { op, value }, { values: [...] } or { min?, max? }";
+  const shape = "a filter is { op, value }, { values: [...] }, { min?, max? } or { present: true }";
   if (!f || typeof f !== "object") return shape;
   const o = f as Record<string, unknown>;
+  if ("present" in o) return o.present === true && Object.keys(o).length === 1 ? null : "{ present: true } keeps the rows with a value, and takes nothing else";
   if (!["op", "values", "min", "max"].some((k) => k in o)) return shape;
   if ("min" in o || "max" in o) {
     if (!numeric) return "a range filter needs a numeric column; use { op, value } or { values } for text";
@@ -128,6 +132,7 @@ function checkFilter(f: unknown, numeric: boolean): string | null {
 
 export function isRange(f: ColumnFilter): f is { min?: number; max?: number } { return "min" in f || "max" in f; }
 export function isValues(f: ColumnFilter): f is { values: string[] } { return "values" in f; }
+export function isPresent(f: ColumnFilter): f is { present: true } { return "present" in f; }
 
 function textCond(x: string, f: { op: TextFilterOp; value: string }): string {
   const v = sq(f.value), lx = "lowerUTF8(" + x + ")", lv = "lowerUTF8(" + v + ")";
@@ -143,6 +148,7 @@ function textCond(x: string, f: { op: TextFilterOp; value: string }): string {
 }
 
 function filterCond(col: QueryColumn, f: ColumnFilter): string {
+  if (isPresent(f)) return col.text + " != ''";
   if (isRange(f)) {
     const n = col.num || col.text, r = f;
     return [n + " IS NOT NULL", ...(r.min != null ? [n + " >= " + Number(r.min)] : []), ...(r.max != null ? [n + " <= " + Number(r.max)] : [])].join(" AND ");
@@ -200,7 +206,10 @@ export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study
 
 /** Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. */
 export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): PatientSql {
-  return patientSql(src.with + "SELECT cohort, study, countIf(" + whereSql(src, q, defaults) + ") AS n, count() AS all FROM rows GROUP BY cohort, study");
+  const where = whereSql(src, q, defaults);
+  return patientSql(src.with + "SELECT cohort, study, countIf(" + where + ") AS n, count() AS all" +
+    (src.units ? ", uniqExactIf(" + src.units.sample + ", " + where + ") AS ns, uniqExactIf(" + src.units.patient + ", " + where + ") AS np" : "") +
+    " FROM rows GROUP BY cohort, study");
 }
 
 /**
@@ -252,7 +261,9 @@ export function describeQuery(q: TableQuery, all: { id: string; name: string }[]
   const s = (q.search || "").trim();
   if (s) parts.push("containing “" + s + "” in a shown column");
   for (const [id, f] of Object.entries(q.filters || {})) {
-    if (isRange(f)) {
+    if (isPresent(f)) {
+      parts.push(name(id) + " has a value");
+    } else if (isRange(f)) {
       const r = f;
       parts.push(name(id) + (r.min != null && r.max != null ? " from " + r.min + " to " + r.max : r.min != null ? " ≥ " + r.min : " ≤ " + r.max));
     } else if (isValues(f)) {

@@ -29,9 +29,12 @@ export function pointTip(d: PlotData, id: string, layer: string): PointTip | nul
   const inLayer = own && [...(own.points || []), ...(own.shared || [])].find((p) => p.id === id);
   const rows: [string, string][] = [];
   if (d.shape === "scatter") {
-    const pt = inLayer && "x" in inLayer ? inLayer : (d.xyPoints || []).find((p) => p.id === id);
+    const base = (d.xyPoints || []).find((p) => p.id === id);
+    const pt = inLayer && "x" in inLayer ? inLayer : base;
     if (!pt) return null;
     rows.push([axisTitle(d.x), value(d.x, pt.x)], [axisTitle(d.y), value(d.y, pt.y)]);
+    if (d.colorLabel && base?.c != null) rows.push([d.colorLabel, base.c || "no value"]);
+    if (d.ringLabel && base?.r != null) rows.push([d.ringLabel, base.r || "no value"]);
   } else if (d.shape === "box") {
     // a layer's point carries no colour or ring; the plotted cohort's own point for the case does
     const base = (d.points || []).find((p) => p.id === id);

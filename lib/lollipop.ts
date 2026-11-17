@@ -3,6 +3,7 @@
 // from the portal is a bug here rather than a design choice. Pure except fetchProteinInfo.
 import type { LollipopReport } from "./federation.ts";
 import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hotspots/types.ts";
+import type { TableQuery } from "./table-query.ts";
 
 // ---- mutation types: getCanonicalMutationType / getProteinImpactTypeFromCanonical ----------
 
@@ -100,6 +101,46 @@ export function clickCodon(selected: readonly number[], pos: number, multi: bool
   const next = multi ? selected.filter((p) => p !== pos) : [];
   if (!on) next.push(pos);
   return [...new Set(next)].sort((a, b) => a - b);
+}
+
+/** The lollipop's y-axis title, as the portal's results page words it (a stem counts patients). */
+export const LOLLIPOP_Y_TITLE = "# patients";
+
+/** A tick on the lollipop's axes; only the ticks the portal labels carry a label. */
+export interface LollipopTick { pos: number; label?: string }
+
+/**
+ * The portal's tick step for an axis over [0, range]: the first candidate that gives fewer than
+ * maxTickCount − 1 steps, else the first power of ten from 10 up that does.
+ */
+export function lollipopTickInterval(candidates: number[], range: number, maxTickCount: number): number {
+  const c = candidates.find((x) => range / x < maxTickCount - 1);
+  if (c != null) return c;
+  let step = 10;
+  while (range / step > maxTickCount - 1) step *= 10;
+  return step;
+}
+
+/** every multiple of `step` strictly inside (0, max), labelled where `labelled` says */
+function between(step: number, max: number, labelled: (t: number) => boolean): LollipopTick[] {
+  const out: LollipopTick[] = [];
+  for (let t = step; t < max; t += step) out.push(labelled(t) ? { pos: t, label: String(t) } : { pos: t });
+  return out;
+}
+
+/**
+ * The x axis over a protein of `length` codons: "0", "<length>aa", and the steps between, every other
+ * one labelled except one within two thirds of a step of the end.
+ */
+export function lollipopXTicks(length: number): LollipopTick[] {
+  const step = lollipopTickInterval([50, 100, 200, 250, 500, 1000, 2500, 5000, 10000, 25000], length, 16);
+  return [{ pos: 0, label: "0" }, ...between(step, length, (t) => length - t > (2 * step) / 3 && t % (2 * step) === 0), { pos: length, label: length + "aa" }];
+}
+
+/** The y axis up to `max`: "0" and the maximum (">= " before it when a stem is taller), the steps between unlabelled. */
+export function lollipopYTicks(max: number, capped: boolean): LollipopTick[] {
+  const step = lollipopTickInterval([1, 2, 5, 10, 20, 50, 100, 200, 500], max, 10);
+  return [{ pos: 0, label: "0" }, ...between(step, max, () => false), { pos: max, label: (capped ? ">= " : "") + max }];
 }
 
 /** The selection with only the genes given kept and empty lists dropped; undefined when nothing is left. */
@@ -396,4 +437,19 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}),
     somaticSamples, cohortSamples, tally, ...(protein?.ids ? { ids: protein.ids } : {})
   };
+}
+
+/** the mutation table's filters that are the lollipop's own selection — its grid's cells and its stems — and so never narrow it */
+export const LOLLIPOP_OWN_FILTERS: ReadonlySet<string> = new Set(["alteration", "proteinPos"]);
+/**
+ * The part of the mutation table's query that narrows the lollipop and badges (the portal's filtered
+ * data): its search and its column filters other than LOLLIPOP_OWN_FILTERS; null when nothing does.
+ */
+export function lollipopNarrowing<Q extends TableQuery>(q: Q): Q | null {
+  const filters = Object.fromEntries(Object.entries(q.filters || {}).filter(([id]) => !LOLLIPOP_OWN_FILTERS.has(id)));
+  const search = (q.search || "").trim();
+  if (!search && !Object.keys(filters).length) return null;
+  const out = { ...q } as Q;
+  delete out.filters; delete out.search; delete out.sort;
+  return { ...out, ...(search ? { search } : {}), ...(Object.keys(filters).length ? { filters } : {}) };
 }

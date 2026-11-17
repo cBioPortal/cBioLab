@@ -46,6 +46,7 @@ import { useToolActions } from "./use-tool-actions.ts";
 import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { cellExplorerFor } from "../../lib/cell-explorer.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
+import { ClinicalDataTab } from "./explore-clinical-tab.tsx";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { PAGE_TAB } from "../_ui/toolbar.ts";
@@ -175,6 +176,8 @@ export default function AnalysisPage() {
   // document store may already have written the URL
   const openedWith = useRef(typeof sp.doc === "string" ? sp.doc : null);
   const [tab, setTab] = useState<typeof TABS[number]>(() => tabFromParams(sp));
+  /** Explore's own tabs, the portal's study view's: its charts, or the Clinical Data table */
+  const [svTab, setSvTab] = useState<"summary" | "clinical">("summary");
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -530,11 +533,24 @@ export default function AnalysisPage() {
               show — Analyze lives in the studies card above regardless of whether any
               filters exist, so this block's whole job now is the filters themselves. */}
           <ExploreBar ctx={exploreCtx} />
+          {/* the portal's study view tabs: Clinical Data only while the selection holds a sample */}
+          {!addMode && explore && exStudies.length > 0 && <Tabs value={explore.draftCount === 0 ? "summary" : svTab} className="mb-3"
+            onValueChange={(v) => setSvTab(v as "summary" | "clinical")}>
+            <TabsList variant="line" aria-label="study view sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
+              <TabsTrigger value="summary" className={PAGE_TAB}>Summary</TabsTrigger>
+              {explore.draftCount !== 0 && <TabsTrigger value="clinical" className={PAGE_TAB}>Clinical Data</TabsTrigger>}
+            </TabsList>
+          </Tabs>}
+          {!addMode && explore && exStudies.length > 0 && explore.draftCount !== 0 && svTab === "clinical" &&
+            <ClinicalDataTab selection={(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; })()} studies={exStudies}
+              charts={(visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number }[])
+                .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0 }))} />}
           {/* A facet click starts a recount, and a second click before it lands
               would race it — so the facets themselves greyscale until it does.
               The study picker above stays live: choosing studies is a staged,
               separately-submitted action, not an immediate filter. */}
-          <div className={exploreBusy ? "busy" : undefined} aria-busy={exploreBusy}>
+          <div className={exploreBusy ? "busy" : undefined} aria-busy={exploreBusy}
+            hidden={!addMode && !!explore && explore.draftCount !== 0 && svTab === "clinical"}>
           {exStudies.length === 0 && <div className="card"><p className="note t-md flush">
             Choose one or more studies above to explore.</p></div>}
           {/* first load: placeholders shaped like the facet grid, so it does not jump when it lands */}

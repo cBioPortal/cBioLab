@@ -63,7 +63,7 @@ The pure rules are in `lib/study-view-gene-tables.ts`, and the rows come from `g
 | GD2 | Mutated header | `Gene`, `MutSig(Q-value)`, `# Mut`, `#`, `Profiled Samples`, `Freq` | SVU:5085-5128 |
 | GD3 | SV header | `Gene`, `# Structural Variant`, `#`, `Profiled Samples`, `Freq` | SVU:5176-5219 |
 | GD4 | CNA header | `Gene`, `Gistic(Q-value)`, `Cytoband`, `CNA`, `Profiled Samples`, `#`, `Freq` | SVU:5221-5266 |
-| GD5 | Cells | Gene; the q-value empty (not read yet: the warehouse's `mut_sig` and `gistic` tables hold it for some studies, a later change; the portal writes `''` when it has none); events; altered samples; profiled samples; the call `AMP` / `HOMDEL` and the cytoband (empty when none) for CNA | SVU:5085-5266 |
+| GD5 | Cells | Gene; the row's q-value (QV7; `''` when it has none); events; altered samples; profiled samples; the call `AMP` / `HOMDEL` and the cytoband (empty when none) for CNA | SVU:5085-5266 |
 | GD6 | ⚠ CNA columns | Under `Profiled Samples` the profiled count and under `#` the altered count. The portal writes them the other way round under the same headers (altered under "Profiled Samples"), a bug | SVU:5231-5250 |
 | GD7 | ⚠ Freq | The frequency the table shows (altered on a covering panel ÷ profiled), as `portalFreq` writes it; `NA` with no profiled sample. The portal's download divides every altered sample by the profiled, so it differs from its own screen when a call is off-panel | SVU:5112-5116 vs MST:389-410 |
 | GD8 | Rows and order | Every row, whatever the search box holds and however the table is sorted, in the rows' own order: the most events first, then the gene A to Z | SVU:5085-5266 (API order); AM:32, 59, 82 |
@@ -108,3 +108,20 @@ The pure rules are in `lib/study-view-gene-tables.ts`, and the rows come from `g
 | GI1 | Indicator | With Alterations: OncoKB drivers only (the page's alteration filter), the `#` header's filter icon is drawn dark and its tooltip is the portal's filtered text: "Total number of mutations" (mutated), "Total number of fusions" (SV) or "Number of samples with one or more copy number alterations" (CNA), then "This table is filtered based on selections in the Alteration Filter menu." | ChartContainer.tsx:733-739, 879-885, 1056-1063 |
 | GI2 | Off | With every alteration counted, the icon is drawn grey and the tooltip is the plain one (GH1–GH3) | TableHeaderCellFilterIcon.tsx:29; MST:341-342 |
 | GU6 | ⚠ Past the filter limit | A selection holds at most 8 filters, and Intersection adds one per gene (OQL can't AND genes in one query). When the checked genes would take the selection past 8, Intersection is offered but disabled, saying how many filters it would make. Union, one filter, is unaffected. The portal has no limit | `lib/cohort2.ts` (all: 0–8 clauses) |
+
+## MutSig and GISTIC q-values (QV)
+
+Further source: ACSU = backend `src/main/java/org/cbioportal/legacy/service/util/AlterationCountServiceUtil.java`,
+GACU = backend `src/main/java/org/cbioportal/domain/alteration/usecase/GetAlterationCountByGeneUseCase.java`,
+GC = `src/pages/studyView/table/GeneCell.tsx`, MS / GI = `src/shared/components/annotation/MutSig.tsx` / `Gistic.tsx`.
+The q-values are read in `lib/explore.ts` (`geneTables`) from the study's `mut_sig` and `gistic` tables.
+
+| # | Case | Rule | Source |
+|---|---|---|---|
+| QV1 | Mutated genes | A row's q-value is the study's MutSig q-value for the gene (by gene symbol); none when MutSig has no row for it | GACU:120-163 |
+| QV2 | CNA genes | GISTIC regions, each amplified or deleted, list their genes. A row's q-value is the lowest q-value of the regions that list its gene with its own call (an amplified region for AMP, a deleted one for HOMDEL) | ACSU:52-72, 155-167 |
+| QV3 | SV genes | No q-value | GACU (mutations only); cbioportal.org's structural-variant counts carry none |
+| QV4 | Several studies | No q-value on any table | GACU:136-149 (single study); cbioportal.org returns none for two studies |
+| QV5 | Icon | After the gene symbol, when the row has a q-value: "M" on the Mutated table, "G" on the CNA table | GC:84-102; MS:19; GI:22 |
+| QV6 | Tooltip | MutSig: "Candidate driver gene, as determined by the MutSig algorithm." / "MutSig identifies likely driver genes by evaluating the frequency of observed mutations within the entire study." / "Note that not all mutations in this gene are necessarily functional/driver events." / "Q-value: <q>". GISTIC: "Candidate driver gene, as determined by the GISTIC algorithm." / "The GISTIC algorithm identifies likely driver copy number alterations by evaluating the frequency and amplitude of observed CNA events within the entire study." / "Q-value: <q>". `<q>` is `toExponential(3)` (`2.120e-12`; 0 → `0.000e+0`) | MS:27-44; GI:27-42 |
+| QV7 | Download | The MutSig(Q-value) / Gistic(Q-value) column: `0` for 0, otherwise `toExponential(3)`; empty when the row has none | SVU:2431-2437, 5105, 5242 |

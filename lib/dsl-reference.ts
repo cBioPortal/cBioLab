@@ -1199,7 +1199,7 @@ rather than silently ignoring what it does not understand.
 | \`event\` | \`{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}\` | timeline sub-DSL (below) |
 | \`sampleList\` | \`{"kind":"sampleList","ids":["<study>:<id>", ...]}\` or \`{"kind":"sampleList","set":"<id set>"}\` | explicit, cross-study list of sample ids: inline in \`ids\` (up to about 200 KB of ids per study, roughly 10,000 — refused by name past that), or a **stored id set** named by \`set\`, of any size up to 250,000 (see below) |
 | \`patientList\` | \`{"kind":"patientList","ids":["<study>:<id>", ...]}\` or \`{"kind":"patientList","set":"<id set>"}\` | explicit, cross-study list of patient ids, same two forms and limits |
-| \`profiled\` | \`{"kind":"profiled","type":"MUTATION"\\|"CNA"\\|"SV", "gene"?:"KRAS" \\| "genes"?:["KRAS","NRAS"]}\` | patient has a sample on a gene panel for that data type — with \`gene\`, a panel covering that gene (or whole-exome); with \`genes\` (≤32), covering every one of them, the same as one \`gene\` clause per gene in a single clause. Combine with \`not\` to separate wild-type from not-profiled: \`not\` alone keeps patients never tested for the gene |
+| \`profiled\` | \`{"kind":"profiled","type":"MUTATION"\\|"CNA"\\|"SV" \\| "profile":"rna_seq_v2_mrna", "ifHeld"?:true, "gene"?:"KRAS" \\| "genes"?:["KRAS","NRAS"], "anyGene"?:true}\` | patient has a sample on a gene panel for that data type (with \`profile\` instead: in that one profile of the study, any data type, expression and protein included; \`ifHeld\` makes a study without it match nobody rather than refuse) — with \`gene\`, a panel covering that gene (or whole-exome); with \`genes\` (≤32), covering every one of them, the same as one \`gene\` clause per gene in a single clause, or with \`anyGene:true\` covering at least one of them (not wholly unprofiled for the list). Combine with \`not\` to separate wild-type from not-profiled: \`not\` alone keeps patients never tested for the gene |
 | \`caseList\` | \`{"kind":"caseList","id":"sequenced"}\` or \`{"kind":"caseList","category":"all_cases_with_mutation_data"}\` | portal sample list; bare ids get the study prefix. By \`category\` instead (the portal's sample-list categories): each study's list of that category, the first by id — how the portal resolves a multi-study query's case set; a study without one contributes no samples |
 | \`genomicData\` | \`{"kind":"genomicData","gene":G,"profileType":P,"range"\\|"values"}\` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | \`genericAssay\` | \`{"kind":"genericAssay","profileType":P,"entity":E,"range"\\|"values"\\|"measured":true}\` | generic assay values (mutational signatures, …); \`measured\`: any value at all, which a split on an entity uses to give unmeasured patients their own child |
@@ -1390,6 +1390,8 @@ filtered, sorted table; the page is the reader's and is not.
   \`{"op": "contains"|"notContains"|"equals"|"notEquals"|"startsWith"|"endsWith"|"regex", "value": "…"}\`
   (case-insensitive but for \`regex\`, RE2 syntax) or \`{"values": ["…", …]}\` (≤500 exact values; \`""\`
   is blank); a numeric column takes \`{"min"?: n, "max"?: n}\` (inclusive; a blank value fails it).
+  Any column takes \`{"present": true}\`: the rows with a value, whatever it is (a numeric
+  column's \`>89\` included).
 - \`sort: {"column": id, "desc"?: true}\` — numbers as numbers, missing values last either way.
 
 All four run in the database across every cohort and study together, so the order is global and
@@ -1834,8 +1836,10 @@ Leaf kinds:
 - Attributes named "custom:<dataset>/<COLUMN>" are the user's own uploads (Explore → Custom data),
   usable anywhere a clinical attribute is. Use only ones explore_get_facets lists; they are stored on
   the server, so whoever opens a shared link must be logged in to run it.
-- {"kind":"profiled","type":"MUTATION"|"CNA"|"SV","gene"?:"KRAS"|"genes"?:[...]} — patient was
-  profiled for that data type, on a panel covering the gene(s) if given. A wild-type cohort is
+- {"kind":"profiled","type":"MUTATION"|"CNA"|"SV" | "profile":"rna_seq_v2_mrna","ifHeld"?:true,
+  "gene"?:"KRAS"|"genes"?:[...],"anyGene"?:true} — patient was profiled for that data type (or in that
+  one profile, expression and protein too), on a panel covering the gene(s) if given — every one of
+  \`genes\`, or with anyGene at least one. A wild-type cohort is
   {"not": oql "GENE:"} AND profiled with that gene: "not" alone keeps patients never tested for it.
 - {"kind":"caseList","id":"sequenced"|"cna"|full stable id} — portal case lists.
 - {"kind":"genomicData","gene":"CDKN2A","profileType":"cna","range":{"lte":-2}} — continuous
