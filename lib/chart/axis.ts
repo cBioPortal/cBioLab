@@ -23,17 +23,20 @@ export const bottomAxisHeight = (title?: string): number => TICK_GAP + FS.small 
  * A value axis on the left at `x`, gridlines across to `gridTo` when given. The title runs up the
  * left edge of the room `leftAxisWidth` reserved.
  */
-export function axisLeft(s: Scale, x: number, pal: AxisPal, o: { title?: string; gridTo?: number; fmt?: (v: number) => string; line?: boolean } = {}): string {
+export function axisLeft(s: Scale, x: number, pal: AxisPal, o: { title?: string; gridTo?: number; fmt?: (v: number) => string; line?: boolean;
+  /** a tick mark this long left of the axis at each tick */ tickLen?: number } = {}): string {
   const fmt = o.fmt || s.fmt;
   const out: string[] = [];
   for (const t of s.ticks) {
     const y = s(t);
     if (o.gridTo != null) out.push(`<line x1="${x}" y1="${r1(y)}" x2="${o.gridTo}" y2="${r1(y)}" stroke="${pal.line}" stroke-width="${SW.hair}"/>`);
-    out.push(label(x - TICK_GAP, y + FS.small * 0.35, fmt(t), { size: FS.small, fill: pal.muted, anchor: "end" }));
+    if (o.tickLen) out.push(`<line x1="${x - o.tickLen}" y1="${r1(y)}" x2="${x}" y2="${r1(y)}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
+    const text = fmt(t);
+    if (text) out.push(label(x - TICK_GAP - (o.tickLen ?? 0), y + FS.small * 0.35, text, { size: FS.small, fill: pal.muted, anchor: "end" }));
   }
   if (o.line) out.push(`<line x1="${x}" y1="${s.range[0]}" x2="${x}" y2="${s.range[1]}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
   if (o.title) {
-    const w = leftAxisWidth(s, o.title, fmt);
+    const w = leftAxisWidth(s, o.title, fmt) + (o.tickLen ?? 0);
     const tx = x - w + FS.body * 0.8, ty = (s.range[0] + s.range[1]) / 2;
     out.push(label(tx, ty, o.title, { size: FS.body, fill: pal.ink, anchor: "middle", rotate: -90, maxW: Math.abs(s.range[0] - s.range[1]) }));
   }
@@ -43,9 +46,10 @@ export function axisLeft(s: Scale, x: number, pal: AxisPal, o: { title?: string;
 /**
  * A value axis below the plot, its line at `y`. Labels are centred on their ticks except where that
  * would cross [minX, maxX] (the figure's edges), where they are pulled in; labels that would touch
- * are thinned to every second (third, …) tick.
+ * are thinned to every second (third, …) labelled tick; with `keepEnds`, the first and last labels are always
+ * drawn and a label crowding the last gives way to it. A tick whose label is empty is drawn as a mark alone.
  */
-export function axisBottom(s: Scale, y: number, pal: AxisPal, o: { title?: string; gridTo?: number; fmt?: (v: number) => string; minX?: number; maxX?: number; line?: boolean } = {}): string {
+export function axisBottom(s: Scale, y: number, pal: AxisPal, o: { title?: string; gridTo?: number; fmt?: (v: number) => string; minX?: number; maxX?: number; line?: boolean; keepEnds?: boolean } = {}): string {
   const fmt = o.fmt || s.fmt;
   const minX = o.minX ?? 0, maxX = o.maxX ?? Infinity;
   const ticks = s.ticks;
@@ -54,21 +58,26 @@ export function axisBottom(s: Scale, y: number, pal: AxisPal, o: { title?: strin
     const left = Math.min(Math.max(cx - w / 2, minX), maxX - w);
     return { t, text, w, cx, left };
   });
-  let every = 1;
-  const collides = (k: number) => {
-    let prev = -Infinity;
-    for (let i = 0; i < placed.length; i += k) {
-      if (placed[i].left < prev + 6) return true;
-      prev = placed[i].left + placed[i].w;
+  const labelled = placed.flatMap((p, i) => p.text ? [i] : []);
+  const right = (i: number) => placed[i].left + placed[i].w + 6;
+  const pick = (k: number): number[] => {
+    const ix = labelled.filter((_, j) => j % k === 0);
+    const last = labelled[labelled.length - 1];
+    if (o.keepEnds && labelled.length > 1) {
+      if (ix[ix.length - 1] !== last) ix.push(last);
+      while (ix.length > 2 && right(ix[ix.length - 2]) > placed[last].left) ix.splice(ix.length - 2, 1);
     }
-    return false;
+    return ix;
   };
-  while (every < placed.length && collides(every)) every++;
+  const collides = (ix: number[]) => ix.some((i, j) => j > 0 && placed[i].left < right(ix[j - 1]));
+  let every = 1;
+  while (every < labelled.length && collides(pick(every))) every++;
+  const shown = new Set(pick(every));
   const out: string[] = [];
   placed.forEach((p, i) => {
     if (o.gridTo != null) out.push(`<line x1="${r1(p.cx)}" y1="${o.gridTo}" x2="${r1(p.cx)}" y2="${y}" stroke="${pal.line}" stroke-width="${SW.hair}"/>`);
     out.push(`<line x1="${r1(p.cx)}" y1="${y}" x2="${r1(p.cx)}" y2="${y + 3}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
-    if (i % every === 0) out.push(label(p.left, y + TICK_GAP + FS.small, p.text, { size: FS.small, fill: pal.muted }));
+    if (shown.has(i)) out.push(label(p.left, y + TICK_GAP + FS.small, p.text, { size: FS.small, fill: pal.muted }));
   });
   if (o.line !== false) out.push(`<line x1="${s.range[0]}" y1="${y}" x2="${s.range[1]}" y2="${y}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
   if (o.title) {

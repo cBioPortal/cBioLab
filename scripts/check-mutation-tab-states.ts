@@ -111,7 +111,7 @@ const words = lollipopSummaryText(both.hotspots || [], []);
 ok("EX8 the figure's words (lollipopSummaryText) say BRCA1 has no mutations", saysNone(words, "BRCA1"), words.slice(0, 300));
 const svg = lollipopPanelsSvg(both.hotspots || [], { width: 720 }, "");
 ok("EX2 E5 the figure draws BRCA1's plot with the one line `No BRCA1 mutations in this cohort`, once, and no BRCA1 stem",
-  (svg.match(/No BRCA1 mutations in this cohort/g) || []).length === 1 && /# BRCA1 Mutations/.test(svg) && !/data-gene="BRCA1"/.test(svg),
+  (svg.match(/No BRCA1 mutations in this cohort/g) || []).length === 1 && /# patients/.test(svg) && !/data-gene="BRCA1"/.test(svg),
   "message ×" + (svg.match(/No BRCA1 mutations in this cohort/g) || []).length);
 ok("EX2 KRAS, which has mutations, gets no such line", !/No KRAS mutations/.test(svg));
 

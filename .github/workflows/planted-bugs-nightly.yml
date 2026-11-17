@@ -1,0 +1,129 @@
+# Every planted bug, once a night, on master. A pull request and a push to master plant only the bugs
+# their diff can affect (verify.yml's planted-bugs job); this is the run that plants all of them, so a
+# test weakened far from the bug it guards is still caught within a day. One full run a night, not one
+# per merge, keeps the load on the shared warehouse down.
+#
+# Its report part is kept as the planted-bugs-nightly artifact: the full run /verification's
+# docs/verification/mutants.json is refreshed from (a partial run's mutants.json carries `selection`).
+# When it fails, the open issue "Nightly planted bugs failed" gets the run's failures (opened if none is
+# open), so a bug that survives does not go unseen.
+name: Planted bugs (nightly)
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: planted-bugs-nightly
+  cancel-in-progress: false
+
+jobs:
+  planted-bugs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    permissions:
+      contents: read
+      issues: write
+    env:
+      RECORD: "1"
+      REPORT_DIR: ${{ github.workspace }}/verification-report
+      CLICKHOUSE_MAX_INFLIGHT: "4"
+      PORTAL_CACHE: ${{ github.workspace }}/.portal-cache
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: master
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Versions the peer database pins
+        id: pins
+        run: |
+          echo "clickhouse=$(sed -n 's/^export const CLICKHOUSE_VERSION = "\(.*\)";$/\1/p' scripts/clickhouse-local.ts)" >> "$GITHUB_OUTPUT"
+          echo "cbioportal=$(sed -n 's/^export const CBIOPORTAL_COMMIT = "\(.*\)";$/\1/p' packages/importer/src/setup.ts)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the ClickHouse binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cbiolab/bin
+          key: clickhouse-${{ runner.os }}-${{ runner.arch }}-${{ steps.pins.outputs.clickhouse }}
+
+      - name: Cache cBioPortal's schema and reference files
+        uses: actions/cache@v4
+        with:
+          path: ~/.cbiolab/upstream
+          key: cbioportal-upstream-${{ steps.pins.outputs.cbioportal }}
+
+      - name: Write .env.local from secrets
+        env:
+          CLICKHOUSE_URL: ${{ secrets.CLICKHOUSE_URL }}
+          CLICKHOUSE_USER: ${{ secrets.CLICKHOUSE_USER }}
+          CLICKHOUSE_PASSWORD: ${{ secrets.CLICKHOUSE_PASSWORD }}
+          CLICKHOUSE_DB: ${{ secrets.CLICKHOUSE_DB }}
+        run: |
+          if [ -z "$CLICKHOUSE_URL" ]; then
+            echo "::error::The CLICKHOUSE_* repository secrets are not set; the planted bugs need the warehouse."
+            exit 1
+          fi
+          umask 077
+          for k in CLICKHOUSE_URL CLICKHOUSE_USER CLICKHOUSE_PASSWORD CLICKHOUSE_DB; do
+            [ -n "${!k}" ] && printf '%s=%s\n' "$k" "${!k}" >> .env.local
+          done
+          true
+
+      # the oncoprint-values guard reads the fixture study on connection b
+      - name: Peer database (test/fixtures/peer-study)
+        run: node --env-file=.env.local scripts/peer-db.ts --port 21999 >> "$GITHUB_ENV"
+
+      - name: Today (cbioportal.org's answers are cached for a UTC day)
+        id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache cbioportal.org's answers
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.portal-cache
+          key: portal-answers-${{ steps.day.outputs.day }}
+
+      - name: Every planted bug
+        run: |
+          set -o pipefail
+          npm run check:mutants 2>&1 | tee "$RUNNER_TEMP/planted.log"
+
+      - name: Keep the full run's report part
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: planted-bugs-nightly
+          path: verification-report/
+          if-no-files-found: warn
+
+      - name: Open or update the issue "Nightly planted bugs failed"
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            echo "The nightly planted-bug run on master ($(git rev-parse --short HEAD), $(date -u +%F)) failed: $RUN_URL"
+            echo
+            echo '```'
+            grep -E '^(SURVIVED|FAIL )' "$RUNNER_TEMP/planted.log" 2>/dev/null | head -60 || true
+            grep -E 'planted bugs caught' "$RUNNER_TEMP/planted.log" 2>/dev/null || echo "(no summary line: the run stopped before planting finished; see the log)"
+            echo '```'
+            echo
+            echo "A SURVIVED bug is one no check caught: the checks would miss it if it were real. A FAIL line is a bug that could not be planted (its site moved) or a guard that failed on unmodified code."
+          } > "$RUNNER_TEMP/issue.md"
+          title="Nightly planted bugs failed"
+          n=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number,title -q ".[] | select(.title == \"$title\") | .number" | head -1)
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/issue.md"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/issue.md"
+          fi
