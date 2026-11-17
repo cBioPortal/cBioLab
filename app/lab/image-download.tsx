@@ -12,10 +12,12 @@ export type ImageFormat = "svg" | "png" | "pdf";
 
 /**
  * The menu: one entry per format, in the order given (the portal's order for the figure). `svg`
- * draws the figure for saving, in the light theme; null saves nothing.
+ * draws the figure for saving, in the light theme; null saves nothing. `extra` entries follow the
+ * formats (the portal's additionalRightButtons, e.g. the timeline's "Data (ZIP)").
  */
-export function ImageDownload({ name, formats, svg, label, tip }: {
+export function ImageDownload({ name, formats, svg, label, tip, extra }: {
   name: string; formats: ImageFormat[]; svg: () => string | null; label: string; tip: string;
+  extra?: { label: string; save: () => void }[];
 }) {
   const [failed, setFailed] = useState<string | null>(null);
   const save = (fmt: ImageFormat) => {
@@ -37,6 +39,7 @@ export function ImageDownload({ name, formats, svg, label, tip }: {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           {formats.map((f) => <DropdownMenuItem key={f} onSelect={() => save(f)}>{f.toUpperCase()}</DropdownMenuItem>)}
+          {(extra || []).map((x) => <DropdownMenuItem key={x.label} onSelect={() => { setFailed(null); try { x.save(); } catch (e) { setFailed("Could not make " + x.label + ": " + String((e as Error)?.message || e)); } }}>{x.label}</DropdownMenuItem>)}
         </DropdownMenuContent>
       </DropdownMenu>
     </>
