@@ -15,7 +15,7 @@ import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOff
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { portalTipNumber } from "../../lib/chart/format.ts";
-import { STYLE, stackColor, clinicalLegend, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, thresholdColor, stackColor, clinicalLegend, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { contractToTsv, orderFileName, orderFileText, tabularFileName } from "../../lib/oncoprint-tabular.ts";
@@ -652,7 +652,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       else if (t.numeric) {
         // the exact value where the contract carries it; an older contract has only the drawing code
         const x = t.values ? t.values[hit.ci] : NaN;
-        lines.push({ text: t.label + ": " + (c === -1 ? "no data" : c === -2 ? "N/A" : !Number.isNaN(x) ? portalTipNumber(x, t.kind !== "heatmap")
+        lines.push({ text: t.label + ": " + (c === -1 ? "no data" : c === -2 ? "N/A" : c <= -3 && t.thresholds ? t.thresholds[-3 - c] : !Number.isNaN(x) ? portalTipNumber(x, t.kind !== "heatmap")
           : "≈" + portalTipNumber(numericValue(t, c), t.kind !== "heatmap")) });
       }
       else lines.push({ text: t.label + ": " + (c === -1 ? (t.profiledFor ? STYLE.glyph.profiled.no : "no data") : (t.categories && t.categories[c]) || "Other") });
@@ -1179,7 +1179,8 @@ function Legend({ data, display, colors, shown }: { data: UnpackedContract; disp
             })()
           : t.numeric
           ? <>{sw("linear-gradient(90deg," + [0, 64, 128, 191, 255].map((c) => heatColor(t, c, S)).join(",") + ")", 44)}{t.min} → {t.max}
-              {t.ramp === "vaf" && Array.prototype.includes.call(t.cells, -2) && <span style={{ marginLeft: 6 }}>{sw(S.glyph.heatNull.fill)}{S.glyph.heatNull.vafLabel}</span>}</>
+              {t.ramp === "vaf" && Array.prototype.includes.call(t.cells, -2) && <span style={{ marginLeft: 6 }}>{sw(S.glyph.heatNull.fill)}{S.glyph.heatNull.vafLabel}</span>}
+              {t.thresholds?.map((c, k) => <span key={c} style={{ marginLeft: 6 }}>{sw(thresholdColor(k, S))}{c}</span>)}</>
           : (() => {
               const key = clinicalLegend(t, S, colors, shown);
               if (key.kind !== "categories") return null;

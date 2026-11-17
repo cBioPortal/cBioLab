@@ -6,6 +6,8 @@ export interface TipTrack {
   label: string; kind: string; numeric?: boolean; categories?: string[]; profiledFor?: string;
   /** a counts track (the mutation spectrum): its category names; `values` holds that many per column */
   stack?: readonly string[];
+  /** a generic assay's threshold categories: cell -3 - k is category k */
+  thresholds?: readonly string[];
   values?: ArrayLike<number>; cells: ArrayLike<number>;
 }
 
@@ -28,11 +30,19 @@ export function zoomedTip(t: TipTrack, cols: number[]): string[] {
     return t.stack.map((name, i) => name + ": " + t.values![c * k + i]);
   }
   if (t.numeric || t.kind === "heatmap") {
+    // a threshold value is its category, not a number to average (TooltipUtils 340-392)
     let sum = 0, n = 0;
-    for (const c of cols) { const x = t.values ? t.values[c] : NaN; if (t.cells[c] !== -1 && !Number.isNaN(x)) { sum += x; n++; } }
+    const cats: string[] = [];
+    for (const c of cols) {
+      const code = t.cells[c], x = t.values ? t.values[c] : NaN;
+      if (code <= -3 && t.thresholds) cats.push(t.thresholds[-3 - code]);
+      else if (code !== -1 && !Number.isNaN(x)) { sum += x; n++; }
+    }
     const clinical = t.kind !== "heatmap";
-    if (!n) return [t.label + ": " + (clinical ? "no data" : "N/A")];
-    return [t.label + ": " + portalTipNumber(sum / n, clinical) + (n > 1 ? " (average of " + n + " values)" : "")];
+    const value = n ? portalTipNumber(sum / n, clinical) + (n > 1 ? " (average of " + n + " values)" : "") : clinical ? "no data" : "N/A";
+    if (!cats.length) return [t.label + ": " + value];
+    const cat = cats.length === 1 ? cats[0] : [...new Set(cats)].join(", ") + " (" + cats.length + " data points)";
+    return [t.label + ": " + (n ? value + " and " : "") + cat];
   }
   // the counts of each value, keyed as the portal's object is, so integer-like values come first
   const counts: Record<string, number> = {};
