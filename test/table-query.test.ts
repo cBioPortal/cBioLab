@@ -131,3 +131,14 @@ describe("describeQuery, cleanQuery, csvField", () => {
     assert.equal(csvField("two\nlines"), '"two\nlines"');
   });
 });
+
+describe("column sort hook", () => {
+  const withSort: RowSource = { ...src, columns: [...src.columns, { id: "v", name: "V", numeric: true, text: "v", num: "v", sort: (d) => "custom(" + d + ")" }] };
+  test("Q1: a column with sort is ordered by sort(dir), then the tiebreak, both directions", () => {
+    assert.match(pageSql(withSort, { sort: { column: "v", desc: true } }, defaults, 1, 0), /ORDER BY custom\(DESC\), name, ord\n/);
+    assert.match(pageSql(withSort, { sort: { column: "v" } }, defaults, 1, 0), /ORDER BY custom\(ASC\), name, ord\n/);
+  });
+  test("Q2: a column without sort keeps NULLS LAST", () => {
+    assert.match(pageSql(withSort, { sort: { column: "n", desc: true } }, defaults, 1, 0), /ORDER BY toFloat64\(n\) DESC NULLS LAST, name, ord\n/);
+  });
+});

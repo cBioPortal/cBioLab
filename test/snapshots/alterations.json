@@ -524,8 +524,8 @@
                   "Oncogenic · Level 1",
                   "Missense_Mutation",
                   "",
-                  28.5,
-                  0.08,
+                  28.466453674121407,
+                  0.0758,
                   42,
                   512,
                   "SNP",
@@ -535,7 +535,16 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "reads": [
+                    {
+                      "sample": "P-0024249-T02-IM7",
+                      "alt": 42,
+                      "ref": 512
+                    }
+                  ]
+                }
               },
               {
                 "cohort": "Prostate",
@@ -549,8 +558,8 @@
                   "Likely Oncogenic · Level 1",
                   "Missense_Mutation",
                   "",
-                  4.8,
-                  0.62,
+                  4.788338658146965,
+                  0.6194,
                   262,
                   161,
                   "SNP",
@@ -560,7 +569,16 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "reads": [
+                    {
+                      "sample": "P-0024249-T01-IM6",
+                      "alt": 262,
+                      "ref": 161
+                    }
+                  ]
+                }
               },
               {
                 "cohort": "Prostate",
@@ -574,8 +592,8 @@
                   "Likely Oncogenic",
                   "Missense_Mutation",
                   "",
-                  52.4,
-                  0.76,
+                  52.412140575079874,
+                  0.761,
                   761,
                   239,
                   "SNP",
@@ -585,7 +603,16 @@
                   "G",
                   "C",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "reads": [
+                    {
+                      "sample": "P-0024249-T01-IM6",
+                      "alt": 761,
+                      "ref": 239
+                    }
+                  ]
+                }
               }
             ],
             "offset": 0,
@@ -663,7 +690,7 @@
                   "HOMDEL",
                   "Likely Oncogenic",
                   "5q11.2",
-                  0.3
+                  0.3194888178913738
                 ]
               },
               {
@@ -677,7 +704,7 @@
                   "HOMDEL",
                   "Likely Oncogenic · Level 1",
                   "14q24.1",
-                  0.1
+                  0.0878594249201278
                 ]
               },
               {
@@ -691,7 +718,7 @@
                   "HOMDEL",
                   "Unknown",
                   "5q11.2",
-                  0.2
+                  0.23963575365444525
                 ]
               }
             ],
@@ -726,8 +753,24 @@
                 "numeric": false
               },
               {
+                "id": "status",
+                "name": "Status",
+                "numeric": false,
+                "unsorted": true
+              },
+              {
                 "id": "class",
                 "name": "Variant Class",
+                "numeric": false
+              },
+              {
+                "id": "pos1",
+                "name": "Site 1 Position",
+                "numeric": false
+              },
+              {
+                "id": "pos2",
+                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -736,13 +779,18 @@
                 "numeric": false
               },
               {
+                "id": "connectionType",
+                "name": "Connection Type",
+                "numeric": false
+              },
+              {
                 "id": "breakpointType",
                 "name": "Breakpoint Type",
                 "numeric": false
               },
               {
-                "id": "connectionType",
-                "name": "Connection Type",
+                "id": "svAnnotation",
+                "name": "Additional Annotation",
                 "numeric": false
               },
               {
@@ -758,16 +806,6 @@
               {
                 "id": "site2",
                 "name": "Site 2 Description",
-                "numeric": false
-              },
-              {
-                "id": "pos1",
-                "name": "Site 1 Position",
-                "numeric": false
-              },
-              {
-                "id": "pos2",
-                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -796,16 +834,6 @@
                 "numeric": false
               },
               {
-                "id": "status",
-                "name": "Status",
-                "numeric": false
-              },
-              {
-                "id": "svAnnotation",
-                "name": "Study Annotation",
-                "numeric": false
-              },
-              {
                 "id": "comments",
                 "name": "Comments",
                 "numeric": false
@@ -815,18 +843,18 @@
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "defaults": [
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "query": {},
@@ -840,22 +868,22 @@
                   "P-0024249-T01-IM6",
                   "IRS2",
                   "CHMP1A",
+                  "SOMATIC",
                   "TRANSLOCATION",
+                  "16:89721445",
+                  "13:110437384",
                   "Protein Fusion: mid-exon  {IRS2:CHMP1A}",
-                  "IMPPRECISE",
                   "3to5",
+                  "IMPPRECISE",
+                  "IRS2 (NM_003749) - CHMP1A (NM_002768) rearrangement: t(13;16)(q34;q24.3)(chr13:g.110437384::chr16:g.89721445)",
                   "NA",
                   "Intron of CHMP1A(-):1Kb before exon 2",
                   "Exon 1 of IRS2(-)",
-                  "16:89721445",
-                  "13:110437384",
                   0,
                   10,
                   0,
                   "NA",
                   "NA",
-                  "SOMATIC",
-                  "IRS2 (NM_003749) - CHMP1A (NM_002768) rearrangement: t(13;16)(q34;q24.3)(chr13:g.110437384::chr16:g.89721445)",
                   "NA"
                 ]
               },
@@ -868,22 +896,22 @@
                   "P-0024249-T01-IM6",
                   "TCF7L2",
                   "",
+                  "SOMATIC",
                   "DELETION",
+                  "10:114917851",
+                  "10:115014274",
                   "TCF7L2-intragenic",
-                  "PRECISE",
                   "3to5",
+                  "PRECISE",
+                  "TCF7L2 (NM_001146274) rearrangement: c.1318+23_chr10:g.115014274del",
                   "NA",
                   "Intron of TCF7L2(+):23bp after exon 12",
                   "IGR: 296Kb before HABP2(+)",
-                  "10:114917851",
-                  "10:115014274",
                   96423,
                   23,
                   4714,
                   "NA",
                   "NA",
-                  "SOMATIC",
-                  "TCF7L2 (NM_001146274) rearrangement: c.1318+23_chr10:g.115014274del",
                   "NA"
                 ]
               },
@@ -896,22 +924,22 @@
                   "P-0024249-T01-IM6",
                   "TMPRSS2",
                   "ERG",
+                  "SOMATIC",
                   "DELETION",
+                  "21:39890681",
+                  "21:42870724",
                   "Protein Fusion: out of frame  {TMPRSS2:ERG}",
-                  "IMPPRECISE",
                   "3to5",
+                  "IMPPRECISE",
+                  "TMPRSS2 (NM_001135099) - ERG (NM_004449) fusion ( TMPRSS2 exon 1 fused to ERG exons 4 -11): c.56-608:TMPRSS2_c.39+56905:ERGdel",
                   "NA",
                   "Intron of ERG(-):57Kb after exon 3",
                   "Intron of TMPRSS2(-):608bp before exon 2",
-                  "21:39890681",
-                  "21:42870724",
                   2980043,
                   105,
                   41084,
                   "NA",
                   "NA",
-                  "SOMATIC",
-                  "TMPRSS2 (NM_001135099) - ERG (NM_004449) fusion ( TMPRSS2 exon 1 fused to ERG exons 4 -11): c.56-608:TMPRSS2_c.39+56905:ERGdel",
                   "NA"
                 ]
               }
@@ -944,7 +972,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
@@ -966,7 +994,7 @@
           {
             "kind": "fetch",
             "title": "Read P-0024249's three tables",
-            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
             "params": [
               [
                 "Mutations",

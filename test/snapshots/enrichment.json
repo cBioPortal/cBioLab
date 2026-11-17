@@ -845,13 +845,13 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel that lists it, or whole-exome; an off-panel call is left out), uncalled mutations excluded as the portal excludes them. 500 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 7 tested genes have fewer than 5 altered samples across the cohorts and are not listed, though counted in q. The 300 most significant of the 493 listed genes are in the table; the rest are drawn as density on the volcano. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. ",
+      "caveat": "Every gene's mutation frequency in each cohort, counted in SAMPLES over the samples profiled for that gene (a panel of its profile that lists it, each sample once, or whole-exome; an off-panel call is left out), uncalled mutations excluded as the portal excludes them. 500 genes tested with a two-sided Fisher's exact test; q is Benjamini–Hochberg across all of them. 7 tested genes have fewer than 5 altered samples across the cohorts and are not listed, though counted in q. The 300 most significant of the 493 listed genes are in the table; the rest are drawn as density on the volcano. The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. ",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Count altered and profiled samples per gene",
-            "detail": "The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
+            "detail": "The enrichment queries above: per gene, samples with any mutation; per gene, samples one of whose panels for those types' profiles lists it (each sample once, grouped by its set of panels; copy number from the discrete profile); and the samples with a whole-exome profile among them, profiled for every gene.",
             "scope": "Colorectal, MSS · msk_chord_2024",
             "rowsOut": 500,
             "params": [
@@ -864,7 +864,7 @@
           {
             "kind": "fetch",
             "title": "Count altered and profiled samples per gene",
-            "detail": "The enrichment queries above: per gene, samples with a mutation; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
+            "detail": "The enrichment queries above: per gene, samples with any mutation; per gene, samples one of whose panels for those types' profiles lists it (each sample once, grouped by its set of panels; copy number from the discrete profile); and the samples with a whole-exome profile among them, profiled for every gene.",
             "scope": "Pancreatic, MSS · msk_chord_2024",
             "rowsOut": 482,
             "params": [

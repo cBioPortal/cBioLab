@@ -1,5 +1,5 @@
 // The enrichment view's spec and result, added to lib/types.ts's maps by the declaration at the end.
-import type {  } from "../../types.ts";
+import type { AlterationEvent } from "../../alteration-events.ts";
 
 /**
  * Genomic-alteration enrichment (cBioPortal's group-comparison Genomic Alterations tab): every gene's
@@ -9,14 +9,19 @@ import type {  } from "../../types.ts";
 export interface EnrichmentView {
   note?: string;
   kind: "enrichment"; cohorts?: string[];
-  /** which alteration (default mutation); "cna" is amplification or deep deletion */
-  alteration?: "mutation" | "cna" | "amp" | "homdel" | "sv";
+  /** which alteration (default mutation); "cna" is amplification or deep deletion; "any" is every type in
+   *  `events`, a sample altered by any of them and profiled by any of their profiles' panels (the portal's tab) */
+  alteration?: "mutation" | "cna" | "amp" | "homdel" | "sv" | "any";
+  /** with alteration "any": the portal's alteration types that count (default all of them) */
+  events?: AlterationEvent[];
   /** count OncoKB drivers only, or any alteration (default) */
   measure?: "driver" | "any";
   /** genes altered in fewer samples than this, across all cohorts, are tested (q counts them) but not listed (default 5) */
   minAltered?: number;
   /** genes named on the volcano (default 12) */
   label?: number;
+  /** carry every listed gene in the result (`all`), for a page whose table and charts draw them all, as the portal's (default only the 300 most significant) */
+  allRows?: boolean;
 }
 export interface EnrichmentGene {
   gene: string;
@@ -29,18 +34,33 @@ export interface EnrichmentGene {
   /** the cohort with the highest altered share */
   enrichedIn: string;
 }
+/** every listed gene as columns, row i across them (lib/views/enrichment/rows.ts rebuilds the rows) */
+export interface EnrichmentColumns {
+  gene: string[];
+  /** "" when not known */
+  cytoband: string[];
+  /** per gene, per cohort in `groups` order */
+  altered: number[][]; profiled: number[][];
+  p: number[]; q: number[];
+}
 export interface EnrichmentResult {
-  alteration: string; measure: "driver" | "any"; groups: string[];
+  alteration: string;
+  /** with alteration "any": the event types counted */
+  events?: AlterationEvent[]; measure: "driver" | "any"; groups: string[];
   tested: number; untested: number; significant: number; minAltered: number;
   /** tested genes under minAltered, not listed */
   hidden?: number;
   test: string;
   /** the most significant genes with at least minAltered altered samples (≤300), the rest summarised in `grid` */
   rows: EnrichmentGene[];
+  /** every listed gene, most significant first, when there are more than `rows` holds: the page's table and charts draw them all, as the portal's */
+  all?: EnrichmentColumns;
   /** "Genes with highest frequency in any group": the tested genes with the highest altered share in any cohort, highest first */
   topFrequency?: EnrichmentGene[];
   /** two cohorts: every other tested gene binned on the volcano's axes, [x bin, y bin, count] */
-  grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][] };
+  grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][];
+    /** with `all`: the cells of the tested genes not listed (under minAltered), which the page draws as density beside every listed gene's point */
+    unlisted?: [number, number, number][] };
   labels: string[];
   excluded?: { study: string; reason: string }[];
 }

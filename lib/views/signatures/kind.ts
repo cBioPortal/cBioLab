@@ -2,8 +2,7 @@
 import type { ViewKindDef } from "../kind-def.ts";
 import { tableText } from "../text.ts";
 import { signaturesSvg } from "./figure.ts";
-import { SIGNIFICANT_P, pctText, versionLabel } from "./data.ts";
-import { fmtShare } from "../../chart/format.ts";
+import { SIGNIFICANT_P, pctText, spectrumPct, versionLabel } from "./data.ts";
 
 /** spectrum channels listed in the results text, the largest first; the figure draws every one */
 const TEXT_CHANNELS = 12;
@@ -24,7 +23,7 @@ export const signaturesKind: ViewKindDef<"signatures"> = {
       (nonzero.length < s.signatures.length ? `\n  … ${s.signatures.length - nonzero.length} more signatures at 0 (or NA) in every sample` : "") +
       (s.notProfiled.length ? `\nNot profiled for mutational signatures: ${s.notProfiled.join(", ")}` : "") +
       (sp ? `\n${sp.sample}'s spectrum: ${sp.total.toLocaleString()} mutations in ${sp.channels.length} channels; largest: ` +
-        sp.channels.filter((c) => c.count > 0).sort((a, b) => b.count - a.count).slice(0, TEXT_CHANNELS).map((c) => `${c.label} ${c.count} (${fmtShare(c.count / sp.total)})`).join(", ") : "") +
+        sp.channels.filter((c) => c.count > 0).sort((a, b) => b.count - a.count).slice(0, TEXT_CHANNELS).map((c) => `${c.label} ${c.count} (${spectrumPct(c.count, sp.total)}%)`).join(", ") : "") +
       caveatOf(v) + noteOf(v));
   },
   help: {
