@@ -59,13 +59,20 @@ export function plotMethod(t: PlotTrace): MethodRecord {
         params: [["Spearman ties", "average rank: tied values share the mean of the ranks they span, as scipy's spearmanr and cbioportal.org rank them (PLT-STM-5)"]] });
     }
     steps.push({ kind: "statistic", title: "p-values",
-      detail: "For each coefficient r over n points: t = |r|·√((n − 2)/(1 − r²)), two-sided Student's t on n − 2 degrees of freedom; p = 0 when |r| = 1, none for n ≤ 2 (the portal's PLT-STM-6)." });
+      detail: "For each coefficient r over n points, rounded to 5 decimals first as the portal keeps it: t = |r|·√((n − 2)/(1 − r²)), two-sided Student's t on n − 2 degrees of freedom; p = 0 when the rounded |r| = 1, none for n ≤ 2 (the portal's PLT-STM-6)." });
     functions.push("corrPValue");
     python.push(
+      "from decimal import Decimal, ROUND_HALF_UP",
+      "",
+      "def r5(r):",
+      "    # r as the portal keeps it, Number(r.toFixed(5)): its exact value to 5 decimals, a tie away from zero",
+      "    return float(Decimal(r).quantize(Decimal(\"1e-5\"), rounding=ROUND_HALF_UP))",
+      "",
       "def p_of(r, n):",
-      "    # two-sided p for a correlation coefficient: Student's t on n - 2 df",
+      "    # two-sided p for a correlation coefficient, tested as the portal keeps it: Student's t on n - 2 df",
       "    if r is None or n <= 2:",
       "        return None",
+      "    r = r5(r)",
       "    if abs(r) >= 1:",
       "        return 0.0",
       "    t = abs(r) * ((n - 2) / (1 - r * r)) ** 0.5",

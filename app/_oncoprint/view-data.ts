@@ -8,8 +8,8 @@ export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colo
 
 /** the view without what the figure applies in the browser — what decides whether a re-run is needed */
 export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
-  // the lollipop's alteration grid and its selected codons are applied in the browser, from the whole result
-  if (v.kind === "hotspots") { const { hide, codons, ...rest } = v; void hide; void codons; return rest; }
+  // the lollipop's alteration grid, its selected codons and its y-axis maxima are applied in the browser, from the whole result
+  if (v.kind === "hotspots") { const { hide, codons, yMax, ...rest } = v; void hide; void codons; void yMax; return rest; }
   // the two-group lollipop's axis, alteration badges and selected codons likewise
   if (v.kind === "mutcompare") { const { hide, positions, axis, ...rest } = v; void hide; void positions; void axis; return rest; }
   // the timeline's folded tracks and its gap cuts are drawn in the browser, from the whole result

@@ -20,10 +20,10 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 29 |
+| ✅ match | 30 |
 | 🟡 partial | 44 |
 | 🔶 different | 16 |
-| ❌ missing | 33 |
+| ❌ missing | 32 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 7 |
@@ -119,14 +119,14 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-HD-1 | 🟡 | B | Unchanged: disabled one-entry select (`TranscriptSummary.tsx:20`) (tracked) |
 | MUT-HD-2 | ❌ | C | Unchanged: no other transcript (tracked) |
 | MUT-HD-2a | ✅ | BC | Same ids and links; Ensembl on GRCh38 when every study is (`TranscriptSummary.tsx:26`) (#250) |
-| MUT-HD-3 | 🟡 | B | "Somatic Mutation Frequency 36.7%" ✅ with a tip; "Germline Mutation Frequency" when a sample has a germline mutation, over every queried sample (legacy's default: no germline-consented list configured); no Somatic/Germline badges yet |
+| MUT-HD-3 | 🟡 | B | Unchanged: "Somatic Mutation Frequency 36.7%" ✅ with a tip; no germline rate or Somatic/Germline badges (tracked) |
 
 ### §3 Lollipop plot
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-LP-1 | 🟡 | B | Unchanged: [Legend 👁] [☁]; no track selector, no Y-Axis Max |
-| MUT-LP-2 | ❌ | B | Unchanged: no Y-Axis Max slider/box |
+| MUT-LP-1 | 🟡 | B | Y-Axis Max, [Legend 👁] [☁]; no track selector |
+| MUT-LP-2 | ✅ | B | "Y-Axis Max:" slider 1…default and a number box above it; below 1 read as 1; kept in the view (`yMax`), as in-tab state is (invariant 9), not local |
 | MUT-LP-3 | ✅ | C | No %/# toggle, no log scale |
 | MUT-LP-4 | 🟡 | BC | Unchanged: SVG / PNG of the plot; no PDF; `KRAS_mutation_diagram.<ext>` |
 | MUT-LP-5 | 🐞 ok | BC | Legend lists Splice as its own entry, as the stems draw it, not under Truncating as the portal's legend does (#250) |
@@ -286,7 +286,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-14 | ❌ | B | Unchanged |
 | MUT-STM-15 | ❌ | B | Unchanged: no Freq in the Columns menu |
 | MUT-STM-16 | ❌ | B | Unchanged |
-| MUT-STM-17 | 🟡 | B | Unchanged: domain max(5, tallest); axis niced (0-50-100-150) |
+| MUT-STM-17 | 🟡 | B | Default max(5, tallest), niced (0-50-100-150); a set Y-Axis Max is the exact top, "≥" on it when a stem is capped |
 
 ---
 

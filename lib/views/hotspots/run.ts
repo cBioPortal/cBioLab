@@ -1,6 +1,6 @@
 // Hotspots view: a lollipop of mutation counts per protein position for each gene.
 import { geneSymbols } from "../../gene-tracks.ts";
-import { lollipopGeneEmpty, buildLollipopGene, fetchProteinInfo, checkHide, checkCodons, pruneCodons } from "../../lollipop.ts";
+import { lollipopGeneEmpty, buildLollipopGene, fetchProteinInfo, checkHide, checkCodons, checkYMax, pruneCodons } from "../../lollipop.ts";
 import type { ViewResult } from "../../types.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit, viewOql } from "../shared.ts";
@@ -22,6 +22,8 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   { const e = checkHide(hv.hide); if (e) return untimed({ kind: "hotspots", error: e }); }
   const hide = [...new Set(hv.hide || [])];
   { const e = checkCodons(hv.codons, uniq); if (e) return untimed({ kind: "hotspots", error: e }); }
+  { const e = checkYMax(hv.yMax, uniq); if (e) return untimed({ kind: "hotspots", error: e }); }
+  const yMax = hv.yMax && Object.keys(hv.yMax).length ? hv.yMax : undefined;
   const codons = pruneCodons(hv.codons && Object.fromEntries(Object.entries(hv.codons).map(([g, ps]) => [g, [...new Set(ps)].sort((a, b) => a - b)])), uniq);
   if (hv.drivers !== undefined) { try { resolveDrivers(hv.drivers); } catch (e) { return untimed({ kind: "hotspots", error: (e as Error).message }); } }
   const cn = vNames[0];
@@ -48,7 +50,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const noGermline = studies.filter((_, i) => reports[i].germlineCohortSamples === undefined);
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
-  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(annotated ? {} : { annotated: false }), ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
+  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(annotated ? {} : { annotated: false }), ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}), ...(yMax ? { yMax } : {}),
     participation: participationFor(studies, false),
     note: (vNames.length > 1 ? "A lollipop draws one cohort: this shows “" + cn + "” only; " +
         vNames.slice(1).map((n) => "“" + n + "”").join(", ") + (vNames.length === 2 ? " is" : " are") + " not drawn. " : "") +
