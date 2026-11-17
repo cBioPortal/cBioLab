@@ -11,7 +11,6 @@
   "app/lab/kinds/compare.tsx": 4,
   "app/lab/kinds/cooccurrence.tsx": 2,
   "app/lab/kinds/correlates.tsx": 3,
-  "app/lab/kinds/datafiles.tsx": 1,
   "app/lab/kinds/diffexpr.tsx": 3,
   "app/lab/kinds/enrichment.tsx": 1,
   "app/lab/kinds/mutations.tsx": 1,

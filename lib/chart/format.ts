@@ -144,12 +144,6 @@ export function portalClinicalValue(v: string): string {
   return f !== parseInt(v, 10) ? portalRound1(f) : v;
 }
 
-/** A share in percent (0–100) as cBioPortal's FormatUtils getPercentage writes it: "0%", "<1%" below 1, else rounded ("72%"). */
-export function portalPercentage(pct: number): string {
-  if (pct === 0) return "0%";
-  return pct < 1 ? "<1%" : Math.round(pct) + "%";
-}
-
 /**
  * A p- or q-value's digits: two decimals at 0.1 and up, two significant figures down to 0.001,
  * then scientific; below the double-precision floor it is "<1e-300", never "0".
@@ -223,3 +217,26 @@ export const portalLocale = (x: number): string => x.toLocaleString("en-US");
  */
 export const portalRange = (min: number, max: number): string =>
   min === max ? portalLocale(min) : "(" + portalLocale(min) + ", " + portalLocale(max) + "]";
+
+/**
+ * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",
+ * "<1%" below one percent, else the whole percent, Math.round's (2.5 → "3%").
+ */
+export function portalPercentage(proportion: number): string {
+  const perc = 100 * proportion;
+  if (perc === 0) return "0%";
+  return perc < 1 ? "<1%" : Math.round(perc) + "%";
+}
+
+/**
+ * altered ÷ sequenced as the portal's percentAltered writes it (OncoprintUtils 857-876), the value of
+ * the Download tab's frequency file: "N/P" when nothing was sequenced; below 3% one decimal, dropped
+ * when it is 0 ("2.5%", "2%"); else a whole percent.
+ */
+export function portalPercentAltered(altered: number, sequenced: number): string {
+  if (sequenced === 0) return "N/P";
+  const p = altered / sequenced, percent = 100 * p;
+  let fixed = p < 0.03 ? percent.toFixed(1) : percent.toFixed();
+  if (p < 0.03 && fixed.endsWith("0")) fixed = percent.toFixed();
+  return fixed + "%";
+}

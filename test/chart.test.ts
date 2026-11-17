@@ -180,7 +180,8 @@ test("portalFixed, portalLocale, portalRange: the density chart's numbers as the
 
 test("P1 (PAT-STM-2, PAT-STM-3): portalPercentage is 0%, <1% below 1, else Math.round", () => {
   const cases: [number, string][] = [[0, "0%"], [0.3378, "<1%"], [0.999, "<1%"], [1, "1%"], [72.4719, "72%"], [4.5608, "5%"], [72.5, "73%"], [100, "100%"]];
-  for (const [x, want] of cases) assert.equal(portalPercentage(x), want, String(x));
+  // the cases are percents; portalPercentage takes the share (0–1), as the Cohort % cell passes it
+  for (const [x, want] of cases) assert.equal(portalPercentage(x / 100), want, String(x));
 });
 
 test("R1 (PAT-STM-10): portalRound1 is toFixed(1), '< 0.1' when it rounds to 0 but isn't 0", () => {
