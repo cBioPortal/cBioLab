@@ -3,7 +3,10 @@ import { type MethodRecord, type MethodStep, VERIFIED, RESULT_INIT, withResult, 
 import { BUILD_COMMIT } from "../../build-info.ts";
 
 export interface EnrichmentTrace {
-  alteration: string; measure: "driver" | "any"; oncokbPin: string | null; cohorts: string[]; minAltered: number;
+  alteration: string;
+  /** alteration "any": a sample profiled by the union of its panels across the selected types' profiles */
+  union?: boolean;
+  measure: "driver" | "any"; oncokbPin: string | null; cohorts: string[]; minAltered: number;
   test: string; two: boolean;
   perSite: { cohort: string; study: string; genes: number; wes: number }[];
   tested: number; untested: number;
@@ -17,7 +20,9 @@ export function enrichmentMethod(t: EnrichmentTrace): MethodRecord {
   const steps: MethodStep[] = t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Count altered and profiled samples per gene",
     detail: "The enrichment queries above: per gene, samples with " + (t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ") " : "a ") + t.alteration +
-      "; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene.",
+      (t.union
+      ? " of any selected type; per gene, samples one of whose panels for those types lists it (each sample once, grouped by its set of panels); and the samples with a whole-exome profile among them, profiled for every gene."
+      : "; per gene, samples on a panel listing it (counted per panel, then joined to its genes); and the whole-exome samples, profiled for every gene."),
     scope: s.cohort + " · " + s.study, rowsOut: s.genes, params: [["whole-exome samples", s.wes.toLocaleString("en-US")]],
   }));
   steps.push({ kind: "transform", title: "Profiled = panel samples + whole-exome samples, summed across studies",
