@@ -9,6 +9,8 @@
  *      EML4-ALK fusion, in T1 and T2 alike, is one row naming both samples
  *   G  genes profiled in all samples (PAT-MT-6, PAT-STM-15): FX-P33-T1's EGFR is off its panel
  *      (PEERFIX_NO_EGFR), so genesProfiled "all" drops it; with one sample in view no menu is offered; FX-P01 has none
+ *   P  each table's profile and the samples it holds (data_gene_panel_matrix.txt: FX-P49's two samples
+ *      in all three; the fixture has no sample outside a profile, so that branch is checked on the warehouse)
  *   K  the key, run on ClickHouse over literal rows: a fusion recorded A–B and B–A is one key;
  *      another position, chromosome or class is another (the fixture holds no A–B / B–A pair)
  *   F  a merged row's fields are one record's (Gene 1 and Gene 2 never both the same partner)
@@ -108,6 +110,16 @@ for (const id of ["FX-P49", "FX-P51"]) {
   ok("G one sample in view: no gene-panel menu to offer, though a row is off its panel", any?.mixedPanels?.mutations === false, JSON.stringify(any?.mixedPanels));
   const p01 = (await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: "FX-P01" } }, ctx) as { alterations?: AlterationsResult }).alterations;
   ok("G FX-P01, both samples on PEERFIX_FULL: no row off a panel", p01?.mixedPanels?.mutations === false && p01?.mixedPanels?.cna === false, JSON.stringify(p01?.mixedPanels));
+}
+
+// ---- P: which samples each table's profile holds (the not-profiled alerts) ------------------------
+{
+  // data_gene_panel_matrix.txt profiles both of FX-P49's samples for mutations, cna (DISCRETE) and structural variants
+  const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: "FX-P49" } }, ctx) as { alterations?: AlterationsResult; error?: string };
+  const pr = r.alterations?.profiling;
+  const both = ["FX-P49-T1", "FX-P49-T2"];
+  ok("P FX-P49: the study holds all three profiles", !!pr && pr.mutations.study && pr.cna.study && pr.sv.study, JSON.stringify(pr));
+  ok("P FX-P49: each profile holds both samples", !!pr && (["mutations", "cna", "sv"] as const).every((t) => JSON.stringify([...pr[t].profiled].sort()) === JSON.stringify(both)), JSON.stringify(pr));
 }
 
 // ---- K: the key on literal rows -----------------------------------------------------------------
