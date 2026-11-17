@@ -537,6 +537,10 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "enrichAlteredSql:cna-any": () => aggregates.enrichAlteredSql(cohortSql, "x", "db", "cna", null, false),
     "enrichPanelProfiledSql": () => aggregates.enrichPanelProfiledSql(cohortSql, "x", "db", "amp"),
     "enrichWesSql": () => aggregates.enrichWesSql(cohortSql, "x", "db", "sv"),
+    "enrichEventsAlteredSql": () => aggregates.enrichEventsAlteredSql(cohortSql, "x", "db", ["missense", "other", "amp", "sv"], "v7.5", true),
+    "enrichEventsAlteredSql:in": () => aggregates.enrichEventsAlteredSql(cohortSql, "x", "db", ["missense", "homdel"], null, false),
+    "enrichEventsPanelProfiledSql": () => aggregates.enrichEventsPanelProfiledSql(cohortSql, "x", "db", ["nonsense", "amp", "sv"]),
+    "enrichEventsWesSql": () => aggregates.enrichEventsWesSql(cohortSql, "x", "db", ["missense", "homdel"]),
     // mutcompare: the cohort's patients profiled for one gene, filtered by sample in a subquery; one count leaves
     "mutcompareProfiledSql": () => aggregates.mutcompareProfiledSql(cohortSql, "x", "db", "TP53"),
     // assays: per-entity moments or value counts; the rows CTE holds values, never ids, and stays inside
