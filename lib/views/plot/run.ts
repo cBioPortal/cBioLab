@@ -1,10 +1,10 @@
 // Plot view: two axes over one cohort's cases, drawn as a scatter, box or contingency table as
 // the axes decide; local, or federated where every participant can answer.
 import type { ViewResult } from "../../types.ts";
-import { pearsonFromMoments, regressionFromMoments, type Moments } from "../../stats.ts";
+import { pearsonR, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
 import { logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
-import { fitOf, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
+import { fitOf, portalBox, spearmanRho, corrPValue, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
@@ -12,7 +12,7 @@ import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
 import { OQL_NOT_PROFILED } from "../../plot-oql.ts";
 import { naturalSort } from "./natural-sort.ts";
-import { fmtNum } from "../../chart/format.ts";
+import { fmtInt, fmtNum } from "../../chart/format.ts";
 import { assayEntitiesKnown } from "../shared.ts";
 import type { PlotView } from "./types.ts";
 import { plotMethod } from "./method.ts";
@@ -40,7 +40,39 @@ function poolBoxRows(parts: BoxRow[][]): PlotGroup[] {
   });
 }
 
+/** the most values (a box) or pairs (a scatter) a site hands over for statistics over several studies' cases together */
+const POOLED_VALUES_CAP = 50000;
+
+/** one box per group over the values themselves, by the portal's rule (portalBox) */
+function poolBoxValues(pts: PlotPoint[]): PlotGroup[] {
+  const byGroup = new Map<string, number[]>();
+  for (const p of pts) {
+    const vs = byGroup.get(p.g);
+    if (vs) vs.push(p.v); else byGroup.set(p.g, [p.v]);
+  }
+  return [...byGroup.entries()].map(([g, vs]) => {
+    const b = portalBox(vs)!, t = tukey(b.q1, b.q3, b.lo, b.hi);
+    return { g, ...b, loWhisker: t.loWhisker, hiWhisker: t.hiWhisker };
+  });
+}
+
 type Def = ViewRun["doc"]["cohorts"][string];
+
+/**
+ * Every study's (x, y) pairs, for a statistic that needs them ranked together, where every study may
+ * show its cases and each has at most POOLED_VALUES_CAP; otherwise why not, for the caption.
+ */
+async function pooledPairs(sites: string[], resolvers: Record<string, Resolver>, def: Def, spec: PlotRequest, n: number):
+  Promise<{ pairs: { x: number; y: number }[]; why?: undefined } | { pairs: null; why: string }> {
+  const closed = sites.filter((s) => !plotCasesOf(resolvers[s]));
+  if (closed.length) return { pairs: null, why: closed.join(", ") + " may not show individual cases" };
+  const perSite = await peerSafe(sites.map((s) => resolvers[s]),
+    () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotScatterPoints(def, spec, POOLED_VALUES_CAP))), () => [null]);
+  const pairs = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : null;
+  if (!pairs) return { pairs: null, why: "not every study handed over its pairs (one past " + fmtInt(POOLED_VALUES_CAP) + ", or a peer that cannot)" };
+  if (pairs.length !== n) return { pairs: null, why: "the studies' pairs (" + fmtInt(pairs.length) + ") did not add up to the plotted " + fmtInt(n) };
+  return { pairs };
+}
 
 /**
  * The value range every site bins a pooled box's density over, and how many bins. The figure's
@@ -658,15 +690,18 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           const pooledM = momentParts.reduce((a, m) => ({ n: a.n + m.n, sx: a.sx + m.sx, sy: a.sy + m.sy,
             sxy: a.sxy + m.sxy, sxx: a.sxx + m.sxx, syy: a.syy + m.syy }),
             { n: 0, sx: 0, sy: 0, sxy: 0, sxx: 0, syy: 0 } as Moments);
-          const corr = pearsonFromMoments(pooledM), reg = regressionFromMoments(pooledM);
+          const pearson = pearsonR(pooledM), reg = regressionFromMoments(pooledM);
+          const pairs = await pooledPairs(sites, resolvers, doc.cohorts[cn], spec, n);
+          const spearman = pairs.pairs ? spearmanRho(pairs.pairs.map((p) => p.x), pairs.pairs.map((p) => p.y)) : null;
           data = { shape, n, ...label, extent, grid: bins, ...(pv.regression ? fitOf(pooledM) : {}),
             bins: [...cells.values()],
-            stats: { pearson: corr.r, spearman: null, slope: reg.slope, intercept: reg.intercept,
-              pPearson: corr.r != null ? corr.p : null, pSpearman: null },
+            stats: { pearson, spearman, slope: reg.slope, intercept: reg.intercept,
+              pPearson: corrPValue(pearson, n), pSpearman: corrPValue(spearman, n) },
             note: scaleNote + ". Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for" +
               " Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent," +
-              " pooled) so cells sum correctly. Spearman rank correlation is not reported for a federated plot: it" +
-              " needs the pooled GLOBAL ranking, which per-site aggregates cannot reconstruct exactly." };
+              " pooled) so cells sum correctly. " + (pairs.pairs
+                ? "Spearman's rank correlation is over every study's pairs ranked together, as the portal ranks them."
+                : "Spearman's rank correlation is not reported: it needs every study's pairs ranked together, and " + pairs.why + ".") };
         }
       } else if (shape === "table") {
         const parts = await Promise.all(sites.map((s) => fr[s].plotTableCells(doc.cohorts[cn], spec, xk, yk)));
@@ -689,23 +724,30 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
             " site records it, so there is no shared-scale question here the way there is for a numeric axis." };
       } else {
         // box: numeric axis grouped by the categorical one, pooled per group
-        const groups = poolBoxRows(await Promise.all(sites.map((s) => fr[s].plotBoxRows(doc.cohorts[cn], spec, xk, yk))));
+        let groups = poolBoxRows(await Promise.all(sites.map((s) => fr[s].plotBoxRows(doc.cohorts[cn], spec, xk, yk))));
         if (groups.length > CATEGORY_CAP)
           throw new Error("more than " + CATEGORY_CAP + " groups on the categorical axis; narrow the cohort or pick another attribute");
         const n = groups.reduce((a, g) => a + g.n, 0);
-        data = { shape, n, ...label, groups, overlay: "none",
-          note: scaleNote + ". Counts and extremes per group sum exactly; the quartiles are a size-weighted" +
-            " approximation across sites (it can shift where an outlier bar falls, never a count)." };
+        // Every value of every site, where each may show its cases: the boxes are then computed over
+        // the pooled values, as the portal computes them, and the same rows are the points. A site
+        // past its cap answers null, and then no site's values are used.
+        const closed = sites.filter((s) => !plotCasesOf(resolvers[s]));
+        const perSite = closed.length ? [null] : await peerSafe(sites.map((s) => resolvers[s]),
+          () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotPoints(doc.cohorts[cn], spec, POOLED_VALUES_CAP))), () => [null]);
+        const pts = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : [];
+        const exact = pts.length === n ? poolBoxValues(pts) : null;
+        if (exact) groups = exact;
+        data = { shape, n, ...label, groups, overlay: "none", quartiles: exact ? "pooled" : "weighted",
+          note: scaleNote + (exact
+            ? ". Each group's box is computed over every study's values together, as the portal computes it."
+            : ". Counts and extremes per group sum exactly; the quartiles are a size-weighted approximation across sites" +
+              " (it can shift where an outlier bar falls, never a count), because " +
+              (closed.length ? closed.join(", ") + " may not show individual values." : "not every site handed over its values (one past " + fmtInt(POOLED_VALUES_CAP) + ", or a peer that cannot).")) };
         // Points, unlike a density, just concatenate: each site's own case-level rows are already
         // independent of any shared scale. They are drawn from every site or from none: a site that
         // may not show cases leaves the boxes to the pooled density, and the caption names it.
-        const closed = sites.filter((s) => !plotCasesOf(resolvers[s]));
         if (pv.allPoints !== false && closed.length) data.note += " Cases are not drawn as points: " + closed.join(", ") + " may not show individual cases.";
         else if (pv.allPoints !== false) {
-          // a site past its cap answers null, and then no site's cases are drawn either
-          const perSite = await peerSafe(sites.map((s) => resolvers[s]),
-            () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotPoints(doc.cohorts[cn], spec))), () => [null]);
-          const pts = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : [];
           if (pts.length && pts.length <= POINTS_CAP) {
             data.points = pts; data.overlay = "points";
             data.pointSet = { rule: "all", drawn: pts.length };
