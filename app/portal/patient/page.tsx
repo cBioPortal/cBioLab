@@ -22,7 +22,7 @@ import { api } from "../../lab/api.ts";
 import type { ViewPageBody } from "../../../lib/api-schemas.ts";
 import { PatientHeader, usePatientRecord } from "../patient-header.tsx";
 import { CohortNav, useCohortPosition } from "../cohort-nav.tsx";
-import { navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
+import { navigationFromHash, navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
 
 const ID = /[^A-Za-z0-9._-]/g;
 
@@ -80,7 +80,18 @@ export default function PatientPage() {
   // as on the portal, a sample in the link makes it the sample view, whatever patient is named too
   const patient = sample ? "" : (q.get("patient") || q.get("caseId") || "").replace(ID, "");
   const link = useAddressLink();
-  const { nav, error } = useMemo(() => readNavigation(q, link), [q, link]);
+  // a cbioportal.org link's cohort rides in the hash (#navCaseIds=), which only the browser sees
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    const read = () => setHash(window.location.hash);
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+  const { nav, error } = useMemo(() => {
+    const fromQuery = readNavigation(q, link);
+    return fromQuery.nav || fromQuery.error ? fromQuery : navigationFromHash(hash);
+  }, [q, link, hash]);
   if (error) return <><SiteHeader page="patient" /><main className="analysis-main"><div className="error">{error}</div></main></>;
   if (nav && !patient && !sample) return <CohortStart nav={nav} tab={q.get("tab")} />;
   return <PatientView key={study + "|" + patient + "|" + sample} study={study} patient={patient} sample={sample} nav={nav} tab={q.get("tab")} />;

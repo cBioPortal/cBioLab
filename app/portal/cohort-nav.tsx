@@ -6,17 +6,19 @@
 // of any size is one short link, and one whose clauses hold a long id list names a stored set.
 // The list's order (?order=: search, filters, sort) is the list dialog's, so prev / next step
 // through what the reader sees there.
+// As the portal's: "N patients" opens the Study View over the cohort, ⊖ steps on without the shown
+// patient (the cohort's definition, excluding it); the list dialog is beside them.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, CircleMinus, List } from "lucide-react";
 import { api } from "../lab/api.ts";
 import { Button } from "../_ui/button";
 import { DataTable } from "../_table/DataTable.tsx";
 import { PatientsDialog } from "../lab/patient-nav.tsx";
 import type { AnalysisDoc, TableRows } from "../../lib/types.ts";
 import type { TableQuery } from "../../lib/table-query.ts";
-import { listDoc, patientHref, type CohortNavigation, type PatientKey } from "./cohort-navigation.ts";
+import { excludePatient, listDoc, patientHref, studyViewHref, type CohortNavigation, type PatientKey } from "./cohort-navigation.ts";
 
 type Position = { index: number; prev: PatientKey | null; next: PatientKey | null } | null;
 type ListResult = TableRows<string> & { position?: Position };
@@ -72,6 +74,11 @@ export function CohortNav({ nav, at, tab }: { nav: CohortNavigation; at: Patient
     setJumping(null);
     try { go(await patientAt(nav, offset)); } catch (e) { setJumping((e as Error).message); }
   };
+  // the portal's ⊖: the cohort without this patient, opened at the next patient (the previous when it was the last)
+  const exclude = () => {
+    const to = pos?.next ?? pos?.prev ?? null;
+    if (to) router.push(patientHref(to, excludePatient(nav, at), tab));
+  };
   if (error) return <p data-tw className="text-sm text-destructive" role="alert">the cohort's patients could not be listed: {error}</p>;
   if (!list) return <span data-tw className="skeleton h-8 w-80" role="status" aria-label="placing the patient in the cohort" />;
   const first = !pos || pos.index === 0, last = !pos || pos.index === total - 1;
@@ -91,11 +98,14 @@ export function CohortNav({ nav, at, tab }: { nav: CohortNavigation; at: Patient
             <span className="text-muted-foreground">of</span>
           </form>
         ) : <span className="text-muted-foreground">{at.id} is not in this cohort ·</span>}
-        <button type="button" className="text-primary hover:underline" data-tip="list the cohort's patients: search, filter, sort, and pick one" onClick={() => setListOpen(true)}>
+        <a className="text-primary hover:underline" href={studyViewHref(nav)} target="_blank" rel="noreferrer" data-tip="Open all patients in study view">
           {total.toLocaleString()} patients
-        </button>
+        </a>
         <IconLink to={pos?.next ?? null} label="next patient"><ChevronRight /></IconLink>
         <Button variant="outline" size="icon-sm" disabled={last} data-tip="the cohort's last patient" aria-label="last patient" onClick={() => void jump(total - 1)}><ChevronLast /></Button>
+        <Button variant="outline" size="icon-sm" disabled={!pos || total < 2} data-tip={!pos ? "the patient is not in this cohort" : total < 2 ? "the cohort's only patient cannot be excluded" : "Exclude the current patient"}
+          aria-label="exclude the current patient" onClick={exclude}><CircleMinus /></Button>
+        <Button variant="outline" size="icon-sm" data-tip="list the cohort's patients: search, filter, sort, and pick one" aria-label="list the cohort's patients" onClick={() => setListOpen(true)}><List /></Button>
       </div>
       {!pos && total > 0 && <Button variant="link" size="xs" onClick={() => void jump(0)}>go to the cohort's first patient</Button>}
       {(list.excluded || []).map((x) => (

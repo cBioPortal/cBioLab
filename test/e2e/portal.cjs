@@ -29,6 +29,13 @@ async function portal({ browser, ok, BASE }) {
       ok("explore: View patients opens the cohort's first patient, and steps to the next and the last",
         first.get("cohort") && first.get("study") === "coadread_tcga_pub" && total === 276 && second.get("patient") !== first.get("patient") && last.get("cohort") === first.get("cohort"),
         first.get("patient") + " → " + second.get("patient") + " → " + last.get("patient") + " of " + total);
+      // the portal's ⊖ (PAT-NAV-4): the last patient left out, the page steps back to the one before it
+      ok("patient pager: N patients opens the Study View over the cohort (PAT-NAV-3)",
+        /^\/lab\?tab=explore&study=coadread_tcga_pub&filters=/.test(await page.locator(".cohort-nav a", { hasText: "patients" }).getAttribute("href") || ""));
+      await page.getByRole("button", { name: "exclude the current patient" }).click();
+      await page.waitForFunction((p) => new URL(location.href).searchParams.get("patient") !== p, last.get("patient"), { timeout: 120000 });
+      await at(String(total - 1));
+      ok("patient pager: excluding the last patient steps to the previous, one patient fewer (PAT-NAV-4)", (await of()) === total - 1, (await of()) + " of " + (total - 1));
     } catch (e) {
       ok("explore: View patients opens the cohort's first patient, and steps to the next and the last", false, String(e.message).split("\n")[0].slice(0, 200));
     }
