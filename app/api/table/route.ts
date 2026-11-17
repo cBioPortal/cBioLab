@@ -3,7 +3,9 @@ import { runAnalysis } from "../../../lib/analysis.ts";
 import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts";
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
-import { isDrawn, type AnalysisDoc, type ViewResult } from "../../../lib/types.ts";
+import { isDrawn, type AnalysisDoc, type TableRows, type ViewResult } from "../../../lib/types.ts";
+import { caseFileHeader, caseFileLine, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
+import { portalDisposition, portalMatrix } from "../../../lib/views/datafiles/portal-file.ts";
 
 export const maxDuration = 300;
 
@@ -39,8 +41,10 @@ export async function POST(req: Request) {
   const v = first.views[0];
   const t = pagedTable(v, table);
   if (!t || !isDrawn(v)) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
-  const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
+  if (body.format === "tsv" || body.format === "tsv-transposed") return portalFile(v, t, table, body.format === "tsv-transposed", run, doc);
   const enc = new TextEncoder();
+  if (body.caseFile) return caseFileResponse(t, body.caseFile as CaseFileFormat, (offset) => run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table })), table);
+  const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   // the header row comes first, so the file opens as a table anywhere; what the query kept and who
   // was left out are on screen and in the view's caveat, and the file name says it was filtered
   const filtered = !!describeQuery(t.query, t.columns);
@@ -77,5 +81,65 @@ export async function POST(req: Request) {
   return new Response(stream, { headers: {
     "content-type": "text/csv; charset=utf-8",
     "content-disposition": "attachment; filename=\"" + name.replace(/[^A-Za-z0-9._-]/g, "_") + "\""
+  } });
+}
+
+/**
+ * The table's shown columns as a cBioPortal Study View file (download-cases.md PC): TSV, a line per
+ * row, no line ending after the last. The studies left out, that may not list their patients, are
+ * named in the x-left-out header. A download cut short ends with a # line, as the CSV does.
+ */
+function caseFileResponse(t: TableRows<unknown>, format: CaseFileFormat, page: (offset: number) => Promise<{ views: ViewResult[] }>, table: string | undefined): Response {
+  const shown = t.shown.filter((id) => id !== "cohort" && id !== "study" && id !== "samples");
+  const at = shown.map((id) => t.columns.findIndex((c) => c.id === id));
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      controller.enqueue(enc.encode(caseFileHeader(at.map((i) => t.columns[i]), format)));
+      try {
+        for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
+          const r = await page(offset);
+          const p = pagedTable(r.views[0], table);
+          if (!p) throw new Error(r.views[0].error || "the page at row " + offset + " returned nothing");
+          controller.enqueue(enc.encode(p.rows.map((row) => "\n" + caseFileLine(row.study, at.map((i) => String(row.values[i] ?? "")))).join("")));
+        }
+      } catch (e) {
+        controller.enqueue(enc.encode("\n# DOWNLOAD INCOMPLETE: " + String((e as Error)?.message || e).replace(/\s+/g, " ")));
+      }
+      controller.close();
+    }
+  });
+  const left = (t.excluded || []).map((e) => e.study + ": " + e.reason).join("; ");
+  return new Response(stream, { headers: {
+    "content-type": "text/tab-separated-values; charset=utf-8",
+    ...(left ? { "x-left-out": encodeURIComponent(left) } : {}),
+  } });
+}
+
+/**
+ * A Download-tab gene-by-sample file in the portal's format (Tab Delimited Format, or its Transposed
+ * Matrix): every row read first, since the transposed file's lines run across all of them; a read cut
+ * short refuses the file rather than writing part of it.
+ */
+async function portalFile(v: ViewResult, t: NonNullable<ReturnType<typeof pagedTable>>, table: string | undefined, transposed: boolean,
+  run: <T>(fn: () => Promise<T>) => Promise<T>, doc: AnalysisDoc): Promise<Response> {
+  const file = v.kind === "datafiles" ? v.datafiles?.files.find((f) => f.id === table && f.portalFile) : undefined;
+  if (!file) return new Response("cannot download: the portal's tab-delimited formats are for the Download tab's gene-by-sample files\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
+  const genes = t.columns.slice(2).map((c) => c.name);
+  const rows: { study: string; sample: string; values: string[] }[] = [];
+  try {
+    for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
+      const r = await run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table }));
+      const p = pagedTable(r.views[0], table);
+      if (!p) throw new Error(r.views[0].error || "the page at row " + offset + " returned nothing");
+      for (const row of p.rows) rows.push({ study: row.study, sample: row.sample, values: row.values.slice(2).map(String) });
+    }
+  } catch (e) {
+    return new Response("cannot download: " + String((e as Error)?.message || e) + "\n", { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
+  }
+  const name = transposed ? file.portalFile!.replace(/\.txt$/, "_transposed.txt") : file.portalFile!;
+  return new Response(portalMatrix(genes, rows, transposed), { headers: {
+    "content-type": "text/plain; charset=utf-8",
+    "content-disposition": portalDisposition(name)
   } });
 }
