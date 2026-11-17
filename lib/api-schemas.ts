@@ -134,6 +134,8 @@ export const TableRequest = z.object({
   doc: z.union([DocEnvelope, z.string()]),
   view: z.number().int().min(0),
   table: z.string().max(120).optional(),
+  /** csv (default); or, for a Download-tab gene-by-sample file, the portal's Tab Delimited Format or Transposed Matrix */
+  format: z.enum(["csv", "tsv", "tsv-transposed"]).optional(),
   ...customData,
 });
 
