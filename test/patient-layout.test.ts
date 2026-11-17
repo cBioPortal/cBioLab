@@ -95,3 +95,11 @@ test("L1 PTB-CD-2: the Clinical Data tab's patient and sample tables are transpo
   assert.partialDeepStrictEqual(at("Clinical Data › Patient"), { kind: "table", unit: "patient", transpose: true });
   assert.partialDeepStrictEqual(at("Clinical Data › Samples"), { kind: "table", unit: "sample", transpose: true });
 });
+
+test("L2 PTB-CD-4: the Clinical Data tab's Timeline Data view is the event tables", () => {
+  const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION", "CNA"] });
+  const at = l.names.indexOf("Clinical Data › Timeline Data");
+  assert.ok(at >= 0, l.names.join(", "));
+  assert.equal((l.doc.views![at] as { kind: string; tables?: boolean }).kind, "timeline");
+  assert.equal((l.doc.views![at] as { tables?: boolean }).tables, true);
+});

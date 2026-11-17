@@ -149,4 +149,8 @@ export const mutants: Mutant[] = [
     effect: "The Patient page's Samples table lists the patient's attributes in every sample's column, where the portal lists a sample's own.",
     find: "const patientAttrs = unit === \"sample\" ? held.filter((c) => c.per === \"patient\").map((c) => c.id) : [];",
     replace: "const patientAttrs: string[] = [];" },
+  { id: "corr-shown-unrounded-r", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
+    effect: "A plot's correlation is shown to 2 decimals from the full-precision r, where the portal rounds its 5-decimal value (0.124996 shows 0.12, the portal 0.13).",
+    find: "export const portalCorr = (r: number): string => portalR5(r).toFixed(2);",
+    replace: "export const portalCorr = (r: number): string => r.toFixed(2);" },
 ];

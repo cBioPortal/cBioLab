@@ -60,6 +60,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       // as the portal lists them: Attribute | Value, and an attribute per row with a column per sample (PTB-CD-2, PTB-CD-3)
       v("Patient", { kind: "table", unit: "patient", transpose: true }),
       v("Samples", { kind: "table", unit: "sample", transpose: true, rows: 100 }),
+      // the portal's "Timeline Data": the patient's events, a table per event type (PTB-CD-4)
+      v("Timeline Data", { kind: "timeline", tables: true }),
     ] },
     { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
     // the view refuses, naming what there is, when this patient has no signature values
