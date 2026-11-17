@@ -430,7 +430,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
   - [ ] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3)
   - [ ] Clinical Data tab: the Timeline Data tables (PTB-CD-4); the patient table's 1-decimal values (PTB-STM-11)
-    - [x] Attribute | Value and Attribute × sample, a sample's own attributes (PTB-CD-1…3) (#PR)
+    - [x] Attribute | Value and Attribute × sample, a sample's own attributes (PTB-CD-1…3) (#314)
 
 ## Medium — annotation depth and per-sample viewers
 
