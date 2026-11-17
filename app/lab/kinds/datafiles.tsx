@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Copy, Download, ExternalLink } from "lucide-react";
 import { DataTable, specQuery } from "../../_table/DataTable.tsx";
 import { Button } from "../../_ui/button";
-import { TB } from "../../_ui/toolbar.ts";
+import { FIELD, TB } from "../../_ui/toolbar.ts";
 import { api } from "../api.ts";
 import { docParam } from "../use-library.ts";
 import { storeDocLists } from "../id-sets-client.ts";
@@ -15,7 +15,10 @@ import type { AnalysisDoc, DrawnResultOf, TableQuery } from "../../../lib/types"
 import type { TableBody } from "../../../lib/api-schemas.ts";
 import type { DataFile } from "../../../lib/views/datafiles/types.ts";
 import type { KindUi } from "./kind-ui.ts";
-import { portalPercentage, portalPercentAltered } from "../../../lib/chart/format.ts";
+import { portalPercentage } from "../../../lib/chart/format.ts";
+import { frequencyFilter, frequencySort, frequencyTsv, type FrequencyColumn } from "../../../lib/views/datafiles/frequency.ts";
+import { Input } from "../../_ui/input";
+import { cn } from "../../../lib/cn";
 
 /**
  * A line's altered share as the portal's frequency table draws it (FrequencyBar, barWidth 200): the
@@ -108,10 +111,64 @@ function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJso
   );
 }
 
-function frequencyCsv(d: Result): string {
-  const q = (s: string) => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  return ["gene,oql_line,altered,profiled,percent_altered",
-    ...d.frequency.map((f) => [f.gene, q(f.line), f.profiled ? f.altered : "N/P", f.profiled, portalPercentAltered(f.altered, f.profiled)].join(","))].join("\n") + "\n";
+const FREQ_PAGE = 10;
+
+/**
+ * The gene alteration frequency table as the portal's (GeneAlterationTable): sorted by Percent Samples Altered,
+ * highest first, until a header is clicked; filtered on gene and OQL line; ten rows a page; the OQL Line column
+ * hidden until asked for; its file the portal's gene_alteration_frequency.tsv, every row in the table's order.
+ * Ours alone: the Profiled column, each line's denominator.
+ */
+function FrequencyTable({ rows }: { rows: Result["frequency"] }) {
+  const [sort, setSort] = useState<{ column: FrequencyColumn; asc: boolean }>({ column: "percent", asc: false });
+  const [filter, setFilter] = useState("");
+  const [page, setPage] = useState(0);
+  const [showLine, setShowLine] = useState(false);
+  const sorted = frequencySort(rows, sort.column, sort.asc);
+  const shown = frequencyFilter(sorted, filter, showLine);
+  const pages = Math.max(1, Math.ceil(shown.length / FREQ_PAGE));
+  const at = Math.min(page, pages - 1);
+  const head = (column: FrequencyColumn, name: string, className?: string) => (
+    <th className={className} aria-sort={sort.column === column ? (sort.asc ? "ascending" : "descending") : "none"}>
+      <button type="button" className="cursor-pointer border-0 bg-transparent p-0 font-semibold hover:underline" data-tip={"sort by " + name}
+        onClick={() => { setSort(sort.column === column ? { column, asc: !sort.asc } : { column, asc: true }); setPage(0); }}>
+        {name}{sort.column === column ? (sort.asc ? " ▲" : " ▼") : ""}</button>
+    </th>
+  );
+  return (
+    <>
+      <div className="mb-2 flex items-center gap-3">
+        <h4 className="m-0 font-semibold">Gene alteration frequency</h4>
+        <span className="text-sm text-muted-foreground">altered ÷ samples profiled for the gene</span>
+        <span className="flex-1" />
+        <label className="chk text-sm"><input type="checkbox" checked={showLine} onChange={(e) => setShowLine(e.target.checked)} /> OQL Line column</label>
+        <Input type="search" className={cn(FIELD, "w-40")} value={filter} placeholder="search genes" aria-label="search the gene alteration frequency table"
+          onChange={(e) => { setFilter(e.target.value); setPage(0); }} />
+        <Button variant="outline" size="sm" className={TB} asChild>
+          <a href={"data:text/tab-separated-values;charset=utf-8," + encodeURIComponent(frequencyTsv(sorted))} download="gene_alteration_frequency.tsv"
+            data-tip="every row of this table, in its order, as the portal's tab-separated file">
+            <Download />TSV</a>
+        </Button>
+      </div>
+      <table className="text-md [&_td]:border-b [&_td]:py-1 [&_td]:pr-6 [&_th]:pr-6 [&_th]:text-left">
+        <thead><tr>{head("gene", "Gene Symbol")}{showLine && head("line", "OQL Line")}{head("altered", "Num Samples Altered", "text-right")}
+          <th className="text-right">Profiled</th>{head("percent", "Percent Samples Altered")}</tr></thead>
+        <tbody>{shown.slice(at * FREQ_PAGE, (at + 1) * FREQ_PAGE).map((f) => (
+          <tr key={f.line}><td className="font-medium">{f.gene}</td>{showLine && <td className="mono">{f.line}</td>}
+            <td className="tabular-nums text-right">{f.profiled ? f.altered.toLocaleString() : "Not Profiled"}</td><td className="tabular-nums text-right">{f.profiled.toLocaleString()}</td>
+            <td>{f.profiled ? <FrequencyBar altered={f.altered} profiled={f.profiled} /> : "Not Profiled"}</td></tr>))}
+        </tbody>
+      </table>
+      <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+        <span>{shown.length ? "Showing " + (at * FREQ_PAGE + 1) + "–" + Math.min(shown.length, (at + 1) * FREQ_PAGE) + " of " + shown.length : "No line matches"}
+          {filter && shown.length < rows.length ? " (filtered from " + rows.length + ")" : ""}</span>
+        {pages > 1 && <>
+          <Button variant="outline" size="sm" className={TB} disabled={at === 0} onClick={() => setPage(at - 1)}>Previous</Button>
+          <Button variant="outline" size="sm" className={TB} disabled={at >= pages - 1} onClick={() => setPage(at + 1)}>Next</Button>
+        </>}
+      </div>
+    </>
+  );
 }
 
 function DatafilesBody({ d, spec, vi, updating, docJson, onQuery }: { d: Result; spec: Record<string, unknown>; vi: number; updating: boolean; docJson?: () => string;
@@ -125,23 +182,7 @@ function DatafilesBody({ d, spec, vi, updating, docJson, onQuery }: { d: Result;
         </table>
       </section>
       <section aria-label="gene alteration frequency">
-        <div className="mb-2 flex items-center gap-3">
-          <h4 className="m-0 font-semibold">Gene alteration frequency</h4>
-          <span className="text-sm text-muted-foreground">altered ÷ samples profiled for the gene</span>
-          <span className="flex-1" />
-          <Button variant="outline" size="sm" className={TB} asChild>
-            <a href={"data:text/csv;charset=utf-8," + encodeURIComponent(frequencyCsv(d))} download="gene_alteration_frequency.csv" data-tip="this table as comma-separated text">
-              <Download />CSV</a>
-          </Button>
-        </div>
-        <table className="text-md [&_td]:border-b [&_td]:py-1 [&_td]:pr-6 [&_th]:pr-6 [&_th]:text-left">
-          <thead><tr><th>Gene</th><th>OQL line</th><th className="text-right">Altered</th><th className="text-right">Profiled</th><th>Altered %</th></tr></thead>
-          <tbody>{d.frequency.map((f) => (
-            <tr key={f.line}><td className="font-medium">{f.gene}</td><td className="mono">{f.line}</td>
-              <td className="tabular-nums text-right">{f.profiled ? f.altered.toLocaleString() : "Not Profiled"}</td><td className="tabular-nums text-right">{f.profiled.toLocaleString()}</td>
-              <td>{f.profiled ? <FrequencyBar altered={f.altered} profiled={f.profiled} /> : "Not Profiled"}</td></tr>))}
-          </tbody>
-        </table>
+        <FrequencyTable rows={d.frequency} />
         <p className="mt-2 mb-0 text-sm text-muted-foreground">
           Altered in {d.counts.altered.toLocaleString()} of {d.counts.samples.toLocaleString()} samples
           {d.counts.samples ? " (" + (Math.round(d.counts.altered / d.counts.samples * 1000) / 10) + "%)" : ""}; unaltered: {d.counts.unaltered.toLocaleString()}
