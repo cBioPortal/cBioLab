@@ -47,10 +47,11 @@ const report = (gene: string, stems: [number, number][]) => ({
 const gene = (stems: [number, number][], name = "G") =>
   buildLollipopGene(name, [report(name, stems)] as never, { proteinLength: 189, transcriptId: "T", domains: [] }) as HotspotGene;
 
+const unesc = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
 /** the y axis's ticks: each grid line's y and the label drawn on it */
 function yTicks(svg: string) {
   const out: { y: number; label: string }[] = [];
-  for (const m of svg.matchAll(/<line x1="[^"]*" y1="([^"]*)" x2="[^"]*" y2="\1"[^>]*\/><text [^>]*text-anchor="end">([^<]*)<\/text>/g)) out.push({ y: Number(m[1]), label: m[2] });
+  for (const m of svg.matchAll(/<line x1="[^"]*" y1="([^"]*)" x2="[^"]*" y2="\1"[^>]*\/><text [^>]*text-anchor="end">([^<]*)<\/text>/g)) out.push({ y: Number(m[1]), label: unesc(m[2]) });
   return out;
 }
 const topTick = (ts: { y: number; label: string }[]) => [...ts].sort((a, b) => a.y - b.y)[0];
@@ -84,12 +85,12 @@ test("Y3 checkYMax refuses a malformed yMax, naming the problem", () => {
   assert.equal(checkYMax({ KRAS: 1 }, ["KRAS"]), null);
 });
 
-test("Y4 a maximum below the tallest stem: the top tick reads ≥10, the stem is capped there", () => {
+test("Y4 a maximum below the tallest stem: the top tick reads >= 10, the stem is capped there", () => {
   const svg = panels([gene([[12, 40], [61, 3]])], { G: 10 });
   const ticks = yTicks(svg), top = topTick(ticks);
-  assert.equal(top.label, "≥10");
+  assert.equal(top.label, ">= 10");
   assert.equal(headY(svg, 12), top.y, "the 40 stem's head sits on the top tick");
-  assert.ok(!ticks.some((t) => t.label === "40" || t.label === "≥40"), "the axis does not run to 40");
+  assert.ok(!ticks.some((t) => t.label === "40" || t.label === ">= 40"), "the axis does not run to 40");
 });
 
 test("Y5 a maximum above the tallest stem: the top tick reads 100, the stem below it", () => {
@@ -103,7 +104,7 @@ test("Y5 a maximum above the tallest stem: the top tick reads 100, the stem belo
 test("Y6 a maximum below 1 is drawn as 1", () => {
   const g = gene([[12, 40]]);
   const one = panels([g], { G: 1 });
-  assert.equal(topTick(yTicks(one)).label, "≥1");
+  assert.equal(topTick(yTicks(one)).label, ">= 1");
   assert.equal(panels([g], { G: 0 }), one);
   assert.equal(panels([g], { G: -3 }), one);
 });
@@ -136,7 +137,7 @@ test("Y8 the hotspots view checks yMax, returns it, and its figure draws the cap
   assert.equal(ok.error, undefined, String(ok.error));
   assert.deepEqual(ok.yMax, { KRAS: 10 });
   const svg = hotspotsSvg(ok as never, { width: 720 });
-  assert.equal(topTick(yTicks(svg)).label, "≥10");
+  assert.equal(topTick(yTicks(svg)).label, ">= 10");
   const bad = await run({ EGFR: 10 });
   assert.equal(typeof lib.checkYMax, "function");
   assert.equal(bad.error, checkYMax({ EGFR: 10 }, ["KRAS"]));
@@ -190,13 +191,11 @@ test("Y12 the Mutations tab's gene chooser leaves the lollipop with no yMax", ()
   assert.equal(lp.yMax, undefined);
 });
 
-test("Y13 a set maximum has whole, distinct ticks topped by the cap", () => {
+test("Y13 a set maximum's axis is labelled 0 and the cap only", () => {
   for (const cap of [1, 2, 3]) {
-    const labels = [...yTicks(panels([gene([[12, 40]])], { G: cap }))].sort((a, b) => b.y - a.y).map((t) => t.label);
-    const nums = labels.map((s) => Number(s.replace("≥", "")));
+    const labels = [...yTicks(panels([gene([[12, 40]])], { G: cap }))].sort((a, b) => b.y - a.y).map((t) => t.label).filter((l) => l.trim() !== "");
+    const nums = labels.map((s) => Number(s.replace(">= ", "")));
     assert.ok(nums.every(Number.isInteger), cap + ": " + labels.join(","));
-    assert.equal(new Set(nums).size, nums.length, cap + ": " + labels.join(","));
-    assert.equal(labels.at(-1), "≥" + cap);
-    if (cap === 1) assert.deepEqual(labels, ["0", "≥1"]);
+    assert.deepEqual(labels, ["0", ">= " + cap], cap + ": " + labels.join(","));
   }
 });
