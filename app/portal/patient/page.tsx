@@ -19,6 +19,7 @@ import { patientLayout, SAMPLE_COHORT, type PatientQuery } from "../patient-layo
 import { PortalSummary, PortalLoading } from "../portal-chrome.tsx";
 import { SiteHeader } from "../../_ui/site-header.tsx";
 import { api } from "../../lab/api.ts";
+import type { ViewPageBody } from "../../../lib/api-schemas.ts";
 import { PatientHeader, usePatientRecord } from "../patient-header.tsx";
 import { CohortNav, useCohortPosition } from "../cohort-nav.tsx";
 import { navigationParams, patientHref, readNavigation, type CohortNavigation } from "../cohort-navigation.ts";
@@ -48,6 +49,29 @@ function useSamplePatient(study: string, sample: string): { patient: string | nu
   }, [study, sample]);
   return out;
 }
+
+/**
+ * Whether the patient is one the Genomic Evolution view can draw — two or more samples and a
+ * mutation with a VAF above 0, the portal's condition for its tab — read as one row of the view's
+ * patient list; null while it loads, and true when it fails, so the tab is laid out and says why.
+ */
+function useEvolutionDrawable(study: string, patient: string | null, samples: number | undefined): boolean | null {
+  const [out, setOut] = useState<boolean | null>(null);
+  const wanted = !!(study && patient && (samples ?? 0) > 1);
+  useEffect(() => {
+    if (!wanted) return;
+    setOut(null);
+    const ctl = new AbortController();
+    api.viewPage({ doc: { study, cohorts: { [EVOLUTION_COHORT]: { study, all: [{ kind: "patientList", ids: [study + ":" + patient] }] } },
+      views: [{ kind: "evolution", cohorts: [EVOLUTION_COHORT], columns: ["patient"] }] } as ViewPageBody["doc"], view: 0, offset: 0, limit: 1 }, { signal: ctl.signal })
+      .then((r) => r.json())
+      .then((j) => setOut(j.error ? true : Number(j.total) > 0))
+      .catch(() => { if (!ctl.signal.aborted) setOut(true); });
+    return () => ctl.abort();
+  }, [study, patient, wanted]);
+  return wanted ? out : false;
+}
+const EVOLUTION_COHORT = "Patient";
 
 export default function PatientPage() {
   const q = useLinkParams();
@@ -84,11 +108,12 @@ function PatientView({ study, patient, sample, nav, tab }: { study: string; pati
   const owner = useSamplePatient(study, sample);
   const owned = sample ? owner.patient : patient;
   const { record, error: recordError, missing } = usePatientRecord(study, owned);
+  const vaf = useEvolutionDrawable(sample ? "" : study, owned, record?.samples.length);
   const query: PatientQuery | null = sample ? { study, sample } : patient ? { study, patient } : null;
   // laid out from the study list at once; the profiles only add the Mutational Signatures tab
   const fresh = useMemo(() => basics && query
-    ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known || (!sample && !record), samples: record?.samples.length })
-    : null, [basics, known, study, patient, sample, record]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
+    ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known || (!sample && (!record || vaf == null)), samples: record?.samples.length, vaf: vaf ?? undefined })
+    : null, [basics, known, study, patient, sample, record, vaf]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
   const page = usePageDoc(fresh);
   const shell = (body: React.ReactNode) => <><SiteHeader page={sample ? "sample" : "patient"} /><main className="analysis-main">{body}</main></>;
   if (!study || !query) return shell(<p className="note">This page shows one patient, or one sample: give the study and the patient as <code>?study=&lt;study id&gt;&amp;patient=&lt;patient id&gt;</code>, or a sample as <code>?study=&lt;study id&gt;&amp;sample=&lt;sample id&gt;</code>.</p>);

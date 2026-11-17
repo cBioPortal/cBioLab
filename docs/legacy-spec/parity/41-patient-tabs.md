@@ -22,9 +22,9 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 18 |
-| 🟡 partial | 15 |
-| 🔶 different | 15 |
+| ✅ match | 22 |
+| 🟡 partial | 16 |
+| 🔶 different | 10 |
 | ❌ missing | 30 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
@@ -98,8 +98,8 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | ID | verdict | how | note |
 |---|---|---|---|
 | PTB-TAB-1 | 🟡 | B | `?tab=<Title>` keeps the query; unknown → Summary ✅; not a path segment |
-| PTB-TAB-2 | 🔶 | B | P1: Summary · Pathways · Clinical Data · Genomic Evolution · Files & Links · Clinical Trials; GE gated on "not sample mode and has mutations" (`patient-layout.ts:57`), not ≥2 samples + VAF; Signatures on a contribution profile (`patient-layout.ts:25`) ✅; no Pathology / Tissue / Matched Trials / mRNA / Plots / resource / custom tabs |
-| PTB-TAB-3 | 🔶 | B | Adds a "Clinical Trials — not built yet" tab (OncoKB trial matching) that legacy does not have |
+| PTB-TAB-2 | 🟡 | B | Summary · Genomic Evolution · Pathways · Clinical Data · Files & Links · Mutational Signatures, the legacy order ✅; GE on >1 sample and a called mutation with VAF > 0 (the evolution view's patient list) ✅, uncalled reads not counted toward the gate; Files & Links always shown (a placeholder), not only with resource data; no Pathology / Tissue / Matched Trials / mRNA / Plots / resource / custom tabs |
+| PTB-TAB-3 | ✅ | B | No Clinical Trials tab |
 | PTB-TAB-4 | N/A | — | Observation about the public build; requirement is TAB-2 #5 |
 | PTB-TAB-5 | 🟡 | C | Line tabs + "Open in cBioPortal"; no pagination, no help widget, no closable resource tabs |
 
@@ -190,8 +190,8 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | ID | verdict | how | note |
 |---|---|---|---|
 | PTB-MD-1 | ✅ | BC | P2: no GE; signatures read the cohort's sample (`samples: "cohort"`, `patient-layout.ts:59`) |
-| PTB-MD-2 | 🔶 | B | GE tab shown and refuses (P3, P4); Samples table one row ✅ |
-| PTB-MD-3 | 🔶 | C | GE tab shown; the view refuses a patient with no allele counts |
+| PTB-MD-2 | ✅ | B | No GE tab (TCGA-A6-2671); Samples table one row ✅ |
+| PTB-MD-3 | ✅ | B | No GE tab: prad_mskcc_2017 P-0000964 (2 samples, 10 mutations, none with allele counts on the portal's API) |
 | PTB-MD-4 | ✅ | C | `noDay` forces sequential; checkbox disabled with the reason (not hidden) |
 | PTB-MD-5 | 🟡 | C | NA cells ✅, dashed line across NP ✅; no alert |
 | PTB-MD-6 | ✅ | C | Spectrum, count line, %/# and reference need counts (`signatures-body.tsx:71,119`) |
@@ -200,7 +200,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-MD-9 | ❌ | C | (tracked) |
 | PTB-MD-10 | ❌ | C | (tracked) |
 | PTB-MD-11 | ❌ | C | (tracked: Data-governance switches) |
-| PTB-MD-12 | 🔶 | B | "Clinical Trials" placeholder on every patient |
+| PTB-MD-12 | ✅ | B | No trials tab |
 
 §8 Persistence (no IDs): GE chart, sequential, log, data range, signature version/scale/ymax/signature, table queries all in the document (`?changes=`, invariant 9); legacy keeps most local or in `genomicEvolutionSettings`. Hover and picks stay in the browser in both.
 
