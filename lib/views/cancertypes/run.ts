@@ -102,7 +102,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   for (const n of vNames) {
     // gene "*" is the genes together; every other key one gene
     const byGene = new Map<string, Map<string, CancertypesGroup>>();
-    const totals = new Map<string, { samples: number; profiledFor: { mutation: number; cna: number; sv: number }; label: string }>();
+    const totals = new Map<string, { samples: number; label: string }>();
     const get = (gene: string, k: string, label: string) => {
       let m = byGene.get(gene); if (!m) { m = new Map(); byGene.set(gene, m); }
       let g = m.get(k); if (!g) { g = zeroGroup(k, label); m.set(k, g); } else if (!g.label && label) g.label = label;
@@ -119,12 +119,16 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
         g.profiled += Number(r.profiled); g.altered += Number(r.altered); if (r.gene === "*") profiled += Number(r.profiled);
         g.mutation += Number(r.mutation); g.amp += Number(r.amp); g.homdel += Number(r.homdel); g.sv += Number(r.sv); g.multiple += Number(r.multiple);
         for (const k of ["mrnaHigh", "mrnaLow", "protHigh", "protLow"] as const) g[k] = (g[k] || 0) + Number(r[k] ?? 0);
+        const pf = g.profiledFor ??= { mutation: 0, cna: 0, sv: 0 };
+        pf.mutation += Number(r.pmut ?? 0); pf.cna += Number(r.pcna ?? 0); pf.sv += Number(r.psv ?? 0);
+        if (Number(r.pmrna ?? 0)) pf.mrna = (pf.mrna || 0) + Number(r.pmrna);
+        if (Number(r.pprot ?? 0)) pf.prot = (pf.prot || 0) + Number(r.pprot);
       }
       for (const r of tot) {
         if (r.grp === ALL_KEY) { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.samples += Number(r.samples); cohortTotal.set(n, t); continue; }
         const name = String(r.label || r.grp);
-        const t = totals.get(String(r.grp)) || { samples: 0, profiledFor: { mutation: 0, cna: 0, sv: 0 }, label: attribute ? name : shortStudyName(name) };
-        t.samples += Number(r.samples); t.profiledFor.mutation += Number(r.mut); t.profiledFor.cna += Number(r.cna); t.profiledFor.sv += Number(r.sv);
+        const t = totals.get(String(r.grp)) || { samples: 0, label: attribute ? name : shortStudyName(name) };
+        t.samples += Number(r.samples);
         totals.set(String(r.grp), t);
       }
       perSite.push({ cohort: n, study: st, groups: rows.filter((r) => r.gene === "*").length, profiled });
@@ -133,7 +137,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
     for (const [k, t] of totals) for (const gene of ["*", ...genes]) get(gene, k, t.label);
     for (const m of byGene.values()) for (const g of m.values()) {
       const t = totals.get(g.key);
-      if (t) { g.samples = t.samples; g.profiledFor = { ...t.profiledFor }; }
+      if (t) { g.samples = t.samples; g.profiledFor ??= { mutation: 0, cna: 0, sv: 0 }; }
     }
     const all = [...(byGene.get("*") || new Map()).values()];
     // the cohort's own totals count each unit once, though a patient can sit in two groups

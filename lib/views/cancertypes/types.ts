@@ -53,8 +53,11 @@ export interface CancertypesGroup {
   mutation: number; amp: number; homdel: number; sv: number; multiple: number;
   /** a line's EXP / PROT: mRNA and protein high and low */
   mrnaHigh?: number; mrnaLow?: number; protHigh?: number; protLow?: number;
-  /** units profiled for each data type at all (any gene) — the portal's "+" rows */
-  profiledFor?: { mutation: number; cna: number; sv: number };
+  /**
+   * units profiled for each data type — for this gene on a gene tab, for any queried gene on the genes
+   * together; mRNA and protein only when a line reads EXP / PROT — the portal's profiled-data strip
+   */
+  profiledFor?: { mutation: number; cna: number; sv: number; mrna?: number; prot?: number };
 }
 /** a panel's (or one gene tab's) drawn groups */
 export interface CancertypesGroups {
