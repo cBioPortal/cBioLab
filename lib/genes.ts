@@ -1,7 +1,7 @@
 // The warehouse's gene catalog, for the gene query dialog: is a symbol a gene (HUGO), an alias of
-// one, or neither; genes and gene sets matching what is being typed; a gene set's members.
+// one, or neither; genes and gene sets matching what is being typed; a gene set's members; a gene panel's genes.
 // Reference data only — no patient, sample or study is read here.
-import { chQuery, DB } from "./ch.ts";
+import { chQuery, DB, PRIMARY, type ChConn } from "./ch.ts";
 import { sq } from "./compiler.ts";
 
 export type GeneStatus = "gene" | "alias" | "unknown";
@@ -83,4 +83,13 @@ export async function geneSetMembers(name: string): Promise<string[]> {
   if (r.data.length > MAX_SET_GENES)
     throw new Error("“" + name + "” has " + r.data.length + " genes; a query takes at most " + MAX_SET_GENES + " — add the ones you want one by one");
   return r.data.map((x) => x.s);
+}
+
+/** A gene panel's genes by Hugo symbol, A to Z, from the database `conn` holds; none for WES. */
+export async function panelGenes(panel: string, conn: ChConn = PRIMARY): Promise<string[]> {
+  if (panel === "WES") return [];
+  const r = await chQuery<{ g: string }>(
+    "SELECT gene AS g FROM " + conn.db + ".gene_panel_to_gene_derived WHERE gene_panel_id = " + sq(panel) + " ORDER BY g", conn);
+  if (!r.data.length) throw new Error("no gene panel named “" + panel + "” in " + conn.label);
+  return r.data.map((x) => x.g);
 }

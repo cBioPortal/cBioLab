@@ -54,6 +54,12 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid
     AND g.hugo_gene_symbol IN ('TP53')
     AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))
 
+-- view 0 plot: clinical:names · luad_tcga_pan_can_atlas_2018
+SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name
+FROM snapshot_db.clinical_attribute_meta cam
+JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id
+WHERE cs.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND cam.attr_id IN ('AGE','TMB_NONSYNONYMOUS')
+
 -- view 0 plot: plot:bins · luad_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'),
@@ -583,6 +589,12 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
 SELECT xs.id AS id, xs.v AS x, ys.v AS y
 FROM xs INNER JOIN ys ON ys.id = xs.id
 LIMIT 50001
+
+-- view 1 plot: clinical:names · luad_tcga_pan_can_atlas_2018
+SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name
+FROM snapshot_db.clinical_attribute_meta cam
+JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id
+WHERE cs.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND cam.attr_id IN ('SEX','TMB_NONSYNONYMOUS')
 
 -- view 1 plot: plot:box · luad_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived

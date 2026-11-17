@@ -80,7 +80,12 @@ The pure rules are in `lib/study-view-gene-tables.ts`, and the rows come from `g
 | GP3 | Which panels | Each gene panel held by a selected sample for the table's alteration type that lists the gene, whole-exome (`WES`) among them | AM:127-149 (`getMatchingGenePanelIds`) |
 | GP4 | ⚠ Their order | A to Z. The portal's are a set, in no fixed order | AbstractAlterationCountByGeneUseCase.java:58-72 |
 | GP5 | Several connections | The panels of every connection, each once | `mergeExplore` |
-| GP6 | ⚠ A panel's genes | The portal opens a panel's gene list on a click of its name. Not built here | StudyViewGenePanelModal.tsx |
+| GP6 | A panel's link | Each panel name on the panel line is a link; a click opens a dialog titled with the panel's id. The tooltip stays open while the pointer moves into it | StudyViewGenePanelModal.tsx:20-44; GenePanelModal.tsx |
+| GP7 | The panel's genes | One gene per line, by Hugo symbol, A to Z: the order `/api/gene-panels/{id}` returns (IMPACT341, IMPACT468, IMPACT505 and DFCI-ONCOPANEL-3 checked; IMPACT468's 469 genes identical to ours) | StudyViewGenePanelModal.tsx:51-58 |
+| GP8 | Waiting and closing | A loading indicator until the genes arrive; the header's ×, the Close button and Escape close it | GenePanelModal.tsx:32-64 |
+| GP9 | ⚠ WES | The portal holds no panel named WES (`/api/gene-panels/WES` answers "Gene panel not found: WES"), so its dialog is empty. Here too no genes are listed, with a line saying whole-exome sequencing profiles every gene | GenePanelModal.tsx (a failed request leaves the body empty) |
+| GP10 | Unknown panel | A panel id the study's database does not hold is refused, naming it ("no gene panel named …"), not shown as an empty list | invariant 1 |
+| GP11 | Where from | The panel's genes are reference data, read from the database that holds the study; a study held by a federation peer is refused with that reason | DATA-BOUNDARY (no patient rows) |
 
 ## Selecting rows (GU)
 
@@ -88,6 +93,7 @@ The pure rules are in `lib/study-view-gene-tables.ts`, and the rows come from `g
 |---|---|---|---|
 | GU1 | Union | The checked genes filter as one clause: the samples altered in any of them (one OQL query of a line per gene) | STS-GT-9; MST |
 | GU2 | Intersection | The checked genes filter as a clause per gene: the samples altered in every one | STS-GT-9 |
+| GU3 | The table's own selection | A gene table is narrowed by its own checked genes as by any other filter: under KRAS the Mutated Genes table counts only the KRAS-mutated samples (KRAS 100%, every other gene its co-occurrence). Unlike the clinical charts, whose own filter is left out (STS-MD-6). Checked on cbioportal.org: brca under TP53 gives 347 profiled samples, TTN 83, PIK3CA 81 (unfiltered: 1,066; 187; 347) | StudyViewPageStore.ts:10022 (`studyViewFilter: this.filters`); 30-study-summary.md:653, STS-MD-6 |
 | GU3 | The choice | Offered with two or more rows checked. Union by default for the gene tables. The choice is kept by the browser and shared by the three gene tables | STS-GT-9 (localStorage by table type) |
 | GU4 | Applied rows | A gene the selection already filters on in this table (a line of one of the draft's OQL clauses) is pinned to the top, checked and disabled, in the filter's order | STS-GT-9 |
 | GU5 | Appended | A new filter is added to the selection's other filters (AND), never replacing them | STS-GT-9 |

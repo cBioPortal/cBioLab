@@ -228,3 +228,30 @@ describe("table: more attributes than a table carries", () => {
     assert.match(v.caveat!, /with 200 attributes as each study recorded them \(of 205; name others in columns\)/);
   });
 });
+
+describe("table: PTB-CD-2, PTB-CD-3 transpose and patient attributes (legacy Patient Clinical Data tab)", () => {
+  test("T1 PTB-CD-2: transpose that is not a boolean is refused, naming transpose", async () => {
+    const v = await run({ transpose: "yes" as never }, one());
+    assert.match(v.error!, /transpose/);
+  });
+
+  test("T2 PTB-CD-2: transpose true with unit sample is not refused and holds the same rows and columns", async () => {
+    const plain = await run({ unit: "sample" }, one());
+    const tr = await run({ unit: "sample", transpose: true }, one());
+    assert.equal(tr.error, undefined);
+    assert.deepEqual(tableOf(tr).rows, tableOf(plain).rows);
+    assert.deepEqual(tableOf(tr).columns, tableOf(plain).columns);
+  });
+
+  test("T3 PTB-CD-3: unit sample lists the shown patient attributes, not the sample ones", async () => {
+    const t = tableOf(await run({ unit: "sample" }, one()));
+    assert.ok(t.patientAttrs!.includes("AGE"));
+    assert.ok(!t.patientAttrs!.includes("ST"));
+  });
+
+  test("T4 PTB-CD-3: unit patient has no patientAttrs", async () => {
+    const v = await run({ unit: "patient" }, one(PATIENT_ROWS));
+    assert.equal(v.error, undefined);
+    assert.equal(tableOf(v).patientAttrs, undefined);
+  });
+});

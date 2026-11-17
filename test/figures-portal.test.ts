@@ -22,15 +22,16 @@ describe("cancertypes", () => {
     assert.ok(svg.includes("30 / 150 samples, 160 in the group"), "a group with unprofiled samples says so");
     assert.ok(svg.includes("Alteration Frequency"));
   });
-  test("a '+' per group for a data type only some groups were profiled for, and one gene's bars on request", () => {
+  test("a '+' or '−' per group for every data type the query reads (CTS-CH-5), and one gene's bars on request", () => {
     const g = (k: string, label: string, n: number, m: number, sv: number) => ({ ...grp(k, label, n, m), profiledFor: { mutation: n, cna: 0, sv } });
     const two: ViewResult = { ...v, cancertypes: { ...v.cancertypes!, genes: ["KRAS", "NRAS"], panels: [{ ...v.cancertypes!.panels[0],
-      groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], categories: 2, filtered: undefined,
+      profiledTypes: ["sv", "mutation"], groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], categories: 2, filtered: undefined,
       perGene: [{ gene: "KRAS", altered: 40, profiled: 100, groups: [g("a", "A", 100, 40, 100)], categories: 1, minSamples: 10 }, { gene: "NRAS", altered: 7, profiled: 100, groups: [g("b", "B", 100, 7, 0)], categories: 1, minSamples: 10 }] }] } };
     const all = cancertypesPanelSvg(two.cancertypes!, 0);
     assert.ok(all.body.includes("Structural variant data") && !all.body.includes("CNA data"));
-    assert.equal((all.body.match(/>\+</g) || []).length, 1, "only the SV row differs between groups: one '+', for A");
-    assert.ok(all.body.includes("Every group was profiled for mutation data."), "a type every group has is said once, not marked per group");
+    assert.equal((all.body.match(/>\+</g) || []).length, 3, "mutation: A and B; structural variant: A");
+    assert.equal((all.body.match(/>\u2212</g) || []).length, 1, "structural variant: B was not profiled");
+    assert.ok(all.body.includes("<title>Not profiled</title>") && all.body.includes("<title>100 samples profiled</title>"));
     const nras = cancertypesPanelSvg(two.cancertypes!, 0, { gene: "NRAS" });
     assert.ok(nras.body.includes("B: 7.0% (7 / 100 samples)") && !nras.body.includes("A: "));
   });

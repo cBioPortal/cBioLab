@@ -485,6 +485,11 @@
                 "id": "status",
                 "name": "MS",
                 "numeric": false
+              },
+              {
+                "id": "inAll",
+                "name": "Profiled in all samples",
+                "numeric": true
               }
             ],
             "shown": [
@@ -538,7 +543,8 @@
                   25398284,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -572,7 +578,8 @@
                   89692896,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -606,7 +613,8 @@
                   7578478,
                   "G",
                   "C",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -663,6 +671,11 @@
                 "id": "freq",
                 "name": "Cohort %",
                 "numeric": true
+              },
+              {
+                "id": "inAll",
+                "name": "Profiled in all samples",
+                "numeric": true
               }
             ],
             "shown": [
@@ -694,7 +707,8 @@
                   "HOMDEL",
                   "Likely Oncogenic",
                   "5q11.2",
-                  0.3194888178913738
+                  0.3194888178913738,
+                  null
                 ]
               },
               {
@@ -708,7 +722,8 @@
                   "HOMDEL",
                   "Likely Oncogenic · Level 1",
                   "14q24.1",
-                  0.0878594249201278
+                  0.0878594249201278,
+                  null
                 ]
               },
               {
@@ -722,7 +737,8 @@
                   "HOMDEL",
                   "Unknown",
                   "5q11.2",
-                  0.23963575365444525
+                  0.23963575365444525,
+                  null
                 ]
               }
             ],
@@ -984,6 +1000,10 @@
               "P-0024249-T02-IM7"
             ]
           }
+        },
+        "mixedPanels": {
+          "mutations": false,
+          "cna": false
         },
         "oncokbPin": "v7.5"
       },

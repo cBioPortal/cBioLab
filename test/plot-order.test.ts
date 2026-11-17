@@ -2,7 +2,7 @@
 // rule: cbioportal-frontend cd8c6df src/shared/components/plots/PlotsTabUtils.tsx makeBoxScatterPlotData
 // (2837-2843: a data type's categoryOrder when it has one, else _.sortBy by label) and the orders it
 // uses (2148 cnaCategoryOrder; 2165 mutTypeCategoryOrder; 2176 mutVsWildCategoryOrder; 2181
-// mutDriverVsVUSCategoryOrder), with our labels ("Not mutated" for the portal's "No mutation").
+// mutDriverVsVUSCategoryOrder), with the portal's labels ("No mutation").
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { categoryOrder } from "../lib/views/plot/run.ts";
@@ -16,21 +16,21 @@ const CASES: [string, unknown, string[], string[]][] = [
     ["Rectal", "Colon", "Mucinous"], ["Colon", "Mucinous", "Rectal"]],
   ["O2 alphabetical compares code units, as lodash sortBy: capitals first", { source: "clinical", attribute: "X" }, ["b", "B", "a"], ["B", "a", "b"]],
   ["O3 copy-number levels, deep deletion to amplification", { source: "molecular", profileType: "cna", gene: "KRAS", discrete: true },
-    ["Diploid", "Amplification", "Deep deletion", "Gain", "Shallow deletion"], ["Deep deletion", "Shallow deletion", "Diploid", "Gain", "Amplification"]],
+    ["Diploid", "Amplification", "Deep Deletion", "Gain", "Shallow Deletion"], ["Deep Deletion", "Shallow Deletion", "Diploid", "Gain", "Amplification"]],
   ["O4 a category outside the type's order follows it", { source: "molecular", profileType: "cna", gene: "KRAS", discrete: true },
-    ["Gain", "Weird", "Deep deletion"], ["Deep deletion", "Gain", "Weird"]],
+    ["Gain", "Weird", "Deep Deletion"], ["Deep Deletion", "Gain", "Weird"]],
   ["O5 mutation classes, Multiple, then no mutation and not profiled", gene("mutationType"),
-    ["Not mutated", "Truncating", "Promoter", "Missense", "Multiple", "Not profiled", "Other", "Splice", "Inframe"],
-    ["Missense", "Inframe", "Truncating", "Splice", "Promoter", "Other", "Multiple", "Not mutated", "Not profiled"]],
+    ["No mutation", "Truncating", "Promoter", "Missense", "Multiple", "Not profiled", "Other", "Splice", "Inframe"],
+    ["Missense", "Inframe", "Truncating", "Splice", "Promoter", "Other", "Multiple", "No mutation", "Not profiled"]],
   ["O6 classes split Driver / VUS: each class's Driver before its VUS", gene("mutationType"),
-    ["Missense (VUS)", "Truncating (Driver)", "Not mutated", "Missense (Driver)"], ["Missense (Driver)", "Missense (VUS)", "Truncating (Driver)", "Not mutated"]],
-  ["O7 Driver vs VUS", gene("driver"), ["VUS", "Not profiled", "Not mutated", "Driver"], ["Driver", "VUS", "Not mutated", "Not profiled"]],
-  ["O8 mutated vs not", gene(), ["Not profiled", "Not mutated", "Mutated"], ["Mutated", "Not mutated", "Not profiled"]],
-  ["O9 any of several genes, mutated vs not", { source: "alteration", genes: ["KRAS", "NRAS"] }, ["Not mutated", "Mutated"], ["Mutated", "Not mutated"]],
+    ["Missense (VUS)", "Truncating (Driver)", "No mutation", "Missense (Driver)"], ["Missense (Driver)", "Missense (VUS)", "Truncating (Driver)", "No mutation"]],
+  ["O7 Driver vs VUS", gene("driver"), ["VUS", "Not profiled", "No mutation", "Driver"], ["Driver", "VUS", "No mutation", "Not profiled"]],
+  ["O8 mutated vs not", gene(), ["Not profiled", "No mutation", "Mutated"], ["Mutated", "No mutation", "Not profiled"]],
+  ["O9 any of several genes, mutated vs not", { source: "alteration", genes: ["KRAS", "NRAS"] }, ["No mutation", "Mutated"], ["Mutated", "No mutation"]],
   ["O10 amplified / deleted (no portal axis): the levels' order", gene("cna"), ["Amplification", "Not profiled", "Neutral", "Deep deletion"],
     ["Deep deletion", "Neutral", "Amplification", "Not profiled"]],
-  ["O11 structural variant or not", gene("sv"), ["No structural variant", "Not profiled", "Structural variant"],
-    ["Structural variant", "No structural variant", "Not profiled"]],
+  ["O11 structural variant or not", gene("sv"), ["No Structural Variants", "Not profiled for structural variants", "With Structural Variants"],
+    ["With Structural Variants", "No Structural Variants", "Not profiled for structural variants"]],
 ];
 
 describe("plot: box categories in the portal's order", () => {
@@ -56,7 +56,7 @@ describe("plot: a contingency table's categories", () => {
     const tumour = categoryOrder({ source: "clinical", attribute: "TUMOR_STAGE" } as never, naturalSort)!;
     assert.deepEqual(tumour(["T10", "T2", "T1"]), ["T1", "T2", "T10"]);
     const cna = categoryOrder({ source: "molecular", profileType: "cna", gene: "KRAS", discrete: true } as never, naturalSort)!;
-    assert.deepEqual(cna(["Gain", "Diploid", "Deep deletion"]), ["Deep deletion", "Diploid", "Gain"]);
+    assert.deepEqual(cna(["Gain", "Diploid", "Deep Deletion"]), ["Deep Deletion", "Diploid", "Gain"]);
   });
 });
 
