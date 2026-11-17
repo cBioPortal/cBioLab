@@ -9,10 +9,16 @@
  * compares it with a reimplementation of the Java binning (BE:88-163) over the values read straight
  * from clinical_data_derived.
  *
+ * It also checks download-cases.md PC5 and PC7 on the fixture: a numeric chart's Data and the
+ * density's Data list every recorded value (KI67_INDEX's ">90" and "high" included).
+ *
  * Run: node --env-file=.env.local scripts/check-density.ts
  * (connection b is `npm run peer-db`: export the CLICKHOUSE2_* lines it prints)
  */
+import { readFileSync } from "node:fs";
 import { chQuery, connById } from "../lib/ch.ts";
+import { runAnalysis } from "../lib/analysis.ts";
+import { caseFileDoc, type CaseFile } from "../lib/study-view-case-files.ts";
 import { axisSelect, plotBinsSql, plotStatsSql, plotExtent } from "../lib/plot.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { lnFromEngine, MUTATION_COUNT, FGA } from "../lib/study-view-density.ts";
@@ -275,6 +281,28 @@ await row("fixture study", async () => {
   ok("fixture: n, Pearson and Spearman equal commons-math's",
     st.n === both.length && near(st.pearson, pear(fx, mc), 1e-9) && near(st.spearman, pear(rank(fx), rank(mc)), 1e-9),
     `got ${JSON.stringify(st)}, want n ${both.length} pearson ${pear(fx, mc)} spearman ${pear(rank(fx), rank(mc))}`);
+});
+
+// download-cases PC5–PC7: a numeric chart's Data and the density's Data list every recorded value,
+// as the portal's do — the fixture's KI67_INDEX (a NUMBER attribute) holds 10, 20, 30, ">90" and
+// "high", and a plain-number filter would keep three of its six samples
+await row("PC5/PC7 fixture: a numeric attribute's Data keeps every recorded value", async () => {
+  const lines = readFileSync(new URL("../test/fixtures/peer-study/data_clinical_sample.txt", import.meta.url), "utf8")
+    .split("\n").filter((l) => l && !l.startsWith("#"));
+  const head = lines[0].split("\t"), rows = lines.slice(1).map((l) => l.split("\t"));
+  const has = (v: string | undefined) => v != null && v.trim() !== "" && v.trim().toUpperCase() !== "NA";
+  const ki = head.indexOf("KI67_INDEX"), pp = head.indexOf("PARSE_PROBE");
+  const wantFull = rows.filter((r) => has(r[ki])).length, wantBoth = rows.filter((r) => has(r[ki]) && has(r[pp])).length;
+  const run = async (file: CaseFile) => {
+    const v = (await runAnalysis(caseFileDoc(file, { all: [] } as never, STUDY))).views[0] as { error?: string; table?: { total: number; rows: { values: string[] }[] } };
+    if (v.error || !v.table) throw new Error(v.error || "no table");
+    return v.table;
+  };
+  const full = await run({ kind: "full", attribute: "KI67_INDEX", per: "sample" });
+  ok("PC5 fixture: KI67_INDEX's Data lists every sample with a value, \">90\" and \"high\" included", full.total === wantFull && wantFull >= 6,
+    `${full.total} rows, want ${wantFull}`);
+  const density = await run({ kind: "density", x: "KI67_INDEX", y: "PARSE_PROBE" });
+  ok("PC7 fixture: the density's Data lists every sample with both values recorded", density.total === wantBoth, `${density.total} rows, want ${wantBoth}`);
 });
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall passed");

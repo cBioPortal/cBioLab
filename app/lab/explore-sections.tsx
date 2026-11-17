@@ -17,7 +17,9 @@ import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
-import { figureActions } from "./chart-files.ts";
+import { caseFileAction, figureActions, saveCaseFile } from "./chart-files.ts";
+import { caseFileName } from "../../lib/study-view-case-files.ts";
+import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, freqTipLines, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
@@ -26,7 +28,7 @@ import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
-import { Dna, Filter, Save, Search, Tag, Users, X } from "lucide-react";
+import { Dna, Download, Filter, LoaderCircle, Save, Search, Tag, Users, X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { CHIP } from "../_ui/toolbar.ts";
 import { GearMenu } from "../_ui/gear-menu.tsx";
@@ -179,6 +181,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 ", and step through the rest" : "select a study first"}>
               <Users />View patients
             </Button>}
+            {!addMode && <ClinicalDataButton ctx={ctx} ready={ready} />}
             {exStudies.length > 0 && <Button variant="outline" onClick={() => {
               if (exPanelOpen) { setExDraftStudies(null); setExPanelOpen(false); }   // close discards
               else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
@@ -638,15 +641,47 @@ const forBoth = (make: (t: GroupsTarget) => ChartAction | null): ChartAction[] =
  * why, when the chart holds only its most frequent values.
  */
 function summaryDownload(name: string, unit: DownloadUnit, values: CategoryCount[], na: number, distinct: number | undefined,
-  onError: (message: string) => void, order?: (vs: CategoryCount[]) => CategoryCount[]): ChartAction {
+  onError: (message: string) => void, order?: (vs: CategoryCount[]) => CategoryCount[], full?: ChartAction): ChartAction {
   const cut = summaryCut(values.length, distinct);
   const counts = na > 0 ? [...values, { value: "NA", count: na }] : values;
   const file = chartFileName(name, "summary");
   return { label: "Download", title: "save this chart's data as a file", sub: [
     { label: "Summary Data", disabled: !!cut, title: cut || "each value with its count and percentage, as " + file,
       onClick: () => saveText(file, summaryDataTsv(counts, unit)) },
+    ...(full ? [full] : []),
     ...figureActions(name, () => pieFigureSvg(name, pieSlices(order ? order(values) : values, na)), onError)
   ] };
+}
+
+/**
+ * The portal's "Download clinical data": every clinical attribute of each selected sample, as
+ * <study>_clinical_data.tsv (download-cases.md PC9), through the patient-level table route.
+ */
+function ClinicalDataButton({ ctx, ready }: { ctx: ExploreCtx; ready: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const file = caseFileName({ kind: "clinical" }, "", ctx.exStudies);
+  const save = () => {
+    const sel = selectionOf(ctx);
+    if (!sel) { ctx.setExMsg("select a study first"); return; }
+    setBusy(true);
+    ctx.setExMsg(null);
+    saveCaseFile({ kind: "clinical" }, file, sel.def, sel.study)
+      .then((left) => ctx.setExMsg(left ? file + " leaves out the studies that may not list their patients: " + left : null))
+      .catch((e) => ctx.setExMsg("Could not download the clinical data: " + String((e as Error)?.message || e)))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <Button variant="outline" className="clinicaldata" disabled={!ready || busy} onClick={save}
+      data-tip={!ready ? "select a study first" : busy ? "preparing " + file + "…" : "download clinical data for the selected cases, as " + file}>
+      {busy ? <LoaderCircle className="animate-spin" /> : <Download />}Download clinical data
+    </Button>
+  );
+}
+
+/** the selection a per-case file lists: the draft (or every selected study), in the first study's document */
+function selectionOf(ctx: ExploreCtx): { def: CohortDef; study: string } | null {
+  const def = ctx.barDef();
+  return def ? { def, study: ctx.exSel.current[0] } : null;
 }
 
 /** a categorical chart's values as the pie draws them: the page's colours in order, NA grey and last */
@@ -780,7 +815,8 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                   ...forBoth((t) => compareAction(c.values.map(valueArm), PIE_ATTRIBUTES.has(c.attribute) ? null : checked.map(valueArm), "value of " + label, (arms) => compareItems(chart, arms, t), t)),
                   ...selected]),
                   summaryDownload(label, c.per, c.values.map((v: any) => ({ value: String(v.v), count: v.n })), c.na || 0, c.distinct, ctx.setExMsg,
-                    (vs) => naturalOrder(vs, (v) => v.value))]} />;
+                    (vs) => naturalOrder(vs, (v) => v.value),
+                    caseFileAction("Full Data", { kind: "full", attribute: c.attribute, per: c.per }, caseFileName({ kind: "full", attribute: c.attribute, per: c.per }, label, []), () => selectionOf(ctx), ctx.setExMsg))]} />;
                 const bins = (c.bins || []).filter((b: any) => b.count > 0).map((b: any) => ({ name: armLabel(c.attribute + " " + binLabel(b)), where: binClause(c.attribute, b) as Leaf }));
                 const fixed = oneValueBars(c.bins);
                 return <ChartMenu label={label} actions={[
@@ -796,9 +832,11 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                   ...(c.naCount ? [{ label: "Show NA", checked: !!binSet?.showNa,
                     title: binSet?.showNa ? "show the cases with no " + label + " as a count beside the bars" : "draw the cases with no " + label + " as a bar of their own",
                     onClick: () => setChartBins(c.attribute, { ...binSet, showNa: !binSet?.showNa }, false) }] : []),
-                  { label: "Download", title: "save this chart as a file", sub: figureActions(label, () => c.bins && c.bins.length > 1 ? barFigure([
+                  { label: "Download", title: "save this chart as a file", sub: [
+                    caseFileAction("Data", { kind: "full", attribute: c.attribute, per: c.per }, chartFileName(label, "data"), () => selectionOf(ctx), ctx.setExMsg),
+                    ...figureActions(label, () => c.bins && c.bins.length > 1 ? barFigure([
                     ...c.bins.map((b: any) => ({ count: b.count, tick: String(b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start)) })),
-                    ...(showNa ? [{ count: c.naCount!, tick: "NA", na: true }] : [])], c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null) : null, ctx.setExMsg) },
+                    ...(showNa ? [{ count: c.naCount!, tick: "NA", na: true }] : [])], c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null) : null, ctx.setExMsg)] },
                 ]} />;
               })()}
             </div>

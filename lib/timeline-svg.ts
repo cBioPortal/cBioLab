@@ -3,9 +3,9 @@
 // 4px points and 5px bars, same-day events stacked with their count, samples as numbered markers,
 // numeric lab results as line charts. Browser-safe (the lab card draws with it) and used by
 // lib/view-svg.ts for the MCP figure, so both are the same drawing.
-import { esc, frame, caption, palette, label, textWidth, textOn, fmtNum, FS, SW, type SvgOpts } from "./svg-kit.ts";
+import { esc, frame, caption, palette, label, textWidth, textOn, fmtNum, r1, FS, SW, type SvgOpts } from "./svg-kit.ts";
 import {
-  buildTracks, flattenTracks, axisTicks, dayScale, sampleMarks, numericResult, attr, yearLabel, formatDays,
+  buildTracks, flattenTracks, axisTicks, dayScale, sampleMarks, numericResult, attr, yearLabel, formatDays, monthTicks,
   COLOR_KEY, SHAPE_KEY, POINT_COLOR, YEAR, type TlItem, type TlTrack, type SampleMark,
 } from "./timeline-tracks.ts";
 import type { PatientEvent, PatientTimeline } from "./types.ts";
@@ -155,6 +155,18 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
       const clear = cx - w / 2 > lastRight + 6 && cuts.every((c) => Math.abs(c - cx) > w / 2 + 8);
       parts.push(`<line x1="${xx}" x2="${xx}" y1="${AXIS_H - 4}" y2="${H - 4}" stroke="${d === 0 ? pal.muted : pal.line}" stroke-width="${SW.hair}"/>`);
       if (clear) { parts.push(label(cx, AXIS_H - 8, text, { size: FS.small, fill: pal.muted, anchor: "middle" })); lastRight = cx + w / 2; }
+      // the months inside a wide year: short ticks on the axis, some labelled, as the portal's axis
+      for (const m of monthTicks(d, X(d + YEAR) - x)) {
+        if (m.day > tk.end) break;
+        const mx = X(m.day);
+        parts.push(`<line x1="${r1(mx)}" x2="${r1(mx)}" y1="${AXIS_H - 3}" y2="${AXIS_H}" stroke="${pal.muted}" stroke-width="${SW.hair}"/>`);
+        if (!m.label) continue;
+        const mw = textWidth(m.label, FS.small);
+        if (mx - mw / 2 > lastRight + 6 && mx + mw / 2 < W - 2 && cuts.every((c) => Math.abs(c - mx) > mw / 2 + 8)) {
+          parts.push(label(mx, AXIS_H - 8, m.label, { size: FS.small, fill: pal.muted, anchor: "middle" }));
+          lastRight = mx + mw / 2;
+        }
+      }
     }
   }
 
