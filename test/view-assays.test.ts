@@ -13,6 +13,7 @@ import { palette } from "../lib/svg-kit.ts";
 import { PRIMARY } from "../lib/ch.ts";
 import { kindText } from "./support/kind-text.ts";
 import { assaysKind } from "../lib/views/assays/kind.ts";
+import { chiSquareTest } from "../lib/stats.ts";
 
 type Row = Record<string, unknown>;
 const PT = "sigs";
@@ -25,8 +26,9 @@ const cohort = (counts: Record<string, number>): EvaluatedCohort => ({
 const mom = (entity: string, vals: number[], other = 0): Row =>
   ({ entity, n: vals.length, sx: vals.reduce((a, b) => a + b, 0), sxx: vals.reduce((a, b) => a + b * b, 0), other });
 
-interface SiteOpts { meta?: Row; names?: Row[]; rows: Record<string, Row[]>; entities?: number; asked?: string[] }
-/** a local participant: its profile's metadata, entity names (and how many it has), and per cohort its moments or value counts */
+interface SiteOpts { meta?: Row; names?: Row[]; rows: Record<string, Row[]>; profiled?: Record<string, number>; entities?: number; asked?: string[] }
+/** a local participant: its profile's metadata, entity names (and how many it has), per cohort its moments or value counts,
+ *  and per cohort how many of its samples are in the profile (none unless given) */
 const site = (o: SiteOpts) => ({
   instance: { id: "local", mode: "patient-level", label: "local", conn: PRIMARY },
   viewMeta: async (label: string, build: (s: string, d: string) => unknown) => {
@@ -34,8 +36,10 @@ const site = (o: SiteOpts) => ({
     return label === "assays:profile" ? (o.meta ? [o.meta] : []) : label === "assays:entities" ? [{ n: o.entities ?? 0 }] : (o.names ?? []);
   },
   viewAggregate: async (label: string, _def: unknown, build: (c: string, s: string, d: string) => unknown) => {
-    build("SELECT 'p' AS patient_id", "s", "db");
-    return o.rows[label.split(":").pop()!] ?? [];
+    o.asked?.push(label, String(build("SELECT 'p' AS patient_id", "s", "db")));
+    const cohortName = label.split(":").pop()!;
+    if (label.startsWith("assays:profiled:")) return [{ n: o.profiled?.[cohortName] ?? 0 }];
+    return o.rows[cohortName] ?? [];
   },
   viewAggregateMany: async () => [],
 });
@@ -60,14 +64,6 @@ const res = (r: ViewResult) => { assert.equal(r.error, undefined, String(r.error
 
 /** two-sided p of Student's t with 4 degrees of freedom, in closed form (Abramowitz & Stegun 26.7.4) */
 const pT4 = (t: number) => { const th = Math.atan(Math.abs(t) / 2); return 1 - Math.sin(th) * (1 + Math.cos(th) ** 2 / 2); };
-/** two-sided p of a 1-df chi-squared: P(|Z| > √χ²) */
-const pChi1 = (x: number) => 2 * (1 - normalCdf(Math.sqrt(x)));
-function normalCdf(z: number): number {
-  // Abramowitz & Stegun 7.1.26 is too coarse; integrate the density by Simpson's rule instead
-  const n = 2000, h = z / n; let s = 0;
-  for (let i = 0; i <= n; i++) { const x = i * h, w = i === 0 || i === n ? 1 : i % 2 ? 4 : 2; s += w * Math.exp(-x * x / 2); }
-  return 0.5 + s * h / 3 / Math.sqrt(2 * Math.PI);
-}
 
 describe("assays: what it refuses", () => {
   const s1 = site({ meta: NUM, rows: {} });
@@ -207,30 +203,147 @@ describe("assays: a numeric profile", () => {
   });
 });
 
+const nonZero = (cells: AssaysResult["rows"][number]["cells"]) =>
+  cells.map((c) => ({ ...c, values: Object.fromEntries(Object.entries(c.values ?? {}).filter(([, n]) => n > 0)) }));
+
 describe("assays: a categorical profile", () => {
-  // 1p: A Gain 6 Loss 2, B Gain 2 Loss 6: every expected count 4, χ² = 4 · (2²/4) = 4 on 1 df
-  // A's Gain (and B's Loss) are furthest above independence: +2/√4 = 1; the first in order is named
-  // 2q: a single value throughout — not tested; NA and blank are not called, and are counted apart
+  // 1p: A Gain 6 Loss 2 NA 3, B Gain 2 Loss 6 " " 1 — every stored value a category of its own
+  // 2q: a single value throughout — not tested
   const rows = {
     A: [{ entity: "1p", value: "Gain", n: 6 }, { entity: "1p", value: "Loss", n: 2 }, { entity: "2q", value: "Gain", n: 5 }, { entity: "1p", value: "NA", n: 3 }],
     B: [{ entity: "1p", value: "Gain", n: 2 }, { entity: "1p", value: "Loss", n: 6 }, { entity: "2q", value: "Gain", n: 5 }, { entity: "1p", value: " ", n: 1 }],
   };
 
-  test("chi-squared on cohort × value, the most over-represented cell named, NA and blank left out", async () => {
+  test("chi-squared on cohort × value, NA and blank counted as values, the most over-represented cell named", async () => {
     const out = await runAssays(v(), two({ s1: site({ meta: CAT, rows }) }));
     const r = res(out);
     assert.equal(r.datatype, "categorical");
     assert.equal(r.test, "Pearson chi-squared test (cohort × value)");
-    assert.deepEqual([r.tested, r.untested, r.missing], [1, 1, 4]);
+    assert.deepEqual([r.tested, r.untested], [1, 1]);
     const e = r.rows[0];
-    close(e.statistic, 4, 1e-4);
-    close(e.p, pChi1(4), 1e-6);
-    assert.equal(e.higherIn, "A");
-    assert.equal(e.value, "Gain");
-    assert.deepEqual(e.cells, [{ cohort: "A", n: 8, values: { Gain: 6, Loss: 2 } }, { cohort: "B", n: 8, values: { Gain: 2, Loss: 6 } }]);
-    assert.deepEqual(r.values, ["Gain", "Loss"], "values by frequency: Gain 18, Loss 8");
+    const expected = chiSquareTest([[6, 2, 3, 0], [2, 6, 0, 1]]);
+    close(e.statistic, expected.chi2, 1e-4);
+    close(e.p, expected.p, 1e-6);
+    // Pearson residuals: B's Loss (6 vs 3.6 expected) is furthest above independence
+    assert.equal(e.higherIn, "B");
+    assert.equal(e.value, "Loss");
+    assert.deepEqual(nonZero(e.cells), [{ cohort: "A", n: 11, values: { Gain: 6, Loss: 2, NA: 3 } }, { cohort: "B", n: 9, values: { Gain: 2, Loss: 6, " ": 1 } }]);
+    assert.deepEqual(r.values, ["Gain", "Loss", "NA", " "], "values by frequency: Gain 18, Loss 8, NA 3, blank 1");
     assert.equal(r.grid, undefined);
-    assert.match(out.caveat!, /Values NA or blank mean not called and are left out \(4 of them\)/);
+  });
+});
+
+describe("assays: categorical NA as the portal counts it (ExpressionEnrichmentUtil.getGenericAssayCategoricalEnrichments)", () => {
+  /** an entity's cells with each cohort's non-zero counts (a cell lists every value of the entity, 0 where the cohort has none) */
+  const cellsOf = (r: AssaysResult, entity: string) => nonZero(r.rows.find((e) => e.entity === entity)!.cells);
+
+  test("row 1: stored NA and blank are categories of their own, counted exactly as stored (no trimming, case kept)", async () => {
+    const rows = {
+      A: [{ entity: "E", value: "Gain", n: 5 }, { entity: "E", value: "NA", n: 2 }, { entity: "E", value: "", n: 1 }, { entity: "E", value: " Gain", n: 1 }, { entity: "E", value: "na", n: 1 }],
+      B: [{ entity: "E", value: "Gain", n: 1 }, { entity: "E", value: "NA", n: 4 }, { entity: "E", value: "", n: 3 }, { entity: "E", value: "gain", n: 2 }],
+    };
+    const r = res(await runAssays(v(), two({ s1: site({ meta: CAT, rows, profiled: { A: 10, B: 10 } }) })));
+    assert.deepEqual(cellsOf(r, "E"), [
+      { cohort: "A", n: 10, values: { Gain: 5, NA: 2, "": 1, " Gain": 1, na: 1 } },
+      { cohort: "B", n: 10, values: { Gain: 1, NA: 4, "": 3, gain: 2 } },
+    ]);
+    // columns Gain, NA, "", " Gain", na, gain
+    close(r.rows[0].p, chiSquareTest([[5, 2, 1, 1, 1, 0], [1, 4, 3, 0, 0, 2]]).p, 1e-6);
+  });
+
+  test("row 2: samples in the profile without a stored value are NA, added to any stored NA, per entity", async () => {
+    const rows = {
+      A: [{ entity: "E", value: "Gain", n: 4 }, { entity: "E", value: "Loss", n: 2 }, { entity: "E", value: "NA", n: 1 },
+        { entity: "F", value: "Gain", n: 3 }, { entity: "F", value: "Loss", n: 2 }],
+      B: [{ entity: "E", value: "Gain", n: 2 }, { entity: "E", value: "Loss", n: 8 },
+        { entity: "F", value: "Gain", n: 1 }, { entity: "F", value: "Loss", n: 9 }],
+    };
+    const r = res(await runAssays(v(), two({ s1: site({ meta: CAT, rows, profiled: { A: 10, B: 10 } }) })));
+    assert.deepEqual(cellsOf(r, "E"), [{ cohort: "A", n: 10, values: { Gain: 4, Loss: 2, NA: 4 } }, { cohort: "B", n: 10, values: { Gain: 2, Loss: 8 } }],
+      "A: 7 stored of 10 in the profile → 3 NA filled + 1 stored NA");
+    assert.deepEqual(cellsOf(r, "F"), [{ cohort: "A", n: 10, values: { Gain: 3, Loss: 2, NA: 5 } }, { cohort: "B", n: 10, values: { Gain: 1, Loss: 9 } }]);
+  });
+
+  test("row 3: stored values equal to the samples in the profile — no NA added", async () => {
+    const rows = {
+      A: [{ entity: "E", value: "Gain", n: 6 }, { entity: "E", value: "Loss", n: 2 }],
+      B: [{ entity: "E", value: "Gain", n: 2 }, { entity: "E", value: "Loss", n: 6 }],
+    };
+    const out = await runAssays(v(), two({ s1: site({ meta: CAT, rows, profiled: { A: 8, B: 8 } }) }));
+    const r = res(out);
+    assert.deepEqual(cellsOf(r, "E"), [{ cohort: "A", n: 8, values: { Gain: 6, Loss: 2 } }, { cohort: "B", n: 8, values: { Gain: 2, Loss: 6 } }]);
+    close(r.rows[0].p, chiSquareTest([[6, 2], [2, 6]]).p, 1e-6);
+    assert.ok(!r.values?.includes("NA"), "NA is not a value here");
+  });
+
+  test("row 4: a patient-level categorical profile is not NA-filled (its sample list is not asked)", async () => {
+    const asked: string[] = [];
+    const rows = {
+      A: [{ entity: "E", value: "Gain", n: 6 }, { entity: "E", value: "Loss", n: 2 }],
+      B: [{ entity: "E", value: "Gain", n: 2 }, { entity: "E", value: "Loss", n: 6 }],
+    };
+    const r = res(await runAssays(v(), two({ s1: site({ meta: { ...CAT, patient_level: 1 }, rows, profiled: { A: 20, B: 20 }, asked }) })));
+    assert.deepEqual(cellsOf(r, "E"), [{ cohort: "A", n: 8, values: { Gain: 6, Loss: 2 } }, { cohort: "B", n: 8, values: { Gain: 2, Loss: 6 } }]);
+    assert.ok(!asked.some((l) => l.startsWith("assays:profiled:")), "no assays:profiled query: " + asked.filter((l) => l.startsWith("assays:")).join(", "));
+  });
+
+  test("row 5: a numeric profile is unchanged — non-numbers counted as missing and left out, no NA fill", async () => {
+    const asked: string[] = [];
+    const rows = { A: [mom("E1", [1, 2, 3], 2)], B: [mom("E1", [4, 5, 6], 1)] };
+    const r = res(await runAssays(v(), two({ s1: site({ meta: NUM, rows, profiled: { A: 10, B: 10 }, asked }) })));
+    assert.equal(r.missing, 3);
+    assert.deepEqual(r.rows[0].cells, [{ cohort: "A", n: 3, mean: 2, sd: 1 }, { cohort: "B", n: 3, mean: 5, sd: 1 }]);
+    close(r.rows[0].p, pT4(-3 / Math.sqrt(2 / 3)), 1e-6);
+    assert.ok(!asked.some((l) => l.startsWith("assays:profiled:")), "no assays:profiled query for a numeric profile");
+  });
+
+  test("row 6: the χ² runs over cohorts × all categories, NA included", async () => {
+    // A: Gain 4 Loss 2 NA 1 stored, 10 in profile → NA 4; B: Gain 2 Loss 5, 9 in profile → NA 2; C: Gain 1 Loss 1 NA 5 stored, 7 in profile → NA 5
+    const rows = {
+      A: [{ entity: "E", value: "Gain", n: 4 }, { entity: "E", value: "Loss", n: 2 }, { entity: "E", value: "NA", n: 1 }],
+      B: [{ entity: "E", value: "Gain", n: 2 }, { entity: "E", value: "Loss", n: 5 }],
+      C: [{ entity: "E", value: "Gain", n: 1 }, { entity: "E", value: "Loss", n: 1 }, { entity: "E", value: "NA", n: 5 }],
+    };
+    const c = ctx({ A: cohort({ s1: 10 }), B: cohort({ s1: 9 }), C: cohort({ s1: 7 }) }, { s1: site({ meta: CAT, rows, profiled: { A: 10, B: 9, C: 7 } }) });
+    const r = res(await runAssays(v(), c));
+    const expected = chiSquareTest([[4, 2, 4], [2, 5, 2], [1, 1, 5]]);
+    close(r.rows[0].statistic, expected.chi2, 1e-4);
+    close(r.rows[0].p, expected.p, 1e-6);
+    assert.notEqual(Number(r.rows[0].p.toPrecision(4)), Number(chiSquareTest([[4, 2], [2, 5], [1, 1]]).p.toPrecision(4)), "not the NA-free table's p");
+  });
+
+  test("row 7: two studies in one cohort — samples in the profile summed per cohort before filling", async () => {
+    // A: s1 stores 3 values for E with 4 in the profile, s2 stores none for E with 6 in the profile → 10 − 3 = 7 NA
+    // B: s1 stores 5 of 5, s2 stores 4 of 5 → 1 NA
+    const c = ctx({ A: cohort({ s1: 4, s2: 6 }), B: cohort({ s1: 5, s2: 5 }) }, {
+      s1: site({ meta: CAT, rows: { A: [{ entity: "E", value: "Gain", n: 3 }], B: [{ entity: "E", value: "Gain", n: 1 }, { entity: "E", value: "Loss", n: 4 }] }, profiled: { A: 4, B: 5 } }),
+      s2: site({ meta: CAT, rows: { A: [{ entity: "F", value: "Gain", n: 6 }], B: [{ entity: "E", value: "Loss", n: 4 }, { entity: "F", value: "Loss", n: 5 }] }, profiled: { A: 6, B: 5 } }),
+    });
+    const r = res(await runAssays(v(), c));
+    assert.deepEqual(cellsOf(r, "E"), [{ cohort: "A", n: 10, values: { Gain: 3, NA: 7 } }, { cohort: "B", n: 10, values: { Gain: 1, Loss: 8, NA: 1 } }]);
+    close(r.rows.find((e) => e.entity === "E")!.p, chiSquareTest([[3, 0, 7], [1, 8, 1]]).p, 1e-6);
+  });
+
+  test("row 8: the caveat names the rule and the fill count; the method's data and checks carry the NA rows", async () => {
+    const rows = {
+      A: [{ entity: "E", value: "Gain", n: 4 }, { entity: "E", value: "Loss", n: 2 }, { entity: "E", value: "NA", n: 1 }],
+      B: [{ entity: "E", value: "Gain", n: 2 }, { entity: "E", value: "Loss", n: 8 }],
+    };
+    const out = await runAssays(v(), two({ s1: site({ meta: CAT, rows, profiled: { A: 10, B: 12 } }) }));
+    const r = res(out);
+    // filled: A 10 − 7 = 3, B 12 − 10 = 2 → 5
+    assert.match(out.caveat!, /every value is a category, NA and blank included/i);
+    assert.match(out.caveat!, /no stored value[^.]*NA[^.]*\b5\b/, "the caveat says how many were filled");
+    assert.doesNotMatch(out.caveat!, /left out \(\d+ of them\)/, "categorical values are not left out");
+    const m = out.method!;
+    assert.ok(m.python!.includes('"A,E,NA,4"'), "the script's data has A's NA (1 stored + 3 filled)");
+    assert.match(m.python!, /pd\.read_csv\(io\.StringIO\([\s\S]*?\)\), keep_default_na=False\)/, "pandas reads NA and blank as values, not as missing");
+    assert.ok(m.python!.includes('"B,E,NA,2"'), "the script's data has B's filled NA");
+    const p = chiSquareTest([[4, 2, 4], [2, 8, 2]]).p;
+    close(r.rows[0].p, p, 1e-6);
+    close(m.check!["assays:E:p"].v!, p, 1e-6);
+    assert.equal(m.check!["assays:tested"].v, 1);
+    assert.ok(m.steps.some((st) => /NA and blank included/.test(st.detail) && /\b5\b/.test(st.detail)), "a method step states the rule and the 5 filled");
   });
 });
 

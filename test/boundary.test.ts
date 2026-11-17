@@ -546,6 +546,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     // assays: per-entity moments or value counts; the rows CTE holds values, never ids, and stays inside
     "assayMomentsSql": () => aggregates.assayMomentsSql(cohortSql, "x", "db", "mutational_signatures_contribution_v2"),
     "assayValueCountsSql": () => aggregates.assayValueCountsSql(cohortSql, "x", "db", "armlevel_cna"),
+    "assayProfileSamplesSql": () => aggregates.assayProfileSamplesSql(cohortSql, "x", "db", "armlevel_cna"),
     "assayProfileSql": () => federation.assayProfileSql("x", "db", "armlevel_cna"),
     "assayEntityNamesSql": () => federation.assayEntityNamesSql("x", "db", "armlevel_cna"),
     "assayEntityNamesSql:listed": () => federation.assayEntityNamesSql("x", "db", "methylation_hm27_hm450_merge", ["cg00000029", "cg00000108"]),

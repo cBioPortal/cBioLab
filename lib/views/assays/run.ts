@@ -5,16 +5,16 @@ import { chiSquareTest, benjaminiHochberg, welchT, oneWayAnova, varianceFromMome
 import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, niceCeil, PROFILE_NAME, askEachSite } from "../shared.ts";
 import type { AssaysView, AssaysEntity, AssaysResult } from "./types.ts";
-import { assayMomentsSql, assayValueCountsSql } from "./sql.ts";
+import { assayMomentsSql, assayValueCountsSql, assayProfileSamplesSql } from "./sql.ts";
 import { assaysMethod } from "./method.ts";
 
 const ASSAY_ROWS = 300;
+/** the value a sample in a categorical profile holds when the warehouse stores none: the profile's data file writes NA */
+const NA_VALUE = "NA";
 /** past this many entities a profile is refused rather than compared: the per-cohort answer
  *  carries a row per entity. A PanCancer Atlas study's merged methylation profile (the probes the
  *  27k and 450k arrays share) has 22,601; its full 450k one, hundreds of thousands */
 const ASSAY_MAX_ENTITIES = 25000;
-/** values a categorical assay uses for "not called"; counted apart, never a category */
-const MISSING_VALUES = new Set(["", "NA", "N/A", "NaN", "nan", "null", "NULL"]);
 
 export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewResult> {
   const { doc, cohorts, vNames } = ctx;
@@ -67,17 +67,25 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
   const counts = new Map<string, Map<string, number>>();
   const entities = new Set<string>();
   const names = new Map<string, string>();
-  let missing = 0;
+  let missing = 0, naFilled = 0;
   const perSite: { cohort: string; study: string; rows: number }[] = [];
   const holding = Object.fromEntries(holders.map((st) => [st, ok[st]]));
+  // a sample-level categorical profile: each cohort's samples in the profile, so the values the
+  // warehouse does not store (NA) are counted as the portal counts them, a category of their own
+  const fillNa = isCat && !patientLevel;
   const answers = await askEachSite(ctx, holding, (n, _st, r) => isCat
     ? r.viewAggregate("assays:values:" + n, doc.cohorts[n], (c, s, d) => assayValueCountsSql(c, s, d, pt))
     : r.viewAggregate("assays:moments:" + n, doc.cohorts[n], (c, s, d) => assayMomentsSql(c, s, d, pt)));
+  const inProfile = new Map<string, number>();
+  if (fillNa) for (const { cohort: n, answer } of await askEachSite(ctx, holding, (n, _st, r) =>
+    r.viewAggregate("assays:profiled:" + n, doc.cohorts[n], (c, s, d) => assayProfileSamplesSql(c, s, d, pt))))
+    inProfile.set(n, (inProfile.get(n) || 0) + Number(answer[0]?.n || 0));
   for (const { cohort: n, study: st, answer: rows } of answers) {
     if (isCat) {
       for (const r of rows) {
-        const v = String(r.value ?? "").trim(), c = Number(r.n);
-        if (MISSING_VALUES.has(v)) { missing += c; continue; }
+        // every stored value is a category, NA and blank too, matched exactly: the portal's test
+        // (ExpressionEnrichmentUtil.getGenericAssayCategoricalEnrichments, CMM-STM-6)
+        const v = String(r.value ?? ""), c = Number(r.n);
         const k = n + "\t" + r.entity;
         entities.add(String(r.entity));
         const m = counts.get(k) || new Map<string, number>();
@@ -92,6 +100,12 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
       }
     }
     perSite.push({ cohort: n, study: st, rows: rows.length });
+  }
+  // a sample in the profile with no stored value for an entity holds NA there, a value like any other
+  if (fillNa) for (const e of entities) for (const n of vNames) {
+    const k = n + "\t" + e, m = counts.get(k) || new Map<string, number>();
+    const na = (inProfile.get(n) || 0) - [...m.values()].reduce((a, b) => a + b, 0);
+    if (na > 0) { m.set(NA_VALUE, (m.get(NA_VALUE) || 0) + na); counts.set(k, m); naFilled += na; }
   }
   if (!entities.size) return refuse("assays", ctx, "none of these cohorts' " + unit + " has a value in “" + pt + "”");
   if (entities.size > ASSAY_MAX_ENTITIES) return refuse("assays", ctx, "“" + pt + "” has " + entities.size.toLocaleString("en-US") + " entities with values here; an assays view compares at most " + ASSAY_MAX_ENTITIES.toLocaleString("en-US"));
@@ -167,7 +181,7 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
     kind: "assays", cohorts: vNames,
     assays: { profileType: pt, profileName, assayType, ...(pickedEntity ? { entity: pickedEntity } : {}), datatype: isCat ? "categorical" : "numeric", unit, groups: vNames, tested: tested.length, untested, significant, minN, test,
       ...(values ? { values } : {}), missing, rows, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
-    method: assaysMethod({ profileType: pt, categorical: isCat, unit, cohorts: vNames, minN, test, perSite, tested: tested.length, untested, missing,
+    method: assaysMethod({ profileType: pt, categorical: isCat, unit, cohorts: vNames, minN, test, perSite, tested: tested.length, untested, missing, naFilled,
       moments: isCat ? [] : [...mom].map(([k, m]) => { const [cohort, entity] = k.split("\t"); return { cohort, entity, ...m }; }),
       counts: isCat ? [...counts].flatMap(([k, m]) => { const [cohort, entity] = k.split("\t"); return [...m].map(([value, n]) => ({ cohort, entity, value, n })); }) : [],
       results: rows.map((g) => ({ entity: g.entity, p: g.p, q: g.q })) }),
@@ -176,7 +190,7 @@ export async function runAssays(view: AssaysView, ctx: ViewRun): Promise<ViewRes
     caveat: "Every entity of “" + profileName + "” (" + pt + ") compared across the cohorts, one value per " + unit.replace(/s$/, "") + " as the study recorded it" +
       (unit === "samples" ? ", from each cohort's own samples" : ", from the patients owning each cohort's samples") + ". " +
       (isCat
-        ? "Values NA or blank mean not called and are left out (" + missing.toLocaleString("en-US") + " of them), not treated as a category. Each entity is tested with a " + test + " on its counts, no continuity correction; the χ² approximation is thin where a value is rare. "
+        ? "Every value is a category, NA and blank included, as the portal counts them" + (fillNa ? "; a sample in the profile with no stored value for an entity is counted as NA there (" + naFilled.toLocaleString("en-US") + " of them)" : "") + ". Each entity is tested with a " + test + " on its counts, no continuity correction; the χ² approximation is thin where a value is rare. "
         : "Values that are not numbers (a limit such as \">8\", or NA) are left out (" + missing.toLocaleString("en-US") + " of them). Each entity is tested with " + test +
           " from each cohort's n, mean and variance; with thousands of " + unit + " a tiny difference is significant, so read the means too. ") +
       tested.length.toLocaleString("en-US") + " entities tested; q is Benjamini–Hochberg across all of them. " +

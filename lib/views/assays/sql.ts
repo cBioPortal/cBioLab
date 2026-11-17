@@ -21,6 +21,16 @@ export function assayValueCountsSql(cohortSql: string, study: string, db: string
   return aggregateSql(assayRowsCte(cohortSql, study, db, profileType) + "\nSELECT entity, value, count() AS n FROM rows GROUP BY entity, value");
 }
 
+/** The cohort's samples in a (sample-level) generic-assay profile, as its sample list holds them: each
+ *  has a value for every entity, those the warehouse does not store being NA. Counts only. */
+export function assayProfileSamplesSql(cohortSql: string, study: string, db: string, profileType: string): AggregateSql {
+  return aggregateSql(
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT uniqExact(sp.sample_unique_id) AS n FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.genetic_profile_id = " + sq(study + "_" + profileType) + "\n" +
+    "  AND replaceOne(sp.sample_unique_id, " + sq(study + "_") + ", '') IN (SELECT sid FROM cohort)");
+}
+
 /** The cohort's rows of one generic-assay profile. The profile type is the table's leading sort
  *  key, so only that profile's rows are read; the study's own profile id then picks its slice. */
 function assayRowsCte(cohortSql: string, study: string, db: string, profileType: string): string {

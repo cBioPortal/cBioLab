@@ -201,19 +201,21 @@ function csvField(v: string | number | null | undefined): string {
   return /[",\r\n]/.test(s) ? "\"" + s.replace(/"/g, "\"\"") + "\"" : s;
 }
 
-/** `name = pd.read_csv(...)`: inline when small enough, else from a file the reader exports. */
-export function pyTable(name: string, what: string, columns: string[], rows: (string | number | null | undefined)[][], file: string): string[] {
+/** `name = pd.read_csv(...)`: inline when small enough, else from a file the reader exports. `read`:
+ *  extra read_csv arguments (`keep_default_na=False` where "NA" or "" is a value, not a missing one). */
+export function pyTable(name: string, what: string, columns: string[], rows: (string | number | null | undefined)[][], file: string, read = ""): string[] {
+  const extra = read ? ", " + read : "";
   if (rows.length > INLINE_ROWS_MAX) {
     return ["# " + pyComment(what) + " — " + rows.length.toLocaleString() + " rows, too many to include here: export them as " + pyComment(file),
       "# with columns " + pyComment(columns.join(", ")) + ".",
-      name + " = pd.read_csv(" + py(file) + ")"];
+      name + " = pd.read_csv(" + py(file) + extra + ")"];
   }
   // each CSV line is its own string literal, so no value in the data can end the string
   return ["# " + pyComment(what) + ".",
     name + " = pd.read_csv(io.StringIO(\"\\n\".join([",
     "    " + py(columns.map(csvField).join(",")) + ",",
     ...rows.map((r) => "    " + py(r.map(csvField).join(",")) + ","),
-    "])))"];
+    "]))" + extra + ")"];
 }
 
 export const pFmt = (p: number) => p === 0 ? "<1e-300" : p < 1e-4 ? p.toExponential(2) : p.toPrecision(3);

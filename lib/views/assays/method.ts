@@ -7,6 +7,8 @@ export interface AssaysTrace {
   cohorts: string[]; minN: number; test: string;
   perSite: { cohort: string; study: string; rows: number }[];
   tested: number; untested: number; missing: number;
+  /** categorical, sample-level: samples in the profile with no stored value for an entity, counted as NA */
+  naFilled?: number;
   /** numeric: per cohort and entity, summed over its studies */
   moments: { cohort: string; entity: string; n: number; sx: number; sxx: number }[];
   /** categorical: per cohort, entity and called value, summed over its studies */
@@ -27,7 +29,8 @@ export function assaysMethod(t: AssaysTrace): MethodRecord {
   if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length) steps.push({ kind: "transform", title: "Add each cohort's " + (cat ? "counts" : "sums") + " across its studies",
     detail: "The totals add exactly; there is no batch correction between studies." });
   steps.push({ kind: "transform", title: "Leave out what cannot be tested",
-    detail: (cat ? "Values NA or blank (not called) are not a category: " : "Values that are not numbers: ") + t.missing.toLocaleString("en-US") + " left out. " +
+    detail: (cat ? "Every value is a category, NA and blank included, as cBioPortal counts them" + (t.naFilled ? "; samples in the profile (the assays:profiled queries) with no stored value for an entity count as NA there: " + t.naFilled.toLocaleString("en-US") : "") + ". "
+      : "Values that are not numbers: " + t.missing.toLocaleString("en-US") + " left out. ") +
       "An entity with fewer than " + t.minN + " " + t.unit + " with a value in any cohort" + (cat ? ", or one value throughout," : ", or no spread in any cohort (variance ≤ 1e-12 · (1 + mean²)),") + " is not tested.",
     params: [["tested", t.tested.toLocaleString("en-US")], ["not tested", t.untested.toLocaleString("en-US")]] });
   steps.push({ kind: "statistic", title: t.test + " per entity, then Benjamini–Hochberg",
@@ -48,8 +51,8 @@ export function assaysMethod(t: AssaysTrace): MethodRecord {
     "cohorts = " + JSON.stringify(t.cohorts),
     "MIN_N = " + t.minN,
     ...(cat
-      ? pyTable("data", "Per cohort, entity and called value: how many " + t.unit + ", from the assays:values queries summed over each cohort's studies (NA and blank left out)",
-        ["cohort", "entity", "value", "n"], t.counts.map((r) => [r.cohort, r.entity, r.value, r.n]), file)
+      ? pyTable("data", "Per cohort, entity and value: how many " + t.unit + ", from the assays:values queries summed over each cohort's studies, with NA for the samples in the profile holding no stored value",
+        ["cohort", "entity", "value", "n"], t.counts.map((r) => [r.cohort, r.entity, r.value, r.n]), file, "keep_default_na=False")
       : pyTable("data", "Per cohort and entity: n, sum and sum of squares of the numeric values, from the assays:moments queries summed over each cohort's studies",
         ["cohort", "entity", "n", "sx", "sxx"], t.moments.map((r) => [r.cohort, r.entity, r.n, r.sx, r.sxx]), file)),
     "rows = []",
