@@ -22,17 +22,17 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 24 |
-| 🟡 partial | 14 |
+| ✅ match | 23 |
+| 🟡 partial | 16 |
 | 🔶 different | 10 |
-| ❌ missing | 30 |
+| ❌ missing | 29 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 0 |
 | **Total IDs** | **81** |
 
-**Overall: 33.3 %** (✅ 24 + 🐞ok 0 + N/A 3 = 27 of 81). Counting 🟡 as half: 42.0 %.
+**Overall: 25.9 %** (✅ 18 + 🐞ok 0 + N/A 3 = 21 of 81). Counting 🟡 as half: 35.2 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
@@ -43,7 +43,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | §1 GE table | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Own columns (VAF by sample, Max VAF); no "only selected" |
 | §2 Pathways | 4 | 0 | 2 | 2 | 0 | 0 | 0 | Same scores; numeric score not Yes/No; tie order → other default pathway |
 | §3 Clinical Data | 4 | 0 | 0 | 3 | 1 | 0 | 0 | Wide row-per-case tables; no timeline tables |
-| §4 Mutational Signatures | 7 | 6 | 1 | 0 | 0 | 0 | 0 | Close port; numbers identical; table paged |
+| §4 Mutational Signatures | 7 | 5 | 2 | 0 | 0 | 0 | 0 | Close port; numbers identical; table paged |
 | §5 Resources, pathology, tissue, trials, custom | 10 | 0 | 0 | 0 | 10 | 0 | 0 | None built (tracked) |
 | §6 mRNA / Plots (beta) | 11 | 0 | 0 | 0 | 10 | 0 | 1 | None built (mRNA tracked) |
 | §7 Modes | 12 | 5 | 1 | 3 | 3 | 0 | 0 | Sample mode right; GE offered on 1-sample patients |
@@ -140,7 +140,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-CD-1 | 🔶 | B | Two cards "Patient", "Samples"; no Timeline Data section |
 | PTB-CD-2 | 🔶 | B | One row, attributes as columns (P04 · 4 · 1:DECEASED · 22 …); per-column filter + CSV ✅; no Attribute \| Value, no priority order, no 1-decimal format, no panel links |
 | PTB-CD-3 | 🔶 | B | One row per sample, patient attributes repeated; legacy one column per sample |
-| PTB-CD-4 | ❌ | B | No per-event-type timeline tables |
+| PTB-CD-4 | 🟡 | B | Timeline Data: a table per event type, START_DATE · STOP_DATE · EVENT_TYPE · each attribute key in first-seen order, PATIENT_ID and STYLE_* left out, days as recorded, each sortable (as text) and filterable ✅ (lgg P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows — the portal API's counts); laid out as its own card under the two tables |
 
 ### §4 Mutational Signatures
 
@@ -150,9 +150,9 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-MS-2 | ✅ | B | "Mutational Signature Type:" select, %/#, "Y-axis Max:" slider; settings in the document; sample select not exercised (1 sample) |
 | PTB-MS-3 | ✅ | C | "<ids> is/are not profiled for mutational signatures." (`signatures-body.tsx:121`) |
 | PTB-MS-4 | ✅ | B | "Sample: SP1003 \| Single Base Substitution (SBS) count: 347" + ⓘ |
-| PTB-MS-5 | ✅ | B | Category strip, contexts, "Single Base Substitution (%)" ✅; Download ▸ SVG / PNG / PDF of the spectrum as drawn (with the chosen reference profile), named mutationalBarChart, as legacy (pancan_pcawg_2020 DO1000 saved in all three) |
+| PTB-MS-5 | 🟡 | B | Category strip, contexts, "Single Base Substitution (%)" ✅; no SVG/PNG/PDF button |
 | PTB-MS-6 | ✅ | C | Row click → COSMIC v3.3 reference below (`reference.ts`) |
-| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; every row on one page, as legacy (65 of 65 for pancan_pcawg_2020 DO1000) ✅; extra "Signature contributions" bar chart; no download (tracked) |
+| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; paged 25 of 65 (legacy all); extra "Signature contributions" bar chart; no download (tracked) |
 
 ### §5 Files & Links, resources, pathology, tissue, trials, custom tabs
 
