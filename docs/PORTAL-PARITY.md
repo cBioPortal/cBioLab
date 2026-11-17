@@ -270,7 +270,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Discrete × discrete as bars: Bar, Stacked (the portal's default), 100% stacked, Sort By, Horizontal Bars (ours a table only) (PLT-PT-6, PLT-UT-4…6, PLT-BR-1…8, PLT-STM-12)
   - [x] Correlation text as the portal's: "Spearman: -0.06 (p = 0.185)" then "Pearson: -0.04 (p = 0.359)", `toFixed(2)` and `toConditionalPrecision(p, 3, 0.01)` (was "Pearson r = −0.038 (p = 0.36) · Spearman ρ = −0.055 (p = 0.19)") (PLT-SC-2, PLT-STM-4…6, PLT-STM-22) (#234)
     - [ ] In the right gutter on two lines each, as the portal places it (ours one line above the plot)
-    - [ ] p from r rounded to 5 decimals first, as the portal computes it (ours from the full-precision r; no shown value differs in the audit's four scatters)
+    - [x] r rounded to 5 decimals before it is shown to 2 or tested, as the portal keeps it (`portalR5`): an r rounding to ±1 has p 0, 0.124996 shows "0.13"; coadread Mut# × FGA and AGE × FGA show the portal's strings, p 2.1191e-16 / 0.184829 from −0.34872 / −0.05509 (PLT-STM-4…6) (#285)
     - [x] Several studies: Spearman over every study's pairs ranked together, where every study may show its cases (was not reported), and Pearson's r unrounded (was 4 decimals before its p); coadread + brca Mut# × FGA, n 1,573: ρ 0.092107 (p 2.54e-4), r −0.175601 (p 2.32e-12) = scipy on cbioportal.org's data (PLT-MD-2, PLT-STM-5, PLT-STM-6) (#283)
       - [ ] A study that may not show its cases: still no Spearman, and the caption says why
   - [ ] The quick-plot "Examples" pills (Mut# vs Dx, FGA vs Dx, mRNA vs CNA, …) (PLT-QP-1…12, PLT-LY-1)
@@ -302,7 +302,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - Ours alone: with two cohorts, one menu per chart, the cohort's name added to the file name
     - [ ] The hide-download switch (CTS-MD-12): with the Data-governance switches
   - [ ] The bar's popover "Gene altered in 92.77% of 982 patients" with the type table to 2 dp, the study link and "Query this study" (ours an SVG title) (CTS-CH-7, CTS-STM-5, CTS-MD-2)
-  - [ ] Stack and legend order (Multiple at the bottom, Mutation on top; ours the reverse); Multiple `#666` (ours `#6e7a83`) (CTS-CH-3, CTS-CH-4)
+  - [x] Stack and legend order as the portal's: Multiple at the bottom, then protein and mRNA low / high, deep deletion, amplification, structural variant, Mutation on top (OrderedAlterationLabelMap); the legend the kinds present, reversed (Mutation first); Multiple `#666` (CTS-CH-3, CTS-CH-4) (#328)
   - [ ] The profiled strip: "+" and "−" rows for every data type, with hover counts (ours rows only where a group lacks a type) (CTS-CH-5, CTS-CH-6, CTS-MD-8)
   - [ ] The "Show Genomic Alteration Types" toggle (CTS-OC-3)
   - [ ] A gene with no alterations: grey tab label, "There are no alterations in this gene." (CTS-GT-4, CTS-MD-10)
@@ -437,7 +437,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Tooltips pinned by a click, lingering 100 ms, closed by Esc, and paged "‹ i of n events ›" with the arrow keys (PAT-TL-TT-1, PAT-TL-TT-4) (#317)
     - [x] The sample row's tooltip with the sample's clinical attributes (PAT-TL-TT-3) (#319)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
-  - [x] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15) (#325)
+  - [ ] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15)
   - [ ] Cohort column: the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
     - [x] "72%" and "<1%" as the portal writes them (#290)
   - [x] The header's tooltip tables write non-integers to one decimal (PAT-STM-10) (#290)
@@ -445,6 +445,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
   - [x] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3) (#303)
   - [ ] Clinical Data tab as Attribute | Value and Attribute × sample, and the Timeline Data tables (ours two wide tables of raw values) (PTB-CD-1…4, PTB-STM-11)
+    - [x] The Timeline Data tables, one per event type (PTB-CD-4) (#316)
 
 ## Medium — annotation depth and per-sample viewers
 
