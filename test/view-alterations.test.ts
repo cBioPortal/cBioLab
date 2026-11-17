@@ -177,13 +177,13 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.match(v.caveat!, /The patient list: 2 patients\. Sorted with patients who have any alteration first, then by patient id across the cohort;/);
   });
 
-  test("each cell as the table shows it: OncoKB's call with its level, numbers as numbers, allele frequency to 2 places, rounded once (10/57 is 0.18, not 0.175 then 0.17), and Cohort % to 1, blanks", async () => {
+  test("each cell as the table shows it: OncoKB's call with its level, numbers as numbers, allele frequency to 2 places, rounded once (10/57 is 0.18, not 0.175 then 0.17), and Cohort % to 4 (the browser rounds it to 1), blanks", async () => {
     const t = alt(await run({ mutations: { columns: ["gene", "annotation", "vaf", "freq", "altCount", "refCount", "copy", "start"] } }, one())).tables;
     const cols = t.mutations!.columns.map((c) => c.id);
     const row = Object.fromEntries(cols.map((id, i) => [id, t.mutations!.rows[0].values[i]]));
     assert.equal(row.annotation, "Oncogenic · Level 1");
     assert.equal(row.vaf, 0.18);
-    assert.equal(row.freq, 12.3);
+    assert.equal(row.freq, 12.345, "Cohort % keeps 4 decimals so the browser rounds it once (A1)");
     assert.equal(row.altCount, null, "an empty number is missing, not 0");
     assert.equal(row.refCount, null);
     assert.equal(row.copy, "", "missing text is blank");
@@ -193,6 +193,16 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.deepEqual(t.mutations!.shown, ["gene", "annotation", "vaf", "freq", "altCount", "refCount", "copy", "start"]);
     const cna = Object.fromEntries(t.cna!.columns.map((c, i) => [c.id, t.cna!.rows[0].values[i]]));
     assert.equal(cna.annotation, "Likely Oncogenic", "no level, no level suffix");
+  });
+
+  test("A1 (PAT-STM-2): the Cohort % cell keeps 4 decimals in both the mutations and cna tables", async () => {
+    const mut = [{ ...MUT[0], freq: 72.47191 }];
+    const cna = [{ ...CNA[0], freq: 72.47191 }];
+    const t = alt(await run({ mutations: { columns: ["gene", "freq"] }, cna: { columns: ["gene", "freq"] } }, one(study({ mut, cna })))).tables;
+    for (const k of ["mutations", "cna"] as const) {
+      const i = t[k]!.columns.findIndex((c) => c.id === "freq");
+      assert.equal(t[k]!.rows[0].values[i], 72.4719, k);
+    }
   });
 
   test("a pinned OncoKB version is named; a table's query is described in its line", async () => {

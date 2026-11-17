@@ -48,7 +48,7 @@ SP124409's spectrum: 1,566 mutations in 96 channels; largest: T[C>T]C 422 (26.9%
         type: SBS
         profiled samples: SP124409
         signatures with a value: 65
-    - SP124409's spectrum: Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in percent.
+    - SP124409's spectrum: Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in whole percent (rounded half up, as the portal rounds it; the shares need not add to 100).
         total: 1,566
         channels: 96
-    The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total, which the script recomputes.
+    The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total in whole percent, which the script recomputes.

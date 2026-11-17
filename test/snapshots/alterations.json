@@ -524,7 +524,7 @@
                   "Oncogenic · Level 1",
                   "Missense_Mutation",
                   "",
-                  28.5,
+                  28.4665,
                   0.08,
                   42,
                   512,
@@ -549,7 +549,7 @@
                   "Likely Oncogenic · Level 1",
                   "Missense_Mutation",
                   "",
-                  4.8,
+                  4.7883,
                   0.62,
                   262,
                   161,
@@ -574,7 +574,7 @@
                   "Likely Oncogenic",
                   "Missense_Mutation",
                   "",
-                  52.4,
+                  52.4121,
                   0.76,
                   761,
                   239,
@@ -663,7 +663,7 @@
                   "HOMDEL",
                   "Likely Oncogenic",
                   "5q11.2",
-                  0.3
+                  0.3195
                 ]
               },
               {
@@ -677,7 +677,7 @@
                   "HOMDEL",
                   "Likely Oncogenic · Level 1",
                   "14q24.1",
-                  0.1
+                  0.0879
                 ]
               },
               {
@@ -691,7 +691,7 @@
                   "HOMDEL",
                   "Unknown",
                   "5q11.2",
-                  0.2
+                  0.2396
                 ]
               }
             ],

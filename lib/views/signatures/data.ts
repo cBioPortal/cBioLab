@@ -91,6 +91,15 @@ export function signatureRows(rows: { entity: string; name: string; description:
 }
 
 /** A share as the portal's table writes it (getMutationalSignaturePercentage): "<1%" below one percent, else whole percent. */
+/**
+ * A spectrum channel's share of the sample's count, in whole percent as the portal rounds it
+ * (MutationalSignatureBarChartUtils: Math.round(count / sum * 100), 0 when the sum is 0); the
+ * shares need not add to 100.
+ */
+export function spectrumPct(count: number, total: number): number {
+  return total ? Math.round(100 * count / total) : 0;
+}
+
 export function pctText(v: number | null): string {
   if (v == null) return "NA";
   return 100 * v < 1 ? "<1%" : Math.round(100 * v) + "%";

@@ -116,8 +116,30 @@ export const portalSig2 = (x: number): string => x === 0 ? "0" : String(Number(x
  */
 export function portalPct(f: number | null): string {
   if (f == null || Number.isNaN(f)) return "-";
-  const fixed = (f * 100).toFixed(1);
-  return f !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
+  return portalRound1(f * 100);
+}
+
+/** A number to one decimal as cbioportal-utils formatPercentValue writes it: "< 0.1" when it rounds to nothing but is not 0. */
+export function portalRound1(x: number): string {
+  const fixed = x.toFixed(1);
+  return x !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
+}
+
+/**
+ * A clinical value in the Patient page's attribute tables (ClinicalInformationPatientTable
+ * getDisplayValue): a non-integer number to one decimal (portalRound1: Fraction Genome Altered
+ * 0.4881 → "0.5"), anything else as stored.
+ */
+export function portalClinicalValue(v: string): string {
+  if (v.trim() === "" || Number.isNaN(Number(v))) return v;
+  const f = parseFloat(v);
+  return f !== parseInt(v, 10) ? portalRound1(f) : v;
+}
+
+/** A share in percent (0–100) as cBioPortal's FormatUtils getPercentage writes it: "0%", "<1%" below 1, else rounded ("72%"). */
+export function portalPercentage(pct: number): string {
+  if (pct === 0) return "0%";
+  return pct < 1 ? "<1%" : Math.round(pct) + "%";
 }
 
 /**

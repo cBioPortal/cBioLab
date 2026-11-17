@@ -11,6 +11,7 @@ import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult } from "../../lib/views/alterations/types";
+import { portalPercentage } from "../../lib/chart/format.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
@@ -99,7 +100,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 },
                 selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
               })}
-              num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
+              num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "freq" ? portalPercentage(x) : x.toLocaleString()}
               cell={(id, x) => id === "samples" ? sampleCell(x)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>

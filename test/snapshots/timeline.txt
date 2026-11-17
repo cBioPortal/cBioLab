@@ -245,37 +245,37 @@ Patient alterations — patients to choose from: 5,368; the first 25, tab-separa
 P-0000012 (msk_chord_2024); samples: P-0000012-T02-IM3 (Primary), P-0000012-T03-IM3 (Metastasis)
 Mutations: 31 rows; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	proteinChange	annotation	mutationType	copy	freq	vaf
-  Breast	P-0000012-T03-IM3	ATRX	K983*	Likely Oncogenic	Nonsense_Mutation		3.3	0.2
-  Breast	P-0000012-T03-IM3	BLM	A363fs	Likely Oncogenic	Frame_Shift_Del		1.4	0.13
-  Breast	P-0000012-T03-IM3	FBXW7	G61*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.5	0.23
-  Breast	P-0000012-T03-IM3	FBXW7	X413_splice	Likely Oncogenic · Level 3A	Splice_Site		4.5	0.26
-  Breast	P-0000012-T03-IM3	MAP3K1	E302*	Likely Oncogenic	Nonsense_Mutation		3.1	0.17
-  Breast	P-0000012-T03-IM3	MAP3K1	X696_splice	Likely Oncogenic	Splice_Site		3.1	0.2
-  Breast	P-0000012-T03-IM3	PTPRD	E915*	Likely Oncogenic	Nonsense_Mutation		4.3	0.18
-  Breast	P-0000012-T03-IM3	PTPRD	P1338T	Unknown	Missense_Mutation		4.3	0.3
-  Breast	P-0000012-T03-IM3	PTPRT	G969V	Unknown	Missense_Mutation		4.8	0.14
-  Breast	P-0000012-T03-IM3	PTPRT	X1053_splice	Likely Oncogenic	Splice_Site		4.8	0.05
-  Breast	P-0000012-T03-IM3	SMARCA4	E1211*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.3	0.21
-  Breast	P-0000012-T02-IM3	TP53	T256P	Likely Oncogenic	Missense_Mutation		52.4	0.5
-  Breast	P-0000012-T03-IM3	TP53	P67Qfs*56	Likely Oncogenic	Frame_Shift_Del		52.4	0.4
-  Breast	P-0000012-T03-IM3	ATR	R2431M	Unknown	Missense_Mutation		2.7	0.17
-  Breast	P-0000012-T03-IM3	AXIN2	I375M	Unknown	Missense_Mutation		2.1	0.14
-  Breast	P-0000012-T03-IM3	BRIP1	D393V	Unknown	Missense_Mutation		1.4	0.15
-  Breast	P-0000012-T03-IM3	CCNE1	A47V	Unknown	Missense_Mutation		0.5	0.15
-  Breast	P-0000012-T03-IM3	CREBBP	M2161I	Unknown	Missense_Mutation		3.4	0.25
-  Breast	P-0000012-T03-IM3	DOT1L	W305C	Unknown	Missense_Mutation		2.3	0.16
-  Breast	P-0000012-T03-IM3	FLT4	S293R	Unknown	Missense_Mutation		2.8	0.18
-  Breast	P-0000012-T03-IM3	HGF	W547Cfs*35	Unknown	Frame_Shift_Del		2.2	0.14
-  Breast	P-0000012-T03-IM3	KDM5A	N212I	Unknown	Missense_Mutation		1.8	0.22
-  Breast	P-0000012-T03-IM3	KMT2C	K3105N	Unknown	Missense_Mutation		6.5	0.18
-  Breast	P-0000012-T03-IM3	NSD1	V1780F	Unknown	Missense_Mutation		2.1	0.19
-  Breast	P-0000012-T03-IM3	PDGFRA	L465M	Unknown	Missense_Mutation		2.1	0.2
+  Breast	P-0000012-T03-IM3	ATRX	K983*	Likely Oncogenic	Nonsense_Mutation		3.3347	0.2
+  Breast	P-0000012-T03-IM3	BLM	A363fs	Likely Oncogenic	Frame_Shift_Del		1.4097	0.13
+  Breast	P-0000012-T03-IM3	FBXW7	G61*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.4728	0.23
+  Breast	P-0000012-T03-IM3	FBXW7	X413_splice	Likely Oncogenic · Level 3A	Splice_Site		4.4728	0.26
+  Breast	P-0000012-T03-IM3	MAP3K1	E302*	Likely Oncogenic	Nonsense_Mutation		3.139	0.17
+  Breast	P-0000012-T03-IM3	MAP3K1	X696_splice	Likely Oncogenic	Splice_Site		3.139	0.2
+  Breast	P-0000012-T03-IM3	PTPRD	E915*	Likely Oncogenic	Nonsense_Mutation		4.3294	0.18
+  Breast	P-0000012-T03-IM3	PTPRD	P1338T	Unknown	Missense_Mutation		4.3294	0.3
+  Breast	P-0000012-T03-IM3	PTPRT	G969V	Unknown	Missense_Mutation		4.7887	0.14
+  Breast	P-0000012-T03-IM3	PTPRT	X1053_splice	Likely Oncogenic	Splice_Site		4.7887	0.05
+  Breast	P-0000012-T03-IM3	SMARCA4	E1211*	Likely Oncogenic · Level 3A	Nonsense_Mutation		4.3331	0.21
+  Breast	P-0000012-T02-IM3	TP53	T256P	Likely Oncogenic	Missense_Mutation		52.4121	0.5
+  Breast	P-0000012-T03-IM3	TP53	P67Qfs*56	Likely Oncogenic	Frame_Shift_Del		52.4121	0.4
+  Breast	P-0000012-T03-IM3	ATR	R2431M	Unknown	Missense_Mutation		2.6677	0.17
+  Breast	P-0000012-T03-IM3	AXIN2	I375M	Unknown	Missense_Mutation		2.0569	0.14
+  Breast	P-0000012-T03-IM3	BRIP1	D393V	Unknown	Missense_Mutation		1.3538	0.15
+  Breast	P-0000012-T03-IM3	CCNE1	A47V	Unknown	Missense_Mutation		0.5351	0.15
+  Breast	P-0000012-T03-IM3	CREBBP	M2161I	Unknown	Missense_Mutation		3.4425	0.25
+  Breast	P-0000012-T03-IM3	DOT1L	W305C	Unknown	Missense_Mutation		2.2564	0.16
+  Breast	P-0000012-T03-IM3	FLT4	S293R	Unknown	Missense_Mutation		2.7516	0.18
+  Breast	P-0000012-T03-IM3	HGF	W547Cfs*35	Unknown	Frame_Shift_Del		2.2045	0.14
+  Breast	P-0000012-T03-IM3	KDM5A	N212I	Unknown	Missense_Mutation		1.8411	0.22
+  Breast	P-0000012-T03-IM3	KMT2C	K3105N	Unknown	Missense_Mutation		6.5056	0.18
+  Breast	P-0000012-T03-IM3	NSD1	V1780F	Unknown	Missense_Mutation		2.1366	0.19
+  Breast	P-0000012-T03-IM3	PDGFRA	L465M	Unknown	Missense_Mutation		2.1326	0.2
   … 6 more rows
 Copy Number Alterations: 3 rows; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	cna	annotation	cytoband	freq
-  Breast	P-0000012-T03-IM3	CDK4	AMP	Oncogenic · Level 4	12q14.1	1.6
-  Breast	P-0000012-T02-IM3	MCL1	AMP	Oncogenic	1q21.2	1.5
-  Breast	P-0000012-T02-IM3	RIT1	AMP	Unknown	1q22	0.7
+  Breast	P-0000012-T03-IM3	CDK4	AMP	Oncogenic · Level 4	12q14.1	1.5575
+  Breast	P-0000012-T02-IM3	MCL1	AMP	Oncogenic	1q21.2	1.5096
+  Breast	P-0000012-T02-IM3	RIT1	AMP	Unknown	1q22	0.7389
 Structural Variants: 0 rows; the first 0, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene1	gene2	class	eventInfo	breakpointType	connectionType
   CAVEAT (tell the user): P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 

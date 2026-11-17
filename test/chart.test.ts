@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange, portalRound1, portalClinicalValue, portalPercentage } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -176,4 +176,20 @@ test("portalFixed, portalLocale, portalRange: the density chart's numbers as the
   assert.equal(portalFixed(-0.33174, 4), "-0.3317"); assert.equal(portalFixed(1.0e-16, 2), "0.00"); assert.equal(portalFixed(3, 2), "3.00");
   assert.equal(portalLocale(1234), "1,234"); assert.equal(portalLocale(1234.5678), "1,234.568"); assert.equal(portalLocale(Math.log(5)), "1.609");
   assert.equal(portalRange(1234, 1234), "1,234"); assert.equal(portalRange(3, 4), "(3, 4]"); assert.equal(portalRange(Math.log(5), Math.log(6)), "(1.609, 1.792]");
+});
+
+test("P1 (PAT-STM-2, PAT-STM-3): portalPercentage is 0%, <1% below 1, else Math.round", () => {
+  const cases: [number, string][] = [[0, "0%"], [0.3378, "<1%"], [0.999, "<1%"], [1, "1%"], [72.4719, "72%"], [4.5608, "5%"], [72.5, "73%"], [100, "100%"]];
+  for (const [x, want] of cases) assert.equal(portalPercentage(x), want, String(x));
+});
+
+test("R1 (PAT-STM-10): portalRound1 is toFixed(1), '< 0.1' when it rounds to 0 but isn't 0", () => {
+  const cases: [number, string][] = [[0.4881, "0.5"], [0.04, "< 0.1"], [0, "0.0"], [12.345, "12.3"], [-0.04, "< 0.1"]];
+  for (const [x, want] of cases) assert.equal(portalRound1(x), want, String(x));
+});
+
+test("C1 (PAT-STM-10): portalClinicalValue rounds non-integer numbers, returns everything else as written", () => {
+  // "1e3": parseFloat 1000 but parseInt 1, so the portal treats it as a non-integer and writes "1000.0"
+  const cases: [string, string][] = [["0.4881", "0.5"], ["64", "64"], ["Primary", "Primary"], ["4.0", "4.0"], ["1e3", "1000.0"], ["", ""]];
+  for (const [x, want] of cases) assert.equal(portalClinicalValue(x), want, JSON.stringify(x));
 });
