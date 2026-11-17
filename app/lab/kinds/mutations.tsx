@@ -19,7 +19,7 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
   return (
     <div className="pb">
       {tips.node}
-      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} onQuery={onQuery}
+      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} {...(t.kept ? { kept: t.kept } : {})} onQuery={onQuery}
         num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "vafNormal" ? String(x) : x.toLocaleString()}
         colHead={(id) => id === "functionalImpact" ? <FunctionalImpactHead show={tips.show} /> : null}
         cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />

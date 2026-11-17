@@ -3,7 +3,7 @@
 // and counts only; it names no patient. A peer serves it for its studies through the federation
 // API's `catalog` op.
 import { chQuery, PORTAL } from "./ch.ts";
-import { catalogSqls, lineCatalogSqls, LINE_TYPE } from "./compiler.ts";
+import { catalogSqls, lineCatalogSqls, LINE_TYPE, sq } from "./compiler.ts";
 import { studyRouting } from "./federation.ts";
 import { survivalEndpointsSql } from "./survival-queries.ts";
 
@@ -19,10 +19,11 @@ export async function catalogFor(study: string) {
   if (Number(chk.data[0].n) !== 1) throw new Error("Study '" + study + "' not found");
   const lSqls = lineCatalogSqls(DB, study);
   // independent queries, run together
-  const [tRes, vRes, kRes, epRes, lStats, lCombos] = await Promise.all([
+  const [tRes, vRes, kRes, epRes, lStats, lCombos, aRes] = await Promise.all([
     chQuery(sqls.types, conn), chQuery(sqls.values, conn), chQuery(sqls.keys, conn),
     chQuery(survivalEndpointsSql(study, DB), conn).catch(() => null),
-    chQuery(lSqls.stats, conn), chQuery(lSqls.combos, conn)]);
+    chQuery(lSqls.stats, conn), chQuery(lSqls.combos, conn),
+    chQuery("SELECT name, description, pmid, citation FROM " + DB + ".cancer_study WHERE cancer_study_identifier = " + sq(study), conn).catch(() => null)]);
   const values: Record<string, Record<string, string[]>> = {}, keys: Record<string, string[]> = {};
   vRes.data.forEach((r) => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
   kRes.data.forEach((r) => { (keys[r.t] = keys[r.t] || []).push(r.k); });
@@ -44,5 +45,8 @@ export async function catalogFor(study: string) {
     COMPOSITION: lCombos.data.map(r => r.combo)
   };
   keys[LINE_TYPE] = ["LINE_NO", "COMPOSITION"];
-  return { study, portal: PORTAL, totalPatients, hasPriorMedFlag, types, values, keys, survivalEndpoints };
+  // the study's own words, for the Explore header (study-header-cases.md); null when the lookup fails
+  const a = aRes?.data[0] as Record<string, unknown> | undefined;
+  const about = a ? { name: String(a.name ?? ""), description: String(a.description ?? ""), pmid: a.pmid ? String(a.pmid) : null, citation: a.citation ? String(a.citation) : null } : null;
+  return { study, portal: PORTAL, totalPatients, hasPriorMedFlag, types, values, keys, survivalEndpoints, about };
 }

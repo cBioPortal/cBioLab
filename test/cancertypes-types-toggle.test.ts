@@ -94,6 +94,12 @@ describe("cancertypes: Show Genomic Alteration Types", () => {
     assert.equal(cancertypesPanelSvg(asCount(withTrue), 0).body, cancertypesPanelSvg(asCount(base), 0).body);
   });
 
+  test("T9 with the page's popover, a whole bar names its group (data-group), so hovering it opens the popover", () => {
+    const body = cancertypesPanelSvg(hide(base), 0, { popover: true }).body;
+    const bars = body.match(/<rect[^>]*fill="#666"[^>]*>/g) || [];
+    assert.ok(bars.length >= 2, "a whole bar per group");
+    assert.ok(bars.every((b) => /data-group="[ab]"/.test(b) && /aria-label="Group[AB]: /.test(b)), bars.join("\n"));
+  });
   test("T7 the Data file ignores the checkbox (CTS-DL-3)", () => {
     assert.equal(cancertypesTsv(hide(base) as never, 0, null), cancertypesTsv(base as never, 0, null));
   });
