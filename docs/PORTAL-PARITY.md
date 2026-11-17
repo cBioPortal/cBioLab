@@ -369,7 +369,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The Genomic tab's frequencies, the gene tab's profile select with sample counts, gene sets and chart-type radios, a tab per generic-assay type; custom data with the portal's sign-in rules and "Unselected" for cases without a value (STV-AC-4…6, STV-AC-8, STV-STM-4, STV-STM-7)
     - [ ] The Genomic and X vs Y tabs (STV-AC-2, STV-AC-7)
   - [ ] CN Segments and Plots tabs on the Study View (STV-CN-1…3, STV-PL-1, STV-STM-13)
-    - [x] CN Segments: offered when a selected study holds segments; the portal's info line and its 20,000-sample limit; the segments view over the selection (STV-CN-1, STV-CN-3, STV-STM-13; [study-cn-segments-cases](legacy-spec/parity/study-cn-segments-cases.md)) (PR #PRNUM open)
+    - [x] CN Segments: offered when a selected study holds segments; the portal's info line and its 20,000-sample limit; the segments view over the selection (STV-CN-1, STV-CN-3, STV-STM-13; [study-cn-segments-cases](legacy-spec/parity/study-cn-segments-cases.md)) (PR #292 open)
     - [ ] CN Segments' `.seg` download (STV-CN-2), with Per-sample CN segments' download
     - [ ] Plots (STV-PL-1)
   - [ ] Per-user layout: Save settings, the restore banner, reset charts (STV-LP-1…6, STV-AC-1, STV-MD-9, STS-MD-13)
