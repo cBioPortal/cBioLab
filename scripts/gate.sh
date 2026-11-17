@@ -124,6 +124,7 @@ warehouse_checks() (
   phase "fusions on the mutations tab" && npm run check:mutation-fusions 2>&1 | summary grep -E "^FAIL|mutation fusion checks passed|FAILED"
   phase "mutation table columns"   && npm run check:mutation-columns 2>&1 | summary grep -E "^FAIL|mutation column checks passed|FAILED"
   phase "mutation tab states (empty gene, germline)" && npm run check:mutation-tab-states 2>&1 | summary grep -E "^FAIL|mutation tab state checks passed|FAILED"
+  phase "germline mutation frequency" && npm run check:germline-frequency 2>&1 | summary grep -E "^FAIL|germline frequency checks passed|FAILED"
   phase "patient allele frequency"  && npm run check:patient-vaf 2>&1 | summary grep -E "^FAIL|patient VAF checks passed|FAILED"
   phase "mutation tab driver settings" && npm run check:mutation-driver-settings 2>&1 | summary grep -E "^FAIL|mutation driver settings checks passed|FAILED"
   phase "patient structural variants" && npm run check:patient-sv 2>&1 | summary grep -E "^FAIL|patient SV checks passed|FAILED"
