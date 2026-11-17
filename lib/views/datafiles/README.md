@@ -26,10 +26,13 @@ One rule decides a sample's status against a line, used by both the counts and t
 - **unaltered** (the sample, not the line) — no line alters it AND it is profiled for EVERY line's gene
   in EVERY data type the line reads, as the Results page's Unaltered cohort. The rest are "not profiled".
 
+The gene-by-sample files are the portal's Tab Delimited and Transposed Matrix files (`POST /api/table` with
+`format`). Mutations, structural variants and cna.txt (each study's own selected discrete copy-number
+profile) list every queried sample, NP throughout for a study without that kind of profile (RDL-STM-4);
+every other profile's file lists the samples of the studies that hold it (RDL-STM-5).
+
 Deliberate differences from the portal: the lists and the sample matrix are CSV (every table download here
-is), with the cohort and study as the first columns (the gene-by-sample files are the portal's Tab Delimited
-and Transposed Matrix files, `POST /api/table` with `format`); a gene-by-sample file holds the samples of the
-studies that have its profile, where the portal lists every queried sample, NP for a study without one; the unaltered list and the sample matrix leave out (NP)
+is), with the cohort and study as the first columns; the unaltered list and the sample matrix leave out (NP)
 samples not profiled for everything the query reads, where the portal counts them unaltered; a line's
 denominator is the data types that line reads, not every profile selected; generic-assay profiles are not
 offered (the portal offers only those added as oncoprint tracks); the lists open as a cohort in the lab (a
