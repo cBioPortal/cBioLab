@@ -365,7 +365,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] Survival-attribute pills; a density drag shown on the chart only, not as two range pills (STV-FB-3a, STV-FB-3b)
     - [ ] Several separate ranges of one chart show as one pill each (STV-FB-4); the portal merges them into one interval from the first bar's start to the last's end (which reads wider than the filter)
   - [ ] Add chart: the "% samples with data" column, Select all, the X vs Y and Genomic tabs; turning a chart off clears its filter (STV-AC-2, STV-AC-3, STV-AC-7, STV-STM-3)
-    - [x] Clinical: the Freq column, its order and greyed 0% rows, Select all (N) / Deselect all, unchecking clears the chart's filter (STV-AC-3, STV-AC-4, STV-STM-3; [add-chart-cases](legacy-spec/parity/add-chart-cases.md) AC1–AC8) (PR #PRNUM open)
+    - [x] Clinical: the Freq column, its order and greyed 0% rows, Select all (N) / Deselect all, unchecking clears the chart's filter (STV-AC-3, STV-AC-4, STV-STM-3; [add-chart-cases](legacy-spec/parity/add-chart-cases.md) AC1–AC8) (PR #276 open)
     - [ ] The Genomic tab's frequencies, the gene tab's profile select with sample counts, gene sets and chart-type radios, a tab per generic-assay type; custom data with the portal's sign-in rules and "Unselected" for cases without a value (STV-AC-4…6, STV-AC-8, STV-STM-4, STV-STM-7)
     - [ ] The Genomic and X vs Y tabs (STV-AC-2, STV-AC-7)
   - [ ] CN Segments and Plots tabs on the Study View (STV-CN-1…3, STV-PL-1, STV-STM-13)
