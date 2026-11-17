@@ -12,7 +12,7 @@ export function evolutionMethod(t: { cohorts: string[]; queryText: string; sortN
     order: t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + " with missing values last, then patient id" : "most samples first, then by patient id" });
   steps.push({
     kind: "fetch" as const, title: "Read " + t.patient.id + "'s samples and mutations",
-    detail: "The patient's samples (evolution:samples, with the gene panel each was sequenced with for mutations) and timeline (for each sample's collection day), numbered in collection order; then evolution:mutations: " +
+    detail: "The patient's samples (evolution:samples, with the gene panel each was sequenced with for mutations) and timeline (for each sample's collection day, and the span of all its events for the axis), numbered in collection order; then evolution:mutations: " +
       "every mutation called in any of the patient's samples (fusions left out), merged across samples by gene, protein change and genomic position as the portal merges them, " +
       "with its state in every sample — called (VAF = variant reads ÷ (variant + reference reads)), called without allele counts, uncalled with variant reads (the study's uncalled-mutations profile; drawn with its VAF), " +
       "not found in a sample sequenced for the gene (VAF 0), or not profiled (the sample's panel omits the gene, or it was not sequenced for mutations: no VAF). " +

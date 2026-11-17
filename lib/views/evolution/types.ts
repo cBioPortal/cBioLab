@@ -1,6 +1,7 @@
 // The evolution view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type { TableRows, TimelineResult } from "../../types.ts";
 import type { TableQuery } from "../../table-query.ts";
+import type { AxisTick } from "../../timeline-tracks.ts";
 
 /** The mutation table as the spec holds it: its query, and its page size. */
 export interface EvolutionTableQuery extends TableQuery {
@@ -42,6 +43,8 @@ export interface EvolutionView extends TableQuery {
   cluster?: boolean;
   /** the heatmap labels each mutation "GENE pChange" (default true) */
   mutationLabels?: boolean;
+  /** the line chart's time axis draws every year, rather than cutting runs of four or more years with no event (default false), as the timeline's expandGaps */
+  expandGaps?: boolean;
 }
 
 /**
@@ -92,8 +95,10 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   noDay?: string[];
   /** the heatmap's order (chart "heatmap" only): indices into `drawn` and the patient's samples, clustered or by name */
   heatmapOrder?: { mutations: number[]; samples: number[] };
+  /** placed by day: the patient's timeline axis, a tick a year from the first to the last of all the patient's events, empty stretches of four or more years cut, as the portal's line chart shares the timeline's axis */
+  axis?: AxisTick[];
   /** the display as drawn, from the spec */
-  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean };
+  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean };
 }
 
 declare module "../../types.ts" {
