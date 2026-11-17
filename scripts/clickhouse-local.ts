@@ -41,7 +41,7 @@ export async function clickhouseBinary(binDir: string, say: (msg: string) => voi
     const tmp = path.join(binDir, "unpack");
     await mkdir(tmp, { recursive: true });
     await run("tar", ["-xzf", file, "-C", tmp]);
-    const { stdout } = await run("find", [tmp, "-type", "f", "-name", "clickhouse", "-path", "*bin*"]);
+    const { stdout } = await run("find", [tmp, "-type", "f", "-path", "*/usr/bin/clickhouse"]);
     await run("mv", [stdout.trim().split("\n")[0], bin]);
     await rm(tmp, { recursive: true, force: true });
     await rm(file, { force: true });
