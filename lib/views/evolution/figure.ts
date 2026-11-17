@@ -6,7 +6,8 @@
 import type { DrawnResultOf } from "../../types.ts";
 import { palette, frame, caption, label, textWidth, legend, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, fmtInt, esc, FS, SW, r1, type SvgOpts, type Scale } from "../../svg-kit.ts";
 import { STYLE, rampColor } from "../../oncoprint-style.ts";
-import { clusterHeatmap } from "../../oncoprint-cluster.ts";
+import { heatmapOrder, mutationName } from "./order.ts";
+export { heatmapOrder };
 import type { EvolutionCell, EvolutionMutation, EvolutionSample } from "./types.ts";
 
 /** the table columns that identify a mutation: one key names its line or heatmap row and its table row alike */
@@ -29,7 +30,6 @@ export function cellText(c: EvolutionCell): string {
     default: return "not profiled";
   }
 }
-const mutationName = (m: EvolutionMutation) => m.gene + " " + m.proteinChange;
 const mutationTip = (m: EvolutionMutation, samples: EvolutionSample[]) =>
   mutationName(m) + (m.mutationType ? " (" + m.mutationType.replace(/_/g, " ") + ")" : "") + " — " + m.cells.map((c, i) => samples[i].label + ": " + cellText(c)).join(" · ");
 
@@ -144,28 +144,11 @@ function keyRow(parts: string[], x0: number, y0: number, maxW: number, p: Return
 /** a VAF's colour: the portal's VAF heatmap ramp, rgb(241,242,181) → rgb(19,80,88) (lib/oncoprint-style.ts) */
 const heatFill = (vaf: number) => rampColor(STYLE.ramps.vaf, Math.max(0, Math.min(1, vaf)));
 
-/**
- * The heatmap's order, as the portal's (MutationOncoprint, PTB-GE-HM-2/4): clustered (average linkage,
- * 1 − Spearman over the VAFs, lib/oncoprint-cluster.ts) or, unclustered, the samples in their order and
- * the mutations in the table's (alphabetical by "GENE pChange" when they are the rows).
- */
-export function heatmapOrder(drawn: EvolutionMutation[], nSamples: number, o: { transpose: boolean; cluster: boolean }): { mutations: number[]; samples: number[] } {
-  const ms = drawn.map((_, i) => i), ss = Array.from({ length: nSamples }, (_, j) => j);
-  if (!o.cluster) return { mutations: o.transpose ? [...ms].sort((a, b) => mutationName(drawn[a]).localeCompare(mutationName(drawn[b]))) : ms, samples: ss };
-  const vaf = (i: number, j: number) => { const c = drawn[i].cells[j]; return c.vaf != null && (c.status === "called" || c.status === "uncalled") ? c.vaf : NaN; };
-  if (o.transpose) {
-    // tracks are the mutations, columns the samples
-    const r = clusterHeatmap({ rows: ms.map((i) => Float64Array.from(ss, (j) => vaf(i, j))), n: nSamples });
-    return { mutations: r.rows.map((k) => ms[k]), samples: r.order };
-  }
-  const r = clusterHeatmap({ rows: ss.map((j) => Float64Array.from(ms, (i) => vaf(i, j))), n: drawn.length });
-  return { mutations: r.order, samples: r.rows.map((k) => ss[k]) };
-}
-
-function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
+/** The heatmap; `width` is wider than `W` when the default layout's columns need more room. */
+function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number; width: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const G = STYLE.glyph, out: string[] = [];
-  const ord = heatmapOrder(drawn, samples.length, d);
+  const ord = e.heatmapOrder ?? heatmapOrder(drawn, samples.length, d);
   const names = drawn.map(mutationName);
   /** one cell of mutation i in sample j at (x, y), w × h */
   const cell = (i: number, j: number, x: number, y: number, w: number, h: number) => {
@@ -181,6 +164,7 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
   };
   const gap = 1, top = 4;
   let y0: number, gridBottom: number;
+  let width = W;
   if (d.transpose) {
     // a row per mutation, labelled; a column per sample, its numbered marker above
     const labelW = d.mutationLabels ? Math.min(W * 0.4, Math.max(60, ...names.map((n) => textWidth(n, FS.small))) + 10) : 8;
@@ -197,8 +181,10 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
     gridBottom = y0 + drawn.length * rowH;
   } else {
     // the portal's default: a row per sample, its numbered marker at the left; a column per mutation, labelled below
+    // a column is at least 6 px, or a label's line height when labelled; past that the figure widens
     const x0 = 8 + 2 * MARK_R + 8, rowH = 18;
-    const colW = Math.max(6, Math.min(20, (W - 16 - x0) / Math.max(1, drawn.length)));
+    const colW = Math.max(d.mutationLabels ? FS.small + 2 : 6, Math.min(20, (W - 16 - x0) / Math.max(1, drawn.length)));
+    width = Math.max(W, x0 + drawn.length * colW + 8);
     y0 = top;
     ord.samples.forEach((j, r) => out.push(marker(8 + MARK_R, y0 + r * rowH + rowH / 2, samples[j])));
     ord.mutations.forEach((i, k) => {
@@ -208,10 +194,12 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
     });
     gridBottom = y0 + samples.length * rowH;
     if (d.mutationLabels) {
+      // rotated a quarter turn, a label's glyphs lie on the +x side of its baseline: the baseline sits
+      // 0.35 em left of the column's centre so the text is centred under its column
       const lh = Math.min(140, Math.max(...names.map((n) => textWidth(n, FS.small))) + 6);
       ord.mutations.forEach((i, k) => {
-        const cx = x0 + k * colW + colW / 2;
-        out.push(`<text x="${r1(cx + FS.small * 0.35)}" y="${r1(gridBottom + 4)}" font-size="${FS.small}" fill="${p.ink}" transform="rotate(90 ${r1(cx + FS.small * 0.35)} ${r1(gridBottom + 4)})">${esc(names[i])}</text>`);
+        const bx = x0 + k * colW + colW / 2 - FS.small * 0.35;
+        out.push(label(bx, gridBottom + 4, names[i], { size: FS.small, fill: p.ink, rotate: 90, maxW: lh - 6 }));
       });
       gridBottom += lh;
     }
@@ -233,7 +221,7 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
   ], rx + rampW + 18, h - 2, W - rx - rampW - 26, p);
   out.push(key.svg);
   h += Math.max(30, key.height + 4);
-  return { svg: out.join(""), height: h };
+  return { svg: out.join(""), height: h, width };
 }
 
 /** `o.caption: false` leaves the caveat out, for a page that prints it beside the figure. */
@@ -241,11 +229,15 @@ export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { capti
   const e = v.evolution, pt = e.patient;
   if (!pt || !e.drawn || !e.drawn.length) return null;
   const p = palette(o.theme), W = Math.max(420, o.width || 760);
-  const body = e.display.chart === "heatmap" ? heatmap(v, W, p) : lineChart(v, W, p);
+  const body: { svg: string; height: number; width?: number } = e.display.chart === "heatmap" ? heatmap(v, W, p) : lineChart(v, W, p);
+  const FW = Math.max(W, body.width ?? W);
   let y = body.height + 4;
   const key = sampleKey(pt.samples, y, W, p);
   y += key.height + 4;
   const cap = caption(o.caption === false ? "" : v.caveat || "", W, y, p.muted);
-  return frame(W, y + cap.height + 8, body.svg + key.svg + cap.svg, p.bg, false,
-    "Genomic evolution — " + pt.id + ": " + e.drawn.length + " mutations across " + pt.samples.length + " samples (" + (e.display.chart === "heatmap" ? "heatmap" : "VAF lines") + ")", { tip: false });
+  const hm = e.display.chart === "heatmap"
+    ? "heatmap, a row per " + (e.display.transpose ? "mutation" : "sample") + (e.display.cluster ? ", clustered" : "")
+    : "VAF lines";
+  return frame(FW, y + cap.height + 8, body.svg + key.svg + cap.svg, p.bg, false,
+    "Genomic evolution — " + pt.id + ": " + e.drawn.length + " mutations across " + pt.samples.length + " samples (" + hm + ")", { tip: false });
 }

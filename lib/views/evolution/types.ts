@@ -11,7 +11,7 @@ export interface EvolutionTableQuery extends TableQuery {
 /**
  * One patient's mutations followed across their samples — cBioPortal's patient-view Genomic Evolution
  * tab: each mutation's variant allele frequency (VAF) in each of the patient's samples, drawn as a
- * line per mutation through the samples in their order or as a heatmap of mutation × sample, above
+ * line per mutation through the samples in their order or as a heatmap of sample × mutation, above
  * the mutations as a table view. The cohort's patients with two or more samples and allele counts
  * are listed to choose from. Everything names a patient, so only a patient-level participant
  * contributes.
@@ -25,7 +25,7 @@ export interface EvolutionView extends TableQuery {
   rows?: number;
   /** the mutation table's query; the figure draws every mutation it keeps (the top-level query is the patient list's) */
   mutations?: EvolutionTableQuery;
-  /** "line" (the default: a line per mutation across the samples) or "heatmap" (mutation × sample) */
+  /** "line" (the default: a line per mutation across the samples) or "heatmap" (a row per sample, a column per mutation) */
   chart?: "line" | "heatmap";
   /**
    * place the samples evenly in their order rather than by the day each was collected (default
@@ -90,6 +90,8 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   x: "time" | "sequence";
   /** sequence was not asked for, but these samples have no collection day, so the samples are drawn in sequence */
   noDay?: string[];
+  /** the heatmap's order (chart "heatmap" only): indices into `drawn` and the patient's samples, clustered or by name */
+  heatmapOrder?: { mutations: number[]; samples: number[] };
   /** the display as drawn, from the spec */
   display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean };
 }

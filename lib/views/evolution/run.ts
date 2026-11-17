@@ -18,6 +18,7 @@ import {
 import type { EvolutionView, EvolutionResult, EvolutionSample, EvolutionMutation, EvolutionCell, EvolutionStatus } from "./types.ts";
 import { evolutionMethod } from "./method.ts";
 import { EVOLUTION_KEY_COLUMNS, evolutionKey } from "./figure.ts";
+import { heatmapOrder } from "./order.ts";
 
 type Cell = string | number | null;
 
@@ -61,7 +62,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return no("rows (the page size of the patient list) is 1 to " + TABLE_ROWS_MAX);
   if (view.patient != null && (typeof view.patient !== "object" || typeof view.patient.study !== "string" || typeof view.patient.id !== "string" || !PATIENT_ID.test(view.patient.id)))
     return no("patient is {study, id}: a study of the view's cohort and a patient id in it, e.g. {\"study\": \"glioma_msk_2018\", \"id\": \"IM-GBM-28\"}");
-  if (view.chart != null && view.chart !== "line" && view.chart !== "heatmap") return no("chart is \"line\" (a line per mutation across the samples, the default) or \"heatmap\" (mutation × sample)");
+  if (view.chart != null && view.chart !== "line" && view.chart !== "heatmap") return no("chart is \"line\" (a line per mutation across the samples, the default) or \"heatmap\" (a row per sample, a column per mutation)");
   for (const k of ["sequential", "logScale", "dataRange", "transpose", "cluster", "mutationLabels"] as const)
     if (view[k] != null && typeof view[k] !== "boolean") return no(k + " is true or false");
   const q = viewQuery(view);
@@ -183,7 +184,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     return {
       kind: "evolution", cohorts: vNames,
       evolution: { ...list, patient: { ...want, samples }, position, mutations: table, drawn, ...(undrawn ? { undrawn } : {}), noVaf, x,
-        ...(!view.sequential && noDay.length ? { noDay } : {}), display },
+        ...(!view.sequential && noDay.length ? { noDay } : {}), ...(drawn && display.chart === "heatmap" ? { heatmapOrder: heatmapOrder(drawn, samples.length, display) } : {}), display },
       method: evolutionMethod({ cohorts: vNames, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length, lists: r.lists, excluded, instances: r.groups,
         patient: want, samples: samples.length, table: { total: m.total, all: m.all, queryText: tq }, drawn: drawn?.length ?? null, noVaf }),
       participation: ctx.participationFor(ctx.vStudies, true),
@@ -197,7 +198,9 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
         " — never 0" + (npCells ? " (" + plural(npCells, "such cell") + " here)" : "") + ". " +
         (display.chart === "line" ? "A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment" +
           (display.logScale ? "; the y axis is log-scaled, a VAF of 0 sitting at its floor of 0.001" : "") + (display.dataRange ? "; the y axis spans the VAFs drawn rather than 0 to 1" : "") + ". "
-          : "The heatmap colours each sample's VAF from 0 to 1; grey is not found, white with a bar is not profiled. ") +
+          : "The heatmap has " + (display.transpose ? "a row per mutation and a column per sample" : "a row per sample and a column per mutation") + ", " +
+            (display.cluster ? "both clustered by VAF as the portal clusters an oncoprint heatmap" : "the samples in order and the mutations by name") +
+            (display.mutationLabels ? "" : ", mutation labels hidden") + "; it colours each sample's VAF from 0 to 1 on the portal's VAF ramp; grey is not found, white with a bar is not profiled. ") +
         "Fusions recorded as mutations are left out, as the portal leaves them out. " +
         "The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: " + tableTail(r, q, listColumns, "patient", "with the most samples first, then by patient id", excluded, false),
     };

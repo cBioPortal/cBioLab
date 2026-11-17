@@ -64,8 +64,8 @@ export const mutants: Mutant[] = [
     effect: "A timeline sample's tooltip lists its attributes as they come, where the portal sorts them by key.",
     find: "  return [...merged].sort(([a], [b]) => a.localeCompare(b));\n}",
     replace: "  return [...merged];\n}" },
-  { id: "evolution-heatmap-cluster-ignored", layer: "counts", guard: "unit", file: "lib/views/evolution/figure.ts",
-    effect: "The Genomic Evolution heatmap draws mutations in table order with Cluster on, so mutations with the same VAFs across samples sit apart, unlike the portal's clustered heatmap.",
+  { id: "evolution-heatmap-cluster-ignored", layer: "counts", guard: "unit", file: "lib/views/evolution/order.ts",
+    effect: "The Genomic Evolution heatmap draws mutations by name with Cluster on, so mutations with the same VAFs across samples sit apart, unlike the portal's clustered heatmap.",
     find: "  if (!o.cluster) return",
     replace: "  if (!o.cluster || true) return" },
 ];
