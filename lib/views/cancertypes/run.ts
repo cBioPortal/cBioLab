@@ -39,15 +39,20 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   const { ok, excluded } = answering(ctx);
   if (!Object.keys(ok).length) return refuse("cancertypes", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const unit: "patient" | "sample" = view.unit === "sample" ? "sample" : "patient";
-  let groupBy: string;
-  if (view.groupBy != null) groupBy = String(view.groupBy).trim();
-  else if (ctx.vStudies.length > 1) groupBy = "study";
-  else {
-    // the portal's default for one study (CancerSummaryContainer groupAlterationsBy): the detailed type when every sample has one cancer type
+  let groupBy = String(view.groupBy ?? "").trim();
+  // the portal's default (CancerSummaryContainer groupAlterationsBy), as the method record states it
+  let byDefault: { studies: number; cancerTypes?: number } | undefined;
+  // the per-group samples answers by CANCER_TYPE, kept when that is the category chosen
+  const typeAnswers = new Map<string, Record<string, unknown>[]>();
+  if (!groupBy && ctx.vStudies.length > 1) { groupBy = "study"; byDefault = { studies: ctx.vStudies.length }; }
+  else if (!groupBy) {
+    // one study: the detailed type when every sample has one cancer type
     const types = await askEachSite(ctx, ok, async (n, _st, r) =>
       r.viewAggregate("cancertypes:default:" + n, doc.cohorts[n], (c, s, d) => cancerTypeSamplesSql(c, s, d, "CANCER_TYPE", unit)));
+    for (const a of types) typeAnswers.set(a.cohort + "\0" + a.study, a.answer);
     const distinct = new Set(types.flatMap((a) => a.answer.map((row) => String(row.grp)).filter((g) => g !== "\x01all")));
     groupBy = distinct.size === 1 ? "CANCER_TYPE_DETAILED" : "CANCER_TYPE";
+    byDefault = { studies: 1, cancerTypes: distinct.size };
   }
   if (groupBy !== "study" && !ATTR_NAME.test(groupBy)) return refuse("cancertypes", ctx, "groupBy is a sample attribute name or \"study\"; got " + JSON.stringify(groupBy).slice(0, 40));
   const measure: "driver" | "any" = view.measure === "driver" ? "driver" : "any";
@@ -88,7 +93,8 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
       ...(view.drivers !== undefined ? { drivers: view.drivers, hotspotPins } : {}) } : undefined;
     return Promise.all([
     r.viewAggregate("cancertypes:" + n, doc.cohorts[n], (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit, oql)),
-    r.viewAggregate("cancertypes:samples:" + n, doc.cohorts[n], (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute, unit))
+    attribute === "CANCER_TYPE" && typeAnswers.has(n + "\0" + st) ? typeAnswers.get(n + "\0" + st)!
+      : r.viewAggregate("cancertypes:samples:" + n, doc.cohorts[n], (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute, unit))
   ]); });
   for (const n of vNames) {
     // gene "*" is the genes together; every other key one gene
@@ -113,7 +119,8 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
       }
       for (const r of tot) {
         if (r.grp === ALL_KEY) { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.samples += Number(r.samples); cohortTotal.set(n, t); continue; }
-        const t = totals.get(String(r.grp)) || { samples: 0, profiledFor: { mutation: 0, cna: 0, sv: 0 }, label: String(r.grp) };
+        const name = String(r.label || r.grp);
+        const t = totals.get(String(r.grp)) || { samples: 0, profiledFor: { mutation: 0, cna: 0, sv: 0 }, label: attribute ? name : shortStudyName(name) };
         t.samples += Number(r.samples); t.profiledFor.mutation += Number(r.mut); t.profiledFor.cna += Number(r.cna); t.profiledFor.sv += Number(r.sv);
         totals.set(String(r.grp), t);
       }
@@ -138,7 +145,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   return {
     kind: "cancertypes", cohorts: vNames,
     cancertypes: { groupBy: groupWord, measure, genes, minSamples, show, unit, panels, ...(excluded.length ? { excluded } : {}) },
-    method: cancertypesMethod({ genes, groupBy: groupWord, measure, oncokbPin: pin, minSamples, unit, perSite, ...(lines ? { oql: lines } : {}),
+    method: cancertypesMethod({ genes, groupBy: groupWord, measure, oncokbPin: pin, minSamples, unit, ...(byDefault ? { byDefault } : {}), perSite, ...(lines ? { oql: lines } : {}),
       panels: panels.map((p) => ({ cohort: p.cohort, groups: p.groups.length, pooled: p.pooled ? p.pooled.count : 0, profiled: p.profiled, altered: p.altered })) }),
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),

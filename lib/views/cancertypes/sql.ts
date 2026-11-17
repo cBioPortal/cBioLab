@@ -149,7 +149,8 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
     "  SELECT sample_unique_id AS suid, groupUniqArray(alteration_type) AS types FROM " + db + ".sample_to_gene_panel_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
     ")\n" +
-    "SELECT " + (attribute ? "ifNull(grp.g, '')" : sq(study)) + " AS grp, uniqExact(" + k + ") AS samples,\n" +
+    "SELECT " + (attribute ? "ifNull(grp.g, '')" : sq(study)) + " AS grp, " +
+    (attribute ? "any(ifNull(grp.label, ''))" : "(SELECT any(name) FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")") + " AS label, uniqExact(" + k + ") AS samples,\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')) AS mut,\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'COPY_NUMBER_ALTERATION')) AS cna,\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'STRUCTURAL_VARIANT')) AS sv\n" +
@@ -157,7 +158,7 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
     (attribute ? "LEFT JOIN (" + groupSql(db, study, attribute) + ") grp ON grp.suid = samp.suid\n" : "") +
     "GROUP BY grp\n" +
     // the whole cohort, each unit once
-    "UNION ALL SELECT '\\x01all' AS grp, uniqExact(" + k + "), uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')),\n" +
+    "UNION ALL SELECT '\\x01all' AS grp, '' AS label, uniqExact(" + k + "), uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')),\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'COPY_NUMBER_ALTERATION')), uniqExactIf(" + k + ", has(prof.types, 'STRUCTURAL_VARIANT'))\n" +
     "FROM samp LEFT JOIN prof ON prof.suid = samp.suid"
   ));

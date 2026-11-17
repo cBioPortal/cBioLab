@@ -92,7 +92,7 @@ function ctxOf(o: { cohorts: Record<string, string[]>; defaults?: Record<string,
       const byStudy = !/attribute_name/.test(sql);
       if (!byStudy) return label.startsWith("cancertypes:samples:") ? TOT : ROWS;
       return label.startsWith("cancertypes:samples:")
-        ? [{ grp: study, samples: 20, mut: 20, cna: 0, sv: 0 }, { grp: ALL, samples: 20, mut: 20, cna: 0, sv: 0 }]
+        ? [{ grp: study, label: o.names?.[study] ?? study, samples: 20, mut: 20, cna: 0, sv: 0 }, { grp: ALL, label: "", samples: 20, mut: 20, cna: 0, sv: 0 }]
         : [{ ...grp(study, 20, 5), label: o.names?.[study] ?? study }, { gene: "*", grp: ALL, profiled: 20, altered: 5 }];
     },
   });
@@ -188,5 +188,41 @@ describe("cancertypes: study labels (CTS-CH-8)", () => {
     const { r } = await runOn({ cohorts: { A: ["s1", "s2"] }, names: { s1: LONG_PAREN, s2: SHORT_PAREN } }, { groupBy: "study" });
     const groups = (r as unknown as CtResult).cancertypes!.panels[0].groups.map((g) => [g.key, g.label]).sort();
     assert.deepEqual(groups, [["s1", LONG.slice(0, 49) + "...(TCGA, Nat Genet 2016)"], ["s2", SHORT_PAREN]]);
+  });
+});
+
+// ---- what review asked of the default category ----------------------------------------------------
+type Method = { method?: { steps: { title: string; detail: string }[] } };
+const steps = (r: ViewResult) => ((r as unknown as Method).method?.steps || []);
+
+describe("cancertypes: the default category, as the method record and the queries state it", () => {
+  test("an empty groupBy is no category: the portal's default, not a refusal", async () => {
+    const { r } = await runOn({ cohorts: { A: ["s1"] }, defaults: { A: ["luad"] } }, { groupBy: "  " });
+    assert.equal((r as unknown as CtResult).error, undefined);
+    assert.equal(groupByOf(r), "CANCER_TYPE_DETAILED");
+  });
+  test("the default reached by CANCER_TYPE reuses its per-group samples answer: no second samples query", async () => {
+    const { r, asked } = await runOn({ cohorts: { A: ["s1"] }, defaults: { A: ["luad", "brca"] } });
+    assert.equal(groupByOf(r), "CANCER_TYPE");
+    assert.deepEqual(asked.filter((a) => a.label.startsWith("cancertypes:samples:")), []);
+  });
+  test("a default reached by CANCER_TYPE_DETAILED still asks for its own samples", async () => {
+    const { asked } = await runOn({ cohorts: { A: ["s1"] }, defaults: { A: ["luad"] } });
+    assert.deepEqual(asked.filter((a) => a.label.startsWith("cancertypes:samples:")).map((a) => a.label), ["cancertypes:samples:A"]);
+  });
+  test("the method record states the rule, the count it read and the category chosen", async () => {
+    const one = steps((await runOn({ cohorts: { A: ["s1"] }, defaults: { A: ["luad"] } })).r);
+    const choose = one.find((s) => s.title === "Choose the category");
+    assert.ok(choose, JSON.stringify(one.map((s) => s.title)));
+    assert.match(choose!.detail, /counts 1 distinct CANCER_TYPE value: grouped by CANCER_TYPE_DETAILED/);
+    const two = steps((await runOn({ cohorts: { A: ["s1", "s2"] } })).r);
+    assert.match(two.find((s) => s.title === "Choose the category")!.detail, /2 studies: grouped by study/);
+    assert.equal(steps((await runOn({ cohorts: { A: ["s1"] } }, { groupBy: "CANCER_TYPE" })).r).some((s) => s.title === "Choose the category"), false);
+  });
+  test("the method record states how a sample without a cancer type is grouped", async () => {
+    const detail = (r: ViewResult) => steps(r).map((s) => s.detail).join(" ");
+    assert.match(detail((await runOn({ cohorts: { A: ["s1"] } }, { groupBy: "CANCER_TYPE" })).r), /without a CANCER_TYPE takes its study's type of cancer/);
+    assert.match(detail((await runOn({ cohorts: { A: ["s1"] } }, { groupBy: "CANCER_TYPE_DETAILED" })).r), /without a CANCER_TYPE_DETAILED takes its CANCER_TYPE, else its study's type of cancer/);
+    assert.doesNotMatch(detail((await runOn({ cohorts: { A: ["s1"] } }, { groupBy: "TUMOR_GRADE" })).r), /type of cancer/);
   });
 });

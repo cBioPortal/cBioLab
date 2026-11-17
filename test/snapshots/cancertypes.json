@@ -1855,9 +1855,20 @@
       "method": {
         "steps": [
           {
+            "kind": "transform",
+            "title": "Choose the category",
+            "detail": "The view names no groupBy, so the portal's default applies (CancerSummaryContainer groupAlterationsBy): the study when the cohorts span more than one study; otherwise CANCER_TYPE_DETAILED when the cohort's samples have exactly one CANCER_TYPE (a sample without one counted as its study's type of cancer), else CANCER_TYPE. One study; the cancertypes:default query above counts 66 distinct CANCER_TYPE values: grouped by CANCER_TYPE.",
+            "params": [
+              [
+                "category",
+                "CANCER_TYPE"
+              ]
+            ]
+          },
+          {
             "kind": "fetch",
             "title": "Count patients per CANCER_TYPE group",
-            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
+            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only. A sample without a CANCER_TYPE takes its study's type of cancer (else \"Unknown\").",
             "scope": "all patients · msk_impact_50k_2026",
             "rowsOut": 67,
             "params": [

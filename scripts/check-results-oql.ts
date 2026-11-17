@@ -651,6 +651,7 @@ async function categoryOf(tag: string, attribute: string | null, unit: "sample" 
     const groups = (rs: Row[], k: string): Groups => Object.fromEntries(rs.filter((r) => r.grp !== ALL).map((r) => [String(r.grp), Number(r[k])]));
     return { samples: groups(tot, "samples"), profiled: groups(rows, "profiled"),
       labels: Object.fromEntries(rows.filter((r) => r.grp !== ALL).map((r) => [String(r.grp), String(r.label)])) as Record<string, string>,
+      sampleLabels: Object.fromEntries(tot.filter((r) => r.grp !== ALL).map((r) => [String(r.grp), String(r.label)])) as Record<string, string>,
       all: [Number(tot.find((r) => r.grp === ALL)?.samples), Number(rows.find((r) => r.grp === ALL)?.profiled)] };
   } catch (e) {
     ok(tag + " runs", false, (e as Error).message.slice(0, 300));
@@ -675,7 +676,13 @@ async function expectCategory(tag: string, attribute: string | null, unit: "samp
   await expectCategory("G1", "CANCER_TYPE", "sample", { [NSCLC]: 57, [LC]: 2 }, 59);
   await expectCategory("G1", "CANCER_TYPE", "patient", { [NSCLC]: 51, [LC]: 2 }, 53);
   // G2 (F2a, F2b): CANCER_TYPE_DETAILED — FX-P42 and FX-P48 take their CANCER_TYPE, FX-P41 and FX-P47 the study's type
-  await expectCategory("G2", "CANCER_TYPE_DETAILED", "sample", { [LUAD]: 42, [LUSC]: 13, [LC]: 2, [NSCLC]: 2 }, 59);
+  {
+    const got = await expectCategory("G2", "CANCER_TYPE_DETAILED", "sample", { [LUAD]: 42, [LUSC]: 13, [LC]: 2, [NSCLC]: 2 }, 59);
+    // the samples query labels a group with its value as written, the fallback's included
+    if (got) ok("G2 CANCER_TYPE_DETAILED (samples) cancerTypeSamplesSql labels as written",
+      got.sampleLabels[LC] === "Lung Cancer" && got.sampleLabels[NSCLC] === "Non-Small Cell Lung Cancer" && got.sampleLabels[LUAD] === "Lung Adenocarcinoma",
+      "ours " + JSON.stringify(got.sampleLabels));
+  }
   await expectCategory("G2", "CANCER_TYPE_DETAILED", "patient", { [LUAD]: 39, [LUSC]: 12, [LC]: 2, [NSCLC]: 2 }, 53);
   // G3 (F3): another attribute keeps its "" group — TUMOR_GRADE: "1" FX-P01-T1; "2" FX-P01-T2, FX-P02-T1, FX-P02-T2;
   //   none on the other 55 samples, of 51 patients (all but FX-P01 and FX-P02)
@@ -686,6 +693,9 @@ async function expectCategory(tag: string, attribute: string | null, unit: "samp
     const got = await expectCategory("G4", null, unit, { [STUDY]: n }, n);
     if (got) ok("G4 study (" + unit + "s) cancerTypesSql label is the study's name", got.labels[STUDY] === "cBioLab peer fixture (synthetic)",
       "ours " + JSON.stringify(got.labels[STUDY]));
+    // so is the samples query's, which alone names a group with units but none profiled
+    if (got) ok("G4 study (" + unit + "s) cancerTypeSamplesSql label is the study's name", got.sampleLabels[STUDY] === "cBioLab peer fixture (synthetic)",
+      "ours " + JSON.stringify(got.sampleLabels[STUDY]));
   }
 }
 
