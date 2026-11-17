@@ -15,6 +15,7 @@ import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult, PatientEvent } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
 import type { EvolutionView, EvolutionResult, EvolutionMutation } from "../lib/views/evolution/types.ts";
+import { axisTicks, eventItems } from "../lib/timeline-tracks.ts";
 import { kindText } from "./support/kind-text.ts";
 
 type Row = Record<string, unknown>;
@@ -284,6 +285,53 @@ describe("evolution: cells, lines and the figure", () => {
     assert.equal(LOG_FLOOR, 0.001);
     const same = await run({}, one(study(), {}, { events: EVENTS.map((e) => ({ ...e, start: 5 })) }));
     assert.deepEqual(lintSvg(evolutionSvg(same as never, { width: 700 })!), [], "samples collected the same day stack");
+  });
+});
+
+describe("evolution: the time axis is the patient timeline's axis", () => {
+  const sp = (id: string, start: number): PatientEvent => ({ type: "Specimen", start, end: null, attrs: [["SAMPLE_ID", id]] });
+  const events: PatientEvent[] = [sp("T1", 0), sp("T2", 461), sp("T3", 1343), { type: "Treatment", start: 1854, end: null, attrs: [] }];
+  const timed = (view: Partial<EvolutionView> = {}) => run(view, one(study(), {}, { events }));
+
+  test("time mode carries the timeline's trimmed ticks, covering events beyond the last sample", async () => {
+    const e = evo(await timed());
+    assert.equal(e.x, "time");
+    assert.ok(e.axis);
+    assert.equal(e.axis![0].start, -20);
+    assert.equal(e.axis![e.axis!.length - 1].end, 1874);
+    assert.deepEqual(e.axis, axisTicks(eventItems(events), true).ticks);
+  });
+
+  test("sequence mode has no axis", async () => {
+    const e = evo(await timed({ sequential: true }));
+    assert.equal(e.x, "sequence");
+    assert.equal(e.axis, undefined);
+  });
+
+  test("expandGaps keeps long empty runs as ordinary ticks; without it they are cut", async () => {
+    const far = [sp("T1", 0), sp("T2", 2500), sp("T3", 2500)];
+    const open = evo(await run({ expandGaps: true }, one(study(), {}, { events: far }))).axis!;
+    assert.deepEqual(open, axisTicks(eventItems(far), false).ticks);
+    assert.ok(open.every((t) => !t.trim));
+    const cut = evo(await run({}, one(study(), {}, { events: far }))).axis!;
+    assert.ok(cut.some((t) => t.trim));
+  });
+
+  test("expandGaps is true or false", async () => {
+    const r = await run({ expandGaps: "yes" } as never, one());
+    assert.match(r.error!, /expandGaps/);
+    assert.match(r.error!, /true or false/);
+  });
+
+  test("the figure labels years, or falls back to the days title without an axis", async () => {
+    const v = await timed();
+    const svg = evolutionSvg(v as never, { width: 900 })!;
+    assert.match(svg, />0</);
+    assert.match(svg, />1y</);
+    assert.doesNotMatch(svg, /Days from diagnosis/);
+    const bare = structuredClone(v) as typeof v & { evolution: EvolutionResult };
+    delete bare.evolution.axis;
+    assert.match(evolutionSvg(bare as never, { width: 900 })!, /Days from diagnosis/);
   });
 });
 

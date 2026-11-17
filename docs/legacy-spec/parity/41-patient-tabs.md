@@ -22,8 +22,8 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 23 |
-| 🟡 partial | 15 |
+| ✅ match | 24 |
+| 🟡 partial | 14 |
 | 🔶 different | 10 |
 | ❌ missing | 30 |
 | 🐞 ok | 0 |
@@ -32,13 +32,13 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | ? | 0 |
 | **Total IDs** | **81** |
 
-**Overall: 25.9 %** (✅ 18 + 🐞ok 0 + N/A 3 = 21 of 81). Counting 🟡 as half: 35.2 %.
+**Overall: 33.3 %** (✅ 24 + 🐞ok 0 + N/A 3 = 27 of 81). Counting 🟡 as half: 42.0 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 TAB inventory | 5 | 0 | 2 | 2 | 0 | 0 | 1 | Different order and gating; placeholder tabs; `?tab=` not path |
 | §1 GE core | 4 | 2 | 1 | 0 | 1 | 0 | 0 | Same mutation set and selection model; no unprofiled alert |
-| §1 GE line chart | 7 | 1 | 4 | 0 | 2 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
+| §1 GE line chart | 7 | 2 | 3 | 0 | 2 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
 | §1 GE heatmap | 4 | 0 | 0 | 3 | 1 | 0 | 0 | Mutation × sample fixed, oncoprint ramp, no cluster/transpose/zoom/download |
 | §1 GE table | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Own columns (VAF by sample, Max VAF); no "only selected" |
 | §2 Pathways | 4 | 0 | 2 | 2 | 0 | 0 | 0 | Same scores; numeric score not Yes/No; tie order → other default pathway |
@@ -114,7 +114,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-GE-LC-1 | ❌ | B | No Show/Hide Timeline |
 | PTB-GE-LC-2 | 🟡 | B | sequential (disabled + reason when days missing), log scale, y axis to data range ✅ (in document); no Group by, no "Show only selected mutations" |
 | PTB-GE-LC-3 | 🟡 | B | Polylines + sample markers ✅; y title "Variant allele frequency"; extra legend (called / uncalled / not found / not profiled) |
-| PTB-GE-LC-4 | 🟡 | B | Sequential even spacing / collection day ✅; x axis in days (0…1,400) not 0, 4m, 8m, 1y |
+| PTB-GE-LC-4 | ✅ | BC | Sequential even spacing / collection day ✅; the x axis is the patient timeline's, as legacy: year ticks "0, 1y, 2y" with month ticks "4m, 8m", spanning all the patient's events (lgg_ucsf_2014 P04: specimens at 0/461/1075/1343, last event day 1854, axis to 5y, as the API gives), empty years cut, "every year" (expandGaps, in the document) for legacy's click on the cut; axis below the plot (legacy above) |
 | PTB-GE-LC-5 | ❌ | B | No grouping |
 | PTB-GE-LC-6 | 🟡 | C | "VAF 0.38 (46 of 121 reads)", "called, no allele counts", "uncalled, VAF …", "not found", "not profiled" (`figure.ts:15-26`) — same states, other words |
 | PTB-GE-LC-7 | ✅ | C | No download on the tab, as legacy without the timeline |

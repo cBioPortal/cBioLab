@@ -5,6 +5,7 @@
 import type { DrawnResultOf } from "../../types.ts";
 import { palette, frame, caption, label, textWidth, legend, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, fmtInt, esc, FS, SW, r1, type SvgOpts, type Scale } from "../../svg-kit.ts";
 import { STYLE, numericColor, encodeNumeric } from "../../oncoprint-style.ts";
+import { YEAR, dayScale, monthTicks, yearLabel, type AxisTick } from "../../timeline-tracks.ts";
 import type { EvolutionCell, EvolutionMutation, EvolutionSample } from "./types.ts";
 
 /** the table columns that identify a mutation: one key names its line or heatmap row and its table row alike */
@@ -57,6 +58,46 @@ export function lineCells(m: EvolutionMutation): { i: number; c: EvolutionCell }
   return all.slice(a, b + 1);
 }
 
+/**
+ * The line chart's x axis as the portal's, which is the patient timeline's (TickAxis): a line and a
+ * label at each year ("0", "1y", "-2y"), month ticks inside a year wide enough for them, a squiggle
+ * where empty years are cut; a faint guide up through the plot at each year. Labels that would touch
+ * the one before them or a cut are left out.
+ */
+function timeAxis(ticks: AxisTick[], X: (day: number) => number, left: number, right: number, axY: number, top: number, p: ReturnType<typeof palette>): string[] {
+  const out = [`<line x1="${r1(left)}" y1="${r1(axY)}" x2="${r1(right)}" y2="${r1(axY)}" stroke="${p.muted}" stroke-width="${SW.line}"/>`];
+  const pxPerYear = (right - left) / Math.max(1, ticks.filter((t) => !t.trim).length);
+  const cuts = ticks.filter((t) => t.trim).map((t) => X(t.start));
+  // each label row (years, months) keeps its own right edge so far
+  const lastRight = new Map<number, number>();
+  const put = (x: number, text: string, y: number, fill: string) => {
+    const w = textWidth(text, FS.small), cx = Math.min(Math.max(x, left + w / 2), right - w / 2);
+    if (cx - w / 2 <= (lastRight.get(y) ?? -Infinity) + 4 || cuts.some((c) => Math.abs(c - cx) <= w / 2 + 8)) return;
+    out.push(label(cx, y, text, { size: FS.small, fill, anchor: "middle" }));
+    lastRight.set(y, cx + w / 2);
+  };
+  for (const t of ticks) {
+    if (t.trim) {
+      const cx = X(t.start);
+      out.push(`<g transform="translate(${r1(cx)} ${r1(axY)})"><title>${t.trim.years} years with no events, cut</title><path d="M-6 0 q3 -6 6 0 t6 0" fill="none" stroke="${p.muted}" stroke-width="1.2"/></g>`);
+      continue;
+    }
+    for (let d = Math.ceil(t.start / YEAR) * YEAR; d <= t.end; d += YEAR) {
+      const x = X(d);
+      out.push(`<line x1="${r1(x)}" x2="${r1(x)}" y1="${r1(top)}" y2="${r1(axY)}" stroke="${p.line}" stroke-width="${SW.hair}"/>`,
+        `<line x1="${r1(x)}" x2="${r1(x)}" y1="${r1(axY)}" y2="${r1(axY + 6)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+      put(x, yearLabel(d), axY + 17, p.ink);
+      for (const m of monthTicks(d, pxPerYear)) {
+        if (m.day > t.end) break;
+        const mx = X(m.day);
+        out.push(`<line x1="${r1(mx)}" x2="${r1(mx)}" y1="${r1(axY)}" y2="${r1(axY + 3)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+        if (m.label) put(mx, m.label, axY + 29, p.muted);
+      }
+    }
+  }
+  return out;
+}
+
 function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const out: string[] = [];
@@ -75,8 +116,10 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
   let xs: number[], bottom: number;
   if (e.x === "time") {
     const days = samples.map((s) => s.day!);
-    const xsc = linear(Math.min(...days), Math.max(...days), left + pad, right - pad);
-    xs = days.map((t) => xsc(t));
+    let X: (day: number) => number;
+    if (e.axis?.length) { const { x } = dayScale(e.axis, right - left); X = (t) => left + x(t); }
+    else X = linear(Math.min(...days), Math.max(...days), left + pad, right - pad);
+    xs = days.map((t) => X(t));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));
     const markTop = top + H + 12;
     // samples taken the same day stack their markers
@@ -84,8 +127,13 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
     const rows = xs.map((x) => { const k = Math.round(x); const n = seen.get(k) || 0; seen.set(k, n + 1); return n; });
     samples.forEach((s, i) => out.push(marker(xs[i], markTop + MARK_R + rows[i] * (2 * MARK_R + 2), s)));
     const axY = markTop + (Math.max(...rows) + 1) * (2 * MARK_R + 2) + 4;
-    out.push(axisBottom(xsc, axY, p, { title: "Days from diagnosis, when each sample was collected", fmt: (t) => fmtInt(t), minX: 0, maxX: W, line: true }));
-    bottom = axY + bottomAxisHeight("x");
+    if (e.axis?.length) {
+      out.push(...timeAxis(e.axis, X, left, right, axY, top, p));
+      bottom = axY + 34;
+    } else {
+      out.push(axisBottom(X as Scale, axY, p, { title: "Days from diagnosis, when each sample was collected", fmt: (t) => fmtInt(t), minX: 0, maxX: W, line: true }));
+      bottom = axY + bottomAxisHeight("x");
+    }
   } else {
     xs = samples.map((_, i) => samples.length === 1 ? (left + right) / 2 : left + pad + i * (right - left - 2 * pad) / (samples.length - 1));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));

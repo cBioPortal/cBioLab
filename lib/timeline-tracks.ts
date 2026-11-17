@@ -91,6 +91,9 @@ export function numericResult(e: PatientEvent): { v: number; censored: boolean }
 const endOf = (e: PatientEvent) => (e.end != null && e.end > e.start ? e.end : e.start);
 const itemOf = (e: PatientEvent, i: number): TlItem => ({ i, start: e.start, end: endOf(e) });
 
+/** Every event as the span the axis covers: its start to its end, or its day. */
+export const eventItems = (events: PatientEvent[]): TlItem[] => events.map(itemOf);
+
 function nest(events: PatientEvent[], idx: number[], keys: string[], uid: string, label: string, depth: number): TlTrack {
   if (!keys.length) return { uid, label, depth, items: idx.map((i) => itemOf(events[i], i)), children: [], draw: "events" };
   const groups = new Map<string, number[]>();
