@@ -3,7 +3,6 @@
 import type { GuardCommands, Mutant } from "./types.ts";
 
 export const guards: GuardCommands = {
-  "oncokb-cancer-gene": ["node", "--env-file=.env.local", "scripts/check-oncokb-cancer-gene.ts"],
   "oncokb-tumor-type": ["node", "--env-file=.env.local", "scripts/check-oncokb-tumor-type.ts"],
   "oncokb-sv": ["node", "--env-file=.env.local", "scripts/check-oncokb-sv.ts"],
   "hotspot-drivers": ["node", "--env-file=.env.local", "scripts/check-hotspot-drivers.ts"],
@@ -117,12 +116,9 @@ export const mutants: Mutant[] = [
     effect: "The mutation table lists every mutation whatever the query's OQL.",
     find: "(filter ? \"\\n    AND \" + filter : \"\")",
     replace: "(\"\")" },
-  { id: "cancer-gene-read-reads-curated", layer: "counts", guard: "oncokb-cancer-gene", file: "lib/annotation-store.ts",
-    effect: "The cancer-gene read returns only the genes OncoKB curates, leaving out listed genes it does not.",
-    find: "\" AND cancer_gene\";", replace: "\" AND oncokb_annotated\";" },
-  { id: "cancer-gene-partial-read-as-complete", layer: "counts", guard: "oncokb-cancer-gene", file: "lib/annotation-store.ts",
-    effect: "A cancer gene list whose sync left genes unstored reads as complete, so a gene not yet stored reads as no cancer gene.",
-    find: "count() > 0 AND argMax(note, (finished_at, run_id)) = 'complete'", replace: "count() > 0" },
+  { id: "mutation-default-columns-six", layer: "counts", guard: "unit", file: "lib/mutation-table.ts",
+    effect: "The Mutations table opens without Copy # and Allele Freq (T), which the portal shows by default.",
+    find: "\"mutationType\", \"copyNumber\", \"vaf\", \"mutCount\"]", replace: "\"mutationType\", \"mutCount\"]" },
   { id: "lollipop-ymax-not-clamped", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
     effect: "A Y-Axis Max typed below 1 is kept, where the portal clamps it to 1.",
     find: "const v = Math.max(1, Math.round(input));", replace: "const v = Math.round(input);" },

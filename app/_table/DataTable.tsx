@@ -107,7 +107,7 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
       <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page"><ChevronRight /></Button>
       <span>Showing {from.toLocaleString()}–{to.toLocaleString()} of {p.total.toLocaleString()} {unit}</span>
       <label className="tbfield">per page <OptionSelect value={String(p.size)} onValueChange={(v) => p.setSize(Number(v))}>
-        {[25, 50, 100, 250].map((n) => <option key={n} value={n}>{n}</option>)}
+        {[...new Set([p.size, 25, 50, 100, 250])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
       </OptionSelect></label>
       {p.error && <span className="mark">{p.error}</span>}
     </div></div>
@@ -349,9 +349,15 @@ export interface DataTableProps<V> {
   /** a column whose runs of one value are drawn as groups (the alterations view's gene): the value shown on a run's
    *  first row only, no rule inside a run, alternate runs shaded */
   groupBy?: string;
+  /** no column chooser and no per-column filters: the columns follow something else (the Explore charts) */
+  plain?: boolean;
+  /** the rows are one cohort's: no cohort column, the study column alone when there are several studies */
+  oneCohort?: boolean;
+  /** the download button in place of the CSV one: its label, tooltip and action */
+  download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -411,7 +417,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     <div className="dt">
       <div className="dt-bar">
         <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}
-          {multi ? <span className="meta"> across {t.lists.length} cohorts and studies</span> : null}</span>
+          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
@@ -419,20 +425,23 @@ export function DataTable<V extends string | number | null>({ t, query, updating
             onChange={(e) => { setSearch(e.target.value); if (!e.target.value && q.search) set({ search: undefined }); }}
             onBlur={() => { if ((search || "") !== (q.search || "")) set({ search }); }} />
         </form>
-        <span className="dt-anchor">
+        {!plain && <span className="dt-anchor">
           <Button type="button" variant="outline" size="sm" className={cn(TB, "aria-expanded:border-primary aria-expanded:bg-accent aria-expanded:text-accent-foreground")}
             aria-expanded={menu === "\x01columns"} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
             data-tip="choose the columns shown"><Columns3 />columns ({shownIdx.length}/{t.columns.length})</Button>
           <Popover open={menu === "\x01columns"} onClose={() => setMenu(null)} align="right">
             <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set({ columns: ids }, true)} />
           </Popover>
-        </span>
+        </span>}
+        {ownDownload ? <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !t.total || ownDownload.disabled}
+          data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download" : ownDownload.tip}
+          onClick={ownDownload.onClick}><Download />{ownDownload.label}</Button> :
         <form method="post" action="/api/table" target="_blank" onSubmit={download}>
           <input type="hidden" name="payload" />
           <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
             data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
               : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />download CSV ({t.total.toLocaleString()})</Button>
-        </form>
+        </form>}
       </div>
       {(filters.length > 0 || (q.search || "").trim()) && (
         <div className="dt-chips">
@@ -449,7 +458,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         <div className="tv-scroll">
           <table className="pb-table dt-table">
             <thead ref={head}><tr>
-              {multi && <th>cohort</th>}
+              {multi && !oneCohort && <th>cohort</th>}
               {multi && <th>study</th>}
               {shownIdx.map((i) => {
                 const c = t.columns[i];
@@ -463,7 +472,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                         data-tip={(c.tip ? c.tip + " — click to " : "") + "sort the whole table by this column, across every page"}>
                         {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
                       </button>}
-                      <span className="dt-anchor">
+                      {!plain && <span className="dt-anchor">
                         <button type="button" className={"dt-funnel" + (fon ? " on" : "")} aria-label={"filter " + c.name}
                           data-tip={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>
                           <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true"><path d="M1 1.5h10L7.2 6.2V10L4.8 11V6.2z" fill="currentColor" /></svg>
@@ -471,7 +480,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                         <Popover open={menu === c.id} onClose={() => setMenu(null)} align={c.numeric ? "right" : "left"}>
                           <FilterMenu col={c} current={q.filters?.[c.id]} vi={vi} docJson={docJson} table={table} onApply={(f) => setFilter(c.id, f)} />
                         </Popover>
-                      </span>
+                      </span>}
                     </span>
                   </th>);
               })}
@@ -483,13 +492,13 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                 return (
                 <tr key={k} className={cls || undefined}
                   onClick={onRow ? () => onRow(r) : undefined} onMouseEnter={onHover ? () => onHover(r) : undefined} aria-selected={onRow ? !!(selected && selected(r)) : undefined}>
-                  {multi && <td className="meta">{r.cohort}</td>}
+                  {multi && !oneCohort && <td className="meta">{r.cohort}</td>}
                   {multi && <td className="meta">{r.study}</td>}
                   {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>
                     {g?.cont && t.columns[i].id === groupBy ? null : show(t.columns[i], r.values[i], r)}</td>)}
                 </tr>);
               })}
-              {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi ? 2 : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
+              {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi ? (oneCohort ? 1 : 2) : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
             </tbody>
           </table>
         </div>
