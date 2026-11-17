@@ -10,7 +10,8 @@
  *
  * Every expected count is written down by hand from test/fixtures/peer-study/*.txt:
  * data_clinical_sample.txt (59 samples of 53 patients; CANCER_TYPE "Non-Small Cell Lung Cancer"
- * for 55 samples / 49 patients, "Lung Cancer" for FX-P42 and FX-P48, none for FX-P41 and FX-P47;
+ * for 55 samples / 49 patients, "Lung Cancer" for FX-P42 and FX-P48, none for FX-P41 and FX-P47, which
+ * take the study's type of cancer, Non-Small Cell Lung Cancer (section G), so the C rows' NSCLC group is 57 / 51;
  * FX-P01…FX-P04, FX-P43, FX-P49 have two samples each), data_mutations.txt, data_cna.txt (±2 only),
  * data_sv.txt and data_gene_panel_matrix.txt (FX-P31…FX-P40 on PEERFIX_NO_EGFR, the rest on
  * PEERFIX_FULL; both list KRAS, TP53, FAT1, STK11, CDKN2A; structural variants on a whole-exome
@@ -41,12 +42,26 @@
  * gene's rows of the study, and compares the rows kept (sample and protein change) with the rows written
  * down from data_mutations.txt.
  *
+ * The Cancer Types category section (G*) runs lib/views/cancertypes/sql.ts cancerTypeSamplesSql and
+ * cancerTypesSql over every sample of the study, grouped by CANCER_TYPE, CANCER_TYPE_DETAILED,
+ * TUMOR_GRADE and the study, by sample and by patient. The legacy rule is cbioportal-frontend cd8c6df
+ * ResultsViewPageStore.ts extendSamplesWithCancerType: a sample with no CANCER_TYPE takes its study's
+ * type of cancer (the fixture's nsclc, "Non-Small Cell Lung Cancer" in type_of_cancer), and "Unknown"
+ * without one; a sample with no CANCER_TYPE_DETAILED takes its cancer type after that. Any other
+ * attribute keeps its "" group; grouped by study, the label is the study's name. Counts from
+ * data_clinical_sample.txt: (Non-Small Cell Lung Cancer, Lung Adenocarcinoma) 42 samples,
+ * (Non-Small Cell Lung Cancer, Lung Squamous Cell Carcinoma) 13, (none, none) FX-P41 and FX-P47,
+ * (Lung Cancer, none) FX-P42 and FX-P48; TUMOR_GRADE 1 on FX-P01-T1, 2 on FX-P01-T2, FX-P02-T1 and
+ * FX-P02-T2, none elsewhere; meta_study.txt names the study "cBioLab peer fixture (synthetic)". The
+ * "Unknown" rows (G5) run over a scratch database of views onto the fixture's tables whose
+ * type_of_cancer lacks nsclc.
+ *
  * Run: node --env-file=.env.local scripts/check-results-oql.ts (connection b must be the fixture:
  * `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
-import { cancerTypesSql } from "../lib/views/cancertypes/sql.ts";
+import { cancerTypesSql, cancerTypeSamplesSql } from "../lib/views/cancertypes/sql.ts";
 import { lineCtes, type StudyOpts } from "../lib/views/datafiles/sql.ts";
 import { pairCountsSql, geneCountsSql, lollipopChangesSql } from "../lib/federation.ts";
 import { oqlMutationFilterSql } from "../lib/oql.ts";
@@ -115,16 +130,15 @@ function expectGenes(tag: string, rows: Row[], genes: string[]) {
   const lines = ["KRAS: MUT=G12D", "CDKN2A: HOMDEL"];
   const s = await rowsOf({ lines }, "sample");
   expectGenes("C9 [KRAS: MUT=G12D, CDKN2A: HOMDEL] samples:", s, ["KRAS", "CDKN2A"]);
-  expectRow("C1/C2 samples:", s, "KRAS", NSCLC, { profiled: 55, altered: 5, mutation: 5 });
-  expectRow("C1 samples:", s, "CDKN2A", NSCLC, { profiled: 55, altered: 4, homdel: 4 });
-  expectRow("C1/C5 samples:", s, "*", NSCLC, { profiled: 55, altered: 9, mutation: 5, homdel: 4 });
+  expectRow("C1/C2 samples:", s, "KRAS", NSCLC, { profiled: 57, altered: 5, mutation: 5 });
+  expectRow("C1 samples:", s, "CDKN2A", NSCLC, { profiled: 57, altered: 4, homdel: 4 });
+  expectRow("C1/C5 samples:", s, "*", NSCLC, { profiled: 57, altered: 9, mutation: 5, homdel: 4 });
   expectRow("C1 samples:", s, "*", LC, { profiled: 2, altered: 0 });
-  expectRow("C1 samples:", s, "*", NONE, { profiled: 2, altered: 0 });
   expectRow("C1 samples:", s, "*", ALL, { profiled: 59, altered: 9 });
   const p = await rowsOf({ lines }, "patient");
-  expectRow("C10 patients:", p, "KRAS", NSCLC, { profiled: 49, altered: 4, mutation: 4 });
-  expectRow("C10 patients:", p, "CDKN2A", NSCLC, { profiled: 49, altered: 4, homdel: 4 });
-  expectRow("C10 patients:", p, "*", NSCLC, { profiled: 49, altered: 8, mutation: 4, homdel: 4 });
+  expectRow("C10 patients:", p, "KRAS", NSCLC, { profiled: 51, altered: 4, mutation: 4 });
+  expectRow("C10 patients:", p, "CDKN2A", NSCLC, { profiled: 51, altered: 4, homdel: 4 });
+  expectRow("C10 patients:", p, "*", NSCLC, { profiled: 51, altered: 8, mutation: 4, homdel: 4 });
   expectRow("C10 patients:", p, "*", ALL, { profiled: 53, altered: 8 });
 }
 
@@ -137,12 +151,12 @@ function expectGenes(tag: string, rows: Row[], genes: string[]) {
 {
   const lines = ["KRAS: MUT=G12D", "FAT1: AMP HOMDEL"];
   const s = await rowsOf({ lines }, "sample");
-  expectRow("C5 samples:", s, "FAT1", NSCLC, { profiled: 55, altered: 3, amp: 1, homdel: 2 });
-  expectRow("C3 samples:", s, "*", NSCLC, { profiled: 55, altered: 6, mutation: 3, homdel: 1, multiple: 2 });
+  expectRow("C5 samples:", s, "FAT1", NSCLC, { profiled: 57, altered: 3, amp: 1, homdel: 2 });
+  expectRow("C3 samples:", s, "*", NSCLC, { profiled: 57, altered: 6, mutation: 3, homdel: 1, multiple: 2 });
   expectRow("C3 samples:", s, "*", ALL, { profiled: 59, altered: 6 });
   const p = await rowsOf({ lines }, "patient");
-  expectRow("C4/C10 patients:", p, "FAT1", NSCLC, { profiled: 49, altered: 2, amp: 1, homdel: 1 });
-  expectRow("C3/C10 patients:", p, "*", NSCLC, { profiled: 49, altered: 5, mutation: 3, homdel: 1, multiple: 1 });
+  expectRow("C4/C10 patients:", p, "FAT1", NSCLC, { profiled: 51, altered: 2, amp: 1, homdel: 1 });
+  expectRow("C3/C10 patients:", p, "*", NSCLC, { profiled: 51, altered: 5, mutation: 3, homdel: 1, multiple: 1 });
   expectRow("C10 patients:", p, "*", ALL, { profiled: 53, altered: 5 });
 }
 
@@ -153,17 +167,17 @@ function expectGenes(tag: string, rows: Row[], genes: string[]) {
   const fat1 = ["FAT1: AMP", "FAT1: HOMDEL"];
   const s = await rowsOf({ lines: fat1 }, "sample");
   expectGenes("C9 [FAT1: AMP, FAT1: HOMDEL] samples:", s, ["FAT1"]);
-  expectRow("C9 samples:", s, "FAT1", NSCLC, { profiled: 55, altered: 3, amp: 1, homdel: 2 });
-  expectRow("C9 samples:", s, "*", NSCLC, { profiled: 55, altered: 3, amp: 1, homdel: 2 });
+  expectRow("C9 samples:", s, "FAT1", NSCLC, { profiled: 57, altered: 3, amp: 1, homdel: 2 });
+  expectRow("C9 samples:", s, "*", NSCLC, { profiled: 57, altered: 3, amp: 1, homdel: 2 });
   const p = await rowsOf({ lines: fat1 }, "patient");
-  expectRow("C4/C9 patients:", p, "FAT1", NSCLC, { profiled: 49, altered: 2, amp: 1, homdel: 1 });
-  expectRow("C4/C9 patients:", p, "*", NSCLC, { profiled: 49, altered: 2, amp: 1, homdel: 1 });
+  expectRow("C4/C9 patients:", p, "FAT1", NSCLC, { profiled: 51, altered: 2, amp: 1, homdel: 1 });
+  expectRow("C4/C9 patients:", p, "*", NSCLC, { profiled: 51, altered: 2, amp: 1, homdel: 1 });
   const kras = ["KRAS: MUT=G12D", "KRAS: MUT=G12C"];
   const ks = await rowsOf({ lines: kras }, "sample");
   expectGenes("C9 [KRAS: MUT=G12D, KRAS: MUT=G12C] samples:", ks, ["KRAS"]);
-  expectRow("C9 samples:", ks, "KRAS", NSCLC, { profiled: 55, altered: 11, mutation: 11 });
+  expectRow("C9 samples:", ks, "KRAS", NSCLC, { profiled: 57, altered: 11, mutation: 11 });
   const kp = await rowsOf({ lines: kras }, "patient");
-  expectRow("C9 patients:", kp, "KRAS", NSCLC, { profiled: 49, altered: 9, mutation: 9 });
+  expectRow("C9 patients:", kp, "KRAS", NSCLC, { profiled: 51, altered: 9, mutation: 9 });
 }
 
 // ---- C5: structural variant only, in every group -------------------------------------------------
@@ -171,12 +185,11 @@ function expectGenes(tag: string, rows: Row[], genes: string[]) {
 // ALK is on the structural-variant panel only, which every sample has.
 {
   const s = await rowsOf({ lines: ["ALK: FUSION"] }, "sample");
-  expectRow("C5 samples:", s, "ALK", NSCLC, { profiled: 55, altered: 4, sv: 4 });
+  expectRow("C5 samples:", s, "ALK", NSCLC, { profiled: 57, altered: 5, sv: 5 });
   expectRow("C5 samples:", s, "ALK", LC, { profiled: 2, altered: 1, sv: 1 });
-  expectRow("C5 samples:", s, "ALK", NONE, { profiled: 2, altered: 1, sv: 1 });
   expectRow("C5 samples:", s, "*", ALL, { profiled: 59, altered: 6 });
   const p = await rowsOf({ lines: ["ALK: FUSION"] }, "patient");
-  expectRow("C5/C10 patients:", p, "ALK", NSCLC, { profiled: 49, altered: 3, sv: 3 });
+  expectRow("C5/C10 patients:", p, "ALK", NSCLC, { profiled: 51, altered: 4, sv: 4 });
   expectRow("C5/C10 patients:", p, "*", ALL, { profiled: 53, altered: 5 });
 }
 
@@ -193,7 +206,7 @@ function expectGenes(tag: string, rows: Row[], genes: string[]) {
     ["OncoKB and hotspots", { lines, drivers: {}, hotspotPins: HOTSPOT_PINS }, 9],
   ];
   for (const [tag, oql, n] of cases)
-    expectRow("C13 " + tag + ", samples:", await rowsOf(oql, "sample", conn.db, ONCOKB), "STK11", NSCLC, { profiled: 55, altered: n, mutation: n });
+    expectRow("C13 " + tag + ", samples:", await rowsOf(oql, "sample", conn.db, ONCOKB), "STK11", NSCLC, { profiled: 57, altered: n, mutation: n });
 }
 
 // ---- C6, C7, C8: mRNA and protein, over scratch copies with z-scores added ----------------------
@@ -224,6 +237,9 @@ const COPY: [string, string][] = [
   // mutation and copy-number panels only: EGFR is then not profiled on FX-P31…FX-P40
   ["sample_to_gene_panel_derived", "cancer_study_identifier = '" + STUDY + "' AND alteration_type != 'STRUCTURAL_VARIANT'"],
   ["gene_panel_to_gene_derived", "gene_panel_id IN ('PEERFIX_FULL', 'PEERFIX_NO_EGFR')"],
+  // a sample without a cancer type takes the study's
+  ["cancer_study", "cancer_study_identifier = '" + STUDY + "'"],
+  ["type_of_cancer", "1"],
 ];
 for (const [t, where] of COPY) {
   await write("CREATE OR REPLACE TABLE " + scratch + "." + t + " AS " + conn.db + "." + t);
@@ -240,15 +256,15 @@ for (const [sid, gene, prof, v] of EXPR)
 {
   const oql: Oql = { lines: ["KRAS: MUT=G12D EXP>=2 EXP<=-2 PROT>=2 PROT<=-2", "EGFR: EXP>=2"], profiles: ["mutations", "cna", "structural_variants", EXP_PROFILE, PROT_PROFILE] };
   const s = await rowsOf(oql, "sample", scratch);
-  expectRow("C6/C7 samples:", s, "KRAS", NSCLC, { profiled: 55, altered: 10, mutation: 3, multiple: 2, mrnaHigh: 2, mrnaLow: 1, protHigh: 1, protLow: 1 });
-  expectRow("C6/C8 samples:", s, "EGFR", NSCLC, { profiled: 47, altered: 1, mrnaHigh: 1 });
+  expectRow("C6/C7 samples:", s, "KRAS", NSCLC, { profiled: 57, altered: 10, mutation: 3, multiple: 2, mrnaHigh: 2, mrnaLow: 1, protHigh: 1, protLow: 1 });
+  expectRow("C6/C8 samples:", s, "EGFR", NSCLC, { profiled: 49, altered: 1, mrnaHigh: 1 });
   expectRow("C8 samples:", s, "EGFR", LC, { profiled: 2, altered: 0 });
-  expectRow("C6/C7 samples:", s, "*", NSCLC, { profiled: 55, altered: 11, mutation: 3, multiple: 2, mrnaHigh: 3, mrnaLow: 1, protHigh: 1, protLow: 1 });
+  expectRow("C6/C7 samples:", s, "*", NSCLC, { profiled: 57, altered: 11, mutation: 3, multiple: 2, mrnaHigh: 3, mrnaLow: 1, protHigh: 1, protLow: 1 });
   expectRow("C6 samples:", s, "*", ALL, { profiled: 59, altered: 11 });
   const p = await rowsOf(oql, "patient", scratch);
-  expectRow("C6/C7/C10 patients:", p, "KRAS", NSCLC, { profiled: 49, altered: 9, mutation: 2, multiple: 2, mrnaHigh: 2, mrnaLow: 1, protHigh: 1, protLow: 1 });
-  expectRow("C8/C10 patients:", p, "EGFR", NSCLC, { profiled: 41, altered: 1, mrnaHigh: 1 });
-  expectRow("C6/C10 patients:", p, "*", NSCLC, { profiled: 49, altered: 10, mutation: 2, multiple: 2, mrnaHigh: 3, mrnaLow: 1, protHigh: 1, protLow: 1 });
+  expectRow("C6/C7/C10 patients:", p, "KRAS", NSCLC, { profiled: 51, altered: 9, mutation: 2, multiple: 2, mrnaHigh: 2, mrnaLow: 1, protHigh: 1, protLow: 1 });
+  expectRow("C8/C10 patients:", p, "EGFR", NSCLC, { profiled: 43, altered: 1, mrnaHigh: 1 });
+  expectRow("C6/C10 patients:", p, "*", NSCLC, { profiled: 51, altered: 10, mutation: 2, multiple: 2, mrnaHigh: 3, mrnaLow: 1, protHigh: 1, protLow: 1 });
   expectRow("C6/C10 patients:", p, "*", ALL, { profiled: 53, altered: 10 });
 }
 
@@ -616,6 +632,80 @@ const rowsOfChange = (change: string, samples: string[]) => samples.map((s) => "
   const on = await stems({ KRAS: filter }), off = await stems();
   ok("Mutations U1/U10 the lollipop's stems under KRAS: MUT=G12D", on === "G12D:4", "ours " + JSON.stringify(on));
   ok("Mutations U6 the lollipop without a filter keeps every KRAS change", off === "G12C:5 G12D:4 G12V:4 G13D:4 Q61H:3", "ours " + JSON.stringify(off));
+}
+
+// ==== Cancer Types: the category a sample falls in (G*; CTS-CT-2, CTS-MD-2, CTS-MD-3, CTS-STM-1) ====
+// Samples by (CANCER_TYPE, CANCER_TYPE_DETAILED), data_clinical_sample.txt: (NSCLC, Lung Adenocarcinoma) 42 samples,
+// (NSCLC, Lung Squamous Cell Carcinoma) 13, FX-P41 and FX-P47 neither, FX-P42 and FX-P48 "Lung Cancer" and no detailed type.
+// Patients with two samples: FX-P01, FX-P02, FX-P03 (both adenocarcinoma), FX-P04 (both squamous), FX-P43 and FX-P49 (one each).
+// So by patient: adenocarcinoma 42 - 3 = 39, squamous 13 - 1 = 12; NSCLC 49 patients + FX-P41, FX-P47 = 51; 53 in all.
+const LUAD = "lung adenocarcinoma", LUSC = "lung squamous cell carcinoma", UNKNOWN = "unknown";
+type Groups = Record<string, number>;
+/** each group's units: cancerTypeSamplesSql's `samples`, and cancerTypesSql's profiled for the genes together (KRAS, on every
+ *  sample's panel, so profiled = units) with its label; the whole cohort apart */
+async function categoryOf(tag: string, attribute: string | null, unit: "sample" | "patient", db = conn!.db) {
+  const cohort = compileCohortDef(null, { study: STUDY, db });
+  try {
+    const tot = (await chQuery<Row>(cancerTypeSamplesSql(cohort, STUDY, db, attribute, unit), conn!)).data;
+    const rows = (await chQuery<Row>(cancerTypesSql(cohort, STUDY, db, ["KRAS"], attribute, null, "any", unit), conn!)).data.filter((r) => r.gene === "*");
+    const groups = (rs: Row[], k: string): Groups => Object.fromEntries(rs.filter((r) => r.grp !== ALL).map((r) => [String(r.grp), Number(r[k])]));
+    return { samples: groups(tot, "samples"), profiled: groups(rows, "profiled"),
+      labels: Object.fromEntries(rows.filter((r) => r.grp !== ALL).map((r) => [String(r.grp), String(r.label)])) as Record<string, string>,
+      all: [Number(tot.find((r) => r.grp === ALL)?.samples), Number(rows.find((r) => r.grp === ALL)?.profiled)] };
+  } catch (e) {
+    ok(tag + " runs", false, (e as Error).message.slice(0, 300));
+    return null;
+  }
+}
+const sortedJson = (g: Groups) => JSON.stringify(Object.fromEntries(Object.entries(g).sort(([a], [b]) => a.localeCompare(b))));
+/** both queries' groups are exactly these, with these units; the whole cohort `all`; and, for a cancer type, no "" group */
+async function expectCategory(tag: string, attribute: string | null, unit: "sample" | "patient", want: Groups, all: number, db = conn!.db) {
+  const got = await categoryOf(tag, attribute, unit, db);
+  if (!got) return;
+  const name = tag + " " + (attribute ?? "study") + " (" + unit + "s)";
+  ok(name + " cancerTypeSamplesSql groups", sortedJson(got.samples) === sortedJson(want), "ours " + sortedJson(got.samples) + ", expected " + sortedJson(want));
+  ok(name + " cancerTypesSql groups", sortedJson(got.profiled) === sortedJson(want), "ours " + sortedJson(got.profiled) + ", expected " + sortedJson(want));
+  ok(name + " whole cohort", got.all[0] === all && got.all[1] === all, "ours " + got.all.join(" / ") + ", expected " + all);
+  if (attribute === "CANCER_TYPE" || attribute === "CANCER_TYPE_DETAILED")
+    ok(name + " no \"\" group", !("" in got.samples) && !("" in got.profiled), "samples " + (got.samples[""] ?? "-") + ", profiled " + (got.profiled[""] ?? "-"));
+  return got;
+}
+{
+  // G1 (F1a, F1b): CANCER_TYPE — FX-P41 and FX-P47 take the study's type, Non-Small Cell Lung Cancer
+  await expectCategory("G1", "CANCER_TYPE", "sample", { [NSCLC]: 57, [LC]: 2 }, 59);
+  await expectCategory("G1", "CANCER_TYPE", "patient", { [NSCLC]: 51, [LC]: 2 }, 53);
+  // G2 (F2a, F2b): CANCER_TYPE_DETAILED — FX-P42 and FX-P48 take their CANCER_TYPE, FX-P41 and FX-P47 the study's type
+  await expectCategory("G2", "CANCER_TYPE_DETAILED", "sample", { [LUAD]: 42, [LUSC]: 13, [LC]: 2, [NSCLC]: 2 }, 59);
+  await expectCategory("G2", "CANCER_TYPE_DETAILED", "patient", { [LUAD]: 39, [LUSC]: 12, [LC]: 2, [NSCLC]: 2 }, 53);
+  // G3 (F3): another attribute keeps its "" group — TUMOR_GRADE: "1" FX-P01-T1; "2" FX-P01-T2, FX-P02-T1, FX-P02-T2;
+  //   none on the other 55 samples, of 51 patients (all but FX-P01 and FX-P02)
+  await expectCategory("G3", "TUMOR_GRADE", "sample", { "1": 1, "2": 3, [NONE]: 55 }, 59);
+  await expectCategory("G3", "TUMOR_GRADE", "patient", { "1": 1, "2": 2, [NONE]: 51 }, 53);
+  // G4 (L1): by study — one group, keyed by the study id, labelled with its name
+  for (const [unit, n] of [["sample", 59], ["patient", 53]] as const) {
+    const got = await expectCategory("G4", null, unit, { [STUDY]: n }, n);
+    if (got) ok("G4 study (" + unit + "s) cancerTypesSql label is the study's name", got.labels[STUDY] === "cBioLab peer fixture (synthetic)",
+      "ours " + JSON.stringify(got.labels[STUDY]));
+  }
+}
+
+// G5 (F1c): the study's type has no type_of_cancer row — FX-P41 and FX-P47 are "Unknown", by either cancer-type attribute
+{
+  const noType = "cbiolab_check_cts_no_type";
+  await write("DROP DATABASE IF EXISTS " + noType);
+  await write("CREATE DATABASE " + noType);
+  const tables = (await chQuery<{ name: string }>("SELECT name FROM system.tables WHERE database = " + sq(conn.db) + " AND engine LIKE '%MergeTree'", conn)).data.map((r) => r.name);
+  for (const t of tables) {
+    if (t === "type_of_cancer") {
+      await write("CREATE TABLE " + noType + ".type_of_cancer AS " + conn.db + ".type_of_cancer");
+      await write("INSERT INTO " + noType + ".type_of_cancer SELECT * FROM " + conn.db + ".type_of_cancer WHERE type_of_cancer_id != 'nsclc'");
+    } else await write("CREATE VIEW " + noType + "." + t + " AS SELECT * FROM " + conn.db + "." + t);
+  }
+  await expectCategory("G5", "CANCER_TYPE", "sample", { [NSCLC]: 55, [LC]: 2, [UNKNOWN]: 2 }, 59, noType);
+  await expectCategory("G5", "CANCER_TYPE", "patient", { [NSCLC]: 49, [LC]: 2, [UNKNOWN]: 2 }, 53, noType);
+  await expectCategory("G5", "CANCER_TYPE_DETAILED", "sample", { [LUAD]: 42, [LUSC]: 13, [LC]: 2, [UNKNOWN]: 2 }, 59, noType);
+  await expectCategory("G5", "CANCER_TYPE_DETAILED", "patient", { [LUAD]: 39, [LUSC]: 12, [LC]: 2, [UNKNOWN]: 2 }, 53, noType);
+  await write("DROP DATABASE IF EXISTS " + noType);
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);

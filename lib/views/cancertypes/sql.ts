@@ -38,6 +38,36 @@ function oqlLevelCoverageSql(oql: CancertypesOql, study: string, db: string): st
   return parts.map((p) => "\n  UNION DISTINCT\n" + p).join("");
 }
 
+const PORTAL_CATEGORIES = new Set(["CANCER_TYPE", "CANCER_TYPE_DETAILED"]);
+
+/**
+ * Each cohort sample's group as (suid, g folded, label), over the query's `samp`: an attribute's value
+ * (no row for a sample without one), or the study by its name. CANCER_TYPE and CANCER_TYPE_DETAILED read
+ * as the portal's (ResultsViewPageStore extendSamplesWithCancerType): a sample without a cancer type
+ * takes its study's type of cancer, else "Unknown", and one without a detailed type its cancer type.
+ */
+function groupSql(db: string, study: string, attribute: string | null): string {
+  if (!attribute)
+    return "SELECT suid, " + sq(study) + " AS g, (SELECT any(name) FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ") AS label FROM samp";
+  if (!PORTAL_CATEGORIES.has(attribute))
+    return "SELECT sample_unique_id AS suid, any(" + clinicalValueFoldSql("attribute_value") + ") AS g, any(attribute_value) AS label FROM " + clinicalTable(db, [attribute]) + "\n" +
+      "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
+      "    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid";
+  const studyType = "(SELECT ifNull(nullIf(any(t.name), ''), 'Unknown') FROM " + db + ".cancer_study cs JOIN " + db + ".type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id\n" +
+    "     WHERE cs.cancer_study_identifier = " + sq(study) + ")";
+  const ct = "if(ifNull(c.ct, '') != '', c.ct, " + studyType + ")";
+  const detailed = attribute === "CANCER_TYPE_DETAILED";
+  const read = detailed ? ["CANCER_TYPE", "CANCER_TYPE_DETAILED"] : ["CANCER_TYPE"];
+  const value = detailed ? "if(ifNull(c.ctd, '') != '', c.ctd, " + ct + ")" : ct;
+  return "SELECT suid, " + clinicalValueFoldSql("v") + " AS g, v AS label FROM (\n" +
+    "  SELECT samp.suid AS suid, " + value + " AS v FROM samp LEFT JOIN (\n" +
+    "    SELECT sample_unique_id AS suid, anyIf(attribute_value, attribute_name = 'CANCER_TYPE') AS ct" +
+    (detailed ? ", anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS ctd" : "") + " FROM " + clinicalTable(db, read) + "\n" +
+    "    WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name IN (" + read.map(sq).join(", ") + ")\n" +
+    "      AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
+    "  ) c ON c.suid = samp.suid)";
+}
+
 /**
  * Per group of the cohort's samples (a sample attribute's value, or the study) and per gene — plus
  * the row "*" for the genes together — the units profiled for that gene and how many are altered,
@@ -50,20 +80,13 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
   pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample", oql?: CancertypesOql): AggregateSql {
   const geneList = genes.map(sq).join(",");
   const drv = measure === "driver" && pin;
-  const fold = clinicalValueFoldSql("attribute_value");
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
     "samp AS (\n" +
     "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
     "),\n" +
-    (attribute
-      ? "grp AS (\n" +
-        "  SELECT sample_unique_id AS suid, any(" + fold + ") AS g, any(attribute_value) AS label FROM " + clinicalTable(db, [attribute]) + "\n" +
-        "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
-        "    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
-        "),\n"
-      : "grp AS (SELECT suid, " + sq(study) + " AS g, " + sq(study) + " AS label FROM samp),\n") +
+    "grp AS (" + groupSql(db, study, attribute) + "),\n" +
     "alt AS (\n" +
     (oql ? oqlAltSql(oql, study, db, pin) + "\n),\n" : "") +
     (oql ? "" : "  SELECT g.sample_unique_id AS suid, g.hugo_gene_symbol AS gene,\n" +
@@ -115,7 +138,6 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
 /** Each group's units (the cohort's samples, or patients with one of them in the group), profiled or not, and how many
  *  were profiled for mutations, copy number and structural variants at all — the portal's "+" rows. */
 export function cancerTypeSamplesSql(cohortSql: string, study: string, db: string, attribute: string | null, unit: "sample" | "patient" = "sample"): AggregateSql {
-  const fold = clinicalValueFoldSql("attribute_value");
   const k = unit === "patient" ? "samp.puid" : "samp.suid";
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
@@ -132,13 +154,7 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
     "       uniqExactIf(" + k + ", has(prof.types, 'COPY_NUMBER_ALTERATION')) AS cna,\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'STRUCTURAL_VARIANT')) AS sv\n" +
     "FROM samp LEFT JOIN prof ON prof.suid = samp.suid\n" +
-    (attribute
-      ? "LEFT JOIN (\n" +
-        "  SELECT sample_unique_id AS suid, any(" + fold + ") AS g FROM " + clinicalTable(db, [attribute]) + "\n" +
-        "  WHERE cancer_study_identifier = " + sq(study) + " AND type = 'sample' AND attribute_name = " + sq(attribute) + "\n" +
-        "    AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
-        ") grp ON grp.suid = samp.suid\n"
-      : "") +
+    (attribute ? "LEFT JOIN (" + groupSql(db, study, attribute) + ") grp ON grp.suid = samp.suid\n" : "") +
     "GROUP BY grp\n" +
     // the whole cohort, each unit once
     "UNION ALL SELECT '\\x01all' AS grp, uniqExact(" + k + "), uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')),\n" +

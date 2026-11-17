@@ -10,6 +10,12 @@ import { parseOql } from "../../oql-parse.ts";
 import { resolveDrivers } from "../../driver-settings.ts";
 import { variantPins } from "../../variant-annotation.ts";
 
+/** a study's name as the portal labels its group: cut to 49 characters before a "(" that starts past 50 (FormatUtils shortenStudyName) */
+export function shortStudyName(name: string): string {
+  const paren = name.indexOf("(");
+  return paren > 50 ? name.substring(0, 49) + "..." + name.substring(paren) : name;
+}
+
 const zeroGroup = (key: string, label: string): CancertypesGroup =>
   ({ key, label, samples: 0, profiled: 0, altered: 0, mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0, mrnaHigh: 0, mrnaLow: 0, protHigh: 0, protLow: 0 });
 
@@ -30,18 +36,27 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   } else try { genes = geneSymbols(view.genes || []); } catch (e) { return refuse("cancertypes", ctx, (e as Error).message); }
   if (!genes.length) return refuse("cancertypes", ctx, "a cancertypes view needs genes");
   { const e = overLimit("a cancertypes view", 30, genes.length); if (e) return refuse("cancertypes", ctx, e.replace("at most 30", "at most 30 genes")); }
-  const groupBy = String(view.groupBy || "CANCER_TYPE").trim();
+  const { ok, excluded } = answering(ctx);
+  if (!Object.keys(ok).length) return refuse("cancertypes", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
+  const unit: "patient" | "sample" = view.unit === "sample" ? "sample" : "patient";
+  let groupBy: string;
+  if (view.groupBy != null) groupBy = String(view.groupBy).trim();
+  else if (ctx.vStudies.length > 1) groupBy = "study";
+  else {
+    // the portal's default for one study (CancerSummaryContainer groupAlterationsBy): the detailed type when every sample has one cancer type
+    const types = await askEachSite(ctx, ok, async (n, _st, r) =>
+      r.viewAggregate("cancertypes:default:" + n, doc.cohorts[n], (c, s, d) => cancerTypeSamplesSql(c, s, d, "CANCER_TYPE", unit)));
+    const distinct = new Set(types.flatMap((a) => a.answer.map((row) => String(row.grp)).filter((g) => g !== "\x01all")));
+    groupBy = distinct.size === 1 ? "CANCER_TYPE_DETAILED" : "CANCER_TYPE";
+  }
   if (groupBy !== "study" && !ATTR_NAME.test(groupBy)) return refuse("cancertypes", ctx, "groupBy is a sample attribute name or \"study\"; got " + JSON.stringify(groupBy).slice(0, 40));
   const measure: "driver" | "any" = view.measure === "driver" ? "driver" : "any";
   if (measure === "driver" && !pin) return refuse("cancertypes", ctx, "no OncoKB annotation pin is available here, so drivers cannot be called — use measure: \"any\"");
   const minSamples = view.minSamples == null ? 10 : Math.floor(Number(view.minSamples));
   if (!(minSamples >= 1 && minSamples <= 1000)) return refuse("cancertypes", ctx, "minSamples is 1 to 1000");
   const show: "frequency" | "count" = view.show === "count" ? "count" : "frequency";
-  const unit: "patient" | "sample" = view.unit === "sample" ? "sample" : "patient";
   const attribute = groupBy === "study" ? null : groupBy;
 
-  const { ok, excluded } = answering(ctx);
-  if (!Object.keys(ok).length) return refuse("cancertypes", ctx, "no participant can answer: " + excluded.map((e) => e.study + " is " + e.reason).join("; "));
   const perSite: { cohort: string; study: string; groups: number; profiled: number }[] = [];
   const panels: CancertypesPanel[] = [];
   const COUNTS = ["samples", "profiled", "altered", "mutation", "amp", "homdel", "sv", "multiple", "mrnaHigh", "mrnaLow", "protHigh", "protLow"] as const;
@@ -91,7 +106,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
           if (r.gene === "*") { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.profiled += Number(r.profiled); t.altered += Number(r.altered); cohortTotal.set(n, t); }
           continue;
         }
-        const g = get(String(r.gene), String(r.grp), String(r.label || r.grp));
+        const g = get(String(r.gene), String(r.grp), attribute ? String(r.label || r.grp) : shortStudyName(String(r.label || r.grp)));
         g.profiled += Number(r.profiled); g.altered += Number(r.altered); if (r.gene === "*") profiled += Number(r.profiled);
         g.mutation += Number(r.mutation); g.amp += Number(r.amp); g.homdel += Number(r.homdel); g.sv += Number(r.sv); g.multiple += Number(r.multiple);
         for (const k of ["mrnaHigh", "mrnaLow", "protHigh", "protLow"] as const) g[k] = (g[k] || 0) + Number(r[k] ?? 0);
@@ -133,7 +148,10 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
         : measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. ") +
       "A " + unit + " with more than one kind of alteration across the genes counts once, under \"multiple\"; an amplification and a deep deletion are one kind (copy number), shown as the amplification. " +
       (unit === "patient" ? "A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. " : "Samples are counted, not patients: a patient with two samples counts twice. ") +
-      (attribute ? attribute + " is read per sample and folded on case and whitespace; samples with no value form their own group. " : "") +
+      (view.groupBy == null ? "Grouped by " + groupWord + ", the portal's default category for " + (groupBy === "study" ? "several studies" : groupBy === "CANCER_TYPE_DETAILED" ? "a cohort of one cancer type" : "a cohort of several cancer types") + ". " : "") +
+      (attribute === "CANCER_TYPE" ? "CANCER_TYPE is read per sample and folded on case and whitespace; a sample without one takes its study's type of cancer, as the portal's. "
+        : attribute === "CANCER_TYPE_DETAILED" ? "CANCER_TYPE_DETAILED is read per sample and folded on case and whitespace; a sample without one takes its CANCER_TYPE, else its study's type of cancer, as the portal's. "
+        : attribute ? attribute + " is read per sample and folded on case and whitespace; samples with no value form their own group. " : "Each study is labelled by its name. ") +
       "Groups with fewer than " + plural(minSamples, "profiled " + unit) + " are pooled into one bar rather than dropped. " +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; values are matched by name, not harmonized. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
