@@ -95,15 +95,22 @@ async function readTsv(file: string): Promise<Record<string, string>[]> {
   return lines.map((l) => Object.fromEntries(cols.map((c, i) => [c, l.split("\t")[i] ?? ""])));
 }
 
+/**
+ * The tag a seeded release's rows carry in api_version: a hash of the fixture's rows, so an edit to a
+ * value (not only to the row count) re-seeds them on a database seeded before.
+ */
+const seedTag = (rows: Record<string, string>[]): string => "fixture:" + createHash("sha1").update(JSON.stringify(rows)).digest("hex").slice(0, 12);
+
 async function seedOncokb(conn: WriteConn, pin: string | null): Promise<void> {
   const rows = await readTsv(ONCOKB);
   const versions = [...new Set([pin, "fixture"].filter((v): v is string => !!v))];
   const db = { ...conn, db: "annotation" };
   for (const v of versions) {
-    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM oncokb FINAL WHERE oncokb_version = " + sq(v));
-    if (Number(n[0]?.n) === rows.length) continue;
+    const tag = seedTag(rows);
+    const n = await query<{ n: number; tag: string }>(db, "SELECT count() AS n, any(api_version) AS tag FROM oncokb FINAL WHERE oncokb_version = " + sq(v));
+    if (Number(n[0]?.n) === rows.length && n[0]?.tag === tag) continue;
     await exec(db, "ALTER TABLE oncokb DELETE WHERE oncokb_version = " + sq(v));
-    await insertAll(db, "oncokb", rows.map((r) => ({ ...r, oncokb_version: v, api_version: "fixture" })));
+    await insertAll(db, "oncokb", rows.map((r) => ({ ...r, oncokb_version: v, api_version: tag })));
     say("OncoKB calls for the fixture's variants stored under " + v);
   }
   if (!pin) say("no primary warehouse to read the app's OncoKB pin from; its calls are stored under \"fixture\" only");
@@ -117,10 +124,11 @@ async function seedOncokbTumorType(conn: WriteConn, pin: string | null): Promise
   const db = { ...conn, db: "annotation" };
   for (const v of versions) {
     const want = own(v);
-    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM oncokb_tumor_type FINAL WHERE oncokb_version = " + sq(v));
-    if (Number(n[0]?.n) === want.length) continue;
+    const tag = seedTag(want);
+    const n = await query<{ n: number; tag: string }>(db, "SELECT count() AS n, any(api_version) AS tag FROM oncokb_tumor_type FINAL WHERE oncokb_version = " + sq(v));
+    if (Number(n[0]?.n) === want.length && n[0]?.tag === tag) continue;
     await exec(db, "ALTER TABLE oncokb_tumor_type DELETE WHERE oncokb_version = " + sq(v));
-    await insertAll(db, "oncokb_tumor_type", want.map((r) => ({ ...r, oncokb_version: v, api_version: "fixture" })));
+    await insertAll(db, "oncokb_tumor_type", want.map((r) => ({ ...r, oncokb_version: v, api_version: tag })));
     say("OncoKB calls by tumour type for the fixture's variants stored under " + v);
   }
 }
@@ -133,10 +141,11 @@ async function seedOncokbSv(conn: WriteConn, pin: string | null): Promise<void> 
   const db = { ...conn, db: "annotation" };
   for (const v of versions) {
     const want = own(v);
-    const n = await query<{ n: number }>(db, "SELECT count() AS n FROM oncokb_sv FINAL WHERE oncokb_version = " + sq(v));
-    if (Number(n[0]?.n) === want.length) continue;
+    const tag = seedTag(want);
+    const n = await query<{ n: number; tag: string }>(db, "SELECT count() AS n, any(api_version) AS tag FROM oncokb_sv FINAL WHERE oncokb_version = " + sq(v));
+    if (Number(n[0]?.n) === want.length && n[0]?.tag === tag) continue;
     await exec(db, "ALTER TABLE oncokb_sv DELETE WHERE oncokb_version = " + sq(v));
-    await insertAll(db, "oncokb_sv", want.map((r) => ({ ...r, oncokb_version: v, api_version: "fixture" })));
+    await insertAll(db, "oncokb_sv", want.map((r) => ({ ...r, oncokb_version: v, api_version: tag })));
     say("OncoKB calls for the fixture's structural variants stored under " + v);
   }
 }
