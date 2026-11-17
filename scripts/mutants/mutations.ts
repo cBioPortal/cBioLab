@@ -116,4 +116,7 @@ export const mutants: Mutant[] = [
     effect: "The mutation table lists every mutation whatever the query's OQL.",
     find: "(filter ? \"\\n    AND \" + filter : \"\")",
     replace: "(\"\")" },
+  { id: "mutation-default-columns-six", layer: "counts", guard: "unit", file: "lib/mutation-table.ts",
+    effect: "The Mutations table opens without Copy # and Allele Freq (T), which the portal shows by default.",
+    find: "\"mutationType\", \"copyNumber\", \"vaf\", \"mutCount\"]", replace: "\"mutationType\", \"mutCount\"]" },
 ];

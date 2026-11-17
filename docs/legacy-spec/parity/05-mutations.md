@@ -20,9 +20,9 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 29 |
+| ✅ match | 30 |
 | 🟡 partial | 44 |
-| 🔶 different | 16 |
+| 🔶 different | 15 |
 | ❌ missing | 33 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -181,7 +181,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-15 | ❌ | C | Unchanged |
 | MUT-COL-16 | ❌ | C | Unchanged |
 | MUT-COL-17 | ❌ | C | Unchanged |
-| MUT-COL-18 | 🟡 | B | Copy # column, values as legacy (Q1 G12C: ShallowDel, Gain, Diploid) (#245); hidden by default, legacy shows it |
+| MUT-COL-18 | 🟡 | B | Copy # column, values as legacy (Q1 G12C: ShallowDel, Gain, Diploid) (#245); shown by default, as legacy when the query holds the discrete CNA profile (ours shows it whatever the query holds) |
 | MUT-COL-19 | 🟡 | B | Unchanged: "MS" raw; no S / G badges |
 | MUT-COL-20 | ✅ | C | VS, hidden (#245) |
 | MUT-COL-21 | ✅ | C | Center, hidden (#245) |
@@ -190,7 +190,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-24 | ✅ | C | Ref / Var |
 | MUT-COL-25 | ✅ | C | HGVSg from the mutation's coordinates ("12:g.25398283_25398284insCCAGCT") (#245) |
 | MUT-COL-26 | 🟡 | C | HGVSc column (#245); blank on Q1 (not in the Genome Nexus store) |
-| MUT-COL-27 | 🟡 | BC | Unchanged: values identical; hidden by default (legacy shown); always 2 decimals |
+| MUT-COL-27 | 🟡 | BC | Values identical; shown by default, as legacy; always 2 decimals |
 | MUT-COL-28 | ✅ | C | Allele Freq (N), hidden (#245) |
 | MUT-COL-29 | 🟡 | C | Normal read counts added (#245); a 0 still shown as "0" |
 | MUT-COL-30 | ✅ | BC | Default visible, identical 555/555 |
@@ -201,7 +201,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-35 | 🟡 | C | SIGNAL column (#245); blank on Q1 |
 | MUT-COL-36 | ❌ | C | Unchanged: no clinical attribute columns beyond Cancer Type |
 | MUT-COL-37 | ❌ | C | Unchanged: no namespace columns |
-| MUT-COL-38 | 🔶 | B | Unchanged default set: "columns (6/35)" without Copy # and Allele Freq (T) (`mutation-table.ts:76`); legacy 8: + Copy #, Allele Freq (T) |
+| MUT-COL-38 | ✅ | B | The portal's 8 by default: Sample ID, Cancer Type Detailed, Protein Change, Annotation, Mutation Type, Copy #, Allele Freq (T), # Mut in Sample |
 | MUT-COL-T1 | ✅ | B | Label mapping and colours (`lib/mutation-type.ts`) (#245) |
 | MUT-COL-T2 | ❌ | C | Unchanged: no Variant Type colours |
 | MUT-COL-40 | N/A | C | Patient View column, not on the Results tab (audit in 40/41) |
