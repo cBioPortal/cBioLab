@@ -30,9 +30,10 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# A pull request's newer push cancels its older run; every push to master runs to the end, in a group of its own.
 concurrency:
-  group: verify-${{ github.ref }}
-  cancel-in-progress: true
+  group: verify-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Its own job, so a pull request shows lint as a check of its own, and in a couple of minutes
