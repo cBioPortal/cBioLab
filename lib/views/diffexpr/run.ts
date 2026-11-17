@@ -6,6 +6,7 @@ import type { ViewRun } from "../run.ts";
 import { overLimit, answering, refuse, niceCeil, askEachSite, cytobands } from "../shared.ts";
 import type { DiffexprView, DiffexprGene } from "./types.ts";
 import { profileMomentsAllSql, genesetMembersSql } from "./sql.ts";
+import { toColumns } from "./rows.ts";
 import { diffexprMethod } from "./method.ts";
 
 const DE_MIN_N = 3, DE_POINT_CAP = 1500, DE_PERMUTATIONS = 1000, DE_MAX_COHORTS = 10;
@@ -118,8 +119,8 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
   // the most significant genes, whether or not they reach q < 0.05: the volcano's points and the table's rows
   const pointSet = new Set([...labels, ...byP.slice(0, DE_POINT_CAP).map((g) => g.gene)]);
   const points = byP.filter((g) => pointSet.has(g.gene));
-  const bands = await cytobands(ok, points.map((g) => g.gene));
-  for (const g of points) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
+  const bands = await cytobands(ok, byP.map((g) => g.gene));
+  for (const g of byP) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
   let grid: NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>["grid"];
   if (two) {
     const yOf = (p: number) => -Math.log10(Math.max(1e-300, p));
@@ -177,7 +178,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     }),
     diffexpr: { profileType, ...(gene ? { gene } : {}), ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups, ...(dropped.length ? { dropped } : {}),
       test: two ? "Welch's t-test" : "one-way ANOVA", tested: tested.length, skipped, significant: sig.length, ...(two ? { up, down } : {}),
-      points, ...(grid ? { grid } : {}), pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
+      points, ...(tested.length > points.length ? { all: toColumns(byP, two) } : {}), ...(grid ? { grid } : {}), pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -188,7 +189,8 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       "; computed from three running totals per gene and cohort, so it is exact across sites. " +
       tested.length.toLocaleString("en-US") + " genes tested" + (skipped ? ", " + skipped.toLocaleString("en-US") + " left out (fewer than " + DE_MIN_N + " samples with a value in a cohort, or no variance)" : "") +
       "; q is Benjamini–Hochberg across every gene tested. " +
-      (tested.length > points.length ? "The " + DE_POINT_CAP.toLocaleString("en-US") + " most significant genes are " + (two ? "drawn as points and listed in the table, the rest drawn as density. " : "listed in the table. ") : "") +
+      (tested.length > points.length ? "The table" + (two ? " and volcano hold" : " holds") + " all " + tested.length.toLocaleString("en-US") + " genes tested; a drawing of this view made outside the page " +
+        (two ? "draws the " + DE_POINT_CAP.toLocaleString("en-US") + " most significant as points and the rest as density. " : "lists the " + DE_POINT_CAP.toLocaleString("en-US") + " most significant. ") : "") +
       (/zscore/i.test(profileType) ? "Z-scores are standardised within each study, so a difference is in study-specific units. " : "") +
       "A test on thousands of samples finds tiny differences significant — read the " + (two ? "effect" : "means") + ", not only the q. " +
       (gsea ? "Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from " + DE_PERMUTATIONS +
