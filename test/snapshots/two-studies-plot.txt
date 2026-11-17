@@ -13,7 +13,7 @@ Plot (scatter): AGE vs TMB_NONSYNONYMOUS — 968 patients, binned onto a 240x160
     - Pearson's r and the least-squares line from the pooled sums: r = (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); slope = (nΣxy − ΣxΣy) / (nΣx² − (Σx)²), intercept = (Σy − slope·Σx) / n.
     - Every study's pairs, ranked together [Lung (TCGA) · luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018]: The plot:points queries above: every study's (x, y) pairs, 968 in all; Spearman's ρ is Pearson's r of their ranks over the pooled pairs, as the portal computes it over several studies (PLT-MD-2).
         Spearman ties: average rank: tied values share the mean of the ranks they span, as scipy's spearmanr and cbioportal.org rank them (PLT-STM-5)
-    - p-values: For each coefficient r over n points: t = |r|·√((n − 2)/(1 − r²)), two-sided Student's t on n − 2 degrees of freedom; p = 0 when |r| = 1, none for n ≤ 2 (the portal's PLT-STM-6).
+    - p-values: For each coefficient r over n points, rounded to 5 decimals first as the portal keeps it: t = |r|·√((n − 2)/(1 − r²)), two-sided Student's t on n − 2 degrees of freedom; p = 0 when the rounded |r| = 1, none for n ≤ 2 (the portal's PLT-STM-6).
     In the database, the coefficients and quartiles are checked against scipy 1.18.1 (pearsonr, spearmanr) and the portal's jStat rule on known values by scripts/check-plot-stats.ts.
 
 Plot (box): TMB_NONSYNONYMOUS by SEX — 998 patients.
