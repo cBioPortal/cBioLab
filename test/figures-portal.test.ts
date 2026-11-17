@@ -55,6 +55,49 @@ describe("cancertypes", () => {
   });
 });
 
+describe("cancertypes stack, legend and colour (CTS-CH-3, CTS-CH-4)", () => {
+  const STACK = ["Multiple Alterations", "Protein Low", "Protein High", "mRNA Low", "mRNA High", "Deep Deletion", "Amplification", "Structural Variant", "Mutation"];
+  const full: CancertypesGroup = { key: "full", label: "Full", samples: 100, profiled: 100, altered: 45,
+    mutation: 9, sv: 8, amp: 7, homdel: 6, mrnaHigh: 5, mrnaLow: 4, protHigh: 3, protLow: 2, multiple: 1 };
+  const some: CancertypesGroup = { key: "some", label: "Some", samples: 100, profiled: 100, altered: 20,
+    mutation: 6, sv: 4, amp: 3, homdel: 2, multiple: 5 };
+  const result = (groups: CancertypesGroup[]) => ({ groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 1, minAltered: 0,
+    show: "count", unit: "sample", panels: [{ cohort: "all", samples: 200, profiled: 200, altered: 65, groups, categories: groups.length, minSamples: 1 }] }) as
+    NonNullable<Extract<ViewResult, { kind: "cancertypes" }>["cancertypes"]>;
+  /** a group's segments in document order: kind, y, fill */
+  const segments = (body: string, group: string) => [...body.matchAll(/<rect [^>]*y="([\d.]+)"[^>]*fill="([^"]+)"><title>([^<]*)<\/title><\/rect>/g)]
+    .map(([, y, fill, t]) => ({ y: Number(y), fill, m: t.match(new RegExp("^" + group + " — (.+?): ")) }))
+    .filter((s) => s.m).map((s) => ({ kind: s.m![1], y: s.y, fill: s.fill }));
+  /** the legend's entries in order: swatch fill and label */
+  const legendItems = (body: string) => [...body.matchAll(/<rect [^>]*rx="2" fill="([^"]+)"\/><text[^>]*>(?:<title>[^<]*<\/title>)?([^<]*)<\/text>/g)]
+    .map(([, fill, text]) => ({ fill, label: text }));
+
+  test("K1: a group's segments stack bottom to top as the portal's OrderedAlterationLabelMap", () => {
+    const { body } = cancertypesPanelSvg(result([full]), 0);
+    assert.deepEqual(segments(body, "Full").map((s) => s.kind), STACK);
+  });
+  test("K2: the first segment sits on the axis (largest y), Mutation on top (smallest y)", () => {
+    const segs = segments(cancertypesPanelSvg(result([full]), 0).body, "Full");
+    const ys = segs.map((s) => s.y);
+    assert.equal(segs.find((s) => s.y === Math.max(...ys))!.kind, "Multiple Alterations");
+    assert.equal(segs.find((s) => s.y === Math.min(...ys))!.kind, "Mutation");
+  });
+  test("L1: the legend lists the kinds present in reverse stack order", () => {
+    const { body } = cancertypesPanelSvg(result([some]), 0);
+    assert.deepEqual(legendItems(body).map((i) => i.label), ["Mutation", "Structural Variant", "Amplification", "Deep Deletion", "Multiple Alterations"]);
+  });
+  test("L2: a kind with no count in any group is not in the legend", () => {
+    const labels = legendItems(cancertypesPanelSvg(result([some, { ...some, key: "s2", label: "S2" }]), 0).body).map((i) => i.label);
+    for (const k of ["mRNA High", "mRNA Low", "Protein High", "Protein Low"]) assert.ok(!labels.includes(k), k);
+    assert.equal(labels.length, 5);
+  });
+  test("C1: Multiple Alterations is drawn and keyed in the portal's #666", () => {
+    const { body } = cancertypesPanelSvg(result([full]), 0);
+    assert.equal(segments(body, "Full").find((s) => s.kind === "Multiple Alterations")!.fill, "#666");
+    assert.equal(legendItems(body).find((i) => i.label === "Multiple Alterations")!.fill, "#666");
+  });
+});
+
 describe("overlap", () => {
   const v: ViewResult = { kind: "overlap", cohorts: ["A", "<B>", "C"], caveat: "within a study",
     overlap: { union: 100, sets: [{ name: "A", size: 60 }, { name: "<B>", size: 50 }, { name: "C", size: 10 }],

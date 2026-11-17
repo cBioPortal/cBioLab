@@ -22,17 +22,17 @@ Legacy per-group numbers read from the chart component's React props (`countsByG
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 15 |
-| 🟡 partial | 14 |
-| 🔶 different | 13 |
-| ❌ missing | 13 |
+| ✅ match | 12 |
+| 🟡 partial | 15 |
+| 🔶 different | 14 |
+| ❌ missing | 14 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 0 |
 | **Total IDs** | **59** |
 
-**Overall: 32.2 %** (✅ 15 + 🐞ok 1 + N/A 3 = 19 of 59). Counting 🟡 as half: 44.1 %.
+**Overall: 27.1 %** (✅ 12 + 🐞ok 1 + N/A 3 = 16 of 59). Counting 🟡 as half: 39.8 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
@@ -40,10 +40,10 @@ Legacy per-group numbers read from the chart component's React props (`countsByG
 | §1 Gene tabs (GT) | 6 | 3 | 1 | 0 | 1 | 0 | 1 | Same pill tabs; no grey label for unaltered genes |
 | §2 Category (CT) | 10 | 0 | 1 | 4 | 4 | 0 | 1 | Same 3 categories (+ any attribute); default always Cancer Type; small groups pooled, not filtered; no altered threshold, no sort select |
 | §2 Occurrence (OC) | 5 | 3 | 0 | 0 | 1 | 0 | 1 | Count By (Patients default) and Y-axis ✅; no "Show Genomic Alteration Types" |
-| §3 Chart (CH) | 9 | 2 | 4 | 3 | 0 | 0 | 0 | Stacked bars with same colours but reversed stack; "+" rows only where groups differ; SVG titles, not popovers; study ids as labels |
+| §3 Chart (CH) | 9 | 0 | 4 | 4 | 1 | 0 | 0 | Stacked bars with same colours but reversed stack; "+" rows only where groups differ; SVG titles, not popovers; study ids as labels |
 | §4 Sorting (SO) | 4 | 1 | 0 | 2 | 1 | 0 | 0 | Frequency order identical; count mode still sorted by frequency; no Alphabetical |
 | §5 Downloads (DL) | 3 | 0 | 0 | 0 | 3 | 0 | 0 | No download at all |
-| §6 Modes (MD) | 12 | 3 | 2 | 2 | 4 | 1 | 0 | Patients/samples ✅; OQL not applied; no filters/Show-only-profiled; default category per mode differs |
+| §6 Modes (MD) | 12 | 2 | 3 | 2 | 4 | 1 | 0 | Patients/samples ✅; OQL not applied; no filters/Show-only-profiled; default category per mode differs |
 | §8 Statistics (STM) | 6 | 1 | 4 | 1 | 0 | 0 | 0 | Every denominator identical; altered counts identical in all 65 groups compared; amp + homdel across genes → Multiple (legacy picks one) in 3 groups |
 
 ---
@@ -158,8 +158,8 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-CH-2 | 🟡 | BC | Vertical stacked bars ≤ 32 px, plot 240 px (legacy 20 px / 400); y titles identical; labels at 45° under the bars (legacy 50°); more groups than fit → figure grows and scrolls, no synced top scrollbar |
 | CTS-CH-3 | 🔶 | C | Stack bottom → top: Mutation, Amplification, Deep Deletion, SV, Multiple (`figure.ts:11, 76`) — legacy reverse; no Gain / Shallow Deletion / mRNA / Protein buckets (not loaded / not counted); colours identical except Multiple `#6e7a83` (legacy `#666`) |
 | CTS-CH-4 | 🟡 | B | Only types present ✅; order Mutation · Amplification · Deep Deletion · Structural Variant · Multiple (legacy Mutation · SV · Amp · Deep Del · Multiple) |
-| CTS-CH-5 | ✅ | BC | The profiled-data strip as the portal's: a row per data type the query reads (Structural variant / Mutation / CNA, and mRNA / Protein for an EXP / PROT line), "+" or "−" per group; on a gene tab for that gene's panels (msk_impact_2017 NEGR1: Colorectal 782 of 982 patients) |
-| CTS-CH-6 | ✅ | BC | Each mark's tip "N patients profiled" or "Not profiled" |
+| CTS-CH-5 | 🔶 | BC | Rows "Mutation data / CNA data / Structural variant data" with "+" only for a type some group lacks; when every group has it, one line "Every group was profiled for mutation, CNA and structural variant data." (`figure.ts:39-42, 101-105`); no "−"; no mRNA/protein rows; per-type profiled counts identical to legacy (Q3) |
+| CTS-CH-6 | ❌ | B | No scatter tooltip |
 | CTS-CH-7 | 🟡 | BC | SVG `<title>` per segment "Colorectal Cancer — Mutation: 888 of 982 profiled patients" and per bar "Colorectal Cancer: 92.8% (911 / 982 patients)"; no popover table, no study link, no "Query this study" |
 | CTS-CH-8 | 🔶 | B | Raw values ✅ for attributes; by study the label is the study id (`sql.ts:35`), not the study name |
 | CTS-CH-9 | 🟡 | C | No profiled unit → refusal "no patient in this cohort was profiled for …" (`run.ts:98`); "No data to plot" cannot occur (nothing filtered); no "There are no alterations in this gene." |
@@ -192,7 +192,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-MD-5 | 🟡 | BC | The query's OQL applied (the view's `oql`), EXP/PROT as mRNA / protein high and low segments; the OQL banner is the page's note (tracked) |
 | CTS-MD-6 | 🟡 | BC | Own "count: drivers" (OncoKB only) toggle, not the page's settings; no VUS/germline/hotspot; no warning (tracked: Driver-annotation settings) |
 | CTS-MD-7 | ❌ | C | No Show only profiled |
-| CTS-MD-8 | ✅ | BC | Denominator excludes cases whose panels lack the genes ✅ (all denominators identical); the strip shows "−" for a group with no case profiled for a type |
+| CTS-MD-8 | 🟡 | BC | Denominator excludes cases whose panels lack the genes ✅ (all denominators identical); profiled strip lacks "−" |
 | CTS-MD-9 | 🐞 ok | C | Groups are pooled, never all filtered away; controls never disappear |
 | CTS-MD-10 | ❌ | C | No grey label, no message |
 | CTS-MD-11 | 🟡 | B | > 37 groups: figure widens and scrolls; no top scrollbar |

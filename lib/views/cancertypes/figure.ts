@@ -14,11 +14,11 @@ const level = (opts: readonly { bit: string; color: string; label: string }[], b
   const o = opts.find((x) => x.bit === bit)!;
   return [o.label, o.color];
 };
-const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["mutation", "Mutation", MUT], ["amp", "Amplification", AMP],
-  ["homdel", "Deep Deletion", DEL], ["sv", "Structural Variant", SV],
-  ["mrnaHigh", ...level(STYLE.glyph.mrna.options, "MRNA_HIGH")], ["mrnaLow", ...level(STYLE.glyph.mrna.options, "MRNA_LOW")],
-  ["protHigh", ...level(STYLE.glyph.protein.options, "PROT_HIGH")], ["protLow", ...level(STYLE.glyph.protein.options, "PROT_LOW")],
-  ["multiple", "Multiple Alterations", MULTI]];
+/** the kinds in the portal's stack order, bottom first (CancerSummaryContent OrderedAlterationLabelMap); its legend lists them reversed */
+const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["multiple", "Multiple Alterations", MULTI],
+  ["protLow", ...level(STYLE.glyph.protein.options, "PROT_LOW")], ["protHigh", ...level(STYLE.glyph.protein.options, "PROT_HIGH")],
+  ["mrnaLow", ...level(STYLE.glyph.mrna.options, "MRNA_LOW")], ["mrnaHigh", ...level(STYLE.glyph.mrna.options, "MRNA_HIGH")],
+  ["homdel", "Deep Deletion", DEL], ["amp", "Amplification", AMP], ["sv", "Structural Variant", SV], ["mutation", "Mutation", MUT]];
 /** the profiled-data strip's rows, top to bottom (the portal's AlterationTypeToDataTypeLabel, drawn bottom up) */
 const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string][] = [["sv", "Structural variant data"], ["mutation", "Mutation data"],
   ["cna", "CNA data"], ["mrna", "mRNA data"], ["prot", "Protein data"]];
@@ -138,7 +138,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const bl = bandLabels(groups.map((g) => g.label), centers, band, y, p, { maxH: LABEL_H });
   out.push(bl.svg);
   y += bl.height + 6;
-  const items: LegendItem[] = CT_KINDS.filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
+  const items: LegendItem[] = [...CT_KINDS].reverse().filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
   const lg = legend(items, L, y, W - L - PAD, p, { size: FS.small });
   out.push(lg.svg);
   y += lg.height;
