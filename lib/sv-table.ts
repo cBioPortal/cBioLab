@@ -86,8 +86,10 @@ function partRows(p: TablePart, i: number, db: string, genes: string[], pin: str
   const rows =
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         s.pid AS patient, s.sid AS sid, ifNull(ct.v, '') AS cancerType,\n" +
-    (pin ? "         " + svCellSql("oncogenicity") + " AS oncogenicity, " + svCellSql("level") + " AS level, " + svDriverSql("pr") + " AS drv,\n"
-      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
+    (pin ? "         " + svCellSql("oncogenicity") + " AS oncogenicity, " + svCellSql("level") + " AS level, " + svDriverSql("pr") + " AS drv,\n" +
+        // the call's other levels, taken as its oncogenicity and level are: what the portal's Annotation sort reads (OncoKB.tsx sortValue)
+        "         " + svCellSql("resistance_level") + " AS resistanceLevel, " + svCellSql("diagnostic_level") + " AS diagnosticLevel, " + svCellSql("prognostic_level") + " AS prognosticLevel,\n"
+      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv, '' AS resistanceLevel, '' AS diagnosticLevel, '' AS prognosticLevel,\n") +
     "         s.* EXCEPT (" + (pin ? "pid, sid, ttype, k1, k2, ktype" : "pid, sid") + ")\n" +
     "  FROM " + (pin ? "sk" : "s") + i + " AS s\n" +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = s.sid\n" +

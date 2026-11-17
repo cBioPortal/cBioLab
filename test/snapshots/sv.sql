@@ -4,10 +4,12 @@ SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(
   WHERE cancer_study_identifier = 'msk_impact_2017'
 
 -- view 0 sv: sv:counts · msk_impact_2017
-WITH ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
+WITH ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level,
+    any(highest_resistance_level) AS resistance_level, '' AS diagnostic_level, '' AS prognostic_level, toUInt8(max(is_driver)) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
   GROUP BY gene),
 asv AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
+    any(t.highest_resistance_level) AS resistance_level, any(t.highest_diagnostic_level) AS diagnostic_level, any(t.highest_prognostic_level) AS prognostic_level,
     toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found
   FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('ALK', 'ROS1', 'RET'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('ALK', 'ROS1', 'RET'))))
@@ -58,6 +60,7 @@ rows AS (
   SELECT 'MSK-IMPACT' AS cohort, 'msk_impact_2017' AS study, 0 AS ord,
          s.pid AS patient, s.sid AS sid, ifNull(ct.v, '') AS cancerType,
          if(pr.found = 1, pr.oncogenicity, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.oncogenicity, a1.oncogenicity)) AS oncogenicity, if(pr.found = 1, pr.level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.level, a1.level)) AS level, toUInt8(if(pr.found = 1, pr.driver, greatest(a1.driver, a2.driver))) AS drv,
+         if(pr.found = 1, pr.resistance_level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.resistance_level, a1.resistance_level)) AS resistanceLevel, if(pr.found = 1, pr.diagnostic_level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.diagnostic_level, a1.diagnostic_level)) AS diagnosticLevel, if(pr.found = 1, pr.prognostic_level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.prognostic_level, a1.prognostic_level)) AS prognosticLevel,
          s.* EXCEPT (pid, sid, ttype, k1, k2, ktype)
   FROM sk0 AS s
   LEFT JOIN ct0 AS ct ON ct.sid = s.sid
@@ -99,10 +102,12 @@ SELECT gene, any((SELECT count() FROM cs)) AS samples, uniqExactIf(sid, what = '
 FROM marks GROUP BY gene ORDER BY gene
 
 -- view 0 sv: sv:rows · msk_impact_2017
-WITH ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
+WITH ann AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level,
+    any(highest_resistance_level) AS resistance_level, '' AS diagnostic_level, '' AS prognostic_level, toUInt8(max(is_driver)) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
   GROUP BY gene),
 asv AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
+    any(t.highest_resistance_level) AS resistance_level, any(t.highest_diagnostic_level) AS diagnostic_level, any(t.highest_prognostic_level) AS prognostic_level,
     toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found
   FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('ALK', 'ROS1', 'RET'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('ALK', 'ROS1', 'RET'))))
@@ -153,6 +158,7 @@ rows AS (
   SELECT 'MSK-IMPACT' AS cohort, 'msk_impact_2017' AS study, 0 AS ord,
          s.pid AS patient, s.sid AS sid, ifNull(ct.v, '') AS cancerType,
          if(pr.found = 1, pr.oncogenicity, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.oncogenicity, a1.oncogenicity)) AS oncogenicity, if(pr.found = 1, pr.level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.level, a1.level)) AS level, toUInt8(if(pr.found = 1, pr.driver, greatest(a1.driver, a2.driver))) AS drv,
+         if(pr.found = 1, pr.resistance_level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.resistance_level, a1.resistance_level)) AS resistanceLevel, if(pr.found = 1, pr.diagnostic_level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.diagnostic_level, a1.diagnostic_level)) AS diagnosticLevel, if(pr.found = 1, pr.prognostic_level, if(a2.oncogenicity != '' AND (a1.oncogenicity = '' OR a2.driver > a1.driver), a2.prognostic_level, a1.prognostic_level)) AS prognosticLevel,
          s.* EXCEPT (pid, sid, ttype, k1, k2, ktype)
   FROM sk0 AS s
   LEFT JOIN ct0 AS ct ON ct.sid = s.sid

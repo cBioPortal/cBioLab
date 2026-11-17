@@ -20,10 +20,12 @@ att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncog
     max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
   FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration, consequence, tumor_type),
-sva AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
+sva AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level,
+    any(highest_resistance_level) AS resistance_level, '' AS diagnostic_level, '' AS prognostic_level, toUInt8(max(is_driver)) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
   GROUP BY gene),
 svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
+    any(t.highest_resistance_level) AS resistance_level, any(t.highest_diagnostic_level) AS diagnostic_level, any(t.highest_prognostic_level) AS prognostic_level,
     toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found
   FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))))
@@ -189,10 +191,12 @@ att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncog
     max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
   FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
   GROUP BY alteration, consequence, tumor_type),
-sva AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
+sva AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level,
+    any(highest_resistance_level) AS resistance_level, '' AS diagnostic_level, '' AS prognostic_level, toUInt8(max(is_driver)) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
   GROUP BY gene),
 svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
+    any(t.highest_resistance_level) AS resistance_level, any(t.highest_diagnostic_level) AS diagnostic_level, any(t.highest_prognostic_level) AS prognostic_level,
     toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found
   FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))))
