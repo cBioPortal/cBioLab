@@ -224,7 +224,7 @@ Data version: every n, event count and median agrees exactly on identical groups
 | CMP-STM-5 | ❌ | C | No HR |
 | CMP-STM-6 | ✅ | C | Pearson χ², no Yates, patient attrs per patient; p identical (Race, Subtype, Stage, Sex) |
 | CMP-STM-7 | 🔶 | C | Reported p = Welch t (2) / Welch ANOVA (3+) from moments (`clinical/run.ts:96-115`); Mann-Whitney / Kruskal-Wallis computed (matches legacy) but not on portal and not in q |
-| CMP-STM-8 | 🟡 | C | BH same formula; n = attributes tested (8 on the portal) — legacy quirk of hidden survival attributes not copied, but q differs because the attribute set differs |
+| CMP-STM-8 | 🟡 | BC | BH same formula; 2026-11-17: n counts the attributes the portal tests but does not list (each survival endpoint's pair, AGE_LAST_FU_YEARS, BIRTH_YEAR): coadread G1 n 52 (was 44), Patient Weight q 1.003e-6 against the portal's 1.022e-6 over 53 — the one left is OTHER_PATIENT_ID, refused past 200 values (QUESTIONS.md: its values are patient identifiers) |
 | CMP-STM-9 | 🟡 | BC | Overlap counts and Exclude sizes identical on G2; no iterative exclusion; refused when groups differ in >1 condition or nest |
 | CMP-STM-10 | 🔶 | B | p `pDigits` (2 sig ≥ 0.001, `lib/chart/format.ts:47-53`) vs `toConditionalPrecision(3)`; median 1 decimal vs 2; no HR / landmark formats |
 | CMP-STM-11 | 🟡 | B | Group chip = patients only; per-curve n and at-risk counts ✅ |

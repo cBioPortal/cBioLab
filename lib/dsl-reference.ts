@@ -1399,7 +1399,7 @@ column id or a filter that does not suit its column is refused with the ids acce
 \`POST /api/view-page {doc, view, offset, limit}\` returns another page; \`{doc, view, values:
 "<column>"}\` returns the values that column takes among the rows the rest of the query keeps
 (distinct values with counts, or a numeric column's range) — what its filter offers.
-\`POST /api/table {doc, view}\` streams every row kept, every column, as CSV.
+\`POST /api/table {doc, view}\` streams every row kept, every column, as CSV; for the Download tab's gene-by-sample files, \`format:"tsv"\` or \`"tsv-transposed"\` gives the portal's Tab Delimited Format or Transposed Matrix file instead.
 
 ### Plot axes
 
