@@ -15,6 +15,22 @@ import type { AnalysisDoc, DrawnResultOf, TableQuery } from "../../../lib/types"
 import type { TableBody } from "../../../lib/api-schemas.ts";
 import type { DataFile } from "../../../lib/views/datafiles/types.ts";
 import type { KindUi } from "./kind-ui.ts";
+import { portalPercentage, portalPercentAltered } from "../../../lib/chart/format.ts";
+
+/**
+ * A line's altered share as the portal's frequency table draws it (FrequencyBar, barWidth 200): the
+ * share of a grey bar filled light green, then getPercentage's text ("<1%", or a whole percent).
+ */
+function FrequencyBar({ altered, profiled }: { altered: number; profiled: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="inline-block h-2 w-[200px] bg-[#ccc]" aria-hidden="true">
+        <span className="block h-full bg-[lightgreen]" style={{ width: (100 * altered / profiled) + "%" }} />
+      </span>
+      <span className="tabular-nums">{portalPercentage(altered / profiled)}</span>
+    </span>
+  );
+}
 
 type Result = DrawnResultOf<"datafiles">["datafiles"];
 
@@ -95,7 +111,7 @@ function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJso
 function frequencyCsv(d: Result): string {
   const q = (s: string) => /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   return ["gene,oql_line,altered,profiled,percent_altered",
-    ...d.frequency.map((f) => [f.gene, q(f.line), f.altered, f.profiled, f.percent ?? ""].join(","))].join("\n") + "\n";
+    ...d.frequency.map((f) => [f.gene, q(f.line), f.profiled ? f.altered : "N/P", f.profiled, portalPercentAltered(f.altered, f.profiled)].join(","))].join("\n") + "\n";
 }
 
 function DatafilesBody({ d, spec, vi, updating, docJson, onQuery }: { d: Result; spec: Record<string, unknown>; vi: number; updating: boolean; docJson?: () => string;
@@ -119,11 +135,11 @@ function DatafilesBody({ d, spec, vi, updating, docJson, onQuery }: { d: Result;
           </Button>
         </div>
         <table className="text-md [&_td]:border-b [&_td]:py-1 [&_td]:pr-6 [&_th]:pr-6 [&_th]:text-left">
-          <thead><tr><th>Gene</th><th>OQL line</th><th className="text-right">Altered</th><th className="text-right">Profiled</th><th className="text-right">Altered %</th></tr></thead>
+          <thead><tr><th>Gene</th><th>OQL line</th><th className="text-right">Altered</th><th className="text-right">Profiled</th><th>Altered %</th></tr></thead>
           <tbody>{d.frequency.map((f) => (
             <tr key={f.line}><td className="font-medium">{f.gene}</td><td className="mono">{f.line}</td>
-              <td className="tabular-nums text-right">{f.altered.toLocaleString()}</td><td className="tabular-nums text-right">{f.profiled.toLocaleString()}</td>
-              <td className="tabular-nums text-right">{f.percent == null ? "—" : f.percent.toFixed(1) + "%"}</td></tr>))}
+              <td className="tabular-nums text-right">{f.profiled ? f.altered.toLocaleString() : "Not Profiled"}</td><td className="tabular-nums text-right">{f.profiled.toLocaleString()}</td>
+              <td>{f.profiled ? <FrequencyBar altered={f.altered} profiled={f.profiled} /> : "Not Profiled"}</td></tr>))}
           </tbody>
         </table>
         <p className="mt-2 mb-0 text-sm text-muted-foreground">

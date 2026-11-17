@@ -84,7 +84,7 @@ async function patientViews({ browser, ok, BASE }) {
       const titles = await page.locator(".alt-table .dt-title").allInnerTexts();
       ok("alterations: the patient's three tables, in the portal's order", /^7 Mutations/.test(titles[0]) && /^3 Copy Number Alterations/.test(titles[1]) && /^3 Structural Variants/.test(titles[2]), titles.join(" | "));
       const muts = await sec("Mutations").locator("tbody tr").allInnerTexts();
-      ok("alterations: mutations carry OncoKB's call and the cohort frequency", muts.some((r) => /KRAS\s+G12V\s+Oncogenic · Level 1/.test(r) && /\d+\.\d%/.test(r)), muts[0]);
+      ok("alterations: mutations carry OncoKB's call and the cohort frequency", muts.some((r) => /KRAS\s+G12V\s+Oncogenic · Level 1/.test(r) && /(^|\s)(\d+|<1)%(\s|$)/.test(r)), muts[0]);
       ok("alterations: a fusion lists both genes", (await sec("Structural Variants").locator("tbody tr").allInnerTexts()).some((r) => /TMPRSS2\s+ERG/.test(r)));
       const head = await page.locator(".vtitle", { hasText: /patient alterations/i }).innerText();
       ok("alterations: the header names the cohort and not the patient", /Prostate/.test(head) && !/P-0024249/.test(head), head);
@@ -255,6 +255,20 @@ async function patientViews({ browser, ok, BASE }) {
       ok("overview: Reset view goes back to compact and lets the row go", !s.navbar && (await row.getAttribute("aria-selected")) === "false", JSON.stringify(s));
     } catch (e) {
       ok("overview: the genomic overview", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    // the timeline's tooltip as the portal's (PAT-TL-TT-1): hover shows it, a click pins it past the pointer leaving, Esc closes it
+    try {
+      const mark = page.locator(".tl-fig svg .tl-m").first();
+      await mark.scrollIntoViewIfNeeded();
+      await mark.hover(); await page.waitForTimeout(250);
+      const hovered = await page.locator(".tl-tip").count();
+      await mark.click(); await page.mouse.move(2, 2); await page.waitForTimeout(400);
+      const pinned = await page.locator(".tl-tip").count();
+      await page.keyboard.press("Escape"); await page.waitForTimeout(200);
+      const closed = await page.locator(".tl-tip").count();
+      ok("timeline: a hovered tooltip, pinned by a click past the pointer leaving, closed by Esc (PAT-TL-TT-1)", hovered === 1 && pinned === 1 && closed === 0, [hovered, pinned, closed].join(" "));
+    } catch (e) {
+      ok("timeline: a hovered tooltip, pinned by a click past the pointer leaving, closed by Esc (PAT-TL-TT-1)", false, String(e.message).split("\n")[0].slice(0, 200));
     }
     ok("overview: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();

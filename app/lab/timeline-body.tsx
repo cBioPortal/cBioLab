@@ -4,7 +4,7 @@
 // settings over its right corner. The navigator above it steps to the patient before or after the
 // drawn one in the list's order and opens the list in a dialog (app/lab/patient-nav.tsx). The
 // cohort is the header's picker, as for every view.
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { timelineSvg, timelineSummary } from "../../lib/timeline-svg.ts";
 import { formatDays, sampleMarks, attr } from "../../lib/timeline-tracks.ts";
@@ -25,7 +25,30 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
-  const [tip, setTip] = useState<{ x: number; y: number; ev: number[] } | null>(null);
+  // the portal's event tooltip (TimelineTrack, TimelineStore): shown on hover, gone 100 ms after the pointer
+  // leaves unless pinned by a click; one event at a time when several share the mark, paged
+  const [tip, setTip] = useState<{ x: number; y: number; ev: number[]; pinned: boolean; page: number } | null>(null);
+  const linger = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTip = () => { if (linger.current) { clearTimeout(linger.current); linger.current = null; } };
+  const dropTip = () => { holdTip(); linger.current = setTimeout(() => setTip((t) => t && !t.pinned ? null : t), 100); };
+  useEffect(() => () => holdTip(), []);
+  // Esc closes it; ←/↓ and →/↑/space page through a mark's events, wrapping (TimelineStore's key handling)
+  useEffect(() => {
+    if (!tip) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setTip(null); return; }
+      const n = tip.ev.length;
+      if (n < 2) return;
+      const step = e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === " " ? 1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      setTip((t) => t && { ...t, page: (t.page + step + n) % n });
+    };
+    const onLeave = () => setTip(null);
+    window.addEventListener("keydown", onKey);
+    document.body.addEventListener("mouseleave", onLeave);
+    return () => { window.removeEventListener("keydown", onKey); document.body.removeEventListener("mouseleave", onLeave); };
+  }, [tip]);
   const [listOpen, setListOpen] = useState(false);
   useLayoutEffect(() => {
     const el = box.current;
@@ -43,14 +66,25 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
     const next = collapsed.includes(uid) ? collapsed.filter((u) => u !== uid) : [...collapsed, uid];
     patch({ collapsed: next.length ? next : undefined });
   };
+  const marked = (e: React.MouseEvent) => {
+    const m = (e.target as Element).closest?.(".tl-m") as SVGGElement | null;
+    return m?.dataset.ev ? m.dataset.ev : null;
+  };
   const onClick = (e: React.MouseEvent) => {
     const h = (e.target as Element).closest?.(".tl-h") as SVGGElement | null;
-    if (h?.dataset.uid) toggle(h.dataset.uid);
+    if (h?.dataset.uid) { toggle(h.dataset.uid); return; }
+    // a click on a mark pins its tooltip, or lets a pinned one go
+    const ev = marked(e);
+    if (!ev) return;
+    holdTip();
+    setTip((t) => t && t.pinned && t.ev.join(",") === ev ? { ...t, pinned: false } : { x: e.clientX, y: e.clientY, ev: ev.split(",").map(Number), pinned: true, page: t && t.ev.join(",") === ev ? t.page : 0 });
   };
   const onMove = (e: React.MouseEvent) => {
-    const m = (e.target as Element).closest?.(".tl-m") as SVGGElement | null;
-    if (!m || !m.dataset.ev) { if (tip) setTip(null); return; }
-    setTip({ x: e.clientX, y: e.clientY, ev: m.dataset.ev.split(",").map(Number) });
+    if (tip?.pinned) return;
+    const ev = marked(e);
+    if (!ev) { if (tip) dropTip(); return; }
+    holdTip();
+    setTip((t) => ({ x: e.clientX, y: e.clientY, ev: ev.split(",").map(Number), pinned: false, page: t && t.ev.join(",") === ev ? t.page : 0 }));
   };
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.patient;
 
@@ -84,11 +118,12 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
         </div>
       ) : <p className="meta">No patient to draw: the cohort's patient list is empty.</p>}
       {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-static-element-interactions -- track groups in the drawn SVG expand on click only; there is no keyboard equivalent yet */}
-      <div ref={box} className={"tl-fig" + (updating ? " stale" : "")} onClick={onClick} onMouseMove={onMove} onMouseLeave={() => setTip(null)}>
+      <div ref={box} className={"tl-fig" + (updating ? " stale" : "")} onClick={onClick} onMouseMove={onMove} onMouseLeave={() => { if (!tip?.pinned) dropTip(); }}>
         {drawn && (p!.events.length
           ? <div dangerouslySetInnerHTML={{ __html: drawn.svg }} />
           : <p className="meta tl-empty">{p!.patient} has no timeline events recorded.</p>)}
-        {tip && p && <EventTip x={tip.x} y={tip.y} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} />}
+        {tip && p && <EventTip x={tip.x} y={tip.y} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} page={tip.page} pinned={tip.pinned}
+          onPage={(n) => setTip((t) => t && { ...t, page: n })} onClose={() => setTip(null)} onHold={holdTip} onLeave={() => { if (!tip.pinned) dropTip(); }} />}
       </div>
       {p && drawn && <p className="note vfoot">{timelineSummary(p, drawn.layout, !!spec.expandGaps)} Click a track with ▾ to fold its sub-tracks into one row.</p>}
       {listOpen && (
@@ -105,24 +140,37 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   );
 }
 
-function EventTip({ x, y, events, marks }: { x: number; y: number; events: PatientEvent[]; marks: Map<string, { label: string; color: string }> }) {
-  const shown = events.slice(0, 4);
+/**
+ * One event of a mark, as the portal's tooltip shows it: its attributes, then its date or start and end;
+ * with several events on the mark, "‹ i of n events ›" pages through them (the keys do too). Pinned, it
+ * stays until clicked again, Esc, or a close; hovered, the pointer may move onto it.
+ */
+function EventTip({ x, y, events, marks, page, pinned, onPage, onClose, onHold, onLeave }: {
+  x: number; y: number; events: PatientEvent[]; marks: Map<string, { label: string; color: string }>; page: number; pinned: boolean;
+  onPage: (n: number) => void; onClose: () => void; onHold: () => void; onLeave: () => void;
+}) {
+  const n = events.length, i = Math.min(page, n - 1), e = events[i];
+  if (!e) return null;
+  const sid = attr(e, "SAMPLE_ID");
+  const m = sid ? marks.get(sid) : undefined;
   return (
     <FloatingTip x={x} y={y} className="tl-tip">
-      {shown.map((e, k) => {
-        const sid = attr(e, "SAMPLE_ID");
-        const m = sid ? marks.get(sid) : undefined;
-        return (
-          <div key={k} className={k ? "tl-tip-more" : undefined}>
-            <div className="lead">{e.type}{m ? <> · sample {m.label}</> : null}</div>
-            <table><tbody>
-              {e.attrs.filter(([a]) => !/^STYLE_/i.test(a)).map(([a, v], j) => <tr key={j}><th>{a.replace(/_/g, " ")}</th><td>{v}</td></tr>)}
-              <tr><th>{e.end != null && e.end > e.start ? "START" : "DATE"}</th><td>{formatDays(e.start)} <span className="dim">(day {e.start})</span></td></tr>
-              {e.end != null && e.end > e.start && <tr><th>END</th><td>{formatDays(e.end)} <span className="dim">(day {e.end})</span></td></tr>}
-            </tbody></table>
-          </div>);
-      })}
-      {events.length > shown.length && <div className="dim">and {events.length - shown.length} more on this day</div>}
+      <div onMouseEnter={onHold} onMouseLeave={onLeave}>
+        <div className="lead flex items-center gap-1.5">
+          <span>{e.type}{m ? <> · sample {m.label}</> : null}</span>
+          {n > 1 && <span className="ml-auto flex items-center gap-1">
+            <button type="button" className="px-1" aria-label="previous event" onClick={() => onPage((i - 1 + n) % n)}>‹</button>
+            <span className="dim">{i + 1} of {n} events</span>
+            <button type="button" className="px-1" aria-label="next event" onClick={() => onPage((i + 1) % n)}>›</button>
+          </span>}
+          {pinned && <button type="button" className="px-1" aria-label="close the tooltip" onClick={onClose}>×</button>}
+        </div>
+        <table><tbody>
+          {e.attrs.filter(([a]) => !/^STYLE_/i.test(a)).map(([a, v], j) => <tr key={j}><th>{a.replace(/_/g, " ")}</th><td>{v}</td></tr>)}
+          <tr><th>{e.end != null && e.end > e.start ? "START" : "DATE"}</th><td>{formatDays(e.start)} <span className="dim">(day {e.start})</span></td></tr>
+          {e.end != null && e.end > e.start && <tr><th>END</th><td>{formatDays(e.end)} <span className="dim">(day {e.end})</span></td></tr>}
+        </tbody></table>
+      </div>
     </FloatingTip>
   );
 }
