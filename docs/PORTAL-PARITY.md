@@ -308,7 +308,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Every gene, column sort (SV by # SV), "(N profiled samples)" in the title, the header tooltips, the Data download (STS-GT-1…4, STS-GT-10; [gene-tables-cases](legacy-spec/parity/gene-tables-cases.md)) (#261)
     - [x] Gene-panel list in the Freq tooltip, Intersection as well as Union with applied rows pinned, a gene click queues a query, the alteration-filter indicator (STS-GT-5, STS-GT-6, STS-GT-8, STS-GT-9; [gene-tables-cases](legacy-spec/parity/gene-tables-cases.md) GP, GU, GQ, GI) (#266)
     - [ ] A panel's gene list on a click of its name (STS-GT-5)
-    - [ ] MutSig / GISTIC q-values: the icon and the download's q-value column (the warehouse's `mut_sig` and `gistic` tables hold them for the studies that have them) (STS-GT-6)
+    - [x] MutSig / GISTIC q-values: the "M" / "G" icon with its tooltip and the download's q-value column, single study only (STS-GT-6; [gene-tables-cases](legacy-spec/parity/gene-tables-cases.md) QV1–QV7) (PR #PRNUM open)
     - [ ] The OncoKB cancer-gene icon and filter: [data: OncoKB's cancer-gene list is read during the annotation sync but not stored] (STS-GT-6, STS-GT-7)
   - [ ] Chart kinds: treatment tables, the GA frequency table (arm-level CNA by default), mutation-type counts, variant annotations, X-vs-Y density and violin, gene-specific violin, continuous gene bar (STS-OT-3…6, STS-VI-1…8, STS-GS-4, STS-SC-1, STS-STM-16, STS-STM-17)
   - [ ] Value lists: a header row and swatches, a search box, Select all / Deselect all, selected rows pinned, the portal's row height; Compare from the tooltip (STS-TBL-1…7)

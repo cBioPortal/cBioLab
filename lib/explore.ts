@@ -170,6 +170,7 @@ const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
 import { chartBinSettings, chartOrder, chartPriority } from "./study-view-config.ts";
+import { gisticQValues, withQValues } from "./study-view-gene-tables.ts";
 
 
 export interface ExploreArgs {
@@ -664,15 +665,40 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
   return { rows, total: Number(distinct.data[0]?.n || 0) };
 };
 
+const significant = significantGenes(studies, db, conn);
 const [mut, cna, sv] = await Promise.all([
   geneTable("mutation", "MUTATION_EXTENDED"),
   geneTable("cna", "COPY_NUMBER_ALTERATION"),
   geneTable("structural_variant", "STRUCTURAL_VARIANT")
 ]);
-const mutatedGenes = mut.rows, cnaGenes = cna.rows, svGenes = sv.rows;
+const q = await significant;
+const mutatedGenes = withQValues("mutated", mut.rows, q.mutsig, q.gistic), cnaGenes = withQValues("cna", cna.rows, q.mutsig, q.gistic), svGenes = sv.rows;
 const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
 
   return { mutatedGenes, cnaGenes, svGenes, geneTotals };
+}
+
+/**
+ * One study's MutSig q-values by gene and GISTIC's by gene and call (gene-tables-cases.md QV1-QV4);
+ * empty for several studies, as the portal gives none, and when the study has neither table's rows.
+ * A failed lookup leaves the tables without q-values rather than failing them.
+ */
+async function significantGenes(studies: string[], db: string, conn: ChConn): Promise<{ mutsig: Map<string, number>; gistic: Map<string, number> }> {
+  if (studies.length !== 1) return { mutsig: new Map(), gistic: new Map() };
+  const study = "cs.cancer_study_identifier = " + sq(studies[0]);
+  const [m, g] = await Promise.all([
+    chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, m.q_value AS q FROM " + db + ".mut_sig m\n" +
+      "JOIN " + db + ".gene g ON g.entrez_gene_id = m.entrez_gene_id\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id WHERE " + study, conn).catch(() => ({ data: [] as ChRow[] })),
+    chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, gi.amp AS amp, gi.q_value AS q FROM " + db + ".gistic gi\n" +
+      "JOIN " + db + ".gistic_to_gene gg ON gg.gistic_roi_id = gi.gistic_roi_id\n" +
+      "JOIN " + db + ".gene g ON g.entrez_gene_id = gg.entrez_gene_id\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gi.cancer_study_id WHERE " + study, conn).catch(() => ({ data: [] as ChRow[] })),
+  ]);
+  return {
+    mutsig: new Map(m.data.map((r) => [String(r.g), Number(r.q)])),
+    gistic: gisticQValues(g.data.map((r) => ({ gene: String(r.g), amp: Number(r.amp) === 1, q: Number(r.q) }))),
+  };
 }
 
 // ---- per-gene alteration facets ------------------------------------------
@@ -1647,6 +1673,8 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
 
   const evm = sumBy(parts.map(p => p.events), "type");
   // gene tables: sum altered/events/profiled per (gene, cna) across participants
+  // a q-value is one study's: several studies' tables carry none (gene-tables-cases.md QV4)
+  const oneStudysQ = (rows: GeneTableRow[]) => parts.length === 1 ? rows : rows.map(({ qValue: _q, ...r }) => r);
   const mergeGeneTable = (pick: (p: ExploreResult) => GeneTableRow[] | undefined): GeneTableRow[] => {
     const m = new Map<string, GeneTableRow>();
     for (const p of parts) for (const r of pick(p) || []) {
@@ -1701,8 +1729,8 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     caseLists: byCount([...lm.values()]),
     geneFacets: [...gfMap.values()],
-    mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),
-    cnaGenes: mergeGeneTable((p) => p.cnaGenes),
+    mutatedGenes: oneStudysQ(mergeGeneTable((p) => p.mutatedGenes)),
+    cnaGenes: oneStudysQ(mergeGeneTable((p) => p.cnaGenes)),
     svGenes: mergeGeneTable((p) => p.svGenes),
     geneTotals: {
       mutated: Math.max(...parts.map((p) => p.geneTotals?.mutated || 0)),

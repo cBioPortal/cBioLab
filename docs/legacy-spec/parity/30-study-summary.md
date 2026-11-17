@@ -211,7 +211,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-GT-3 | ✅ | B | Columns ✅; a header click sorts by any column, a second reverses; default Freq desc (SV # SV desc), ties by events then gene ([gene-tables-cases](gene-tables-cases.md)) |
 | STS-GT-4 | 🟡 | B | The portal's header tooltips ([gene-tables-cases](gene-tables-cases.md)); the alteration-filter variant not built (no Alteration Filter menu) |
 | STS-GT-5 | 🟡 | B | # Mut/# SV = events ✅, # = altered ✅, Freq ✅; CNA AMP/HOMDEL tag ✅; the Freq tooltip as the portal's, with "Gene panels: …" ([gene-tables-cases](gene-tables-cases.md)) GP1–GP5; no panel gene-list modal |
-| STS-GT-6 | 🟡 | B | A gene's search icon queues it for Query genes…, with the portal's messages ([gene-tables-cases](gene-tables-cases.md)) GQ1–GQ4; no OncoKB cancer-gene tooltip, no q-value icon |
+| STS-GT-6 | 🟡 | B | A gene's search icon queues it for Query genes…, with the portal's messages ([gene-tables-cases](gene-tables-cases.md)) GQ1–GQ4; the MutSig "M" / GISTIC "G" q-value icon and tooltip, single study (QV1–QV7; stad_tcga: 192 MutSig and 2,517 GISTIC rows, identical to the portal API). No OncoKB cancer-gene tooltip |
 | STS-GT-7 | ❌ | C | No OncoKB cancer-gene filter |
 | STS-GT-8 | ✅ | B | The `#` header's filter icon, dark under "Alterations: OncoKB drivers only" (the page's alteration filter), with the portal's filtered tooltip ([gene-tables-cases](gene-tables-cases.md)) GI1–GI2 |
 | STS-GT-9 | 🟡 | B | Check rows → [Apply filter], Union (one OQL clause) or Intersection (a clause per gene, refused past the selection's 8 filters), the choice kept by the browser; applied rows pinned, checked and disabled ([gene-tables-cases](gene-tables-cases.md)) GU1–GU6; compare via "…" |

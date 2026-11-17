@@ -1012,6 +1012,8 @@ export interface GeneTableRow {
   /** CNA only: 2 = amplification, -2 = deep deletion, plus its cytoband */
   cna?: number;
   cytoband?: string;
+  /** single study: MutSig's q-value (Mutated) or GISTIC's for the gene and call (CNA) */
+  qValue?: number;
 }
 
 /** one row per selected study: how the current draft distributes across them */
