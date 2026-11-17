@@ -54,7 +54,7 @@ function ctx(cohorts: Record<string, EvaluatedCohort>, resolvers: Record<string,
   };
 }
 const de = (r: ViewResult) => (r as unknown as { diffexpr: DiffexprResult }).diffexpr;
-const run = (view: Record<string, unknown>, c: ViewRun) => runDiffexpr({ kind: "diffexpr", profileType: "mrna_zscores", geneSets: [], ...view } as never, c);
+const run = (view: Record<string, unknown>, c: ViewRun) => runDiffexpr({ kind: "diffexpr", profileType: "mrna_zscores", geneSets: [], allRows: true, ...view } as never, c);
 
 /** `count` genes (G0…, the first named UP), each with its own shift of the first cohort, so each its own t and p */
 function profile(count: number, cohorts: number): Values {
@@ -90,22 +90,27 @@ describe("diffexpr: every tested gene (CMM-GN, CMM-EX-5)", () => {
     // per gene, per cohort in groups order
     for (let i = 0; i < 1600; i++) {
       assert.equal(all.n[i].length, 2); assert.equal(all.mean[i].length, 2); assert.equal(all.sd[i].length, 2);
-      assert.ok(Math.abs(all.effect![i] - (all.mean[i][0] - all.mean[i][1])) < 1e-9, all.gene[i]);
+      // each to 3 places, so their difference to within a rounding step of each
+      assert.ok(Math.abs(all.effect![i] - (all.mean[i][0] - all.mean[i][1])) <= 0.0015, all.gene[i]);
     }
     // cytoband "" when the warehouse does not know it
     assert.equal(all.cytoband[all.gene.indexOf("UP")], "1p36.33");
     assert.equal(all.cytoband[all.gene.indexOf("G1")], "");
   });
 
-  test("the numbers in `all` are the runner's numbers for the same gene in `points`", async () => {
+  // `all` carries means, SDs and differences to 3 places and p, q to 4 significant digits (one more than the page writes)
+  const sig4 = (a: number, b: number, what: string) => assert.ok(Math.abs(a - b) <= 5e-4 * Math.abs(b), what + ": " + a + " vs " + b);
+  const places3 = (a: number, b: number, what: string) => assert.ok(Math.abs(a - b) <= 5e-4 + 1e-12, what + ": " + a + " vs " + b);
+  test("the numbers in `all` are the runner's numbers for the same gene in `points`, rounded as the page reads them", async () => {
     const d = await runOn(1600, 2);
     const all = d.all!;
     for (const g of d.points) {
       const i = all.gene.indexOf(g.gene);
       assert.ok(i >= 0, g.gene);
-      assert.equal(all.p[i], g.p, g.gene); assert.equal(all.q[i], g.q, g.gene);
-      assert.deepEqual(all.n[i], g.n, g.gene); assert.deepEqual(all.mean[i], g.mean, g.gene); assert.deepEqual(all.sd[i], g.sd, g.gene);
-      assert.equal(all.effect![i], g.effect, g.gene);
+      sig4(all.p[i], g.p, g.gene); sig4(all.q[i], g.q, g.gene);
+      assert.deepEqual(all.n[i], g.n, g.gene);
+      g.mean.forEach((m, k) => places3(all.mean[i][k], m, g.gene)); g.sd.forEach((x, k) => places3(all.sd[i][k], x, g.gene));
+      places3(all.effect![i], g.effect!, g.gene);
       assert.equal(all.cytoband[i], g.cytoband ?? "", g.gene);
     }
   });
@@ -119,8 +124,14 @@ describe("diffexpr: every tested gene (CMM-GN, CMM-EX-5)", () => {
     assert.equal(all.n[0].length, 3);
     for (const g of d.points) {
       const i = all.gene.indexOf(g.gene);
-      assert.equal(all.p[i], g.p); assert.equal(all.q[i], g.q); assert.deepEqual(all.mean[i], g.mean);
+      sig4(all.p[i], g.p, g.gene); sig4(all.q[i], g.q, g.gene); g.mean.forEach((m, k) => places3(all.mean[i][k], m, g.gene));
     }
+  });
+
+  test("without allRows (an agent's run) no `all`, however many genes", async () => {
+    const d = await runOn(1600, 2, { allRows: undefined });
+    assert.equal(d.all, undefined);
+    assert.ok(d.points.length < d.tested);
   });
 
   test("no more genes tested than points hold: no `all`", async () => {

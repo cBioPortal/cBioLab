@@ -242,7 +242,7 @@ checks assert rather than whatever a real warehouse happens to contain:
   BRCA1, a gene with no mutation, SV or panel row anywhere in the fixture: the empty-gene state.
 
 `check:enrichment-events` runs the Genomic Alterations table's any-type SQL over a scratch copy of
-the fixture's genomic tables in a database of its own (`cbiolab_check_enrichment_events`, dropped
+the fixture's genomic tables in a database of its own (`cbiolab_check_enrichment_events_<pid>_<time>`, dropped
 after), with four samples added for shapes the study does not hold: a sample whose mutation and
 copy-number panels differ, a whole-exome mutation sample, mutation types outside the portal's tree
 and blank, and a whole-exome row on a log2 copy-number profile. The study's own files are untouched,

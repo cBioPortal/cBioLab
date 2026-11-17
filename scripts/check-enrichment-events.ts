@@ -25,7 +25,8 @@ import { enrichEventsAlteredSql, enrichEventsPanelProfiledSql, enrichEventsWesSq
 import { ALTERATION_EVENTS, MUTATION_UNITS, MUTATION_UNIT_LIST, type AlterationEvent } from "../lib/alteration-events.ts";
 
 const STUDY = "cbiolab_peer_fixture";
-const SCRATCH = "cbiolab_check_enrichment_events";
+// one per run, so two gates on one fixture peer do not drop each other's copy
+const SCRATCH = "cbiolab_check_enrichment_events_" + process.pid + "_" + Date.now().toString(36);
 const conn: Conn = { id: "b", url: process.env.CLICKHOUSE2_URL || "", user: process.env.CLICKHOUSE2_USER || "", password: process.env.CLICKHOUSE2_PASSWORD || "",
   db: process.env.CLICKHOUSE2_DB || "", label: process.env.CLICKHOUSE2_LABEL };
 if (!conn.url || !conn.db) throw new Error("connection b (CLICKHOUSE2_*) is not set: start the fixture with npm run peer-db");

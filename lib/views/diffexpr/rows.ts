@@ -1,14 +1,17 @@
 // Every tested gene of a diffexpr result as compact columns, and back: what the page's table and
 // volcano draw past the result's 1,500 points, as the portal's tab lists every gene.
 import type { DiffexprGene, DiffexprColumns, DiffexprResult } from "./types.ts";
+import { roundPlaces, roundSig } from "../../chart/format.ts";
 
-/** genes as columns, in their order */
+/** genes as columns, in their order; means, SDs and differences to 3 places and p, q to 4 digits, one
+ *  more than the page writes, so 20,000 genes stay a few MB */
 export function toColumns(genes: DiffexprGene[], two: boolean): DiffexprColumns {
+  const r3 = (xs: number[]) => xs.map((x) => roundPlaces(x, 3));
   return {
     gene: genes.map((g) => g.gene), cytoband: genes.map((g) => g.cytoband || ""),
-    n: genes.map((g) => g.n), mean: genes.map((g) => g.mean), sd: genes.map((g) => g.sd),
-    ...(two ? { effect: genes.map((g) => g.effect ?? 0) } : {}),
-    p: genes.map((g) => g.p), q: genes.map((g) => g.q),
+    n: genes.map((g) => g.n), mean: genes.map((g) => r3(g.mean)), sd: genes.map((g) => r3(g.sd)),
+    ...(two ? { effect: genes.map((g) => roundPlaces(g.effect ?? 0, 3)) } : {}),
+    p: genes.map((g) => roundSig(g.p, 4)), q: genes.map((g) => roundSig(g.q, 4)),
   };
 }
 

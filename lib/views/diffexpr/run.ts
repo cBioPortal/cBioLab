@@ -3,7 +3,8 @@
 import type { ViewResult, ViewResultOf } from "../../types.ts";
 import { benjaminiHochberg, varianceFromMoments, welchT, oneWayAnova, preRankedGsea } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
-import { overLimit, answering, refuse, niceCeil, askEachSite, cytobands } from "../shared.ts";
+import { overLimit, answering, refuse, niceCeil, askEachSite, cytobands, allRowsWithin, ALL_ROWS_MAX_BYTES } from "../shared.ts";
+import { fmtMb } from "../../chart/format.ts";
 import type { DiffexprView, DiffexprGene } from "./types.ts";
 import { profileMomentsAllSql, genesetMembersSql } from "./sql.ts";
 import { toColumns } from "./rows.ts";
@@ -121,6 +122,9 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
   const points = byP.filter((g) => pointSet.has(g.gene));
   const bands = await cytobands(ok, byP.map((g) => g.gene));
   for (const g of byP) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
+  // every tested gene, for a page that draws them all (allRows), when there are more than `points` holds
+  const every = view.allRows === true && tested.length > points.length ? allRowsWithin(toColumns(byP, two)) : null;
+  const withAll = !!every && "all" in every;
   let grid: NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>["grid"];
   if (two) {
     const yOf = (p: number) => -Math.log10(Math.max(1e-300, p));
@@ -178,7 +182,7 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
     }),
     diffexpr: { profileType, ...(gene ? { gene } : {}), ...(info ? { profileName: info.name, profileKind: info.type } : {}), log2, effectLabel, groups, ...(dropped.length ? { dropped } : {}),
       test: two ? "Welch's t-test" : "one-way ANOVA", tested: tested.length, skipped, significant: sig.length, ...(two ? { up, down } : {}),
-      points, ...(tested.length > points.length ? { all: toColumns(byP, two) } : {}), ...(grid ? { grid } : {}), pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
+      points, ...(every && "all" in every ? { all: every.all } : {}), ...(grid ? { grid } : {}), pooledSignificant: sig.length - points.filter((g) => g.q < 0.05).length,
       labels, ...(gsea ? { gsea } : {}), ...(excluded.length ? { excluded } : {}) },
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
@@ -189,8 +193,9 @@ export async function runDiffexpr(view: DiffexprView, ctx: ViewRun): Promise<Vie
       "; computed from three running totals per gene and cohort, so it is exact across sites. " +
       tested.length.toLocaleString("en-US") + " genes tested" + (skipped ? ", " + skipped.toLocaleString("en-US") + " left out (fewer than " + DE_MIN_N + " samples with a value in a cohort, or no variance)" : "") +
       "; q is Benjamini–Hochberg across every gene tested. " +
-      (tested.length > points.length ? "The table" + (two ? " and volcano hold" : " holds") + " all " + tested.length.toLocaleString("en-US") + " genes tested; a drawing of this view made outside the page " +
-        (two ? "draws the " + DE_POINT_CAP.toLocaleString("en-US") + " most significant as points and the rest as density. " : "lists the " + DE_POINT_CAP.toLocaleString("en-US") + " most significant. ") : "") +
+      (withAll ? "The table" + (two ? " and volcano hold" : " holds") + " all " + tested.length.toLocaleString("en-US") + " genes tested; a drawing of this view made outside the page " +
+        (two ? "draws the " + DE_POINT_CAP.toLocaleString("en-US") + " most significant as points and the rest as density. " : "lists the " + DE_POINT_CAP.toLocaleString("en-US") + " most significant. ")
+        : tested.length > points.length ? (every && "tooBig" in every ? "Every gene would be " + fmtMb(every.tooBig) + ", past the " + fmtMb(ALL_ROWS_MAX_BYTES) + " a page's rows may hold, so the table lists the most significant. " : "") + "The " + DE_POINT_CAP.toLocaleString("en-US") + " most significant genes are " + (two ? "drawn as points and listed in the table, the rest drawn as density. " : "listed in the table. ") : "") +
       (/zscore/i.test(profileType) ? "Z-scores are standardised within each study, so a difference is in study-specific units. " : "") +
       "A test on thousands of samples finds tiny differences significant — read the " + (two ? "effect" : "means") + ", not only the q. " +
       (gsea ? "Enrichment is preranked GSEA on the unrounded t (Subramanian et al. 2005, weight 1), significance from " + DE_PERMUTATIONS +

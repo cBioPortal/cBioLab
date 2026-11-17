@@ -24,6 +24,8 @@ export interface DiffexprView {
    * change re-runs nothing.
    */
   gene?: string;
+  /** carry every tested gene in the result (`all`), for a page whose table and volcano draw them all, as the portal's (default only the 1,500 most significant) */
+  allRows?: boolean;
 }
 export interface DiffexprGene {
   gene: string;
