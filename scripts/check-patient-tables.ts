@@ -73,7 +73,8 @@ ok("F a values filter [Missense] keeps KEAP1, KRAS, TP53", genes(await rows({ fi
 ok("S search \"nonsense\" finds ARID1A", genes(await rows({ search: "nonsense" })) === "ARID1A");
 {
   const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: "FX-P03" }, mutations: { columns: ["gene", "mutationType"] } }, ctxFor({ values: "mutationType", table: "mutations", page: undefined })) as { alterations?: AlterationsResult };
-  const vals = (r.alterations?.tables.mutations?.values?.values || []).map((v) => v.value).sort();
+  const cv = r.alterations?.tables.mutations?.values;
+  const vals = (cv && !cv.numeric ? cv.values : []).map((v) => v.value).sort();
   ok("F the filter offers the labels", vals.join(", ") === "Missense, Nonsense", vals.join(", "));
 }
 
