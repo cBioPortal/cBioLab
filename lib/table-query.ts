@@ -59,6 +59,8 @@ export interface RowSource {
   defaultOrder: string;
   /** after any sort, so the order is total and every page and the download agree */
   tiebreak: string;
+  /** the columns of `rows` naming a row's sample and patient: the counts then say how many of each the query keeps */
+  units?: { sample: string; patient: string };
 }
 
 export const SEARCH_MAX = 200;
@@ -204,7 +206,10 @@ export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study
 
 /** Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. */
 export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): PatientSql {
-  return patientSql(src.with + "SELECT cohort, study, countIf(" + whereSql(src, q, defaults) + ") AS n, count() AS all FROM rows GROUP BY cohort, study");
+  const where = whereSql(src, q, defaults);
+  return patientSql(src.with + "SELECT cohort, study, countIf(" + where + ") AS n, count() AS all" +
+    (src.units ? ", uniqExactIf(" + src.units.sample + ", " + where + ") AS ns, uniqExactIf(" + src.units.patient + ", " + where + ") AS np" : "") +
+    " FROM rows GROUP BY cohort, study");
 }
 
 /**

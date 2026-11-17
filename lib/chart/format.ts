@@ -236,6 +236,15 @@ export function portalQTip(q: number): string {
 }
 
 /**
+ * A filtered table's samples and patients as the portal's reset panel writes them (PatientSampleSummary):
+ * "3 samples / 2 patients", or one count for both when they are equal, "5 samples/patients".
+ */
+export function portalKeptUnits(samples: number, patients: number): string {
+  if (samples !== patients) return samples + (samples === 1 ? " sample" : " samples") + " / " + patients + (patients === 1 ? " patient" : " patients");
+  return samples + (samples === 1 ? " sample/patient" : " samples/patients");
+}
+
+/**
  * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",
  * "<1%" below one percent, else the whole percent, Math.round's (2.5 → "3%").
  */

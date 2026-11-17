@@ -6,6 +6,7 @@
 // The search, filters, sort and columns are the view's spec (lib/table-query.ts), so a change
 // re-runs the view and a shared document reproduces the table; the page is this browser's.
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { portalKeptUnits } from "../../lib/chart/format.ts";
 import type { ColumnFilter, ColumnValues, TableQuery, TableRows, TextFilterOp } from "../../lib/types.ts";
 import { api } from "../lab/api.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
@@ -329,6 +330,8 @@ export interface DataTableProps<V> {
   table?: string;
   /** what a row is, plural: "mutations", "samples" */
   unit: string;
+  /** when the query keeps fewer rows than there are: the distinct samples and patients of those it keeps, said after the count */
+  kept?: { samples: number; patients: number };
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
   onQuery: (q: TableQuery) => void;
   /** a cell drawn other than as its text (a badge, a link); the row says whose it is (study, sample) */
@@ -357,7 +360,7 @@ export interface DataTableProps<V> {
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -416,7 +419,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   return (
     <div className="dt">
       <div className="dt-bar">
-        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}
+        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}{kept ? " (" + portalKeptUnits(kept.samples, kept.patients) + ")" : null}</> : <>{t.total.toLocaleString()} {unit}</>}
           {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
