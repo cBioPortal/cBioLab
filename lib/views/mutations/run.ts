@@ -1,7 +1,7 @@
 // Mutations view: the mutation table for one gene, on lib/table-query.ts
 import type { ViewResult } from "../../types.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
-import { resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
+import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterationOf } from "../../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
@@ -103,6 +103,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   return {
     kind: "mutations", cohorts: vNames, mutations,
     method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, variantPins: gn, queryText: describeQuery(q, MUTATION_COLUMNS),
+      ...(drivers ? { drivers: driverSourceText(drivers, pin ? "OncoKB " + pin : null, gn ? "a Cancer Hotspot of its kind in the stored " + gn + " annotation" : null) } : {}),
       sortName: q.sort ? MUTATION_COLUMNS.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
       shown: rows.length, lists: r.lists, excluded, instances: r.groups }),
     participation: ctx.participationFor(ctx.vStudies, true),

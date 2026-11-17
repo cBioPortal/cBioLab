@@ -29,16 +29,31 @@ export const germlineCondSql = (g = ""): string =>
 
 /**
  * The page's driver sources as a view can read them: OncoKB only at a pin, Cancer Hotspots only with
- * Genome Nexus pins (the portal's sources the deployment offers). `sure`: some source is on whatever
- * the data holds; with none but "every tier" (`byTier`), something is annotated only where the data
- * carries a tier.
+ * Genome Nexus pins (the portal's sources the deployment offers). `sure`: one of those is on, so the
+ * mutations are annotated whatever the study holds.
  */
-export function offeredSources(d: ResolvedDrivers, pin: string | null, hotspotPins: VariantPins | null): { oncokb: boolean; hotspots: boolean; sure: boolean; byTier: boolean } {
+export function offeredSources(d: ResolvedDrivers, pin: string | null, hotspotPins: VariantPins | null): { oncokb: boolean; hotspots: boolean; sure: boolean } {
   const oncokb = d.oncokb && !!pin, hotspots = d.hotspots && !!hotspotPins && Object.values(hotspotPins).some(Boolean);
-  const sure = oncokb || hotspots || d.custom || (d.tiers !== null && d.tiers.length > 0);
-  return { oncokb, hotspots, sure, byTier: !sure && d.tiers === null };
+  return { oncokb, hotspots, sure: oncokb || hotspots };
 }
 
-/** whether any of the study's mutations of the genes (`list`, quoted and comma-separated) carries a custom driver tier (cbp_driver_tiers), as SQL */
-export const tieredSql = (db: string, study: string, list: string): string =>
-  "(SELECT count() > 0 FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ") AND ifNull(driverTiersFilter, '') != '')";
+/**
+ * Whether the study's mutations are told apart as driver or VUS, as SQL ("1", "0" or a condition): a
+ * source in `sure`, or the study's own calls where it holds any — the portal offers its custom-driver
+ * box only when the study's report has binary calls (customDriverAnnotationReport.hasBinary) and a tier
+ * box only for a tier the study has, so with OncoKB and hotspots off a study without them is not
+ * annotated at all (driversAnnotated false). Judged over the whole study, as that report is.
+ */
+export function annotatingSql(d: ResolvedDrivers, sure: boolean, db: string, study: string): string {
+  if (sure) return "1";
+  const any = (cond: string) => "(SELECT count() > 0 FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND " + cond + ")";
+  const or: string[] = [];
+  if (d.custom) or.push(any("ifNull(driverFilter, '') != ''"));
+  if (d.tiers === null) or.push(any("ifNull(driverTiersFilter, '') != ''"));
+  else if (d.tiers.length) or.push(any("ifNull(driverTiersFilter, '') IN (" + d.tiers.map(sq).join(", ") + ")"));
+  return or.length ? "(" + or.join(" OR ") + ")" : "0";
+}
+
+/** `driver`, a row's call under the settings, as filed when nothing annotates: every row in its class's one cell */
+export const unannotatedOrSql = (annotating: string, driver: string): string =>
+  annotating === "1" ? driver : annotating === "0" ? "toUInt8(1)" : "if(" + annotating + ", " + driver + ", toUInt8(1))";

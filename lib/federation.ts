@@ -73,7 +73,7 @@ import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
-import { offeredSources, tieredSql } from "./driver-sql.ts";
+import { annotatingSql, offeredSources, unannotatedOrSql } from "./driver-sql.ts";
 import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 import { variantPins, type VariantPins } from "./variant-annotation.ts";
 
@@ -142,6 +142,8 @@ export interface LollipopTotal { gene: string; patients: number; pairs: number; 
 export interface LollipopReport {
   changes: LollipopChange[]; types: LollipopType[]; totals: LollipopTotal[];
   cohortSamples: number; minCount: number; annotated: boolean;
+  /** the page's driver settings the split followed, when the caller gave them (lollipopCounts' `drivers`) */
+  drivers?: DriverSettings;
 }
 /** Six sums for one gene pair on a continuous profile. Sufficient for Pearson's r. */
 export interface PairMoments {
@@ -613,11 +615,9 @@ function lollipopCteWith(cohortSql: string, genes: string[], study: string, floo
     "        WHERE oncokb_version = " + sq(pin!) + " AND is_driver AND alteration_type = 'MUTATION')");
   const hotspotKeys = src.hotspots ? hotspotKeysSql(db, [study], genes, hotspotPins!) : null;
   if (hotspotKeys) or.push("(`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (" + hotspotKeys + ")");
-  const annotating = src.sure ? "" : src.byTier ? tieredSql(db, study, list) : "0";
-  let driver = or.length ? "if(" + or.join("\n        OR ") + ", 1, 0)" : "0";
-  let fusionDriver = src.oncokb ? svDriverSql("vn") : "toUInt8(0)";
-  if (annotating === "0") { driver = "1"; fusionDriver = "toUInt8(1)"; }
-  else if (annotating) { driver = "if(" + annotating + ", " + driver + ", 1)"; fusionDriver = "if(" + annotating + ", " + fusionDriver + ", toUInt8(1))"; }
+  const annotating = annotatingSql(d, src.sure, db, study);
+  const driver = unannotatedOrSql(annotating, or.length ? "toUInt8(" + or.join("\n        OR ") + ")" : "toUInt8(0)");
+  const fusionDriver = unannotatedOrSql(annotating, src.oncokb ? svDriverSql("vn") : "toUInt8(0)");
   return lollipopCteSql(cohortSql, genes, study, floor, pin, db, filters, fusionLines, list, driver, fusionDriver);
 }
 
@@ -683,12 +683,17 @@ export function lollipopTypesSql(cohortSql: string, genes: string[], study: stri
  * portal counts its rows by their gene (MutationUtils somaticMutationRate). A row is germline when its
  * status contains "germline" in any case (/germline/i), somatic otherwise, a missing status included.
  */
+/**
+ * With `drivers`, the stems' and badges' pins too (`pins`), so a DRIVER line keeps the same rows here as
+ * there; `annotating` then says whether the settings tell this study's mutations apart at all.
+ */
 export function lollipopTotalsSql(cohortSql: string, genes: string[], study: string, db: string = DB, filters?: MutationFilters,
-  fusions?: { lines: string[]; pin: string | null }, drivers?: ResolvedDrivers): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, 1, fusions?.pin ?? null, db, null, filters, fusions?.lines, drivers) +
+  fusions?: { lines: string[]; pin: string | null }, drivers?: ResolvedDrivers, pins?: { pin: string | null; hotspotPins: VariantPins | null }): AggregateSql {
+  const pin = drivers && pins ? pins.pin : fusions?.pin ?? null, hotspotPins = drivers && pins ? pins.hotspotPins : null;
+  return aggregateSql(lollipopCte(cohortSql, genes, study, 1, pin, db, hotspotPins, filters, fusions?.lines, drivers) +
     "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
     "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples" +
-    (drivers ? ",\n       " + tieredSql(db, study, genes.map(sq).join(",")) + " AS tiered" : "") + "\n" +
+    (drivers ? ",\n       " + annotatingSql(drivers, offeredSources(drivers, pin, hotspotPins).sure, db, study) + " AS annotating" : "") + "\n" +
     "FROM m GROUP BY gene");
 }
 /** A compiled cohort's size: its patients (the owners of its samples) and its samples. */
@@ -1665,10 +1670,11 @@ abstract class BaseResolver implements AggregateCapable {
   async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, drivers?: DriverSettings): Promise<LollipopReport> {
     const pin = this.ctx.oncokbPin ?? null;
     const d = drivers === undefined ? undefined : resolveDrivers(drivers);
-    const hotspotPins = genes.length || d ? await variantPins() : null;
+    // the settings this report applied, echoed so a caller can tell a site that ignored them
+    const echo = drivers !== undefined ? { drivers } : {};
+    if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: d ? d.oncokb && !!pin : !!pin, ...echo };
+    const hotspotPins = await variantPins();
     const src = d ? offeredSources(d, pin, hotspotPins) : null;
-    const empty: LollipopReport = { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: src ? src.sure : !!pin };
-    if (!genes.length) return empty;
     const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
     const pos = (x: unknown) => x == null || x === "" ? null : Number(x);
     const filters = oql ? mutationFilters(oql, genes, { study: this.study, db, oncokbPin: pin, hotspotPins }) : undefined;
@@ -1676,11 +1682,11 @@ abstract class BaseResolver implements AggregateCapable {
     const [c, t, tot, cs] = await Promise.all([
       this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d), conn),
       this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d), conn),
-      this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters, fusionLines ? { lines: fusionLines, pin } : undefined, d), conn),
+      this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters, fusionLines ? { lines: fusionLines, pin } : undefined, d, { pin, hotspotPins }), conn),
       this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
     ]);
     return {
-      minCount, annotated: src ? src.sure || (src.byTier && tot.data.some((x) => Number(x.tiered) === 1)) : !!pin, cohortSamples: Number(cs.data[0]?.n || 0),
+      minCount, annotated: src ? src.sure || tot.data.some((x) => Number(x.annotating) === 1) : !!pin, cohortSamples: Number(cs.data[0]?.n || 0), ...echo,
       changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1,
         ...(x.impact ? { impact: String(x.impact) } : {}) })),
       types: t.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), mtype: String(x.mtype), driver: Number(x.driver) === 1, rows: Number(x.rows) })),

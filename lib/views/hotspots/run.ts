@@ -23,6 +23,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const hide = [...new Set(hv.hide || [])];
   { const e = checkCodons(hv.codons, uniq); if (e) return untimed({ kind: "hotspots", error: e }); }
   const codons = pruneCodons(hv.codons && Object.fromEntries(Object.entries(hv.codons).map(([g, ps]) => [g, [...new Set(ps)].sort((a, b) => a - b)])), uniq);
+  if (hv.drivers !== undefined) { try { resolveDrivers(hv.drivers); } catch (e) { return untimed({ kind: "hotspots", error: (e as Error).message }); } }
   const cn = vNames[0];
   const studies = cohorts[cn].studies;
   // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once

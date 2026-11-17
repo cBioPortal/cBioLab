@@ -294,8 +294,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   // every tab draws the queried patients, as cBioPortal's do; only Comparison/Survival compares groups
   const queried = ["Queried"], both = ["Altered", "Unaltered"];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
-  // the Mutations tab follows the query's lines where they narrow mutations, as the portal's
-  // the Mutations tab's Driver/VUS split follows the page's driver settings, with or without DRIVER in the query
+  // the Mutations tab follows the query's lines where they narrow mutations, and its Driver/VUS split the
+  // page's driver settings, with or without DRIVER in the query, as the portal's
   const mutOql = { oql: q.entries, drivers: {} };
   const queryHasOql = q.entries.some((x) => { try { return parseOql(x).some((e) => hasOql(e.specs)); } catch { return false; } });
   // Mutual Exclusivity's tracks are the query's lines, named as the portal names them (2 or more to pair)

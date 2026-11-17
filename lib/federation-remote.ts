@@ -407,6 +407,9 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     // a peer on an older build answers without these; refuse by name rather than draw nothing
     if (!r.lollipopCounts)
       throw new Error("peer " + this.study + " does not report per-codon lollipop counts (it predates them); update that instance");
+    // a site that predates the settings answers by OncoKB and hotspots alone: refused, not drawn as if it followed them
+    if (drivers && !r.lollipopCounts.drivers)
+      throw new Error("peer " + this.study + " does not apply the page's driver settings to its Mutations tab counts (it predates them); update that instance");
     return r.lollipopCounts;
   }
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {

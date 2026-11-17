@@ -1,8 +1,8 @@
 /**
  * Live check: the Mutations tab's driver calls follow the page's driver settings (MUT-BF-2, MUT-MD-2,
  * MUT-0-3), run against the committed fixture study on connection b — lib/federation.ts
- * lollipopTypesSql with `drivers` summed into the grid's tally (F), and lollipopCounts' report
- * `annotated` (R). Row ids are the spec table's.
+ * lollipopTypesSql with `drivers` summed into the grid's tally (F, B1), and lollipopCounts' report:
+ * its `annotated` (R, B1) and its totals beside its stems and tally (B3). Row ids are the spec table's.
  *
  * Each expected number is written down by hand from the fixture files, by the portal's rule
  * (annotateMutationPutativeDriver: oncoKb || hotspots || custom, each only from a switched-on
@@ -21,13 +21,19 @@
  *     G469A on FX-P29-T1 (not in peer-oncokb.tsv; its record has an empty allele, so no hotspot: VUS by
  *     default); one KIAA1549-BRAF FUSION on FX-P53-T1 (data_sv.txt line 23), the pair (57670, 673)
  *     Oncogenic with no tumour type in peer-oncokb-sv.tsv: a driver.
- *   data_mutations.txt has no cbp_driver / cbp_driver_tiers column: no custom call, no tier (R6).
+ *   data_mutations.txt has no cbp_driver / cbp_driver_tiers column: no custom call, no tier (R6). So
+ *     with OncoKB and hotspots off the study's own calls cannot annotate it: the portal offers its
+ *     custom-driver box only when the study has binary calls and a tier box only for a tier it has
+ *     (R5, B1: not annotated, every row filed as a driver, one badge per type).
+ *   B3: EML4 and ALK have no mutation; the 6 EML4-ALK fusions (6 samples) have EML4 as site 1, so
+ *     they count toward EML4's somatic samples, not ALK's; no hotspot calls a fusion, so with hotspots
+ *     the only source a DRIVER line keeps none of them.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-driver-settings.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQuery, connById } from "../lib/ch.ts";
-import { PatientLevelResolver, lollipopTypesSql } from "../lib/federation.ts";
+import { PatientLevelResolver, lollipopTypesSql, type LollipopOql } from "../lib/federation.ts";
 import { resolveDrivers, type DriverSettings } from "../lib/driver-settings.ts";
 import { canonicalType, cellOf, impactType, IMPACT_TYPES, type ImpactType } from "../lib/lollipop.ts";
 import type { CohortDef } from "../lib/types.ts";
@@ -125,12 +131,13 @@ await tallyCase("F5 every source off: BRAF G469A counted with the drivers", "BRA
 await tallyCase("F5 every source off, no pin", "PIK3CA", OFF, PIK_ALL, null);
 
 // ---- R: the report's `annotated`, and its tally, through lollipopCounts
-type Counts = (def: CohortDef, genes: string[], minCount?: number, oql?: undefined, drivers?: DriverSettings) =>
-  Promise<{ annotated: boolean; types: { gene: string; mtype: string; driver: boolean; rows: number }[] }>;
-const report = async (pin: string | null, gene: string, drivers?: DriverSettings) => {
+type Counts = (def: CohortDef, genes: string[], minCount?: number, oql?: LollipopOql, drivers?: DriverSettings) =>
+  Promise<{ annotated: boolean; drivers?: DriverSettings; types: { gene: string; mtype: string; driver: boolean; rows: number }[];
+    changes: { gene: string }[]; totals: { gene: string; patients: number; pairs: number; somaticSamples: number }[] }>;
+const report = async (pin: string | null, gene: string, drivers?: DriverSettings, oql?: LollipopOql) => {
   try {
     const r = resolver(pin);
-    return await (r.lollipopCounts as unknown as Counts).call(r, WHOLE, [gene], 1, undefined, drivers);
+    return await (r.lollipopCounts as unknown as Counts).call(r, WHOLE, [gene], 1, oql, drivers);
   } catch (e) { return "error: " + String((e as Error).message).slice(0, 200); }
 };
 const annotatedCase = async (tag: string, pin: string | null, drivers: DriverSettings | undefined, want: boolean, gene = "PIK3CA") => {
@@ -147,7 +154,13 @@ if (typeof r3 !== "string") {
   ok("R3/F5 the report's tally with every source off: every row a driver", same(t, PIK_ALL), show(t));
 }
 await annotatedCase("R4 OncoKB alone, not offered (no pin)", null, { oncokb: true, hotspots: false, custom: false, tiers: [] }, false);
-await annotatedCase("R5 custom calls alone (no store needed)", null, { oncokb: false, hotspots: false, custom: true, tiers: [] }, true);
+const r5 = await annotatedCase("R5 custom calls alone, the study holding none", null, { oncokb: false, hotspots: false, custom: true, tiers: [] }, false);
+if (typeof r5 !== "string") {
+  const t = fill(r5.types, "PIK3CA");
+  ok("R5 the report's tally with custom calls alone: every row a driver (one badge per type)", same(t, PIK_ALL), show(t));
+}
+await annotatedCase("R5 custom calls alone, with a pin", PIN, { oncokb: false, hotspots: false, custom: true, tiers: [] }, false);
+await annotatedCase("R5 the defaults with OncoKB and hotspots off", PIN, { oncokb: false, hotspots: false }, false);
 const tiers = (await chQuery<{ n: number }>("SELECT countIf(ifNull(driverTiersFilter, '') != '') AS n FROM " + db +
   ".mutation_derived WHERE studyId = '" + STUDY + "' AND `GENE.hugoGeneSymbol` = 'PIK3CA'", conn)).data;
 ok("R6 fixture: no PIK3CA row has a driverTiersFilter", Number(tiers[0]?.n) === 0, String(tiers[0]?.n));
@@ -162,6 +175,47 @@ if (typeof r2 !== "string") {
   const t = fill(r2.types, "PIK3CA");
   ok("F2 the report's tally with hotspots off", same(t, { missense: [4, 1], inframe: [0, 1] }), show(t));
 }
+
+// ---- B1: OncoKB and hotspots off, the study's own calls and tiers on (it holds none): not annotated,
+// no VUS in any class, each class's driver count its rows — through the SQL and through the report
+const NO_STORES: DriverSettings = { oncokb: false, hotspots: false };
+const KRAS_ALL: Want = { missense: [24, 0] };
+await tallyCase("B1 OncoKB and hotspots off", "KRAS", NO_STORES, KRAS_ALL);
+await tallyCase("B1 OncoKB and hotspots off", "PIK3CA", NO_STORES, PIK_ALL);
+for (const [gene, want] of [["KRAS", KRAS_ALL], ["PIK3CA", PIK_ALL]] as const) {
+  const r = await annotatedCase("B1 OncoKB and hotspots off, " + gene, PIN, NO_STORES, false, gene);
+  if (typeof r !== "string") {
+    const t = fill(r.types, gene);
+    ok("B1 the report's " + gene + " tally with OncoKB and hotspots off: vus 0, driver the rows", same(t, want), show(t));
+    ok("B1 the report echoes the settings it applied", JSON.stringify(r.drivers) === JSON.stringify(NO_STORES), JSON.stringify(r.drivers));
+  }
+}
+
+// ---- B3: hotspots the only source and a line that keeps drivers: the totals (patients, pairs,
+// somatic samples) count the rows the stems and the tally count. EML4 has no mutation and is site 1
+// of the 6 EML4-ALK fusions, which no hotspot calls: "EML4: DRIVER" keeps nothing, so its totals are 0
+// (they were 6 somatic samples when the totals filed every row a driver). The line's drivers are the
+// view's (lib/views/shared.ts viewOql passes them on).
+const HOT_ONLY: DriverSettings = { oncokb: false, custom: false, tiers: [] };
+const totalsOf = (r: Exclude<Awaited<ReturnType<typeof report>>, string>, gene: string) => {
+  const t = r.totals.find((x) => x.gene === gene);
+  return { patients: t?.patients ?? 0, pairs: t?.pairs ?? 0, somaticSamples: t?.somaticSamples ?? 0 };
+};
+const totalsCase = async (tag: string, gene: string, line: string, want: { stems: number; tally: Want; patients: number; pairs: number; somaticSamples: number }) => {
+  const r = await report(PIN, gene, HOT_ONLY, { lines: [line], drivers: HOT_ONLY });
+  if (typeof r === "string") { ok(tag, false, r); return; }
+  const t = fill(r.types, gene), tot = totalsOf(r, gene), stems = r.changes.filter((c) => c.gene === gene).length;
+  ok(`${tag} ${gene}, hotspots alone, "${line}": ${want.stems} stems, tally ${show({ ...emptyTally(), ...Object.fromEntries(Object.entries(want.tally).map(([k, [d, v]]) => [k, { driver: d, vus: v }])) })}`,
+    stems === want.stems && same(t, want.tally), "stems " + stems + ", tally " + show(t));
+  ok(`${tag} ${gene} the totals agree: ${want.patients} patients, ${want.pairs} pairs, ${want.somaticSamples} somatic samples`,
+    tot.patients === want.patients && tot.pairs === want.pairs && tot.somaticSamples === want.somaticSamples, JSON.stringify(tot));
+};
+await totalsCase("B3 no fusion is a driver:", "EML4", "EML4: DRIVER", { stems: 0, tally: {}, patients: 0, pairs: 0, somaticSamples: 0 });
+// BRAF: D594G (a hotspot) on FX-P29-T1 is the one driver; its fusion's site 1 is KIAA1549
+await totalsCase("B3 one hotspot kept:", "BRAF", "BRAF: DRIVER", { stems: 1, tally: { missense: [1, 0] }, patients: 1, pairs: 1, somaticSamples: 1 });
+// a FUSION_DRIVER line alone does not narrow (doesQueryContainMutationOQL): ALK's 6 fusions stay, as
+// VUS; ALK is their site 2, so they add no somatic sample to ALK
+await totalsCase("B3 a fusion line alone:", "ALK", "ALK: FUSION_DRIVER", { stems: 0, tally: { fusion: [0, 6] }, patients: 0, pairs: 0, somaticSamples: 0 });
 
 console.log(`\n${checks - failures}/${checks} mutation driver settings checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

@@ -10,7 +10,7 @@ import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
-import { offeredSources, tieredSql } from "./driver-sql.ts";
+import { annotatingSql, offeredSources, unannotatedOrSql } from "./driver-sql.ts";
 import { PUTATIVE_DRIVER, type ResolvedDrivers } from "./driver-settings.ts";
 import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
@@ -147,15 +147,7 @@ function mutationDrvSql(p: TablePart, db: string, gene: string, pin: string | nu
   else if (drivers.tiers.length) or.push("ifNull(m.driverTiersFilter, '') IN (" + drivers.tiers.map(sq).join(", ") + ")");
   if (drivers.oncokb && pin) or.push(oncokb);
   if (drivers.hotspots && hotspot) or.push(hotspot);
-  return unannotatedOr(p, db, gene, drivers, pin, pins, or.length ? "toUInt8(" + or.join(" OR ") + ")" : "toUInt8(0)");
-}
-
-/** `drv`, or 1 for every row when no source annotates (the grid then files every mutation in its class's one cell) */
-function unannotatedOr(p: TablePart, db: string, gene: string, drivers: ResolvedDrivers, pin: string | null, pins: VariantPins, drv: string): string {
-  const src = offeredSources(drivers, pin, pins);
-  if (src.sure) return drv;
-  if (!src.byTier) return "toUInt8(1)";
-  return "if(" + tieredSql(db, p.study, sq(gene)) + ", " + drv + ", toUInt8(1))";
+  return unannotatedOrSql(annotatingSql(drivers, offeredSources(drivers, pin, pins).sure, db, p.study), or.length ? "toUInt8(" + or.join(" OR ") + ")" : "toUInt8(0)");
 }
 
 /** A part's rows, every column the table has, labelled with its cohort, study and document order. */
@@ -278,7 +270,7 @@ function fusionCtes(p: TablePart, i: number, db: string, gene: string, pin: stri
  * the query's OQL, the fusions a line of either partner wants (lib/oql.ts oqlFusionFilterSql).
  */
 function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): string {
-  const drv = drivers ? unannotatedOr(p, db, gene, drivers, pin, pins, pin && drivers.oncokb ? svDriverSql("vn", "va1", "va2") : "toUInt8(0)")
+  const drv = drivers ? unannotatedOrSql(annotatingSql(drivers, offeredSources(drivers, pin, pins).sure, db, p.study), pin && drivers.oncokb ? svDriverSql("vn", "va1", "va2") : "toUInt8(0)")
     : pin ? svDriverSql("vn", "va1", "va2") : "toUInt8(0)";
   const filter = oql ? oqlFusionFilterSql(oql.lines, "v.gene1", "v.gene2", drv) : null;
   return "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +

@@ -26,6 +26,20 @@ function toggled(hide: Set<string>, cells: AlterationCell[]): string[] {
   return [...next];
 }
 
+/** A class's row header: its name, which shows or hides the whole row, and "only", which keeps just it. */
+function RowHead({ k, shown, onToggle, onOnly, tail }: { k: ImpactType; shown: boolean; onToggle: () => void; onOnly: () => void; tail: string }) {
+  const c = IMPACT_COLORS[k];
+  return (
+    <th scope="row">
+      <span className="lp-head">
+        <button type="button" className={"lp-rowname" + (shown ? "" : " off")} style={{ color: k === "truncating" ? undefined : c.driver }}
+          onClick={onToggle} data-tip={(shown ? "hide" : "show") + " every " + c.label.toLowerCase() + " mutation" + tail}>{c.label}</button>
+        <button type="button" className="lp-only" onClick={onOnly} data-tip={"show only " + c.label.toLowerCase() + " mutations" + tail}>only</button>
+      </span>
+    </th>
+  );
+}
+
 function Badge({ n, color, shown, onClick, title, label }: { n: number; color: string; shown: boolean; onClick: () => void; title: string; label: string }) {
   return (
     <button type="button" className={"lp-badge" + (shown ? "" : " off")} onClick={onClick} data-tip={title} aria-pressed={shown} aria-label={label}
@@ -73,13 +87,7 @@ export function AlterationGrid({ tally, classes, hide, onHide, of, note, annotat
           const rowShown = rowCells(k).some((x) => !hide.has(x));
           return (
             <tr key={k}>
-              <th scope="row">
-                <span className="lp-head">
-                  <button type="button" className={"lp-rowname" + (rowShown ? "" : " off")} style={{ color: k === "truncating" ? undefined : c.driver }}
-                    onClick={() => onHide(toggled(hide, rowCells(k)))} data-tip={(rowShown ? "hide" : "show") + " every " + c.label.toLowerCase() + " mutation" + tail}>{c.label}</button>
-                  <button type="button" className="lp-only" onClick={() => only(rowCells(k))} data-tip={"show only " + c.label.toLowerCase() + " mutations" + tail}>only</button>
-                </span>
-              </th>
+              <RowHead k={k} shown={rowShown} onToggle={() => onHide(toggled(hide, rowCells(k)))} onOnly={() => only(rowCells(k))} tail={tail} />
               {COLS.map((col) => {
                 const x = cell(k, col), on = !hide.has(x);
                 return (
@@ -112,13 +120,7 @@ function TypeBadges({ tally, classes, hide, onHide, of, note }: {
           const shown = rowCells(k).some((x) => !hide.has(x));
           return (
             <tr key={k}>
-              <th scope="row">
-                <span className="lp-head">
-                  <button type="button" className={"lp-rowname" + (shown ? "" : " off")} style={{ color: k === "truncating" ? undefined : c.driver }}
-                    onClick={() => onHide(toggled(hide, rowCells(k)))} data-tip={(shown ? "hide" : "show") + " every " + c.label.toLowerCase() + " mutation" + tail}>{c.label}</button>
-                  <button type="button" className="lp-only" onClick={() => only(rowCells(k))} data-tip={"show only " + c.label.toLowerCase() + " mutations" + tail}>only</button>
-                </span>
-              </th>
+              <RowHead k={k} shown={shown} onToggle={() => onHide(toggled(hide, rowCells(k)))} onOnly={() => only(rowCells(k))} tail={tail} />
               <td>
                 <Badge n={n} color={c.driver} shown={shown} onClick={() => onHide(toggled(hide, rowCells(k)))}
                   title={(shown ? "hide " : "show ") + c.label.toLowerCase() + " mutations (" + n.toLocaleString() + " mutation rows" + where + ")" + tail}

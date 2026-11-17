@@ -4,8 +4,8 @@
 // (lib/mutation-table.ts mutationRowSource with `drivers`, alterationSql), the grid and legend when
 // nothing is annotated (app/_lollipop/AlterationGrid.tsx, ColorLegend, lib/lollipop.ts lollipopLegend)
 // and the Results page's views (app/portal/results-layout.ts). Row ids are the spec table's (L, R, T,
-// G, P). What these calls give on real rows is run against the fixture study by
-// scripts/check-mutation-driver-settings.ts (F, R3-R6).
+// V, G, P). What these calls give on real rows is run against the fixture study by
+// scripts/check-mutation-driver-settings.ts (F, B, R3-R6).
 import { test, describe, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { register } from "node:module";
@@ -29,8 +29,14 @@ const { lollipopLegend, IMPACT_COLORS } = await import("../lib/lollipop.ts");
 const { resultsLayout, syncDrivers, syncDriverCohorts } = await import("../app/portal/results-layout.ts");
 const { answerFederation } = await import("../lib/federation-api.ts");
 const { RemoteAggregateResolver } = await import("../lib/federation-remote.ts");
+const { runHotspots } = await import("../lib/views/hotspots/run.ts");
+const { Untimed } = await import("../lib/views/run.ts");
 type View = import("../lib/types.ts").View;
 type DriverSettings = import("../lib/driver-settings.ts").DriverSettings;
+type ViewResult = import("../lib/types.ts").ViewResult;
+type ViewRun = import("../lib/views/run.ts").ViewRun;
+type EvaluatedCohort = import("../lib/views/run.ts").EvaluatedCohort;
+type ViewParticipation = import("../lib/types.ts").ViewParticipation;
 
 register("./support/tsx-loader.mjs", import.meta.url);
 const { renderToStaticMarkup } = await import("react-dom/server");
@@ -160,11 +166,14 @@ describe("L the lollipop's SQL follows the driver settings", () => {
 });
 
 // ---------------------------------------------------------------- R: the report's `annotated`
-type Lollipop = (def: unknown, genes: string[], minCount?: number, oql?: unknown, drivers?: DriverSettings) => Promise<{ annotated: boolean }>;
+type Lollipop = (def: unknown, genes: string[], minCount?: number, oql?: unknown, drivers?: DriverSettings) => Promise<{ annotated: boolean; drivers?: DriverSettings }>;
 const resolver = (pin: string | null) =>
   new PatientLevelResolver("s1", { oncokbPin: pin }, { id: PRIMARY.id, mode: "patient-level", label: "stand-in", conn: PRIMARY });
-const annotated = async (pin: string | null, drivers?: DriverSettings) =>
-  (await (resolver(pin).lollipopCounts as unknown as Lollipop)({ all: [] }, ["KRAS"], 1, undefined, drivers)).annotated;
+const reportOf = async (pin: string | null, drivers?: DriverSettings) => {
+  const r = resolver(pin);
+  return (r.lollipopCounts as unknown as Lollipop).call(r, { all: [] }, ["KRAS"], 1, undefined, drivers);
+};
+const annotated = async (pin: string | null, drivers?: DriverSettings) => (await reportOf(pin, drivers)).annotated;
 
 describe("R the report says whether drivers are told apart", () => {
   test("R1 drivers omitted: annotated is whether there is an OncoKB pin, as today", async () => {
@@ -180,8 +189,27 @@ describe("R the report says whether drivers are told apart", () => {
   test("R4 OncoKB alone, but no pin: not annotated (OncoKB is not offered)", async () => {
     assert.equal(await annotated(null, { oncokb: true, hotspots: false, custom: false, tiers: [] }), false);
   });
-  test("R5 custom calls alone, no pin: annotated (custom calls need no store)", async () => {
-    assert.equal(await annotated(null, { oncokb: false, hotspots: false, custom: true, tiers: [] }), true);
+  test("R5 custom calls alone, the study holding none (the stand-in answers no rows): not annotated", async () => {
+    assert.equal(await annotated(null, { oncokb: false, hotspots: false, custom: true, tiers: [] }), false);
+    assert.equal(await annotated("v1", { oncokb: false, hotspots: false, custom: true, tiers: [] }), false, "with a pin too");
+  });
+  test("R5 the defaults with OncoKB and hotspots off, the study holding no calls or tiers: not annotated", async () => {
+    assert.equal(await annotated("v1", { oncokb: false, hotspots: false }), false);
+    assert.equal(await annotated(null, { oncokb: false, hotspots: false }), false);
+  });
+  test("R5 the totals query says study-wide whether the study's own calls annotate (an `annotating` column)", async () => {
+    sent.length = 0;
+    await reportOf(null, { oncokb: false, hotspots: false, custom: true, tiers: [] });
+    const totals = sent.find((q) => /AS somatic_samples/.test(q));
+    assert.ok(totals, "a totals statement was run");
+    assert.match(totals, /AS annotating\b/);
+  });
+
+  test("R7 the local report echoes the settings it applied, and has none when given none", async () => {
+    assert.deepEqual((await reportOf("v1", {})).drivers, {});
+    assert.deepEqual((await reportOf("v1", { oncokb: false })).drivers, { oncokb: false });
+    assert.deepEqual((await reportOf(null, OFF)).drivers, OFF);
+    assert.equal("drivers" in await reportOf("v1"), false);
   });
 
   test("R7 the federation API carries lollipopDrivers to the peer's lollipopCounts as its 5th argument", async () => {
@@ -207,22 +235,44 @@ describe("R the report says whether drivers are told apart", () => {
     assert.equal(seen[1][4] ?? undefined, undefined);
   });
 
-  test("R7 the remote resolver sends lollipopDrivers in the body when given, and not otherwise", async () => {
+  /** a peer answering lollipopCounts, echoing the body's lollipopDrivers when `echo` */
+  const remoteCalls = async (echo: boolean, calls: [DriverSettings?][]) => {
     const bodies: Record<string, unknown>[] = [];
+    const results: ({ drivers?: DriverSettings } | Error)[] = [];
     const original = globalThis.fetch;
     globalThis.fetch = (async (_url: string, init: RequestInit) => {
-      bodies.push(JSON.parse(String(init.body)));
-      return new Response(JSON.stringify({ study: "s1", count: 1, samples: 1, oncokbPin: null,
-        lollipopCounts: { changes: [], types: [], totals: [], cohortSamples: 1, minCount: 1, annotated: false } }), { status: 200, headers: { "content-type": "application/json" } });
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      bodies.push(body);
+      const report = { changes: [], types: [], totals: [], cohortSamples: 1, minCount: 1, annotated: false,
+        ...(echo && body.lollipopDrivers ? { drivers: body.lollipopDrivers } : {}) };
+      return new Response(JSON.stringify({ study: "s1", count: 1, samples: 1, oncokbPin: null, lollipopCounts: report }),
+        { status: 200, headers: { "content-type": "application/json" } });
     }) as typeof fetch;
     try {
       const r = new RemoteAggregateResolver("s1", "http://peer.invalid/api/federation/v1", { id: "peer", mode: "aggregate-only", label: "test peer", conn: PRIMARY });
       const call = Object.getOwnPropertyDescriptor(RemoteAggregateResolver.prototype, "lollipopCounts")?.value as Lollipop;
-      await call.call(r, { all: [] }, ["KRAS"], 1, undefined, { hotspots: false });
-      await call.call(r, { all: [] }, ["KRAS"], 1);
+      for (const [d] of calls) {
+        try { results.push(await (d === undefined ? call.call(r, { all: [] }, ["KRAS"], 1) : call.call(r, { all: [] }, ["KRAS"], 1, undefined, d))); }
+        catch (e) { results.push(e as Error); }
+      }
     } finally { globalThis.fetch = original; }
+    return { bodies, results };
+  };
+
+  test("R7 the remote resolver sends lollipopDrivers in the body when given, and not otherwise; the peer's echo comes back", async () => {
+    const { bodies, results } = await remoteCalls(true, [[{ hotspots: false }], []]);
     assert.deepEqual(bodies[0].lollipopDrivers, { hotspots: false });
     assert.equal("lollipopDrivers" in bodies[1], false);
+    assert.ok(!(results[0] instanceof Error), String(results[0]));
+    assert.deepEqual((results[0] as { drivers?: DriverSettings }).drivers, { hotspots: false });
+    assert.ok(!(results[1] instanceof Error), String(results[1]));
+  });
+
+  test("R8 a peer whose answer does not echo the settings it was sent: refused, naming the driver settings", async () => {
+    const { results } = await remoteCalls(false, [[{ hotspots: false }], []]);
+    assert.ok(results[0] instanceof Error, "refused, not drawn: " + JSON.stringify(results[0]));
+    assert.match(results[0].message, /driver settings/);
+    assert.ok(!(results[1] instanceof Error), "sent no settings, so no echo needed: " + String(results[1]));
   });
 });
 
@@ -371,6 +421,51 @@ describe("G the grid and legend when nothing is annotated", () => {
     assert.ok(lines.some((l) => l.label === IMPACT_COLORS.missense.label + " Mutations"));
     const html = renderToStaticMarkup(createElement(ColorLegend as never, { drivers: false } as never));
     assert.doesNotMatch(html, /putative driver|unknown significance/);
+  });
+});
+
+// ---------------------------------------------------------------- V: the hotspots view checks `drivers`
+/** a participant that records what the lollipop asks of it */
+function local() {
+  const asked: unknown[][] = [];
+  return {
+    asked,
+    instance: { id: "c1", mode: "patient-level", label: "Local c1", conn: { id: "c1", db: "c1" } },
+    cohortSql: () => "SELECT 1",
+    lollipopCounts: async (...args: unknown[]) => { asked.push(args); return { changes: [], types: [], totals: [], cohortSamples: 10, minCount: 1, annotated: true }; },
+  };
+}
+const vCohort: EvaluatedCohort = { studies: ["s1"], perStudy: { s1: { sql: "", count: 10, samples: 10, mode: "" } }, count: 10, samples: 10, text: "" };
+const vCtx = (r: ReturnType<typeof local>): ViewRun => ({
+  doc: { study: "s1", cohorts: { Q: { study: "s1" } }, views: [] } as never,
+  cohorts: { Q: vCohort }, resolvers: { s1: r } as never, vNames: ["Q"], vStudies: ["s1"],
+  participationFor: (_s: string[], requiresPatientLevel: boolean): ViewParticipation => ({ studies: [], requiresPatientLevel, aggregateOnly: [] }),
+  pin: "v7", studyProfiles: async () => ({ profiles: ["mutations"], gaProfiles: [] }),
+} as ViewRun);
+const runView = async (view: Record<string, unknown>) => {
+  const r = local();
+  const out = await runHotspots({ kind: "hotspots", genes: ["KRAS"], cohorts: ["Q"], ...view } as never, vCtx(r));
+  const res: ViewResult = out instanceof Untimed ? out.result : out;
+  return { r, res, err: String((res as { error?: string }).error || "") };
+};
+
+describe("V the hotspots view checks its driver settings", () => {
+  test("V4 drivers {foo: true}: refused as the view's error, naming the setting, nothing asked", async () => {
+    let got: Awaited<ReturnType<typeof runView>> | Error;
+    try { got = await runView({ drivers: { foo: true } }); } catch (e) { got = e as Error; }
+    assert.ok(!(got instanceof Error), "returned, not thrown: " + String(got));
+    assert.equal(got.res.kind, "hotspots");
+    assert.match(got.err, /foo/);
+    assert.equal(got.r.asked.length, 0, "nothing asked");
+  });
+
+  test("V4 drivers {tiers: \"x\"}: refused as the view's error, naming tiers", async () => {
+    let got: Awaited<ReturnType<typeof runView>> | Error;
+    try { got = await runView({ drivers: { tiers: "x" } }); } catch (e) { got = e as Error; }
+    assert.ok(!(got instanceof Error), "returned, not thrown: " + String(got));
+    assert.equal(got.res.kind, "hotspots");
+    assert.match(got.err, /tiers/);
+    assert.equal(got.r.asked.length, 0, "nothing asked");
   });
 });
 
