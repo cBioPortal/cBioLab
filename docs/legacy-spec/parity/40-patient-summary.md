@@ -22,10 +22,10 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 44 |
-| 🟡 partial | 25 |
-| 🔶 different | 5 |
-| ❌ missing | 13 |
+| ✅ match | 41 |
+| 🟡 partial | 26 |
+| 🔶 different | 6 |
+| ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
@@ -237,7 +237,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 | ID | verdict | how | note |
 |---|---|---|---|
 | PAT-CNA-1 | ✅ | B | ±2 only, merged by gene + call; 74/74 rows |
-| PAT-CNA-2 | ✅ | B | No discrete profile → "Study is not profiled for copy number alterations." in place of the table (lgg P04, as on the portal) |
+| PAT-CNA-2 | 🔶 | B | lgg: "0 Copy Number Alterations … no rows", not "Study is not profiled …" |
 | PAT-CNA-3 | 🟡 | B | "74 Copy Number Alterations" ✅; 25 rows; sort driver genes first then gene |
 | PAT-CNA-4 | 🟡 | B | Samples (always) · Gene · CNA (AMP/HOMDEL, not DeepDel) · Annotation (OncoKB) · Cytoband ✅ · Cohort %; no mRNA Expr., Custom Driver, GISTIC badge, Gene panel |
 | PAT-CNA-5 | 🐞 ok | C | No gene filter, so the mutation-panel-map bug cannot occur |
@@ -247,7 +247,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 | ID | verdict | how | note |
 |---|---|---|---|
 | PAT-SV-1 | ✅ | BC | One row per the portal's key, both genes, positions and chromosomes and the class sorted (generateStructuralVariantId), so A–B and B–A merge; the row's fields one record's: paad_msk_2025 C-873T8K's 4 FGFR2/MYOF records (both orders, 2 samples) are 1 row on both sides (`check:patient-sv`) |
-| PAT-SV-2 | ✅ | B | No SV profile → "Study is not profiled for structural variants." (lgg) ✅; empty → "0 Structural Variants" ✅ |
+| PAT-SV-2 | 🟡 | B | Empty: "0 Structural Variants … no rows" ✅; no "not profiled" alert (lgg) |
 | PAT-SV-3 | 🟡 | B | Samples · Gene 1 · Gene 2 · Status (s / g badge, not sortable) · Variant Class · Event Info · Connection Type ✅; Breakpoint Type hidden ✅; no Annotation (tracked), +13 optional columns |
 | PAT-SV-4 | 🐞 ok | C | No SV gene filter |
 | PAT-SV-5 | ❌ | C | No server column config (tracked: Instance defaults) |
@@ -256,7 +256,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-NP-1 | ✅ | B | Per table, "Sample(s) <markers> not profiled for <mutations | copy number alterations | structural variants>" for the samples in view outside the profile (sample_profile, what the portal's gene-panel data lists); the table hidden when none is profiled (paad_msk_2025 P-0007179: sample 2 not profiled for structural variants, as the portal API's profiled: false); not shown for a peer's patient |
+| PAT-NP-1 | ❌ | B | No "Sample(s) … not profiled for …" alert above any table |
 | PAT-GP-1 | ✅ | C | Profiled = panel covers the gene (`profiledCte`, `patient-alterations.ts:77`; evolution `np`) |
 | PAT-GP-2 | 🟡 | B | GO panel icons ✅; no not-profiled pill, Gene panel column, tooltip link |
 | PAT-GP-3 | ❌ | C | No gene panel modal |
