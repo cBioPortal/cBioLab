@@ -4,7 +4,7 @@ import type { ViewResult } from "../../types.ts";
 import { pearsonR, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
 import { logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
-import { fitOf, portalBox, spearmanRho, corrPValue, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
+import { fitOf, portalBox, spearmanRho, corrPValue, AXIS_LABELS, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
@@ -102,17 +102,17 @@ function poolViolin(parts: ViolinBin[][]): ViolinBin[] {
 }
 
 /** copy-number levels in their own order, as the portal draws them */
-const CNA_LEVELS = ["Deep deletion", "Shallow deletion", "Diploid", "Gain", "Amplification"];
+const CNA_LEVELS = [AXIS_LABELS.portal.deepDel, AXIS_LABELS.portal.shallowDel, "Diploid", "Gain", "Amplification"];
 /** mutation classes in the portal's order (PlotsTabUtils.tsx mutTypeCategoryOrder), then the cases without one */
 const MUT_TYPES = ["Missense", "Inframe", "Truncating", "Splice", "Promoter", "Other", "Multiple"];
-const NO_MUTATION = ["Not mutated", OQL_NOT_PROFILED];
+const NO_MUTATION = [AXIS_LABELS.portal.noMutation, OQL_NOT_PROFILED];
 
 /**
  * The order an axis's categories are drawn in, as the portal's makeBoxScatterPlotData orders a
  * box plot's (PLT-BX-1): a data type with an order of its own keeps it — copy-number levels deep
  * deletion to amplification, mutation classes (Missense, Inframe, Truncating, Splice, Promoter,
  * Other, Multiple, then no mutation and not profiled; each class's Driver before its VUS),
- * Mutated / Not mutated / Not profiled, Driver / VUS / … — and any other is alphabetical, by code
+ * Mutated / No mutation / Not profiled, Driver / VUS / … — and any other is alphabetical, by code
  * unit as lodash's sortBy compares strings (`rest`; a contingency table's is naturalSort, as the
  * portal's TablePlot sorts). A category outside a type's order follows it, by `rest` (the portal
  * puts a box's first, an artefact of indexOf, and leaves a table's out). An OQL axis, which the
@@ -128,7 +128,7 @@ export function categoryOrder(cat: PlotRequest["x"], rest: (a: string, b: string
     if (cat.by === "mutationType") return listed([...MUT_TYPES.flatMap((t) => [t, t + " (Driver)", t + " (VUS)"]), ...NO_MUTATION]);
     if (cat.by === "driver") return listed(["Driver", "VUS", ...NO_MUTATION]);
     if (cat.by === "cna") return listed(["Deep deletion", "Neutral", "Amplification", OQL_NOT_PROFILED]);
-    if (cat.by === "sv") return listed(["Structural variant", "No structural variant", OQL_NOT_PROFILED]);
+    if (cat.by === "sv") return listed([AXIS_LABELS.portal.sv, AXIS_LABELS.portal.noSv, AXIS_LABELS.portal.svNotProfiled]);
     return listed(["Mutated", ...NO_MUTATION]);
   }
   if (cat.source === "alteration") return "oql" in cat ? null : listed(["Mutated", ...NO_MUTATION]);
