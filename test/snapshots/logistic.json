@@ -51,13 +51,13 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Logistic regression on 470 patients, 27 with MSI_TYPE = Instable (1 term). Every other observed value of MSI_TYPE (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers.",
+      "caveat": "Logistic regression on 470 patients, 27 with MSI Type = Instable (1 term). Every other observed value of MSI Type (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers.",
       "method": {
         "steps": [
           {
             "kind": "fetch",
             "title": "Fetch one row per patient",
-            "detail": "The logisticRows query above. Patients with a value for MSI_TYPE and for every covariate are kept. 1 cohort patient had no row.",
+            "detail": "The logisticRows query above. Patients with a value for MSI Type and for every covariate are kept. 1 cohort patient had no row.",
             "scope": "crc_apc_impact_2020",
             "rowsIn": 471,
             "rowsOut": 470
@@ -65,7 +65,7 @@
           {
             "kind": "transform",
             "title": "Code the outcome",
-            "detail": "1 if MSI_TYPE = “Instable”, else 0 — every other observed value (Do not report, Indeterminate, Stable) counts as not the event."
+            "detail": "1 if MSI Type = “Instable”, else 0 — every other observed value (Do not report, Indeterminate, Stable) counts as not the event."
           },
           {
             "kind": "transform",

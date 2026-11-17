@@ -3,6 +3,12 @@
 SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_50k_2026'
 
+-- view 0 forest: clinical:names · msk_impact_50k_2026
+SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name
+FROM snapshot_db.clinical_attribute_meta cam
+JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id
+WHERE cs.cancer_study_identifier = 'msk_impact_50k_2026' AND cam.attr_id IN ('CANCER_TYPE')
+
 -- view 0 forest: coxNotProfiled:OS · msk_impact_50k_2026
 SELECT countIf(c0 = 'Not profiled') AS n FROM (
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_50k_2026_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_50k_2026_', '') AS sid FROM snapshot_db.sample_derived

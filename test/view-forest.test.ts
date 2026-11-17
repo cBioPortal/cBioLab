@@ -104,7 +104,7 @@ describe("forest: the exposure and strata as the data has them", () => {
   test("a numeric exposure needs a threshold; a categorical one refuses a threshold", async () => {
     const num = { source: "clinical", attribute: "TMB" };
     assert.match((await run({ exposure: num }, c1(stratum("A", 40, 2, [12, 3]), ["num", "cat"]))).error!, /TMB is numeric: give a threshold/);
-    assert.match((await run({ exposure: TP53, threshold: 1 }, c1(stratum("A", 40, 2), ["cat", "cat"]))).error!, /mutation status is categorical: name the exposed level with exposed, not a threshold/);
+    assert.match((await run({ exposure: TP53, threshold: 1 }, c1(stratum("A", 40, 2), ["cat", "cat"]))).error!, /TP53: Mutated vs Wild Type is categorical: name the exposed level with exposed, not a threshold/);
   });
   test("a categorical attribute needs the exposed level named, from the values it takes", async () => {
     const smoker = { source: "clinical", attribute: "SMOKER" };

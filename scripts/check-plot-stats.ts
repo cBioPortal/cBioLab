@@ -16,7 +16,7 @@
  *       x AGE, y FRACTION_GENOME_ALTERED, each row carries `c` / `r`, the case's category from the
  *       colorSel / ringSel given ("" where it has none), counted against a separate query joining the
  *       axis selects.
- *   T*  lib/federation.ts plotAxisKinds / plot — an axis's title as the portal writes it (PLT-DT-19;
+ *   T*  lib/federation.ts plotAxisKinds / plot (its clinicalMetaSql) and, T11, lib/clinical-titles.ts titledAxes — an axis's title as the portal writes it (PLT-DT-19;
  *       cbioportal-frontend cd8c6df PlotsTabUtils.tsx getAxisLabel): a clinical attribute by its
  *       display name, " (log2(value + 1))" after it on a log scale, and the colour axis likewise.
  *       Read against the warehouse's coadread_tcga_pan_can_atlas_2018, all samples; the names are
@@ -30,6 +30,7 @@ import { compileCohortDef } from "../lib/cohort2.ts";
 import { OQL_NOT_PROFILED } from "../lib/plot-oql.ts";
 import { resolverFor, hasFederatedPlot } from "../lib/federation.ts";
 import { studyProfiles } from "../lib/analysis.ts";
+import { titledAxes } from "../lib/clinical-titles.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 
 /** [row id, values, expected q1, median, q3, lo, hi] */
@@ -144,6 +145,9 @@ for (const [id, x, y, rho] of RANKS) {
   const FGA = clin("FRACTION_GENOME_ALTERED");
   const is = (id: string, what: string, got: unknown, want: string) => ok(got === want, id + " " + what, JSON.stringify(got) + " — expected " + JSON.stringify(want));
 
+  // the resolver titles its own plot's axes (so a remote peer's plot is named); the other views
+  // title theirs through lib/clinical-titles.ts, whose query runs here through viewMeta (T11)
+  const titled = (axes: Record<string, PlotAxis | undefined>) => titledAxes(axes, { [STUDY]: r }, [STUDY]);
   if (!hasFederatedPlot(r)) ok(false, "T7 plotAxisKinds", STUDY + "'s resolver has no plotAxisKinds");
   else {
     const k = await r.plotAxisKinds({ x: clin("MUTATION_COUNT"), y: FGA });
@@ -161,6 +165,12 @@ for (const [id, x, y, rho] of RANKS) {
 
   const t10 = await r.plot(null, { x: clin("CANCER_TYPE_DETAILED"), y: FGA, unit: "sample", colorBy: clin("SEX") });
   is("T10", "plot colorLabel (" + t10.shape + ")", t10.colorLabel, "Sex");
+
+  // T11 the other views' step: titledAxes, its clinicalMetaSql run through the resolver's viewMeta
+  const t11 = await titled({ a: clin("MUTATION_COUNT"), b: clin("SEX"), c: clin("NOT_AN_ATTRIBUTE_HERE") });
+  is("T11", "titledAxes MUTATION_COUNT", t11.a?.source === "clinical" ? t11.a.label : undefined, "Mutation Count");
+  is("T11", "titledAxes SEX", t11.b?.source === "clinical" ? t11.b.label : undefined, "Sex");
+  ok(t11.c?.source === "clinical" && t11.c.label === undefined, "T11 titledAxes: an attribute the study does not declare keeps no label", JSON.stringify(t11.c));
 }
 
 console.log(failures ? "\n" + failures + " of " + checks + " plot statistics checks FAILED" : "\nall " + checks + " plot statistics checks passed");
