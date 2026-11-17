@@ -475,6 +475,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                         data-tip={(c.tip ? c.tip + " — click to " : "") + "sort the whole table by this column, across every page"}>
                         {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
                       </button>}
+                      {!c.unsorted && colHead?.(c.id)}
                       {!plain && <span className="dt-anchor">
                         <button type="button" className={"dt-funnel" + (fon ? " on" : "")} aria-label={"filter " + c.name}
                           data-tip={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>
