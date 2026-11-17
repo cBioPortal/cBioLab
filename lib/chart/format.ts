@@ -28,6 +28,14 @@ export function fmtPct(pct: number, decimals = 1): string {
 }
 
 /**
+ * A variant allele frequency as cbioportal.org writes it (getFormattedFrequencyValue,
+ * TumorAlleleFreqColumnFormatter.tsx): 4 decimals below 0.01, else 2 — 0.0098 → "0.0098", 0.1754 → "0.18".
+ */
+export function portalVaf(f: number): string {
+  return f < 0.01 ? f.toFixed(4) : f.toFixed(2);
+}
+
+/**
  * A share of a Study View chart (0–100), as cbioportal.org writes it (`getFrequencyStr`,
  * StudyViewUtils.tsx): "0%", one decimal, "99.9%" for anything from 99.9 up to but short of 100,
  * "<0.1%" below a tenth, "NA" when negative or not a number.
