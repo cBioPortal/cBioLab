@@ -25,6 +25,7 @@ import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { PORTAL_TYPE_CLASS, oqlHasMutationOql } from "./oql-match.ts";
 export { oqlHasMutationOql };
 import { driverCondSql } from "./driver-sql.ts";
+import { svDriverKeysSql } from "./sv-oncokb.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import type { VariantPins } from "./variant-annotation.ts";
@@ -81,7 +82,7 @@ function rangeCond(r: OqlRange): string {
 
 /**
  * Mutations with their protein positions, under genomic_event_derived's column names so specCond
- * and DRIVER_JOIN read them unchanged. genomic_event_derived stores no positions; this table holds
+ * and driverEventSql read them unchanged. genomic_event_derived stores no positions; this table holds
  * the same mutation rows (same profiles, same protein change and type, the same mutation status).
  */
 const mutationsWithPositions = (db: string, study: string, gene: string): string =>
@@ -89,7 +90,7 @@ const mutationsWithPositions = (db: string, study: string, gene: string): string
   "          studyId AS cancer_study_identifier, `GENE.hugoGeneSymbol` AS hugo_gene_symbol, 'mutation' AS variant_type,\n" +
   "          ifNull(driverFilter, '') AS driver_filter, ifNull(driverTiersFilter, '') AS driver_tiers_filter,\n" +
   "          proteinChange AS mutation_variant, mutationType AS mutation_type, proteinPosStart AS pos_start, proteinPosEnd AS pos_end,\n" +
-  "          CAST(NULL AS Nullable(Int8)) AS cna_alteration, ifNull(mutationStatus, '') AS mutation_status\n" +
+  "          CAST(NULL AS Nullable(Int8)) AS cna_alteration, ifNull(mutationStatus, '') AS mutation_status, '' AS sv_event_info\n" +
   "     FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + ") g\n";
 
 /**
@@ -112,24 +113,29 @@ const storeAlteration = (g: string): string =>
 
 /**
  * "This genomic_event_derived row is an OncoKB driver at the pin", as a condition on the row's own
- * columns (`g` names its table, or "" for unqualified columns): the same match as the driver join,
- * as a set lookup, so it narrows a query that aggregates the rows without joining them, and never
- * repeats a row the store happens to list twice.
+ * columns (`g` names its table, or "" for unqualified columns), as a set lookup, so it narrows a
+ * query that aggregates the rows without joining them, and never repeats a row the store happens to
+ * list twice. A mutation or copy-number row matches the store's row for its gene and alteration; a
+ * structural variant row matches its variant's pair call (lib/sv-oncokb.ts svDriverKeysSql), read
+ * from `db`'s structural variants, of `studies` when given.
  */
-export const driverEventSql = (pin: string, g = ""): string => {
+export const driverEventSql = (pin: string, g = "", { db = DB, studies }: { db?: string; studies?: string[] } = {}): string => {
   const c = g ? g + "." : "";
-  return "(" + c + "hugo_gene_symbol, " + storeAlterationType(c) + ", " + storeAlteration(c) + ") IN (\n" +
+  return "((" + c + "variant_type != 'structural_variant' AND (" + c + "hugo_gene_symbol, " + storeAlterationType(c) + ", " + storeAlteration(c) + ") IN (\n" +
     "    SELECT hugo_gene_symbol, alteration_type, alteration FROM " + ONCOKB_TABLE + "\n" +
-    "    WHERE oncokb_version = " + sq(pin) + " AND is_driver)";
+    "    WHERE oncokb_version = " + sq(pin) + " AND is_driver))\n" +
+    "  OR (" + c + "variant_type = 'structural_variant' AND (" + c + "sample_unique_id, " + c + "hugo_gene_symbol, ifNull(" + c + "sv_event_info, '')) IN (\n" +
+    svDriverKeysSql(db, pin, studies) + ")))";
 };
 
-/** The store's driver rows at the pin, joined to each event `g` (`kind`: INNER or LEFT). */
+/**
+ * The store's driver rows at the pin, joined to each event `g` (`kind`: INNER or LEFT) on gene and
+ * alteration: a structural variant by its genes' gene-level Fusion rows, not by its pair's call.
+ */
 export const driverAnnotationJoin = (pin: string, kind: "INNER" | "LEFT"): string =>
   "  " + kind + " JOIN (SELECT hugo_gene_symbol, alteration_type, alteration, is_driver FROM " + ONCOKB_TABLE + "\n" +
   "      WHERE oncokb_version = " + sq(pin) + " AND is_driver) ann\n" +
   "    ON " + annotationMatchSql("ann", "g");
-
-const DRIVER_JOIN = (pin: string): string => driverAnnotationJoin(pin, "INNER");
 
 /**
  * The Mutations tab's filter for one gene: a condition over mutation_derived's own columns
@@ -149,10 +155,10 @@ export function oqlMutationFilterSql(lines: string[], gene: string, { study, db,
   const driver = (): string => {
     if (rule) {
       if (rule.hotspots && !hotspotPins) throw new Error("OQL DRIVER with Cancer Hotspots on needs the Genome Nexus pins the hotspots are read at; none were given");
-      return driverCondSql(rule, oncokbPin, "g", rule.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null);
+      return driverCondSql(rule, oncokbPin, "g", rule.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null, { db, studies: [study] });
     }
     if (!oncokbPin) throw new Error("OQL DRIVER requires the OncoKB annotation store");
-    return driverEventSql(oncokbPin, "g");
+    return driverEventSql(oncokbPin, "g", { db, studies: [study] });
   };
   const conds = wanting.map((x) => "(" + specCond(x.type === "ANY" ? { type: "MUT" } : x) + (x.driver ? " AND " + driver() : "") + ")");
   return "(concat(studyId, '_', sampleId), ifNull(proteinChange, ''), ifNull(mutationType, ''), ifNull(proteinPosStart, -99), ifNull(proteinPosEnd, -99)) IN (\n" +
@@ -259,7 +265,7 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
   const driverCond = (gene: string): string => {
     if (settings!.oncokb && !oncokbPin) throw new Error("OQL DRIVER with OncoKB on requires the OncoKB annotation store");
     if (settings!.hotspots && !hotspotPins) throw new Error("OQL DRIVER with Cancer Hotspots on needs the Genome Nexus pins the hotspots are read at; none were given");
-    return driverCondSql(settings!, oncokbPin, "g", settings!.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null);
+    return driverCondSql(settings!, oncokbPin, "g", settings!.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null, { db, studies: [study] });
   };
   const parts: string[] = [];
   // what each part selects: the case alone, distinct; or, for events, the case with the event's order and label
@@ -286,11 +292,10 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
       parts.push(
         head("g", spec.range ? "1" : EVENT_ORDER, spec.range ? "g.mutation_variant" : EVENT_LABEL) +
         "  FROM " + (spec.range ? mutationsWithPositions(db, study, gene) : db + ".genomic_event_derived g\n") +
-        (spec.driver && !settings ? DRIVER_JOIN(oncokbPin!) : "") +
         "  WHERE " + (spec.range ? "g.cancer_study_identifier = " + sq(study) : genomicStudySql(study, "g")) + "\n" +
         "    AND g.hugo_gene_symbol = " + sq(gene) + "\n" +
         "    AND " + specCond(spec) +
-        (spec.driver && settings ? "\n    AND " + driverCond(gene) : "")
+        (spec.driver ? "\n    AND " + (settings ? driverCond(gene) : driverEventSql(oncokbPin!, "g", { db, studies: [study] })) : "")
       );
     }
   }
