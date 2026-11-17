@@ -153,4 +153,8 @@ export const mutants: Mutant[] = [
     effect: "A gene table download writes a q-value of 0 as 0.000e+0, where the portal writes 0.",
     find: "return q === 0 ? \"0\" : q.toExponential(3);",
     replace: "return q.toExponential(3);" },
+  { id: "corr-shown-unrounded-r", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
+    effect: "A plot's correlation is shown to 2 decimals from the full-precision r, where the portal rounds its 5-decimal value (0.124996 shows 0.12, the portal 0.13).",
+    find: "export const portalCorr = (r: number): string => portalR5(r).toFixed(2);",
+    replace: "export const portalCorr = (r: number): string => r.toFixed(2);" },
 ];
