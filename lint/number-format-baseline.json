@@ -13,7 +13,6 @@
   "app/lab/kinds/correlates.tsx": 3,
   "app/lab/kinds/diffexpr.tsx": 3,
   "app/lab/kinds/enrichment.tsx": 1,
-  "app/lab/kinds/mutations.tsx": 1,
   "app/lab/kinds/mutcompare.tsx": 4,
   "app/lab/mutation-cells.tsx": 1,
   "app/lab/partitions.tsx": 1,
