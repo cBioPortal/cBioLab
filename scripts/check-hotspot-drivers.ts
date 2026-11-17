@@ -130,7 +130,7 @@ type Ev = { gene: string; v: string; t: string; vt: string; drv: number; germ: n
 const events = async (settings: Parameters<typeof resolveDrivers>[0], pin: string | null, k: string | null) =>
   (await chQuery<Ev>(
     "SELECT g.hugo_gene_symbol AS gene, g.mutation_variant AS v, g.mutation_type AS t, g.variant_type AS vt, toUInt8(" +
-    driverCondSql(resolveDrivers(settings), pin, "g", k) + ") AS drv, toUInt8(" + germlineCondSql("g") + ") AS germ FROM " + db + ".genomic_event_derived g " +
+    driverCondSql(resolveDrivers(settings), pin, "g", k, { db, studies: [STUDY] }) + ") AS drv, toUInt8(" + germlineCondSql("g") + ") AS germ FROM " + db + ".genomic_event_derived g " +
     "WHERE g.cancer_study_identifier = '" + STUDY + "' AND g.sample_unique_id = '" + STUDY + "_" + SAMPLE + "'", conn)).data;
 const ksql = hotspotKeysSql(db, [STUDY], null, PINS);
 
