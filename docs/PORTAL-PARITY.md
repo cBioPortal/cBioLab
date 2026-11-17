@@ -397,6 +397,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The driver / VUS / tier / germline filters by the DB `driver_filter` (CMM-AT-6); off-panel calls stay out of both sides (invariant 7; the portal counts them)
   - [x] Every altered gene tested (ours `minAltered: 5`, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested, DYNC2H1 q 0.0503 vs 0.239; CNA 6,512 vs 6,156 significant; G5 mutation 145 vs 336; see bugs) (CMM-STM-7, CMM-AL-4) (#228)
   - [ ] Every row (ours ≤300, and the frequency scatter and bar plot are built from those 300; the expression tabs' cap is under them) (CMM-AL-5, CMM-FS, CMM-BP-2, CMM-GN, CMM-EX-5)
+    - [x] Genomic Alterations: every gene tested listed (G2 22,871 rows, as the portal's), the volcano and frequency scatter drawing every one; the bar plot already ranked every tested gene (#228); a two-group tie enriched in the second group (CMM-STM-3) (#294)
+    - [ ] The expression tabs past their 1,500 cap (CMM-GN, CMM-EX-5)
   - [ ] Patient-level enrichment: the Sample / Patient select (CMM-AL-4, CMM-MD-5)
   - [x] Formats: p and q "< 10^-10" (ours "1.1e-82"), altered % to 2 dp (ours 1), the volcano's y capped at 10 (ours to 82) (CMM-STM-9, CMM-STM-3, CMM-AL-5, CMM-VO-1) (#236)
     - [ ] Group headers "(A) Basal": the ordinals come with the group selector's (CMP-GS-7)
