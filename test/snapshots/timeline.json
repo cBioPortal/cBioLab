@@ -2509,6 +2509,29 @@
             "all": 0
           }
         },
+        "profiling": {
+          "mutations": {
+            "study": true,
+            "profiled": [
+              "P-0000012-T02-IM3",
+              "P-0000012-T03-IM3"
+            ]
+          },
+          "cna": {
+            "study": true,
+            "profiled": [
+              "P-0000012-T02-IM3",
+              "P-0000012-T03-IM3"
+            ]
+          },
+          "sv": {
+            "study": true,
+            "profiled": [
+              "P-0000012-T02-IM3",
+              "P-0000012-T03-IM3"
+            ]
+          }
+        },
         "oncokbPin": "v7.5"
       },
       "participation": {
