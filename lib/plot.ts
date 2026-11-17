@@ -865,6 +865,28 @@ export function tukey(q1: number, q3: number, lo: number, hi: number): { loWhisk
   return { loWhisker: Math.max(lo, q1 - 1.5 * iqr), hiWhisker: Math.min(hi, q3 + 1.5 * iqr), iqr };
 }
 
+/** a box's count, extremes and quartiles, before its whiskers */
+export interface BoxStats { n: number; lo: number; hi: number; q1: number; median: number; q3: number }
+
+/**
+ * A box over the values themselves, by the rule plotBoxSql applies in the database (the portal's
+ * jStat.quartiles and jStat.median, PLT-STM-8): of the n sorted values, q1 is the round(n/4)-th and
+ * q3 the round(3n/4)-th, halves up, no interpolation; the median is the middle value, or the mean of
+ * the two middle values for an even n. Null for no values.
+ */
+export function portalBox(values: readonly number[]): BoxStats | null {
+  const n = values.length;
+  if (!n) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const at = (k: number) => s[Math.max(1, k) - 1];
+  return {
+    n, lo: s[0], hi: s[n - 1],
+    q1: at(Math.floor((n + 2) / 4)),
+    median: n % 2 === 1 ? at((n + 1) / 2) : (at(n / 2) + at(n / 2 + 1)) / 2,
+    q3: at(Math.floor((3 * n + 2) / 4)),
+  };
+}
+
 /** the portal's regression line as its Plots tab shows it: y = slope·x + intercept, and R² */
 export interface PlotFit { slope: number; intercept: number; r2: number | null }
 /** n, Σx, Σy, Σxy, Σx², Σy² over the plotted points */
@@ -1033,6 +1055,8 @@ export interface PlotData {
   /** the regression line the view shows (its `regression`), as the portal rounds it, and the six sums it was fitted from; absent when not shown */
   fit?: PlotFit & { sums: FitSums };
   groups?: PlotGroup[];
+  /** a box pooled across studies: its quartiles over every study's values ("pooled"), or each study's weighted by its count ("weighted") */
+  quartiles?: "pooled" | "weighted";
   /** the values behind the boxes: every one, when few enough and the reader may see cases */
   points?: PlotPoint[];
   /** a scatter's cases drawn as points: every one, when few enough and the reader may see cases */

@@ -119,18 +119,23 @@ export function plotMethod(t: PlotTrace): MethodRecord {
       check = { ...check, "plot:fit:slope": { v: f.slope, abs: 1e-9 }, "plot:fit:intercept": { v: f.intercept, abs: 1e-9 }, "plot:fit:r2": { v: f.r2, abs: 1e-9 } };
     }
   } else if (d.shape === "box" && d.groups) {
-    steps.push({ kind: "fetch", title: "Each group's quartiles, in the database", scope, rowsOut: d.groups.length,
-      detail: "The plot:box " + (pooled ? "queries" : "query") + " above: per category, the count, the extremes and the quartiles of the numeric axis's values (log-transformed first where it is on a log scale).",
+    steps.push({ kind: "fetch", title: d.quartiles === "pooled" ? "Each group's quartiles, over every study's values" : "Each group's quartiles, in the database", scope, rowsOut: d.groups.length,
+      detail: (d.quartiles === "pooled"
+        ? "The plot:points queries above: every study's values of the numeric axis per category (log-transformed first where it is on a log scale), and from them, per category, the count, the extremes and the quartiles."
+        : "The plot:box " + (pooled ? "queries" : "query") + " above: per category, the count, the extremes and the quartiles of the numeric axis's values (log-transformed first where it is on a log scale)."),
       params: [["quartiles", "the portal's rule (jStat.quartiles, PLT-STM-8): of the n sorted values, q1 is the round(n/4)-th and q3 the round(3n/4)-th, halves rounded up, no interpolation"],
         ["median", "the middle value; for an even n the mean of the two middle values"],
         ["a group of one", "no quartiles, drawn as its value with no box"]] });
-    if (pooled) steps.push({ kind: "transform", title: "Pool each group across studies",
-      detail: "Counts and extremes add exactly; the quartiles are each study's weighted by its count, an approximation (the portal pools the values themselves)." });
+    if (pooled) steps.push(d.quartiles === "pooled"
+      ? { kind: "transform", title: "Pool each group across studies",
+        detail: "Every study's values per group, put together and boxed by the rule above, as the portal computes a box over several studies (PLT-MD-2)." }
+      : { kind: "transform", title: "Pool each group across studies",
+        detail: "Counts and extremes add exactly; the quartiles are each study's weighted by its count, an approximation (the portal pools the values themselves)." });
     steps.push({ kind: "statistic", title: "Whiskers",
       detail: "The portal's rule (PLT-STM-8): each whisker ends at its fence, q1 − 1.5 × IQR or q3 + 1.5 × IQR, when some value lies beyond it, else at the extreme value. Not Tukey's furthest value inside the fence, so a whisker may end where no case lies." });
     functions.push("tukey");
     python.push(
-      "# what the plot:box " + (pooled ? "queries returned, pooled per group" : "query returned") + ": group, n, extremes, quartiles",
+      "# " + (d.quartiles === "pooled" ? "each group's box over every study's values" : "what the plot:box " + (pooled ? "queries returned, pooled per group" : "query returned")) + ": group, n, extremes, quartiles",
       "groups = [",
       ...d.groups.map((g) => "    dict(g=" + py(g.g) + ", n=" + g.n + ", lo=" + pyNum(g.lo) + ", hi=" + pyNum(g.hi) +
         ", q1=" + pyNum(g.q1) + ", median=" + pyNum(g.median) + ", q3=" + pyNum(g.q3) + "),"),

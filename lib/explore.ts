@@ -282,6 +282,9 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
     if (l) l.push(row); else valuesOf.set(k, [row]);
   }
   const bases = await basesP;
+  // a patient-level attribute's queried samples with a value (0 when its patients hold none of them)
+  const samplesOf = new Map<string, number>((pre.patientSamples || []).map((r) => [String(r.a), Number(r.n)]));
+  if (pre.patientSamples) for (const r of cls.data) if (r.type === "patient" && !samplesOf.has(String(r.a))) samplesOf.set(String(r.a), 0);
   const clinical: ClinicalFacet[] = [
     ...catAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
@@ -306,7 +309,9 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
       attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np), distinct: Number(r.nv),
       min: Number(r.mn), max: Number(r.mx), median: Number(r.md), naCount: Number(r.na)
     }))
-  ].map((f) => {
+  ].map((facet) => {
+    const ns = facet.per === "patient" ? samplesOf.get(facet.attribute) : undefined;
+    const f = ns != null ? { ...facet, samples: ns } : facet;
     const m = meta.get(f.attribute);
     return m ? {
       ...f,
@@ -1304,6 +1309,8 @@ function isNumericAttr(r: ChRow, meta: Map<unknown, ChRow>): boolean {
 
 /** One study's rows of Explore's facet queries, as buildExploreOne would have fetched them. */
 interface Prefetched { totals: ChRow; meta: ChRow[]; cls: ChRow[]; catValues: ChRow[]; events: ChRow[]; dataTypes: ChRow[]; lists: ChRow[];
+  /** each patient-level attribute's queried samples whose patient has a value (a, n) */
+  patientSamples?: ChRow[];
   /** a drafted attribute's values (rows of both levels) without its own clauses, keyed by attribute (draftedClinical) */
   disjunctive?: Map<string, ChRow[]> }
 
@@ -1371,7 +1378,7 @@ async function prefetchFacets(opts: {
   const IN = "(" + studies.map(sq).join(",") + ")";
   const attrAllow = [...new Set((opts.attributes || []).map(String).filter((a) => ATTR_NAME_RE.test(a)))].slice(0, 60);
   if (attrAllow.length) for (const s of studies) for (const c of customAttributesFor(s)) if (!attrAllow.includes(c.attribute)) attrAllow.push(c.attribute);
-  const [totals, meta, cls, events, dataTypes, lists] = await Promise.all([
+  const [totals, meta, cls, events, dataTypes, lists, patientSamples] = await Promise.all([
     chQuery<ChRow>(
       "SELECT cancer_study_identifier AS s, uniqExact(patient_unique_id) AS pts, uniqExact(sample_unique_id) AS smp\n" +
       "FROM " + db + ".sample_derived\nWHERE cancer_study_identifier IN " + IN + inSamples(set) + "\nGROUP BY s", conn),
@@ -1431,6 +1438,16 @@ async function prefetchFacets(opts: {
       // a list's members are samples, counted as samples: only the cohort's own
       (set.samples ? "\n  AND concat(cs.cancer_study_identifier, '_', s.stable_id) IN " + set.samples : "") + "\n" +
       "GROUP BY s, id", conn),
+    // a patient-level attribute counted in the queried samples of the patients with a value, as the
+    // portal's clinical-attributes/counts does (ClinicalAttributeMapper): the Tracks menu's Freq
+    chQuery<ChRow>(
+      "SELECT cd.cancer_study_identifier AS s, cd.attribute_name AS a, uniqExact(sd.sample_unique_id) AS n\n" +
+      "FROM " + clinicalTable(db, attrAllow.length ? attrAllow : "all") + " cd\n" +
+      "JOIN (SELECT sample_unique_id, patient_unique_id FROM " + db + ".sample_derived WHERE cancer_study_identifier IN " + IN +
+      (set.samples ? " AND sample_unique_id IN " + set.samples : "") + ") sd ON sd.patient_unique_id = cd.patient_unique_id\n" +
+      "WHERE cd.cancer_study_identifier IN " + IN + " AND cd.type = 'patient' AND cd.attribute_value != ''" +
+      (attrAllow.length ? "\n  AND cd.attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
+      "GROUP BY s, a", conn),
   ]);
   const metaRows = groupByStudy(meta.data);
   const metaOf = new Map(studies.map((st) => [st, new Map((metaRows.get(st) || []).map((r) => [r.a, r]))]));
@@ -1445,11 +1462,11 @@ async function prefetchFacets(opts: {
     ? (opts.drafted || []).map((attr) => [attr, groupByStudy(scanned.filter((r) => r.a === attr))] as const)
     : await Promise.all((opts.disjunctive || []).map(async (d) =>
       [d.attr, await valueCounts({ studies, db, conn, attrs: [d.attr], set: d.set })] as const));
-  const [tot, cl, vals, ev, dt, li] = [totals.data, cls.data, values, events.data, dataTypes.data, lists.data].map(groupByStudy);
+  const [tot, cl, vals, ev, dt, li, ps] = [totals.data, cls.data, values, events.data, dataTypes.data, lists.data, patientSamples.data].map(groupByStudy);
   return new Map(studies.map((st) => [st, {
     totals: tot.get(st)?.[0] || { pts: "0", smp: "0" },
     meta: metaRows.get(st) || [], cls: cl.get(st) || [], catValues: vals.get(st) || [],
-    events: ev.get(st) || [], dataTypes: dt.get(st) || [], lists: li.get(st) || [],
+    events: ev.get(st) || [], dataTypes: dt.get(st) || [], lists: li.get(st) || [], patientSamples: ps.get(st) || [],
     // every study gets each key, empty where it has no such values, as its own query would give
     ...(disj.length ? { disjunctive: new Map(disj.map(([k, m]) => [k, m.get(st) || []])) } : {}),
   }]));
@@ -1550,9 +1567,11 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     const nums = same.filter((i): i is Extract<ClinicalFacet, { kind: "num" }> => i.kind === "num");
     const cats = same.filter((i): i is Extract<ClinicalFacet, { kind: "cat" }> => i.kind === "cat");
     const patients = same.reduce((s: number, i) => s + i.patients, 0);
+    // a patient attribute's samples, summed over the studies, when every study counted them
+    const samples = same.every((i) => i.samples != null) ? same.reduce((s: number, i) => s + i.samples!, 0) : undefined;
     const withMeta = same.find((i) => i.displayName || i.priority != null) || same[0];
     const base = {
-      attribute: same[0].attribute, per: same[0].per, patients,
+      attribute: same[0].attribute, per: same[0].per, patients, ...(samples != null ? { samples } : {}),
       displayName: withMeta.displayName, description: withMeta.description,
       priority: withMeta.priority, distinct: Math.max(...same.map((i) => i.distinct ?? 0)) || undefined,
       // How many of the participating studies carry this attribute at all. A

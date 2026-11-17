@@ -1,8 +1,8 @@
 # Parity audit — Study View › shell, filters, actions, other tabs (spec `31-study-view-shell.md`)
 
-- **Date:** 2026-11-11
-- **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
-- **Legacy:** cbioportal.org v7.2.3 (Playwright, logged out, same day)
+- **Date:** 2026-11-11; re-scored 2026-11-16
+- **cBioLab:** master @ `3ff57c37`, `next dev` on `http://127.0.0.1:3000` (first audit: `session/spec` @ `f3197d75`)
+- **Legacy:** cbioportal.org v7.2.3 (Playwright, logged out, 2026-11-11)
 - **Study View equivalent in cBioLab: Explore** — `/lab?tab=explore&study=<id[,id…]>` (homepage "Explore selected studies", `app/_home/query-flow.tsx:20`). No `/portal/study` route. Explore is a single page: study picker + filter bar + facet grid. **None of the Study View's other tabs exist on it** (Clinical Data, CN Segments, Plots, Heatmaps, Files & Links, Similarity Maps, resource tabs). Their nearest equivalents live elsewhere and are noted per ID: the Analysis tab's `table`, `plot` and `segments` views; Results › CN Segments.
 - **Code paths (cBioLab):** `app/lab/page.tsx:506-581`, `app/lab/explore-sections.tsx` (`StudyPicker`, `ExploreBar`, `AddChartDialog`), `app/lab/use-explore-state.ts` (URL, `viewPatients`, `openGroups`, `compareQuantiles`, `addClause`), `app/lab/pills.tsx` (`CohortPills`), `app/lab/dialogs.tsx` (`SaveCohortDialog`), `app/lab/custom-data-*.tsx`, `app/lab/list-cohort.tsx`, `app/portal/query-editor.tsx` (`QueryGenesDialog`), `app/_ui/site-header.tsx` (Copy link), `lib/explore.ts`
 
@@ -23,34 +23,36 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 7 |
+| ✅ match | 14 |
 | 🟡 partial | 26 |
-| 🔶 different | 15 |
-| ❌ missing | 62 |
+| 🔶 different | 11 |
+| ❌ missing | 59 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 4 |
 | ? | 0 |
 | **Total IDs** | **118** |
 
-**Overall: 12.7 %** (✅ 7 + 🐞ok 4 + N/A 4 = 15 of 118). Counting 🟡 as half: 23.7 %.
+**Overall: 18.6 %** (✅ 14 + 🐞ok 4 + N/A 4 = 22 of 118). Counting 🟡 as half: 29.7 %. (2026-11-11: 12.7 % / 23.7 %.)
+
+Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated were checked again, and 5 more verdicts changed, all for the better (#188, #189). The filters now live in the URL, Copy link carries them, and a portal `#filterJson` or `filterAttributeId` link opens with its filters. Still missing: the Clinical Data tab, the clinical-data download, the Groups manager, virtual studies, Custom Selection on the page, the study header and per-user layout.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
-| §1 URL | 5 | 0 | 2 | 1 | 2 | 0 | 0 | `?study=a,b` ✅-ish; no filterJson/filterAttributeId input, no sharedGroups |
+| §1 URL | 5 | 1 | 1 | 1 | 2 | 0 | 0 | `?study=a,b`; filters in the URL, `#filterJson` and `filterAttributeId` read (#189); no sharedGroups |
 | §2 Header (HD) | 4 | 0 | 1 | 2 | 1 | 0 | 0 | "Exploring — N studies · P patients · S samples" + id chips; no name, description, PubMed |
-| §3 Filter bar (FB) | 9 | 0 | 4 | 2 | 3 | 0 | 0 | One pill per clause with ×, Clear; no editable intervals, no Submit, no bookmark |
+| §3 Filter bar (FB) | 9 | 2 | 4 | 0 | 3 | 0 | 0 | Pills named by chart, intervals edited in place (#191, #203); no Submit, no bookmark icon |
 | §4 Action buttons (AB) | 6 | 1 | 1 | 2 | 2 | 0 | 0 | Counts ✅; View patients ✅; Save as a Cohort ≈ VS; no download, no ⚙ |
 | §5 Custom Selection (CS) | 9 | 0 | 2 | 0 | 7 | 0 | 0 | Not on Explore; an id-list cohort exists in Analysis (sign-in) |
 | §6 Charts menu (AC) | 8 | 0 | 4 | 1 | 3 | 0 | 0 | "Add chart" dialog: Clinical / Gene status / Generic assays / Derived / Custom data; no Freq column, no X vs Y |
 | §7 Groups (GR) | 10 | 1 | 2 | 0 | 6 | 0 | 1 | No Groups menu; chart Compare entry points ✅ |
 | §8 Virtual study (VS) | 6 | 0 | 2 | 1 | 3 | 0 | 0 | "Save as a Cohort": a name, saved to the library as a definition |
-| §9 Bookmark (BM) | 3 | 0 | 0 | 0 | 3 | 0 | 0 | No filter link |
+| §9 Bookmark (BM) | 3 | 1 | 2 | 0 | 0 | 0 | 0 | Copy link carries the filters; no bookmark modal or short URL |
 | §10 Tabs (TAB, CD, CN, PL, RS) | 18 | 0 | 2 | 0 | 15 | 0 | 1 | No tabs on Explore |
 | §11 Layout persistence (LP) | 6 | 0 | 0 | 0 | 6 | 0 | 0 | Chart picks are browser state only |
-| §12 Loading / empty (LD) | 7 | 1 | 1 | 2 | 0 | 2 | 1 | Skeleton + refusals named; empty state has no message |
-| §13 Modes (MD) | 14 | 2 | 2 | 3 | 5 | 1 | 1 | Single/multi fine; no VS, manual submit, tabs |
-| §15 Statistics (STM) | 13 | 2 | 3 | 1 | 6 | 1 | 0 | Selected counts and query hand-off fine; no download, Add-chart Freq, VS text |
+| §12 Loading / empty (LD) | 7 | 2 | 1 | 1 | 0 | 2 | 1 | Skeleton + refusals named; the portal's empty-selection message (#260) |
+| §13 Modes (MD) | 14 | 3 | 2 | 2 | 5 | 1 | 1 | Single/multi fine; no VS, manual submit, tabs |
+| §15 Statistics (STM) | 13 | 3 | 2 | 1 | 6 | 1 | 0 | Selected counts (bars of a chart OR) and query hand-off fine; no download, Add-chart Freq, VS text |
 
 ---
 
@@ -58,20 +60,20 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **No Clinical Data tab** (per-case table of the visible charts' attributes, search/sort, download) on Explore; nearest is an Analysis `table` view | TAB-1, CD-1…9, STM-12 | not tracked |
-| 2 | **No "Download clinical data" (⤓) for the selection** | AB-4, STM-5, HD-2 | Data-governance switch tracked; the download itself not |
-| 3 | **No filter bookmark / shareable filtered URL**: filters live in the page only; Copy link gives `?tab=explore&study=…`; no `#filterJson`, no `filterAttributeId`/`filterValues` input | URL-2, URL-3, BM-1…3, FB-7 | not tracked |
-| 4 | **No Groups manager** (create group from selection, colour, share, Filter by union, Compare 2–20 saved groups); "Save as a Cohort" + Analysis cohorts stand in | GR-1…9, STM-10 | not tracked |
-| 5 | **Virtual study** replaced by "Save as a Cohort": name only, no description/auto-text, always dynamic (a definition), no shareable `/study?id=` | VS-1…6, STM-9, MD-3, MD-4 | not tracked |
-| 6 | **No Custom Selection by sample/patient ids on Explore** (exists as "Add a cohort from a list of ids" in Analysis, signed-in only) | CS-1…9 | not tracked |
-| 7 | **Header lacks study name, description, PubMed, study download**; shows ids as chips | HD-2, HD-3 | not tracked |
-| 8 | **Pills are clause text** ("CLINICAL SEX = Female", "AGE > 50 ≤ 60"), not chart-name pills; numeric intervals not editable; one pill per clause, no and/or grouping words | FB-1…4 | not tracked |
-| 9 | **Add chart dialog**: no Freq "% samples with data" column, no Select all (has check all/none), no X vs Y tab, no Genomic tab (gene tables fixed), toggling a chart off does not reset its filter | AC-2, AC-3, AC-7, STM-3 | not tracked |
+| 1 | **No Clinical Data tab** (per-case table of the visible charts' attributes, search/sort, download) on Explore; nearest is an Analysis `table` view | TAB-1, CD-1…9, STM-12 | tracked |
+| 2 | **No "Download clinical data" (⤓) for the selection** | AB-4, STM-5, HD-2 | tracked |
+| 3 | **No filter bookmark / shareable filtered URL**: filters live in the page only; Copy link gives `?tab=explore&study=…`; no `#filterJson`, no `filterAttributeId`/`filterValues` input | URL-2, URL-3, BM-1…3, FB-7 | fixed (#189); bookmark icon and sharedGroups tracked |
+| 4 | **No Groups manager** (create group from selection, colour, share, Filter by union, Compare 2–20 saved groups); "Save as a Cohort" + Analysis cohorts stand in | GR-1…9, STM-10 | tracked |
+| 5 | **Virtual study** replaced by "Save as a Cohort": name only, no description/auto-text, always dynamic (a definition), no shareable `/study?id=` | VS-1…6, STM-9, MD-3, MD-4 | tracked |
+| 6 | **No Custom Selection by sample/patient ids on Explore** (exists as "Add a cohort from a list of ids" in Analysis, signed-in only) | CS-1…9 | tracked |
+| 7 | **Header lacks study name, description, PubMed, study download**; shows ids as chips | HD-2, HD-3 | tracked |
+| 8 | **Pills are clause text** ("CLINICAL SEX = Female", "AGE > 50 ≤ 60"), not chart-name pills; numeric intervals not editable; one pill per clause, no and/or grouping words | FB-1…4 | fixed (#191, #203); gene and assay pills, merged ranges tracked |
+| 9 | **Add chart dialog**: no Freq "% samples with data" column, no Select all (has check all/none), no X vs Y tab, no Genomic tab (gene tables fixed), toggling a chart off does not reset its filter | AC-2, AC-3, AC-7, STM-3 | tracked |
 | 10 | **No CN Segments / Plots tabs on Explore** (Results › CN Segments and Analysis `plot` exist elsewhere) | CN-1…3, PL-1, STM-13 | (tracked) Results CN Segments sub-items only |
-| 11 | **Empty selection** draws facets with "0 patients match"; no message, no hidden tabs | LD-6, MD-6 | not tracked |
+| 11 | **Empty selection** draws facets with "0 patients match"; no message, no hidden tabs | LD-6, MD-6 | fixed (#260) |
 | 12 | **No settings gear / manual submit**; no Alteration Filter menu (only "Alterations: all / OncoKB drivers only") | AB-5, AB-6, FB-6, MD-7 | (tracked) Driver-annotation settings |
 | 13 | **Files & Links / resource tabs** | RS-1…4 | (tracked) Files & Links and resource tabs |
-| 14 | **No per-user layout persistence** (Save settings, restore banner, reset charts) | LP-1…6 | not tracked |
+| 14 | **No per-user layout persistence** (Save settings, restore banner, reset charts) | LP-1…6 | tracked |
 | 15 | **Heatmaps / Similarity Maps tabs** | TAB-1, MD | (tracked) Gated portal features |
 
 ---
@@ -100,8 +102,8 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 | ID | verdict | how | note |
 |---|---|---|---|
 | STV-URL-1 | 🔶 | B | `/lab?tab=explore` (also `analysis`); no per-tab paths; `/lab?tab=cohorts` redirects to Explore + Saved work |
-| STV-URL-2 | 🟡 | BC | `study=a,b` (comma list) ✅, `drivers=1`, `custom=add`, `editCohort=<id>`; no filterJson / filters / filterAttributeId+filterValues / sharedGroups / sharedCustomData / plots_* |
-| STV-URL-3 | 🟡 | BC | Filters not written to the URL, as legacy; but no bookmark route either (BM) |
+| STV-URL-2 | 🟡 | BC | `study=a,b` (comma list), `filters=1.…` (the filters, compressed), `#filterJson=` and `filterAttributeId` + `filterValues` read (SEX = Female → 280 patients) (#189); `drivers=1`, `custom=add`, `editCohort=<id>`; no sharedGroups / sharedCustomData / plots_* |
+| STV-URL-3 | ✅ | BC | The filters live in the URL (`filters=1.…`) as the user filters, so a reload or a copied link keeps them (#189); the portal only through its bookmark link |
 | STV-URL-4 | ❌ | C | URL read once on load (`page.tsx:340-346`); in-page study changes write the URL (`use-explore-state.ts:657-664`) |
 | STV-URL-5 | ❌ | C | No localStorage hand-off; links carry the cohort definition (stored set / stored link past the address-bar limit, LINKS.md) — different mechanism, no "query is too large" alert |
 
@@ -123,10 +125,10 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 | STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene, GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
 | STV-FB-3a | ❌ | C | No survival-attribute pills (no survival filter) |
 | STV-FB-3b | 🟡 | C | Density drag → two visible range pills (legacy: chart-only) |
-| STV-FB-4 | 🟡 | B | "50 < x ≤ 60", "a ≤ x ≤ b", "> a", "≤ b", one value; ends edited in place (start > end swaps, start = end and empty refused). Separate ranges are separate pills (portal: one merged interval); an edit filters on the range but makes no custom bins yet |
+| STV-FB-4 | 🟡 | B | "50 < x ≤ 60", "a ≤ x ≤ b", "> a", "≤ b", one value; ends edited in place (start > end swaps, start = end and empty refused), and an edit makes custom bins on the chart (#203). Separate ranges are separate pills (portal: one merged interval) |
 | STV-FB-5 | ✅ | B | "Clear All Filters" removes every clause (keeps studies) |
 | STV-FB-6 | ❌ | C | No manual mode / Submit (filters apply at once) |
-| STV-FB-7 | ❌ | B | No bookmark icon |
+| STV-FB-7 | ❌ | B | No bookmark icon; the header's Copy link carries the filters instead |
 
 ### §4 Selection summary and action buttons
 
@@ -196,9 +198,9 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-BM-1 | ❌ | B | Copy link holds study only |
-| STV-BM-2 | ❌ | B | — |
-| STV-BM-3 | ❌ | C | (Long links are stored links elsewhere, LINKS.md) |
+| STV-BM-1 | ✅ | B | Copy link carries the study and the filters (`filters=1.…`); a portal `#filterJson=` link opens with its filters (AGE (50,60] → 106 patients) (#189) |
+| STV-BM-2 | 🟡 | B | Copy link puts the full link on the clipboard; no "Bookmark this filter" modal, no shortened URL |
+| STV-BM-3 | 🟡 | C | Filters compressed into `filters=1.…`; long links go through stored links (LINKS.md); no too-long → virtual study fallback |
 
 ### §10 Tabs
 
@@ -269,7 +271,7 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-STM-1 | 🟡 | BC | Server-side: clauses ANDed, values ORed (except numeric bars, see 30 BAR-5); one cohort set per study, patient clauses select the patients' samples; counts identical (Q2, Q3) |
+| STV-STM-1 | ✅ | BC | Server-side: clauses ANDed, values ORed, bars of one chart too (#188); one cohort set per study, patient clauses select the patients' samples; counts identical (Q2, Q3) |
 | STV-STM-2 | ✅ | B | Samples = distinct sample ids, patients = distinct patients owning a selected sample, per study (594/594, 280/280, 1,678/1,678) |
 | STV-STM-3 | ❌ | B | No Add-chart Freq (legacy multi-study 190.7 % bug therefore not reproduced) |
 | STV-STM-4 | ❌ | B | No profile select with sample counts |

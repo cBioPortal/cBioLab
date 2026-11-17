@@ -721,26 +721,27 @@
             "n": 402,
             "lo": 0,
             "hi": 67.2,
-            "q1": 3.4337479268034823,
-            "median": 6.917744610159204,
-            "q3": 12.117495852835821,
+            "q1": 3.3,
+            "median": 7.2,
+            "q3": 12.2,
             "loWhisker": 0,
-            "hiWhisker": 25.143117741884332
+            "hiWhisker": 25.549999999999997
           },
           {
             "g": "Male",
             "n": 596,
             "lo": 0,
             "hi": 53.36666667,
-            "q1": 4.37091722561745,
-            "median": 7.326230425189597,
-            "q3": 12.537024609161074,
+            "q1": 4.466666667,
+            "median": 7.366666667,
+            "q3": 11.86666667,
             "loWhisker": 0,
-            "hiWhisker": 24.786185684476507
+            "hiWhisker": 22.9666666745
           }
         ],
         "overlay": "points",
-        "note": "2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Counts and extremes per group sum exactly; the quartiles are a size-weighted approximation across sites (it can shift where an outlier bar falls, never a count).",
+        "quartiles": "pooled",
+        "note": "2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each group's box is computed over every study's values together, as the portal computes it.",
         "points": [
           {
             "id": "TCGA-NJ-A7XG",
@@ -1002,15 +1003,15 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "998 of 1,053 patients have a value on both axes (52 have no SEX; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Counts and extremes per group sum exactly; the quartiles are a size-weighted approximation across sites (it can shift where an outlier bar falls, never a count). Point layers — “KRAS mut”: 175 patients, 164 patients drawn as points. The statistics are over the whole plotted cohort.",
+      "note": "998 of 1,053 patients have a value on both axes (52 have no SEX; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each group's box is computed over every study's values together, as the portal computes it. Point layers — “KRAS mut”: 175 patients, 164 patients drawn as points. The statistics are over the whole plotted cohort.",
       "method": {
         "steps": [
           {
             "kind": "fetch",
-            "title": "Each group's quartiles, in the database",
+            "title": "Each group's quartiles, over every study's values",
             "scope": "Lung (TCGA) · luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018",
             "rowsOut": 2,
-            "detail": "The plot:box queries above: per category, the count, the extremes and the quartiles of the numeric axis's values (log-transformed first where it is on a log scale).",
+            "detail": "The plot:points queries above: every study's values of the numeric axis per category (log-transformed first where it is on a log scale), and from them, per category, the count, the extremes and the quartiles.",
             "params": [
               [
                 "quartiles",
@@ -1029,7 +1030,7 @@
           {
             "kind": "transform",
             "title": "Pool each group across studies",
-            "detail": "Counts and extremes add exactly; the quartiles are each study's weighted by its count, an approximation (the portal pools the values themselves)."
+            "detail": "Every study's values per group, put together and boxed by the rule above, as the portal computes a box over several studies (PLT-MD-2)."
           },
           {
             "kind": "statistic",
@@ -1050,13 +1051,13 @@
             "v": 0
           },
           "plot:Female:hiWhisker": {
-            "v": 25.143117741884332
+            "v": 25.549999999999997
           },
           "plot:Male:loWhisker": {
             "v": 0
           },
           "plot:Male:hiWhisker": {
-            "v": 24.786185684476507
+            "v": 22.9666666745
           }
         }
       }

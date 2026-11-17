@@ -1,5 +1,6 @@
 // The Patient page's document, as cBioPortal's patient view lays the page out: one cohort — the
-// patient (every sample), or in sample mode one sample — and one tab per portal tab drawing it. A tab whose view does not exist yet is laid out
+// patient (every sample), or in sample mode one sample — and one tab per portal tab drawing it, in
+// the portal's order (PatientViewPageTabs tabs()). A tab whose view does not exist yet is laid out
 // with what it will show (`pending`), so the page has the portal's tabs and says which are still
 // to be built. Pure: the page builds it, and so can a script that checks the views run.
 import type { View } from "../../lib/types.ts";
@@ -18,6 +19,8 @@ export interface PatientData {
   partial?: boolean;
   /** the patient's samples, once known: Genomic Evolution needs more than one */
   samples?: number;
+  /** whether some mutation of the patient's has an allele frequency above 0 (variant and reference reads), once known: Genomic Evolution needs one */
+  vaf?: boolean;
 }
 
 export const PATIENT_COHORT = "Patient";
@@ -49,17 +52,16 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       // in sample mode, the sample's alterations alone, as the portal's sample view lists them
       ...(genomic ? [v("Genomic alterations", { kind: "alterations", ...(q.sample ? { samples: "cohort" } : {}) })] : []),
     ] },
+    // each mutation's allele frequency across the patient's samples, offered as the portal offers it: more than one sample in view and a mutation with a VAF
+    ...(q.sample || !data.held.includes("MUTATION") || !((data.samples ?? 0) > 1) || data.vaf !== true ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
     // the portal's PathwayMapper tab: the pathway holding most of the patient's altered genes, then the canonical ten as bars
     ...(genomic ? [{ title: "Pathways", views: [v("Pathway diagram", { kind: "pathwaymap" }), v("Canonical pathways", { kind: "pathways", measure: "any" })] }] : []),
     { title: "Clinical Data", views: [
       v("Patient", { kind: "table", unit: "patient" }),
       v("Samples", { kind: "table", unit: "sample" }),
     ] },
-    // each mutation's allele frequency across the patient's samples, offered as the portal offers it: more than one sample in view
-    ...(q.sample || !data.held.includes("MUTATION") || !((data.samples ?? 0) > 1) ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
+    { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
     // the view refuses, naming what there is, when this patient has no signature values
     ...(signatures ? [{ title: "Mutational Signatures", views: [v("Mutational signatures", { kind: "signatures", ...(q.sample ? { samples: "cohort" } : {}) })] }] : []),
-    { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
-    { title: "Clinical Trials", views: [], pending: "Trials the patient's OncoKB-annotated alterations and cancer type match, as the portal's Clinical Trials tab lists them." },
   ], left, { partial: data.partial });
 }
