@@ -727,6 +727,7 @@
               },
               "somaticSamples": 153,
               "cohortSamples": 171,
+              "cohortPatients": 171,
               "tally": {
                 "missense": {
                   "driver": 81,
@@ -1358,6 +1359,7 @@
               },
               "somaticSamples": 53,
               "cohortSamples": 499,
+              "cohortPatients": 499,
               "tally": {
                 "missense": {
                   "driver": 32,
