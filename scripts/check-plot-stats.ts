@@ -25,6 +25,12 @@
  *       L5 L2 with labels "model": {Mutated, Not mutated, Not profiled}
  *       L6 L3 with labels "model": ⊆ {Structural variant, No structural variant, Not profiled}
  *       L7 the resolver's coxRows reads a covariate with those labels: KRAS mutated has "Not mutated", not "No mutation"
+ *   C*  lib/plot.ts plotScatterPointsSql — a scatter's points coloured and ringed (PLT-CL-8,
+ *       PLT-SC-6; cbioportal-frontend cd8c6df PlotsTabUtils.tsx:1877-2397), rows C1–C3 of the case
+ *       table for colouring a scatter's points: over coadread_tcga_pan_can_atlas_2018, every sample,
+ *       x AGE, y FRACTION_GENOME_ALTERED, each row carries `c` / `r`, the case's category from the
+ *       colorSel / ringSel given ("" where it has none), counted against a separate query joining the
+ *       axis selects.
  *   T*  lib/federation.ts plotAxisKinds / plot — an axis's title as the portal writes it (PLT-DT-19;
  *       cbioportal-frontend cd8c6df PlotsTabUtils.tsx getAxisLabel): a clinical attribute by its
  *       display name, " (log2(value + 1))" after it on a log scale, and the colour axis likewise.
@@ -34,8 +40,9 @@
  * Run: node --env-file=.env.local scripts/check-plot-stats.ts
  */
 import { chQuery } from "../lib/ch.ts";
-import { axisSelect, plotBoxSql, plotStatsSql, type AxisCtx, type PlotAxis } from "../lib/plot.ts";
+import { axisSelect, plotBoxSql, plotScatterPointsSql, plotStatsSql, type AxisCtx, type PlotAxis } from "../lib/plot.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
+import { OQL_NOT_PROFILED } from "../lib/plot-oql.ts";
 import { resolverFor, hasFederatedPlot } from "../lib/federation.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { oncokbPin } from "../lib/annotation.ts";
@@ -129,6 +136,61 @@ const LABELS: LabelCase[] = [
         (off.length ? " — expected " + off.map(([l, n]) => l + " " + n).join(", ") : ""));
     } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
   }
+}
+
+{
+  const study = "coadread_tcga_pan_can_atlas_2018";
+  const cohortSql = compileCohortDef(null, { study });
+  const ctx = { study, unit: "sample" as const, cohortSql };
+  const sel = (a: PlotAxis, kind: "num" | "cat") => axisSelect(a, ctx, kind);
+  const xSel = sel({ source: "clinical", attribute: "AGE" }, "num");
+  const ySel = sel({ source: "clinical", attribute: "FRACTION_GENOME_ALTERED" }, "num");
+  const kras = sel({ source: "alteration", gene: "KRAS", by: "mutated" }, "cat");
+  const sex = sel({ source: "clinical", attribute: "SEX" }, "cat");
+  const rowsOf = async (colorSel?: string, ringSel?: string) =>
+    (await chQuery<Record<string, unknown>>(plotScatterPointsSql(xSel, ySel, cohortSql, undefined, undefined, colorSel, ringSel))).data;
+  /** per category of `catSel`, the plotted samples (a value on both axes), "" for one without a category */
+  const countsBy = async (catSel: string) => new Map((await chQuery<Record<string, unknown>>(
+    "WITH cohort AS (" + cohortSql + "),\n     xs AS (" + xSel + "),\n     ys AS (" + ySel + "),\n     cs AS (" + catSel + ")\n" +
+    "SELECT ifNull(cs.v, '') AS k, count() AS n FROM xs INNER JOIN ys ON ys.id = xs.id LEFT JOIN cs ON cs.id = xs.id GROUP BY k")).data
+    .map((r) => [String(r.k), Number(r.n)]));
+  const tally = (rows: Record<string, unknown>[], col: string) => {
+    const m = new Map<string, number>();
+    for (const r of rows) { const k = r[col] == null ? "(missing)" : String(r[col]); m.set(k, (m.get(k) || 0) + 1); }
+    return m;
+  };
+  const show = (m: Map<string, number>) => [...m].sort().map(([k, n]) => (k || "\"\"") + "=" + n).join(" ");
+  const caseRow = async (id: string, f: () => Promise<void>) => {
+    try { await f(); } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+  };
+
+  // the plotted samples, counted by a separate join (581 on cbioportal.org when the scorecard read Q4)
+  const plotted = [...(await countsBy(sex)).values()].reduce((a, n) => a + n, 0);
+  await caseRow("C1 no colour or ring: every plotted sample", async () => {
+    const rows = await rowsOf();
+    ok(rows.length === plotted, "C1 no colour or ring: every plotted sample", "rows " + rows.length + " — expected " + plotted);
+  });
+
+  await caseRow("C2 colorSel KRAS mutated", async () => {
+    const rows = await rowsOf(kras);
+    const c = tally(rows, "c");
+    const allowed = new Set(["Mutated", "Not mutated", "No mutation", OQL_NOT_PROFILED, "Not profiled"]);
+    const want = (await countsBy(kras)).get("Mutated") || 0;
+    ok(rows.length === plotted && [...c.keys()].every((k) => allowed.has(k)) && (c.get("Mutated") || 0) === want,
+      "C2 colorSel KRAS mutated: every c a KRAS category, Mutated counted as a separate join counts it",
+      "rows " + rows.length + ", c: " + show(c) + " — expected " + plotted + " rows, Mutated=" + want);
+  });
+
+  await caseRow("C3 colorSel KRAS mutated, ringSel SEX", async () => {
+    const rows = await rowsOf(kras, sex);
+    const r = tally(rows, "r");
+    const want = await countsBy(sex);
+    const keys = new Set([...r.keys(), ...want.keys()]);
+    ok(rows.length === plotted && [...r.keys()].every((k) => k === "Male" || k === "Female" || k === "") &&
+      [...keys].every((k) => (r.get(k) || 0) === (want.get(k) || 0)),
+    "C3 colorSel KRAS mutated, ringSel SEX: every r Male, Female or \"\", counted as a separate join counts them",
+    "rows " + rows.length + ", r: " + show(r) + " — expected " + plotted + " rows, " + show(want));
+  });
 }
 
 {
