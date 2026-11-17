@@ -817,6 +817,8 @@ export interface ClusterMethod { profileType: string; columns: number; noData: n
 
 export interface Track {
   kind: TrackKind; label: string; cells: number[] | Int32Array;
+  /** a generic assay's threshold categories (">90.00"), in order: cell -3 - k is category k */
+  thresholds?: string[];
   /** a heatmap row's colour ramp, the portal's for its profile (lib/oncoprint-style.ts ramps) */
   ramp?: "expression" | "methylation" | "vaf";
   /** a generic-assay heatmap row's own gradient: colours (r, g, b) at these values (assayScale) */
@@ -913,6 +915,8 @@ interface FacetBase {
    */
   studyCount?: number;
   attribute: string; per: "patient" | "sample"; patients: number;
+  /** a patient-level attribute: the queried samples whose patient has a value (the portal's Tracks-menu count) */
+  samples?: number;
   /** from clinical_attribute_meta — the portal's own declarations */
   displayName?: string; description?: string;
   /** the portal orders charts by this and hides priority 0 by default */

@@ -170,6 +170,25 @@ for (const [tag, got] of [["heatmap", heat], ["generic assay", assay]] as const)
     ok(`${tag} ${p} [${vals.join(", ")}]`, found.length <= 1 && (want === null ? v === null : v !== null && Math.abs(v - want) <= 1e-9),
       "ours " + JSON.stringify(v) + ", expected " + JSON.stringify(want));
   }
+// a generic assay's threshold values (GenericAssayMolecularDataCache handleValueThreshold), a patient's
+// representing value: the furthest from 0, of a tie the one without a threshold (DataUtils 500-517)
+/** [patient, its samples' values, expected value, expected sign; null = no row] */
+const THR: [string, string[], number | null, string][] = [
+  ["T1", [">90", "90"], 90, ""], ["T2", ["90", ">90"], 90, ""],
+  ["T3", [">95", "10"], 95, ">"], ["T4", ["< 0.5"], 0.5, "<"],
+  ["T5", [">=5"], null, ""], ["T6", ["> -2", "-2"], -2, ""]
+];
+for (const [p, vals] of THR)
+  for (let i = 0; i < vals.length; i++)
+    await run("INSERT INTO " + scratch + ".generic_assay_data_derived (sample_unique_id, patient_unique_id, entity_stable_id, profile_type, profile_stable_id, value) VALUES ('" +
+      sid(p, i) + "', 'hs_" + p + "', 'E2', 'assay', 'hs_assay', " + lit(vals[i]) + ")");
+const thr = (await chQuery<HeatRow & { t: string }>(assayHeatmapSql("assay", ["E2"], "hs", scratch, "patient"), conn)).data;
+for (const [p, vals, want, sign] of THR) {
+  const found = thr.filter((r) => r.pid === p);
+  const got = found.length ? [Number(found[0].v), found[0].t] : null;
+  ok(`generic assay threshold ${p} [${vals.join(", ")}]`, found.length <= 1 && JSON.stringify(got) === JSON.stringify(want === null ? null : [want, sign]),
+    "ours " + JSON.stringify(got) + ", expected " + JSON.stringify(want === null ? null : [want, sign]));
+}
 await run("DROP DATABASE IF EXISTS " + scratch);
 
 // ---- a row's EXP / PROT values ---------------------------------------------------------------
@@ -242,7 +261,11 @@ const freq = (rows: typeof whole, a: string) => { const x = rows.find((r) => r.a
 const MENU: [string, typeof whole, string, string][] = [
   ["all", whole, "PARSE_PROBE", "20.3%"], ["all", whole, "TUMOR_GRADE", "6.8%"], ["all", whole, "FLAG_BOOL", "8.5%"],
   ["SEX = Female", female, "PARSE_PROBE", "21.2%"], ["SEX = Female", female, "FLAG_BOOL", "9.1%"],
-  ["SEX = Female", female, "PATIENT_FLAG", "0%"]          // no woman has a value: listed, at 0%
+  ["SEX = Female", female, "PATIENT_FLAG", "0%"],         // no woman has a value: listed, at 0%
+  // patient-level attributes in their patients' queried samples, as the portal: PATIENT_SCORE is FX-P01's and FX-P02's
+  // (two samples each), PATIENT_FLAG FX-P01's; OS_MONTHS every patient's
+  ["all", whole, "PATIENT_SCORE", "6.8%"], ["all", whole, "PATIENT_FLAG", "3.4%"], ["all", whole, "OS_MONTHS", "100.0%"],
+  ["SEX = Female", female, "PATIENT_SCORE", "6.1%"]
 ];
 for (const [tag, rows, a, want] of MENU) ok(`tracks menu (${tag}) ${a}`, freq(rows, a) === want, "ours " + freq(rows, a) + ", expected " + want);
 ok("tracks menu lists all 20 declared attributes", whole.length === 20, String(whole.length));
@@ -361,6 +384,6 @@ const evLabels = async (line: string) => (await chQuery<{ ev: string }>(oqlEvent
 oqlOk("cohort events EGFR: MUT leave out the Fusion-typed mutation; a bare EGFR keeps it",
   !(await evLabels("EGFR: MUT")).includes("EGFR-SEPT14") && (await evLabels("EGFR")).includes("EGFR-SEPT14"), "");
 
-const total = typeChecks + vafChecks + autoChecks + exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
+const total = typeChecks + vafChecks + autoChecks + exprChecks + oqlChecks + EXPECTED.length + EXPECTED_RESTRICTED.length + 1 + 2 * HEAT.length + THR.length + MENU.length + 2 + NAMES.length + 1 + KINDS.length;
 console.log(`\n${total - failures}/${total} oncoprint value checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

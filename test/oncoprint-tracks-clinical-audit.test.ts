@@ -203,16 +203,16 @@ describe("freq", () => {
     assert.equal(trackFreqText(got[0].pct), "62.5%"); // (3 + 2) / (5 + 3)
   });
 
-  test("15: patient-level attribute counted over queried PATIENTS is OUR documented divergence (PR #196; the portal counts those patients' samples / #samples) (RVS:1275-1290)", { skip: dbReason ?? false }, async () => {
+  test("15: a patient-level attribute counted in the queried samples of its patients, as the portal (RVS:1237-1300, ClinicalAttributeMapper)", { skip: dbReason ?? false }, async () => {
     const all = await fixtureRows();
     const female = await fixtureRows(FEMALE);
     // PATIENT_SCORE: FX-P01 (2 samples), FX-P02 (2 samples). Portal: 4/59 = 6.8%, females 2/33 = 6.1%.
     // PATIENT_FLAG: FX-P01 only. Portal: 2/59 = 3.4%.
     assert.deepEqual([freqOf(all.byId, "PATIENT_SCORE"), freqOf(all.byId, "PATIENT_FLAG"), freqOf(female.byId, "PATIENT_SCORE"), freqOf(all.byId, "OS_MONTHS")],
-      ["3.8%" /* 2/53 */, "1.9%" /* 1/53 */, "3.3%" /* 1/30 */, "100.0%" /* 53/53; the portal's 59/59 */]);
+      ["6.8%" /* 4/59 */, "3.4%" /* 2/59 */, "6.1%" /* 2/33 */, "100.0%" /* 59/59 */]);
   });
 
-  test("15: the patient-level row's tooltip says it counts patients and that the portal counts samples (documented, PR #196)", async (t) => {
+  test("15: a patient-level row without a samples count (an older peer) says it counts patients and that the portal counts samples", async (t) => {
     const m = await renderMenu(t, { attrs: [attr("SEX", 5, "patient", "Sex")], totals: { patients: 8, samples: 10 } });
     if (!m) return;
     assert.equal(m.rows[0].freq, "62.5%");
@@ -307,7 +307,7 @@ describe("sort", () => {
 
   test("33: fixture database — the portal's order uses each attribute's stored priority (1; MUTATION_COUNT 30) (TM:205-214, RVS:1157)", { skip: dbReason ?? false }, async () => {
     const { rows: got } = await fixtureRows();
-    // Sample-level Freqs as the portal counts them; patient-level ones are 100% both ways except PATIENT_SCORE/FLAG (row 15).
+    // Freqs as the portal counts them, a patient-level attribute in its patients' samples (row 15).
     const top = got.slice(0, 14).map((r) => r.attribute);
     assert.deepEqual(top, ["MUTATION_COUNT", // 100%, priority 30
       // 100%, priority 1, by display name lowercased
@@ -315,7 +315,8 @@ describe("sort", () => {
       "OS_MONTHS", "OS_STATUS", "SAMPLE_TYPE", "SEX", "SMOKING_HISTORY",
       "CANCER_TYPE" /* 96.6%: FX-P41-T1's and FX-P47-T1's are blank */, "CANCER_TYPE_DETAILED", "ONCOTREE_CODE" /* 93.2% */,
       "PARSE_PROBE" /* 20.3% */]);
-    assert.deepEqual(got.slice(14, 18).map((r) => r.attribute), ["KI67_INDEX", "SITE_LABEL" /* 10.2%: "ki-67 index" < "site label" */, "FLAG_BOOL" /* 8.5% */, "TUMOR_GRADE" /* 6.8% */]);
+    assert.deepEqual(got.slice(14, 19).map((r) => r.attribute), ["KI67_INDEX", "SITE_LABEL" /* 10.2%: "ki-67 index" < "site label" */, "FLAG_BOOL" /* 8.5% */,
+      "PATIENT_SCORE" /* 6.8%, 4 of 59 samples (row 15): "patient score" < "tumor grade" */, "TUMOR_GRADE" /* 6.8% */]);
   });
 
   test("34: the table re-sorts by its Name / Freq headers (ACT:178-184, 216-217)", { skip: "our menu has no column headers to sort by (not claimed by PR #196)" });
