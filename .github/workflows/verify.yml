@@ -285,8 +285,10 @@ jobs:
             echo "a push with no previous commit: every bug is planted"
             exit 0
           else
-            git fetch --no-tags --depth=1 origin "$BEFORE"
-            git diff --name-only "$BEFORE" "$GITHUB_SHA" > "$RUNNER_TEMP/changed.txt"
+            if ! git fetch --no-tags --depth=1 origin "$BEFORE" || ! git diff --name-only "$BEFORE" "$GITHUB_SHA" > "$RUNNER_TEMP/changed.txt"; then
+              echo "the push's previous commit $BEFORE cannot be read (a force push?): every bug is planted"
+              exit 0
+            fi
           fi
           echo "MUTANT_CHANGED=$RUNNER_TEMP/changed.txt" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/changed.txt"
