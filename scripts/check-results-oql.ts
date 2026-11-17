@@ -721,21 +721,33 @@ async function expectCategory(tag: string, attribute: string | null, unit: "samp
 }
 
 // ==== Download: a gene-by-sample file over a study without its profile (N*) ====================
-// lib/views/datafiles/tables.ts matrixRowSource lists every queried sample, as the portal's file does: a study
-// that holds no such profile (holds false) gives each of its 59 samples NP in every gene, reading none of its data;
-// one that holds it gives the fixture's calls (TP53 mutated on its panel: not every row NP).
+// lib/views/datafiles/tables.ts matrixRowSource lists every queried sample, as the portal's file does: a part
+// whose study holds no such profile (holds false) gives each of its 59 samples NP in every gene, reading none of
+// its data; one that holds it gives the fixture's calls — TP53's mutated samples, counted here on their own.
+// N3 runs both in one query (UNION ALL of an NP-only part and a holding part), as a two-study cohort does.
 {
   const cohort = compileCohortDef(null, { study: STUDY, db: conn.db });
-  const part = [{ cohort: "Q", study: STUDY, cohortSql: cohort }];
-  for (const [tag, holds] of [["N1 without the profile", false], ["N2 with it", true]] as const) {
-    const src = matrixRowSource({ kind: "mutations" }, part, ["TP53", "KRAS"], conn.db, () => holds);
-    try {
-      const rows = (await chQuery<Row>(pageSql(src, {}, ["sample", "patient", "TP53", "KRAS"], 1000, 0), conn)).data;
-      const np = rows.filter((r) => r.g0 === "NP" && r.g1 === "NP").length;
-      ok(tag + ": a row per sample (59)", rows.length === 59, "ours " + rows.length);
-      ok(tag + (holds ? ": the fixture's calls, not NP throughout" : ": NP in every gene"), holds ? np < rows.length : np === rows.length, "NP rows " + np + " of " + rows.length);
-    } catch (e) { ok(tag + " runs", false, (e as Error).message.slice(0, 300)); }
-  }
+  const cols = ["sample", "patient", "TP53", "KRAS"];
+  const mutated = Number((await chQuery<Row>("SELECT uniqExact(sampleId) AS n FROM " + conn.db + ".mutation_derived WHERE " + mutationStudySql(STUDY) +
+    " AND `GENE.hugoGeneSymbol` = 'TP53' AND molecularProfileId NOT LIKE '%uncalled%'", conn)).data[0]?.n);
+  const page = async (parts: { cohort: string; study: string; cohortSql: string }[], holds: (p: { cohort: string }) => boolean) =>
+    (await chQuery<Row>(pageSql(matrixRowSource({ kind: "mutations" }, parts, ["TP53", "KRAS"], conn.db, holds), {}, cols, 1000, 0), conn)).data;
+  const tp53 = (rows: Row[]) => rows.filter((r) => r.g0 !== "NP" && r.g0 !== "WT").length;
+  try {
+    const one = [{ cohort: "Q", study: STUDY, cohortSql: cohort }];
+    const n1 = await page(one, () => false);
+    ok("N1 without the profile: a row per sample (59)", n1.length === 59, "ours " + n1.length);
+    ok("N1 without the profile: NP in every gene", n1.every((r) => r.g0 === "NP" && r.g1 === "NP"), "rows not NP: " + n1.filter((r) => r.g0 !== "NP" || r.g1 !== "NP").length);
+    const n2 = await page(one, () => true);
+    ok("N2 with it: a row per sample (59)", n2.length === 59, "ours " + n2.length);
+    ok("N2 with it: TP53 called in the " + mutated + " samples mutation_derived holds", mutated > 0 && tp53(n2) === mutated, "ours " + tp53(n2) + ", expected " + mutated);
+    const two = [{ cohort: "A", study: STUDY, cohortSql: cohort }, { cohort: "B", study: STUDY, cohortSql: cohort }];
+    const n3 = await page(two, (p) => p.cohort === "A");
+    const a = n3.filter((r) => r.cohort === "A"), b = n3.filter((r) => r.cohort === "B");
+    ok("N3 both parts in one query: 59 rows each", a.length === 59 && b.length === 59, "ours " + a.length + " / " + b.length);
+    ok("N3 the holding part's calls, the other part NP throughout", tp53(a) === mutated && b.every((r) => r.g0 === "NP" && r.g1 === "NP"),
+      "A TP53 " + tp53(a) + " (expected " + mutated + "), B not NP " + b.filter((r) => r.g0 !== "NP" || r.g1 !== "NP").length);
+  } catch (e) { ok("N runs", false, (e as Error).message.slice(0, 300)); }
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);
