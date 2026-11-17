@@ -430,6 +430,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] Uncalled mutations' reads toward the Genomic Evolution gate (legacy counts called or uncalled); Files & Links only with resource data (ours a placeholder on every patient) (PTB-TAB-2)
   - [ ] Timeline: drag-zoom, PDF/PNG/SVG/ZIP download, month ticks, tooltips pinned and paged, the sample row's clinical data in its tooltip (PAT-TL-ZM-1, PAT-TL-ZM-3, PAT-TL-ZM-4, PAT-TL-TT-1…4)
     - [x] Tooltips pinned by a click, lingering 100 ms, closed by Esc, and paged "‹ i of n events ›" with the arrow keys (PAT-TL-TT-1, PAT-TL-TT-4) (#317)
+    - [x] The sample row's tooltip with the sample's clinical attributes (PAT-TL-TT-3) (#PR)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
   - [ ] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15)
   - [ ] Cohort column: "72%" and "<1%" (ours "72.5%"), the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
