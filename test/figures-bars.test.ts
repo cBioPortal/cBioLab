@@ -69,13 +69,15 @@ describe("genome chromosome labels", () => {
 });
 
 describe("lollipop at the width it is given", () => {
-  test("the plot fills the width, and the y axis has more than its ends", () => {
+  test("the plot fills the width; the y axis labels its ends, as the portal, with unlabelled steps between", () => {
     const g = { gene: "G", mutated: 9, mutations: 9, positions: [{ pos: 50, n: 37, color: "#008000", impact: "missense", driver: true, changes: [{ change: "X50Y", n: 37, rows: 37 }] }],
       domains: [], proteinLength: 1068, lengthSource: "genome-nexus", unpositioned: 0, withheld: 0, label: { pos: 50, text: "X50Y" }, topChanges: [],
       somaticSamples: 9, cohortSamples: 90, tally: { missense: { driver: 9, vus: 0 }, truncating: { driver: 0, vus: 0 }, inframe: { driver: 0, vus: 0 }, splice: { driver: 0, vus: 0 }, fusion: { driver: 0, vus: 0 }, other: { driver: 0, vus: 0 } } };
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [g] } as any, { width: 1300 })!;
     assert.equal(vb(svg), 1300);
-    assert.ok(svg.includes(">1,068aa<"));
-    assert.ok((svg.match(/>(10|20|30)<\/text>/g) || []).length >= 2, "round ticks between 0 and the top");
+    assert.ok(svg.includes(">1068aa<"));
+    assert.deepEqual([...svg.matchAll(/text-anchor="end">([^<]*)<\/text>/g)].map((m) => m[1]), ["0", "37"], "only the ends labelled");
+    const marks = [...svg.matchAll(/<line x1="([^"]*)" y1="([^"]*)" x2="([^"]*)" y2="\2"/g)].filter((m) => Number(m[3]) - Number(m[1]) === 7);
+    assert.equal(marks.length, 9, "a tick mark at 0, 5, …, 35 and 37, the steps unlabelled");
   });
 });
