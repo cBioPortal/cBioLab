@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-tables";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-tables" | "patient-vaf";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "patient-vaf": ["node", "--env-file=.env.local", "scripts/check-patient-vaf.ts"],
   "patient-tables": ["node", "--env-file=.env.local", "scripts/check-patient-tables.ts"],
 };
 
@@ -699,6 +700,18 @@ const MUTANTS: Mutant[] = [
     effect: "A heatmap's patient column shows its samples' mean instead of the one furthest from 0, so a patient with +2 and −5 draws −1.5.",
     find: "\"argMax(\" + v + \", (abs(\" + v + \"), \" + v + \"))\"",
     replace: "\"avg(\" + v + \")\"" },
+  { id: "patient-vaf-sort-by-highest", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
+    effect: "The Patient page's Allele Freq column sorts by a mutation's highest VAF, where the portal compares the samples' VAFs in sample order (FX-P02: KRAS second instead of last).",
+    find: "c.id === \"vaf\" ? { ...c, sort: vafSort(order.length) } : c",
+    replace: "c" },
+  { id: "patient-vaf-missing-first", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
+    effect: "A sample without the mutation sorts before every VAF in the Allele Freq column, where the portal puts it last in either direction.",
+    find: "\"isNull(vafs[\" + (i + 1) + \"]) ASC, ",
+    replace: "\"isNull(vafs[\" + (i + 1) + \"]) DESC, " },
+  { id: "patient-vaf-reads-unordered", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
+    effect: "A mutation's per-sample bars and tooltip lines follow no sample order, so a bar can sit in another sample's slot.",
+    find: "arraySort(x -> \" + ordinalOf(order, \"x.1\") + \", groupArrayIf(",
+    replace: "arrayReverseSort(x -> \" + ordinalOf(order, \"x.1\") + \", groupArrayIf(" },
   { id: "patient-evolution-ignores-vaf", layer: "counts", guard: "unit", file: "app/portal/patient-layout.ts",
     effect: "The Patient page offers Genomic Evolution to a patient with several samples but no mutation with a VAF, where the portal hides the tab (PTB-MD-3).",
     find: " || data.vaf !== true ? [] :",
@@ -1111,6 +1124,22 @@ const MUTANTS: Mutant[] = [
     effect: "A high mRNA level is counted as low.",
     find: "e.ev = 'EXP HIGH', 'mrnaHigh'",
     replace: "e.ev = 'EXP HIGH', 'mrnaLow'" },
+  { id: "cts-cancer-type-no-study-fallback", layer: "counts", guard: "results-oql", file: "lib/views/cancertypes/sql.ts",
+    effect: "A sample without a CANCER_TYPE forms a blank group, where the portal files it under its study's type of cancer.",
+    find: "const ct = \"if(ifNull(c.ct, '') != '', c.ct, \" + studyType + \")\";",
+    replace: "const ct = \"ifNull(c.ct, '')\";" },
+  { id: "cts-detailed-skips-cancer-type", layer: "counts", guard: "results-oql", file: "lib/views/cancertypes/sql.ts",
+    effect: "A sample without a CANCER_TYPE_DETAILED takes its study's type of cancer rather than its own CANCER_TYPE.",
+    find: "\"if(ifNull(c.ctd, '') != '', c.ctd, \" + ct + \")\"",
+    replace: "\"if(ifNull(c.ctd, '') != '', c.ctd, \" + studyType + \")\"" },
+  { id: "cts-default-never-detailed", layer: "counts", guard: "unit", file: "lib/views/cancertypes/run.ts",
+    effect: "A study of one cancer type is drawn as one bar by Cancer Type, where the portal splits it by Cancer Type Detailed.",
+    find: "groupBy = distinct.size === 1 ? \"CANCER_TYPE_DETAILED\" : \"CANCER_TYPE\";",
+    replace: "groupBy = \"CANCER_TYPE\";" },
+  { id: "cts-study-name-cut-early", layer: "counts", guard: "unit", file: "lib/views/cancertypes/run.ts",
+    effect: "A study name whose \"(\" is at character 50 is cut, where the portal cuts only past 50.",
+    find: "return paren > 50 ? name.substring(0, 49)",
+    replace: "return paren >= 50 ? name.substring(0, 49)" },
   { id: "cts-driver-measure-with-oql", layer: "counts", guard: "unit", file: "lib/views/cancertypes/run.ts",
     effect: "The view takes measure: driver beside OQL, counting drivers twice over.",
     find: "if (view.measure === \"driver\") return refuse(",

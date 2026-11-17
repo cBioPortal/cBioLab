@@ -40,20 +40,25 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   );
 }
 
+const CATEGORY_NAMES: Record<string, string> = { study: "Cancer Study", CANCER_TYPE: "Cancer Type", CANCER_TYPE_DETAILED: "Cancer Type Detailed" };
+
 /** the cancertypes view's settings row */
 function Controls({ c }: { c: KindCardCtx }) {
   const { spec, busy, patch } = c;
   const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
-  const by = spec.groupBy || "CANCER_TYPE";
+  const by: string = spec.groupBy || "";
+  // what the portal's default chose for the last result, named beside it (the next run may choose again)
+  const chosen: string | undefined = !by ? c.v?.cancertypes?.groupBy : undefined;
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" data-tip="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute">
-          category <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v === "CANCER_TYPE" ? undefined : v })}>
+        <label className="tbfield" data-tip="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute. Until one is chosen, the portal's default: the study for several studies, the detailed cancer type for a study of one cancer type, else the cancer type">
+          category <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v || undefined })}>
+            <option value="">{"portal default" + (chosen ? " (" + (CATEGORY_NAMES[chosen] || chosen) + ")" : "")}</option>
             <option value="study">Cancer Study</option>
             <option value="CANCER_TYPE">Cancer Type</option>
             <option value="CANCER_TYPE_DETAILED">Cancer Type Detailed</option>
-            {!cats.includes(by) && !["study", "CANCER_TYPE", "CANCER_TYPE_DETAILED"].includes(by) && <option value={by}>{by}</option>}
+            {by && !cats.includes(by) && !["study", "CANCER_TYPE", "CANCER_TYPE_DETAILED"].includes(by) && <option value={by}>{by}</option>}
             {cats.filter((a) => a !== "CANCER_TYPE" && a !== "CANCER_TYPE_DETAILED").map((a) => <option key={a} value={a}>{a}</option>)}
           </OptionSelect>
         </label>
@@ -92,7 +97,7 @@ export const cancertypesUi: KindUi<"cancertypes"> = {
   genes: true,
   maxCohorts: 2,
   defaults: (known) => ({ kind: "cancertypes", genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] }),
-  sub: (spec) => "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled " + (spec.unit === "sample" ? "samples" : "patients"),
+  sub: (spec) => "by " + (spec.groupBy || "the portal's default category") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled " + (spec.unit === "sample" ? "samples" : "patients"),
   Controls,
   body: (c) => c.v.cancertypes ? <CancertypesBody v={c.v} /> : null,
 };

@@ -15,7 +15,7 @@ import {
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
 import { plural, refuse } from "../shared.ts";
-import type { AlterationsView, AlterationsResult } from "./types.ts";
+import type { AlterationsView, AlterationsResult, AlleleReads } from "./types.ts";
 import { alterationsMethod } from "./method.ts";
 
 type Cell = string | number | null;
@@ -32,13 +32,26 @@ function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean })
   if (!c.numeric) return x == null ? "" : String(x);
   if (x == null || x === "") return null;
   const n = Number(x);
-  return c.id === "vaf" ? Math.round(n * 100) / 100 : c.id === "freq" ? Math.round(n * 10) / 10 : n;
+  return c.id === "vaf" ? Math.round(n * 1e4) / 1e4 : c.id === "freq" ? Math.round(n * 10) / 10 : n;
 }
 
-/** A page of rows as the result carries them, aligned with `cols`. */
-const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map((x) => ({
-  cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
-  values: cols.map((c) => cellOf(x, c)), ...(cols.some((c) => c.id === "mutationType") ? { detail: { mutationType: String(x.mutationType ?? "") } } : {}) }));
+/** A mutation's reads in each sample carrying it with allele counts, in the patient's sample order: what its Allele Freq cell draws. */
+function readsOf(x: unknown): AlleleReads[] | undefined {
+  if (!Array.isArray(x)) return undefined;
+  return x.map((t) => ({ sample: String(t[0]), alt: Number(t[1]), ref: Number(t[2]) }));
+}
+
+/**
+ * A page of rows as the result carries them, aligned with `cols`; a mutation row's detail holds its
+ * per-sample reads and its stored type (the cell shows the portal's label).
+ */
+const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map((x) => {
+  const reads = readsOf(x.reads);
+  const typed = cols.some((c) => c.id === "mutationType");
+  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}) };
+  return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
+    values: cols.map((c) => cellOf(x, c)), ...(Object.keys(detail).length ? { detail } : {}) };
+});
 
 /** The table's page size from its spec: 1 to TABLE_ROWS_MAX, 25 when unset; NaN when out of range. */
 const pageSize = (n: unknown) => n == null ? 25 : Math.floor(Number(n));
@@ -173,7 +186,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
       participation: ctx.participationFor(ctx.vStudies, true),
       ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
       caveat: (want ? want.id + " — " + ALTERATION_TABLES.map(tableLine).join("; ") + ". " : "No patient to list: the cohort's patient list is empty. ") +
-        "Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. " +
+        "Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. " +
         "Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them" +
         (tables.mutations?.shown.includes("copy") ? "; Copy # on a mutation is the gene's deep calls anywhere in " + (scope === "cohort" ? "the cohort's samples of the patient. " : "the patient. ") : ". ") +
         (want && inCohort ? "Only " + plural(inCohort.samples.length, "sample") + " of " + want.id + "'s " + (smp?.samples.length ?? 0) + " " + (inCohort.samples.length === 1 ? "is" : "are") + " in the cohort, and the tables read only " + (inCohort.samples.length === 1 ? "it" : "those") + " (samples: \"cohort\"); each keeps its number among all the patient's samples. " : "") +
