@@ -115,7 +115,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
       (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope),
       ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined,
       remote(("alterations:" + t) as PeerTable, { patient: pt.id, order }));
-    const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }));
+    const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, ...(c.unsorted ? { unsorted: true } : {}) }));
     return { r, rows: { columns, shown: shownColumns(tqq, columns, defs), defaults: defs, query: tqq, rows: rowsOf(r, cols), offset: r.offset, pageSize: size,
       lists: r.lists, total: r.total, all: r.all, ...(r.values ? { values: r.values } : {}) } };
   };

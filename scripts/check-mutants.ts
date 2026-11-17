@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "enrichment-events";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "sv-levels" | "enrichment-events" | "patient-sv";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,9 +49,11 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "sv-levels": ["node", "--env-file=.env.local", "scripts/check-sv-levels.ts"],
   "patient-vaf": ["node", "--env-file=.env.local", "scripts/check-patient-vaf.ts"],
   // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
   "enrichment-events": ["node", "--env-file=.env.local", "scripts/check-enrichment-events.ts"],
+  "patient-sv": ["node", "--env-file=.env.local", "scripts/check-patient-sv.ts"],
 };
 
 interface Mutant {
@@ -576,6 +578,18 @@ const MUTANTS: Mutant[] = [
   { id: "fusion-only-gene-dropped", layer: "counts", guard: "mutation-fusions", file: "lib/views/hotspots/run.ts",
     effect: "A gene with fusions but no mutations disappears from the Mutations tab's lollipop, with its Fusion badge and frequency, where the portal keeps it.",
     find: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));", replace: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i])).filter((h) => h.mutated > 0);" },
+  { id: "oncokb-sort-3a-3b-swapped", layer: "counts", guard: "sv-levels", file: "lib/sv-oncokb.ts",
+    effect: "A level 3B call sorts above a level 3A one in the Annotation sort, where the portal scores 3A 3 and 3B 2.",
+    find: "['1', '2', '3A', '3B', '4'], [6, 5, 3, 2, 1]", replace: "['1', '2', '3A', '3B', '4'], [6, 5, 2, 3, 1]" },
+  { id: "sv-resistance-level-from-sensitive", layer: "counts", guard: "sv-levels", file: "lib/sv-oncokb.ts",
+    effect: "An SV call's resistance level reads its sensitive level, so the sort's third element is wrong.",
+    find: "toString(t.highest_resistance_level), toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at)", replace: "toString(t.highest_sensitive_level), toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at)" },
+  { id: "sv-gene-level-resistance-dropped", layer: "counts", guard: "sv-levels", file: "lib/sv-oncokb.ts",
+    effect: "A fusion whose pair has no stored call loses its partner's gene-level resistance level, so it sorts below where the portal puts it.",
+    find: "toString(highest_sensitive_level), toString(highest_resistance_level)), resolved_at) AS c\\n\"", replace: "toString(highest_sensitive_level), ''), resolved_at) AS c\\n\"" },
+  { id: "mutation-sort-ignores-hotspot", layer: "counts", guard: "sv-levels", file: "lib/mutation-table.ts",
+    effect: "A Cancer Hotspot the OncoKB store does not call sorts with the unannotated mutations, where the portal's Annotation sort raises it.",
+    find: "[toFloat64(0), toFloat64(hot), toFloat64(0)]", replace: "[toFloat64(0), toFloat64(0), toFloat64(0)]" },
   { id: "germline-case-sensitive", layer: "counts", guard: "mutation-tab-states", file: "lib/federation.ts",
     effect: "A mutation whose status is spelled 'Germline' or 'germline' counts as somatic in the Somatic Mutation Frequency, where the portal matches germline in any case.",
     find: "AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "AND ifNull(status, '') != 'GERMLINE') AS somatic_samples" },
@@ -757,6 +771,22 @@ const MUTANTS: Mutant[] = [
     effect: "The Patient page offers Genomic Evolution to a patient with several samples but no mutation with a VAF, where the portal hides the tab (PTB-MD-3).",
     find: " || data.vaf !== true ? [] :",
     replace: " ? [] :" },
+  { id: "patient-sv-key-unsorted", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table keys a row by its fields in order, so a fusion recorded A–B in one sample and B–A in another is two rows, where the portal shows one.",
+    find: "return \"arrayStringConcat(arraySort([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"]), '_')\";",
+    replace: "return \"arrayStringConcat([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"], '_')\";" },
+  { id: "patient-sv-row-per-sample", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table lists an event once per sample carrying it, where the portal lists it once naming the samples.",
+    find: "  FROM s GROUP BY k\\n",
+    replace: "  FROM s GROUP BY k, sid\\n" },
+  { id: "patient-sv-list-counts-records", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient list counts a patient's structural-variant records, not the rows the table lists, so a fusion in two samples counts twice.",
+    find: "\"  SELECT p.stable_id AS pid, uniqExact(\" + svRowKey(",
+    replace: "\"  SELECT p.stable_id AS pid, count(\" + svRowKey(" },
+  { id: "patient-sv-status-sortable", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table offers a sort by Status, which the portal does not sort.",
+    find: "{ ...text(\"status\", \"Status\"), unsorted: true },",
+    replace: "text(\"status\", \"Status\")," },
   { id: "cohort-pct-rounded-twice", layer: "counts", guard: "unit", file: "lib/views/alterations/run.ts",
     effect: "The Patient tables' Cohort % is rounded to one decimal on the server and again in the browser, so 72.47% shows \"73%\" where the portal shows \"72%\".",
     find: "  const n = Number(x);\n  return n;\n}",
