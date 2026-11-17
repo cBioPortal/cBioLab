@@ -314,6 +314,14 @@
       "fill": "#e0e0e0",
       "vafLabel": "Not mutated/no VAF data"
     },
+    "assayThreshold": {
+      "colors": [
+        "#f0e442",
+        "#009e73",
+        "#cc79a7",
+        "#000000"
+      ]
+    },
     "notProfiled": {
       "fill": "#ffffff",
       "stripe": {

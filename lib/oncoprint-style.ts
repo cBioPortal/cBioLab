@@ -108,6 +108,8 @@ export const STYLE = {
     profiled: { color: "#1b9e77", yes: "Yes", no: "No" },
     /** a heatmap cell profiled but without a value (the portal's null_color); the VAF row names it in its legend */
     heatNull: { fill: "#e0e0e0", vafLabel: "Not mutated/no VAF data" },
+    /** a generic assay's threshold values (">90"), one colour per category in turn (OncoprintUtils 369-374) */
+    assayThreshold: { colors: ["#f0e442", "#009e73", "#cc79a7", "#000000"] },
     notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
     unalteredLabel: "No alterations"
   },
@@ -635,11 +637,12 @@ export function reservedColor(value: string, S: Style = STYLE): string | undefin
   return S.palette.reserved[value.replace(/\s/g, "").toLowerCase()];
 }
 
-/**
- * Colour for a categorical cell: a per-track override first
- * (`display.colors[trackLabel][value]` — the portal's Edit Colors), then the value's reserved
- * colour, then the palette's cycle.
- */
+/** a generic assay's threshold category k's colour: the portal's four, in turn */
+export function thresholdColor(k: number, S: Style = STYLE): string {
+  const c = S.glyph.assayThreshold.colors;
+  return c[k % c.length];
+}
+
 /**
  * A stacked row's (the mutation spectrum's) colour for its category j: the reader's own for that
  * category, else the portal's fill (OncoprintUtils 1466-1474, MUTATION_SPECTRUM_FILLS).
@@ -651,6 +654,11 @@ export function stackColor(track: { label: string; stack?: readonly string[] }, 
   return override || S.glyph.spectrum.colors[j % S.glyph.spectrum.colors.length];
 }
 
+/**
+ * Colour for a categorical cell: a per-track override first
+ * (`display.colors[trackLabel][value]` — the portal's Edit Colors), then the value's reserved
+ * colour, then the palette's cycle.
+ */
 export function trackCategoryColor(track: { label: string; categories?: string[]; profiledFor?: string }, code: number, S: Style = STYLE,
   colors?: Record<string, Record<string, string>>): string {
   const value = track.categories && track.categories[code];

@@ -13,7 +13,13 @@ export interface CancertypesView {
   note?: string;
   kind: "cancertypes"; cohorts?: string[];
   genes: GeneTrackSpec[];
-  /** a sample attribute to group by, or "study" (default "CANCER_TYPE") */
+  /**
+   * a sample attribute to group by, or "study". Unset, the portal's default (CancerSummaryContainer
+   * groupAlterationsBy): "study" when the cohorts span several studies; else "CANCER_TYPE_DETAILED" when
+   * every sample has one cancer type, else "CANCER_TYPE". A sample without a CANCER_TYPE takes its
+   * study's type of cancer, and one without a CANCER_TYPE_DETAILED its cancer type, as the portal's
+   * extendSamplesWithCancerType does.
+   */
   groupBy?: string;
   /** count OncoKB drivers only, or any alteration (default) */
   measure?: "driver" | "any";
