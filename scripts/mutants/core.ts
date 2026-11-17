@@ -149,4 +149,8 @@ export const mutants: Mutant[] = [
     effect: "A participant that refuses or fails to give a patient's timeline makes the Patient page's alteration tables and signatures refuse, where only the samples' numbering needs it.",
     find: "    if (isAbortError(e)) throw e;\n",
     replace: "    throw e;\n" },
+  { id: "corr-shown-unrounded-r", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
+    effect: "A plot's correlation is shown to 2 decimals from the full-precision r, where the portal rounds its 5-decimal value (0.124996 shows 0.12, the portal 0.13).",
+    find: "export const portalCorr = (r: number): string => portalR5(r).toFixed(2);",
+    replace: "export const portalCorr = (r: number): string => r.toFixed(2);" },
 ];
