@@ -18,6 +18,7 @@ import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import { diffexprVolcanoSvg, diffexprGseaSvg } from "../../../lib/views/diffexpr/figure.ts";
 import { portalP } from "../../../lib/chart/format.ts";
 import { seriesStyle } from "../../../lib/chart/style";
+import { withEveryGene } from "../../../lib/views/diffexpr/rows.ts";
 
 type DeGene = NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>["points"][number];
 type De = NonNullable<ViewResultOf<"diffexpr">["diffexpr"]>;
@@ -29,7 +30,9 @@ const methylation = (d: De) => d.profileKind === "METHYLATION" || /methylation/i
 function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
   v: DrawnResultOf<"diffexpr">; docJson?: () => string; pickedGene: string | null; setPicked: (gene: string) => void;
 }) {
-  const d = v.diffexpr;
+  // every tested gene, as the portal's table and volcano hold them
+  const d = useMemo(() => withEveryGene(v.diffexpr), [v.diffexpr]);
+  const every = useMemo(() => d === v.diffexpr ? v : { ...v, diffexpr: d }, [v, d]);
   const [A, B] = d.groups;
   const two = d.groups.length === 2;
   const meth = methylation(d), word = meth ? "methylation" : "expression";
@@ -68,7 +71,7 @@ function DiffexprBody({ v, docJson, pickedGene, setPicked }: {
       {d.dropped?.length ? <p className="note" data-test="diffexpr-dropped">{d.dropped.join(", ")} {d.dropped.length === 1 ? "has" : "have"} no {d.profileName || d.profileType} data, so {d.dropped.length === 1 ? "it is" : "they are"} left out and {d.groups.join(", ")} compared.</p> : null}
       <div className="pb-row">
         {two && <div className="pb-plot">
-          <PickVolcano draw={(width) => diffexprVolcanoSvg(v, { width }, { selected, picked: pickedGene })} deps={[v, selected, pickedGene]}
+          <PickVolcano draw={(width) => diffexprVolcanoSvg(every, { width }, { selected, picked: pickedGene })} deps={[every, selected, pickedGene]}
             onPick={setPicked} onSelect={setSelected} />
         </div>}
         <div className="pb-plot" data-test="diffexpr-box">
