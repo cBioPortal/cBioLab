@@ -45,7 +45,7 @@ const row = (gene: string, grp: string, c: Partial<Record<string, number>>): Row
   ({ gene, grp, label: grp, profiled: 0, altered: 0, mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0, mrnaHigh: 0, mrnaLow: 0, protHigh: 0, protLow: 0, ...c });
 const TOT: Row[] = [{ grp: "NSCLC", samples: 50, mut: 50, cna: 50, sv: 50 }, { grp: "Small", samples: 4, mut: 4, cna: 4, sv: 4 }, { grp: ALL, samples: 54 }];
 
-type Ct = { genes: string[]; panels: { groups: Row[]; pooled?: Row; perGene?: { gene: string; groups: Row[]; pooled?: Row }[] }[] };
+type Ct = { genes: string[]; panels: { groups: Row[]; categories: number; filtered?: true; perGene?: { gene: string; groups: Row[] }[] }[] };
 const ct = (r: ViewResult) => (r as unknown as { cancertypes?: Ct }).cancertypes;
 const err = (r: ViewResult) => String((r as { error?: string }).error || "");
 const run = (view: Record<string, unknown>, rows: Row[] = [], pin: string | null = "v7.5") => {
@@ -128,15 +128,15 @@ describe("the new kinds: mRNA high / low, protein high / low (C6)", () => {
     const kras = ct(r)!.panels[0].perGene!.find((p) => p.gene === "KRAS")!.groups.find((x) => x.key === "NSCLC")!;
     assert.deepEqual(NEW_KINDS.map((k) => kras[k]), [2, 1, 1, 0]);
   });
-  test("a group under the size floor adds its counts of each into the pooled bar", async () => {
+  test("a group drawn under a lower Min. # Total carries its own counts of each", async () => {
     const rows = [
       row("KRAS", "NSCLC", { profiled: 50, altered: 1, mrnaHigh: 1 }), row("KRAS", "Small", { profiled: 4, altered: 2, mrnaLow: 1, protLow: 1 }),
       row("*", "NSCLC", { profiled: 50, altered: 1, mrnaHigh: 1 }), row("*", "Small", { profiled: 4, altered: 2, mrnaLow: 1, protLow: 1 }),
       row("*", ALL, { profiled: 54, altered: 3 })];
-    const { r } = await run({ oql: ["KRAS: EXP>=2 EXP<=-2 PROT<=-2"] }, rows);
-    const pooled = ct(r)!.panels[0].pooled!;
-    assert.ok(pooled, "Small (4 < 10) is pooled");
-    assert.deepEqual(NEW_KINDS.map((k) => pooled[k]), [0, 1, 0, 1]);
+    const hidden = ct((await run({ oql: ["KRAS: EXP>=2 EXP<=-2 PROT<=-2"] }, rows)).r)!.panels[0];
+    assert.ok(!hidden.groups.some((g) => g.key === "Small") && hidden.categories === 2 && hidden.filtered, "Small (4 < 10) is hidden and counted");
+    const small = ct((await run({ oql: ["KRAS: EXP>=2 EXP<=-2 PROT<=-2"], minSamples: 1 }, rows)).r)!.panels[0].groups.find((g) => g.key === "Small")!;
+    assert.deepEqual(NEW_KINDS.map((k) => small[k]), [0, 1, 0, 1]);
   });
   test("0 when none: a group with no such count, and a view without oql, carry 0 for each", async () => {
     const plain = [{ gene: "*", grp: "NSCLC", label: "NSCLC", profiled: 50, altered: 5, mutation: 5, amp: 0, homdel: 0, sv: 0, multiple: 0 }, { gene: "*", grp: ALL, profiled: 54, altered: 5 }];

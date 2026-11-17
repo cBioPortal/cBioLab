@@ -281,9 +281,9 @@ const PART = [{ cohort: "c", study: STUDY, cohortSql: COHORT }];
 const TPINS = { hg19: "g1", hg38: null };
 const table = (drivers?: R, pin: string | null = PIN) =>
   (drivers === undefined ? mutationRowSource(PART, DB, "KRAS", pin, TPINS) : mutationRowSource(PART, DB, "KRAS", pin, TPINS, undefined, drivers)).with;
-/** each row kind's `drv`, as selected after its Annotation cell: [mutation rows, fusion rows] */
+/** each row kind's `drv`, as selected after its Annotation cell and levels: [mutation rows, fusion rows] */
 const drvTerms = (w: string) => {
-  const all = [...w.matchAll(/ AS level,\s*((?:(?! AS level,)[\s\S])*?)\s+AS drv\b/g)].map((m) => m[1]);
+  const all = [...w.matchAll(/ AS prognosticLevel,\s*((?:(?! AS prognosticLevel,)[\s\S])*?)\s+AS drv\b/g)].map((m) => m[1]);
   assert.equal(all.length, 2, "a mutation and a fusion `drv` per part");
   return all;
 };

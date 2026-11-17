@@ -117,6 +117,6 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
         (unannotated.length ? "Not yet annotated, so blank in those columns: " + (unannotated.length <= 3 ? unannotated.join(", ") : unannotated.length + " studies") + ". " : "")
         : "No Genome Nexus release is stored here, so HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL are empty. ") +
       "Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. " +
-      tableTail(r, q, MUTATION_COLUMNS, "mutation", "drivers first, then by codon", excluded, vNames.length > 1)
+      tableTail(r, q, MUTATION_COLUMNS, "mutation", "by the portal\'s annotation value (OncoKB\'s oncogenicity, then its highest sensitive, resistance, diagnostic and prognostic levels, then a Cancer Hotspot), then by codon", excluded, vNames.length > 1)
   };
 }

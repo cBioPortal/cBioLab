@@ -22,10 +22,10 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 36 |
-| 🟡 partial | 26 |
-| 🔶 different | 10 |
-| ❌ missing | 15 |
+| ✅ match | 38 |
+| 🟡 partial | 27 |
+| 🔶 different | 8 |
+| ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
@@ -123,7 +123,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-SH-1 | ❌ | B | Title "cbio-lab" on every patient; no meta description |
+| PAT-SH-1 | ✅ | B | "Patient: P04" / "Sample: P04_Pri", description "P04 from Low-Grade Gliomas (UCSF, Science 2014)" (set while the page shows them, put back on leaving) |
 | PAT-SH-2 | 🟡 | B | "Patient:" / "Samples:" rows ✅; no user-circle icon; study is id + name text in a summary card, not a link to the study; pager right ✅ |
 | PAT-SH-3 | ✅ | B | Skeleton rows while the header loads; tabs load separately |
 | PAT-SH-4 | 🟡 | B | Unknown patient → "no patient NOPE in lgg_ucsf_2014", but tabs still render with "cohort's patient list is empty" refusals |
@@ -192,10 +192,10 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-TL-TT-1 | 🔶 | C | Hover only; no click-to-pin, no Esc, no 100 ms linger |
+| PAT-TL-TT-1 | ✅ | B | Hover shows it; gone 100 ms after the pointer leaves (the pointer may rest on it); a click pins it, a second click or × lets it go; Esc and leaving the page close it |
 | PAT-TL-TT-2 | 🟡 | C | Attributes with `_`→space, DATE / START / END formatted + "(day n)" ✅; no Markdown links / iframe |
 | PAT-TL-TT-3 | 🔶 | C | Sample row: event attributes + "· sample n"; no sample clinical attributes |
-| PAT-TL-TT-4 | 🔶 | C | Up to 4 events stacked + "and N more"; no `[<] i of n [>]` paging or keys |
+| PAT-TL-TT-4 | 🟡 | B | One event at a time, "‹ i of n events ›", ←/↓ previous and →/↑/space next, wrapping ✅ (msk_chord P-0000012 Treatment: 1 of 2 → 2 of 2); no "Plotted y value is the max of simultaneous events" on line-chart rows |
 
 ### §3 Timeline — axis, zoom, download
 
