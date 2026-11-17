@@ -4,12 +4,13 @@ import type { AnnotationSource } from "./source.ts";
 import { oncokbSource } from "./sources/oncokb.ts";
 import { oncokbTumorTypeSource } from "./sources/oncokb-tumor-type.ts";
 import { oncokbSvSource } from "./sources/oncokb-sv.ts";
+import { oncokbCancerGeneSource } from "./sources/oncokb-cancer-gene.ts";
 import { genomeNexusSource, genomeNexusGrch38Source } from "./sources/genome-nexus.ts";
 import { STORE_DDL } from "./store.ts";
 
 export { ANNOTATION_DB, SYNC_RUN_TABLE, VARIANT_TABLE } from "./store.ts";
 
-export const ANNOTATION_SOURCES: AnnotationSource[] = [oncokbSource, genomeNexusSource, genomeNexusGrch38Source, oncokbTumorTypeSource, oncokbSvSource];
+export const ANNOTATION_SOURCES: AnnotationSource[] = [oncokbSource, genomeNexusSource, genomeNexusGrch38Source, oncokbTumorTypeSource, oncokbSvSource, oncokbCancerGeneSource];
 
 export function annotationSource(id: string): AnnotationSource {
   const s = ANNOTATION_SOURCES.find((x) => x.id === id);

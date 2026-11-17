@@ -282,4 +282,8 @@ export const mutants: Mutant[] = [
     effect: "A CNA row takes GISTIC's q-value for the gene whatever its call, so an amplification shows a deletion peak's q-value.",
     find: "gistic.get(r.gene + \"|\" + r.cna)",
     replace: "(gistic.get(r.gene + \"|2\") ?? gistic.get(r.gene + \"|-2\"))" },
+  { id: "gene-table-not-self-filtered", layer: "counts", guard: "chart-freq", file: "lib/explore.ts",
+    effect: "A gene table counts every sample of the study whatever is checked in it, where the portal narrows it by its own checked genes like any other filter.",
+    find: "      (driverPin ? \"\\n  AND \" + driverEventSql(driverPin, \"\", { db, studies }) : \"\") +\n      inSamples(set);",
+    replace: "      (driverPin ? \"\\n  AND \" + driverEventSql(driverPin, \"\", { db, studies }) : \"\");" },
 ];

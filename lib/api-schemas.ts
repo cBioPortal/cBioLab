@@ -160,6 +160,7 @@ export const GenesRequest = z.object({
   symbols: z.array(z.string()).optional(),
   search: z.string().max(40).optional(),
   geneset: z.string().max(200).optional(),
+  panel: z.object({ id: z.string().regex(/^[A-Za-z0-9._ -]{1,120}$/), study: z.string().regex(/^[A-Za-z0-9._-]{1,120}$/) }).optional(),
 });
 
 /** POST /api/assay-entities — a generic-assay profile's entities matching `q`, for an axis's entity picker. */
