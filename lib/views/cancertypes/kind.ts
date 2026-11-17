@@ -1,6 +1,6 @@
 // The cancertypes view as every page and agent sees it: its figure, title, results text, help and marks.
 import type { ViewKindDef } from "../kind-def.ts";
-import { cancertypesSvg } from "./figure.ts";
+import { cancertypesSvg, filterAlert } from "./figure.ts";
 import { fmtShare } from "../../chart/format.ts";
 
 export const cancertypesKind: ViewKindDef<"cancertypes"> = {
@@ -13,7 +13,7 @@ export const cancertypesKind: ViewKindDef<"cancertypes"> = {
       `    ${g.label}: ${fmtShare(g.profiled ? g.altered / g.profiled : 0)} (${g.altered}/${g.profiled}; mutation ${g.mutation}, amp ${g.amp}, deep del ${g.homdel}, SV ${g.sv}, multiple ${g.multiple})`;
     out.push(`Cancer types summary: ${ct.genes.join(", ")} by ${ct.groupBy} (${ct.measure === "driver" ? "drivers" : "any alteration"}; ${ct.unit}s profiled for at least one gene):\n` +
       ct.panels.map((pn) => `  ${pn.cohort}: ${pn.altered.toLocaleString()} of ${pn.profiled.toLocaleString()} profiled ${ct.unit}s altered\n` +
-        [...pn.groups, ...(pn.pooled ? [pn.pooled] : [])].map(line).join("\n")).join("\n") +
+        [...(filterAlert(ct, pn) ? ["    " + filterAlert(ct, pn)] : []), ...pn.groups.map(line)].join("\n")).join("\n") +
       caveatOf(v) + noteOf(v));
   },
   help: {
