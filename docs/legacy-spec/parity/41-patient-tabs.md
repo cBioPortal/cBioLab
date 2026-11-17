@@ -23,8 +23,8 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | Verdict | Count |
 |---|---|
 | ✅ match | 22 |
-| 🟡 partial | 16 |
-| 🔶 different | 10 |
+| 🟡 partial | 19 |
+| 🔶 different | 7 |
 | ❌ missing | 30 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
@@ -137,9 +137,9 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PTB-CD-1 | 🔶 | B | Two cards "Patient", "Samples"; no Timeline Data section |
-| PTB-CD-2 | 🔶 | B | One row, attributes as columns (P04 · 4 · 1:DECEASED · 22 …); per-column filter + CSV ✅; no Attribute \| Value, no priority order, no 1-decimal format, no panel links |
-| PTB-CD-3 | 🔶 | B | One row per sample, patient attributes repeated; legacy one column per sample |
+| PTB-CD-1 | 🟡 | B | "Patient" and "Samples" tables as the portal's ✅; no Timeline Data section (PTB-CD-4) |
+| PTB-CD-2 | 🟡 | B | Attribute | Value, priority then name, every attribute with a value, a filter box ✅ (lgg P04: Overall Survival Status 1:DECEASED, Diagnosis Age 22, Number of Samples 4, OS 61, Sex Male — the portal API's five); no 1-decimal format yet (PTB-STM-11, with #290), no panel links, no copy/download |
+| PTB-CD-3 | 🟡 | B | Attribute × sample, a sample's own attributes, n/a where missing, raw values ✅ (P04: P04_Pri … P04_Rec3); samples in id order, not the collection-day order; no column sorts (the portal sorts Attribute) |
 | PTB-CD-4 | ❌ | B | No per-event-type timeline tables |
 
 ### §4 Mutational Signatures

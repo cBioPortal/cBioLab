@@ -87,3 +87,11 @@ test("PTB-TAB-3, PTB-MD-12: no Clinical Trials tab, whatever the patient holds",
   ];
   for (const l of cases) assert.ok(!titlesOf(l).includes("Clinical Trials"), titlesOf(l).join(", "));
 });
+
+test("L1 PTB-CD-2: the Clinical Data tab's patient and sample tables are transposed", () => {
+  const l = patientLayout(q, { profileCatalog: [], held: [] });
+  const at = (n: string) => l.doc.views![l.names.indexOf(n)] as any;
+  assert.ok(l.names.includes("Clinical Data › Patient") && l.names.includes("Clinical Data › Samples"), l.names.join(", "));
+  assert.partialDeepStrictEqual(at("Clinical Data › Patient"), { kind: "table", unit: "patient", transpose: true });
+  assert.partialDeepStrictEqual(at("Clinical Data › Samples"), { kind: "table", unit: "sample", transpose: true });
+});
