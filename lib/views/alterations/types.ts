@@ -33,7 +33,9 @@ export interface AlterationsView extends TableQuery {
 }
 export interface AlterationsResult extends TableRows<string | number | null> {
   /** the patient listed, with their samples (none on a page request), or null when the list is empty */
-  patient: { study: string; id: string; samples: PatientSample[];
+  patient: { study: string; id: string;
+    /** every sample of the patient, with the day it was collected (from the timeline), which numbers them */
+    samples: (PatientSample & { day?: number | null })[];
     /** with samples: "cohort", the samples the tables read (the cohort's); `samples` is every sample of the patient, which numbers them */
     shown?: string[];
     source?: { label: string; remote: boolean } } | null;

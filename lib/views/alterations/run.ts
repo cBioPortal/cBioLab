@@ -13,7 +13,7 @@ import {
 } from "../../patient-alterations.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
-import { plural, refuse } from "../shared.ts";
+import { plural, refuse, withSampleDays } from "../shared.ts";
 import type { AlterationsView, AlterationsResult } from "./types.ts";
 import { alterationsMethod } from "./method.ts";
 
@@ -97,7 +97,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const r = await runRows({ ...ctx, page: undefined, values: undefined }, "alterations:samples", [pt.study], {}, ["sid"], ["sid", "type"], TABLE_ROWS_MAX,
       (parts: TablePart[]) => (db) => patientSamplesSource(parts[0], pt.id, db, which), undefined,
       { ...remote("alterations:samples", { patient: pt.id }), samples: which });
-    const samples = r.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
+    const samples = await withSampleDays(ctx, pt.study, pt.id, r.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") })));
     return { samples, order: [...sampleMarks(samples, []).keys()] };
   };
   /** one of the patient's tables, for the page (or values) the request asks of it */

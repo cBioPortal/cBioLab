@@ -375,11 +375,13 @@
           "samples": [
             {
               "id": "P-0024249-T01-IM6",
-              "type": "Primary"
+              "type": "Primary",
+              "day": -113
             },
             {
               "id": "P-0024249-T02-IM7",
-              "type": "Primary"
+              "type": "Primary",
+              "day": 1245
             }
           ]
         },

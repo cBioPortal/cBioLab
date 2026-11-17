@@ -2,7 +2,8 @@
 // refusals, and lookups more than one view makes.
 import { plainResult, type ViewResult, type ViewKind } from "../types.ts";
 import { survivalLeftOutSql } from "../survival-queries.ts";
-import { hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../federation.ts";
+import { hasPatientTimeline, hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../federation.ts";
+import { sampleDays } from "../timeline-tracks.ts";
 import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
 import type { StudyCatalog } from "../plot-profile.ts";
@@ -16,6 +17,17 @@ import { oqlHasMutationOql } from "../oql.ts";
 import { resolveDrivers, type DriverSettings } from "../driver-settings.ts";
 import type { LollipopOql } from "../federation.ts";
 export const COOCCUR_GENE_LIMIT = 12;
+
+/**
+ * The patient's samples with the day each was collected, from the patient's timeline (its sample
+ * events), so a view numbers them as the header and the timeline do (the portal's SampleManager
+ * sortSamples, PAT-STM-12). A study whose participant cannot give a timeline numbers them without days.
+ */
+export async function withSampleDays<S extends { id: string }>(ctx: ViewRun, study: string, patient: string, samples: S[]): Promise<(S & { day: number | null })[]> {
+  const res = ctx.resolvers[study];
+  const days = res && hasPatientTimeline(res) ? sampleDays((await res.patientTimeline(patient)).events) : new Map<string, number>();
+  return samples.map((s) => ({ ...s, day: days.get(s.id) ?? null }));
+}
 /**
  * A request past a view's limit is refused, naming the limit, rather than cut to its first N:
  * a document (or a chat/MCP client writing one) that asks for 25 genes and silently gets 20

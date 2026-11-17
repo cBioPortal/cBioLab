@@ -22,8 +22,8 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 35 |
-| 🟡 partial | 25 |
+| ✅ match | 36 |
+| 🟡 partial | 24 |
 | 🔶 different | 12 |
 | ❌ missing | 15 |
 | 🐞 ok | 4 |
@@ -279,7 +279,7 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 | PAT-STM-9 | ❌ | B | No TMB-H / MSI-H badges |
 | PAT-STM-10 | 🟡 | C | Span floors ✅; tooltip tables show raw values (no 1-decimal rounding, e.g. TMB 0.933333333333) |
 | PAT-STM-11 | 🟡 | C | `formatDays` identical (`timeline-tracks.ts:215`); 365-day ticks, trims ✅; line-chart y rule not checked |
-| PAT-STM-12 | 🟡 | BC | Header/timeline: collection day, type rank, natural id ✅ (`timeline-tracks.ts:196`); tables number without days (`alterations/run.ts:101`, tracked known issue) |
+| PAT-STM-12 | ✅ | BC | Collection day, type rank, natural id, in the header, timeline, alteration tables and signatures alike (`withSampleDays`, `lib/views/shared.ts`): msk_chord_2024 P-0004121's T02 (day −56) is 1 and T01 (day −40) is 2, as the portal API's sample-acquisition events order them |
 | PAT-STM-13 | ✅ | BC | Sorted panel ids → P1…Pn, W for WES (`igv.ts:100-107`) |
 | PAT-STM-14 | 🟡 | C | Mutation key adds mutationType/variantType (harmless); CNA ✅; SV tuple not sorted |
 | PAT-STM-15 | ❌ | C | No "profiled in all samples" filter |

@@ -1281,11 +1281,13 @@
           "samples": [
             {
               "id": "P-0000012-T02-IM3",
-              "type": "Primary"
+              "type": "Primary",
+              "day": -5453
             },
             {
               "id": "P-0000012-T03-IM3",
-              "type": "Metastasis"
+              "type": "Metastasis",
+              "day": 0
             }
           ]
         },

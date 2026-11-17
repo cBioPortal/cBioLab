@@ -11,7 +11,7 @@ import { patientSamplesSource } from "../../patient-alterations.ts";
 import { sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
-import { plural, refuse } from "../shared.ts";
+import { plural, refuse, withSampleDays } from "../shared.ts";
 import { SIGNATURE_PATIENT_COLUMNS, SIGNATURE_PATIENT_DEFAULT_COLUMNS, signaturePatientsSource, signatureValuesSource, type SignaturePart } from "./sql.ts";
 import { SIGNIFICANT_P, defaultVersion, pairsOf, signatureFamilies, signatureRows, spectrumOf, spectrumUnit, versionLabel, YMAX_MAX, YMAX_MIN, type SignatureFamily } from "./data.ts";
 import type { SignaturesView, SignaturesResult } from "./types.ts";
@@ -115,7 +115,7 @@ export async function runSignatures(view: SignaturesView, ctx: ViewRun): Promise
         (parts: TablePart[]) => (db) => signatureValuesSource(parts[0], want.id, db, fam.flatMap((f) => [f.contribution, f.pvalue, f.counts].filter((x): x is string => !!x)), scope)),
     ]);
     if (vals.total > vals.rows.length) return no(want.id + "'s signature profiles hold " + vals.total.toLocaleString("en-US") + " entities; this view reads at most " + TABLE_ROWS_MAX.toLocaleString("en-US"));
-    const samples0 = smp.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
+    const samples0 = await withSampleDays(ctx, want.study, want.id, smp.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") })));
     const marks = sampleMarks(samples0, []);
     const samples = [...marks.values()].map((m) => ({ id: m.id, type: samples0.find((s) => s.id === m.id)?.type || "", label: m.label }));
     const order = samples.map((s) => s.id);

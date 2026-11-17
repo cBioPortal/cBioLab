@@ -332,3 +332,19 @@ describe("alterations: a federation peer that serves patient alterations", () =>
     assert.equal(a.oncokbPin, null);
   });
 });
+
+describe("alterations: PAT-STM-12 sample order", () => {
+  test("A1 PAT-STM-12: the patient's samples carry their days, and the sources get the sample order [T02, T01]", async () => {
+    const T = [{ cohort: "A", study: "s1", patient: "P1", sid: "T01", type: "Primary" }, { cohort: "A", study: "s1", patient: "P1", sid: "T02", type: "Primary" }];
+    const withs: string[] = [];
+    const t: Tables = (table, src) => { withs.push(src.with); return table === "alterations:samples" ? T : study()(table, src); };
+    const resolver = { ...local("db1", t), patientTimeline: async () => ({ events: [{ type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }) };
+    const v = await run({ patient: { study: "s1", id: "P1" } } as never, ctx({ A: cohort({ s1: 2 }) }, { s1: resolver }));
+    const ps = alt(v).patient!.samples as unknown as { id?: string; sid?: string; day: number | null }[];
+    // the fake returns rows in its own order (the real source orders them), so the days are compared by sample
+    assert.deepEqual(Object.fromEntries(ps.map((s) => [s.id ?? s.sid, s.day])), { T02: -56, T01: null });
+    const ordered = withs.filter((w) => w.includes("T01") && w.includes("T02"));
+    assert.ok(ordered.length > 0, "a source names both samples");
+    assert.ok(ordered.every((w) => w.indexOf("T02") < w.indexOf("T01")), "T02 precedes T01 in the source");
+  });
+});
