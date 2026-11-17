@@ -43,11 +43,11 @@ describe("what a study holds and offers", () => {
   });
   test("files in the portal's order, each naming the studies that hold it; generic assays are not offered", () => {
     const fs = fileList({ a: BRCA, b: [p("mutations", "MUTATION_EXTENDED", "MAF"), p("rna_seq_v2_mrna", "MRNA_EXPRESSION", "CONTINUOUS")] }, ["a", "b"]);
-    assert.deepEqual(fs.map((f) => f.id), ["mutations", "sv", "profile:gistic", "profile:log2CNA", "profile:rna_seq_v2_mrna", "profile:rppa"]);
+    assert.deepEqual(fs.map((f) => f.id), ["mutations", "sv", "cna", "profile:log2CNA", "profile:rna_seq_v2_mrna", "profile:rppa"]);
     assert.deepEqual(fs.find((f) => f.id === "sv")!.studies, ["a"]);
     assert.deepEqual(fs.find((f) => f.id === "profile:rna_seq_v2_mrna")!.studies, ["a", "b"]);
-    assert.deepEqual(fs.find((f) => f.id === "profile:gistic")!.matrix, { kind: "profile", profile: "gistic", discrete: true });
-    assert.match(fs.find((f) => f.id === "profile:gistic")!.description, /NP when its panel/);
+    assert.deepEqual(fs.find((f) => f.id === "cna")!.matrix, { kind: "cna", profiles: { a: "gistic" } });
+    assert.match(fs.find((f) => f.id === "cna")!.description, /NP when its panel/);
     assert.doesNotMatch(fs.find((f) => f.id === "profile:log2CNA")!.description, /NP/);
   });
   test("frequencies add counts across studies, never percentages", () => {
@@ -165,7 +165,7 @@ describe("runDatafiles", () => {
     const d = df(v);
     assert.deepEqual(d.counts, { samples: 3, altered: 1, unaltered: 1, unprofiled: 1 });
     assert.deepEqual(d.frequency.map((f) => [f.line, f.altered, f.profiled, f.percent]), [["TP53", 1, 2, 50], ["KRAS: MUT", 0, 3, 0]]);
-    assert.deepEqual(d.files.map((f) => [f.id, f.rows]), [["mutations", 3], ["sv", 3], ["profile:gistic", 3], ["profile:log2CNA", 3], ["profile:rna_seq_v2_mrna", 3], ["profile:rppa", 3],
+    assert.deepEqual(d.files.map((f) => [f.id, f.rows]), [["mutations", 3], ["sv", 3], ["cna", 3], ["profile:log2CNA", 3], ["profile:rna_seq_v2_mrna", 3], ["profile:rppa", 3],
       ["altered", 1], ["unaltered", 1], ["matrix", 3]]);
     assert.deepEqual(d.lines, [{ line: "TP53", gene: "TP53", column: "TP53" }, { line: "KRAS: MUT", gene: "KRAS", column: "KRAS" }]);
     assert.deepEqual(d.rows.map((r) => r.values), [["A-01", "A", "altered", "R175H", "no alteration"], ["B-01", "B", "unaltered", "no alteration", "no alteration"],
@@ -202,13 +202,13 @@ describe("runDatafiles", () => {
     assert.match(String((await run({ oql: [] }, ctx(one, { s1: r1 }))).error), /one OQL entry per line/);
     assert.match(String((await run({ rows: 0 }, ctx(one, { s1: r1 }))).error), /rows \(the page size of the case table\) is 1 to 1000/);
     assert.match(String((await run({ columns: ["nope"] }, ctx(one, { s1: r1 }))).error), /unknown column nope/);
-    assert.match(String((await run({}, ctx(one, { s1: r1 }, { table: "profile:methylation" }))).error), /table is one of cases, altered, unaltered, matrix, mutations, sv, profile:gistic/);
+    assert.match(String((await run({}, ctx(one, { s1: r1 }, { table: "profile:methylation" }))).error), /table is one of cases, altered, unaltered, matrix, mutations, sv, cna/);
     const agg = { instance: { id: "agg", mode: "aggregate-only", label: "agg", conn: { id: "agg" } } };
     assert.match(String((await run({}, ctx(one, { s1: agg }))).error), /no study here may disclose patients' samples \(s1: aggregate-only/);
     const failing = { ...local("c1", () => [], {}), viewAggregate: async () => { throw new Error("warehouse down"); } };
     assert.match(String((await run({}, ctx(one, { s1: failing }))).error), /warehouse down/);
   });
-  test("several studies: counts added, a file only some studies hold names them", async () => {
+  test("several studies: counts added, a file only some studies hold names them and lists every sample", async () => {
     const r1 = local("c1", () => [], { n: 2, altered: 1, unaltered: 1, alt_0: 1, prof_0: 2, alt_1: 0, prof_1: 2 });
     const r2 = local("c1", () => [], { n: 5, altered: 2, unaltered: 1, alt_0: 2, prof_0: 4, off_0: 1, alt_1: 0, prof_1: 5 }, [p("mutations", "MUTATION_EXTENDED", "MAF")]);
     const v = await run({}, ctx({ Q: cohort({ s1: 2, s2: 5 }) }, { s1: r1, s2: r2 }));
@@ -216,7 +216,7 @@ describe("runDatafiles", () => {
     assert.deepEqual(d.counts, { samples: 7, altered: 3, unaltered: 2, unprofiled: 2 });
     assert.equal(d.frequency[0].percent, 50);
     assert.deepEqual(d.files.find((f) => f.id === "sv")!.studies, ["s1"]);
-    assert.equal(d.files.find((f) => f.id === "sv")!.rows, 2);
+    assert.equal(d.files.find((f) => f.id === "sv")!.rows, 7, "every queried sample, NP for s2 (RDL-STM-4)");
     assert.equal(d.files.find((f) => f.id === "mutations")!.studies, undefined);
     assert.match(String(v.caveat), /counts added across studies[\s\S]*TP53: 1 altered sample outside its panel's coverage/);
   });

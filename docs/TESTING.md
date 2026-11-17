@@ -311,8 +311,13 @@ named in the scripts).
   pull request CI sets `MUTANT_CHANGED` to the diff's file list and only the bugs it could affect are
   planted: those in a changed file, those whose guard's script or unit suites changed, and those an
   edited area file defines or guards. A diff touching `scripts/check-mutants.ts`,
-  `scripts/mutants/types.ts`, `verify.yml` or the dependencies plants every bug, as does every push to
-  master and every merge-queue run, so a test weakened far from the bug it guards is caught there.
+  `scripts/mutants/types.ts`, `verify.yml` or the dependencies plants every bug. A push to master is
+  selective the same way, by the push's own diff; every bug is planted once a night on master
+  (`.github/workflows/planted-bugs-nightly.yml`, 03:17 UTC, or run by hand), so a test weakened far
+  from the bug it guards is caught within a day, and a failing night opens or updates the issue
+  "Nightly planted bugs failed". `/verification` shows the committed `docs/verification/mutants.json`,
+  refreshed from a full run (`npm run verify`, or the nightly run's `planted-bugs-nightly` artifact),
+  never from a partial one (whose file carries `selection`).
 
 The first two are gate stages. A new statistic gets a row in `lib/verification.ts`
 (`test/verification.test.ts` fails otherwise); new cohort or count logic should get a planted bug
