@@ -35,3 +35,12 @@ export function sampleGroups(samples: EvolutionSample[], bySample: Record<string
   if (none.length) out.push({ value: "", color: null, samples: none });
   return out;
 }
+
+/**
+ * The document patch that moves the view to another patient (or, with null, back to the list's
+ * first): Group by is cleared, as the portal's starts over on each patient's page, so an attribute
+ * of one patient's samples is never carried to another's.
+ */
+export function patientPatch(to: { study: string; id: string } | null): { patient: { study: string; id: string } | undefined; groupBy: undefined } {
+  return { patient: to ?? undefined, groupBy: undefined };
+}

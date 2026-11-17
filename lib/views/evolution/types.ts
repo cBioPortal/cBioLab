@@ -99,8 +99,10 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   groupOptions?: { id: string; name: string }[];
   /** the samples' groups when grouped: in order of a value's first sample; samples without a value last, unlabelled ("") */
   groupBy?: { attribute: string; name: string; groups: EvolutionGroup[] };
+  /** why the chart is not grouped though groupBy was asked for, or why the attributes to group by could not be listed */
+  ungrouped?: string;
   /** the display as drawn, from the spec */
-  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; groupBy: string | null };
+  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; /** the Group by attribute applied, or null when the chart is not grouped */ groupBy: string | null };
 }
 
 declare module "../../types.ts" {

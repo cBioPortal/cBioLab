@@ -19,7 +19,7 @@ import { axisTicks, timelineAxisItems } from "../lib/timeline-tracks.ts";
 import { timelineSvg } from "../lib/timeline-svg.ts";
 import { palette } from "../lib/svg-kit.ts";
 import { kindText } from "./support/kind-text.ts";
-import { groupOptions, sampleGroups } from "../lib/views/evolution/groups.ts";
+import { groupOptions, sampleGroups, patientPatch } from "../lib/views/evolution/groups.ts";
 import { clinicalColor } from "../lib/oncoprint-style.ts";
 import type { EvolutionSample } from "../lib/views/evolution/types.ts";
 import { FS } from "../lib/svg-kit.ts";
@@ -683,16 +683,32 @@ describe("evolution: Group by, by the rule table (R1–R8)", () => {
     }
   });
 
-  test("GB13 R7: a groupBy the patient's samples do not carry is refused, listing the available ids", async () => {
+  test("GB13 R7a (replaces the refusal of a groupBy the samples do not carry): drawn ungrouped, saying why and listing the samples' attribute ids", async () => {
     for (const bad of ["NOPE", "NOBODY", "PATIENT_ONLY"]) {
       const v = await g({ groupBy: bad });
-      assert.ok(v.error, bad);
-      assert.match(v.error!, new RegExp(bad));
-      assert.match(v.error!, /SAMPLE_TYPE/);
-      assert.match(v.error!, /ONLY_T1/);
-      assert.match(v.error!, /TISSUE/);
-      assert.doesNotMatch(v.error!.replace(JSON.stringify(bad), ""), /NOBODY|PATIENT_ONLY/, "only the available ids are listed");
+      assert.equal(v.error, undefined, bad + ": " + String(v.error));
+      const e = evo(v);
+      assert.equal(e.groupBy, undefined, bad);
+      assert.equal(e.display.groupBy, null, bad);
+      assert.ok(e.ungrouped, bad);
+      assert.match(e.ungrouped!, new RegExp(bad));
+      assert.match(e.ungrouped!, /SAMPLE_TYPE/);
+      assert.match(e.ungrouped!, /ONLY_T1/);
+      assert.match(e.ungrouped!, /TISSUE/);
+      assert.doesNotMatch(e.ungrouped!.replace(bad, ""), /NOBODY|PATIENT_ONLY/, "only the samples' attribute ids are listed");
+      assert.ok(v.caveat!.includes("Group by: " + e.ungrouped!), String(v.caveat));
     }
+    // samples carrying no attribute at all: says they have none
+    const bare = ATTRS.map((r) => ({ ...r, m: {} }));
+    const t: Tables = (table, src) => table === "evolution:sample-attributes" ? bare : study({ muts: MUTS3 })(table, src);
+    const v = await run({ groupBy: "SAMPLE_TYPE" }, ctx({ A: cohort({ s1: 3 }) }, { s1: { ...local("db1", t), viewMeta: async () => META } }));
+    assert.equal(v.error, undefined, String(v.error));
+    const e = evo(v);
+    assert.equal(e.groupBy, undefined);
+    assert.equal(e.display.groupBy, null);
+    assert.match(e.ungrouped ?? "", /SAMPLE_TYPE/);
+    assert.match(e.ungrouped ?? "", /none/);
+    assert.ok(v.caveat!.includes("Group by: " + e.ungrouped), String(v.caveat));
   });
 
   test("GB14 R7: a valid groupBy yields evolution.groupBy and display.groupBy; groupOptions are listed for the line chart", async () => {
@@ -729,5 +745,80 @@ describe("evolution: Group by, by the rule table (R1–R8)", () => {
     assert.match(w.caveat!, /grouped by Only T1/);
     assert.match(w.caveat!, /X: 1; no value: 2, 3/);
     assert.doesNotMatch((await g({})).caveat!, /grouped by/);
+  });
+
+  test("GB17 R7c: display.groupBy is the applied id when grouped, null otherwise, the heatmap with a groupBy included", async () => {
+    assert.equal(evo(await g({ groupBy: "SAMPLE_TYPE" })).display.groupBy, "SAMPLE_TYPE");
+    assert.equal(evo(await g({ groupBy: "TISSUE" })).display.groupBy, "TISSUE");
+    assert.equal(evo(await g({})).display.groupBy, null);
+    assert.equal(evo(await g({ groupBy: "NOPE" })).display.groupBy, null);
+    assert.equal(evo(await g({ chart: "heatmap" })).display.groupBy, null);
+    assert.equal(evo(await g({ chart: "heatmap", groupBy: "SAMPLE_TYPE" })).display.groupBy, null);
+  });
+
+  test("GB18 R7c: the heatmap with a groupBy: ungrouped says only the line chart is grouped, and the attributes are not read", async () => {
+    const { c, res } = grouped();
+    const v = await run({ chart: "heatmap", groupBy: "SAMPLE_TYPE" }, c);
+    assert.equal(v.error, undefined, String(v.error));
+    const e = evo(v);
+    assert.equal(e.groupBy, undefined);
+    assert.equal(e.display.groupBy, null);
+    assert.match(e.ungrouped ?? "", /only the line chart is grouped/);
+    assert.ok(!res.asked.includes("evolution:sample-attributes"), "the samples' attributes are not read");
+  });
+
+  const failing = () => {
+    const t: Tables = (table, src) => {
+      if (table === "evolution:sample-attributes") throw new Error("attribute store down");
+      return study({ muts: MUTS3 })(table, src);
+    };
+    return ctx({ A: cohort({ s1: 3 }) }, { s1: { ...local("db1", t), viewMeta: async () => META } });
+  };
+
+  test("GB19 R7d: the attribute reader fails, no groupBy: drawn ungrouped, saying the attributes could not be read, with the error; no groupOptions", async () => {
+    const v = await run({}, failing());
+    assert.equal(v.error, undefined, String(v.error));
+    const e = evo(v);
+    assert.ok(e.drawn && e.drawn.length > 0, "the view is drawn");
+    assert.equal(e.groupOptions, undefined);
+    assert.equal(e.groupBy, undefined);
+    assert.equal(e.display.groupBy, null);
+    assert.match(e.ungrouped ?? "", /could not be read/);
+    assert.match(e.ungrouped ?? "", /attribute store down/);
+  });
+
+  test("GB20 R7d: the attribute reader fails, with a groupBy: drawn ungrouped, no refusal; the message names the groupBy", async () => {
+    const v = await run({ groupBy: "SAMPLE_TYPE" }, failing());
+    assert.equal(v.error, undefined, String(v.error));
+    const e = evo(v);
+    assert.ok(e.drawn && e.drawn.length > 0, "the view is drawn");
+    assert.equal(e.groupOptions, undefined);
+    assert.equal(e.groupBy, undefined);
+    assert.equal(e.display.groupBy, null);
+    assert.match(e.ungrouped ?? "", /could not be read/);
+    assert.match(e.ungrouped ?? "", /attribute store down/);
+    assert.match(e.ungrouped ?? "", /SAMPLE_TYPE/);
+    assert.ok(v.caveat!.includes("Group by: " + e.ungrouped), String(v.caveat));
+  });
+
+  test("GB21 R9: patientPatch sets the patient and carries a present, undefined groupBy", () => {
+    const to = { study: "s1", id: "P2" };
+    const p = patientPatch(to);
+    assert.deepEqual(p, { patient: to, groupBy: undefined });
+    assert.equal(p.patient, to);
+    assert.ok("groupBy" in p, "groupBy key present");
+    assert.equal(p.groupBy, undefined);
+    const n = patientPatch(null);
+    assert.deepEqual(n, { patient: undefined, groupBy: undefined });
+    assert.ok("patient" in n);
+    assert.ok("groupBy" in n, "groupBy key present");
+  });
+
+  test("GB22 R9: a patient change on a grouped document clears its groupBy", () => {
+    const view = { kind: "evolution", cohorts: ["A"], patient: { study: "s1", id: "P1" }, groupBy: "SAMPLE_TYPE" };
+    const merged = { ...view, ...patientPatch({ study: "s1", id: "P2" }) };
+    const clean = Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== undefined));
+    assert.ok(!("groupBy" in clean), JSON.stringify(clean));
+    assert.deepEqual(clean.patient, { study: "s1", id: "P2" });
   });
 });

@@ -5,9 +5,8 @@ import type { PatientLevelCapable } from "./federation.ts";
 import type { TablePart } from "./mutation-table.ts";
 import { clinicalRowSource, tableAttributesSql } from "./clinical-table.ts";
 import type { ViewResolver } from "./views/shared.ts";
+import { TABLE_ROWS_MAX } from "./views/rows.ts";
 
-/** at most this many samples of one patient are read */
-const SAMPLES_MAX = 1000;
 
 export interface PatientSampleAttributes {
   /** the study's sample-level attributes, in the study's order: id and display name */
@@ -22,7 +21,7 @@ export async function patientSampleAttributes(res: ViewResolver & PatientLevelCa
   const cols = meta.filter((m) => Number(m.patient) !== 1).map((m) => ({ id: String(m.id), name: String(m.name || m.id), per: "sample" as const, numeric: false }));
   if (!cols.length) return { columns: [], bySample: {} };
   const parts: TablePart[] = [{ cohort: "patient", study, cohortSql: res.cohortSql({ study, all: [{ kind: "patientList", ids: [study + ":" + patient] }] }) }];
-  const page = await res.rowsPage(label, (db) => clinicalRowSource(parts, db, "sample", cols), {}, ["patient", "sample"], SAMPLES_MAX, 0);
+  const page = await res.rowsPage(label, (db) => clinicalRowSource(parts, db, "sample", cols), {}, ["patient", "sample"], TABLE_ROWS_MAX, 0);
   const bySample: Record<string, [string, string][]> = {};
   for (const r of page.rows) {
     const m = (r.m || {}) as Record<string, string>;

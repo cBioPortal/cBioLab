@@ -14,6 +14,7 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
 import { OptionSelect } from "../_ui/choice.tsx";
+import { patientPatch } from "../../lib/views/evolution/groups.ts";
 
 type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; expandGaps?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
@@ -79,7 +80,8 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
   };
   const clickFigure = (ev: React.MouseEvent) => { const k = (ev.target as Element).closest?.("[data-key]")?.getAttribute("data-key"); if (k) toggle(k); };
   const tipped = tip ? e.drawn?.find((m) => m.key === tip.key) : undefined;
-  const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch({ patient: to }); };
+  // another patient starts ungrouped, as the portal's Group by starts over on each patient's page
+  const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch(patientPatch(to)); };
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.id;
   const setQuery = (q: TableQuery) => {
     const rows = (spec.mutations as { rows?: number } | undefined)?.rows;
@@ -93,7 +95,7 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
     <div className="tl-view" tabIndex={-1} onKeyDown={patientKeys(e.position, go)}>
       {!fixed && <PatientNav shown={p ? p.id : null} position={e.position} total={e.total} updating={updating} go={go} what="draw it"
-        openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />}
+        openList={() => setListOpen(true)} first={() => patch(patientPatch(null))} />}
       {p ? (
         <div className="tl-head">
           <span className="tl-who mono">{p.id}</span>
@@ -112,12 +114,14 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
             </div>
             <div className="tbz">
               <span className="meta">Group by</span>
-              <OptionSelect value={spec.groupBy || ""} ariaLabel="group the samples by" disabled={chart === "heatmap" || !e.groupOptions?.length} className="max-w-56"
-                title={chart === "heatmap" ? "only the line chart is grouped" : !e.groupOptions?.length ? "the samples have no clinical attributes to group by" : "a line per mutation and group of samples sharing a value, each group in its colour, as the portal's Group by"}
+              <OptionSelect value={spec.groupBy || ""} ariaLabel="group the samples by" disabled={chart === "heatmap" || (!e.groupOptions?.length && !spec.groupBy)} className="max-w-56"
+                title={chart === "heatmap" ? "only the line chart is grouped" : e.ungrouped ? e.ungrouped : !e.groupOptions?.length ? "the samples have no clinical attributes to group by" : "a line per mutation and group of samples sharing a value, each group in its colour, as the portal's Group by"}
                 onValueChange={(v) => patch({ groupBy: v || undefined })}>
                 <option value="">None</option>
                 {(e.groupOptions || []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                {spec.groupBy && !e.groupOptions?.some((o) => o.id === spec.groupBy) && <option value={spec.groupBy}>{spec.groupBy} (not this patient's)</option>}
               </OptionSelect>
+              {e.ungrouped && chart === "line" && <span className="meta" role="status">not grouped: {e.ungrouped}</span>}
             </div>
             <div className="tbz">
               <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
@@ -157,7 +161,7 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
           {(close) => (
             <DataTable t={e} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit="patients"
               title="choose a patient" onQuery={(q) => patch({ ...q })}
-              onRow={(row) => { if (!isSel(row)) patch({ patient: { study: row.study, id: row.patient } }); close(); }} selected={isSel}
+              onRow={(row) => { if (!isSel(row)) patch(patientPatch({ study: row.study, id: row.patient })); close(); }} selected={isSel}
               cell={(id, x) => id === "patient" ? <span className="mono">{x}</span> : undefined} />
           )}
         </PatientsDialog>
