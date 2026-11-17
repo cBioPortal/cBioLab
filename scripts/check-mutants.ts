@@ -148,7 +148,7 @@ function selection(): { mutants: Planted[]; changed: number | null; reason: stri
 }
 /** every planted bug run against its guard in the copy at `dir`; the exit code */
 function plantAll(): number {
-  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".venv"]);
+  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".portal-cache", ".venv"]);
   cpSync(ROOT, dir, { recursive: true, filter: (src) => !SKIP.has(src.split("/").pop()!) });
   symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"));
   mkdirSync(join(dir, "docs/verification"), { recursive: true });
