@@ -180,11 +180,36 @@ export function withClinicalTab(v: V, ticked: string[], autoTracks: string[]): V
   return pruneSort(next);
 }
 
+const isClusterKey = (k: string) => k.replace(/^-/, "").startsWith("cluster:");
+
+/** the heatmap profile the sort clusters by, wherever its key sits (the engine clusters on the first one), or null */
+export function clusteredProfile(keys: string[]): string | null {
+  const k = keys.find(isClusterKey);
+  return k ? k.replace(/^-/, "").slice("cluster:".length) : null;
+}
+
 /**
- * The sort keys after a heatmap profile's "Cluster" (its profile) or "Don't cluster" (null): one
- * profile is clustered at a time, its key first (ResultsViewOncoprintUtils makeTrackGroupHeader).
+ * The sort keys after a heatmap profile's "Cluster" (on) or "Don't cluster" (off), from one of that
+ * profile's rows (ResultsViewOncoprintUtils makeTrackGroupHeader): clustering is one profile at a time,
+ * its key first; "Don't cluster" drops that profile's key and leaves another profile's clustering alone.
  */
-export function clusterSort(keys: string[], profileType: string | null): string[] {
+export function clusterSort(keys: string[], profileType: string, on: boolean): string[] {
   const rest = keys.filter((k) => !k.replace(/^-/, "").startsWith("cluster:"));
-  return profileType ? ["cluster:" + profileType, ...rest].slice(0, 4) : rest;
+  return on ? ["cluster:" + profileType, ...rest].slice(0, 4) : keys.filter((k) => k.replace(/^-/, "") !== "cluster:" + profileType);
+}
+
+/**
+ * The sort keys after a track's "Sort a-Z" ("" ), "Sort Z-a" ("-") or "Don't sort by this" (null): a
+ * direction makes the track the first key and ends heatmap clustering, as the portal's sortByData does
+ * (ResultsViewOncoprint onTrackSortDirectionChange); "Don't sort by this" only drops the track's key.
+ */
+export function trackSort(keys: string[], label: string, dir: "" | "-" | null): string[] {
+  const others = keys.filter((x) => x.replace(/^-/, "") !== label);
+  return dir === null ? others : [dir + label, ...others.filter((k) => !isClusterKey(k))].slice(0, 4);
+}
+
+/** the sort keys after the sort select picks a primary key ("" for the engine's order): any pick ends heatmap clustering, as sortByData */
+export function selectSort(keys: string[], v: string): string[] {
+  const rest = keys.slice(1).filter((k) => !isClusterKey(k));
+  return v ? [v, ...rest].slice(0, 4) : rest;
 }

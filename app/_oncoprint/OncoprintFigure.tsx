@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { zoomedTip } from "./zoomed-tip.ts";
-import { clusterSort } from "./track-edits.ts";
+import { clusterSort, clusteredProfile, selectSort, trackSort } from "./track-edits.ts";
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
@@ -155,6 +155,9 @@ export interface ColumnSelection {
 /** a cohort's explicit id list is capped in the compiler; the dialog says so before the refusal */
 const MAX_SELECTION = 50000;
 
+/** the track menu's widest, which its placement keeps inside the window (globals.css .onco-trackmenu) */
+const TRACK_MENU_MAX_W = 320;
+
 export default function OncoprintFigure(props: OncoprintFigureProps) {
   const { spec, sortKeys, display, onSortKeys, onDisplay, busy } = props;
   const [data, setData] = useState<UnpackedContract | null>(null);
@@ -172,13 +175,15 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** the track whose menu is open, and where to put it */
   const [trackMenu, setTrackMenu] = useState<{ ti: number; cx: number; cy: number } | null>(null);
+  const trackMenuRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    // the menu is fixed at the click point, so it would drift from its row on a scroll
+    // the menu is fixed at the click point, so it would drift from its row on a scroll — but not on one inside it
     if (!trackMenu) return;
+    const onScroll = (e: Event) => { if (!trackMenuRef.current?.contains(e.target as Node)) setTrackMenu(null); };
     const close = () => setTrackMenu(null);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", close);
-    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+    return () => { window.removeEventListener("scroll", onScroll, true); window.removeEventListener("resize", close); };
   }, [trackMenu]);
   /** a drag across the plot: canvas x of where it started and where it is now */
   const [sel, setSel] = useState<{ x0: number; x1: number; live: boolean } | null>(null);
@@ -845,7 +850,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                     onCheckedChange={(c) => set({ sortIgnoreVUS: (c === true) })} /> ignore VUS</label>
             </GearMenu>
             <label className="tbfield">sort <OptionSelect value={sortKeys[0] || ""} disabled={busy}
-              onValueChange={(v) => onSortKeys(v ? [v, ...sortKeys.slice(1)].slice(0, 4) : sortKeys.slice(1))}>
+              onValueChange={(v) => onSortKeys(selectSort(sortKeys, v))}>
               <option value="">engine order ({data.conventions.sort.join(", ")})</option>
               {sortKeys[0]?.startsWith("cluster:") && !data.tracks.some((t) => t.profileType === sortKeys[0].slice(8)) &&
                 <option value={sortKeys[0]}>{sortKeys[0]}</option>}
@@ -853,7 +858,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               <option value="id">{data.unit} id</option>
               {/* clustering is chosen from a heatmap row's menu; the select only shows it, as the portal's Sort menu */}
               {data.tracks.some((t) => t.kind === "heatmap" && t.profileType) &&
-                <option value={sortKeys[0]?.startsWith("cluster:") ? sortKeys[0] : ""} disabled>sorted by heatmap clustering order</option>}
+                <option value={sortKeys[0]?.startsWith("cluster:") && data.tracks.some((t) => t.profileType === sortKeys[0].slice(8)) ? sortKeys[0] : ""} disabled>sorted by heatmap clustering order</option>}
               {data.tracks.filter((t) => t.kind !== "gene" && !/\(no data\)$/.test(t.label)).flatMap((t) => [
                 <option key={t.label} value={t.label}>{t.label} ↑</option>,
                 <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
@@ -922,15 +927,17 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const sortable = t.kind !== "gene" && !/\(no data\)$/.test(t.label);
             const key = (dir: "" | "-") => dir + t.label;
             const isKey = (dir: "" | "-") => sortKeys[0] === key(dir);
-            const setPrimary = (k: string | null) => onSortKeys(k ? [k, ...sortKeys.filter((x) => x.replace(/^-/, "") !== t.label)].slice(0, 4)
-              : sortKeys.filter((x) => x.replace(/^-/, "") !== t.label));
+            const setPrimary = (dir: "" | "-" | null) => onSortKeys(trackSort(sortKeys, t.label, dir));
             const item = (label: string, on: boolean, act: () => void, enabled = true) => (
               <MenuItem className={on ? "font-semibold text-accent-foreground" : undefined} disabled={!enabled || busy}
                 onClick={() => { act(); setTrackMenu(null); }}>{label}{on && <Check className="ml-auto" />}</MenuItem>
             );
             return (
-              <div className="onco-trackmenu" style={{ left: Math.min(trackMenu.cx, window.innerWidth - 220),
-                ...(trackMenu.cy > window.innerHeight * 0.6 ? { bottom: window.innerHeight - trackMenu.cy + 6 } : { top: trackMenu.cy + 6 }) }}
+              <div className="onco-trackmenu" ref={trackMenuRef} style={{ left: Math.max(4, Math.min(trackMenu.cx, window.innerWidth - TRACK_MENU_MAX_W - 8)),
+                // opened upward in the lower part of the window; either way no taller than the room on that side
+                ...(trackMenu.cy > window.innerHeight * 0.6
+                  ? { bottom: window.innerHeight - trackMenu.cy + 6, maxHeight: trackMenu.cy - 14 }
+                  : { top: trackMenu.cy + 6, maxHeight: window.innerHeight - trackMenu.cy - 14 }) }}
                 onMouseLeave={() => setTrackMenu(null)}>
                 <span className="meta onco-trackmenu-name">{t.label + (t.sublabel || "")}
                   {t.members && t.members.length > 1 && <><br />{t.members.join(" · ")}</>}</span>
@@ -939,16 +946,11 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 {props.onRemoveTrack && (!props.canRemoveTrack || props.canRemoveTrack(t.key ?? t.label)) && item("Remove track", false, () => props.onRemoveTrack!(t.key ?? t.label))}
                 {props.onExpandTrack && t.members && t.members.length > 1 &&
                   item("Expand into " + t.members.length + " rows", false, () => props.onExpandTrack!(t.key ?? t.label))}
-                {t.kind === "heatmap" && t.profileType && (() => {
-                  // the portal's heatmap group header (Cluster / Don't cluster); each of the profile's rows carries it here
-                  const mine = "cluster:" + t.profileType;
-                  return <>
-                    {item("Cluster", sortKeys[0] === mine, () => onSortKeys(clusterSort(sortKeys, t.profileType!)))}
-                    {item("Don't cluster", sortKeys[0] !== mine, () => { if (sortKeys[0] === mine) onSortKeys(clusterSort(sortKeys, null)); })}
-                  </>;
-                })()}
-                {item("Sort a-Z", isKey(""), () => setPrimary(key("")), sortable)}
-                {item("Sort Z-a", isKey("-"), () => setPrimary(key("-")), sortable)}
+                {/* the portal's heatmap group header (Cluster / Don't cluster); each of the profile's rows carries it here */}
+                {t.kind === "heatmap" && t.profileType && item("Cluster", clusteredProfile(sortKeys) === t.profileType, () => onSortKeys(clusterSort(sortKeys, t.profileType!, true)))}
+                {t.kind === "heatmap" && t.profileType && item("Don't cluster", clusteredProfile(sortKeys) !== t.profileType, () => onSortKeys(clusterSort(sortKeys, t.profileType!, false)))}
+                {item("Sort a-Z", isKey(""), () => setPrimary(""), sortable)}
+                {item("Sort Z-a", isKey("-"), () => setPrimary("-"), sortable)}
                 {item("Don't sort by this", sortable && !isKey("") && !isKey("-"), () => setPrimary(null), sortable)}
                 {t.categories && t.categories.length > 0 && primaryKey === t.label &&
                   item(display.gaps === "none" ? "Show gaps" : "Hide gaps", display.gaps !== "none", () => set({ gaps: display.gaps === "none" ? "gaps" : "none" }))}
