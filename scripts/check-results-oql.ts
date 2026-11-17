@@ -63,6 +63,8 @@ import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql, cancerTypeSamplesSql } from "../lib/views/cancertypes/sql.ts";
 import { lineCtes, type StudyOpts } from "../lib/views/datafiles/sql.ts";
+import { matrixRowSource } from "../lib/views/datafiles/tables.ts";
+import { pageSql } from "../lib/table-query.ts";
 import { pairCountsSql, geneCountsSql, lollipopChangesSql } from "../lib/federation.ts";
 import { oqlMutationFilterSql } from "../lib/oql.ts";
 import { mutationStudySql, sq } from "../lib/compiler.ts";
@@ -716,6 +718,103 @@ async function expectCategory(tag: string, attribute: string | null, unit: "samp
   await expectCategory("G5", "CANCER_TYPE_DETAILED", "sample", { [LUAD]: 42, [LUSC]: 13, [LC]: 2, [UNKNOWN]: 2 }, 59, noType);
   await expectCategory("G5", "CANCER_TYPE_DETAILED", "patient", { [LUAD]: 39, [LUSC]: 12, [LC]: 2, [UNKNOWN]: 2 }, 53, noType);
   await write("DROP DATABASE IF EXISTS " + noType);
+}
+
+// ==== Cancer Types: units profiled per data type, the profiled-data strip (D*; CTS-CH-5, CTS-CH-6, CTS-MD-8) ====
+// Legacy: cbioportal-frontend cd8c6df CancerSummaryContent.tsx alterationTypeDataCounts, alterationCountHelpers.ts
+// count*AlterationOccurences / isSampleProfiledInMultiple: a unit is profiled for a type where the gene is on its panel
+// for a profile of that type; on the "*" row for any queried gene; a patient where any of their samples is.
+//   D1 a gene row: pmut / pcna / psv by that gene's panels per alteration type
+//   D2 the "*" row: any queried gene — so it is the widest of its genes' rows, and a gene alone's row when alone
+//   D3 a patient counts when any of their cohort samples does
+//   D4 a type the cohort has no panel for (the scratch copies, which hold no structural-variant panel): 0
+//   D5 pmrna / pprot are 0 without an EXP / PROT line
+// From the fixture: data_gene_panel_matrix.txt puts every sample on all three profiles — mutations and cna on
+// PEERFIX_FULL, except FX-P31…FX-P40 on PEERFIX_NO_EGFR for both; structural_variants on WGS for all 59 (whole genome:
+// the WES panel, which lists every gene). data_gene_panel_PEERFIX_NO_EGFR.txt lists KRAS but not EGFR, PEERFIX_FULL both.
+// data_clinical_sample.txt: FX-P31…FX-P40 are all Non-Small Cell Lung Cancer, one sample each; Lung Cancer is FX-P42-T1,
+// FX-P48-T1, both on PEERFIX_FULL. So, grouped by CANCER_TYPE (NSCLC 57 samples / 51 patients, as in C1):
+//   EGFR @ NSCLC: pmut = pcna = 57 − 10 = 47 samples, 51 − 10 = 41 patients; psv = 57 / 51 (WES lists EGFR).
+//   EGFR @ Lung Cancer: 2 for each type.  KRAS (on both panels) @ NSCLC: 57 / 51 for each type.
+//   "*" with KRAS and EGFR: KRAS's, 57 / 51; "*" with EGFR alone: EGFR's, 47 / 41 and psv 57 / 51.
+// The scratch copies (made for C6) drop every STRUCTURAL_VARIANT row of sample_to_gene_panel_derived: psv 0 everywhere,
+// pmut and pcna as above.
+const PROFILED = ["pmut", "pcna", "psv", "pmrna", "pprot"] as const;
+type ProfiledCounts = Record<(typeof PROFILED)[number], number>;
+const pc = (pmut: number, pcna: number, psv: number): ProfiledCounts => ({ pmut, pcna, psv, pmrna: 0, pprot: 0 });
+function expectProfiled(tag: string, rows: Row[], gene: string, grp: string, want: ProfiledCounts) {
+  const found = rows.filter((r) => String(r.gene) === gene && String(r.grp) === grp);
+  const name = tag + " " + gene + " @ " + JSON.stringify(grp) + " profiled per type";
+  if (found.length !== 1) { ok(name, false, found.length + " rows"); return; }
+  const bad = PROFILED.filter((k) => Number(found[0][k] ?? NaN) !== want[k]);
+  ok(name, !bad.length, bad.map((k) => k + " ours " + String(found[0][k]) + ", expected " + want[k]).join("; "));
+}
+{
+  const lines = ["KRAS: MUT=G12D", "EGFR: AMP"];
+  const s = await rowsOf({ lines }, "sample");
+  // EGFR: FX-P31…P40's mutation and CNA panel omit it; the SV panel (WES) lists it
+  expectProfiled("D1/D5 samples:", s, "EGFR", NSCLC, pc(47, 47, 57));
+  expectProfiled("D1 samples:", s, "EGFR", LC, pc(2, 2, 2));
+  expectProfiled("D1 samples:", s, "KRAS", NSCLC, pc(57, 57, 57));
+  // KRAS is on every panel, so "*" (any queried gene) is profiled everywhere
+  expectProfiled("D2 samples:", s, "*", NSCLC, pc(57, 57, 57));
+  expectProfiled("D2 samples:", s, "*", LC, pc(2, 2, 2));
+  const p = await rowsOf({ lines }, "patient");
+  // FX-P31…P40 have one sample each: 51 − 10
+  expectProfiled("D1/D3 patients:", p, "EGFR", NSCLC, pc(41, 41, 51));
+  expectProfiled("D1/D3 patients:", p, "EGFR", LC, pc(2, 2, 2));
+  expectProfiled("D3 patients:", p, "KRAS", NSCLC, pc(51, 51, 51));
+  expectProfiled("D2/D3 patients:", p, "*", NSCLC, pc(51, 51, 51));
+}
+{
+  // EGFR alone: "*" is EGFR's own row
+  const s = await rowsOf({ lines: ["EGFR: AMP"] }, "sample");
+  expectProfiled("D2 [EGFR: AMP] samples:", s, "*", NSCLC, pc(47, 47, 57));
+  expectProfiled("D2 [EGFR: AMP] samples:", s, "EGFR", NSCLC, pc(47, 47, 57));
+  const p = await rowsOf({ lines: ["EGFR: AMP"] }, "patient");
+  expectProfiled("D2/D3 [EGFR: AMP] patients:", p, "*", NSCLC, pc(41, 41, 51));
+}
+{
+  // the scratch copies: no structural-variant panel
+  const lines = ["KRAS: MUT=G12D", "EGFR: AMP"];
+  const s = await rowsOf({ lines }, "sample", scratch);
+  expectProfiled("D4 scratch samples:", s, "EGFR", NSCLC, pc(47, 47, 0));
+  expectProfiled("D4 scratch samples:", s, "KRAS", NSCLC, pc(57, 57, 0));
+  expectProfiled("D4 scratch samples:", s, "*", NSCLC, pc(57, 57, 0));
+  expectProfiled("D4 scratch samples:", s, "*", LC, pc(2, 2, 0));
+  const p = await rowsOf({ lines }, "patient", scratch);
+  expectProfiled("D3/D4 scratch patients:", p, "EGFR", NSCLC, pc(41, 41, 0));
+  expectProfiled("D3/D4 scratch patients:", p, "*", NSCLC, pc(51, 51, 0));
+}
+
+// ==== Download: a gene-by-sample file over a study without its profile (N*) ====================
+// lib/views/datafiles/tables.ts matrixRowSource lists every queried sample, as the portal's file does: a part
+// whose study holds no such profile (holds false) gives each of its 59 samples NP in every gene, reading none of
+// its data; one that holds it gives the fixture's calls — TP53's mutated samples, counted here on their own.
+// N3 runs both in one query (UNION ALL of an NP-only part and a holding part), as a two-study cohort does.
+{
+  const cohort = compileCohortDef(null, { study: STUDY, db: conn.db });
+  const cols = ["sample", "patient", "TP53", "KRAS"];
+  const mutated = Number((await chQuery<Row>("SELECT uniqExact(sampleId) AS n FROM " + conn.db + ".mutation_derived WHERE " + mutationStudySql(STUDY) +
+    " AND `GENE.hugoGeneSymbol` = 'TP53' AND molecularProfileId NOT LIKE '%uncalled%'", conn)).data[0]?.n);
+  const page = async (parts: { cohort: string; study: string; cohortSql: string }[], holds: (p: { cohort: string }) => boolean) =>
+    (await chQuery<Row>(pageSql(matrixRowSource({ kind: "mutations" }, parts, ["TP53", "KRAS"], conn.db, holds), {}, cols, 1000, 0), conn)).data;
+  const tp53 = (rows: Row[]) => rows.filter((r) => r.g0 !== "NP" && r.g0 !== "WT").length;
+  try {
+    const one = [{ cohort: "Q", study: STUDY, cohortSql: cohort }];
+    const n1 = await page(one, () => false);
+    ok("N1 without the profile: a row per sample (59)", n1.length === 59, "ours " + n1.length);
+    ok("N1 without the profile: NP in every gene", n1.every((r) => r.g0 === "NP" && r.g1 === "NP"), "rows not NP: " + n1.filter((r) => r.g0 !== "NP" || r.g1 !== "NP").length);
+    const n2 = await page(one, () => true);
+    ok("N2 with it: a row per sample (59)", n2.length === 59, "ours " + n2.length);
+    ok("N2 with it: TP53 called in the " + mutated + " samples mutation_derived holds", mutated > 0 && tp53(n2) === mutated, "ours " + tp53(n2) + ", expected " + mutated);
+    const two = [{ cohort: "A", study: STUDY, cohortSql: cohort }, { cohort: "B", study: STUDY, cohortSql: cohort }];
+    const n3 = await page(two, (p) => p.cohort === "A");
+    const a = n3.filter((r) => r.cohort === "A"), b = n3.filter((r) => r.cohort === "B");
+    ok("N3 both parts in one query: 59 rows each", a.length === 59 && b.length === 59, "ours " + a.length + " / " + b.length);
+    ok("N3 the holding part's calls, the other part NP throughout", tp53(a) === mutated && b.every((r) => r.g0 === "NP" && r.g1 === "NP"),
+      "A TP53 " + tp53(a) + " (expected " + mutated + "), B not NP " + b.filter((r) => r.g0 !== "NP" || r.g1 !== "NP").length);
+  } catch (e) { ok("N runs", false, (e as Error).message.slice(0, 300)); }
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);

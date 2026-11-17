@@ -4,7 +4,9 @@
 // for VAF, its grey for profiled-but-unaltered, its white-with-a-bar for not profiled.
 import type { DrawnResultOf } from "../../types.ts";
 import { palette, frame, caption, label, textWidth, legend, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, fmtInt, esc, FS, SW, r1, type SvgOpts, type Scale } from "../../svg-kit.ts";
+import { portalEvolutionVaf } from "../../chart/format.ts";
 import { STYLE, numericColor, encodeNumeric } from "../../oncoprint-style.ts";
+import { axisMarks, dayScale, type AxisTick } from "../../timeline-tracks.ts";
 import type { EvolutionCell, EvolutionMutation, EvolutionSample } from "./types.ts";
 
 /** the table columns that identify a mutation: one key names its line or heatmap row and its table row alike */
@@ -25,6 +27,24 @@ export function cellText(c: EvolutionCell): string {
     case "uncalled": return "uncalled, VAF " + vafText(c);
     case "absent": return "not found" + (c.alt != null && c.ref != null ? " (0 of " + fmtInt(c.alt + c.ref) + " reads)" : "");
     default: return "not profiled";
+  }
+}
+/**
+ * A cell's state as the portal's Genomic Evolution tooltip says it (PatientViewMutationsTabUtils
+ * mutationTooltip): "VAF: 0.38 (46 reads of 121 total)", "Mutated, but we don't have VAF data.",
+ * "Mutation uncalled (VAF: …)", "Mutation not detected" (with its VAF when reads were counted),
+ * "<sample> is not sequenced for <gene> mutations."
+ */
+export function portalCellTip(c: EvolutionCell, sampleId: string, gene: string): string {
+  const total = c.alt != null && c.ref != null ? c.alt + c.ref : null;
+  const vaf = c.vaf ?? (total ? c.alt! / total : null);
+  const reads = vaf != null && total != null ? "VAF: " + portalEvolutionVaf(vaf) + " (" + c.alt + " reads of " + total + " total)" : null;
+  switch (c.status) {
+    case "called": return reads ?? "Mutated, but we don't have VAF data.";
+    case "noVaf": return "Mutated, but we don't have VAF data.";
+    case "uncalled": return reads ? "Mutation uncalled (" + reads + ")" : "Mutation uncalled";
+    case "absent": return reads ? "Mutation not detected (" + reads + ")" : "Mutation not detected";
+    default: return sampleId + " is not sequenced for " + gene + " mutations.";
   }
 }
 const mutationName = (m: EvolutionMutation) => m.gene + " " + m.proteinChange;
@@ -57,6 +77,37 @@ export function lineCells(m: EvolutionMutation): { i: number; c: EvolutionCell }
   return all.slice(a, b + 1);
 }
 
+/**
+ * The line chart's x axis as the portal's, which is the patient timeline's (TickAxis), laid out by the
+ * timeline's own axisMarks: a line and a label at each year ("0", "1y", "-2y"), month ticks inside a
+ * year wide enough for them, a squiggle where empty years are cut with a dashed guide up through the
+ * plot, and a faint guide up through the plot at each year; the day-0 line in the muted ink, as the
+ * timeline draws it. Labels share one row under the axis.
+ */
+function timeAxis(ticks: AxisTick[], X: (day: number) => number, left: number, right: number, axY: number, top: number, p: ReturnType<typeof palette>): string[] {
+  const out = [`<line x1="${r1(left)}" y1="${r1(axY)}" x2="${r1(right)}" y2="${r1(axY)}" stroke="${p.muted}" stroke-width="${SW.line}"/>`];
+  const ly = axY + 17;
+  for (const m of axisMarks(ticks, X, left, right, (t) => textWidth(t, FS.small))) {
+    if (m.kind === "cut")
+      out.push(`<g transform="translate(${r1(m.x)} 0)"><title>${m.years} years with no events, cut</title>` +
+        `<path d="M-6 ${r1(axY)} q3 -6 6 0 t6 0" fill="none" stroke="${p.muted}" stroke-width="1.2"/>` +
+        `<line x1="0" x2="0" y1="${r1(top)}" y2="${r1(axY)}" stroke="${p.muted}" stroke-width="${SW.hair}" stroke-dasharray="2 3"/></g>`);
+    else if (m.kind === "year") {
+      out.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(top)}" y2="${r1(axY)}" stroke="${m.day === 0 ? p.muted : p.line}" stroke-width="${SW.hair}"/>`,
+        `<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(axY)}" y2="${r1(axY + 6)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) out.push(label(m.label.x, ly, m.label.text, { size: FS.small, fill: p.muted, anchor: "middle" }));
+    } else {
+      out.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(axY)}" y2="${r1(axY + 3)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) out.push(label(m.x, ly, m.label, { size: FS.small, fill: p.muted, anchor: "middle" }));
+    }
+  }
+  out.push(label((left + right) / 2, ly + 15, TIME_TITLE, { size: FS.small, fill: p.muted, anchor: "middle" }));
+  return out;
+}
+
+/** the time axis's title */
+const TIME_TITLE = "Time from diagnosis, when each sample was collected";
+
 function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const out: string[] = [];
@@ -75,8 +126,10 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
   let xs: number[], bottom: number;
   if (e.x === "time") {
     const days = samples.map((s) => s.day!);
-    const xsc = linear(Math.min(...days), Math.max(...days), left + pad, right - pad);
-    xs = days.map((t) => xsc(t));
+    let X: (day: number) => number;
+    if (e.axis?.length) { const { x } = dayScale(e.axis, right - left); X = (t) => left + x(t); }
+    else X = linear(Math.min(...days), Math.max(...days), left + pad, right - pad);
+    xs = days.map((t) => X(t));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));
     const markTop = top + H + 12;
     // samples taken the same day stack their markers
@@ -84,8 +137,13 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
     const rows = xs.map((x) => { const k = Math.round(x); const n = seen.get(k) || 0; seen.set(k, n + 1); return n; });
     samples.forEach((s, i) => out.push(marker(xs[i], markTop + MARK_R + rows[i] * (2 * MARK_R + 2), s)));
     const axY = markTop + (Math.max(...rows) + 1) * (2 * MARK_R + 2) + 4;
-    out.push(axisBottom(xsc, axY, p, { title: "Days from diagnosis, when each sample was collected", fmt: (t) => fmtInt(t), minX: 0, maxX: W, line: true }));
-    bottom = axY + bottomAxisHeight("x");
+    if (e.axis?.length) {
+      out.push(...timeAxis(e.axis, X, left, right, axY, top, p));
+      bottom = axY + 38;
+    } else {
+      out.push(axisBottom(X as Scale, axY, p, { title: "Days from diagnosis, when each sample was collected", fmt: (t) => fmtInt(t), minX: 0, maxX: W, line: true }));
+      bottom = axY + bottomAxisHeight("x");
+    }
   } else {
     xs = samples.map((_, i) => samples.length === 1 ? (left + right) / 2 : left + pad + i * (right - left - 2 * pad) / (samples.length - 1));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));

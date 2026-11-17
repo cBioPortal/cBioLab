@@ -1,6 +1,8 @@
 // Logistic view: a multivariate logistic regression on the Cox view's covariate coding, fit
 // from per-patient rows inside each local study (patient-level participants only).
 import { logisticRegression, type LogisticRow } from "../../stats.ts";
+import { titledAxes } from "../../clinical-titles.ts";
+import type { PlotAxis } from "../../plot.ts";
 import type { ViewResult, CoxCovariate } from "../../types.ts";
 import { isPatientLevel } from "../../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../../plot.ts";
@@ -30,7 +32,7 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
     lv = { ...lv, outcome: named.outcome, ...(Array.isArray(lv.covariates) ? { covariates: lv.covariates.map((cv, i) => ({ ...named["covariate " + (i + 1)], ...(cv.reference != null ? { reference: cv.reference } : {}) }) as CoxCovariate) } : {}) };
   }
   catch (e) { return untimed({ kind: "logistic", error: (e as Error).message }); }
-  const outcomeLabel = axisLabel(lv.outcome);
+  let outcomeLabel = axisLabel(lv.outcome);
   // alteration/molecular axes are deterministically categorical/numeric without a DB round
   // trip; a clinical attribute's kind is only known once its study's metadata is fetched
   // below, so that half of the check waits until outcomeKindFinal is known.
@@ -40,11 +42,18 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
   if ((lv.outcome.source === "molecular" || (lv.outcome.source === "assay" && !lv.outcome.categorical)) && lv.outcomeEvent) {
     return untimed({ kind: "logistic", error: outcomeLabel + " is numeric (a " + lv.outcome.source + " axis) — outcomeEvent only applies to a categorical outcome" });
   }
-  const lCovariates = Array.isArray(lv.covariates) ? lv.covariates : [];
+  let lCovariates = Array.isArray(lv.covariates) ? lv.covariates : [];
   if (!lCovariates.length) return untimed({ kind: "logistic", error: "a logistic view needs at least one covariate" });
   { const e = overLimit("a logistic view", 8, lCovariates.length); if (e) return untimed({ kind: "logistic", error: e.replace("at most 8", "at most 8 covariates") }); }
   try { lCovariates.forEach((c, i) => validateAxis(c, "covariate " + (i + 1))); }
   catch (e) { return untimed({ kind: "logistic", error: (e as Error).message }); }
+  // titled once everything is validated: the outcome and the covariates by their display names
+  {
+    const titled = await titledAxes<Record<string, PlotAxis | undefined>>({ outcome: lv.outcome, ...Object.fromEntries(lCovariates.map((cv, i) => ["c" + i, cv])) }, resolvers, vStudies);
+    lCovariates = lCovariates.map((cv, i) => (titled["c" + i] || cv) as CoxCovariate);
+    lv = { ...lv, outcome: titled.outcome!, covariates: lCovariates };
+    outcomeLabel = axisLabel(lv.outcome);
+  }
 
   const lCohortTotal = vNames.reduce((n, cn) => n + cohorts[cn].count, 0);
   if (lCohortTotal === 0) {

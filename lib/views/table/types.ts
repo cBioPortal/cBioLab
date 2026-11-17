@@ -19,11 +19,19 @@ export interface TableView extends TableQuery {
   rows?: number;
   /** with `unit: "patient"`, a patient to place in the list's order: the result's `position` */
   patient?: { study: string; id: string };
+  /**
+   * drawn turned on its side, as the Patient page's Clinical Data tab draws it: a row per attribute
+   * and a column per patient or sample (a sample's own attributes only, its patient's left to the
+   * per-patient table); the page of rows the query keeps, filtered by attribute
+   */
+  transpose?: boolean;
 }
 export interface TableResult extends TableRows<string> {
   unit: "sample" | "patient";
   /** the attributes the studies hold, when the table holds fewer (at most TABLE_COLUMNS_MAX) */
   attributesOf?: number;
+  /** with `unit: "sample"`, the attributes that are the sample's patient's, not its own */
+  patientAttrs?: string[];
   /**
    * Where the named patient falls in the list's order (its search, filters and sort), with the
    * patients either side; null when the list leaves it out. Only when the view names a patient.

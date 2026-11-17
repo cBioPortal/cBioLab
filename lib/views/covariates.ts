@@ -1,9 +1,22 @@
 // How the model views (cox, logistic) turn their covariates into fit columns, and what their
 // captions say about the patients a covariate could not place.
 import type { CoxCovariate } from "../types.ts";
-import { axisLabel, OQL_UNALTERED, type AxisKind } from "../plot.ts";
+import { axisLabel, OQL_UNALTERED, type AxisKind, type PlotAxis } from "../plot.ts";
 
 export interface CoxColumn { axisIndex: number; label: string; reference?: string; level?: string }
+/**
+ * A covariate's name in a model's coefficients, "<name>: <level>" for a category. A one-gene
+ * alteration keeps its plain name ("TP53 mutation status") rather than the plot's portal title
+ * ("TP53: Mutated vs Wild Type"), whose own colon would make "<title>: <level>" ambiguous; every
+ * other axis is named as a plot names it (a clinical attribute by its display name).
+ */
+export function covariateLabel(cov: PlotAxis): string {
+  if (cov.source !== "alteration" || "oql" in cov || "genes" in cov) return axisLabel(cov);
+  const what = cov.by === "cna" ? "copy number" : cov.by === "sv" ? "structural variant" : cov.by === "mutationType" ? "mutation type"
+    : cov.by === "driver" ? "driver vs VUS" : "mutation status";
+  return cov.gene.toUpperCase() + " " + what;
+}
+
 /**
  * Dummy-codes Cox covariates into fit columns: a numeric covariate (clinical number, or a
  * molecular value) is a single column as-is. A categorical one becomes one column per
@@ -16,7 +29,7 @@ export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind
   const columns: CoxColumn[] = [];
   covariates.forEach((cov, ci) => {
     if (kindsFinal[ci] === "num") {
-      columns.push({ axisIndex: ci, label: axisLabel(cov) });
+      columns.push({ axisIndex: ci, label: covariateLabel(cov) });
     } else {
       const counts = new Map<string, number>();
       for (const r of rows) { const v = String(r.values[ci]); counts.set(v, (counts.get(v) || 0) + 1); }
@@ -35,7 +48,7 @@ export function buildCoxColumns(covariates: CoxCovariate[], kindsFinal: AxisKind
       const declared = cov.reference && counts.has(cov.reference) ? cov.reference : implicitDefault;
       const levels = declared ? [declared, ...byFreq.filter((l) => l !== declared)] : byFreq;
       const reference = levels[0];
-      for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: axisLabel(cov) + ": " + level, reference, level });
+      for (const level of levels.slice(1)) columns.push({ axisIndex: ci, label: covariateLabel(cov) + ": " + level, reference, level });
     }
   });
   return columns;

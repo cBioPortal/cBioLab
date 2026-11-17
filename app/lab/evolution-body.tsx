@@ -6,7 +6,7 @@
 // (app/lab/patient-nav.tsx); the cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { evolutionSvg, evolutionKey, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
+import { evolutionSvg, evolutionKey, portalCellTip, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
 import type { TableQuery } from "../../lib/types";
 import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../lib/views/evolution/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
@@ -14,7 +14,7 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
 
-type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; mutations?: Record<string, unknown> } & Record<string, unknown>;
+type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; expandGaps?: boolean; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
 export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: {
   v: { evolution: EvolutionResult; caveat?: string } & Record<string, unknown>; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
@@ -119,6 +119,9 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               <label className="chk" data-tip={chart === "heatmap" ? "the heatmap's colours always run from 0 to 1" : "the y axis spans the VAFs drawn rather than 0 to 1"}>
                 <Checkbox checked={!!spec.dataRange} disabled={chart === "heatmap"} onCheckedChange={(on) => patch({ dataRange: (on === true) || undefined })} /> y axis to data range
               </label>
+              <label className="chk" data-tip={chart === "heatmap" || e.x !== "time" ? "only the line chart placed by collection day has a time axis" : "draw every year on the time axis; by default runs of four or more years with no event are cut to a squiggle, as on the timeline"}>
+                <Checkbox checked={!!spec.expandGaps} disabled={chart === "heatmap" || e.x !== "time"} onCheckedChange={(on) => patch({ expandGaps: (on === true) || undefined })} /> every year
+              </label>
             </div>
           </div>
         </div>
@@ -159,11 +162,7 @@ const TIP_ROOM = 125;
 /** A mark's tooltip, as the portal's: the mutation, the sample, and its VAF with the reads behind it. */
 function EvolutionTip({ m, sample, s, x, y, below }: { m: EvolutionMutation; sample: EvolutionSample; s: number; x: number; y: number; below: boolean }) {
   const c = m.cells[s];
-  const reads = c.alt != null && c.ref != null ? " (" + c.alt.toLocaleString() + " reads of " + (c.alt + c.ref).toLocaleString() + " total)" : "";
-  const state = c.status === "called" ? "VAF: " + c.vaf!.toFixed(2) + reads
-    : c.status === "uncalled" ? "VAF: " + c.vaf!.toFixed(2) + reads + ", uncalled"
-    : c.status === "absent" ? "Not found (VAF 0)" + (c.alt != null && c.ref != null ? " in " + (c.alt + c.ref).toLocaleString() + " reads" : "")
-    : c.status === "noVaf" ? "Called, no allele counts" : "Not profiled for " + m.gene;
+  const state = portalCellTip(c, sample.id, m.gene);
   // kept inside the figure: shifted sideways near its edges, the arrow still on the point
   const el = useRef<HTMLDivElement>(null);
   const [shift, setShift] = useState(0);

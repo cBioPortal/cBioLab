@@ -19,7 +19,26 @@ const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["multiple", "Mult
   ["protLow", ...level(STYLE.glyph.protein.options, "PROT_LOW")], ["protHigh", ...level(STYLE.glyph.protein.options, "PROT_HIGH")],
   ["mrnaLow", ...level(STYLE.glyph.mrna.options, "MRNA_LOW")], ["mrnaHigh", ...level(STYLE.glyph.mrna.options, "MRNA_HIGH")],
   ["homdel", "Deep Deletion", DEL], ["amp", "Amplification", AMP], ["sv", "Structural Variant", SV], ["mutation", "Mutation", MUT]];
-const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string, string][] = [["mutation", "Mutation data", "mutation"], ["cna", "CNA data", "CNA"], ["sv", "Structural variant data", "structural variant"]];
+/** the profiled-data strip's rows, top to bottom (the portal's AlterationTypeToDataTypeLabel, drawn bottom up) */
+const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string][] = [["sv", "Structural variant data"], ["mutation", "Mutation data"],
+  ["cna", "CNA data"], ["mrna", "mRNA data"], ["prot", "Protein data"]];
+
+/**
+ * The portal's profiled-data strip under the bars (CancerSummaryContent alterationTypeDataCounts, CancerSummaryChart
+ * scatter): a row per data type of `types` (the panel's profiledTypes, the portal's selected profiles) in the
+ * portal's order, and in it a mark per group — "plus" when any of its units was profiled for that type, else
+ * "minus" — whose tip is the portal's "N patients profiled" (the count as it prints it), or "Not profiled".
+ */
+export function profiledStrip(groups: CancertypesGroup[], types: readonly string[], unit: "patient" | "sample"): { label: string; marks: { plus: boolean; tip: string }[] }[] {
+  const n = (g: CancertypesGroup, k: keyof NonNullable<CancertypesGroup["profiledFor"]>) => Number(g.profiledFor?.[k] ?? 0);
+  return PROFILES.filter(([k]) => types.includes(k)).map(([k, name]) => ({
+    label: name,
+    marks: groups.map((g) => {
+      const c = n(g, k);
+      return { plus: c > 0, tip: c > 0 ? c + " " + unit + (c === 1 ? "" : "s") + " profiled" : "Not profiled" };
+    }),
+  }));
+}
 
 /** the portal's name for a category type (CancerSummaryContainer GroupByOptions); any other attribute by its own name */
 export function categoryLabel(groupBy: string): string {
@@ -40,12 +59,13 @@ const PAD = 8, PLOT_H = 240, MARK_ROW = 13, LABEL_H = 150;
 /**
  * One cohort's Cancer Types Summary as the portal draws it: a vertical bar per group, highest first,
  * stacked by kind of alteration; group names under the bars; the kinds present keyed at the foot.
- * The portal's "+" rows (what each group was profiled for) are drawn only for a data type some
- * groups lack — when every group was profiled for it, one line says so. Laid out for `o.width`; with
+ * Under them the portal's profiled-data strip (profiledStrip): a row per data type, a "+" or "−" per group. Laid out for `o.width`; with
  * more groups than fit it grows (`grown`) rather than squeezing bars below a label's height. `gene`
  * picks one gene's bars (the portal's per-gene tabs); omitted, the genes together.
  */
-export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean } = {}):
+export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean;
+  /** the page shows its own popover per bar (CTS-CH-7): each bar's marks name their group (data-group) and carry their text as an aria-label, not a <title> */
+  popover?: boolean } = {}):
   { body: string; width: number; height: number; grown: boolean } {
   const p = palette(o.theme), pn = r.panels[panel];
   const src = o.gene && pn.perGene ? pn.perGene.find((x) => x.gene === o.gene) || pn : pn;
@@ -56,16 +76,13 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const top = Math.max(1, ...groups.map((g) => value(g, "altered")));
   const yTitle = freq ? "Alteration Frequency" : "Absolute Counts";
 
-  // which data types to mark per group: only those some group was not profiled for
-  const known = groups.length > 0 && groups.every((g) => g.profiledFor);
-  const marked = known ? PROFILES.filter(([k]) => groups.some((g) => (g.profiledFor![k] || 0) > 0) && groups.some((g) => !(g.profiledFor![k] || 0))) : [];
-  const everywhere = known ? PROFILES.filter(([k]) => groups.every((g) => (g.profiledFor![k] || 0) > 0)) : [];
+  const strip = profiledStrip(groups, pn.profiledTypes ?? [], r.unit);
 
   let W = Math.max(360, o.width || 860);
   const T = (o.title === false ? 10 : 34) + (alert ? 18 : 0);
   const ys = linear(0, freq ? Math.min(100, top) : top, T + PLOT_H, T);
   const yFmt = freq ? (v: number) => fmtNum(v) + "%" : (v: number) => fmtInt(v);
-  const markW = Math.max(0, ...marked.map(([, l]) => textWidth(l, FS.small) + 6));
+  const markW = Math.max(0, ...strip.map((row) => textWidth(row.label, FS.small) + 6));
   let L = PAD + Math.max(leftAxisWidth(ys, yTitle, yFmt), markW) + 4;
   const R = 12, n = Math.max(1, groups.length);
   let band = Math.max(MIN_BAND, (W - L - R) / n);
@@ -102,17 +119,22 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
       const h = (T + PLOT_H) - ys(Math.min(ys.domain[1], value(g, k)));
       if (h <= 0) continue;
       y0 -= h;
-      out.push(`<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
+      out.push(o.popover ? `<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}" data-group="${esc(g.key)}" role="img" aria-label="${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}"/>`
+        : `<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
     }
     const alt = value(g, "altered");
-    out.push(`<rect x="${x}" y="${r1(ys(alt))}" width="${r1(bw)}" height="${r1(T + PLOT_H - ys(alt))}" fill="none"><title>${esc(g.label + ": " + fmtPct(100 * g.altered / (g.profiled || 1)) + " (" + fmtInt(g.altered) + " / " + fmtInt(g.profiled) + " " + r.unit + "s" + (g.samples > g.profiled ? ", " + fmtInt(g.samples) + " in the group" : "") + ")")}</title></rect>`);
+    if (!o.popover) out.push(`<rect x="${x}" y="${r1(ys(alt))}" width="${r1(bw)}" height="${r1(T + PLOT_H - ys(alt))}" fill="none"><title>${esc(g.label + ": " + fmtPct(100 * g.altered / (g.profiled || 1)) + " (" + fmtInt(g.altered) + " / " + fmtInt(g.profiled) + " " + r.unit + "s" + (g.samples > g.profiled ? ", " + fmtInt(g.samples) + " in the group" : "") + ")")}</title></rect>`);
   });
-  // what each group was profiled for, where groups differ
+  // what each group was profiled for
   let y = T + PLOT_H + 4;
-  for (const [k, name] of marked) {
+  for (const row of strip) {
     const cy = y + MARK_ROW / 2;
-    out.push(label(L - 6, cy + FS.small * 0.35, name, { size: FS.small, fill: p.muted, anchor: "end" }));
-    groups.forEach((g, i) => { if ((g.profiledFor![k] || 0) > 0) out.push(label(L + i * band + band / 2, cy + FS.body * 0.35, "+", { size: FS.body, weight: 600, fill: p.ink, anchor: "middle" })); });
+    out.push(label(L - 6, cy + FS.small * 0.35, row.label, { size: FS.small, fill: p.muted, anchor: "end" }));
+    row.marks.forEach((m, i) => {
+      const cx = L + i * band + band / 2;
+      out.push(`<g><title>${esc(m.tip)}</title><rect x="${r1(cx - MARK_ROW / 2)}" y="${r1(y)}" width="${MARK_ROW}" height="${MARK_ROW}" fill="transparent"/>` +
+        label(cx, cy + FS.body * 0.35, m.plus ? "+" : "\u2212", { size: FS.body, weight: 600, fill: p.ink, anchor: "middle" }) + "</g>");
+    });
     y += MARK_ROW;
   }
   const centers = groups.map((_, i) => L + i * band + band / 2);
@@ -123,15 +145,9 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const lg = legend(items, L, y, W - L - PAD, p, { size: FS.small });
   out.push(lg.svg);
   y += lg.height;
-  if (everywhere.length) {
-    out.push(label(L, y + FS.small + 2, "Every group was profiled for " + andList(everywhere.map(([, , n]) => n)) + " data.",
-      { size: FS.small, fill: p.muted, maxW: W - L - PAD }));
-    y += FS.small + 6;
-  }
   return { body: out.join(""), width: W, height: y + 8, grown };
 }
 
-const andList = (xs: string[]) => xs.length > 1 ? xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1] : xs.join("");
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 export function cancertypesSvg(v: DrawnResultOf<"cancertypes">, o: SvgOpts): string {
