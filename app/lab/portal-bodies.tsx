@@ -56,7 +56,7 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
     const needle = q.trim().toLowerCase();
     return sorted.filter((r) => (!needle || !search || search(r).toLowerCase().includes(needle)) && (filters || []).every((f, i) => !on[i] || f.test(r)));
   }, [sorted, q, on, search, filters]);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"copied" | "failed" | null>(null);
   const pages = Math.max(1, Math.ceil(shown.length / pageSize)), pg = Math.min(page, pages - 1);
   return (
     <div className="pb-tablewrap">
@@ -68,7 +68,11 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
         {search && <Input type="search" placeholder="search" className={cn(FIELD, "w-44")} value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}
         {download && <>
           <Button type="button" variant="outline" size="sm" className={TB} data-tip="copy every row as tab-separated text"
-            onClick={() => { void navigator.clipboard?.writeText(download.tsv(sorted)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}>{copied ? "Copied" : "Copy"}</Button>
+            onClick={() => {
+              const said = (r: "copied" | "failed") => { setCopied(r); setTimeout(() => setCopied(null), 1500); };
+              if (!navigator.clipboard) { said("failed"); return; }
+              navigator.clipboard.writeText(download.tsv(sorted)).then(() => said("copied"), () => said("failed"));
+            }}>{copied === "copied" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy"}</Button>
           <Button type="button" variant="outline" size="sm" className={TB} data-tip={"download every row as " + download.file}
             onClick={() => saveText(download.file, download.tsv(sorted))}>Download</Button>
         </>}
