@@ -140,7 +140,7 @@ export function figureActions(chartName: string, figure: () => string | null, on
  */
 export async function saveCaseFile(file: CaseFile, fileName: string, def: CohortDef, study: string): Promise<string | null> {
   const res = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
-    body: await api.tablePayload({ doc: caseFileDoc(file, def, study), view: 0, format: caseFileFormat(file) }) });
+    body: await api.tablePayload({ doc: caseFileDoc(file, def, study), view: 0, caseFile: caseFileFormat(file) }) });
   const text = await res.text();
   if (!res.ok) throw new Error(text.replace(/^cannot download: /, "").trim());
   const cut = text.indexOf("\n# DOWNLOAD INCOMPLETE: ");
