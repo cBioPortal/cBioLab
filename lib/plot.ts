@@ -69,7 +69,7 @@ export type PlotAxis =
    * "(Driver)" and "(VUS)" as the portal's Plots tab colours them. The plot view puts its own
    * settings here; without them a mutation type is its class alone.
    */
-  | { source: "alteration"; gene: string; by?: AlterationBy; drivers?: DriverSettings }
+  | { source: "alteration"; gene: string; by?: AlterationBy; drivers?: DriverSettings; label?: string }
   | { source: "alteration"; genes: string[]; by?: "mutated" }
   /**
    * An OQL query, its statements separated by ";", a new line or ",". `by: "any"` (the default)
@@ -177,8 +177,11 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 }
 
 /** what an axis is called on the figure */
-export function axisLabel(a: PlotAxis): string {
-  if (a.source === "clinical") return a.log ? a.attribute + LOG_SUFFIX.log2 : a.attribute;
+export function axisLabel(a: PlotAxis, names?: ReadonlyMap<string, string>): string {
+  if (a.source === "clinical") {
+    const name = names?.get(a.attribute) || a.attribute;
+    return a.log ? name + LOG_SUFFIX.log2 : name;
+  }
   if (a.source === "molecular") {
     const name = a.label || a.gene + " " + a.profileType;
     return a.log ? name + LOG_SUFFIX.log2 : name;
@@ -193,6 +196,7 @@ export function axisLabel(a: PlotAxis): string {
     return (q.length > 48 ? q.slice(0, 47) + "…" : q) + (a.by === "statement" ? " (OQL, by line)" : " (OQL)");
   }
   if (a.source === "alteration") {
+    if ("label" in a && a.label) return a.label;
     const genes = alterationGenes(a);
     const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
     return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : a.by === "driver" ? " driver vs VUS" : " mutation status");
@@ -265,6 +269,7 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
     return;
   }
   if (a.source === "alteration") {
+    if ("label" in a && a.label != null && (typeof a.label !== "string" || a.label.length > 200)) throw new Error(which + " axis: an alteration axis's label is a title of at most 200 characters");
     const genes = alterationGenes(a);
     if (!genes.length) throw new Error(which + " axis: an alteration axis needs a gene, a gene set, or an OQL query");
     for (const g of genes) if (!GENE_RE.test(g)) throw new Error(which + " axis: '" + g + "' is not a valid gene symbol");
@@ -422,7 +427,7 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       throw new Error("calling drivers from OncoKB needs the version-pinned OncoKB store, which this instance cannot read; " +
         "switch drivers.oncokb off to use the study's own driver calls (cbp_driver, cbp_driver_tiers)");
     const hotspotKeys = drivers && drivers.hotspots && ctx.variantPins ? hotspotKeysSql(db, [study], genes, ctx.variantPins) : null;
-    const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin, "", hotspotKeys) + ") AS drv" : "";
+    const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin, "", hotspotKeys, { db, studies: [study] }) + ") AS drv" : "";
     // every case in the cohort appears, because "no alteration" is an answer and not a missing value
     const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration" + drv + "\n" +
       "     FROM " + db + ".genomic_event_derived\n" +

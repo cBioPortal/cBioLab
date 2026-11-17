@@ -8,7 +8,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import { sampleTumorTypeCte, type TablePart } from "./mutation-table.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
-import { entrezOf, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
+import { SV_ANNOTATION_ORDER, entrezOf, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
 const str = (x: string) => "ifNull(toString(" + x + "), '')";
 const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
@@ -29,8 +29,8 @@ export const SV_COLUMNS: QueryColumn[] = [
   text("gene2", "Gene 2"), text("site2Entrez", "Site2 Entrez Gene Id"), text("site2Transcript", "Site2 Ensembl Transcript Id"),
   text("site2Chr", "Site2 Chromosome"), number("site2Pos", "Site2 Position"), text("site2Desc", "Site2 Description"),
   text("frame", "Effect on Frame"),
-  // OncoKB's call as the table shows it, so search and the value list match what is on screen; ordered drivers first
-  { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: "drv",
+  // OncoKB's call as the table shows it, so search and the value list match what is on screen; ordered by the portal's sort value
+  { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: SV_ANNOTATION_ORDER,
     text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))" },
   text("status", "MS"), text("ncbiBuild", "NCBI Build"), text("dnaSupport", "DNA Support"), text("rnaSupport", "RNA Support"),
   number("normalReadCount", "Normal Read Count"), number("tumorReadCount", "Tumor Read Count"),
@@ -86,8 +86,10 @@ function partRows(p: TablePart, i: number, db: string, genes: string[], pin: str
   const rows =
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         s.pid AS patient, s.sid AS sid, ifNull(ct.v, '') AS cancerType,\n" +
-    (pin ? "         " + svCellSql("oncogenicity") + " AS oncogenicity, " + svCellSql("level") + " AS level, " + svDriverSql("pr") + " AS drv,\n"
-      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
+    (pin ? "         " + svCellSql("oncogenicity") + " AS oncogenicity, " + svCellSql("level") + " AS level, " + svDriverSql("pr") + " AS drv,\n" +
+        // the call's other levels, taken as its oncogenicity and level are: what the portal's Annotation sort reads (OncoKB.tsx sortValue)
+        "         " + svCellSql("resistance_level") + " AS resistanceLevel, " + svCellSql("diagnostic_level") + " AS diagnosticLevel, " + svCellSql("prognostic_level") + " AS prognosticLevel,\n"
+      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv, '' AS resistanceLevel, '' AS diagnosticLevel, '' AS prognosticLevel,\n") +
     "         s.* EXCEPT (" + (pin ? "pid, sid, ttype, k1, k2, ktype" : "pid, sid") + ")\n" +
     "  FROM " + (pin ? "sk" : "s") + i + " AS s\n" +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = s.sid\n" +
@@ -124,7 +126,8 @@ export function svRowSource(parts: TablePart[], db: string, genes: string[], pin
     with: allRows(parts, db, genes, pin),
     columns: SV_COLUMNS,
     select: "*",
-    defaultOrder: "drv DESC, gene1, gene2",
+    // the portal's default: Annotation, descending (StructuralVariantTable 190-198)
+    defaultOrder: SV_ANNOTATION_ORDER + " DESC, gene1, gene2",
     tiebreak: "sid, ord, svid",
     // the same breakpoints in one patient's several samples (ResultsViewStructuralVariantMapperDataStore 34-50)
     duplicateKey: "(study, patient, ifNull(toString(site1Chr), ''), ifNull(toString(site1Pos), ''), ifNull(toString(site2Chr), ''), ifNull(toString(site2Pos), ''))",

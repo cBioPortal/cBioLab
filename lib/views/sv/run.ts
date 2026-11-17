@@ -105,6 +105,6 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
       (pin ? "Annotation is OncoKB " + pin + "'s call for the pair of genes in the sample's tumour type, as the portal asks it; for a study whose structural variants are not synced, the stronger of the two partners' gene-level fusion calls. A blank means OncoKB curates neither gene. "
         : "No OncoKB version is pinned here, so the annotation column is empty. ") +
       "Genes 1 and 2 are as the study records the breakpoints (site 1, site 2), not reordered. " +
-      tableTail(r, q, columns, "structural variant", (pin ? "drivers first, then " : "") + "by gene 1, then gene 2", excluded, vNames.length > 1),
+      tableTail(r, q, columns, "structural variant", (pin ? "by the portal's OncoKB annotation value (oncogenic, then the highest sensitive, resistance, diagnostic and prognostic levels; a call from the gene-level fallback has no diagnostic or prognostic level, so sorts as having none), then " : "") + "by gene 1, then gene 2", excluded, vNames.length > 1),
   };
 }
