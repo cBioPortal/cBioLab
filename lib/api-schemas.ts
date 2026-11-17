@@ -134,11 +134,13 @@ export const TableRequest = z.object({
   doc: z.union([DocEnvelope, z.string()]),
   view: z.number().int().min(0),
   table: z.string().max(120).optional(),
+  /** csv (default); or, for a Download-tab gene-by-sample file, the portal's Tab Delimited Format or Transposed Matrix */
+  format: z.enum(["csv", "tsv", "tsv-transposed"]).optional(),
   /**
    * write the shown columns as a cBioPortal Study View file (lib/study-view-case-files.ts): TSV,
    * the study column under this header, attributes headed by their names or ids, a missing value NA
    */
-  format: z.object({ study: z.enum(["Study ID", "Cancer Study"]), header: z.enum(["names", "ids"]) }).optional(),
+  caseFile: z.object({ study: z.enum(["Study ID", "Cancer Study"]), header: z.enum(["names", "ids"]) }).optional(),
   ...customData,
 });
 
