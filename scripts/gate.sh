@@ -120,6 +120,7 @@ warehouse_checks() (
   phase "oncoprint mutation spectrum" && npm run check:oncoprint-spectrum 2>&1 | summary grep -E "^FAIL|spectrum checks passed|FAILED"
   phase "OncoKB by tumour type" && npm run check:oncokb-tumor-type 2>&1 | summary grep -E "^FAIL|tumour-type checks passed|FAILED"
   phase "OncoKB for structural variants" && npm run check:oncokb-sv 2>&1 | summary grep -E "^FAIL|OncoKB SV checks passed|FAILED"
+  phase "OncoKB cancer gene list" && npm run check:oncokb-cancer-gene 2>&1 | summary grep -E "^FAIL|OncoKB cancer gene checks passed|FAILED"
   phase "SV calls' levels and the OncoKB sort value" && npm run check:sv-levels 2>&1 | summary grep -E "^FAIL|SV level checks passed|FAILED"
   phase "fusions on the mutations tab" && npm run check:mutation-fusions 2>&1 | summary grep -E "^FAIL|mutation fusion checks passed|FAILED"
   phase "mutation table columns"   && npm run check:mutation-columns 2>&1 | summary grep -E "^FAIL|mutation column checks passed|FAILED"

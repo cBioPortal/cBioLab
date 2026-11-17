@@ -23,9 +23,11 @@ function mutationValue(r: Record<string, unknown>, id: string, pin: string | boo
       const o = String(r.oncogenicity || ""), lv = String(r.level || "");
       return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
     }
-    case "vaf": return r.vaf == null ? null : Math.round(Number(r.vaf) * 1000) / 1000;
+    // as the portal writes it on screen and in its download, from the SQL's one rule (lib/mutation-table.ts VAF_TEXT)
+    case "vaf": return r.vafText ? String(r.vafText) : null;
+    case "altCount": case "refCount": return num(r[id]);
     case "alteration": return alterationOf(String(r.mutationType ?? ""), Number(r.drv) === 1, pin);
-    case "altCount": case "refCount": case "mutCount": case "start": case "end": case "vafNormal": case "normalAltCount": case "normalRefCount": return num(r[id]);
+    case "mutCount": case "start": case "end": case "vafNormal": case "normalAltCount": case "normalRefCount": return num(r[id]);
     case "proteinPos": return r.pos == null ? "" : String(r.pos);
     case "clinvar": return r.clinvar ? String(r.clinvar) + (r.clinvarConflicting ? "(" + String(r.clinvarConflicting) + ")" : "") : "";
     case "signal": return r.signalFreq == null ? "" : portalSig2(Number(r.signalFreq));

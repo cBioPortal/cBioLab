@@ -33,7 +33,7 @@ const OQL_PROFILED_TYPES: Partial<Record<string, ("MUTATION" | "CNA" | "SV")[]>>
 
 /** what goes on one axis */
 export type PlotAxis =
-  | { source: "clinical"; attribute: string; log?: boolean }
+  | { source: "clinical"; attribute: string; log?: boolean; label?: string }
   /**
    * One of the study's own molecular profiles, by its id without the study prefix, and a gene. What
    * the axis is follows from the profile's own type and datatype (lib/profile-catalog.ts): a
@@ -178,9 +178,10 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 }
 
 /** what an axis is called on the figure */
-export function axisLabel(a: PlotAxis, names?: ReadonlyMap<string, string>): string {
+export function axisLabel(a: PlotAxis): string {
+  // the attribute's display name, put on the axis by lib/clinical-titles.ts; its id where there is none
   if (a.source === "clinical") {
-    const name = names?.get(a.attribute) || a.attribute;
+    const name = a.label || a.attribute;
     return a.log ? name + LOG_SUFFIX.log2 : name;
   }
   if (a.source === "molecular") {
@@ -199,8 +200,11 @@ export function axisLabel(a: PlotAxis, names?: ReadonlyMap<string, string>): str
   if (a.source === "alteration") {
     if ("label" in a && a.label) return a.label;
     const genes = alterationGenes(a);
-    const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
-    return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : a.by === "driver" ? " driver vs VUS" : " mutation status");
+    if (genes.length > 1) return (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") + " mutation status";
+    // one gene, as the portal's getAxisLabel titles it (PLT-DT-19); copy number by the event table has no portal axis
+    const g = genes[0];
+    return a.by === "cna" ? g + " copy number" : a.by === "sv" ? g + ": Variant vs No Variant" : a.by === "mutationType" ? g + ": Mutations"
+      : a.by === "driver" ? g + ": Driver vs VUS Mutations" : g + ": Mutated vs Wild Type";
   }
   if (a.source === "cohort") return "cohort";
   return "ordered cases";
@@ -234,6 +238,14 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
   }
   if (a.source === "clinical" && !ATTR_RE.test(String(a.attribute || "")))
     throw new Error(which + " axis: '" + a.attribute + "' is not a clinical attribute name");
+  // a title: a string, short; and only on the axes that declare one (a gene set's or a query's is its own)
+  const lab = (a as { label?: unknown }).label;
+  if (lab != null) {
+    if (typeof lab !== "string" || lab.length > 200) throw new Error(which + " axis: a label is a title of at most 200 characters");
+    if (a.source === "profile") throw new Error(which + " axis: a profile axis takes its title from the study's profile; drop label");
+    if (a.source === "alteration" && ("genes" in a || isOqlAxis(a)))
+      throw new Error(which + " axis: a label is only for a one-gene alteration axis; a gene set's or an OQL query's title is its own");
+  }
   if (a.source === "profile") {
     if (!PROFILE_RE.test(String(a.profile || ""))) throw new Error(which + " axis: '" + a.profile + "' is not a profile");
     if (a.entity != null) {
@@ -270,7 +282,6 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
     return;
   }
   if (a.source === "alteration") {
-    if ("label" in a && a.label != null && (typeof a.label !== "string" || a.label.length > 200)) throw new Error(which + " axis: an alteration axis's label is a title of at most 200 characters");
     const genes = alterationGenes(a);
     if (!genes.length) throw new Error(which + " axis: an alteration axis needs a gene, a gene set, or an OQL query");
     for (const g of genes) if (!GENE_RE.test(g)) throw new Error(which + " axis: '" + g + "' is not a valid gene symbol");
