@@ -14,8 +14,8 @@ export function alterationsMethod(t: { cohorts: string[]; oncokbPin: string | nu
   if (t.patient) steps.push({
     kind: "fetch" as const, title: "Read " + t.patient.id + "'s three tables",
     detail: "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. " +
-      "Each table reads " + which + ". Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them " +
-      "(variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in those samples (Copy #). " +
+      "Each table reads " + which + ". Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency " +
+      "(variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). " +
       "Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. " +
       "Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call" +
       (t.oncokbPin ? "; the annotation is the OncoKB " + t.oncokbPin + " call for the protein change, or for AMPLIFICATION / DELETION" : "") + ".",

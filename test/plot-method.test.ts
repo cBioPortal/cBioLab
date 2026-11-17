@@ -28,7 +28,7 @@ describe("plot: the method record", () => {
       data: { ...scatter, stats: { ...scatter.stats!, spearman: null, pSpearman: null } }, moments });
     assert.ok(m.steps.some((s) => s.title === "No Spearman"));
     assert.deepEqual(Object.keys(m.check!).sort(), ["plot:intercept", "plot:pPearson", "plot:pearson", "plot:slope"]);
-    assert.equal(m.check!["plot:pearson"].abs, 5e-5 + 1e-12, "r is reported to 4 decimals");
+    assert.equal(m.check!["plot:pearson"].abs, 1e-9, "r is reported unrounded");
     assert.match(m.python!, /dict\(study="b", n=2, sx=9, sy=9, sxy=41, sxx=41, syy=41\)/);
     assert.equal(m.implementation.file, "lib/stats.ts");
   });
