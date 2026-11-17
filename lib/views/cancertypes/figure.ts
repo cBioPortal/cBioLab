@@ -63,7 +63,9 @@ const PAD = 8, PLOT_H = 240, MARK_ROW = 13, LABEL_H = 150;
  * more groups than fit it grows (`grown`) rather than squeezing bars below a label's height. `gene`
  * picks one gene's bars (the portal's per-gene tabs); omitted, the genes together.
  */
-export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean } = {}):
+export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean;
+  /** the page shows its own popover per bar (CTS-CH-7): each bar's marks name their group (data-group) and carry their text as an aria-label, not a <title> */
+  popover?: boolean } = {}):
   { body: string; width: number; height: number; grown: boolean } {
   const p = palette(o.theme), pn = r.panels[panel];
   const src = o.gene && pn.perGene ? pn.perGene.find((x) => x.gene === o.gene) || pn : pn;
@@ -117,10 +119,11 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
       const h = (T + PLOT_H) - ys(Math.min(ys.domain[1], value(g, k)));
       if (h <= 0) continue;
       y0 -= h;
-      out.push(`<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
+      out.push(o.popover ? `<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}" data-group="${esc(g.key)}" role="img" aria-label="${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}"/>`
+        : `<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
     }
     const alt = value(g, "altered");
-    out.push(`<rect x="${x}" y="${r1(ys(alt))}" width="${r1(bw)}" height="${r1(T + PLOT_H - ys(alt))}" fill="none"><title>${esc(g.label + ": " + fmtPct(100 * g.altered / (g.profiled || 1)) + " (" + fmtInt(g.altered) + " / " + fmtInt(g.profiled) + " " + r.unit + "s" + (g.samples > g.profiled ? ", " + fmtInt(g.samples) + " in the group" : "") + ")")}</title></rect>`);
+    if (!o.popover) out.push(`<rect x="${x}" y="${r1(ys(alt))}" width="${r1(bw)}" height="${r1(T + PLOT_H - ys(alt))}" fill="none"><title>${esc(g.label + ": " + fmtPct(100 * g.altered / (g.profiled || 1)) + " (" + fmtInt(g.altered) + " / " + fmtInt(g.profiled) + " " + r.unit + "s" + (g.samples > g.profiled ? ", " + fmtInt(g.samples) + " in the group" : "") + ")")}</title></rect>`);
   });
   // what each group was profiled for
   let y = T + PLOT_H + 4;
