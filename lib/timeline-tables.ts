@@ -41,3 +41,30 @@ export function sortEventRows(rows: string[][], columns: string[], col: number, 
     return dir * (Number(x) - Number(y));
   });
 }
+
+/**
+ * The timeline's "Data (ZIP)" files as the portal writes them (timelineDataUtils.downloadZippedTracks):
+ * a file per event type, in the order the types first appear, named data_timeline_<type, lower
+ * case>.txt; a header PATIENT_ID, START_DATE, STOP_DATE, EVENT_TYPE and then every attribute key of
+ * that type's events in the order first seen (the STYLE_* hints kept, as the portal keeps them), a
+ * line per event; tab-separated, each line ended by "\n". The portal saves them as timeline.zip.
+ */
+export function timelineDataFiles(patient: string, events: PatientEvent[]): { name: string; text: string }[] {
+  const byType = new Map<string, PatientEvent[]>();
+  for (const e of events) {
+    if (!byType.has(e.type)) byType.set(e.type, []);
+    byType.get(e.type)!.push(e);
+  }
+  return [...byType].map(([type, evs]) => {
+    const keys: string[] = [];
+    for (const e of evs) for (const [k] of e.attrs) if (k !== "PATIENT_ID" && !keys.includes(k)) keys.push(k);
+    const lines = [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", ...keys], ...evs.map((e) => {
+      const a = new Map(e.attrs);
+      return [patient, String(e.start), e.end == null ? "" : String(e.end), e.type, ...keys.map((k) => a.get(k) ?? "")];
+    })];
+    return { name: "data_timeline_" + type.toLowerCase() + ".txt", text: lines.map((l) => l.join("\t")).join("\n") + "\n" };
+  });
+}
+
+/** the file the portal saves the timeline's data as */
+export const TIMELINE_ZIP = "timeline.zip";
