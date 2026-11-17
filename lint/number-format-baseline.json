@@ -3,7 +3,6 @@
   "app/campaign/[id]/page.tsx": 2,
   "app/import/import-client.tsx": 1,
   "app/import/updates/updates-client.tsx": 2,
-  "app/lab/alterations-body.tsx": 2,
   "app/lab/custom-data-panel.tsx": 1,
   "app/lab/evolution-body.tsx": 3,
   "app/lab/genomic-overview.tsx": 1,
@@ -12,7 +11,6 @@
   "app/lab/kinds/compare.tsx": 4,
   "app/lab/kinds/cooccurrence.tsx": 2,
   "app/lab/kinds/correlates.tsx": 3,
-  "app/lab/kinds/datafiles.tsx": 1,
   "app/lab/kinds/diffexpr.tsx": 3,
   "app/lab/kinds/enrichment.tsx": 1,
   "app/lab/kinds/mutations.tsx": 1,
@@ -53,7 +51,7 @@
   "lib/views/predictive/run.ts": 2,
   "lib/views/riskmodel/figure.ts": 9,
   "lib/views/riskmodel/method.ts": 9,
-  "lib/views/signatures/figure.ts": 4,
+  "lib/views/signatures/figure.ts": 3,
   "lib/views/survival/method.ts": 3,
   "mcp/tools.ts": 1
 }

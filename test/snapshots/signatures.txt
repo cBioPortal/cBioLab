@@ -38,7 +38,7 @@ Contribution by sample (SP124409):
   SBS7c: 2%
   SBS7d (UV): 2%
   … 61 more signatures at 0 (or NA) in every sample
-SP124409's spectrum: 1,566 mutations in 96 channels; largest: T[C>T]C 422 (26.9%), T[C>T]G 199 (12.7%), T[C>T]A 197 (12.6%), C[C>T]C 150 (9.6%), C[C>T]A 110 (7.0%), T[C>T]T 95 (6.1%), C[C>T]T 85 (5.4%), C[C>T]G 46 (2.9%), A[C>T]C 38 (2.4%), G[C>T]C 38 (2.4%), G[C>T]T 27 (1.7%), G[T>C]T 11 (0.7%)
+SP124409's spectrum: 1,566 mutations in 96 channels; largest: T[C>T]C 422 (27%), T[C>T]G 199 (13%), T[C>T]A 197 (13%), C[C>T]C 150 (10%), C[C>T]A 110 (7%), T[C>T]T 95 (6%), C[C>T]T 85 (5%), C[C>T]G 46 (3%), A[C>T]C 38 (2%), G[C>T]C 38 (2%), G[C>T]T 27 (2%), G[T>C]T 11 (1%)
   CAVEAT (tell the user): DO220875: Single base substitutions (SBS) from mutational_signatures_contribution_SBS, 1 sample profiled. The patient also has DBS, ID signatures. A contribution is the share of the sample's mutations the study's signature fitting assigned to the signature, as stored; a missing value is NA, not 0. This study records no p-value profile for SBS (mutational_signatures_pvalue_SBS), so no signature is marked significant. SP124409's spectrum: 1,566 single base substitutions counted in 96 channels, drawn as each channel's share of them; the counts may include silent and non-coding mutations not shown elsewhere. The patient list holds the cohort's patients with mutational-signature values: 107 patients. Sorted with the most profiled samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
   METHOD:
     - Count the patients per cohort and study: The signatures:counts query above: every patient of each cohort with a numeric value in one of the study's mutational-signature contribution profiles, with their sample count, how many of those samples have a value, and the signature types they have values in.
@@ -48,7 +48,7 @@ SP124409's spectrum: 1,566 mutations in 96 channels; largest: T[C>T]C 422 (26.9%
         type: SBS
         profiled samples: SP124409
         signatures with a value: 65
-    - SP124409's spectrum: Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in percent.
+    - SP124409's spectrum: Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in whole percent (rounded half up, as the portal rounds it; the shares need not add to 100).
         total: 1,566
         channels: 96
-    The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total, which the script recomputes.
+    The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total in whole percent, which the script recomputes.

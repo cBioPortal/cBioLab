@@ -23,11 +23,14 @@ describe("the alterations view's tables", () => {
       assert.deepEqual(ALTERATION_DEFAULT_COLUMNS[t].filter((id) => !ids.includes(id)), []);
       assert.equal(ids[0], "samples", "the portal's tables lead with the samples");
     });
-    test(t + ": every column sorts, filters and lists its values in SQL", () => {
+    test(t + ": every column sorts (but those the portal does not sort), filters and lists its values in SQL", () => {
       for (const pin of ["v7.5", null]) {
         const src = alterationSource(t, part, "P-1", "db", pin, ["P-1-T01", "P-1-T02"]);
         for (const c of cols) {
-          const q = { sort: { column: c.id, desc: true }, filters: { [c.id]: c.numeric ? { min: 0 } : { op: "contains" as const, value: "x" } } };
+          const filters = { [c.id]: c.numeric ? { min: 0 } : { op: "contains" as const, value: "x" } };
+          // a column the portal does not sort (SV Status, PAT-SV-3) refuses a sort, naming it
+          if (c.unsorted) assert.match(checkQuery({ sort: { column: c.id }, filters }, cols) || "", new RegExp(c.id + " is not sortable"));
+          const q = c.unsorted ? { filters } : { sort: { column: c.id, desc: true }, filters };
           assert.equal(checkQuery(q, cols), null);
           const sql = pageSql(src, q, ALTERATION_DEFAULT_COLUMNS[t], 25, 0);
           assert.match(sql, /ORDER BY /);

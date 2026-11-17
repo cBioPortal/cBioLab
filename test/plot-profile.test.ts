@@ -37,9 +37,9 @@ describe("what a profile is, from the study's own description", () => {
 
 describe("a profile axis resolved against the studies it is drawn over", () => {
   test("each reading resolves to the form that runs it", () => {
-    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "mutations", gene: "tp53" }, "x", one), { source: "alteration", gene: "TP53", by: "mutationType" });
-    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "mutations", gene: "TP53", by: "mutated" }, "x", one), { source: "alteration", gene: "TP53", by: "mutated" });
-    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "structural_variants", gene: "ERBB2" }, "x", one), { source: "alteration", gene: "ERBB2", by: "sv" });
+    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "mutations", gene: "tp53" }, "x", one), { source: "alteration", gene: "TP53", by: "mutationType", label: "TP53: Mutations" });
+    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "mutations", gene: "TP53", by: "mutated" }, "x", one), { source: "alteration", gene: "TP53", by: "mutated", label: "TP53: Mutated vs Wild Type" });
+    assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "structural_variants", gene: "ERBB2" }, "x", one), { source: "alteration", gene: "ERBB2", by: "sv", label: "ERBB2: Variant vs No Variant" });
     assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "gistic", gene: "ERBB2" }, "x", one),
       { source: "molecular", profileType: "gistic", gene: "ERBB2", discrete: true, label: "ERBB2: Putative copy-number alterations from GISTIC" });
     assert.deepEqual(resolveProfileAxis({ source: "profile", profile: "rna_seq_v2_mrna", gene: "ESR1", log: true }, "y", one),

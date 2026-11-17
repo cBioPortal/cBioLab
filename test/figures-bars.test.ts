@@ -42,8 +42,8 @@ describe("clinical", () => {
 
 describe("cancertypes", () => {
   const grp = (i: number) => ({ key: "g" + i, label: "Group number " + i, samples: 100, profiled: 100, altered: 50 - (i % 40), mutation: 50 - (i % 40), amp: 0, homdel: 0, sv: 0, multiple: 0 });
-  const v = (n: number): ViewResult => ({ kind: "cancertypes", cohorts: ["all"], cancertypes: { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, show: "frequency", unit: "sample",
-    panels: [{ cohort: "all", samples: 100 * n, profiled: 100 * n, altered: 10, groups: Array.from({ length: n }, (_, i) => grp(i)) }] } });
+  const v = (n: number): ViewResult => ({ kind: "cancertypes", cohorts: ["all"], cancertypes: { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, minAltered: 0, show: "frequency", unit: "sample",
+    panels: [{ cohort: "all", samples: 100 * n, profiled: 100 * n, altered: 10, groups: Array.from({ length: n }, (_, i) => grp(i)), categories: n, minSamples: 10 }] } });
   test("a few groups fit the width asked for; a hundred grow it and scroll rather than squeeze", () => {
     const few = viewToSvg(v(10), { width: 900 })!;
     assert.equal(vb(few), 900);
