@@ -11,7 +11,7 @@ export function svMethod(t: { genes: string[]; oncokbPin: string | null; queryTe
       source: "every call in the study's structural-variant profile, in each cohort's samples, whose gene 1 or gene 2 is " + (t.genes.length > 1 ? "one of " : "") + genes +
         " (matched by Entrez id, as the portal asks), once however many of them it involves, with the sample's CANCER_TYPE_DETAILED where recorded" +
         (t.oncokbPin ? " and OncoKB " + t.oncokbPin + "'s call for the pair in the sample's tumour type (CANCER_TYPE_DETAILED; the study's cancer type for a sample with no cancer type), or, for a study whose structural variants are not synced, the stronger of the two partners' gene-level fusion calls" : "") + ".",
-      order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : (t.oncokbPin ? "drivers first, then " : "") + "by gene 1, then gene 2") + ", then sample" }),
+      order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : (t.oncokbPin ? "by the portal's OncoKB annotation value (oncogenic, then the highest sensitive, resistance, diagnostic and prognostic levels; a call from the gene-level fallback has no diagnostic or prognostic level, so sorts as having none), then " : "") + "by gene 1, then gene 2") + ", then sample" }),
     {
       kind: "fetch" as const, title: "Count the samples profiled for each gene's structural variants",
       detail: "The sv:profiled query above, per cohort and study: the cohort's samples; those whose structural-variant panel lists the gene (or is whole-exome); " +
