@@ -224,7 +224,7 @@ rows AS (SELECT *, multiIf(ev0 != '' OR ev1 != '' OR ev2 != '', 'altered', pf0 A
 SELECT *, count() OVER () AS total FROM rows
 WHERE 1
 ORDER BY rank ASC, sid, ord
-LIMIT 25 OFFSET 0
+LIMIT 20 OFFSET 0
 
 -- view 0 datafiles: datafiles:counts · brca_tcga_pan_can_atlas_2018
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived

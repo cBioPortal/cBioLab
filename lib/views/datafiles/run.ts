@@ -88,8 +88,8 @@ const rowsOf = (r: Rows, cols: FileColumn[], text: (x: Record<string, unknown>, 
   cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
   values: cols.map((c) => text(x, c)) }));
 
-/** The table's page size from its spec: 1 to TABLE_ROWS_MAX, 25 when unset; NaN when out of range. */
-const pageSize = (n: unknown) => n == null ? 25 : Math.floor(Number(n));
+/** The table's page size from its spec: 1 to TABLE_ROWS_MAX, 20 (the portal's) when unset; NaN when out of range. */
+const pageSize = (n: unknown) => n == null ? 20 : Math.floor(Number(n));
 
 export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<ViewResult> {
   const { vNames, pin } = ctx;
@@ -152,7 +152,8 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
       // the status tables' columns, read off their rows as tables.ts names them
       if (c.id === "sample") return String(x.sid ?? "");
       if (c.id === "patient") return String(x.patient ?? "");
-      if (c.id === "altered") return id === "matrix" ? (x.status === "altered" ? "1" : x.status === "unaltered" ? "0" : "NP") : String(x.status ?? "");
+      if (c.id === "study") return String(x.study ?? "");
+      if (c.id === "altered") return x.status === "altered" ? "1" : x.status === "unaltered" ? "0" : "NP";
       return String(x[(id === "matrix" ? "m" : "c") + lineIds.indexOf(c.id)] ?? "");
     };
     return { r, rows: { columns: cols, shown, defaults: defs, query: tq, rows: rowsOf(r, cols, reads), offset: r.offset, pageSize: n,
@@ -160,7 +161,8 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   };
   const result = (d: DatafilesResult, extra: Partial<ViewResult> = {}): ViewResult =>
     ({ kind: "datafiles", cohorts: vNames, datafiles: d, participation: ctx.participationFor(ctx.vStudies, true), ...extra } as ViewResult);
-  const lineInfo = lines.map((l, k) => ({ ...l, column: caseCols[3 + k].id }));
+  const lineIds = lineColumns(lines).map((c) => c.id);
+  const lineInfo = lines.map((l, k) => ({ ...l, column: lineIds[k] }));
   const empty = { samples: 0, altered: 0, unaltered: 0, unprofiled: 0 };
   const files = (counts: DatafilesResult["counts"], perStudy: Record<string, number>): DataFile[] => [
     ...offered.map((f) => ({ id: f.id, name: f.name, description: f.description, group: "data" as const, rows: f.studies.reduce((n, st) => n + (perStudy[st] || 0), 0),

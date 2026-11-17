@@ -88,7 +88,7 @@ describe("SQL", () => {
     const parts = [{ cohort: "C", study: "s", cohortSql: "SELECT pid, sid FROM x" }];
     const plan = () => ({ lines, opts: { study: "s", db: "d", pin: null, profiles: [] } });
     const cases = statusRowSource("cases", parts, lines, plan);
-    assert.deepEqual(cases.columns.map((c) => c.id), ["sample", "patient", "altered", "TP53", "KRAS"]);
+    assert.deepEqual(cases.columns.map((c) => c.id), ["study", "sample", "patient", "altered", "TP53", "KRAS"]);
     assert.equal(cases.columns.find((c) => c.id === "altered")!.order, "rank");
     assert.match(cases.with, /multiIf\(ev0 != '' OR ev1 != '', 'altered', pf0 AND pf1, 'unaltered', 'not profiled'\) AS status/);
     assert.match(statusRowSource("unaltered", parts, lines, plan).with, /WHERE status = 'unaltered'\)\n$/);
@@ -168,8 +168,8 @@ describe("runDatafiles", () => {
     assert.deepEqual(d.files.map((f) => [f.id, f.rows]), [["mutations", 3], ["sv", 3], ["profile:gistic", 3], ["profile:log2CNA", 3], ["profile:rna_seq_v2_mrna", 3], ["profile:rppa", 3],
       ["altered", 1], ["unaltered", 1], ["matrix", 3]]);
     assert.deepEqual(d.lines, [{ line: "TP53", gene: "TP53", column: "TP53" }, { line: "KRAS: MUT", gene: "KRAS", column: "KRAS" }]);
-    assert.deepEqual(d.rows.map((r) => r.values), [["A-01", "A", "altered", "R175H", "no alteration"], ["B-01", "B", "unaltered", "no alteration", "no alteration"],
-      ["C-01", "C", "not profiled", "not profiled", "no alteration"]]);
+    assert.deepEqual(d.rows.map((r) => r.values), [["s1", "A-01", "A", "1", "R175H", "no alteration"], ["s1", "B-01", "B", "0", "no alteration", "no alteration"],
+      ["s1", "C-01", "C", "NP", "not profiled", "no alteration"]]);
     assert.match(String(v.caveat), /alters 1 sample \(33\.3%\) of the cohort's 3 samples; 1 sample are unaltered .* and 1 sample are neither/);
     assert.ok(v.method && v.method.steps.length === 4);
     assert.deepEqual(r1.asked.sort(), ["datafiles:cases:counts", "datafiles:cases:rows", "datafiles:counts"]);
@@ -247,5 +247,43 @@ describe("runDatafiles", () => {
     assert.equal(v.error, undefined);
     assert.deepEqual(df(v).unchecked, ["TP53: EXP>2"]);
     assert.match(String(v.caveat), /Expression or protein conditions \(TP53: EXP>2\) cannot be checked/);
+  });
+});
+
+// The case table as the portal's (RDL-3.1, RDL-3.5), Altered as 1 / 0 but NP where unprofiled (invariant 7).
+// D1  statusColumns("cases")        ids study, sample, patient, altered, ...lines; names Study ID, Sample ID, Patient ID, Altered, ...lines
+// D2  statusColumns altered/unaltered  ["sample", "patient"]               (unchanged)
+// D3  statusColumns("matrix")       ["sample", "altered", ...lines]        (unchanged)
+// D4  cases: study column text      "study"
+// D5  cases: altered column text    multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP'); order "rank"
+// D6  runner rows                   altered → "1", unaltered → "0", not profiled → "NP", study id first
+// D7  no rows in the view           rows.pageSize 20 (the portal's)
+// D8  rows: 50                      rows.pageSize 50
+describe("the case table, as the portal's Download tab", () => {
+  const parts = [{ cohort: "C", study: "s", cohortSql: "SELECT pid, sid FROM x" }];
+  const plan = () => ({ lines, opts: { study: "s", db: "d", pin: null, profiles: [] } });
+  test("D1-D3 columns", () => {
+    const c = statusColumns("cases", lines);
+    assert.deepEqual(c.map((x) => x.id), ["study", "sample", "patient", "altered", "TP53", "KRAS"]);
+    assert.deepEqual(c.map((x) => x.name), ["Study ID", "Sample ID", "Patient ID", "Altered", "TP53", "KRAS: MUT"]);
+    assert.deepEqual(statusColumns("altered", lines).map((x) => x.id), ["sample", "patient"]);
+    assert.deepEqual(statusColumns("unaltered", lines).map((x) => x.id), ["sample", "patient"]);
+    assert.deepEqual(statusColumns("matrix", lines).map((x) => x.id), ["sample", "altered", "TP53", "KRAS"]);
+  });
+  test("D4-D5 study and Altered texts; Altered sorts by rank", () => {
+    const cols = statusRowSource("cases", parts, lines, plan).columns;
+    assert.equal(cols.find((x) => x.id === "study")!.text, "study");
+    const alt = cols.find((x) => x.id === "altered")!;
+    assert.equal(alt.text, "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')");
+    assert.equal(alt.order, "rank");
+  });
+  const r1 = () => local("c1", (l) => l === "datafiles:cases" ? S1 : [], { n: 3, altered: 1, unaltered: 1, alt_0: 1, prof_0: 2, off_0: 0, alt_1: 0, prof_1: 3, off_1: 0 });
+  test("D6 rows: study first, Altered 1 / 0 / NP", async () => {
+    const d = df(await run({}, ctx({ Q: cohort({ s1: 3 }) }, { s1: r1() })));
+    assert.deepEqual(d.rows.map((r) => r.values.slice(0, 4)), [["s1", "A-01", "A", "1"], ["s1", "B-01", "B", "0"], ["s1", "C-01", "C", "NP"]]);
+  });
+  test("D7-D8 page size: 20 by default, rows when set", async () => {
+    assert.equal((df(await run({}, ctx({ Q: cohort({ s1: 3 }) }, { s1: r1() }))).pageSize), 20);
+    assert.equal((df(await run({ rows: 50 }, ctx({ Q: cohort({ s1: 3 }) }, { s1: r1() }))).pageSize), 50);
   });
 });

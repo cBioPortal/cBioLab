@@ -126,11 +126,11 @@ Data version: every count identical.
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| RDL-3.1 | 🟡 | B | Sample ID, Patient ID, Altered; no Study ID column (study in the CSV), no links, "altered/unaltered/not profiled" text instead of 1/0, no tooltip |
+| RDL-3.1 | 🟡 | B | Study ID, Sample ID, Patient ID, Altered ✅; Altered 1 / 0 with tooltip "1 = Sample harbors alteration in one of the input genes" ✅, NP for a sample not profiled for every gene and type (the portal writes 0; invariant 7); no study / sample / patient links |
 | RDL-3.2 | 🟡 | B | One column per line; header = gene for a bare gene ✅, the OQL text for others ("KRAS: AMP MUT=G12D", legacy same without ";") ✅; merged tracks impossible (refused) |
 | RDL-3.3 | ❌ | C | No hidden per-alteration columns |
 | RDL-3.4 | 🟡 | B | Calls joined ", " ✅ incl. CNA ("S127T, HOMDEL") ✅; "no alteration"/"not profiled" ✅; no "(Driver)", no Germline badge |
-| RDL-3.5 | 🟡 | B | Altered first ✅; 25/page (legacy 20); search, columns menu, CSV download (`/api/table`) always on |
+| RDL-3.5 | 🟡 | B | Altered first ✅; 20 per page ✅; search, columns menu, CSV download (`/api/table`) always on, not `alterations_across_samples.tsv` |
 | RDL-3.6 | 🐞 ok | C | Regex filters validated (`table-query.ts:120`): bad input is refused, not thrown |
 
 ### §4 Modes and conditions

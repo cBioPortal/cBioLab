@@ -19,6 +19,11 @@
       "datafiles": {
         "columns": [
           {
+            "id": "study",
+            "name": "Study ID",
+            "numeric": false
+          },
+          {
             "id": "sample",
             "name": "Sample ID",
             "numeric": false
@@ -50,6 +55,7 @@
           }
         ],
         "shown": [
+          "study",
           "sample",
           "patient",
           "altered",
@@ -58,6 +64,7 @@
           "GATA3"
         ],
         "defaults": [
+          "study",
           "sample",
           "patient",
           "altered",
@@ -73,9 +80,10 @@
             "patient": "TCGA-3C-AAAU",
             "sample": "TCGA-3C-AAAU-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-3C-AAAU-01",
               "TCGA-3C-AAAU",
-              "altered",
+              "1",
               "no alteration",
               "no alteration",
               "P408Afs*99"
@@ -87,9 +95,10 @@
             "patient": "TCGA-3C-AALI",
             "sample": "TCGA-3C-AALI-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-3C-AALI-01",
               "TCGA-3C-AALI",
-              "altered",
+              "1",
               "S183*",
               "no alteration",
               "no alteration"
@@ -101,9 +110,10 @@
             "patient": "TCGA-3C-AALJ",
             "sample": "TCGA-3C-AALJ-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-3C-AALJ-01",
               "TCGA-3C-AALJ",
-              "altered",
+              "1",
               "no alteration",
               "no alteration",
               "H423Afs*84"
@@ -115,9 +125,10 @@
             "patient": "TCGA-3C-AALK",
             "sample": "TCGA-3C-AALK-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-3C-AALK-01",
               "TCGA-3C-AALK",
-              "altered",
+              "1",
               "no alteration",
               "E542K, M1004I",
               "no alteration"
@@ -129,9 +140,10 @@
             "patient": "TCGA-5L-AAT0",
             "sample": "TCGA-5L-AAT0-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-5L-AAT0-01",
               "TCGA-5L-AAT0",
-              "altered",
+              "1",
               "no alteration",
               "H1047L",
               "no alteration"
@@ -143,9 +155,10 @@
             "patient": "TCGA-A1-A0SD",
             "sample": "TCGA-A1-A0SD-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A1-A0SD-01",
               "TCGA-A1-A0SD",
-              "altered",
+              "1",
               "no alteration",
               "no alteration",
               "S436Pfs*40"
@@ -157,9 +170,10 @@
             "patient": "TCGA-A1-A0SH",
             "sample": "TCGA-A1-A0SH-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A1-A0SH-01",
               "TCGA-A1-A0SH",
-              "altered",
+              "1",
               "no alteration",
               "AMP",
               "no alteration"
@@ -171,9 +185,10 @@
             "patient": "TCGA-A1-A0SI",
             "sample": "TCGA-A1-A0SI-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A1-A0SI-01",
               "TCGA-A1-A0SI",
-              "altered",
+              "1",
               "R175H",
               "E726K, H1047R",
               "no alteration"
@@ -185,9 +200,10 @@
             "patient": "TCGA-A1-A0SK",
             "sample": "TCGA-A1-A0SK-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A1-A0SK-01",
               "TCGA-A1-A0SK",
-              "altered",
+              "1",
               "M133K",
               "no alteration",
               "no alteration"
@@ -199,9 +215,10 @@
             "patient": "TCGA-A1-A0SO",
             "sample": "TCGA-A1-A0SO-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A1-A0SO-01",
               "TCGA-A1-A0SO",
-              "altered",
+              "1",
               "Y220C",
               "no alteration",
               "no alteration"
@@ -213,9 +230,10 @@
             "patient": "TCGA-A1-A0SP",
             "sample": "TCGA-A1-A0SP-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A1-A0SP-01",
               "TCGA-A1-A0SP",
-              "altered",
+              "1",
               "S183*",
               "no alteration",
               "no alteration"
@@ -227,9 +245,10 @@
             "patient": "TCGA-A1-A0SQ",
             "sample": "TCGA-A1-A0SQ-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A1-A0SQ-01",
               "TCGA-A1-A0SQ",
-              "altered",
+              "1",
               "no alteration",
               "no alteration",
               "S436Lfs*71"
@@ -241,9 +260,10 @@
             "patient": "TCGA-A2-A04N",
             "sample": "TCGA-A2-A04N-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A04N-01",
               "TCGA-A2-A04N",
-              "altered",
+              "1",
               "no alteration",
               "E542K",
               "no alteration"
@@ -255,9 +275,10 @@
             "patient": "TCGA-A2-A04P",
             "sample": "TCGA-A2-A04P-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A04P-01",
               "TCGA-A2-A04P",
-              "altered",
+              "1",
               "G108Vfs*15",
               "R88Q, AMP",
               "no alteration"
@@ -269,9 +290,10 @@
             "patient": "TCGA-A2-A04T",
             "sample": "TCGA-A2-A04T-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A04T-01",
               "TCGA-A2-A04T",
-              "altered",
+              "1",
               "D208G, R273H",
               "H1047Y, AMP",
               "no alteration"
@@ -283,9 +305,10 @@
             "patient": "TCGA-A2-A04U",
             "sample": "TCGA-A2-A04U-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A04U-01",
               "TCGA-A2-A04U",
-              "altered",
+              "1",
               "Y107Cfs*16",
               "no alteration",
               "no alteration"
@@ -297,9 +320,10 @@
             "patient": "TCGA-A2-A04V",
             "sample": "TCGA-A2-A04V-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A04V-01",
               "TCGA-A2-A04V",
-              "altered",
+              "1",
               "no alteration",
               "G118D",
               "no alteration"
@@ -311,9 +335,10 @@
             "patient": "TCGA-A2-A04W",
             "sample": "TCGA-A2-A04W-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A04W-01",
               "TCGA-A2-A04W",
-              "altered",
+              "1",
               "V272M",
               "H1047R",
               "no alteration"
@@ -325,9 +350,10 @@
             "patient": "TCGA-A2-A0CL",
             "sample": "TCGA-A2-A0CL-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A0CL-01",
               "TCGA-A2-A0CL",
-              "altered",
+              "1",
               "R273L",
               "no alteration",
               "no alteration"
@@ -339,21 +365,18 @@
             "patient": "TCGA-A2-A0CM",
             "sample": "TCGA-A2-A0CM-01",
             "values": [
+              "brca_tcga_pan_can_atlas_2018",
               "TCGA-A2-A0CM-01",
               "TCGA-A2-A0CM",
-              "altered",
+              "1",
               "E204Sfs*43",
               "no alteration",
               "no alteration"
             ]
-          },
-          {
-            "…": "5 more",
-            "sha256": "5da22edeadd6866c"
           }
         ],
         "offset": 0,
-        "pageSize": 25,
+        "pageSize": 20,
         "lists": [
           {
             "cohort": "Queried",
@@ -595,7 +618,7 @@
           {
             "kind": "fetch",
             "title": "Sort them together and take one page",
-            "detail": "The datafiles:cases:rows query above: the samples of every cohort and study combined in one query, sorted altered samples first, then by sample id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset."
+            "detail": "The datafiles:cases:rows query above: the samples of every cohort and study combined in one query, sorted altered samples first, then by sample id, and the 20 rows of the first page taken. Every other page, and the download, is the same query at another offset."
           }
         ],
         "implementation": {
