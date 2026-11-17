@@ -80,7 +80,12 @@ The pure rules are in `lib/study-view-gene-tables.ts`, and the rows come from `g
 | GP3 | Which panels | Each gene panel held by a selected sample for the table's alteration type that lists the gene, whole-exome (`WES`) among them | AM:127-149 (`getMatchingGenePanelIds`) |
 | GP4 | ⚠ Their order | A to Z. The portal's are a set, in no fixed order | AbstractAlterationCountByGeneUseCase.java:58-72 |
 | GP5 | Several connections | The panels of every connection, each once | `mergeExplore` |
-| GP6 | ⚠ A panel's genes | The portal opens a panel's gene list on a click of its name. Not built here | StudyViewGenePanelModal.tsx |
+| GP6 | A panel's link | Each panel name on the panel line is a link; a click opens a dialog titled with the panel's id. The tooltip stays open while the pointer moves into it | StudyViewGenePanelModal.tsx:20-44; GenePanelModal.tsx |
+| GP7 | The panel's genes | One gene per line, by Hugo symbol, A to Z: the order `/api/gene-panels/{id}` returns (IMPACT341, IMPACT468, IMPACT505 and DFCI-ONCOPANEL-3 checked; IMPACT468's 469 genes identical to ours) | StudyViewGenePanelModal.tsx:51-58 |
+| GP8 | Waiting and closing | A loading indicator until the genes arrive; the header's ×, the Close button and Escape close it | GenePanelModal.tsx:32-64 |
+| GP9 | ⚠ WES | The portal holds no panel named WES (`/api/gene-panels/WES` answers "Gene panel not found: WES"), so its dialog is empty. Here too no genes are listed, with a line saying whole-exome sequencing profiles every gene | GenePanelModal.tsx (a failed request leaves the body empty) |
+| GP10 | Unknown panel | A panel id the study's database does not hold is refused, naming it ("no gene panel named …"), not shown as an empty list | invariant 1 |
+| GP11 | Where from | The panel's genes are reference data, read from the database that holds the study; a study held by a federation peer is refused with that reason | DATA-BOUNDARY (no patient rows) |
 
 ## Selecting rows (GU)
 

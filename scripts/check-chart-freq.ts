@@ -12,12 +12,17 @@
  * The expected counts come from the fixture's own files, for every attribute, with no filter and
  * filtered to the Metastasis samples.
  *
+ * It also checks the gene panels' gene lists, from docs/legacy-spec/parity/gene-tables-cases.md:
+ * GP7, each fixture panel's genes by Hugo symbol, A to Z, as its data_gene_panel_*.txt lists them;
+ * GP9, WES lists no genes; GP10, a panel the database does not hold is refused, naming it.
+ *
  * Run: node --env-file=.env.local scripts/check-chart-freq.ts
  * (connection b is `npm run peer-db`: export the CLICKHOUSE2_* lines it prints)
  */
 import { readFileSync } from "node:fs";
 import { connById } from "../lib/ch.ts";
 import { buildExplore } from "../lib/explore.ts";
+import { panelGenes } from "../lib/genes.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 
@@ -96,6 +101,34 @@ try {
   ok("AC9 asked for every attribute: every declared attribute is counted", (all.declaredAttributes || []).length > 0 && (all.declaredAttributes || []).every((x) => x.counted === true),
     (all.declaredAttributes || []).filter((x) => x.counted !== true).map((x) => x.attribute).join(", ") || "all counted");
 } catch (e) { ok("AC9", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+
+/** a gene panel file's id and genes, as its `gene_list:` line lists them */
+function panelFile(file: string): { id: string; genes: string[] } {
+  const lines = readFileSync(new URL("../test/fixtures/peer-study/" + file, import.meta.url), "utf8").split("\n");
+  const field = (k: string) => (lines.find((l) => l.startsWith(k + ":")) ?? "").slice(k.length + 1).trim();
+  return { id: field("stable_id"), genes: field("gene_list").split("\t").map((g) => g.trim()).filter(Boolean) };
+}
+
+for (const file of ["data_gene_panel_PEERFIX_FULL.txt", "data_gene_panel_PEERFIX_NO_EGFR.txt"]) {
+  const { id, genes } = panelFile(file);
+  const want = [...genes].sort();
+  try {
+    const got = await panelGenes(id, conn);
+    ok(`GP7 ${id}: the panel's genes A to Z`, want.length > 0 && JSON.stringify(got) === JSON.stringify(want),
+      `${got.length} genes: ${got.join(",")}; want ${want.join(",")}`);
+  } catch (e) { ok(`GP7 ${id}`, false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+}
+try {
+  const got = await panelGenes("WES", conn);
+  ok("GP9 WES lists no genes", Array.isArray(got) && got.length === 0, `${got.length} genes`);
+} catch (e) { ok("GP9 WES", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+try {
+  const got = await panelGenes("NO_SUCH_PANEL", conn);
+  ok("GP10 an unknown panel is refused", false, `answered ${got.length} genes`);
+} catch (e) {
+  const m = String((e as Error).message ?? e);
+  ok("GP10 an unknown panel is refused, naming it", m.includes("NO_SUCH_PANEL"), m.split("\n")[0].slice(0, 300));
+}
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall passed");
 process.exit(failures ? 1 : 0);
