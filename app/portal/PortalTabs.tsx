@@ -120,6 +120,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
           {tabs.map((t) => (
             <TabsTrigger key={t.title} value={t.title} className={PAGE_TAB}>
               {t.title}
+              {t.badge && <span className="ml-1 font-semibold !text-[var(--warn,#b45309)]">{t.badge}</span>}
             </TabsTrigger>
           ))}
           {waiting && <span data-tw className="skeleton my-auto block h-5 w-28" role="status" aria-label={"laying out " + open} />}
@@ -155,7 +156,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
         </div>
       )}
       {banner && bannerText && (
-        <p className="note mb-3 flex flex-wrap items-center gap-2" data-test="oqlStatusBanner">
+        <p className="note mb-3 flex flex-wrap items-center gap-2" data-test="tabBanner">
           <span>{bannerText}</span>
           {banner.toggle && bannerToggle && <Button variant="outline" size="sm" onClick={toggleBanner}>{bannerToggle}</Button>}
         </p>

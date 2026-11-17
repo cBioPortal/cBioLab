@@ -238,8 +238,15 @@ export function svCheckCohort(q: ResultsQuery): CohortDef {
 }
 
 /** The Structural Variants tab's table and the tab's gene chips, the portal's per-gene sub-tabs: one gene's calls at a time. */
+/** the portal's alert above the Structural Variants table (ResultsViewPage, SV-5), word for word */
+export const SV_ALERT = "This is an experimental feature. The structural variant gene and event info annotations might not always be correct. " +
+  "If you are interested in improving SV annotation and visualization together, please reach out on cbioportal@googlegroups.com";
+
 const svTab = (genes: string[], queried: string[]) => ({
   title: "Structural Variants",
+  // the portal marks the tab "Beta!" and warns above its table (SV-1, SV-5)
+  badge: "Beta!",
+  banner: { text: () => SV_ALERT },
   views: [{ title: "Structural variants", view: { kind: "sv", genes: [genes[0]], cohorts: queried } as unknown as View }],
   chooser: { label: "gene", options: genes, locks: ["genes"],
     value: (vs: View[]) => String(((vs[0] as unknown as { genes?: string[] }).genes || [genes[0]])[0]),
