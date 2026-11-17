@@ -322,6 +322,11 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const catAxis = axisSelect({ source: "clinical", attribute: "CANCER_TYPE" }, axisCtx, "cat");
   const catAxis2 = axisSelect({ source: "alteration", gene: "TP53", by: "mutationType" }, axisCtx, "cat");
   const catAxisGeneSet = axisSelect({ source: "alteration", genes: ["TP53", "KRAS", "APC"], by: "mutated" }, axisCtx, "cat");
+  // a gene's colouring readings (PLT-STM-14…16): the top mutation class, with and without drivers, and the copy-number / SV ring
+  const catAxisGeneFill = axisSelect({ source: "alteration", gene: "TP53", by: "topMutationType" }, axisCtx, "cat");
+  const catAxisGeneFillDrivers = axisSelect({ source: "alteration", gene: "TP53", by: "topMutationType", drivers: { oncokb: false, hotspots: false, custom: true } },
+    axisCtx, "cat");
+  const catAxisGeneRing = axisSelect({ source: "alteration", gene: "TP53", by: "copyNumberSv" }, { ...axisCtx, unit: "patient" as const }, "cat");
   const catAxisOql = axisSelect({ source: "alteration", oql: "KRAS: G12C; STK11: DRIVER; ERBB2: EXP>2" }, { ...axisCtx, oncokbPin: "v7.4", profiles: ["rna_seq_v2_mrna_median_Zscores"] }, "cat");
 
   const LAB = { eventType: "Lab_Test", testKey: "TEST", test: "PSA", resultKey: "RESULT" };
@@ -332,6 +337,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const BUILDERS: Record<string, () => string> = {
     // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
   // If one ever projected a case id, this suite is what would stop it reaching a peer.
+  "plotTableSql:geneColour": () => plotTableSql(catAxisGeneFill, catAxisGeneRing, cohortSql),
+  "plotTableSql:geneColourDrivers": () => plotTableSql(catAxisGeneFillDrivers, catAxisGeneRing, cohortSql),
   "plotCountSql": () => plotCountSql(numAxis, catAxis, cohortSql, false),
   "plotCountSql:numeric": () => plotCountSql(numAxis, numAxis2, cohortSql, true),
   "plotStatsSql": () => plotStatsSql(numAxis, numAxis2, cohortSql),
