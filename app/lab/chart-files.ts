@@ -144,7 +144,7 @@ const INCOMPLETE = "# DOWNLOAD INCOMPLETE: ";
  */
 export async function saveCaseFile(file: CaseFile, fileName: string, def: CohortDef, study: string): Promise<string | null> {
   const res = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
-    body: await api.tablePayload({ doc: caseFileDoc(file, def, study), view: 0, format: caseFileFormat(file) }) });
+    body: await api.tablePayload({ doc: caseFileDoc(file, def, study), view: 0, caseFile: caseFileFormat(file) }) });
   if (!res.ok) throw new Error((await res.text()).replace(/^cannot download: /, "").trim());
   const blob = await res.blob();
   const tail = await blob.slice(Math.max(0, blob.size - 4096)).text();

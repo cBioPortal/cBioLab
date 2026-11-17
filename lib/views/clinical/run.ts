@@ -45,9 +45,14 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
   const attrs = listed ? listed.attrs : ((view as ClinicalView).attributes || [])
     .map((a) => String(a).trim()).filter((a) => ATTR_NAME_RE.test(a));
   if (!attrs.length) return untimed({ kind: "clinical", error: all ? "the studies declare no clinical attribute to compare" : "clinical view needs attributes" });
-  if (listed && attrs.length > CLINICAL_ALL_LIMIT) return untimed({ kind: "clinical",
-    error: "every attribute means " + attrs.length + " here, and a clinical view tests at most " + CLINICAL_ALL_LIMIT + "; name the attributes instead" });
+  if (listed && attrs.length + listed.leftOut.length > CLINICAL_ALL_LIMIT) return untimed({ kind: "clinical",
+    error: "every attribute means " + (attrs.length + listed.leftOut.length) + " here" + (listed.leftOut.length ? " (" + listed.leftOut.length + " of them tested but not listed, as the portal's survival attributes)" : "") + ", and a clinical view tests at most " + CLINICAL_ALL_LIMIT + "; name the attributes instead" });
   if (!listed) { const e = overLimit("a clinical view", 20, attrs.length); if (e) return untimed({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); }
+  // the attributes cBioPortal tests but leaves out of its table (each survival endpoint's pair,
+  // AGE_LAST_FU_YEARS, BIRTH_YEAR): tested and counted in the q-values, as its Benjamini–Hochberg
+  // runs over every enrichment returned (ComparisonStore.ts:2750-2779, CMP-STM-8), but not listed
+  const hidden = new Set(listed ? listed.leftOut : []);
+  const toTest = [...attrs, ...hidden];
   // cohort -> study -> that site's description of each attribute
   // A median or a rank sum is not additive the way (n, sum, sumsq) is — there is no honest
   // way to combine two sites' histograms into one — so the complete per-value histogram is
@@ -57,11 +62,11 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
   const stats = new Map<string, AttrStats[]>();  // "cohort|study"
   await Promise.all(vNames.flatMap((n) =>
     cohorts[n].studies.map(async (st) => {
-      const batches = Array.from({ length: Math.ceil(attrs.length / STATS_BATCH) }, (_, i) => attrs.slice(i * STATS_BATCH, (i + 1) * STATS_BATCH));
+      const batches = Array.from({ length: Math.ceil(toTest.length / STATS_BATCH) }, (_, i) => toTest.slice(i * STATS_BATCH, (i + 1) * STATS_BATCH));
       stats.set(n + "|" + st, (await Promise.all(batches.map((b) => resolvers[st].attributeStats(doc.cohorts[n], b, { histograms: singleStudy })))).flat());
     })));
   const rows: ClinicalRow[] = [];
-  for (const attribute of attrs) {
+  for (const attribute of toTest) {
     const pick = (n: string, st: string) => (stats.get(n + "|" + st) || []).find((x) => x.attribute === attribute);
     const all = vNames.flatMap((n) => cohorts[n].studies.map((st) => pick(n, st))).filter((x): x is AttrStats => !!x);
     if (!all.length) { rows.push({ attribute, per: "patient", kind: "cat", cells: [], skipped: "no participating study reports this attribute" }); continue; }
@@ -157,16 +162,18 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
   const tested = rows.filter((r) => r.p != null);
   benjaminiHochberg(tested.map((r) => r.p!)).forEach((q, i) => { tested[i].q = q; });
   rows.sort((a, b) => (a.p ?? 2) - (b.p ?? 2));
-  const untested = rows.length - tested.length;
+  const hiddenTested = tested.filter((r) => hidden.has(r.attribute)).length;
+  const shown = rows.filter((r) => !hidden.has(r.attribute));
+  const untested = shown.filter((r) => r.p == null).length;
   const siteKeys = vNames.flatMap((n) => [...cohorts[n].studies].sort().map((st) => ({ cohort: n, study: st })));
   const testedAttrs = new Set(rows.filter((r) => !r.skipped).map((r) => r.attribute));
   const siteStats = siteKeys.flatMap(({ cohort, study }) =>
     (stats.get(cohort + "|" + study) || []).filter((x) => testedAttrs.has(x.attribute)).map((x) => ({ cohort, study, x })));
-  return { kind: "clinical", cohorts: vNames, clinical: rows, studies: vStudies,
+  return { kind: "clinical", cohorts: vNames, clinical: shown, studies: vStudies,
     method: clinicalMethod({
       cohorts: vNames, singleStudy, rankTests: rank, ...(listed ? { listed: { declared: listed.declared, leftOut: listed.leftOut } } : {}),
       perSite: siteKeys.map(({ cohort, study }) => ({ cohort, study, cohortPatients: cohorts[cohort].perStudy[study]?.count || 0 })),
-      attributes: attrs.map((a) => rows.find((r) => r.attribute === a)!).map((r) => ({
+      attributes: toTest.map((a) => rows.find((r) => r.attribute === a)!).map((r) => ({
         attribute: r.attribute, per: r.per, kind: r.kind, ...(r.skipped ? { skipped: r.skipped } : {}),
         test: r.test, statistic: r.statistic, df: r.df, df2: r.df2, p: r.p, q: r.q, rankStatistic: r.rankStatistic, rankP: r.rankP,
         distinct: r.distinct, minExpected: r.minExpected,
@@ -191,9 +198,9 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
           " (n, Σx, Σx²) per cohort — those totals are ADDITIVE across sites, so the pooled mean and variance are" +
           " exact from per-site aggregates and no individual value is ever transmitted.") +
       " Counting unit follows the attribute: patients for patient-level, samples for sample-level. q-values are Benjamini–Hochberg across" +
-      " the " + tested.length + " tested attributes." +
+      " the " + tested.length + " tested attributes" + (hiddenTested ? ", " + hiddenTested + " of them tested but not listed, as cBioPortal tests and counts them" : "") + "." +
       (listed ? " Every clinical attribute the stud" + (vStudies.length === 1 ? "y declares" : "ies declare") + " is compared (" + attrs.length +
-        "), but each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR, as on cBioPortal" +
+        "), but each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR are not listed, as on cBioPortal" +
         (listed.unlisted.length ? "; " + listed.unlisted.join(", ") + " could not list its attributes, so only those the others declare are asked of it" : "") + "." : "") +
       (untested ? " " + untested + " attribute" + (untested === 1 ? " is" : "s are") + " listed as not tested, each with its reason (a test needs two values and two groups holding any), and left out of the q-values." : "") +
       (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
