@@ -1,8 +1,7 @@
 // Enrichment view: every gene's alteration frequency, compared between cohorts
 import type { ViewResult, ViewResultOf } from "../../types.ts";
-import { type EnrichAlteration, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql,
-  enrichEventsAlteredSql, enrichEventsPanelProfiledSql, enrichEventsWesSql } from "../../federation-views.ts";
-import { ALTERATION_EVENTS, type AlterationEvent, normalizeEvents, eventsWord, mutationTypeFilter, mutationUnitsWord } from "../../alteration-events.ts";
+import { type EnrichAlteration, enrichEventsAlteredSql, enrichEventsPanelProfiledSql, enrichEventsWesSql } from "../../federation-views.ts";
+import { ALTERATION_EVENTS, MUTATION_UNIT_LIST, type AlterationEvent, normalizeEvents, eventsWord, mutationTypeFilter, mutationUnitsWord } from "../../alteration-events.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, cytobands, answering, refuse, niceCeil, askEachSite } from "../shared.ts";
@@ -15,6 +14,10 @@ const ENRICH_ROWS = 300;
 const TOP_FREQUENCY = 10;
 /** the volcano's −log10 p is drawn up to here, as the portal's (CMM-VO-1) */
 const VOLCANO_Y_CAP = 10;
+/** each single alteration type as the event types it counts: one rule for every mode, the any-type table's */
+const SINGLE_EVENTS: Record<EnrichAlteration, AlterationEvent[]> = {
+  mutation: MUTATION_UNIT_LIST, cna: ["amp", "homdel"], amp: ["amp"], homdel: ["homdel"], sv: ["sv"]
+};
 const ALTERATION_WORD: Record<EnrichAlteration, string> = {
   mutation: "mutation", cna: "amplification or deep deletion", amp: "amplification", homdel: "deep deletion", sv: "structural variant"
 };
@@ -34,6 +37,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     if (!events.length) return refuse("enrichment", ctx, "no alteration type is selected: choose at least one of " + ALTERATION_EVENTS.join(", "));
   }
   const word = events ? eventsWord(events) : ALTERATION_WORD[alteration];
+  const counted = events ?? SINGLE_EVENTS[alteration];
   const measure: "driver" | "any" = view.measure === "driver" ? "driver" : "any";
   if (measure === "driver" && !pin) return refuse("enrichment", ctx, "no OncoKB annotation pin is available here, so drivers cannot be called — use measure: \"any\"");
   const minAltered = view.minAltered == null ? 5 : Math.floor(Number(view.minAltered));
@@ -50,10 +54,9 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   const genes = new Set<string>();
   const perSite: { cohort: string; study: string; genes: number; wes: number }[] = [];
   const answers = await askEachSite(ctx, ok, (n, st, r) => Promise.all([
-    r.viewAggregate("enrichment:altered:" + n, doc.cohorts[n], (c, s, d) => events
-      ? enrichEventsAlteredSql(c, s, d, events, pin, measure === "driver") : enrichAlteredSql(c, s, d, alteration, pin, measure === "driver")),
-    r.viewAggregate("enrichment:panels:" + n, doc.cohorts[n], (c, s, d) => events ? enrichEventsPanelProfiledSql(c, s, d, events) : enrichPanelProfiledSql(c, s, d, alteration)),
-    r.viewAggregate("enrichment:wes:" + n, doc.cohorts[n], (c, s, d) => events ? enrichEventsWesSql(c, s, d, events) : enrichWesSql(c, s, d, alteration))
+    r.viewAggregate("enrichment:altered:" + n, doc.cohorts[n], (c, s, d) => enrichEventsAlteredSql(c, s, d, counted, pin, measure === "driver")),
+    r.viewAggregate("enrichment:panels:" + n, doc.cohorts[n], (c, s, d) => enrichEventsPanelProfiledSql(c, s, d, counted)),
+    r.viewAggregate("enrichment:wes:" + n, doc.cohorts[n], (c, s, d) => enrichEventsWesSql(c, s, d, counted))
   ]));
   for (const { cohort: n, study: st, answer: [a, pr, w] } of answers) {
     for (const r of a) { const k = n + "\t" + r.gene; altered.set(k, (altered.get(k) || 0) + Number(r.altered)); genes.add(String(r.gene)); }
@@ -80,13 +83,15 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
       : chiSquareTest(cells.map((c) => [c.altered, c.profiled - c.altered])).p;
     tested.push(enrichmentRow(g, vNames, cells.map((c) => c.altered), cells.map((c) => c.profiled), p, 1));
   }
-  if (!tested.length) return refuse("enrichment", ctx, "no gene had a " + word + " in these cohorts, profiled in each of them");
+  if (!tested.length) return refuse("enrichment", ctx, events ? "no gene had any of " + word + " in these cohorts, profiled in each of them" : "no gene had a " + word + " in these cohorts, profiled in each of them");
   benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
   tested.sort((a, b) => a.p - b.p || a.gene.localeCompare(b.gene));
   const alteredIn = (g: EnrichmentGene) => g.cells.reduce((a, c) => a + c.altered, 0);
   const listed = tested.filter((g) => alteredIn(g) >= minAltered);
   const hidden = tested.length - listed.length;
   const rows = listed.slice(0, ENRICH_ROWS);
+  // every listed gene, for a page that draws them all (allRows), when there are more than `rows` holds
+  const withAll = view.allRows === true && listed.length > rows.length;
   // the portal's "Genes with highest frequency in any group": every tested gene by its highest altered
   // share, the order before it (by p) kept among ties (EnrichmentsUtil compareByAlterationPercentage)
   const highest = (g: EnrichmentGene) => Math.max(...g.cells.map((c) => c.altered / c.profiled));
@@ -101,15 +106,17 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     const xMax = niceCeil(Math.max(1, ...finite.map(Math.abs)));
     // −log10 p capped at 10, as the portal's volcano (p = 0 is drawn at 10)
     const yMax = niceCeil(Math.min(VOLCANO_Y_CAP, Math.max(1, ...tested.map((g) => lp(g.p)))));
-    const nx = 80, ny = 50, cells = new Map<string, number>();
-    const inRows = new Set(rows);
+    const nx = 80, ny = 50, cells = new Map<string, number>(), unlisted = new Map<string, number>();
+    const inRows = new Set(rows), isListed = new Set(listed);
     for (const g of tested.filter((x) => !inRows.has(x))) {
       const x = g.log2Ratio == null ? (g.cells[0].altered ? xMax : -xMax) : g.log2Ratio;
       const bx = Math.min(nx - 1, Math.max(0, Math.floor((x + xMax) / (2 * xMax) * nx)));
       const by = Math.min(ny - 1, Math.floor(Math.min(yMax, lp(g.p)) / yMax * ny));
       cells.set(bx + "," + by, (cells.get(bx + "," + by) || 0) + 1);
+      if (!isListed.has(g)) unlisted.set(bx + "," + by, (unlisted.get(bx + "," + by) || 0) + 1);
     }
-    grid = { xMax, yMax, nx, ny, cells: [...cells].map(([k, c]) => { const [x, y] = k.split(",").map(Number); return [x, y, c] as [number, number, number]; }) };
+    const asCells = (m: Map<string, number>) => [...m].map(([k, c]) => { const [x, y] = k.split(",").map(Number); return [x, y, c] as [number, number, number]; });
+    grid = { xMax, yMax, nx, ny, cells: asCells(cells), ...(withAll ? { unlisted: asCells(unlisted) } : {}) };
   }
   const significant = tested.filter((g) => g.q < 0.05).length;
   const test = two ? "two-sided Fisher's exact test" : "Pearson chi-squared test (altered vs not × cohort)";
@@ -117,20 +124,21 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   return {
     kind: "enrichment", cohorts: vNames,
     enrichment: { alteration: word, ...(events ? { events } : {}), measure, groups: vNames, tested: tested.length, untested, hidden, significant, minAltered, test,
-      rows, ...(listed.length > rows.length ? { all: toColumns(listed) } : {}), topFrequency, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
-    method: enrichmentMethod({ alteration: word, union: !!events, measure, oncokbPin: pin, cohorts: vNames, minAltered, test, two, perSite,
+      rows, ...(withAll ? { all: toColumns(listed) } : {}), topFrequency, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
+    method: enrichmentMethod({ alteration: word, measure, oncokbPin: pin, cohorts: vNames, minAltered, test, two, perSite,
       tested: tested.length, untested, hidden, results: rows.map((g) => ({ gene: g.gene, p: g.p, q: g.q })) }),
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
     caveat: (events ? eventsCaveat(events)
       : "Every gene's " + word + " frequency in each cohort, counted in SAMPLES over the samples profiled for that gene " +
-      "(a panel that lists it, or whole-exome; an off-panel call is left out)" +
-      (alteration === "mutation" ? ", uncalled mutations excluded as the portal excludes them" : alteration === "sv" ? "" : ", high-level copy number only") + ". ") +
+      "(a panel of its profile that lists it, each sample once, or whole-exome; an off-panel call is left out)" +
+      (alteration === "mutation" ? ", uncalled mutations excluded as the portal excludes them" : alteration === "sv" ? "" : ", high-level copy number from the discrete profile only") + ". ") +
       (measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "") +
       tested.length.toLocaleString("en-US") + " genes tested with a " + test + "; q is Benjamini–Hochberg across all of them. " +
       (untested ? untested.toLocaleString("en-US") + " altered gene" + (untested === 1 ? " was" : "s were") + " not tested: not profiled in one of the cohorts. " : "") +
       (hidden ? hidden.toLocaleString("en-US") + " tested gene" + (hidden === 1 ? " has" : "s have") + " fewer than " + minAltered + " altered samples across the cohorts and " + (hidden === 1 ? "is" : "are") + " not listed, though counted in q. " : "") +
-      (listed.length > rows.length ? "The table and charts hold all " + listed.length.toLocaleString("en-US") + " listed genes; a drawing of this view made outside the page names the " + rows.length + " most significant and draws the rest as density. " : "") +
+      (withAll ? "The table and charts hold all " + listed.length.toLocaleString("en-US") + " listed genes; a drawing of this view made outside the page names the " + rows.length + " most significant and draws the rest as density. "
+        : listed.length > rows.length ? "The " + rows.length + " most significant of the " + listed.length.toLocaleString("en-US") + " listed genes are in the table; the rest are drawn as density on the volcano. " : "") +
       (two ? "The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. " : "") +
       "A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. " +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; overlap is not deduplicated. " : "") +

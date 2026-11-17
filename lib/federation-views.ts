@@ -431,12 +431,11 @@ export function assayEntityNamesSql(study: string, db: string, profileType: stri
 }
 
 /** Each gene's cytoband in the study's own reference genome (the portal's Cytoband column). Metadata only. */
-/** Each gene's cytoband in the study's reference genome; with `genes` null, every gene's (a list too long for one statement). */
-export function geneCytobandsSql(genes: string[] | null, study: string, db: string): AggregateSql {
+export function geneCytobandsSql(genes: string[], study: string, db: string): AggregateSql {
   return aggregateSql("SELECT g.hugo_gene_symbol AS gene, any(rgg.cytoband) AS cytoband FROM " + db + ".gene g\n" +
     "JOIN " + db + ".reference_genome_gene rgg ON rgg.entrez_gene_id = g.entrez_gene_id\n" +
     "WHERE rgg.reference_genome_id = (SELECT reference_genome_id FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")\n" +
-    (genes ? "  AND g.hugo_gene_symbol IN (" + (genes.length ? genes.map(sq).join(",") : "''") + ")\n" : "") +
+    "  AND g.hugo_gene_symbol IN (" + (genes.length ? genes.map(sq).join(",") : "''") + ")\n" +
     "GROUP BY gene");
 }
 

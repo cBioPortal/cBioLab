@@ -126,10 +126,10 @@ export function enrichmentCharts(r: EnResult, p: Pal, W: number, y0: number): { 
 }
 const plotHFor = (w: number) => Math.round(Math.max(180, Math.min(260, w * 0.6)));
 
-/** the result with every listed gene as its rows, the volcano drawing each as a point: what the page draws */
+/** the result with every listed gene as its rows, the volcano drawing each as a point and the unlisted tested genes as density: what the page draws */
 export function withEveryRow(r: EnResult): EnResult {
   if (!r.all) return r;
-  return { ...r, rows: fromColumns(r.all, r.groups), all: undefined, ...(r.grid ? { grid: { ...r.grid, cells: [] } } : {}) };
+  return { ...r, rows: fromColumns(r.all, r.groups), all: undefined, ...(r.grid ? { grid: { ...r.grid, cells: r.grid.unlisted || [], unlisted: undefined } } : {}) };
 }
 
 /** the charts alone, framed, at `o.width` — what the page draws above its own table, over every listed gene */

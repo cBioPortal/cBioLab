@@ -41,7 +41,7 @@ function ctx(site: Site, cytobands: Record<string, string> = {}): ViewRun {
   };
 }
 const run = async (site: Site, view: object = {}, cytobands: Record<string, string> = {}) =>
-  (await runEnrichment({ kind: "enrichment", alteration: "sv", ...view } as never, ctx(site, cytobands))) as any;
+  (await runEnrichment({ kind: "enrichment", alteration: "sv", allRows: true, ...view } as never, ctx(site, cytobands))) as any;
 const close = (a: number, b: number, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol * Math.max(1, Math.abs(b)), a + " ≠ " + b);
 
 /** n genes on whole-exome cohorts of 100, each with a distinct (A, B) altered pair, all ≥ 10 altered */
@@ -164,6 +164,24 @@ describe("every listed gene (CMM-AL-5, CMM-FS)", () => {
     assert.equal(e.hidden, 1);
     assert.equal(e.all.gene.length, 350);
     assert.ok(!e.all.gene.includes("RARE"));
+  });
+  test("all only when the view asks for every row (allRows): an agent's run carries the 300", async () => {
+    const e = (await run(bigSite(350), { allRows: undefined })).enrichment;
+    assert.equal(e.rows.length, 300);
+    assert.equal(e.all, undefined);
+    assert.equal(e.grid.unlisted, undefined);
+  });
+  test("a tested gene under minAltered stays on the page's volcano as density beside every listed point", async () => {
+    const site = bigSite(350);
+    site.A.altered.RARE = 1;
+    const e = (await run(site)).enrichment;
+    const total = (cells: [number, number, number][]) => cells.reduce((a, c) => a + c[2], 0);
+    assert.equal(total(e.grid.unlisted), 1, "RARE, the one unlisted tested gene");
+    assert.equal(total(e.grid.cells), 351 - e.rows.length, "the server figure's density: every tested gene past the 300");
+    const page = withEveryRow(e);
+    assert.equal(page.rows.length, 350);
+    assert.equal(total(page.grid!.cells), 1);
+    assert.equal(page.grid!.unlisted, undefined);
   });
   test("3: ≤ 300 listed genes → no all; rows are every listed gene", async () => {
     const site = bigSite(10);

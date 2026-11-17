@@ -92,7 +92,7 @@ EXCEPT DISTINCT
     AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable'))))))))
 SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered
 FROM snapshot_db.genomic_event_derived g
-WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND ((g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'))
   AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene
 
@@ -125,7 +125,7 @@ EXCEPT DISTINCT
     AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable'))))))))
 SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered
 FROM snapshot_db.genomic_event_derived g
-WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'
+WHERE startsWith(g.genetic_profile_stable_id, 'msk_chord_2024_') AND g.cancer_study_identifier = 'msk_chord_2024' AND NOT g.off_panel AND ((g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'))
   AND replaceOne(g.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
 GROUP BY gene
 
@@ -156,15 +156,21 @@ EXCEPT DISTINCT
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable')))))))),
-pc AS (
-  SELECT sp.gene_panel_id AS panel, uniqExact(sp.sample_unique_id) AS n
+ps AS (
+  SELECT sp.sample_unique_id AS s, groupUniqArray(sp.gene_panel_id) AS panels
   FROM snapshot_db.sample_to_gene_panel_derived sp
-  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND sp.gene_panel_id != 'WES' AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
-  GROUP BY panel
+  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type IN ('MUTATION_EXTENDED')
+    AND (sp.alteration_type != 'COPY_NUMBER_ALTERATION' OR sp.genetic_profile_id IN (SELECT stable_id FROM snapshot_db.genetic_profile
+      WHERE genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND datatype = 'DISCRETE'))
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
+  GROUP BY s
 )
-SELECT gptg.gene AS gene, sum(pc.n) AS profiled
-FROM snapshot_db.gene_panel_to_gene_derived gptg INNER JOIN pc ON pc.panel = gptg.gene_panel_id
+, sets AS (SELECT arraySort(panels) AS panels, count() AS n FROM ps WHERE NOT has(panels, 'WES') GROUP BY panels)
+SELECT gene, sum(n) AS profiled FROM (
+  SELECT DISTINCT sets.panels AS panels, sets.n AS n, gptg.gene AS gene
+  FROM sets ARRAY JOIN sets.panels AS panel
+  INNER JOIN snapshot_db.gene_panel_to_gene_derived gptg ON gptg.gene_panel_id = panel
+)
 GROUP BY gene
 
 -- view 0 enrichment: enrichment:panels:Pancreatic, MSS · msk_chord_2024
@@ -194,15 +200,21 @@ EXCEPT DISTINCT
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable')))))))),
-pc AS (
-  SELECT sp.gene_panel_id AS panel, uniqExact(sp.sample_unique_id) AS n
+ps AS (
+  SELECT sp.sample_unique_id AS s, groupUniqArray(sp.gene_panel_id) AS panels
   FROM snapshot_db.sample_to_gene_panel_derived sp
-  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-    AND sp.gene_panel_id != 'WES' AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
-  GROUP BY panel
+  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type IN ('MUTATION_EXTENDED')
+    AND (sp.alteration_type != 'COPY_NUMBER_ALTERATION' OR sp.genetic_profile_id IN (SELECT stable_id FROM snapshot_db.genetic_profile
+      WHERE genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND datatype = 'DISCRETE'))
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
+  GROUP BY s
 )
-SELECT gptg.gene AS gene, sum(pc.n) AS profiled
-FROM snapshot_db.gene_panel_to_gene_derived gptg INNER JOIN pc ON pc.panel = gptg.gene_panel_id
+, sets AS (SELECT arraySort(panels) AS panels, count() AS n FROM ps WHERE NOT has(panels, 'WES') GROUP BY panels)
+SELECT gene, sum(n) AS profiled FROM (
+  SELECT DISTINCT sets.panels AS panels, sets.n AS n, gptg.gene AS gene
+  FROM sets ARRAY JOIN sets.panels AS panel
+  INNER JOIN snapshot_db.gene_panel_to_gene_derived gptg ON gptg.gene_panel_id = panel
+)
 GROUP BY gene
 
 -- view 0 enrichment: enrichment:wes:Colorectal, MSS · msk_chord_2024
@@ -231,11 +243,17 @@ EXCEPT DISTINCT
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024'
-    AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable'))))))))
-SELECT uniqExact(sp.sample_unique_id) AS n
-FROM snapshot_db.sample_to_gene_panel_derived sp
-WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-  AND sp.gene_panel_id = 'WES' AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
+    AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable')))))))),
+ps AS (
+  SELECT sp.sample_unique_id AS s, groupUniqArray(sp.gene_panel_id) AS panels
+  FROM snapshot_db.sample_to_gene_panel_derived sp
+  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type IN ('MUTATION_EXTENDED')
+    AND (sp.alteration_type != 'COPY_NUMBER_ALTERATION' OR sp.genetic_profile_id IN (SELECT stable_id FROM snapshot_db.genetic_profile
+      WHERE genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND datatype = 'DISCRETE'))
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
+  GROUP BY s
+)
+SELECT count() AS n FROM ps WHERE has(panels, 'WES')
 
 -- view 0 enrichment: enrichment:wes:Pancreatic, MSS · msk_chord_2024
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
@@ -263,8 +281,14 @@ EXCEPT DISTINCT
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024'
-    AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable'))))))))
-SELECT uniqExact(sp.sample_unique_id) AS n
-FROM snapshot_db.sample_to_gene_panel_derived sp
-WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED'
-  AND sp.gene_panel_id = 'WES' AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
+    AND attribute_name = 'MSI_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Instable')))))))),
+ps AS (
+  SELECT sp.sample_unique_id AS s, groupUniqArray(sp.gene_panel_id) AS panels
+  FROM snapshot_db.sample_to_gene_panel_derived sp
+  WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type IN ('MUTATION_EXTENDED')
+    AND (sp.alteration_type != 'COPY_NUMBER_ALTERATION' OR sp.genetic_profile_id IN (SELECT stable_id FROM snapshot_db.genetic_profile
+      WHERE genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND datatype = 'DISCRETE'))
+    AND replaceOne(sp.sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM cohort)
+  GROUP BY s
+)
+SELECT count() AS n FROM ps WHERE has(panels, 'WES')

@@ -20,6 +20,8 @@ export interface EnrichmentView {
   minAltered?: number;
   /** genes named on the volcano (default 12) */
   label?: number;
+  /** carry every listed gene in the result (`all`), for a page whose table and charts draw them all, as the portal's (default only the 300 most significant) */
+  allRows?: boolean;
 }
 export interface EnrichmentGene {
   gene: string;
@@ -56,7 +58,9 @@ export interface EnrichmentResult {
   /** "Genes with highest frequency in any group": the tested genes with the highest altered share in any cohort, highest first */
   topFrequency?: EnrichmentGene[];
   /** two cohorts: every other tested gene binned on the volcano's axes, [x bin, y bin, count] */
-  grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][] };
+  grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number][];
+    /** with `all`: the cells of the tested genes not listed (under minAltered), which the page draws as density beside every listed gene's point */
+    unlisted?: [number, number, number][] };
   labels: string[];
   excluded?: { study: string; reason: string }[];
 }

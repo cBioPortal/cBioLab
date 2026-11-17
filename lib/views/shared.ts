@@ -79,19 +79,18 @@ export function viewOql(v: { oql?: unknown; useOql?: unknown; drivers?: DriverSe
 /** A view-level refusal: past a limit, or nothing that can answer. */
 export const refuse = (kind: ViewKind, ctx: ViewRun, error: string): ViewResult => plainResult(kind, { cohorts: ctx.vNames, error });
 
-/** the most genes asked for by name; more and the whole reference genome is read */
-const CYTOBAND_LIST_MAX = 2000;
+/** the most genes asked for in one statement; a longer list is asked in batches of this many */
+const CYTOBAND_BATCH = 2000;
 
 /** Cytobands for the genes a table lists, from the first participant that can answer; a gene it
  *  does not know (or no answer at all) is left without one rather than failing the view. */
 export async function cytobands(ok: Record<string, ViewResolver>, genes: string[]): Promise<Map<string, string>> {
   const first = Object.values(ok)[0];
   if (!first || !genes.length) return new Map();
-  // past this many genes the reference genome's every gene is read, rather than a list too long for one statement
-  const whole = genes.length > CYTOBAND_LIST_MAX;
-  const rows = await first.viewMeta("cytobands", (s, d) => geneCytobandsSql(whole ? null : genes, s, d)).catch(() => []);
-  const want = whole ? new Set(genes) : null;
-  return new Map(rows.filter((r) => !want || want.has(String(r.gene))).map((r) => [String(r.gene), String(r.cytoband || "")]));
+  const batches: string[][] = [];
+  for (let i = 0; i < genes.length; i += CYTOBAND_BATCH) batches.push(genes.slice(i, i + CYTOBAND_BATCH));
+  const rows = (await Promise.all(batches.map((b) => first.viewMeta("cytobands", (s, d) => geneCytobandsSql(b, s, d)).catch(() => [])))).flat();
+  return new Map(rows.map((r) => [String(r.gene), String(r.cytoband || "")]));
 }
 
 /** each study's profiles as it describes them, for resolving a profile axis (lib/plot-profile.ts) */
