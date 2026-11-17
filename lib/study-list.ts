@@ -17,6 +17,12 @@ export type StudyRow = {
 export async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
   const db = conn.db;
   const q = <T = Record<string, string>>(sql: string) => chQuery<T>(sql, conn);
+  // the studies holding copy-number segments (the study view's CN Segments tab); none where the
+  // instance has no segment table
+  const segP = q<{ id: string }>(
+    "SELECT cancer_study_identifier AS id FROM " + db + ".cancer_study\n" +
+    "WHERE cancer_study_id IN (SELECT DISTINCT cancer_study_id FROM " + db + ".copy_number_seg)")
+    .then((x) => new Set(x.data.map((r) => r.id)), () => new Set<string>());
 
   const r = await q(
     "SELECT sd.cancer_study_identifier AS id, any(cs.name) AS name, any(cs.type_of_cancer_id) AS toc,\n" +
@@ -50,6 +56,7 @@ export async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
     oncokb = new Set(ok.data.map((x) => x.study));
   } catch { /* store not granted here */ }
 
+  const seg = await segP;
   return r.data.filter((x) => !isRestrictedStudy(x.id, x.name)).map((x): StudyRow => {
     const types = gpMap.get(x.id) || new Set<string>();
     return {
@@ -60,7 +67,7 @@ export async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
       caps: {
         mut: types.has("MUTATION_EXTENDED"), cna: types.has("COPY_NUMBER_ALTERATION"),
         sv: types.has("STRUCTURAL_VARIANT"), mrna: types.has("MRNA_EXPRESSION"),
-        protein: types.has("PROTEIN_LEVEL"), ga: types.has("GENERIC_ASSAY")
+        protein: types.has("PROTEIN_LEVEL"), ga: types.has("GENERIC_ASSAY"), seg: seg.has(x.id)
       },
       oncokb: oncokb.has(x.id),
       instance: conn.id, instanceLabel: conn.label

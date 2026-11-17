@@ -33,7 +33,7 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 | ? | 0 |
 | **Total IDs** | **118** |
 
-**Overall: 25.4 %** (✅ 22 + 🐞ok 5 + N/A 3 = 30 of 118). Counting 🟡 as half: 39.8 %. (2026-11-16: 18.6 % / 29.7 %.) (2026-11-11: 12.7 % / 23.7 %.)
+**Overall: 27.1 %** (✅ 24 + 🐞ok 5 + N/A 3 = 32 of 118). Counting 🟡 as half: 41.5 %. (2026-11-16: 18.6 % / 29.7 %.) (2026-11-11: 12.7 % / 23.7 %.)
 
 Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated were checked again, and 5 more verdicts changed, all for the better (#188, #189). The filters now live in the URL, Copy link carries them, and a portal `#filterJson` or `filterAttributeId` link opens with its filters. Still missing: the Clinical Data tab, the clinical-data download, the Groups manager, virtual studies, Custom Selection on the page, the study header and per-user layout.
 
@@ -206,7 +206,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-TAB-1 | 🟡 | B | Explore's Summary · Clinical Data tabs under the filter bar; Clinical Data not offered on an empty selection ([clinical-tab-cases](clinical-tab-cases.md) CT1). Not yet: CN Segments, Plots; the tab is not in the URL |
+| STV-TAB-1 | 🟡 | B | Explore's Summary · Clinical Data · CN Segments tabs under the filter bar; Clinical Data not offered on an empty selection ([clinical-tab-cases](clinical-tab-cases.md) CT1), CN Segments only when a selected study holds segments ([study-cn-segments-cases](study-cn-segments-cases.md) CS1). Not yet: Plots; the tab is not in the URL |
 | STV-CD-1 | ✅ | B | "loading clinical data…" until the first page; later pages and queries cover the rows with "updating…" |
 | STV-CD-2 | 🐞 ok | C | ⚠ No row limit: the table pages in the database ([clinical-tab-cases](clinical-tab-cases.md) CT9) |
 | STV-CD-3 | 🟡 | BC | Patient ID and Sample ID (links), then each visible clinical-attribute chart by priority then name ([clinical-tab-cases](clinical-tab-cases.md) CT2, CT5). Several studies: the shared table's study column, not "Cancer Study". No header tooltip with description and id yet |
@@ -216,9 +216,9 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-CD-7 | ✅ | B | Download `<study>_clinical_data.tsv` of the columns shown, every row the search keeps, the portal's table layout (CRLF, empty for missing); ⚠ without the 500-row cap ([clinical-tab-cases](clinical-tab-cases.md) CT10–CT12) |
 | STV-CD-8 | ✅ | B | brca_tcga_pan_can_atlas_2018: "1,084 results", Patient ID, Sample ID, Cancer Type Detailed, Mutation Count, Fraction Genome Altered, Diagnosis Age, MSI MANTIS Score, MSIsensor Score, Overall Survival Status, Sex, Ethnicity Category, Race Category, Subtype, Tumor Type, … — the order the spec saw |
 | STV-CD-9 | 🟡 | C | The columns follow the charts (Add chart changes both); no column menu or filters of the table's own ([clinical-tab-cases](clinical-tab-cases.md) CT8). The Add chart dialog is not reachable from this tab |
-| STV-CN-1 | ❌ | B | No CN Segments on Explore (Results › CN Segments exists) |
+| STV-CN-1 | ✅ | B | The portal's info line: "Segmented copy-number data for the selected N samples." ("sample" for one), "No segmented …" once read and empty, and the >20000 refusal with nothing read ([study-cn-segments-cases](study-cn-segments-cases.md) CI1–CI6). brca_tcga_pan_can_atlas_2018: "…for the selected 1084 samples." |
 | STV-CN-2 | ❌ | C | No .seg download (tracked under Per-sample CN segments) |
-| STV-CN-3 | ❌ | C | — |
+| STV-CN-3 | 🟡 | C | The `segments` view over the selection: igv.js, one segment track, the study's reference genome (CF1). Its gaps are the Results tab's (Per-sample CN segments): 300 rows by default, track height, igv chrome |
 | STV-PL-1 | 🟡 | C | No Plots tab; Analysis `plot` view over the explored cohort via Analyze |
 | STV-RS-1 | ❌ | C | (tracked) Files & Links |
 | STV-RS-2 | 🟡 | C | Legacy hides it too (display:none); nothing to show |
@@ -283,7 +283,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-STM-10 | ❌ | C | No group counts |
 | STV-STM-11 | ✅ | C | Gene × sample limit 1,000,000 refused in the query dialog in legacy's words (PORTAL-PARITY, ticked) |
 | STV-STM-12 | 🐞 ok | C | No row limit (the table pages in the database) and no 500-row download cap (clinical-tab-cases CT7, CT9, CT12) |
-| STV-STM-13 | 🟡 | C | Not on Explore; Results › CN Segments has its own availability rule (tracked: hide the tab when no sample has segments) |
+| STV-STM-13 | ✅ | C | The tab is offered when a selected study holds any segment, whatever the filters select (the study list's `seg` flag, CS1–CS3); segments read for at most 20,000 selected samples (CI5, CI6) |
 
 ---
 
