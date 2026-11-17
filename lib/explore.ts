@@ -571,7 +571,7 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
       // the portal excludes uncalled mutations: they exist only to show read support
       (variantType === "mutation" ? "\n  AND mutation_status != 'UNCALLED'" : "") +
       (geneSearch ? "\n  AND positionCaseInsensitive(hugo_gene_symbol, " + sq(geneSearch) + ") > 0" : "") +
-      (driverPin ? "\n  AND " + driverEventSql(driverPin) : "") +
+      (driverPin ? "\n  AND " + driverEventSql(driverPin, "", { db, studies }) : "") +
       inSamples(set);
 
     const [altered, panelProfiled, wes, distinct, surplus, panelsOf] = await Promise.all([
@@ -781,7 +781,7 @@ async function geneStateFacets(opts: {
   driverPin?: string | null;
 }): Promise<GeneStateFacet[]> {
   const { study, db, conn, total, draft } = opts;
-  const driver = opts.driverPin ? " AND " + driverEventSql(opts.driverPin) : "";
+  const driver = opts.driverPin ? " AND " + driverEventSql(opts.driverPin, "", { db, studies: [study] }) : "";
   const genes = [...new Set(opts.genes.map((g) => String(g).toUpperCase().trim()))]
     .filter((g) => /^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)).slice(0, GENE_FACET_LIMIT);
   if (!genes.length) return [];
