@@ -43,15 +43,18 @@ const CORE_GUARDS: GuardCommands = {
 type Planted = Mutant & { source: string };
 
 /**
- * Every scripts/mutants/<area>.ts but types.ts: its `guards` and its `mutants`. One file per area,
- * so a pull request adds its bugs beside its own and never edits a list another one edits. A
+ * Every .ts file under scripts/mutants/ but types.ts: its `guards` and its `mutants`. An area's
+ * established bugs sit in scripts/mutants/<area>.ts; a pull request adds its own in a new file,
+ * scripts/mutants/<area>/<feature>.ts, so two pull requests never append to the same list. A
  * duplicate id, a guard defined twice or a bug naming no defined guard stops the run here.
  */
 const MUTANT_DIR = join(ROOT, "scripts", "mutants");
 const GUARD_CMD: GuardCommands = { ...CORE_GUARDS };
 const GUARD_SOURCE: Record<string, string> = {};
 const MUTANTS: Planted[] = [];
-for (const f of readdirSync(MUTANT_DIR).filter((n) => n.endsWith(".ts") && n !== "types.ts").sort()) {
+const MUTANT_FILES = (readdirSync(MUTANT_DIR, { recursive: true }) as string[])
+  .filter((n) => n.endsWith(".ts") && n !== "types.ts").sort();
+for (const f of MUTANT_FILES) {
   const source = "scripts/mutants/" + f;
   const area = await import(pathToFileURL(join(MUTANT_DIR, f)).href) as { guards?: GuardCommands; mutants?: Mutant[] };
   if (!Array.isArray(area.mutants)) throw new Error(source + " exports no `mutants` array");
