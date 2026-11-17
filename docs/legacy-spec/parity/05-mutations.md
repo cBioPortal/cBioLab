@@ -21,9 +21,9 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 | Verdict | Count |
 |---|---|
 | ✅ match | 30 |
-| 🟡 partial | 43 |
+| 🟡 partial | 44 |
 | 🔶 different | 16 |
-| ❌ missing | 33 |
+| ❌ missing | 32 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 7 |
@@ -125,8 +125,8 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-LP-1 | 🟡 | B | Unchanged: [Legend 👁] [☁]; no track selector, no Y-Axis Max |
-| MUT-LP-2 | ❌ | B | Unchanged: no Y-Axis Max slider/box |
+| MUT-LP-1 | 🟡 | B | Y-Axis Max, [Legend 👁] [☁]; no track selector |
+| MUT-LP-2 | ✅ | B | "Y-Axis Max:" slider 1…default and a number box above it; below 1 read as 1; kept in the view (`yMax`), as in-tab state is (invariant 9), not local |
 | MUT-LP-3 | ✅ | C | No %/# toggle, no log scale |
 | MUT-LP-4 | 🟡 | BC | Unchanged: SVG / PNG of the plot; no PDF; `KRAS_mutation_diagram.<ext>` |
 | MUT-LP-5 | 🐞 ok | BC | Legend lists Splice as its own entry, as the stems draw it, not under Truncating as the portal's legend does (#250) |
@@ -190,9 +190,9 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-24 | ✅ | C | Ref / Var |
 | MUT-COL-25 | ✅ | C | HGVSg from the mutation's coordinates ("12:g.25398283_25398284insCCAGCT") (#245) |
 | MUT-COL-26 | 🟡 | C | HGVSc column (#245); blank on Q1 (not in the Genome Nexus store) |
-| MUT-COL-27 | 🟡 | BC | Values identical, written as the portal (4 decimals below 0.01, else 2; none for 0); hidden by default here (#331 shows it) |
+| MUT-COL-27 | 🟡 | BC | Unchanged: values identical; hidden by default (legacy shown); always 2 decimals |
 | MUT-COL-28 | ✅ | C | Allele Freq (N), hidden (#245) |
-| MUT-COL-29 | ✅ | C | Normal read counts added (#245); a count of 0 or less blank, as the portal |
+| MUT-COL-29 | 🟡 | C | Normal read counts added (#245); a 0 still shown as "0" |
 | MUT-COL-30 | ✅ | BC | Default visible, identical 555/555 |
 | MUT-COL-31 | 🟡 | C | Exon column (#245); blank on Q1 (not in the Genome Nexus store) |
 | MUT-COL-32 | 🟡 | C | gnomAD column (#245); blank on Q1 |
@@ -274,8 +274,8 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-2 | ✅ | B | Distinct patient + change per codon; 125/125 stems identical |
 | MUT-STM-3 | 🐞 ok | BC | No mislabelled "profiled" denominator; but no denominator at all |
 | MUT-STM-4 | 🟡 | B | Totals as legacy; driver split differs where the stores are not loaded: TP53 325/7 vs 329/3 (hotspots), TMPRSS2 Fusion 0/236 vs 207/29 (no OncoKB pair calls in the pinned v7.5 store; #230 matched at v7.7); tally ignores search/filters |
-| MUT-STM-5 | 🟡 | BC | 4 decimals below 0.01, else 2 (`portalVaf`, and the same in search and CSV); a negative count gives none; 0 shown blank where the portal writes "NA" on screen |
-| MUT-STM-6 | 🟡 | BC | Raw counts; 0 or less blank; no multi-sample "sampleId: value" form |
+| MUT-STM-5 | 🟡 | BC | Unchanged: `toFixed(2)` always (`mutations.tsx:23`) |
+| MUT-STM-6 | 🟡 | BC | Unchanged |
 | MUT-STM-7 | ✅ | BC | `MUTATION_COUNT`, identical 555/555 |
 | MUT-STM-8 | N/A | C | Cohort column not on the Results tab |
 | MUT-STM-9 | 🟡 | C | Unchanged |
@@ -286,7 +286,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-14 | ❌ | B | Unchanged |
 | MUT-STM-15 | ❌ | B | Unchanged: no Freq in the Columns menu |
 | MUT-STM-16 | ❌ | B | Unchanged |
-| MUT-STM-17 | 🟡 | B | Unchanged: domain max(5, tallest); axis niced (0-50-100-150) |
+| MUT-STM-17 | 🟡 | B | Default max(5, tallest), niced (0-50-100-150); a set Y-Axis Max is the exact top, "≥" on it when a stem is capped |
 
 ---
 

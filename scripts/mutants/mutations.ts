@@ -122,4 +122,10 @@ export const mutants: Mutant[] = [
   { id: "mutation-vaf-value-unformatted", layer: "counts", guard: "unit", file: "lib/views/mutations/run.ts",
     effect: "The table's allele frequency and its CSV carry the raw ratio (0.13144758735440932), where the portal writes 0.13.",
     find: "case \"vaf\": return r.vafText ? String(r.vafText) : null;", replace: "case \"vaf\": return r.vaf == null ? null : Number(r.vaf);" },
+  { id: "lollipop-ymax-not-clamped", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "A Y-Axis Max typed below 1 is kept, where the portal clamps it to 1.",
+    find: "const v = Math.max(1, Math.round(input));", replace: "const v = Math.round(input);" },
+  { id: "lollipop-ymax-cap-unmarked", layer: "counts", guard: "unit", file: "lib/lollipop-svg.ts",
+    effect: "A lollipop whose tallest stem is above the set Y-Axis Max shows a plain top tick, where the portal marks the capped axis with \"≥\".",
+    find: "(cap != null && t === cap && maxN > cap ? \"≥\" : \"\")", replace: "(\"\")" },
 ];
