@@ -430,7 +430,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Mutation table: the portal's Mutation Type labels ("FS del"; ours `Frame_Shift_Del`), mRNA Expr., a Samples column only with several samples. Copy # beyond AMP/HOMDEL is under *OQL coverage*, the Annotation under *Mutation annotation breadth* (PAT-MT-2, PAT-MT-5, PAT-STM-4)
   - [ ] Default sort Annotation ↓, 10 rows (ours gene-grouped, driver genes first, 25) (PAT-MT-1, PAT-CNA-3)
   - [ ] The not-profiled marks: grey pills, Gene panel column, panel modal (PAT-GP-2…4)
-    - [x] "Study is not profiled for …" and "Sample(s) … not profiled for …" alerts (PAT-CNA-2, PAT-SV-2, PAT-NP-1) (#PR)
+    - [x] "Study is not profiled for …" and "Sample(s) … not profiled for …" alerts (PAT-CNA-2, PAT-SV-2, PAT-NP-1) (#324)
   - [x] Tabs: Genomic Evolution second, and only for patients with several samples (see bugs); no Clinical Trials placeholder, which the portal does not have (PAT-TAB, PTB-TAB-2, PTB-TAB-3, PTB-MD-2, PTB-MD-3, PTB-MD-12) (#269)
     - [ ] Uncalled mutations' reads toward the Genomic Evolution gate (legacy counts called or uncalled); Files & Links only with resource data (ours a placeholder on every patient) (PTB-TAB-2)
   - [ ] Timeline: drag-zoom, PDF/PNG/SVG/ZIP download, month ticks, tooltips pinned and paged, the sample row's clinical data in its tooltip (PAT-TL-ZM-1, PAT-TL-ZM-3, PAT-TL-ZM-4, PAT-TL-TT-1…4)
