@@ -45,7 +45,7 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
   const docOf = async (p) => JSON.parse(await p.locator("#docjson").inputValue());
   // a document whose link is long: a cohort's notes change nothing it selects, so nothing is counted differently
   const notes = noise(1500);
-  const longDoc = { dsl: "2.9", study: "msk_chord_2024", cohorts: { "Long notes": { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }], notes } }, views: [] };
+  const longDoc = { dsl: "2.10", study: "msk_chord_2024", cohorts: { "Long notes": { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }], notes } }, views: [] };
   const longUrl = BASE + "/lab?tab=analysis&doc=" + encodeUrlJson(longDoc);
   let shortUrl = null;
 
@@ -134,7 +134,7 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
     await linkMax(ctx, 400);
     const p = await ctx.newPage();
     try {
-      const doc = { dsl: "2.9", study: "msk_chord_2024", views: [], cohorts: {
+      const doc = { dsl: "2.10", study: "msk_chord_2024", views: [], cohorts: {
         "Female held": { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }], notes },
         "Male held": { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] } } };
       await p.goto(BASE + "/portal/comparison?doc=" + encodeUrlJson(doc), { waitUntil: "domcontentloaded" });
@@ -226,7 +226,7 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
     const ctx = await browser.newContext();
     const p = await ctx.newPage();
     try {
-      const doc = { dsl: "2.9", study: "msk_chord_2024", views: [], cohorts: {
+      const doc = { dsl: "2.10", study: "msk_chord_2024", views: [], cohorts: {
         "Female e2e": { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] },
         "Male e2e": { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }] } } };
       const r = await ctx.request.post(BASE + "/api/links", { data: { params: { doc: encodeUrlJson(doc) } } });
@@ -255,9 +255,9 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
       await signIn(owner, "links.unowned." + LOGIN);
       const ex = await (await owner.request.get(BASE + "/api/custom-data/example?study=msk_chord_2024")).json();
       const ids = (ex.patients || []).slice(0, 20);
-      const doc = { dsl: "2.9", study: "msk_chord_2024", views: [],
+      const doc = { dsl: "2.10", study: "msk_chord_2024", views: [],
         cohorts: { "Pasted e2e": { all: [{ kind: "patientList", ids: ids.map((x) => "msk_chord_2024:" + x) }], notes: noise(1500) } } };
-      const start = { dsl: "2.9", study: "msk_chord_2024", views: [], cohorts: { Female: { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] } } };
+      const start = { dsl: "2.10", study: "msk_chord_2024", views: [], cohorts: { Female: { all: [{ kind: "clinical", attribute: "SEX", values: ["Female"] }] } } };
       await p.goto(BASE + "/lab?tab=analysis&doc=" + encodeUrlJson(start), { waitUntil: "domcontentloaded" });
       // the button is drawn before the page answers clicks: try until the editor opens
       for (let i = 0; i < 30 && !(await p.locator("dialog[open] #docjson").count()); i++) {
@@ -303,7 +303,7 @@ async function links({ browser, ok, BASE, LOGIN, signIn }) {
       const make = async (name) => (await (await ctx.request.post(BASE + "/api/id-sets", { data: { name, level: "patient", studies: ["msk_chord_2024"], ids } })).json()).set;
       const name = "e2e withdraw " + Date.now();
       const set = await make(name), twin = await make(name + " twin");
-      const docNaming = (s) => ({ dsl: "2.9", study: "msk_chord_2024", cohorts: { L: { all: [{ kind: "patientList", set: s.id }] } }, views: [] });
+      const docNaming = (s) => ({ dsl: "2.10", study: "msk_chord_2024", cohorts: { L: { all: [{ kind: "patientList", set: s.id }] } }, views: [] });
       const run = async (s) => anon.request.post(BASE + "/api/analysis", { data: docNaming(s) });
       await ctx.request.post(BASE + "/api/links", { data: { params: { doc: encodeUrlJson(docNaming(set)) } } });
       steps.readable = (await run(set)).ok();

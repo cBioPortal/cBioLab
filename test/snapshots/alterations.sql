@@ -195,6 +195,26 @@ WHERE (positionCaseInsensitiveUTF8(if(oncogenicity = '', '', concat(oncogenicity
 ORDER BY gdrv DESC, gene, so, pos ASC NULLS LAST, gene, chr, start, end, ref, var, proteinChange, mutationType
 LIMIT 25 OFFSET 0
 
+-- view 0 alterations: alterations:profiled · msk_chord_2024
+WITH rows AS (
+  SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, smp.stable_id AS sid,
+         if((SELECT count() FROM (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'MUTATION_EXTENDED' AND gp.stable_id NOT LIKE '%uncalled%')) = 0, -1, toInt8(smp.internal_id IN (SELECT sample_id FROM snapshot_db.sample_profile WHERE genetic_profile_id IN (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'MUTATION_EXTENDED' AND gp.stable_id NOT LIKE '%uncalled%')))) AS mutations,
+         if((SELECT count() FROM (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE')) = 0, -1, toInt8(smp.internal_id IN (SELECT sample_id FROM snapshot_db.sample_profile WHERE genetic_profile_id IN (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE')))) AS cna,
+         if((SELECT count() FROM (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT')) = 0, -1, toInt8(smp.internal_id IN (SELECT sample_id FROM snapshot_db.sample_profile WHERE genetic_profile_id IN (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT')))) AS sv
+  FROM snapshot_db.sample smp JOIN snapshot_db.patient pt ON pt.internal_id = smp.patient_id JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = pt.cancer_study_id
+  WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND pt.stable_id = 'P-0024249'
+)
+SELECT *, count() OVER () AS total FROM rows
+WHERE 1
+ORDER BY sid, sid
+LIMIT 1000 OFFSET 0
+
 -- view 0 alterations: alterations:rank · msk_chord_2024
 WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -435,3 +455,27 @@ SELECT * EXCEPT (k), count() OVER () AS total FROM rows
 WHERE 1
 ORDER BY gene1, so, gene2, gene1, gene2, pos1, pos2, class, eventInfo, k
 LIMIT 25 OFFSET 0
+
+-- view 0 alterations: timeline:events · msk_chord_2024
+WITH pt AS (
+  SELECT p.internal_id FROM snapshot_db.patient p JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
+  WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND p.stable_id = 'P-0024249'
+), ev AS (
+  SELECT clinical_event_id, event_type, start_date, stop_date FROM snapshot_db.clinical_event WHERE patient_id IN (SELECT internal_id FROM pt)
+)
+SELECT ev.clinical_event_id AS id, ev.event_type AS type, ev.start_date AS start, ev.stop_date AS stop,
+       groupArrayIf((d.key, d.value), d.key != '') AS attrs
+FROM ev LEFT JOIN (
+  SELECT clinical_event_id, key, value FROM snapshot_db.clinical_event_data WHERE clinical_event_id IN (SELECT clinical_event_id FROM ev)
+) d ON d.clinical_event_id = ev.clinical_event_id
+GROUP BY id, type, start, stop
+ORDER BY start, id
+
+-- view 0 alterations: timeline:samples · msk_chord_2024
+SELECT replaceOne(s.sample_unique_id, 'msk_chord_2024_', '') AS id, any(c.attribute_value) AS type
+FROM snapshot_db.sample_derived s
+LEFT JOIN (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')) c ON c.sample_unique_id = s.sample_unique_id AND c.type = 'sample'
+  AND c.cancer_study_identifier = 'msk_chord_2024' AND c.attribute_name = 'SAMPLE_TYPE'
+WHERE s.cancer_study_identifier = 'msk_chord_2024' AND s.patient_unique_id = 'msk_chord_2024_P-0024249'
+GROUP BY id ORDER BY id

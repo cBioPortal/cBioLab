@@ -209,3 +209,27 @@ SELECT *, count() OVER () AS total FROM rows
 WHERE 1
 ORDER BY profile, entity, profile, entity
 LIMIT 1000 OFFSET 0
+
+-- view 0 signatures: timeline:events · pancan_pcawg_2020
+WITH pt AS (
+  SELECT p.internal_id FROM snapshot_db.patient p JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
+  WHERE cs.cancer_study_identifier = 'pancan_pcawg_2020' AND p.stable_id = 'DO220875'
+), ev AS (
+  SELECT clinical_event_id, event_type, start_date, stop_date FROM snapshot_db.clinical_event WHERE patient_id IN (SELECT internal_id FROM pt)
+)
+SELECT ev.clinical_event_id AS id, ev.event_type AS type, ev.start_date AS start, ev.stop_date AS stop,
+       groupArrayIf((d.key, d.value), d.key != '') AS attrs
+FROM ev LEFT JOIN (
+  SELECT clinical_event_id, key, value FROM snapshot_db.clinical_event_data WHERE clinical_event_id IN (SELECT clinical_event_id FROM ev)
+) d ON d.clinical_event_id = ev.clinical_event_id
+GROUP BY id, type, start, stop
+ORDER BY start, id
+
+-- view 0 signatures: timeline:samples · pancan_pcawg_2020
+SELECT replaceOne(s.sample_unique_id, 'pancan_pcawg_2020_', '') AS id, any(c.attribute_value) AS type
+FROM snapshot_db.sample_derived s
+LEFT JOIN (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan')) c ON c.sample_unique_id = s.sample_unique_id AND c.type = 'sample'
+  AND c.cancer_study_identifier = 'pancan_pcawg_2020' AND c.attribute_name = 'SAMPLE_TYPE'
+WHERE s.cancer_study_identifier = 'pancan_pcawg_2020' AND s.patient_unique_id = 'pancan_pcawg_2020_DO220875'
+GROUP BY id ORDER BY id
