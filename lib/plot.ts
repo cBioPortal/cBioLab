@@ -573,7 +573,8 @@ export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): Agg
  * are additive across sites and sufficient for Pearson's r and the OLS line (lib/stats.ts's
  * pearsonFromMoments / regressionFromMoments), the same sufficient-statistic argument
  * pairMomentsSql already makes for co-expression. Spearman is deliberately not here: a rank
- * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct.
+ * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct
+ * (spearmanRho ranks the pairs of the sites that may show them).
  */
 export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
   return aggregateSql(pairCte(xSel, ySel, cohortSql) +
@@ -865,6 +866,28 @@ export function tukey(q1: number, q3: number, lo: number, hi: number): { loWhisk
   return { loWhisker: Math.max(lo, q1 - 1.5 * iqr), hiWhisker: Math.min(hi, q3 + 1.5 * iqr), iqr };
 }
 
+/** a box's count, extremes and quartiles, before its whiskers */
+export interface BoxStats { n: number; lo: number; hi: number; q1: number; median: number; q3: number }
+
+/**
+ * A box over the values themselves, by the rule plotBoxSql applies in the database (the portal's
+ * jStat.quartiles and jStat.median, PLT-STM-8): of the n sorted values, q1 is the round(n/4)-th and
+ * q3 the round(3n/4)-th, halves up, no interpolation; the median is the middle value, or the mean of
+ * the two middle values for an even n. Null for no values.
+ */
+export function portalBox(values: readonly number[]): BoxStats | null {
+  const n = values.length;
+  if (!n) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const at = (k: number) => s[Math.max(1, k) - 1];
+  return {
+    n, lo: s[0], hi: s[n - 1],
+    q1: at(Math.floor((n + 2) / 4)),
+    median: n % 2 === 1 ? at((n + 1) / 2) : (at(n / 2) + at(n / 2 + 1)) / 2,
+    q3: at(Math.floor((3 * n + 2) / 4)),
+  };
+}
+
 /** the portal's regression line as its Plots tab shows it: y = slope·x + intercept, and R² */
 export interface PlotFit { slope: number; intercept: number; r2: number | null }
 /** n, Σx, Σy, Σxy, Σx², Σy² over the plotted points */
@@ -894,6 +917,37 @@ export function portalFit(m: FitSums): PlotFit | null {
 export function fitOf(sums: FitSums): { fit?: PlotFit & { sums: FitSums } } {
   const f = Object.values(sums).every(Number.isFinite) ? portalFit(sums) : null;
   return f ? { fit: { ...f, sums } } : {};
+}
+
+/** ranks 1..n, tied values sharing the mean of the ranks they span */
+function averageRanks(v: readonly number[]): number[] {
+  const n = v.length, idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => v[a] - v[b]);
+  const r = new Array<number>(n);
+  for (let i = 0; i < n;) {
+    let j = i;
+    while (j + 1 < n && v[idx[j + 1]] === v[idx[i]]) j++;
+    for (let k = i; k <= j; k++) r[idx[k]] = (i + j) / 2 + 1;
+    i = j + 1;
+  }
+  return r;
+}
+
+/**
+ * Spearman's ρ over pairs, as plotStatsSql computes it in the database and the portal over pooled
+ * studies (PLT-STM-5): Pearson's r of the ranks, tied values sharing their average rank. Null
+ * unless each axis has two distinct values.
+ */
+export function spearmanRho(x: readonly number[], y: readonly number[]): number | null {
+  const n = Math.min(x.length, y.length);
+  const spread = (v: readonly number[]) => v.some((a) => a !== v[0]);
+  if (n < 2 || !spread(x) || !spread(y)) return null;
+  const rx = averageRanks(x), ry = averageRanks(y), m = (n + 1) / 2;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) {
+    const a = rx[i] - m, b = ry[i] - m;
+    sxy += a * b; sxx += a * a; syy += b * b;
+  }
+  return Math.max(-1, Math.min(1, sxy / Math.sqrt(sxx * syy)));
 }
 
 /**
@@ -1033,6 +1087,8 @@ export interface PlotData {
   /** the regression line the view shows (its `regression`), as the portal rounds it, and the six sums it was fitted from; absent when not shown */
   fit?: PlotFit & { sums: FitSums };
   groups?: PlotGroup[];
+  /** a box pooled across studies: its quartiles over every study's values ("pooled"), or each study's weighted by its count ("weighted") */
+  quartiles?: "pooled" | "weighted";
   /** the values behind the boxes: every one, when few enough and the reader may see cases */
   points?: PlotPoint[];
   /** a scatter's cases drawn as points: every one, when few enough and the reader may see cases */

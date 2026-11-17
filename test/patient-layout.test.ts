@@ -45,10 +45,45 @@ test("the genomic overview is the patient's mutations and copy-number segments, 
   assert.equal(patientLayout(q, { profileCatalog: [], held: ["SV"] }).names.includes("Summary › Genomic overview"), false);
 });
 
-test("Genomic Evolution is offered, as the portal offers it, only with more than one sample in view (PTB-MD-1, PTB-MD-2)", () => {
-  const evo = (l: ReturnType<typeof patientLayout>) => l.tabs.some((t) => t.title === "Genomic Evolution");
-  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 2 })), true);
-  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 1 })), false);
-  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"] })), false, "not before the samples are known");
-  assert.equal(evo(patientLayout({ study: "s", sample: "S1" }, { profileCatalog: [], held: ["MUTATION"], samples: 3 })), false);
+const evo = (l: ReturnType<typeof patientLayout>) => l.tabs.some((t) => t.title === "Genomic Evolution");
+const titlesOf = (l: ReturnType<typeof patientLayout>) => l.tabs.map((t) => t.title);
+
+test("PTB-TAB-2, PTB-MD-1: Genomic Evolution is offered for a patient with mutations, more than one sample and allele counts", () => {
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 2, vaf: true })), true);
+});
+
+test("PTB-MD-3: more than one sample but no mutation with VAF > 0 gives no Genomic Evolution", () => {
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 2, vaf: false })), false);
+});
+
+test("PTB-MD-3: VAF not known yet gives no Genomic Evolution", () => {
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 2 })), false);
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 2, vaf: undefined })), false);
+});
+
+test("PTB-MD-2: a single sample gives no Genomic Evolution, nor does an unknown sample count", () => {
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 1, vaf: true })), false);
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], vaf: true })), false);
+});
+
+test("PTB-TAB-2: sample mode never has Genomic Evolution", () => {
+  assert.equal(evo(patientLayout({ study: "s", sample: "S1" }, { profileCatalog: [], held: ["MUTATION"], samples: 3, vaf: true })), false);
+});
+
+test("PTB-TAB-2: a study holding no mutations gives no Genomic Evolution", () => {
+  assert.equal(evo(patientLayout(q, { profileCatalog: [], held: ["CNA"], samples: 2, vaf: true })), false);
+});
+
+test("PTB-TAB-2: with everything present the tabs come in the legacy order", () => {
+  const l = patientLayout(q, { profileCatalog: SIG, held: ["MUTATION", "CNA"], samples: 2, vaf: true });
+  assert.deepEqual(titlesOf(l), ["Summary", "Genomic Evolution", "Pathways", "Clinical Data", "Files & Links", "Mutational Signatures"]);
+});
+
+test("PTB-TAB-3, PTB-MD-12: no Clinical Trials tab, whatever the patient holds", () => {
+  const cases = [
+    patientLayout(q, { profileCatalog: SIG, held: ["MUTATION", "CNA", "SV"], samples: 2, vaf: true }),
+    patientLayout(q, { profileCatalog: [], held: [] }),
+    patientLayout({ study: "s", sample: "S1" }, { profileCatalog: SIG, held: ["MUTATION"], samples: 1 }),
+  ];
+  for (const l of cases) assert.ok(!titlesOf(l).includes("Clinical Trials"), titlesOf(l).join(", "));
 });
