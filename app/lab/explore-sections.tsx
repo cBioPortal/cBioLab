@@ -22,7 +22,7 @@ import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
-import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, freqTipLines, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
+import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
@@ -40,6 +40,7 @@ import { Choice } from "../_ui/choice.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { StudyChooser } from "../_studies/study-chooser.tsx";
+import { usePanelTips } from "./explore-panel-genes.tsx";
 import { StudyRowActions } from "../_studies/study-actions.tsx";
 import { QueryGenesDialog, studiesProblem } from "../portal/query-editor.tsx";
 import { resultsMaxStudies } from "../../lib/results-settings.ts";
@@ -1213,8 +1214,9 @@ const GENE_OP_KEY = "cbiolab.explore.geneTableOp";
 type GeneOp = "union" | "intersection";
 
 function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: ExploreCtx }) {
-  const { addClauses, addMode, geneFilter, setGeneFilter, compareItems, callOql, parseDraft, queuedGenes, toggleQueuedGene } = ctx;
+  const { addClauses, addMode, geneFilter, setGeneFilter, compareItems, callOql, parseDraft, queuedGenes, toggleQueuedGene, exStudies } = ctx;
   const [op, setOp] = useState<GeneOp>("union");
+  const freqTips = usePanelTips(kind, exStudies);
   useEffect(() => {
     try { if (localStorage.getItem(GENE_OP_KEY) === "intersection") setOp("intersection"); } catch { /* the default stands */ }
   }, []);
@@ -1324,9 +1326,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
                 " of them by a call their panel does not cover (off-panel): counted here, as cBioPortal's \"#\" does, but not in the frequency" : "")}>
                 {g.altered.toLocaleString()}
               </span>
-              <span className="gnum" data-tip={freqTipLines(kind, g).join("\n")}>
-                {g.freqPct != null ? fmtPct(g.freqPct) : "—"}
-              </span>
+              {freqTips.cell(g, g.freqPct != null ? fmtPct(g.freqPct) : "—")}
             </PickRow>
           );
         }}
@@ -1347,6 +1347,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
           </PickBar>
         );
       })()}
+      {freqTips.node}
       {needle && !rows.length && (
         <p className="note flush mt-1.5">
           No match among the {all.length.toLocaleString()} genes in this table.

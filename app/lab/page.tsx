@@ -47,6 +47,8 @@ import { AddCohortDialog, type AddCohortTarget } from "./add-cohort-dialog.tsx";
 import { cellExplorerFor } from "../../lib/cell-explorer.ts";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { ClinicalDataTab } from "./explore-clinical-tab.tsx";
+import { CnSegmentsTab } from "./explore-cn-segments.tsx";
+import { cnSegmentsTab } from "../../lib/study-view-cn-segments.ts";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { PAGE_TAB } from "../_ui/toolbar.ts";
@@ -177,7 +179,7 @@ export default function AnalysisPage() {
   const openedWith = useRef(typeof sp.doc === "string" ? sp.doc : null);
   const [tab, setTab] = useState<typeof TABS[number]>(() => tabFromParams(sp));
   /** Explore's own tabs, the portal's study view's: its charts, or the Clinical Data table */
-  const [svTab, setSvTab] = useState<"summary" | "clinical">("summary");
+  const [svTab, setSvTab] = useState<"summary" | "clinical" | "cn">("summary");
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -435,6 +437,7 @@ export default function AnalysisPage() {
     if (own) openEditCohort({ id, name: own[0], def: own[1].def });
     return !!own;
   };
+  const hasSegments = cnSegmentsTab(studies.filter((s) => exStudies.includes(s.id)));
   useSavedActions({ openDoc: openDocument, openShared, showClauseData, onDataChanged: () => fetchExplore(), editCohort: editSavedCohort, studies: () => exStudies });
   // links into it: ?tab=cohorts (the lab's Saved tab, before the manager) opens it; ?shared=<id> opens
   // that shared analysis, and ?editCohort=<id> that saved cohort in Explore, once the list holding it has arrived
@@ -533,24 +536,29 @@ export default function AnalysisPage() {
               show — Analyze lives in the studies card above regardless of whether any
               filters exist, so this block's whole job now is the filters themselves. */}
           <ExploreBar ctx={exploreCtx} />
-          {/* the portal's study view tabs: Clinical Data only while the selection holds a sample */}
-          {!addMode && explore && exStudies.length > 0 && <Tabs value={explore.draftCount === 0 ? "summary" : svTab} className="mb-3"
-            onValueChange={(v) => setSvTab(v as "summary" | "clinical")}>
+          {/* the portal's study view tabs: Clinical Data and CN Segments only while the selection holds a
+              sample, CN Segments only when a selected study holds segments */}
+          {!addMode && explore && exStudies.length > 0 && <Tabs value={explore.draftCount === 0 || (svTab === "cn" && !hasSegments) ? "summary" : svTab} className="mb-3"
+            onValueChange={(v) => setSvTab(v as "summary" | "clinical" | "cn")}>
             <TabsList variant="line" aria-label="study view sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
               <TabsTrigger value="summary" className={PAGE_TAB}>Summary</TabsTrigger>
               {explore.draftCount !== 0 && <TabsTrigger value="clinical" className={PAGE_TAB}>Clinical Data</TabsTrigger>}
+              {explore.draftCount !== 0 && hasSegments && <TabsTrigger value="cn" className={PAGE_TAB}>CN Segments</TabsTrigger>}
             </TabsList>
           </Tabs>}
           {!addMode && explore && exStudies.length > 0 && explore.draftCount !== 0 && svTab === "clinical" &&
             <ClinicalDataTab selection={(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; })()} studies={exStudies}
               charts={(visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number }[])
                 .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0 }))} />}
+          {!addMode && explore && exStudies.length > 0 && explore.draftCount !== 0 && svTab === "cn" && hasSegments &&
+            <CnSegmentsTab selection={(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; })()}
+              selected={explore.totals?.samples ?? 0} />}
           {/* A facet click starts a recount, and a second click before it lands
               would race it — so the facets themselves greyscale until it does.
               The study picker above stays live: choosing studies is a staged,
               separately-submitted action, not an immediate filter. */}
           <div className={exploreBusy ? "busy" : undefined} aria-busy={exploreBusy}
-            hidden={!addMode && !!explore && explore.draftCount !== 0 && svTab === "clinical"}>
+            hidden={!addMode && !!explore && explore.draftCount !== 0 && (svTab === "clinical" || (svTab === "cn" && hasSegments))}>
           {exStudies.length === 0 && <div className="card"><p className="note t-md flush">
             Choose one or more studies above to explore.</p></div>}
           {/* first load: placeholders shaped like the facet grid, so it does not jump when it lands */}
