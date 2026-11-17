@@ -428,7 +428,7 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       throw new Error("calling drivers from OncoKB needs the version-pinned OncoKB store, which this instance cannot read; " +
         "switch drivers.oncokb off to use the study's own driver calls (cbp_driver, cbp_driver_tiers)");
     const hotspotKeys = drivers && drivers.hotspots && ctx.variantPins ? hotspotKeysSql(db, [study], genes, ctx.variantPins) : null;
-    const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin, "", hotspotKeys) + ") AS drv" : "";
+    const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin, "", hotspotKeys, { db, studies: [study] }) + ") AS drv" : "";
     // every case in the cohort appears, because "no alteration" is an answer and not a missing value
     const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration" + drv + "\n" +
       "     FROM " + db + ".genomic_event_derived\n" +

@@ -131,8 +131,24 @@ export const portalSig2 = (x: number): string => x === 0 ? "0" : String(Number(x
  */
 export function portalPct(f: number | null): string {
   if (f == null || Number.isNaN(f)) return "-";
-  const fixed = (f * 100).toFixed(1);
-  return f !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
+  return portalRound1(f * 100);
+}
+
+/** A number to one decimal as cbioportal-utils formatPercentValue writes it: "< 0.1" when it rounds to nothing but is not 0. */
+export function portalRound1(x: number): string {
+  const fixed = x.toFixed(1);
+  return x !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
+}
+
+/**
+ * A clinical value in the Patient page's attribute tables (ClinicalInformationPatientTable
+ * getDisplayValue): a non-integer number to one decimal (portalRound1: Fraction Genome Altered
+ * 0.4881 → "0.5"), anything else as stored.
+ */
+export function portalClinicalValue(v: string): string {
+  if (v.trim() === "" || Number.isNaN(Number(v))) return v;
+  const f = parseFloat(v);
+  return f !== parseInt(v, 10) ? portalRound1(f) : v;
 }
 
 /**
@@ -208,3 +224,26 @@ export const portalLocale = (x: number): string => x.toLocaleString("en-US");
  */
 export const portalRange = (min: number, max: number): string =>
   min === max ? portalLocale(min) : "(" + portalLocale(min) + ", " + portalLocale(max) + "]";
+
+/**
+ * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",
+ * "<1%" below one percent, else the whole percent, Math.round's (2.5 → "3%").
+ */
+export function portalPercentage(proportion: number): string {
+  const perc = 100 * proportion;
+  if (perc === 0) return "0%";
+  return perc < 1 ? "<1%" : Math.round(perc) + "%";
+}
+
+/**
+ * altered ÷ sequenced as the portal's percentAltered writes it (OncoprintUtils 857-876), the value of
+ * the Download tab's frequency file: "N/P" when nothing was sequenced; below 3% one decimal, dropped
+ * when it is 0 ("2.5%", "2%"); else a whole percent.
+ */
+export function portalPercentAltered(altered: number, sequenced: number): string {
+  if (sequenced === 0) return "N/P";
+  const p = altered / sequenced, percent = 100 * p;
+  let fixed = p < 0.03 ? percent.toFixed(1) : percent.toFixed();
+  if (p < 0.03 && fixed.endsWith("0")) fixed = percent.toFixed();
+  return fixed + "%";
+}
