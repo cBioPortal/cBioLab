@@ -29,15 +29,31 @@ async function portal({ browser, ok, BASE }) {
       ok("explore: View patients opens the cohort's first patient, and steps to the next and the last",
         first.get("cohort") && first.get("study") === "coadread_tcga_pub" && total === 276 && second.get("patient") !== first.get("patient") && last.get("cohort") === first.get("cohort"),
         first.get("patient") + " → " + second.get("patient") + " → " + last.get("patient") + " of " + total);
-      // the portal's ⊖ (PAT-NAV-4): the last patient left out, the page steps back to the one before it
-      ok("patient pager: N patients opens the Study View over the cohort (PAT-NAV-3)",
-        /^\/lab\?tab=explore&study=coadread_tcga_pub&filters=/.test(await page.locator(".cohort-nav a", { hasText: "patients" }).getAttribute("href") || ""));
-      await page.getByRole("button", { name: "exclude the current patient" }).click();
-      await page.waitForFunction((p) => new URL(location.href).searchParams.get("patient") !== p, last.get("patient"), { timeout: 120000 });
-      await at(String(total - 1));
-      ok("patient pager: excluding the last patient steps to the previous, one patient fewer (PAT-NAV-4)", (await of()) === total - 1, (await of()) + " of " + (total - 1));
     } catch (e) {
       ok("explore: View patients opens the cohort's first patient, and steps to the next and the last", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    // the portal's "N patients" (PAT-NAV-3): the Study View over the cohort, in a new window
+    try {
+      const sv = page.locator(".cohort-nav button", { hasText: "patients" });
+      const [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 60000 }), sv.click()]);
+      await popup.waitForURL(/\/lab\?/, { timeout: 60000 });
+      const u = new URL(popup.url());
+      ok("patient pager: N patients opens the Study View over the cohort (PAT-NAV-3)", u.searchParams.get("tab") === "explore" && u.searchParams.get("study") === "coadread_tcga_pub", popup.url());
+      await popup.close();
+    } catch (e) {
+      ok("patient pager: N patients opens the Study View over the cohort (PAT-NAV-3)", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    // the portal's ⊖ (PAT-NAV-4): the last patient left out, the page steps back to the one before it, one patient fewer
+    try {
+      const before = Number(((await page.locator(".cohort-nav").innerText()).match(/([\d,]+) patients/) || [])[1]?.replace(/,/g, ""));
+      const was = new URL(page.url()).searchParams.get("patient");
+      await page.getByRole("button", { name: "exclude the current patient" }).click();
+      await page.waitForFunction((p) => new URL(location.href).searchParams.get("patient") !== p, was, { timeout: 120000 });
+      await page.waitForFunction((n) => document.querySelector(".cohort-nav input")?.value === n, String(before - 1), { timeout: 120000 });
+      const after = Number(((await page.locator(".cohort-nav").innerText()).match(/([\d,]+) patients/) || [])[1]?.replace(/,/g, ""));
+      ok("patient pager: excluding the last patient steps to the previous, one patient fewer (PAT-NAV-4)", after === before - 1, after + " of " + (before - 1));
+    } catch (e) {
+      ok("patient pager: excluding the last patient steps to the previous, one patient fewer (PAT-NAV-4)", false, String(e.message).split("\n")[0].slice(0, 200));
     }
     ok("explore view patients: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();

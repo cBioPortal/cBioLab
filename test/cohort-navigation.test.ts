@@ -2,7 +2,7 @@
 // carries, and the document that lists the cohort's patients.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { excludePatient, listDoc, navigationFromHash, navigationParams, studyViewHref, patientHref, readNavigation, sampleHref, NAV_COHORT } from "../app/portal/cohort-navigation.ts";
+import { excludePatient, listDoc, navigationFromHash, navigationParams, studyViewParams, patientHref, readNavigation, sampleHref, NAV_COHORT } from "../app/portal/cohort-navigation.ts";
 import type { CohortDef } from "../lib/types.ts";
 import { readFilters } from "../lib/study-view-url.ts";
 
@@ -52,7 +52,7 @@ describe("a Patient page's cohort navigation", () => {
 });
 
 // Legacy patient view: PAT-URL-4, PAT-URL-6, PAT-NAV-3, PAT-NAV-4 (docs/legacy-spec/40-patient-summary.md).
-const A = { kind: "clinical", attribute: "SEX", values: ["Female"] } as CohortDef["all"][number];
+const A = { kind: "clinical", attribute: "SEX", values: ["Female"] } as NonNullable<CohortDef["all"]>[number];
 
 describe("navigation from a legacy #navCaseIds hash", () => {
   test("H1: study-qualified ids become one patient list over that study", () => {
@@ -88,42 +88,58 @@ describe("navigation from a legacy #navCaseIds hash", () => {
 
 describe("excluding a patient from the cohort being stepped through", () => {
   const nav = { def: { study: "s1", all: [A] } as CohortDef, order: { search: "x" }, link: "abcdefghijklmnopqrstuv" };
+  const P2 = { study: "s1", id: "P2" };
+  const P3 = { study: "s1", id: "P3" };
   test("X1: appends a not-clause, keeps the order, drops the stored link", () => {
-    const out = excludePatient(nav, { study: "s1", id: "P2" });
+    const out = excludePatient(nav, P2);
     assert.deepEqual(out.def.all, [A, { not: { kind: "patientList", ids: ["s1:P2"] } }]);
     assert.deepEqual(out.order, { search: "x" });
     assert.equal(out.link, undefined);
   });
-  test("X2: excluding twice keeps the first not-clause", () => {
-    const out = excludePatient(excludePatient(nav, { study: "s1", id: "P2" }), { study: "s1", id: "P3" });
-    assert.deepEqual(out.def.all, [
-      A,
-      { not: { kind: "patientList", ids: ["s1:P2"] } },
-      { not: { kind: "patientList", ids: ["s1:P3"] } },
-    ]);
+  test("X2: excluding twice merges into one trailing clause, the first clause kept first", () => {
+    const out = excludePatient(excludePatient(nav, P2), P3);
+    assert.deepEqual(out.def.all, [A, { not: { kind: "patientList", ids: ["s1:P2", "s1:P3"] } }]);
   });
   test("X3: the input navigation is not mutated", () => {
     const before = structuredClone(nav);
-    excludePatient(nav, { study: "s1", id: "P2" });
+    excludePatient(nav, P2);
     assert.deepEqual(nav, before);
+  });
+  test("X4: a stored-set exclusion as the last clause is left alone and a new clause appended", () => {
+    const setClause = { not: { kind: "patientList", set: "0b8b5f0e-1c1a-4a53-9a55-2f4f1f5d9c11" } };
+    const withSet = { def: { study: "s1", all: [A, setClause] } as unknown as CohortDef, order: {} };
+    const out = excludePatient(withSet, P2);
+    assert.deepEqual(out.def.all, [A, setClause, { not: { kind: "patientList", ids: ["s1:P2"] } }]);
+  });
+  test("X5: excluding the same patient twice lists the id once", () => {
+    const out = excludePatient(excludePatient(nav, P2), P2);
+    assert.deepEqual(out.def.all, [A, { not: { kind: "patientList", ids: ["s1:P2"] } }]);
   });
 });
 
-describe("the study view link for a navigation", () => {
-  const parse = (href: string) => new URL("http://h" + href);
-  test("V1: /lab explore tab, the study, and the clauses as filters", () => {
-    const u = parse(studyViewHref({ def: { study: "s1", all: [A] } as CohortDef, order: {} }));
-    assert.equal(u.pathname, "/lab");
-    assert.equal(u.searchParams.get("tab"), "explore");
-    assert.equal(u.searchParams.get("study"), "s1");
-    assert.deepEqual(readFilters(u.searchParams, u.hash)?.all, [A]);
+describe("the study view parameters for a navigation", () => {
+  const ok = (nav: { def: CohortDef; order: object }) => {
+    const r = studyViewParams(nav);
+    assert.ok("params" in r, "expected params, got " + JSON.stringify(r));
+    return r.params;
+  };
+  test("V1: explore tab, the study, and the clauses as filters", () => {
+    const p = ok({ def: { study: "s1", all: [A] } as CohortDef, order: {} });
+    assert.equal(p.tab, "explore");
+    assert.equal(p.study, "s1");
+    assert.deepEqual(readFilters(new URLSearchParams(p), "")?.all, [A]);
   });
   test("V2: several studies are comma-separated", () => {
-    const u = parse(studyViewHref({ def: { studies: ["s1", "s2"], all: [A] } as CohortDef, order: {} }));
-    assert.equal(u.searchParams.get("study"), "s1,s2");
+    assert.equal(ok({ def: { studies: ["s1", "s2"], all: [A] } as CohortDef, order: {} }).study, "s1,s2");
   });
-  test("V3: a cohort with no clauses has no filters parameter", () => {
-    const u = parse(studyViewHref({ def: { study: "s1", all: [] } as CohortDef, order: {} }));
-    assert.equal(u.searchParams.has("filters"), false);
+  test("V3: a cohort with no clauses has no filters key", () => {
+    assert.equal("filters" in ok({ def: { study: "s1", all: [] } as CohortDef, order: {} }), false);
+  });
+  test("V4: a definition with more than study/studies/all is refused, naming the extra keys", () => {
+    const def = { study: "s1", all: [A], a: { kind: "event" }, lineGap: 30 } as unknown as CohortDef;
+    const r = studyViewParams({ def, order: {} });
+    assert.ok("refused" in r, "expected a refusal");
+    assert.match(r.refused, /\ba\b/);
+    assert.match(r.refused, /lineGap/);
   });
 });

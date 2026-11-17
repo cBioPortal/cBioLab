@@ -18,7 +18,10 @@ import { DataTable } from "../_table/DataTable.tsx";
 import { PatientsDialog } from "../lab/patient-nav.tsx";
 import type { AnalysisDoc, TableRows } from "../../lib/types.ts";
 import type { TableQuery } from "../../lib/table-query.ts";
-import { excludePatient, listDoc, patientHref, studyViewHref, type CohortNavigation, type PatientKey } from "./cohort-navigation.ts";
+import { excludePatient, listDoc, navigationParams, patientHref, studyViewParams, NAV_COHORT, type CohortNavigation, type PatientKey } from "./cohort-navigation.ts";
+import { encodeParam } from "./page-doc.ts";
+import { currentLinkUrlMax, linkTo } from "../_links/link-state.ts";
+import { storeCohortLists } from "../lab/id-sets-client.ts";
 
 type Position = { index: number; prev: PatientKey | null; next: PatientKey | null } | null;
 type ListResult = TableRows<string> & { position?: Position };
@@ -56,6 +59,26 @@ export function useCohortPosition(nav: CohortNavigation | null, at: PatientKey |
 }
 
 /**
+ * A link to `path` carrying the navigation's cohort, short however long the cohort: past the
+ * address's limit its id lists are stored as sets, and the link itself stored (as Explore's View
+ * patients opens the page, docs/LINKS.md).
+ */
+export async function navLink(path: string, nav: CohortNavigation, params: Record<string, string>): Promise<string> {
+  let def = nav.def;
+  if (!nav.link && encodeParam(def).length > currentLinkUrlMax()) def = await storeCohortLists(def, NAV_COHORT);
+  return linkTo(path, { ...params, ...navigationParams({ ...nav, def }) });
+}
+
+/** The Study View over the navigation's cohort, its id lists stored first when long; throws why when it cannot show this cohort. */
+async function studyViewLink(nav: CohortNavigation): Promise<string> {
+  let def = nav.def;
+  if (encodeParam(def).length > currentLinkUrlMax()) def = await storeCohortLists(def, NAV_COHORT);
+  const sv = studyViewParams({ ...nav, def });
+  if ("refused" in sv) throw new Error(sv.refused);
+  return linkTo("/lab", sv.params);
+}
+
+/**
  * The legacy pager over the cohort: first, previous, the shown patient's number (typed to jump),
  * "of N patients" (opens the list), next and last.
  */
@@ -75,9 +98,19 @@ export function CohortNav({ nav, at, tab }: { nav: CohortNavigation; at: Patient
     try { go(await patientAt(nav, offset)); } catch (e) { setJumping((e as Error).message); }
   };
   // the portal's ⊖: the cohort without this patient, opened at the next patient (the previous when it was the last)
-  const exclude = () => {
+  const exclude = async () => {
     const to = pos?.next ?? pos?.prev ?? null;
-    if (to) router.push(patientHref(to, excludePatient(nav, at), tab));
+    if (!to) return;
+    setJumping(null);
+    try { router.push(await navLink("/portal/patient", excludePatient(nav, at), { study: to.study, patient: to.id, ...(tab ? { tab } : {}) })); }
+    catch (e) { setJumping("the patient could not be excluded: " + (e as Error).message); }
+  };
+  // the portal's "N patients": the Study View over the cohort, in a new window (opened at once, so no popup blocker stops it)
+  const sv = studyViewParams(nav);
+  const openStudyView = async () => {
+    const w = window.open("", "_blank");
+    try { const href = await studyViewLink(nav); if (w) w.location.href = href; else window.open(href, "_blank"); }
+    catch (e) { w?.close(); setJumping("the Study View could not be opened: " + (e as Error).message); }
   };
   if (error) return <p data-tw className="text-sm text-destructive" role="alert">the cohort's patients could not be listed: {error}</p>;
   if (!list) return <span data-tw className="skeleton h-8 w-80" role="status" aria-label="placing the patient in the cohort" />;
@@ -98,13 +131,14 @@ export function CohortNav({ nav, at, tab }: { nav: CohortNavigation; at: Patient
             <span className="text-muted-foreground">of</span>
           </form>
         ) : <span className="text-muted-foreground">{at.id} is not in this cohort ·</span>}
-        <a className="text-primary hover:underline" href={studyViewHref(nav)} target="_blank" rel="noreferrer" data-tip="Open all patients in study view">
+        <button type="button" className="text-primary hover:underline disabled:text-muted-foreground disabled:no-underline" disabled={"refused" in sv}
+          data-tip={"refused" in sv ? sv.refused : "Open all patients in study view"} onClick={() => void openStudyView()}>
           {total.toLocaleString()} patients
-        </a>
+        </button>
         <IconLink to={pos?.next ?? null} label="next patient"><ChevronRight /></IconLink>
         <Button variant="outline" size="icon-sm" disabled={last} data-tip="the cohort's last patient" aria-label="last patient" onClick={() => void jump(total - 1)}><ChevronLast /></Button>
         <Button variant="outline" size="icon-sm" disabled={!pos || total < 2} data-tip={!pos ? "the patient is not in this cohort" : total < 2 ? "the cohort's only patient cannot be excluded" : "Exclude the current patient"}
-          aria-label="exclude the current patient" onClick={exclude}><CircleMinus /></Button>
+          aria-label="exclude the current patient" onClick={() => void exclude()}><CircleMinus /></Button>
         <Button variant="outline" size="icon-sm" data-tip="list the cohort's patients: search, filter, sort, and pick one" aria-label="list the cohort's patients" onClick={() => setListOpen(true)}><List /></Button>
       </div>
       {!pos && total > 0 && <Button variant="link" size="xs" onClick={() => void jump(0)}>go to the cohort's first patient</Button>}

@@ -39,6 +39,7 @@ export function readNavigation(q: URLSearchParams, link?: { id: string; params: 
  * stepped through in the cohort list's order, not the link's.
  */
 export function navigationFromHash(hash: string): { nav: CohortNavigation | null; error: string | null } {
+  // an unreadable list leaves the page showing its patient, without the pager, and says why (`error`)
   const raw = new URLSearchParams(hash.replace(/^#/, "")).get("navCaseIds");
   if (!raw) return { nav: null, error: null };
   const ids = raw.split(",").map((x) => x.trim()).filter(Boolean);
@@ -49,17 +50,33 @@ export function navigationFromHash(hash: string): { nav: CohortNavigation | null
   return { nav: { def, order: {} }, error: null };
 }
 
-/** The navigation without one of its patients (the portal's ⊖, PAT-NAV-4): the cohort's definition, excluding that patient. */
+/**
+ * The navigation without one of its patients (the portal's ⊖, PAT-NAV-4): the cohort's definition,
+ * excluding that patient — added to the exclusion the cohort already ends with, so excluding one
+ * patient after another stays one clause.
+ */
 export function excludePatient(nav: CohortNavigation, at: PatientKey): CohortNavigation {
-  const all = [...(nav.def.all || []), { not: { kind: "patientList" as const, ids: [at.study + ":" + at.id] } }];
+  const id = at.study + ":" + at.id, all = [...(nav.def.all || [])];
+  const last = all[all.length - 1] as { not?: { kind?: string; ids?: string[]; set?: string } } | undefined;
+  if (last?.not?.kind === "patientList" && Array.isArray(last.not.ids) && !last.not.set) all[all.length - 1] = { not: { kind: "patientList", ids: [...last.not.ids.filter((x) => x !== id), id] } };
+  else all.push({ not: { kind: "patientList", ids: [id] } });
   return { def: { ...nav.def, all }, order: nav.order };
 }
 
-/** The Study View over the navigation's cohort (the portal's "N patients", PAT-NAV-3): its studies, filtered by the cohort's clauses. */
-export function studyViewHref(nav: CohortNavigation): string {
+/** the parts of a cohort's definition the Study View's filters carry: its studies and its clauses */
+const STUDY_VIEW_KEYS = new Set(["study", "studies", "all"]);
+
+/**
+ * The Study View over the navigation's cohort (the portal's "N patients", PAT-NAV-3): the parameters
+ * of /lab's Explore, its studies filtered by the cohort's clauses — or, for a cohort defined by more
+ * than clauses (an event, a gap), why it cannot be shown there, never a larger cohort silently.
+ */
+export function studyViewParams(nav: CohortNavigation): { params: Record<string, string> } | { refused: string } {
+  const extra = Object.keys(nav.def).filter((k) => !STUDY_VIEW_KEYS.has(k) && (nav.def as Record<string, unknown>)[k] != null);
+  if (extra.length) return { refused: "the Study View filters by clauses only; this cohort is also defined by " + extra.join(", ") };
   const studies = nav.def.studies?.length ? nav.def.studies : [studyOf(nav.def)];
   const filters = writeFilters(nav.def.all);
-  return "/lab?" + new URLSearchParams({ tab: "explore", study: studies.join(","), ...(filters ? { filters } : {}) }).toString();
+  return { params: { tab: "explore", study: studies.join(","), ...(filters ? { filters } : {}) } };
 }
 
 /** The URL parameters that carry a navigation: what every link the page makes keeps. */

@@ -117,7 +117,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 | PAT-URL-3 | 🟡 | C | Page state in `?changes=` (GE settings, collapse etc., invariant 9); no `resourceUrl`, plots params, `geneset_list` |
 | PAT-URL-4 | 🟡 | B | `#navCaseIds=study:patient,…` read as a cohort of those patients (an id without its study refused, as PAT-URL-6) ✅; stepped through in the cohort list's order, not the link's; no POSTed list; the page's own links still carry the cohort's definition (`?cohort=`) |
 | PAT-URL-5 | ✅ | C | `PatientView` keyed by study\|patient\|sample (`page.tsx:62`) |
-| PAT-URL-6 | 🐞 ok | C | No id-list parsing at all, so no `this.studyId` crash |
+| PAT-URL-6 | 🐞 ok | C | `#navCaseIds` ids without their study are refused, named, and the patient shown without the pager (`navigationFromHash`), where the portal's parseCohortIds throws: the bug not copied |
 
 ### §1 Header
 
