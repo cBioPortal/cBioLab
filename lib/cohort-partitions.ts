@@ -42,7 +42,7 @@ export interface PartitionPlan {
   unchecked: string[];
 }
 
-const PROFILE_WORD: Record<ProfiledLeaf["type"], string> = { MUTATION: "mutations", CNA: "copy number", SV: "structural variants" };
+const PROFILE_WORD: Record<NonNullable<ProfiledLeaf["type"]>, string> = { MUTATION: "mutations", CNA: "copy number", SV: "structural variants" };
 
 interface Evaluability { leaves: Leaf[]; unchecked: string[] }
 
@@ -96,7 +96,7 @@ function describeLeafBrief(leaf: Leaf): string {
 
 function notEvaluableLabel(e: Leaf): string {
   const l = e as unknown as Record<string, unknown>;
-  if (l.kind === "profiled") return "Not profiled: " + String(l.gene) + " " + PROFILE_WORD[l.type as ProfiledLeaf["type"]];
+  if (l.kind === "profiled") return "Not profiled: " + String(l.gene) + " " + (l.profile != null ? String(l.profile) : PROFILE_WORD[l.type as NonNullable<ProfiledLeaf["type"]>]);
   if (l.kind === "clinical") return "No " + String(l.attribute) + " recorded";
   if (l.kind === "genericAssay") return "No " + entityShortName(String(l.entity), String(l.profileType)) + " measured";
   return "Not evaluable";
