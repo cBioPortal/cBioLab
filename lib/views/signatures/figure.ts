@@ -7,7 +7,7 @@ import type { DrawnResultOf } from "../../types.ts";
 import { palette, frame, caption, label, textWidth, legend, linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight,
   seriesStyle, textOn, fmtInt, esc, FS, SW, r1, type Scale, type SvgOpts } from "../../svg-kit.ts";
 import { SIGNIFICANT_P, YMAX_MAX, channelColor, channelTick, countAxisMax, countLabel, indelBox, pctText, percentAxisMax, referenceAxisMax, referenceTick,
-  spectrumAxisTitle, spectrumTick, spectrumUnit, versionLabel } from "./data.ts";
+  spectrumAxisTitle, spectrumPct, spectrumTick, spectrumUnit, versionLabel } from "./data.ts";
 import type { SignaturesResult } from "./types.ts";
 
 type Pal = ReturnType<typeof palette>;
@@ -86,7 +86,7 @@ function spectrumChart(s: SignaturesResult, W: number, y0: number, p: Pal, head:
     out.push(label(PAD, y + FS.title, "Sample: " + sp.sample + " | " + countLabel(ver) + " count: " + sp.total, { size: FS.title, weight: 600, fill: p.ink, maxW: W - 2 * PAD }));
     y += FS.title + 10;
   }
-  const val = (c: { count: number }) => pct ? (sp.total ? 100 * c.count / sp.total : 0) : c.count;
+  const val = (c: { count: number }) => pct ? spectrumPct(c.count, sp.total) : c.count;
   const max = pct ? percentAxisMax(s.ymax) : countAxisMax(Math.max(0, ...sp.channels.map((c) => c.count)), s.ymax);
   const H = 220;
   const yTitle = spectrumAxisTitle(ver, s.scale);
@@ -127,7 +127,7 @@ function spectrumChart(s: SignaturesResult, W: number, y0: number, p: Pal, head:
   out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: R, fmt: fmtTop, line: true }));
   sp.channels.forEach((c, i) => {
     const v = Math.min(val(c), max);
-    const tip = c.label + ": " + fmtInt(c.count) + " of " + fmtInt(sp.total) + " " + spectrumUnit(ver) + " (" + (sp.total ? (100 * c.count / sp.total).toFixed(1) : "0") + "%)" + (val(c) > max ? ", past the axis" : "");
+    const tip = c.label + ": " + fmtInt(c.count) + " of " + fmtInt(sp.total) + " " + spectrumUnit(ver) + " (" + spectrumPct(c.count, sp.total) + "%)" + (val(c) > max ? ", past the axis" : "");
     out.push(`<rect x="${r1(cx(i) - barW / 2)}" y="${r1(ys(v))}" width="${r1(barW)}" height="${r1(Math.max(0, ys(0) - ys(v)))}" fill="${colors[i]}"><title>${esc(tip)}</title></rect>`);
   });
   y = ys(0) + 4;

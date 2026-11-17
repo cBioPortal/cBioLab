@@ -12,6 +12,13 @@
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))))
 
+-- view 0 timeline: table:attributes · msk_chord_2024
+SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
+FROM snapshot_db.clinical_attribute_meta m
+JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = m.cancer_study_id
+WHERE cs.cancer_study_identifier = 'msk_chord_2024'
+ORDER BY priority DESC, name
+
 -- view 0 timeline: timeline:counts · msk_chord_2024
 WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -191,6 +198,44 @@ WHERE 1
 ORDER BY toFloat64(events) DESC NULLS LAST, patient, ord
 LIMIT 3 OFFSET 1250
 
+-- view 0 timeline: timeline:sample-attributes · msk_chord_2024
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT DISTINCT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN ('P-0000012')))),
+u0 AS (
+  SELECT patient_unique_id AS puid, sample_unique_id AS suid, 1 AS samples FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM c0)
+),
+pv0 AS (
+  SELECT patient_unique_id AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient' AND 0
+    AND attribute_value != '' AND replaceOne(patient_unique_id, 'msk_chord_2024_', '') IN (SELECT pid FROM c0)
+  GROUP BY k
+),
+sv0 AS (
+  SELECT sample_unique_id AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE','CLINICAL_GROUP','CLINICAL_SUMMARY','DIAGNOSIS_DESCRIPTION','ICD_O_HISTOLOGY_DESCRIPTION','PATHOLOGICAL_GROUP','CANCER_TYPE_DETAILED','SAMPLE_TYPE','MSI_TYPE','GENE_PANEL','SOMATIC_STATUS','SAMPLE_CLASS','MUTATION_COUNT','FRACTION_GENOME_ALTERED','TMB_NONSYNONYMOUS','GLEASON_SAMPLE_LEVEL','MSI_COMMENT','MSI_SCORE','METASTATIC_SITE','ONCOTREE_CODE','PRIMARY_SITE','PDL1_POSITIVE','SAMPLE_COVERAGE','TUMOR_PURITY')
+    AND attribute_value != '' AND replaceOne(sample_unique_id, 'msk_chord_2024_', '') IN (SELECT sid FROM c0)
+  GROUP BY k
+),
+rows AS (
+  SELECT 'patient' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
+         replaceOne(u.puid, 'msk_chord_2024_', '') AS patient, replaceOne(u.suid, 'msk_chord_2024_', '') AS sample, u.samples AS samples, mapUpdate(pv.m, sv.m) AS m
+  FROM u0 AS u LEFT JOIN pv0 AS pv ON pv.k = u.puid LEFT JOIN sv0 AS sv ON sv.k = u.suid
+)
+SELECT cohort, study, patient, sample, samples, m, count() OVER () AS total FROM rows
+WHERE 1
+ORDER BY patient, sample, patient, sample, ord
+LIMIT 1000 OFFSET 0
+
 -- view 0 timeline: timeline:samples · msk_chord_2024
 SELECT replaceOne(s.sample_unique_id, 'msk_chord_2024_', '') AS id, any(c.attribute_value) AS type
 FROM snapshot_db.sample_derived s
@@ -283,8 +328,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -304,15 +351,15 @@ SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort,
 WITH m AS (
   SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,
-         if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
+         if(tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
   FROM snapshot_db.mutation_derived
   WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND patientId = 'P-0000012' AND molecularProfileId NOT LIKE '%uncalled%'
 ),
 g AS (
   SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, arrayStringConcat(arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid))) AS so,
          max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount,
-         arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1)), groupArrayIf(tuple(sid, ac, rc), ac >= 0 AND rc >= 0 AND ac + rc > 0)) AS reads,
-         groupArray(tuple(sid, if(ac >= 0 AND rc >= 0 AND f > 0, f, NULL))) AS sf
+         groupArrayIf(tuple(sid, ac, rc), f IS NOT NULL) AS rs,
+         arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1)), arrayFilter((x, i) -> indexOf(arrayMap(y -> y.1, rs), x.1) = i, rs, arrayEnumerate(rs))) AS reads
   FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var
 ),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
@@ -330,8 +377,8 @@ fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
-         g.vaf AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
-         CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, g.sf).2, ['P-0000012-T02-IM3', 'P-0000012-T03-IM3']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
+         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
+         CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)).2, ['P-0000012-T02-IM3', 'P-0000012-T03-IM3']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange
@@ -343,15 +390,15 @@ SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort,
 WITH m AS (
   SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,
-         if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
+         if(tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
   FROM snapshot_db.mutation_derived
   WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND patientId = 'P-0000012' AND molecularProfileId NOT LIKE '%uncalled%'
 ),
 g AS (
   SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, arrayStringConcat(arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid))) AS so,
          max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount,
-         arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1)), groupArrayIf(tuple(sid, ac, rc), ac >= 0 AND rc >= 0 AND ac + rc > 0)) AS reads,
-         groupArray(tuple(sid, if(ac >= 0 AND rc >= 0 AND f > 0, f, NULL))) AS sf
+         groupArrayIf(tuple(sid, ac, rc), f IS NOT NULL) AS rs,
+         arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x.1)), arrayFilter((x, i) -> indexOf(arrayMap(y -> y.1, rs), x.1) = i, rs, arrayEnumerate(rs))) AS reads
   FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var
 ),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
@@ -369,8 +416,8 @@ fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
-         g.vaf AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
-         CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, g.sf).2, ['P-0000012-T02-IM3', 'P-0000012-T03-IM3']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
+         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
+         CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)).2, ['P-0000012-T02-IM3', 'P-0000012-T03-IM3']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange
@@ -411,8 +458,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -460,8 +509,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -510,8 +561,10 @@ cn0 AS (
   GROUP BY pid
 ),
 sv0 AS (
-  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n
+  SELECT p.stable_id AS pid, uniqExact(arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_')) AS n
   FROM snapshot_db.structural_variant sv
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
   JOIN snapshot_db.sample s ON s.internal_id = sv.sample_id
   JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
   JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
@@ -557,7 +610,10 @@ LIMIT 1000 OFFSET 0
 
 -- view 1 alterations: alterations:sv:counts · msk_chord_2024
 WITH s AS (
-  SELECT smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
+  SELECT smp.stable_id AS sid, if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], smp.stable_id) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], smp.stable_id)) AS o,
+         arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_') AS k,
+         tuple(o, sv.internal_id) AS r, tuple(gene1, gene2, class, eventInfo, pos1, pos2, breakpointType, connectionType, frame, site1, site2, length, dnaSupport, rnaSupport, status, svAnnotation, comments) AS rec0,
+         ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
          ifNull(sv.class, '') AS class, ifNull(sv.event_info, '') AS eventInfo, sv.breakpoint_type AS breakpointType, sv.connection_type AS connectionType,
          sv.site2_effect_on_frame AS frame, sv.site1_description AS site1, sv.site2_description AS site2,
          if(sv.site1_position IS NULL, '', concat(ifNull(sv.site1_chromosome, ''), ':', toString(sv.site1_position))) AS pos1,
@@ -573,11 +629,10 @@ WITH s AS (
     WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND p.stable_id = 'P-0000012')
 ),
 g AS (
-  SELECT gene1, gene2, class, eventInfo, pos1, pos2, arrayStringConcat(arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid))) AS so,
-         any(breakpointType) AS breakpointType, any(connectionType) AS connectionType, any(frame) AS frame, any(site1) AS site1, any(site2) AS site2,
-         any(length) AS length, max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount,
-         any(dnaSupport) AS dnaSupport, any(rnaSupport) AS rnaSupport, any(status) AS status, any(svAnnotation) AS svAnnotation, any(comments) AS comments
-  FROM s GROUP BY gene1, gene2, class, eventInfo, pos1, pos2
+  SELECT k, arrayStringConcat(arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid))) AS so,
+         argMin(rec0, r) AS rec, tupleElement(rec, 1) AS gene1, tupleElement(rec, 2) AS gene2, tupleElement(rec, 3) AS class, tupleElement(rec, 4) AS eventInfo, tupleElement(rec, 5) AS pos1, tupleElement(rec, 6) AS pos2, tupleElement(rec, 7) AS breakpointType, tupleElement(rec, 8) AS connectionType, tupleElement(rec, 9) AS frame, tupleElement(rec, 10) AS site1, tupleElement(rec, 11) AS site2, tupleElement(rec, 12) AS length, tupleElement(rec, 13) AS dnaSupport, tupleElement(rec, 14) AS rnaSupport, tupleElement(rec, 15) AS status, tupleElement(rec, 16) AS svAnnotation, tupleElement(rec, 17) AS comments,
+         max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount
+  FROM s GROUP BY k
 ),
-rows AS (SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* FROM g)
+rows AS (SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec) FROM g)
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
