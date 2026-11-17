@@ -19,6 +19,7 @@ import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
 import { caseFileAction, figureActions, saveCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
+import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, freqTipLines, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
@@ -187,6 +188,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               else { setExDraftStudies(exStudies); setExPanelOpen(true); }           // open seeds
             }}>{exPanelOpen ? "Cancel" : "Add / change studies"}</Button>}
           </div>
+          {exStudies.length > 0 && !exPanelOpen && <StudyHeader studies={exStudies.map((id) => ({ id, name: names.get(id) || id }))} />}
           {/* with nothing selected the picker is simply open: there is nothing else to do here */}
           {(exPanelOpen || exStudies.length === 0) && <>
             <div className="row applybar center g5">
