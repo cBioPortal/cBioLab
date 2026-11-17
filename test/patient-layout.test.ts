@@ -87,3 +87,11 @@ test("PTB-TAB-3, PTB-MD-12: no Clinical Trials tab, whatever the patient holds",
   ];
   for (const l of cases) assert.ok(!titlesOf(l).includes("Clinical Trials"), titlesOf(l).join(", "));
 });
+
+test("L1 PTB-CD-4: the Clinical Data tab's Timeline Data view is the event tables", () => {
+  const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION", "CNA"] });
+  const at = l.names.indexOf("Clinical Data › Timeline Data");
+  assert.ok(at >= 0, l.names.join(", "));
+  assert.equal((l.doc.views![at] as { kind: string; tables?: boolean }).kind, "timeline");
+  assert.equal((l.doc.views![at] as { tables?: boolean }).tables, true);
+});
