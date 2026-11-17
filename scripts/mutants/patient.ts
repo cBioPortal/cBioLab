@@ -64,4 +64,8 @@ export const mutants: Mutant[] = [
     effect: "A timeline sample's tooltip lists its attributes as they come, where the portal sorts them by key.",
     find: "  return [...merged].sort(([a], [b]) => a.localeCompare(b));\n}",
     replace: "  return [...merged];\n}" },
+  { id: "evolution-tip-absent-uncalled", layer: "counts", guard: "unit", file: "lib/views/evolution/figure.ts",
+    effect: "The Genomic Evolution tooltip calls a sample sequenced without the mutation \"Mutation uncalled\", where the portal says \"Mutation not detected\".",
+    find: "case \"absent\": return reads ? \"Mutation not detected (\" + reads",
+    replace: "case \"absent\": return reads ? \"Mutation uncalled (\" + reads" },
 ];

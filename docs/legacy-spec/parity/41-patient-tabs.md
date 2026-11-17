@@ -22,8 +22,8 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 23 |
-| 🟡 partial | 15 |
+| ✅ match | 24 |
+| 🟡 partial | 14 |
 | 🔶 different | 10 |
 | ❌ missing | 30 |
 | 🐞 ok | 0 |
@@ -32,13 +32,13 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | ? | 0 |
 | **Total IDs** | **81** |
 
-**Overall: 25.9 %** (✅ 18 + 🐞ok 0 + N/A 3 = 21 of 81). Counting 🟡 as half: 35.2 %.
+**Overall: 33.3 %** (✅ 24 + 🐞ok 0 + N/A 3 = 27 of 81). Counting 🟡 as half: 42.0 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 TAB inventory | 5 | 0 | 2 | 2 | 0 | 0 | 1 | Different order and gating; placeholder tabs; `?tab=` not path |
 | §1 GE core | 4 | 2 | 1 | 0 | 1 | 0 | 0 | Same mutation set and selection model; no unprofiled alert |
-| §1 GE line chart | 7 | 1 | 4 | 0 | 2 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
+| §1 GE line chart | 7 | 2 | 3 | 0 | 2 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
 | §1 GE heatmap | 4 | 0 | 0 | 3 | 1 | 0 | 0 | Mutation × sample fixed, oncoprint ramp, no cluster/transpose/zoom/download |
 | §1 GE table | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Own columns (VAF by sample, Max VAF); no "only selected" |
 | §2 Pathways | 4 | 0 | 2 | 2 | 0 | 0 | 0 | Same scores; numeric score not Yes/No; tie order → other default pathway |
@@ -116,7 +116,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-GE-LC-3 | 🟡 | B | Polylines + sample markers ✅; y title "Variant allele frequency"; extra legend (called / uncalled / not found / not profiled) |
 | PTB-GE-LC-4 | 🟡 | B | Sequential even spacing / collection day ✅; x axis in days (0…1,400) not 0, 4m, 8m, 1y |
 | PTB-GE-LC-5 | ❌ | B | No grouping |
-| PTB-GE-LC-6 | 🟡 | C | "VAF 0.38 (46 of 121 reads)", "called, no allele counts", "uncalled, VAF …", "not found", "not profiled" (`figure.ts:15-26`) — same states, other words |
+| PTB-GE-LC-6 | ✅ | BC | The portal's tooltip: Gene, Protein Change, Sample ID, then "VAF: 0.69 (54 reads of 78 total)" (lgg_ucsf_2014 P04_Pri TP53 R248Q, 54/24 reads in the API), "Mutated, but we don't have VAF data.", "Mutation uncalled (…)", "Mutation not detected", "<sample> is not sequenced for <gene> mutations." (mutationTooltip) |
 | PTB-GE-LC-7 | ✅ | C | No download on the tab, as legacy without the timeline |
 | PTB-GE-HM-1 | ❌ | C | No Cluster, Transpose, labels toggle, zoom, download |
 | PTB-GE-HM-2 | 🔶 | C | Always a row per mutation, column per sample (legacy default is the transpose); no-VAF mutations dropped ✅ |
