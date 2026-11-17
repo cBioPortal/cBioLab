@@ -83,7 +83,9 @@ export const splitGeneTrack = (v: V, label: string): V => {
 };
 
 /** a clinical attribute as the Tracks menu lists it: `n` is counted at its own level (`per`) */
-export interface TrackAttr { attribute: string; kind: string; patients: number; displayName?: string; per?: "patient" | "sample"; priority?: number }
+export interface TrackAttr { attribute: string; kind: string; patients: number; displayName?: string; per?: "patient" | "sample"; priority?: number;
+  /** a patient-level attribute: the queried samples whose patient has a value, which the portal's Freq counts */
+  samples?: number }
 
 /**
  * The Tracks menu's attributes from an Explore result: every attribute the studies declare, as
@@ -92,18 +94,20 @@ export interface TrackAttr { attribute: string; kind: string; patients: number; 
  * no study declares.
  */
 export function trackAttrs(r: {
-  clinical: { attribute: string; kind?: string; patients?: number; displayName?: string; per?: "patient" | "sample"; priority?: number }[];
+  clinical: { attribute: string; kind?: string; patients?: number; displayName?: string; per?: "patient" | "sample"; priority?: number; samples?: number }[];
   declaredAttributes?: { attribute: string; per: "patient" | "sample"; displayName?: string; priority: number }[];
 }): TrackAttr[] {
   const facet = new Map(r.clinical.map((c) => [c.attribute, c]));
   const declared = (r.declaredAttributes || []).map((d): TrackAttr => {
     const f = facet.get(d.attribute);
     return { attribute: d.attribute, kind: f?.kind || "cat", patients: f?.patients || 0, per: f?.per || d.per, priority: d.priority,
+      ...(f?.samples != null ? { samples: f.samples } : {}),
       ...(d.displayName || f?.displayName ? { displayName: d.displayName || f?.displayName } : {}) };
   });
   const known = new Set(declared.map((d) => d.attribute));
   return [...declared, ...r.clinical.filter((c) => !known.has(c.attribute)).map((c): TrackAttr => ({ attribute: c.attribute, kind: c.kind || "cat",
     patients: c.patients || 0, ...(c.displayName ? { displayName: c.displayName } : {}), ...(c.per ? { per: c.per } : {}),
+    ...(c.samples != null ? { samples: c.samples } : {}),
     ...(c.priority != null ? { priority: c.priority } : {}) }))];
 }
 
@@ -128,9 +132,11 @@ export const trackFreqText = (pct: number | null): string => pct == null ? "NA" 
  */
 export function clinicalTrackRows(attrs: TrackAttr[], totals?: { patients: number; samples: number }) {
   return attrs.map((a) => {
-    const of = !totals ? 0 : a.per === "sample" ? totals.samples : totals.patients;
-    const pct = of ? Math.min(100, 100 * a.patients / of) : null;
-    return { ...a, label: a.displayName || a.attribute, pct, unit: a.per === "sample" ? "samples" as const : "patients" as const };
+    // a patient attribute in its patients' samples when Explore counted them, as the portal does
+    const inSamples = a.per === "sample" || a.samples != null;
+    const of = !totals ? 0 : inSamples ? totals.samples : totals.patients;
+    const pct = of ? Math.min(100, 100 * (a.per !== "sample" && a.samples != null ? a.samples : a.patients) / of) : null;
+    return { ...a, label: a.displayName || a.attribute, pct, unit: inSamples ? "samples" as const : "patients" as const };
   }).sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1) || (y.priority ?? 0) - (x.priority ?? 0) || byCodeUnit(x.label.toLowerCase(), y.label.toLowerCase()));
 }
 /** lodash sortBy's order of strings: by UTF-16 code unit, not locale */
