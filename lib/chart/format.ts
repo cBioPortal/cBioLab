@@ -257,3 +257,15 @@ export const roundSig = (x: number, sig: number): number => Number.isFinite(x) &
 export const roundPlaces = (x: number, places: number): number => Number.isFinite(x) ? Math.round(x * 10 ** places) / 10 ** places : x;
 /** A byte count in megabytes, one decimal: "2.5 MB". */
 export const fmtMb = (bytes: number): string => (bytes / 1e6).toFixed(1) + " MB";
+
+/**
+ * A number rounded to two decimals as lodash's _.round(x, 2) does it, by shifting the exponent so 1.005 rounds
+ * to 1.01 (Math.round(1.005 * 100) / 100 gives 1): the Cancer Types Summary popover's percentages
+ * (CancerSummaryChart percentageRounder), printed as JavaScript prints the number (90.43, 0.1, 100).
+ */
+export function portalRound2(x: number): number {
+  const [m, e] = (String(x) + "e").split("e");
+  const shifted = Math.round(+(m + "e" + (+e + 2)));
+  const [m2, e2] = (String(shifted) + "e").split("e");
+  return +(m2 + "e" + (+e2 - 2));
+}
