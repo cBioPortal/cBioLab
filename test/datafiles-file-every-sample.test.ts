@@ -10,6 +10,7 @@
 // | E4   | without holds                                                | unchanged: every part reads the source tables                 |
 // | E5   | runDatafiles, s1 holds mutations, s2 does not (2 + 5 samples) | mutations: rows 7; studies ["s1"]; description ends "; NP throughout for a study without it" |
 // | E6   | same run, the sv file (s1 holds, s2 does not)                | sv: rows 7; studies ["s1"]; same description suffix (RDL-STM-4 covers every matrix file) |
+// | E7   | runDatafiles, ctx.table "mutations" (the file's page), same two studies | rows from both s1 and s2; s2's page SQL is NP-only ('NP' AS g0, no mutation_derived) |
 //
 // The SQL is ClickHouse SQL and the repo's tests have no in-process engine, so it is checked as text,
 // not run.
@@ -109,5 +110,32 @@ describe("runDatafiles: a gene-by-sample file covers every study", () => {
     assert.equal(s.rows, 7);
     assert.deepEqual(s.studies, ["s1"]);
     assert.match(s.description, /; NP throughout for a study without it$/);
+  });
+});
+
+describe("runDatafiles: a gene-by-sample file's page reads every study", () => {
+  test("E7 mutations page: s2's samples come back, from NP-only SQL", async () => {
+    const asked: Record<string, string[]> = { s1: [], s2: [] };
+    const paging = (st: string, conn: string, catalog: ProfileInfo[]) => ({
+      ...local(conn, {}, catalog),
+      rowsPage: async (_l: string, source: (db: string) => RowSource) => {
+        asked[st].push(source(conn).with);
+        const sid = st === "s1" ? "A-01" : "Z-01";
+        return { rows: [{ cohort: "Q", study: st, patient: sid.slice(0, -3), sid, g0: st === "s1" ? "R175H" : "NP", g1: st === "s1" ? "WT" : "NP" }], total: 1 };
+      },
+      rowsCounts: async (_l: string, source: (db: string) => RowSource) => { asked[st].push(source(conn).with); return [{ cohort: "Q", study: st, n: 1, all: 1 }]; },
+    });
+    const c = { ...ctx({ Q: cohort({ s1: 2, s2: 5 }) }, { s1: paging("s1", "c1", BRCA), s2: paging("s2", "c2", NO_MUT) } as never), table: "mutations" } as ViewRun;
+    const v = await runDatafiles({ kind: "datafiles", oql: ["TP53", "KRAS: MUT"] } as DatafilesView, c);
+    assert.equal(v.error, undefined);
+    const t = df(v).tables.mutations!;
+    assert.ok(t.rows.some((r) => r.values[0] === "Z-01"), "s2's sample is on the page");
+    assert.ok(t.rows.some((r) => r.values[0] === "A-01"), "s1's sample is on the page");
+    assert.ok(asked.s2.length > 0, "s2's resolver was asked for the page");
+    for (const sql of asked.s2) {
+      assert.match(sql, /'NP' AS g0/);
+      assert.doesNotMatch(sql, /mutation_derived/);
+    }
+    assert.ok(asked.s1.some((sql) => /mutation_derived/.test(sql)), "s1's page reads its mutations");
   });
 });
