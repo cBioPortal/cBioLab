@@ -30,6 +30,13 @@ export interface PlotView {
    */
   allPoints?: boolean;
   /**
+   * A box plot's "Filter categories" (PLT-AX-9): the categories whose boxes are drawn; empty or
+   * absent draws them all. At most CATEGORY_CAP.
+   */
+  categories?: string[];
+  /** a box plot's "Sort Categories by Median" (PLT-AX-10, PLT-STM-9): boxes by their raw values' median, lowest first */
+  sortByMedian?: boolean;
+  /**
    * Subsets of the plotted cohort's cases drawn in colour over the plot, in order (at most 4): the
    * outliers (past the cap: a box's values beyond its whiskers, a scatter's sparse cells), the
    * extremes on an axis, the cases furthest from the fitted line, or a cohort's cases. Default

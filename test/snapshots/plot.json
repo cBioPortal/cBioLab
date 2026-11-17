@@ -297,6 +297,12 @@
           "rule": "all",
           "drawn": 1068
         },
+        "categoryOptions": [
+          "Amplification",
+          "Diploid",
+          "Gain",
+          "Shallow deletion"
+        ],
         "layers": [
           {
             "kind": "outliers",
@@ -817,6 +823,15 @@
           "rule": "all",
           "drawn": 1068
         },
+        "categoryOptions": [
+          "Inframe",
+          "Missense",
+          "Multiple",
+          "Not mutated",
+          "Not profiled",
+          "Splice",
+          "Truncating"
+        ],
         "layers": [
           {
             "kind": "outliers",

@@ -282,7 +282,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Category order: boxes alphabetical (Q5 Colon, Mucinous, Rectal; ours by count), mutation types before "No mutation" and "Not profiled", table rows likewise; Filter categories, Sort by Median (PLT-BX-1, PLT-TB-3, PLT-DT-3, PLT-AX-9, PLT-AX-10, PLT-STM-9)
     - [x] Boxes in the portal's order: a data type's own (copy number, mutation class, mutated, Driver/VUS), else alphabetical (PLT-BX-1, PLT-DT-3) (#240)
     - [x] Contingency table rows and columns in the same order, natural sort otherwise (was by marginal total) (PLT-TB-3) (#241)
-    - [ ] Filter categories and Sort by Median (PLT-AX-9, PLT-AX-10, PLT-STM-9)
+    - [x] Filter categories and Sort Categories by Median, as the view's `categories` and `sortByMedian`: only the chosen boxes (and their points and layers), then by the raw values' median, lowest first, ties in category order; coadread FGA by Cancer Type Detailed: Mucinous 0.1140 · Colon 0.2268 · Rectal 0.2973, the scorecard's portal medians (PLT-AX-9, PLT-AX-10, PLT-STM-9) (#318)
   - [ ] Clinical attributes by display name with their ⓘ description, in the select, axis title and tooltip (ours `MUTATION_COUNT`) (PLT-AX-2, PLT-DT-19)
     - [x] Axis titles as the portal's getAxisLabel writes them, in the figure, caption and tooltip: a clinical attribute's display name ("Mutation Count", "Diagnosis Age"), "KRAS: Mutations", "KRAS: Mutated vs Wild Type", "KRAS: Driver vs VUS Mutations", "TCF7L2: Variant vs No Variant" (PLT-DT-19) (#298)
     - [ ] The select by display name and priority, with the ⓘ description (PLT-AX-2)

@@ -1104,6 +1104,10 @@ export interface PlotData {
   /** what the colours mean: the fill category, the ring category, and the key to draw */
   colorLabel?: string;
   ringLabel?: string;
+  /** what the view's category filter and median order did, for the caption */
+  categoryNote?: string;
+  /** a box plot's categories before its filter, alphabetical: what "Filter categories" offers */
+  categoryOptions?: string[];
   legend?: { label: string; color: string; ring?: boolean }[];
   violinBins?: number;
   /** the value range the violin's bins were cut over, which is not the range the box is drawn on */

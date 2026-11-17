@@ -3,7 +3,7 @@
 import type { ViewResult } from "../../types.ts";
 import { pearsonR, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
-import { logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
+import { fromLog, logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
 import { fitOf, portalBox, spearmanRho, corrPValue, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
@@ -200,6 +200,68 @@ function densityNote(data: PlotData, unit: "patient" | "sample"): string {
       " the quartiles are over every value.";
   const why = data.pointSet?.why;
   return lead + (why && why !== "allPoints: false" && !why.startsWith("more than") ? " No case is drawn as a point: " + why + "." : "");
+}
+
+/** a box plot's point layers without the cases of the categories its filter leaves out */
+function keptLayers(ls: PlotLayer[], data: PlotData, pv: PlotView): PlotLayer[] {
+  if (data.shape !== "box" || !pv.categories || !pv.categories.length) return ls;
+  const keep = new Set(pv.categories);
+  const inKept = (p: HighlightPoint) => !("g" in p) || keep.has(p.g);
+  return ls.map((l) => {
+    const keptShared = (l.shared || []).map((p, i) => [p, i] as const).filter(([p]) => inKept(p));
+    return { ...l, ...(l.points ? { points: l.points.filter(inKept) } : {}),
+      ...(l.shared ? { shared: keptShared.map(([p]) => p), ...(l.sharedOwners ? { sharedOwners: keptShared.map(([, i]) => l.sharedOwners![i]) } : {}) } : {}) };
+  });
+}
+
+/** what is wrong with the view's category filter, or null */
+function categoriesProblem(pv: PlotView): string | null {
+  const cats = pv.categories;
+  if (cats != null && (!Array.isArray(cats) || cats.some((x) => typeof x !== "string")))
+    return "categories lists the categories whose boxes are drawn, as strings";
+  if (cats && cats.length > CATEGORY_CAP) return "categories takes at most " + CATEGORY_CAP + " categories; this lists " + cats.length;
+  return null;
+}
+
+/**
+ * A box plot's "Filter categories" and "Sort Categories by Median", after the category order, as
+ * the portal applies them (PlotsTab.tsx:5396-5419): only the chosen categories' boxes and points;
+ * then the boxes by ascending median of their raw values (a log axis's points converted back),
+ * equal medians keeping the category order. A plot that is not a box refuses sortByMedian.
+ */
+function applyCategoryChoices(data: PlotData, pv: PlotView): void {
+  if (pv.sortByMedian && data.shape !== "box") throw new Error("sortByMedian applies to a box plot; this pair is drawn as a " + data.shape);
+  if (data.shape !== "box" || !data.groups) return;
+  // every category, for the filter to offer: alphabetical, as the portal lists them
+  data.categoryOptions = data.groups.map((g) => g.g).sort(alpha);
+  const notes: string[] = [];
+  const keep = pv.categories && pv.categories.length ? new Set(pv.categories) : null;
+  if (keep) {
+    const kept = data.groups.filter((g) => keep.has(g.g));
+    if (!kept.length) notes.push("None of the chosen categories (" + pv.categories!.slice(0, 8).join(", ") + (pv.categories!.length > 8 ? ", …" : "") + ") is in the plot.");
+    else notes.push("Filtered to " + kept.length + " of " + data.groups.length + " categories: " + kept.map((g) => g.g).join(", ") + ".");
+    data.groups = kept;
+    data.n = kept.reduce((a, g) => a + g.n, 0);
+    if (data.points) data.points = data.points.filter((p) => keep.has(p.g));
+    if (data.violin) data.violin = data.violin.filter((v) => keep.has(v.g));
+  }
+  if (pv.sortByMedian && data.groups.length > 1) {
+    // the raw values' median, from the points where they are drawn (a log axis's converted back);
+    // without points, the box's own median, which a log scale orders the same way but for an even count
+    const numSide = data.x.kind === "num" ? data.x : data.y;
+    const rule = numSide.log;
+    const byGroup = new Map<string, number[]>();
+    for (const p of data.points || []) (byGroup.get(p.g) ?? byGroup.set(p.g, []).get(p.g)!).push(rule ? fromLog(rule, p.v) : p.v);
+    const medianOf = (g: PlotGroup) => {
+      const vs = byGroup.get(g.g);
+      return vs && vs.length === g.n ? portalBox(vs)!.median : rule ? fromLog(rule, g.median) : g.median;
+    };
+    const at = new Map(data.groups.map((g, i) => [g.g, i]));
+    data.groups = [...data.groups].sort((a, b) => medianOf(a) - medianOf(b) || at.get(a.g)! - at.get(b.g)!);
+    data.order = { ...(data.order || {}), [data.x.kind === "num" ? "y" : "x"]: data.groups.map((g) => g.g) };
+    notes.push("Boxes are ordered by their median, lowest first.");
+  }
+  if (notes.length) data.categoryNote = notes.join(" ");
 }
 
 /** what is wrong with a view's point settings, before anything is queried; null when nothing is */
@@ -625,7 +687,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   const bins: [number, number] = Array.isArray(pv.bins) && pv.bins.length === 2
     ? [Number(pv.bins[0]), Number(pv.bins[1])] : DEFAULT_BINS;
-  const problem = layersProblem(pv, c, cn);
+  const problem = layersProblem(pv, c, cn) ?? categoriesProblem(pv);
   if (problem) return untimed({ kind: "plot", error: problem });
   try {
     if (sites.length === 1) {
@@ -634,15 +696,16 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       if (!pv.regression) delete data.fit;
       orderLevels(data, spec);
       await basePoints(pv, r0, doc.cohorts[cn], spec, data, sites[0]);
+      applyCategoryChoices(data, pv);
       const ls = await pointLayers(pv, data, c, cn, sites, spec);
-      if (ls.length) data.layers = ls;
+      if (ls.length) data.layers = keptLayers(ls, data, pv);
       if (data.n > POINTS_CAP && ls.some((l) => l.kind === "outliers" && l.shown === "points" && data.shape === "box")) data.overlay = "violin";
       markLogOff(data, logs);
       // what the pair left out leads: cases missing either axis are not on the figure at all
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), data.categoryNote, layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data })
       };
       return pr;
@@ -771,6 +834,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       }
 
       orderLevels(data, spec);
+      applyCategoryChoices(data, pv);
       // each site counts its own cases and their axes; the sums are exact. A failed count fails the
       // view: dropping the coverage note would hide how many cases the figure leaves out
       const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk)));
@@ -778,11 +842,11 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         (a, c) => ({ total: a.total + c.total, nx: a.nx + c.nx, ny: a.ny + c.ny, ...(c.multi != null || a.multi != null ? { multi: (a.multi || 0) + (c.multi || 0) } : {}) }),
         { total: 0, nx: 0, ny: 0 });
       const ls = await pointLayers(pv, data, c, cn, sites, spec);
-      if (ls.length) data.layers = ls;
+      if (ls.length) data.layers = keptLayers(ls, data, pv);
       markLogOff(data, logs);
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, data.categoryNote, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data, moments }) };
       return pr;
     }

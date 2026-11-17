@@ -4,6 +4,8 @@
 // between them, the unit and the point layers below), and beside it a line saying how many cases are shown,
 // a box plot's colour and ring, and the figure. Under a narrow card the sidebar sits above the figure.
 // Every control is an edit to the view, handed to `update`.
+import { ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "../_ui/dropdown-menu";
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp, X } from "lucide-react";
 import { AxisPicker } from "./view-chrome.tsx";
@@ -234,6 +236,40 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
                 <Checkbox checked={!!spec.regression} disabled={busy}
                   onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) n.regression = true; else delete n.regression; return n; })} />
                 Show Regression Line
+              </label>
+            )}
+            {plot?.shape === "box" && (plot.categoryOptions?.length || 0) > 0 && (
+              <div className="axfield flex flex-col gap-1">
+                <span className="axfield-name text-sm font-semibold text-foreground">Filter categories</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="plot-categories justify-between" disabled={busy}
+                      data-tip="draw only the boxes of the categories ticked here; none ticked draws them all">
+                      {spec.categories?.length ? spec.categories.length + " of " + plot.categoryOptions!.length : "all " + plot.categoryOptions!.length}
+                      <ChevronDown className="opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="min-w-52 max-h-80 overflow-y-auto">
+                    {plot.categoryOptions!.map((g) => (
+                      // stays open, so several can be ticked in one go
+                      <DropdownMenuCheckboxItem key={g} checked={!!spec.categories?.includes(g)} onSelect={(e) => e.preventDefault()}
+                        onCheckedChange={() => update((vv) => {
+                          const cur = new Set(vv.categories || []);
+                          if (cur.has(g)) cur.delete(g); else cur.add(g);
+                          const n = { ...vv };
+                          if (cur.size) n.categories = [...cur]; else delete n.categories;
+                          return n;
+                        })}>{g}</DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
+            {plot?.shape === "box" && (plot.groups?.length || 0) > 1 && (
+              <label className="chk plot-sort-median text-md text-foreground" data-tip="order the boxes by their values' median, lowest first, as cBioPortal does">
+                <Checkbox checked={!!spec.sortByMedian} disabled={busy}
+                  onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) n.sortByMedian = true; else delete n.sortByMedian; return n; })} />
+                Sort Categories by Median
               </label>
             )}
             {plot?.shape !== "table" && (

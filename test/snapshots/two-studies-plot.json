@@ -864,6 +864,10 @@
           "rule": "all",
           "drawn": 998
         },
+        "categoryOptions": [
+          "Female",
+          "Male"
+        ],
         "coverage": {
           "total": 1053,
           "nx": 1001,
