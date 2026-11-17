@@ -2,7 +2,7 @@
 import type { ViewResult, ViewResultOf } from "../../types.ts";
 import { type EnrichAlteration, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql,
   enrichEventsAlteredSql, enrichEventsPanelProfiledSql, enrichEventsWesSql } from "../../federation-views.ts";
-import { ALTERATION_EVENTS, type AlterationEvent, normalizeEvents, eventsWord, mutationTypeFilter } from "../../alteration-events.ts";
+import { ALTERATION_EVENTS, type AlterationEvent, normalizeEvents, eventsWord, mutationTypeFilter, mutationUnitsWord } from "../../alteration-events.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, cytobands, answering, refuse, niceCeil, askEachSite } from "../shared.ts";
@@ -140,12 +140,14 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   };
 }
 
-/** what alteration "any" counts, in words */
+/** what alteration "any" counts, in words: only the rules of the types selected */
 function eventsCaveat(events: AlterationEvent[]): string {
-  const mut = mutationTypeFilter(events);
-  return "Every gene's alteration frequency in each cohort, counting " + eventsWord(events) + ": a sample is altered when it has any of these in the gene " +
-    "(uncalled mutations excluded, high-level copy number only, an off-panel call left out), and profiled when any of its panels for these types lists the gene, or it is whole-exome — " +
-    "the portal's union of a sample's panels. " +
+  const mut = mutationTypeFilter(events), units = mutationUnitsWord(events);
+  const rules = [mut && "uncalled mutations excluded", (events.includes("amp") || events.includes("homdel")) && "high-level copy number only (the discrete profile)", "an off-panel call left out"]
+    .filter(Boolean).join(", ");
+  return "Every gene's alteration frequency in each cohort, counting " + eventsWord(events) + (units ? " (" + units + ")" : "") +
+    ": a sample is altered when it has any of these in the gene (" + rules + "), and profiled when any of its panels for these types lists the gene, " +
+    "or one of them is whole-exome — the portal's union of a sample's panels. " +
     (mut?.op === "all" ? "Every mutation type counts, those outside the portal's type list (5'Flank, Intron) too, as the portal's do when every mutation type is ticked. "
-      : mut?.op === "not in" ? "Mutation types outside the portal's type list count, as Other is ticked. " : "");
+      : mut?.op === "not in" ? "Mutation types outside the portal's type list, and blank ones, count, as Other is ticked. " : "");
 }

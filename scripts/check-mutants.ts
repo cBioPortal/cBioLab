@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "enrichment-events";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,8 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
+  "enrichment-events": ["node", "--env-file=.env.local", "scripts/check-enrichment-events.ts"],
 };
 
 interface Mutant {
@@ -393,6 +395,18 @@ const MUTANTS: Mutant[] = [
     effect: "With some mutation types unticked, the Genomic Alterations table counts the unticked types instead of the ticked ones (brca Basal vs LumA, Missense + Inframe + Other: every gene's altered count differs from the portal's).",
     find: "(mut.op === \"in\" ? \"IN\" : \"NOT IN\")",
     replace: "(mut.op === \"in\" ? \"NOT IN\" : \"IN\")" },
+  { id: "enrichment-events-panel-per-panel", layer: "counts", guard: "enrichment-events", file: "lib/federation-views.ts",
+    effect: "A sample whose mutation and copy-number panels both list a gene is counted twice among the profiled, so every such gene's frequency in the Genomic Alterations table reads too low.",
+    find: "  SELECT DISTINCT sets.panels AS panels, sets.n AS n, gptg.gene AS gene\\n",
+    replace: "  SELECT sets.panels AS panels, sets.n AS n, gptg.gene AS gene\\n" },
+  { id: "enrichment-events-log2-copy-number", layer: "counts", guard: "enrichment-events", file: "lib/federation-views.ts",
+    effect: "The Genomic Alterations table counts a sample as profiled for copy number through a log2 copy-number profile's panels, which the portal's tab does not ask, so denominators are too large.",
+    find: "\"    AND (sp.alteration_type != 'COPY_NUMBER_ALTERATION' OR sp.genetic_profile_id IN",
+    replace: "\"    AND (1 OR sp.genetic_profile_id IN" },
+  { id: "enrichment-events-blank-type-dropped", layer: "counts", guard: "enrichment-events", file: "lib/federation-views.ts",
+    effect: "With Other ticked, a mutation with a blank type is left out of the Genomic Alterations table, where the portal counts every type it has no name for.",
+    find: "\" AND lower(g.mutation_type) \" + (mut.op",
+    replace: "\" AND lower(nullIf(g.mutation_type, '')) \" + (mut.op" },
   { id: "clinical-constant-tested", layer: "statistics", guard: "unit", file: "lib/views/clinical/run.ts",
     effect: "The Comparison page's Clinical tab tests attributes with one value in every group (Sample Type: Primary), each a p of 1 that inflates every other attribute's q-value.",
     find: "const untestable = vocab.length < 2 ?",

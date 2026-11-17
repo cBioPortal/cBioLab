@@ -69,6 +69,10 @@ function EventTree({ c }: { c: KindCardCtx }) {
   const roots = treeRoots(c.catalog);
   const offered = new Set(roots.flatMap((r) => r.units));
   const [staged, setStaged] = useState<AlterationEvent[] | null>(null);
+  // a change made elsewhere (undo, a link, an agent) replaces what was staged against the old selection
+  const appliedKey = applied.join(",");
+  const [stagedFor, setStagedFor] = useState(appliedKey);
+  if (stagedFor !== appliedKey) { setStagedFor(appliedKey); setStaged(null); }
   const cur = staged ?? applied;
   const on = (n: EventNode) => n.units.some((u) => cur.includes(u));
   const toggle = (n: EventNode) => {
@@ -81,7 +85,8 @@ function EventTree({ c }: { c: KindCardCtx }) {
   const row = (n: EventNode, depth: number): React.ReactNode => (
     <li key={n.label} className="mt-1">
       <label className="flex items-center gap-1.5 cursor-pointer" style={{ paddingLeft: depth * 14 }}>
-        <Checkbox checked={on(n)} disabled={c.busy} onCheckedChange={() => toggle(n)} aria-label={n.label} />
+        <Checkbox checked={on(n)} disabled={c.busy} onCheckedChange={() => toggle(n)} aria-label={n.label}
+          data-tip={c.busy ? "waiting for the table to update" : undefined} />
         <span className={depth ? "" : "font-semibold"}>{n.label}</span>
       </label>
       {n.children && <ul className="list-none m-0 p-0">{n.children.map((k) => row(k, depth + 1))}</ul>}
@@ -96,7 +101,7 @@ function EventTree({ c }: { c: KindCardCtx }) {
     <div className="enrich-types text-sm" style={{ minWidth: 190 }}>
       <div className="font-semibold mb-1">Alteration Types</div>
       <ul className="list-none m-0 p-0 flex flex-col gap-1">{roots.map((r) => row(r, 0))}</ul>
-      <span data-tip={none ? "select at least one alteration type" : !changed ? "the table shows this selection" : "apply the selection"}>
+      <span data-tip={c.busy ? "waiting for the table to update" : none ? "select at least one alteration type" : !changed ? "the table shows this selection" : "apply the selection"}>
         <Button size="sm" className="mt-2" disabled={c.busy || !changed || none} onClick={apply}>Select</Button>
       </span>
     </div>

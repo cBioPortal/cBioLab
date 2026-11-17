@@ -269,13 +269,16 @@ export type EnrichAlteration = "mutation" | "cna" | "amp" | "homdel" | "sv";
 export const ENRICH_PANEL_TYPE: Record<EnrichAlteration, string> = {
   mutation: "MUTATION_EXTENDED", cna: "COPY_NUMBER_ALTERATION", amp: "COPY_NUMBER_ALTERATION", homdel: "COPY_NUMBER_ALTERATION", sv: "STRUCTURAL_VARIANT"
 };
+/** each alteration type's calls (uncalled mutations excluded; high-level copy number only) */
+const EVENT_TYPE_COND: Record<EnrichAlteration, string> = {
+  mutation: "g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'",
+  sv: "g.variant_type = 'structural_variant'",
+  amp: "g.variant_type = 'cna' AND g.cna_alteration >= 2",
+  homdel: "g.variant_type = 'cna' AND g.cna_alteration <= -2",
+  cna: "g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2",
+};
 /** one alteration type's calls, made on a panel covering the gene (an off-panel call is in neither side) */
-export const enrichEventCond = (a: EnrichAlteration): string => "NOT g.off_panel AND " + (
-  a === "mutation" ? "g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'"
-  : a === "sv" ? "g.variant_type = 'structural_variant'"
-  : a === "amp" ? "g.variant_type = 'cna' AND g.cna_alteration >= 2"
-  : a === "homdel" ? "g.variant_type = 'cna' AND g.cna_alteration <= -2"
-  : "g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2");
+export const enrichEventCond = (a: EnrichAlteration): string => "NOT g.off_panel AND " + EVENT_TYPE_COND[a];
 
 /** Per gene: the cohort's samples with that alteration type in it (uncalled mutations excluded, as the
  *  portal's gene tables exclude them; high-level copy number only). Counts only. */
@@ -330,11 +333,12 @@ export function enrichWesSql(cohortSql: string, study: string, db: string, alter
 export function enrichEventsCond(events: readonly AlterationEvent[]): string {
   const mut = mutationTypeFilter(events);
   const or: string[] = [];
-  if (mut) or.push("(g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'" +
+  // a blank mutation_type is stored '' (the column is not nullable): an unknown type, kept by NOT IN as the portal keeps it
+  if (mut) or.push("(" + EVENT_TYPE_COND.mutation +
     (mut.op === "all" ? "" : " AND lower(g.mutation_type) " + (mut.op === "in" ? "IN" : "NOT IN") + " (" + mut.types.map(sq).join(", ") + ")") + ")");
   const amp = events.includes("amp"), del = events.includes("homdel");
-  if (amp || del) or.push("(g.variant_type = 'cna' AND " + (amp && del ? "abs(g.cna_alteration) >= 2" : amp ? "g.cna_alteration >= 2" : "g.cna_alteration <= -2") + ")");
-  if (events.includes("sv")) or.push("g.variant_type = 'structural_variant'");
+  if (amp || del) or.push("(" + EVENT_TYPE_COND[amp && del ? "cna" : amp ? "amp" : "homdel"] + ")");
+  if (events.includes("sv")) or.push("(" + EVENT_TYPE_COND.sv + ")");
   return "NOT g.off_panel AND (" + (or.join(" OR ") || "0") + ")";
 }
 
@@ -361,6 +365,9 @@ function enrichEventsPanelsCte(cohortSql: string, study: string, db: string, eve
     "  SELECT sp.sample_unique_id AS s, groupUniqArray(sp.gene_panel_id) AS panels\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN (" + (types.map(sq).join(", ") || "''") + ")\n" +
+    // copy number from the discrete profile only, the one the portal's tab asks (a log2 profile's panels are not its)
+    "    AND (sp.alteration_type != 'COPY_NUMBER_ALTERATION' OR sp.genetic_profile_id IN (SELECT stable_id FROM " + db + ".genetic_profile\n" +
+    "      WHERE genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND datatype = 'DISCRETE'))\n" +
     "    AND " + inCohortSamples(covSid) + "\n" +
     "  GROUP BY s\n" +
     ")\n";

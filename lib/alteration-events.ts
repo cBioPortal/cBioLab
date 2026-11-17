@@ -79,16 +79,22 @@ export function eventProfileTypes(events: readonly AlterationEvent[]): string[] 
   ];
 }
 
-/** the selection in words, for a title and the caption */
+/** the selection in words, short enough for a title: "mutations, copy-number alterations or structural
+ *  variants"; a partial mutation selection says how many of the tree's types it holds */
 export function eventsWord(events: readonly AlterationEvent[]): string {
   const mut = mutationTypeFilter(events);
   const parts: string[] = [];
-  if (mut) parts.push(mut.op === "all" ? "mutation" : "mutation (" + MUTATION_UNIT_LIST.filter((u) => events.includes(u)).map(unitLabel).join(", ") + ")");
-  if (events.includes("amp") && events.includes("homdel")) parts.push("amplification or deep deletion");
-  else if (events.includes("amp")) parts.push("amplification");
-  else if (events.includes("homdel")) parts.push("deep deletion");
-  if (events.includes("sv")) parts.push("structural variant");
+  if (mut) parts.push(mut.op === "all" ? "mutations" : "mutations (" + MUTATION_UNIT_LIST.filter((u) => events.includes(u)).length + " of " + MUTATION_UNIT_LIST.length + " types)");
+  const amp = events.includes("amp"), del = events.includes("homdel");
+  if (amp || del) parts.push(amp && del ? "copy-number alterations" : amp ? "amplifications" : "deep deletions");
+  if (events.includes("sv")) parts.push("structural variants");
   return parts.length > 1 ? parts.slice(0, -1).join(", ") + " or " + parts[parts.length - 1] : parts[0] || "nothing";
+}
+
+/** the mutation types selected, in words, when not all of them are */
+export function mutationUnitsWord(events: readonly AlterationEvent[]): string | null {
+  const on = MUTATION_UNIT_LIST.filter((u) => events.includes(u));
+  return on.length && on.length < MUTATION_UNIT_LIST.length ? on.map((u) => UNIT_LABEL[u]).join(", ") : null;
 }
 
 const UNIT_LABEL: Record<MutationUnit, string> = {
@@ -96,4 +102,3 @@ const UNIT_LABEL: Record<MutationUnit, string> = {
   truncating: "other truncating", nonsense: "nonsense", frameshift: "other frameshift", frameshift_del: "frameshift deletion",
   frameshift_ins: "frameshift insertion", nonstart: "nonstart", nonstop: "nonstop", splice: "splice", other: "other",
 };
-const unitLabel = (u: MutationUnit) => UNIT_LABEL[u];

@@ -128,6 +128,7 @@ warehouse_checks() (
   phase "study view density"         && npm run check:density 2>&1 | summary grep -E "^FAIL|all passed|failure"
   phase "study view case lists"      && npm run check:case-lists 2>&1 | summary grep -E "^FAIL|all passed|failure"
   phase "study view gene panels"     && npm run check:gene-panels 2>&1 | summary grep -E "^FAIL|all .*passed|failure"
+  phase "comparison alteration types" && npm run check:enrichment-events 2>&1 | summary grep -E "^FAIL|enrichment event checks"
   phase "plot statistics"           && npm run check:plot-stats 2>&1 | summary grep -E "^FAIL|plot statistics checks passed|FAILED"
   phase "warehouse checks done ($(ls "$CH_RUN_CACHE" | wc -l) distinct statements asked)"
 )
