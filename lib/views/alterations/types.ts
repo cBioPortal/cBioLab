@@ -1,5 +1,6 @@
 // The alterations view's spec and result, added to lib/types.ts's maps by the declaration at the end.
-import type { TableRows, PatientSample, TimelineResult } from "../../types.ts";
+import type { TableRows, TimelineResult } from "../../types.ts";
+import type { SampleMark } from "../../timeline-tracks.ts";
 import type { TableQuery } from "../../table-query.ts";
 
 /** One of the alterations view's tables as the spec holds it: its query, and its page size. */
@@ -34,8 +35,8 @@ export interface AlterationsView extends TableQuery {
 export interface AlterationsResult extends TableRows<string | number | null> {
   /** the patient listed, with their samples (none on a page request), or null when the list is empty */
   patient: { study: string; id: string;
-    /** every sample of the patient, with the day it was collected (from the timeline), which numbers them */
-    samples: (PatientSample & { day?: number | null })[];
+    /** every sample of the patient, numbered as the header numbers them (collection day, sample type, id), in that order */
+    samples: SampleMark[];
     /** with samples: "cohort", the samples the tables read (the cohort's); `samples` is every sample of the patient, which numbers them */
     shown?: string[];
     source?: { label: string; remote: boolean } } | null;

@@ -425,11 +425,21 @@ describe("the portal's spectrum chart: colours, labels, axes and the COSMIC refe
 });
 
 describe("signatures: PAT-STM-12 sample order", () => {
-  test("G1 PAT-STM-12: the patient's samples are ordered by their days: T02 is 1, T01 is 2", async () => {
-    const samples = [{ sid: "T01", type: "Primary" }, { sid: "T02", type: "Primary" }];
+  const samples = [{ sid: "T01", type: "Primary" }, { sid: "T02", type: "Primary" }];
+  const build = (patientTimeline: () => Promise<unknown>) => {
     const t = (table: string, src: RowSource): Row[] => table === "signatures:samples" ? samples.map((x) => ({ cohort: "A", study: "s1", patient: "P1", ...x })) : tables()(table, src);
-    const resolver = { ...local(t), patientTimeline: async () => ({ events: [{ type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }) };
+    return { ...local(t), patientTimeline };
+  };
+  test("G1 PAT-STM-12: the patient's samples are numbered by their events: T02 is 1, T01 is 2", async () => {
+    const resolver = build(async () => ({ events: [{ type: "Sample acquisition", start: -40, end: null, attrs: [["SAMPLE_ID", "T01"]] }, { type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }));
     const s = sig(await run({ patient: { study: "s1", id: "P1" } }, ctx({ resolver })));
     assert.deepEqual(s.patient!.samples.map((x) => x.id), ["T02", "T01"]);
+    assert.deepEqual(s.patient!.samples.map((x) => x.label), ["1", "2"]);
+  });
+  test("G2 PAT-STM-12: a refused timeline does not refuse the view", async () => {
+    const resolver = build(async () => { throw new Error("timeline refused"); });
+    const v = await run({ patient: { study: "s1", id: "P1" } }, ctx({ resolver }));
+    assert.equal(err(v), undefined, String(err(v)));
+    assert.ok(sig(v).patient);
   });
 });

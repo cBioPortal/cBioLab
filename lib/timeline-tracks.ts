@@ -188,14 +188,12 @@ export function sampleDays(events: PatientEvent[]): Map<string, number> {
 }
 
 /**
- * The patient's samples numbered in collection order (the day a sample event names it, or the
- * sample's own `day`, then primary before metastasis before cfDNA, then by id — the portal's
- * sortSamples), coloured by sample type.
+ * The patient's samples numbered in collection order (the day a sample event names it, then
+ * primary before metastasis before cfDNA, then by id — the portal's sortSamples), coloured by
+ * sample type.
  */
-export function sampleMarks(samples: (PatientSample & { day?: number | null })[], events: PatientEvent[]): Map<string, SampleMark> {
+export function sampleMarks(samples: PatientSample[], events: PatientEvent[]): Map<string, SampleMark> {
   const day = sampleDays(events);
-  // a sample's day read beforehand (a view that carries its samples without their events)
-  for (const x of samples) if (x.day != null && !day.has(x.id)) day.set(x.id, x.day);
   const typeRank = (t: string) => { const i = ["primary", "metastasis", "cfdna"].indexOf(normalizeSampleType(t).toLowerCase()); return i < 0 ? 3 : i; };
   const ids = [...new Set([...samples.map((s) => s.id), ...day.keys()])];
   const typeOf = new Map(samples.map((s) => [s.id, s.type]));

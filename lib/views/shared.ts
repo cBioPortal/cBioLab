@@ -1,9 +1,9 @@
 // Helpers several view runners share: limits, which participants can answer a view aggregate,
 // refusals, and lookups more than one view makes.
-import { plainResult, type ViewResult, type ViewKind } from "../types.ts";
+import { plainResult, type PatientEvent, type ViewResult, type ViewKind } from "../types.ts";
 import { survivalLeftOutSql } from "../survival-queries.ts";
 import { hasPatientTimeline, hasViewAggregates, type Resolver, type ViewAggregateCapable } from "../federation.ts";
-import { sampleDays } from "../timeline-tracks.ts";
+import { isAbortError } from "../ch.ts";
 import { geneCytobandsSql } from "../federation-views.ts";
 import type { ViewRun } from "./run.ts";
 import type { StudyCatalog } from "../plot-profile.ts";
@@ -19,14 +19,22 @@ import type { LollipopOql } from "../federation.ts";
 export const COOCCUR_GENE_LIMIT = 12;
 
 /**
- * The patient's samples with the day each was collected, from the patient's timeline (its sample
- * events), so a view numbers them as the header and the timeline do (the portal's SampleManager
- * sortSamples, PAT-STM-12). A study whose participant cannot give a timeline numbers them without days.
+ * The patient's sample events (its timeline's specimen / sample-acquisition events), which number
+ * the patient's samples by collection day as the header and the timeline do (sampleMarks, the
+ * portal's SampleManager sortSamples, PAT-STM-12). The days are only a sort key: a participant that
+ * cannot give a timeline, or one that refuses or fails to, leaves the samples numbered by type and
+ * id, and `note` says so for the view's caveat. An abandoned request still throws.
  */
-export async function withSampleDays<S extends { id: string }>(ctx: ViewRun, study: string, patient: string, samples: S[]): Promise<(S & { day: number | null })[]> {
+export async function patientSampleEvents(ctx: ViewRun, study: string, patient: string): Promise<{ events: PatientEvent[]; note: string | null }> {
   const res = ctx.resolvers[study];
-  const days = res && hasPatientTimeline(res) ? sampleDays((await res.patientTimeline(patient)).events) : new Map<string, number>();
-  return samples.map((s) => ({ ...s, day: days.get(s.id) ?? null }));
+  const without = (why: string) => ({ events: [], note: patient + "'s samples are numbered by sample type and id, not collection day: " + why + "." });
+  if (!res || !hasPatientTimeline(res)) return without(study + "'s participant gives no timeline");
+  try {
+    return { events: (await res.patientTimeline(patient)).events, note: null };
+  } catch (e) {
+    if (isAbortError(e)) throw e;
+    return without("the timeline could not be read (" + String((e as Error)?.message || e).slice(0, 200) + ")");
+  }
 }
 /**
  * A request past a view's limit is refused, naming the limit, rather than cut to its first N:

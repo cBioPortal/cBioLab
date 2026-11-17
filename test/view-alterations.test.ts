@@ -164,7 +164,7 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.deepEqual(a.rows.map((r) => r.patient), ["P1", "P2"]);
     assert.equal(a.total, 2);
     assert.deepEqual(a.patient && { study: a.patient.study, id: a.patient.id, samples: a.patient.samples.map((s) => s.id) },
-      { study: "s1", id: "P1", samples: ["S1a", "S1b"] });
+      { study: "s1", id: "P1", samples: ["S1b", "S1a"] });
     assert.equal(a.patient!.shown, undefined, "samples: patient reads every sample, so no subset is named");
     assert.deepEqual(a.position, { index: 0, prev: null, next: { study: "s1", id: "P2" } });
     assert.deepEqual(Object.keys(a.tables), ["mutations", "cna", "sv"]);
@@ -237,7 +237,7 @@ describe("alterations: a named patient", () => {
   test("samples: cohort reads only the cohort's samples, each keeping its number among all the patient's", async () => {
     const v = await run({ samples: "cohort" }, one());
     const a = alt(v);
-    assert.deepEqual(a.patient!.samples.map((s) => s.id), ["S1a", "S1b"]);
+    assert.deepEqual(a.patient!.samples.map((s) => s.id), ["S1b", "S1a"]);
     assert.deepEqual(a.patient!.shown, ["S1a"]);
     assert.match(v.caveat!, /Only 1 sample of P1's 2 is in the cohort, and the tables read only it \(samples: "cohort"\)/);
     assert.match(v.caveat!, /Copy # on a mutation is the gene's deep calls anywhere in the cohort's samples of the patient\./);
@@ -334,17 +334,28 @@ describe("alterations: a federation peer that serves patient alterations", () =>
 });
 
 describe("alterations: PAT-STM-12 sample order", () => {
-  test("A1 PAT-STM-12: the patient's samples carry their days, and the sources get the sample order [T02, T01]", async () => {
-    const T = [{ cohort: "A", study: "s1", patient: "P1", sid: "T01", type: "Primary" }, { cohort: "A", study: "s1", patient: "P1", sid: "T02", type: "Primary" }];
-    const withs: string[] = [];
+  const T = [{ cohort: "A", study: "s1", patient: "P1", sid: "T01", type: "Primary" }, { cohort: "A", study: "s1", patient: "P1", sid: "T02", type: "Primary" }];
+  const build = (patientTimeline: () => Promise<unknown>, withs: string[] = []) => {
     const t: Tables = (table, src) => { withs.push(src.with); return table === "alterations:samples" ? T : study()(table, src); };
-    const resolver = { ...local("db1", t), patientTimeline: async () => ({ events: [{ type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }) };
-    const v = await run({ patient: { study: "s1", id: "P1" } } as never, ctx({ A: cohort({ s1: 2 }) }, { s1: resolver }));
-    const ps = alt(v).patient!.samples as unknown as { id?: string; sid?: string; day: number | null }[];
-    // the fake returns rows in its own order (the real source orders them), so the days are compared by sample
-    assert.deepEqual(Object.fromEntries(ps.map((s) => [s.id ?? s.sid, s.day])), { T02: -56, T01: null });
+    return { ...local("db1", t), patientTimeline };
+  };
+  const mine = { patient: { study: "s1", id: "P1" } } as never;
+  test("A1 PAT-STM-12: the patient's samples are numbered by their events, and the sources get the order [T02, T01]", async () => {
+    const withs: string[] = [];
+    const resolver = build(async () => ({ events: [{ type: "Sample acquisition", start: -40, end: null, attrs: [["SAMPLE_ID", "T01"]] }, { type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }), withs);
+    const v = await run(mine, ctx({ A: cohort({ s1: 2 }) }, { s1: resolver }));
+    const ps = alt(v).patient!.samples;
+    assert.deepEqual(ps.map((s) => s.id), ["T02", "T01"]);
+    assert.deepEqual(ps.map((s) => s.label), ["1", "2"]);
     const ordered = withs.filter((w) => w.includes("T01") && w.includes("T02"));
     assert.ok(ordered.length > 0, "a source names both samples");
     assert.ok(ordered.every((w) => w.indexOf("T02") < w.indexOf("T01")), "T02 precedes T01 in the source");
+  });
+  test("A2 PAT-STM-12: a refused timeline does not refuse the view; the caveat says why", async () => {
+    const resolver = build(async () => { throw new Error("timeline refused"); });
+    const v = await run(mine, ctx({ A: cohort({ s1: 2 }) }, { s1: resolver }));
+    assert.equal(v.error, undefined, String(v.error));
+    assert.ok(alt(v).patient, "tables present");
+    assert.match(String(v.caveat), /timeline refused/);
   });
 });
