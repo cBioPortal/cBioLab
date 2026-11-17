@@ -9,7 +9,7 @@ import type { TablePart } from "./mutation-table.ts";
 import { patientSamplesSql } from "./patient-timeline.ts";
 import { inCohortPatients, inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
-import { mutationTypeLabelSql } from "./mutation-type.ts";
+import { mutationTypeColumn } from "./mutation-type.ts";
 
 /** The view's three tables, in the portal's order. */
 export const ALTERATION_TABLES = ["mutations", "cna", "sv"] as const;
@@ -30,7 +30,7 @@ const freq = number("freq", "Cohort %", "round(freq, 1)");
 export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   mutations: [
     samples, text("gene", "Gene"), { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, annotation,
-    { ...text("mutationType", "Mutation Type", mutationTypeLabelSql("mutationType")), order: "nullIf(" + mutationTypeLabelSql("mutationType") + ", '')" },
+    { id: "mutationType", name: "Mutation Type", numeric: false, ...mutationTypeColumn("mutationType") },
     number("vaf", "Allele Freq", "round(vaf, 2)"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"), text("copy", "Copy #"), freq,
     text("variantType", "Variant Type"), text("chr", "Chromosome"), number("start", "Start Pos"), number("end", "End Pos"),
     text("ref", "Ref"), text("var", "Var"), text("status", "MS"),

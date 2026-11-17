@@ -82,7 +82,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
               <span className="mono">{m.id}</span>
             </span>))}
-          <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not. A gene's rows sit together, shaded alike, in sample order.</span>
+          {marks.size > 1 && <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not. A gene's rows sit together, shaded alike, in sample order.</span>}
         </div>
       ) : <p className="meta">No patient to list: the cohort's patient list is empty.</p>}
       {p && TABLES.map(({ key, name }) => {
@@ -101,9 +101,9 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
               })}
               num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
-              cell={(id, x) => id === "samples" ? sampleCell(x)
+              cell={(id, x, row) => id === "samples" ? sampleCell(x)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
-                : id === "mutationType" ? <MutationTypeCell raw={x == null ? "" : String(x)} />
+                : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>
                 : undefined} />

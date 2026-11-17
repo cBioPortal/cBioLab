@@ -520,7 +520,7 @@
                   "KRAS",
                   "G12V",
                   "Oncogenic · Level 1",
-                  "Missense_Mutation",
+                  "Missense",
                   0.08,
                   42,
                   512,
@@ -533,7 +533,10 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Prostate",
@@ -545,7 +548,7 @@
                   "PTEN",
                   "G127V",
                   "Likely Oncogenic · Level 1",
-                  "Missense_Mutation",
+                  "Missense",
                   0.62,
                   262,
                   161,
@@ -558,7 +561,10 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Prostate",
@@ -570,7 +576,7 @@
                   "TP53",
                   "P151R",
                   "Likely Oncogenic",
-                  "Missense_Mutation",
+                  "Missense",
                   0.76,
                   761,
                   239,
@@ -583,7 +589,10 @@
                   "G",
                   "C",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               }
             ],
             "offset": 0,
@@ -942,7 +951,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {

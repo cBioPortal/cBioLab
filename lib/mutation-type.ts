@@ -41,6 +41,12 @@ export function mutationTypeLabelSql(col: string): string {
     keys.map((k) => quote(LABEL[CANONICAL[k]])).join(", ") + "], ifNull(" + col + ", ''))";
 }
 
+/** A table column of stored types, shown, searched, filtered and sorted by the portal's label (blanks last). */
+export function mutationTypeColumn(col: string): { text: string; order: string } {
+  const label = mutationTypeLabelSql(col);
+  return { text: label, order: "nullIf(" + label + ", '')" };
+}
+
 const VARIANT_TIP: Record<string, string> = {
   SNP: "Single Nucleotide Polymorphism", DNP: "Di-Nucleotide Polymorphism", TNP: "Tri-Nucleotide Polymorphism",
   ONP: "Oligo-Nucleotide Polymorphism", INS: "Insertion", DEL: "Deletion",

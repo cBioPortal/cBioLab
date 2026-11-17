@@ -173,7 +173,7 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.ok(v.method);
     assert.match(v.caveat!, /^P1 — Mutations: 1 row; Copy Number Alterations: 1 row; Structural Variants: 0 rows\. /);
     assert.match(v.caveat!, /No OncoKB version is pinned here, so the annotation columns are empty\./);
-    assert.match(v.caveat!, /Copy # on a mutation is the gene's deep calls anywhere in the patient\./);
+    assert.doesNotMatch(v.caveat!, /Copy # on a mutation/, "P1 has two samples, so Copy # is not shown and the caveat does not explain it");
     assert.match(v.caveat!, /The patient list: 2 patients\. Sorted with patients who have any alteration first, then by patient id across the cohort;/);
   });
 
@@ -188,7 +188,8 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.equal(row.refCount, null);
     assert.equal(row.copy, "", "missing text is blank");
     assert.equal(row.start, 25398284);
-    assert.equal(row.mutationType, "Missense_Mutation");
+    assert.equal(row.mutationType, "Missense", "the portal's label, which the column filters and searches");
+    assert.equal(t.mutations!.rows[0].detail?.mutationType, "Missense_Mutation", "the stored type rides in the detail");
     assert.equal(t.mutations!.rows[0].sample, "S1a");
     assert.deepEqual(t.mutations!.shown, ["gene", "annotation", "vaf", "freq", "altCount", "refCount", "copy", "start"]);
     const cna = Object.fromEntries(t.cna!.columns.map((c, i) => [c.id, t.cna!.rows[0].values[i]]));

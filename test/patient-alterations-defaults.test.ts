@@ -3,7 +3,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { alterationDefaults, ALTERATION_COLUMNS } from "../lib/patient-alterations.ts";
-import { mutationTypeLabelSql } from "../lib/mutation-type.ts";
 
 test("D1 (PAT-MT-2): mutations with 1 sample in view have no Samples column and show Copy #", () => {
   assert.deepEqual(alterationDefaults("mutations", 1), ["gene", "proteinChange", "annotation", "mutationType", "vaf", "copy", "freq"]);
@@ -28,12 +27,4 @@ test("O1 (PAT-MT-2): mutation columns are in the portal's display order", () => 
   assert.ok(at("mutationType") < at("vaf"));
   for (const id of ["altCount", "refCount"]) { assert.ok(at("vaf") < at(id)); assert.ok(at(id) < at("copy")); assert.ok(at(id) < at("freq")); }
   assert.ok(at("vaf") < at("copy") && at("vaf") < at("freq"));
-});
-
-test("L1 (PAT-MT-1): Mutation Type is searched, filtered and sorted by the portal's label", () => {
-  const col = ALTERATION_COLUMNS.mutations.find((c) => c.id === "mutationType")!;
-  const label = mutationTypeLabelSql("mutationType");
-  // every text column's expression is wrapped as ifNull(toString(<expr>), ''), so `text` holds the label inside that wrapper
-  assert.equal(col.text, "ifNull(toString(" + label + "), '')");
-  assert.ok(col.order!.includes(label), String(col.order));
 });

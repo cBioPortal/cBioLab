@@ -1416,7 +1416,7 @@
                   "ATRX",
                   "K983*",
                   "Likely Oncogenic",
-                  "Nonsense_Mutation",
+                  "Nonsense",
                   0.2,
                   110,
                   446,
@@ -1429,7 +1429,10 @@
                   "T",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Nonsense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1441,7 +1444,7 @@
                   "BLM",
                   "A363fs",
                   "Likely Oncogenic",
-                  "Frame_Shift_Del",
+                  "FS del",
                   0.13,
                   43,
                   294,
@@ -1454,7 +1457,10 @@
                   "G",
                   "-",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Frame_Shift_Del"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1466,7 +1472,7 @@
                   "FBXW7",
                   "G61*",
                   "Likely Oncogenic · Level 3A",
-                  "Nonsense_Mutation",
+                  "Nonsense",
                   0.23,
                   130,
                   440,
@@ -1479,7 +1485,10 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Nonsense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1491,7 +1500,7 @@
                   "FBXW7",
                   "X413_splice",
                   "Likely Oncogenic · Level 3A",
-                  "Splice_Site",
+                  "Splice",
                   0.26,
                   85,
                   248,
@@ -1504,7 +1513,10 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Splice_Site"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1516,7 +1528,7 @@
                   "MAP3K1",
                   "E302*",
                   "Likely Oncogenic",
-                  "Nonsense_Mutation",
+                  "Nonsense",
                   0.17,
                   72,
                   341,
@@ -1529,7 +1541,10 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Nonsense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1541,7 +1556,7 @@
                   "MAP3K1",
                   "X696_splice",
                   "Likely Oncogenic",
-                  "Splice_Site",
+                  "Splice",
                   0.2,
                   57,
                   227,
@@ -1554,7 +1569,10 @@
                   "T",
                   "G",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Splice_Site"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1566,7 +1584,7 @@
                   "PTPRD",
                   "E915*",
                   "Likely Oncogenic",
-                  "Nonsense_Mutation",
+                  "Nonsense",
                   0.18,
                   94,
                   439,
@@ -1579,7 +1597,10 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Nonsense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1591,7 +1612,7 @@
                   "PTPRD",
                   "P1338T",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.3,
                   135,
                   318,
@@ -1604,7 +1625,10 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1616,7 +1640,7 @@
                   "PTPRT",
                   "G969V",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.14,
                   63,
                   380,
@@ -1629,7 +1653,10 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1641,7 +1668,7 @@
                   "PTPRT",
                   "X1053_splice",
                   "Likely Oncogenic",
-                  "Splice_Site",
+                  "Splice",
                   0.05,
                   13,
                   243,
@@ -1654,7 +1681,10 @@
                   "C",
                   "G",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Splice_Site"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1666,7 +1696,7 @@
                   "SMARCA4",
                   "E1211*",
                   "Likely Oncogenic · Level 3A",
-                  "Nonsense_Mutation",
+                  "Nonsense",
                   0.21,
                   82,
                   313,
@@ -1679,7 +1709,10 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Nonsense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1691,7 +1724,7 @@
                   "TP53",
                   "T256P",
                   "Likely Oncogenic",
-                  "Missense_Mutation",
+                  "Missense",
                   0.5,
                   114,
                   113,
@@ -1704,7 +1737,10 @@
                   "T",
                   "G",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1716,7 +1752,7 @@
                   "TP53",
                   "P67Qfs*56",
                   "Likely Oncogenic",
-                  "Frame_Shift_Del",
+                  "FS del",
                   0.4,
                   88,
                   131,
@@ -1729,7 +1765,10 @@
                   "G",
                   "-",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Frame_Shift_Del"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1741,7 +1780,7 @@
                   "ATR",
                   "R2431M",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.17,
                   84,
                   398,
@@ -1754,7 +1793,10 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1766,7 +1808,7 @@
                   "AXIN2",
                   "I375M",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.14,
                   89,
                   561,
@@ -1779,7 +1821,10 @@
                   "G",
                   "C",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1791,7 +1836,7 @@
                   "BRIP1",
                   "D393V",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.15,
                   92,
                   538,
@@ -1804,7 +1849,10 @@
                   "T",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1816,7 +1864,7 @@
                   "CCNE1",
                   "A47V",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.15,
                   39,
                   222,
@@ -1829,7 +1877,10 @@
                   "C",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1841,7 +1892,7 @@
                   "CREBBP",
                   "M2161I",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.25,
                   67,
                   203,
@@ -1854,7 +1905,10 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1866,7 +1920,7 @@
                   "DOT1L",
                   "W305C",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.16,
                   61,
                   324,
@@ -1879,7 +1933,10 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "cohort": "Breast",
@@ -1891,7 +1948,7 @@
                   "FLT4",
                   "S293R",
                   "Unknown",
-                  "Missense_Mutation",
+                  "Missense",
                   0.18,
                   42,
                   193,
@@ -1904,11 +1961,14 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "mutationType": "Missense_Mutation"
+                }
               },
               {
                 "…": "5 more",
-                "sha256": "f995d565a81c5dc0"
+                "sha256": "90ba8de4cfc0a1b9"
               }
             ],
             "offset": 0,
@@ -2182,7 +2242,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {

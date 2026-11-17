@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-tables";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "patient-tables": ["node", "--env-file=.env.local", "scripts/check-patient-tables.ts"],
 };
 
 interface Mutant {
@@ -710,6 +711,14 @@ const MUTANTS: Mutant[] = [
     effect: "The Patient mutation table shows Copy # with several samples in view, where the portal shows it only for one sample.",
     find: "!(t === \"mutations\" && c === \"copy\" && inView > 1)",
     replace: "true" },
+  { id: "patient-mutation-type-stored", layer: "counts", guard: "patient-tables", file: "lib/views/alterations/run.ts",
+    effect: "The Patient mutation table's Mutation Type shows the stored type (Missense_Mutation) while its filter and search read the portal's label, so a filter on what is shown matches nothing.",
+    find: "if (c.id === \"mutationType\") return mutationTypeLabel(x == null ? \"\" : String(x));",
+    replace: "" },
+  { id: "patient-mutation-type-filtered-raw", layer: "counts", guard: "patient-tables", file: "lib/patient-alterations.ts",
+    effect: "The Patient mutation table filters, searches and sorts Mutation Type by the stored type, so \"Nonsense\" as shown finds nothing.",
+    find: "{ id: \"mutationType\", name: \"Mutation Type\", numeric: false, ...mutationTypeColumn(\"mutationType\") }",
+    replace: "{ id: \"mutationType\", name: \"Mutation Type\", numeric: false, text: \"mutationType\" }" },
   { id: "tracks-select-all-counts-with-data", layer: "counts", guard: "unit", file: "app/_oncoprint/track-edits.ts",
     effect: "\"Select all (N)\" leaves out the listed rows at 0%, so its N is smaller than the portal's for the same list.",
     find: "return { n: listed.length,",
