@@ -223,8 +223,8 @@ test("A15 a set maximum of 200 above every stem: y labels 0 and 200, no >=", () 
 });
 
 // ---- review follow-up: the ends always labelled, tick marks not grid lines, no separator ----
-test("A16 at width 400 the x labels keep 0 first and <len>aa last, in order, none overlapping (1499, 740, 393)", () => {
-  for (const len of [1499, 740, 393]) {
+test("A16 at width 400 the x labels keep 0 first and <len>aa last, in order, none overlapping (1499, 740, 393, 434, 634)", () => {
+  for (const len of [1499, 740, 393, 434, 634]) {
     const placed = xLabelsPlaced(panelsAt(400, [gene(A13_STEMS, "G", len)]));
     const labels = placed.map((t) => t.label);
     assert.equal(labels[0], "0", len + ": 0 drawn first (" + labels.join(", ") + ")");

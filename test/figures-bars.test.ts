@@ -77,7 +77,7 @@ describe("lollipop at the width it is given", () => {
     assert.equal(vb(svg), 1300);
     assert.ok(svg.includes(">1068aa<"));
     assert.deepEqual([...svg.matchAll(/text-anchor="end">([^<]*)<\/text>/g)].map((m) => m[1]), ["0", "37"], "only the ends labelled");
-    const grid = svg.match(/<line x1="[^"]*" y1="([^"]*)" x2="[^"]*" y2="\1" stroke="var\(--line/g) || [];
-    assert.ok(grid.length >= 4, "steps of 5 between 0 and 37, unlabelled");
+    const marks = [...svg.matchAll(/<line x1="([^"]*)" y1="([^"]*)" x2="([^"]*)" y2="\2"/g)].filter((m) => Number(m[3]) - Number(m[1]) === 7);
+    assert.equal(marks.length, 9, "a tick mark at 0, 5, …, 35 and 37, the steps unlabelled");
   });
 });

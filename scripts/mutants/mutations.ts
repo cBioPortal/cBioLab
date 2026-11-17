@@ -131,4 +131,10 @@ export const mutants: Mutant[] = [
   { id: "lollipop-tick-interval-inclusive", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
     effect: "An axis whose range is exactly (maxTickCount − 1) steps of a candidate takes that candidate (a y maximum of 9 steps by 1), where the portal needs fewer steps and takes the next (2).",
     find: "candidates.find((x) => range / x < maxTickCount - 1)", replace: "candidates.find((x) => range / x <= maxTickCount - 1)" },
+  { id: "lollipop-x-end-label-thinned", layer: "counts", guard: "unit", file: "lib/lollipop-svg.ts",
+    effect: "At a narrow width the lollipop's x axis can drop its \"<length>aa\" end label when labels are thinned, where the portal always shows it.",
+    find: "fmt: (t) => xLabel.get(t) ?? \"\", keepEnds: true }));", replace: "fmt: (t) => xLabel.get(t) ?? \"\" }));" },
+  { id: "lollipop-y-grid-lines", layer: "counts", guard: "unit", file: "lib/lollipop-svg.ts",
+    effect: "The lollipop's y ticks are drawn as grid lines across the plot, where the portal draws short tick marks on the axis.",
+    find: "{ title: yTitle, fmt: yFmt, line: true, tickLen: 7 }", replace: "{ title: yTitle, fmt: yFmt, line: true, gridTo: W - R }" },
 ];

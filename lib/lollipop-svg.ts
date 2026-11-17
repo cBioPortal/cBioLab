@@ -59,19 +59,19 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
     // the top ">= " when a stem is taller and so drawn capped there
     const cap = yMax?.[g.gene] != null ? Math.max(1, yMax[g.gene]) : defaultYMax(g);
     const yt = lollipopYTicks(cap, maxN > cap);
-    const ys = linear(0, cap, yBase, yTop, { nice: false, count: 4 });
+    const ys = linear(0, cap, yBase, yTop, { nice: false });
     ys.ticks = yt.map((t) => t.pos);
     const yLabel = new Map(yt.map((t) => [t.pos, t.label ?? ""]));
     const yFmt = (t: number) => yLabel.get(t) ?? "";
-    const L = 8 + leftAxisWidth(ys, yTitle, yFmt);
+    const L = 8 + 7 + leftAxisWidth(ys, yTitle, yFmt);
     const plotW = W - L - R;
     const x = (pos: number) => L + plotW * Math.min(pos, len) / len;
 
     const gw = textWidth(g.gene, FS.title, 600);
     out.push(label(8, top + 13, g.gene, { size: FS.title, weight: 600, fill: p.ink }));
     out.push(label(8 + gw + 10, top + 13, fmtInt(g.mutations) + " mutations · " + fmtInt(g.mutated) + " mutated patients" +
-      (g.lengthSource === "genome-nexus" ? "" : " · length unknown — axis runs to codon " + fmtInt(len)), { size: FS.small, fill: p.muted, maxW: W - 8 - gw - 10 - 8 }));
-    out.push(axisLeft(ys, L - 6, p, { title: yTitle, gridTo: W - R, fmt: yFmt, line: true }));
+      (g.lengthSource === "genome-nexus" ? "" : " · length unknown — axis runs to codon " + String(len)), { size: FS.small, fill: p.muted, maxW: W - 8 - gw - 10 - 8 }));
+    out.push(axisLeft(ys, L - 6, p, { title: yTitle, fmt: yFmt, line: true, tickLen: 7 }));
 
     // backbone and domains, each named where its name fits (cut with its full name kept), always in its tooltip
     const bbY = yBase + (DOMAIN - BACKBONE) / 2;
@@ -87,10 +87,10 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
     // x axis: the portal's steps, "0" and "<length>aa" at the ends, every other step between labelled
     const axY = yBase + DOMAIN + 4;
     const xt = lollipopXTicks(len);
-    const xs = linear(0, len, L, L + plotW, { nice: false, count: 2 });
+    const xs = linear(0, len, L, L + plotW, { nice: false });
     xs.ticks = xt.map((t) => t.pos);
     const xLabel = new Map(xt.map((t) => [t.pos, t.label ?? ""]));
-    out.push(axisBottom(xs, axY, p, { minX: L - 20, maxX: W - 2, fmt: (t) => xLabel.get(t) ?? "" }));
+    out.push(axisBottom(xs, axY, p, { minX: L - 20, maxX: W - 2, fmt: (t) => xLabel.get(t) ?? "", keepEnds: true }));
 
     // stems, heads, tooltips; a selected codon's head drawn larger and last, over its neighbours, as
     // the portal draws it (radius 5 for 2.8). Each stem names its gene and codon, for the app's click.
