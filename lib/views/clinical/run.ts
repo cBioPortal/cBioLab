@@ -45,8 +45,8 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
   const attrs = listed ? listed.attrs : ((view as ClinicalView).attributes || [])
     .map((a) => String(a).trim()).filter((a) => ATTR_NAME_RE.test(a));
   if (!attrs.length) return untimed({ kind: "clinical", error: all ? "the studies declare no clinical attribute to compare" : "clinical view needs attributes" });
-  if (listed && attrs.length > CLINICAL_ALL_LIMIT) return untimed({ kind: "clinical",
-    error: "every attribute means " + attrs.length + " here, and a clinical view tests at most " + CLINICAL_ALL_LIMIT + "; name the attributes instead" });
+  if (listed && attrs.length + listed.leftOut.length > CLINICAL_ALL_LIMIT) return untimed({ kind: "clinical",
+    error: "every attribute means " + (attrs.length + listed.leftOut.length) + " here (" + listed.leftOut.length + " of them tested but not listed, as the portal's survival attributes), and a clinical view tests at most " + CLINICAL_ALL_LIMIT + "; name the attributes instead" });
   if (!listed) { const e = overLimit("a clinical view", 20, attrs.length); if (e) return untimed({ kind: "clinical", error: e.replace("at most 20", "at most 20 attributes") }); }
   // the attributes cBioPortal tests but leaves out of its table (each survival endpoint's pair,
   // AGE_LAST_FU_YEARS, BIRTH_YEAR): tested and counted in the q-values, as its Benjamini–Hochberg
