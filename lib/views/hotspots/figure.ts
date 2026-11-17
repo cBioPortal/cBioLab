@@ -11,5 +11,5 @@ export function hotspotsSvg(v: DrawnResultOf<"hotspots">, o: SvgOpts): string {
   const all = (v.hotspots || []) as HotspotGene[];
   const codons = v.codons as Record<string, number[]> | undefined;
   return lollipopPanelsSvg(all.map((g) => filterHotspotGene(g, hide).gene), o,
-    [v.note || "", lollipopSummaryText(all, hide, codons)].filter(Boolean).join(" "), codons);
+    [v.note || "", lollipopSummaryText(all, hide, codons)].filter(Boolean).join(" "), codons, v.yMax as Record<string, number> | undefined);
 }

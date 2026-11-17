@@ -180,7 +180,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "hotspots" && v.hotspots
           ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)}
-              codons={spec.codons as CodonSelection | undefined} onCodons={(c) => edit(vi, { ...spec, codons: c } as unknown as View)} />
+              codons={spec.codons as CodonSelection | undefined} onCodons={(c) => edit(vi, { ...spec, codons: c } as unknown as View)}
+              yMax={spec.yMax as Record<string, number> | undefined} onYMax={(y) => edit(vi, { ...spec, yMax: y } as unknown as View)} />
           : v && !v.error && v.kind === "oncoprint" && v.spec
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
           ? <OncoprintCard view={spec} spec={v.spec} uploads={doc.uploads} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}

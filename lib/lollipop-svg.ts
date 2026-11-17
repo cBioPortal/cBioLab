@@ -44,7 +44,8 @@ export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[
  * one panel per gene, with a caption: the app draws its own controls beside them, and
  * lib/view-svg.ts's hotspotsSvg wraps them for a figure that stands alone.
  */
-export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText: string, codons?: CodonSelection): string {
+/** `yMax`: a gene's y-axis maximum set by the reader (the portal's Y-Axis Max; below 1 drawn as 1), else the default */
+export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText: string, codons?: CodonSelection, yMax?: Record<string, number>): string {
   const p = palette(o.theme), W = Math.max(400, o.width || 720);
   const R = 16, STEM = 150, LABEL_ROOM = 18, BACKBONE = 14, DOMAIN = 24, STICK = "#BABDB6";
   const out: string[] = [];
@@ -54,8 +55,13 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
     const maxN = Math.max(0, ...g.positions.map((q) => q.n));
     const yTitle = "# " + g.gene + " Mutations";
     const head = 18, yTop = top + head + LABEL_ROOM, yBase = yTop + STEM;
-    const ys = linear(0, Math.max(5, maxN), yBase, yTop, { count: 4 });
-    const yFmt = (t: number) => fmtInt(t);
+    // a maximum the reader set is the axis's top exactly (a tick there, "≥" on it when a stem is taller and so
+    // capped, as the portal's axis reads); the default, the tallest stem with a floor of 5, is rounded
+    const cap = yMax?.[g.gene] != null ? Math.max(1, yMax[g.gene]) : null;
+    const ys = cap != null ? linear(0, cap, yBase, yTop, { nice: false, count: 4 }) : linear(0, Math.max(5, maxN), yBase, yTop, { count: 4 });
+    // a stem counts patients, so a set maximum's axis has whole ticks only (a maximum of 1 or 2 reads 0, 1(, 2))
+    if (cap != null) ys.ticks = [...new Set([...ys.ticks.filter((t) => Number.isInteger(t) && t < cap && ys(t) - ys(cap) > 12), cap])];
+    const yFmt = (t: number) => (cap != null && t === cap && maxN > cap ? "≥" : "") + fmtInt(t);
     const L = 8 + leftAxisWidth(ys, yTitle, yFmt);
     const plotW = W - L - R;
     const x = (pos: number) => L + plotW * Math.min(pos, len) / len;
