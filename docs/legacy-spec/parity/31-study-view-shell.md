@@ -161,8 +161,8 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 |---|---|---|---|
 | STV-AC-1 | ❌ | B | No Save settings |
 | STV-AC-2 | 🟡 | B | Tabs Clinical · Gene status · Generic assays · Derived timeline filters · Custom data; no Genomic, X vs Y, Variant Annotations, per-GA-type tabs |
-| STV-AC-3 | 🔶 | B | Table checkbox · Attribute · Type · Level, search, "check all / check none", "N of M checked"; no Freq column, no disabled rows, ordered by priority; "*" marks partial attributes in multi-study; no banner |
-| STV-AC-4 | ❌ | B | No frequencies |
+| STV-AC-3 | 🟡 | B | Checkbox · Attribute · **Freq** ("% samples with data") · Type · Level, ordered by Freq then name; a 0% row is greyed and cannot be checked; "Select all (N)" / "Deselect all" as the portal shows them; unchecking a chart clears its filter ([add-chart-cases](add-chart-cases.md) AC1–AC8). No info banner |
+| STV-AC-4 | 🟡 | B | Clinical Freq for brca_tcga_pan_can_atlas_2018: all 60 attributes as the portal's API gives them; filtered to Sex = Male, the 3 the portal greys out. No Genomic tab yet |
 | STV-AC-5 | 🟡 | B | Gene status: type a gene → mutation + CNA charts (≤6 genes); no profile select, gene sets, chart-type radios |
 | STV-AC-6 | 🟡 | B | "Custom data" button / tab: upload and manage datasets, charted as facets; sign-in rules differ |
 | STV-AC-7 | ❌ | B | No X vs Y |
@@ -273,7 +273,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 |---|---|---|---|
 | STV-STM-1 | ✅ | BC | Server-side: clauses ANDed, values ORed, bars of one chart too (#188); one cohort set per study, patient clauses select the patients' samples; counts identical (Q2, Q3) |
 | STV-STM-2 | ✅ | B | Samples = distinct sample ids, patients = distinct patients owning a selected sample, per study (594/594, 280/280, 1,678/1,678) |
-| STV-STM-3 | ❌ | B | No Add-chart Freq (legacy multi-study 190.7 % bug therefore not reproduced) |
+| STV-STM-3 | 🟡 | B | Clinical: samples with data × 100 ÷ selected samples, a patient attribute counted per selected sample of its patients (AC1; fixture check `check:chart-freq`). Genomic options: no Genomic tab |
 | STV-STM-4 | ❌ | B | No profile select with sample counts |
 | STV-STM-5 | 🟡 | B | Study ID, Patient ID, Sample ID, then every attribute by display name, NA where missing; checked cell by cell against the portal's API for brca_tcga_pan_can_atlas_2018 (1,084 × 60, no difference). Attributes in priority order and rows by patient id, not the API's order (PC9, PC10) |
 | STV-STM-6 | 🟡 | BC | Query hand-off: studies + filters as the Results page's case clauses (`StudyPicker`, `explore-sections.tsx:83-86`); profiles from the dialog |

@@ -913,7 +913,10 @@ interface FacetBase {
    */
   studyCount?: number;
   attribute: string; per: "patient" | "sample"; patients: number;
-  /** a patient-level attribute: the queried samples whose patient has a value (the portal's Tracks-menu count) */
+  /**
+   * the selected samples with a value: a sample attribute's count; a patient attribute's queried samples
+   * whose patient has a value (the portal's Tracks-menu count and Add chart Freq numerator, STV-STM-3)
+   */
   samples?: number;
   /** from clinical_attribute_meta — the portal's own declarations */
   displayName?: string; description?: string;

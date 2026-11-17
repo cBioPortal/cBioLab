@@ -285,9 +285,10 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // a patient-level attribute's queried samples with a value (0 when its patients hold none of them)
   const samplesOf = new Map<string, number>((pre.patientSamples || []).map((r) => [String(r.a), Number(r.n)]));
   if (pre.patientSamples) for (const r of cls.data) if (r.type === "patient" && !samplesOf.has(String(r.a))) samplesOf.set(String(r.a), 0);
+  const withData = (r: ChRow) => r.type === "sample" ? Number(r.np) : samplesOf.get(String(r.a));
   const clinical: ClinicalFacet[] = [
     ...catAttrs.map((r): ClinicalFacet => ({
-      attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
+      attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np), samples: withData(r),
       distinct: Number(r.nv),
       values: disjValues.get(r.type + "|" + r.a) || valuesOf.get(r.type + "|" + r.a) || [],
       disjunctive: disjValues.has(r.type + "|" + r.a) || undefined,
@@ -302,16 +303,14 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
         String(meta.get(k.slice(k.indexOf("|") + 1))?.datatype ?? "").toUpperCase() !== "NUMBER")
       .map(([k, vals]): ClinicalFacet => ({
         attribute: k.slice(k.indexOf("|") + 1), per: k.slice(0, k.indexOf("|")) as "patient" | "sample", kind: "cat",
-        patients: 0, distinct: vals.length, values: vals, disjunctive: true,
+        patients: 0, samples: 0, distinct: vals.length, values: vals, disjunctive: true,
         na: baseNa(bases.get(k.slice(k.indexOf("|") + 1)), k.slice(0, k.indexOf("|")) as "patient" | "sample"),
       })),
     ...numAttrs.map((r): ClinicalFacet => ({
-      attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np), distinct: Number(r.nv),
+      attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np), samples: withData(r), distinct: Number(r.nv),
       min: Number(r.mn), max: Number(r.mx), median: Number(r.md), naCount: Number(r.na)
     }))
-  ].map((facet) => {
-    const ns = facet.per === "patient" ? samplesOf.get(facet.attribute) : undefined;
-    const f = ns != null ? { ...facet, samples: ns } : facet;
+  ].map((f) => {
     const m = meta.get(f.attribute);
     return m ? {
       ...f,

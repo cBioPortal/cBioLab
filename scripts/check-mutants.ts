@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "chart-freq" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -43,6 +43,8 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "density": ["node", "--env-file=.env.local", "scripts/check-density.ts"],
   // the Case Lists chart's counts, run on the fixture study's connection b
   "case-lists": ["node", "--env-file=.env.local", "scripts/check-case-lists.ts"],
+  // the Add chart Freq's samples with data, run on the fixture study's connection b
+  "chart-freq": ["node", "--env-file=.env.local", "scripts/check-chart-freq.ts"],
   // the gene tables' Freq-tooltip panels, run on the fixture study's connection b
   "gene-panels": ["node", "--env-file=.env.local", "scripts/check-gene-panels.ts"],
   "plot-stats": ["node", "--env-file=.env.local", "scripts/check-plot-stats.ts"],
@@ -384,6 +386,22 @@ const MUTANTS: Mutant[] = [
     effect: "The Explore header shows a study's whole description on its first line, where the portal shows the first line and puts the rest under ⊕.",
     find: "first: descriptionParts(s.description.split(/\\n+/g)[0]),",
     replace: "first: descriptionParts(s.description)," },
+  { id: "chart-freq-patients", layer: "counts", guard: "chart-freq", file: "lib/explore.ts",
+    effect: "The Add chart Freq counts a patient attribute's patients, where the portal counts their selected samples (a patient with two samples counts once).",
+    find: "const withData = (r: ChRow) => r.type === \"sample\" ? Number(r.np) : samplesOf.get(String(r.a));",
+    replace: "const withData = (r: ChRow) => Number(r.np);" },
+  { id: "add-chart-zero-checkable", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "An attribute no selected sample has data for can be checked in Add chart, where the portal greys it out.",
+    find: "return { ...r, freq, disabled: freq === 0 };",
+    replace: "return { ...r, freq, disabled: false };" },
+  { id: "add-chart-by-name", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "Add chart lists its attributes by name alone, where the portal puts the ones most samples have data for first.",
+    find: "rank(b.freq) - rank(a.freq) || a.name.localeCompare(b.name)",
+    replace: "a.name.localeCompare(b.name)" },
+  { id: "add-chart-uncheck-keeps-mixed", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "Turning a chart off also drops an any-of filter that names another attribute too.",
+    find: "leaves.every((l) => isClinicalLeaf(l) && l.attribute === attribute)",
+    replace: "leaves.some((l) => isClinicalLeaf(l) && l.attribute === attribute)" },
   { id: "density-swap-keeps-log", layer: "counts", guard: "unit", file: "lib/study-view-density.ts",
     effect: "Swap Axes leaves Log Scale on the axis position rather than moving it with mutation count.",
     find: "return { swapped: !s.swapped, xLog: !!s.yLog, yLog: !!s.xLog };",
