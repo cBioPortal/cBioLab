@@ -42,23 +42,28 @@ export function fusionProteinChangeSql(s: string): string {
 
 /**
  * Two CTEs at the pin: `gene` AS (gene, oncogenicity, level, resistance_level, diagnostic_level,
- * prognostic_level, driver), each gene's gene-level 'Fusion' call (the gene-level store holds no
- * diagnostic or prognostic level: ''); `pair` AS (site1_entrez, site2_entrez, sv_type, tumor_type,
- * oncogenicity, level, resistance_level, diagnostic_level, prognostic_level, driver, found), the per-pair
- * calls for the pairs involving one of `genes`. `level` is the highest sensitive level. Each ends with ",\n".
+ * prognostic_level, driver), each gene's gene-level 'Fusion' call; `pair` AS (site1_entrez, site2_entrez,
+ * sv_type, tumor_type, oncogenicity, level, resistance_level, diagnostic_level, prognostic_level, driver,
+ * found), the per-pair calls for the pairs involving one of `genes`. `level` is the highest sensitive
+ * level. Each call's fields come from one stored answer, its latest (the store is a ReplacingMergeTree
+ * that may not have merged a re-sync yet). The gene-level store holds no diagnostic or prognostic
+ * level: those are NULL there, unknown rather than none. Each ends with ",\n".
  */
 export function svCallCtes(db: string, genes: string[], pin: string, names: { gene: string; pair: string }): string {
   const ids = "SELECT toString(entrez_gene_id) FROM (" + entrezOf(db, genes) + ")";
-  return names.gene + " AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level,\n" +
-    "    any(highest_resistance_level) AS resistance_level, '' AS diagnostic_level, '' AS prognostic_level, toUInt8(max(is_driver)) AS driver\n" +
-    "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'SV' AND alteration = 'Fusion'\n" +
-    "  GROUP BY gene),\n" +
-    names.pair + " AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,\n" +
-    "    any(t.highest_resistance_level) AS resistance_level, any(t.highest_diagnostic_level) AS diagnostic_level, any(t.highest_prognostic_level) AS prognostic_level,\n" +
-    "    toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found\n" +
-    "  FROM " + ONCOKB_SV_TABLE + " AS t WHERE oncokb_version = " + sq(pin) + "\n" +
-    "    AND (site1_entrez IN (" + ids + ") OR site2_entrez IN (" + ids + "))\n" +
-    "  GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),\n";
+  const call = "c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level";
+  return names.gene + " AS (SELECT gene, " + call + ", CAST(NULL AS Nullable(String)) AS diagnostic_level, CAST(NULL AS Nullable(String)) AS prognostic_level,\n" +
+    "    toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver\n" +
+    "  FROM (SELECT hugo_gene_symbol AS gene, argMax(tuple(toString(oncogenicity), toString(highest_sensitive_level), toString(highest_resistance_level)), resolved_at) AS c\n" +
+    "    FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'SV' AND alteration = 'Fusion'\n" +
+    "    GROUP BY gene)),\n" +
+    names.pair + " AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, " + call + ", toNullable(c.4) AS diagnostic_level, toNullable(c.5) AS prognostic_level,\n" +
+    "    toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found\n" +
+    "  FROM (SELECT site1_entrez, site2_entrez, sv_type, tumor_type,\n" +
+    "      argMax(tuple(toString(t.oncogenicity), toString(t.highest_sensitive_level), toString(t.highest_resistance_level), toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at) AS c\n" +
+    "    FROM " + ONCOKB_SV_TABLE + " AS t WHERE oncokb_version = " + sq(pin) + "\n" +
+    "      AND (site1_entrez IN (" + ids + ") OR site2_entrez IN (" + ids + "))\n" +
+    "    GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type)),\n";
 }
 
 /**
@@ -88,3 +93,11 @@ export function oncokbSortSql(oncogenicity: string, sensitive: string, resistanc
     "  toFloat64(transform(" + lvl(diagnostic) + ", ['Dx1', 'Dx2', 'Dx3'], [3, 2, 1], 0)),\n" +
     "  toFloat64(transform(" + lvl(prognostic) + ", ['Px1', 'Px2', 'Px3'], [3, 2, 1], 0))]";
 }
+
+/**
+ * The structural-variant table's Annotation order, as SQL over its rows: the portal's
+ * [OncoKB sort value, CIViC] (StructuralVariantTable's annotation column; CIViC is off, 0). The portal's
+ * last element, whether a gene is an OncoKB cancer gene, waits on that list being stored
+ * (lib/annotation-store.ts oncokbCancerGeneSql). Sorted descending, the portal's default.
+ */
+export const SV_ANNOTATION_ORDER = "arrayConcat(" + oncokbSortSql("oncogenicity", "level", "resistanceLevel", "diagnosticLevel", "prognosticLevel") + ", [toFloat64(0)])";

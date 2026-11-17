@@ -8,7 +8,7 @@ import type { QueryColumn, RowSource } from "./table-query.ts";
 import { sampleTumorTypeCte, type TablePart } from "./mutation-table.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
-import { entrezOf, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
+import { SV_ANNOTATION_ORDER, entrezOf, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
 const str = (x: string) => "ifNull(toString(" + x + "), '')";
 const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
@@ -29,8 +29,8 @@ export const SV_COLUMNS: QueryColumn[] = [
   text("gene2", "Gene 2"), text("site2Entrez", "Site2 Entrez Gene Id"), text("site2Transcript", "Site2 Ensembl Transcript Id"),
   text("site2Chr", "Site2 Chromosome"), number("site2Pos", "Site2 Position"), text("site2Desc", "Site2 Description"),
   text("frame", "Effect on Frame"),
-  // OncoKB's call as the table shows it, so search and the value list match what is on screen; ordered drivers first
-  { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: "drv",
+  // OncoKB's call as the table shows it, so search and the value list match what is on screen; ordered by the portal's sort value
+  { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: SV_ANNOTATION_ORDER,
     text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))" },
   text("status", "MS"), text("ncbiBuild", "NCBI Build"), text("dnaSupport", "DNA Support"), text("rnaSupport", "RNA Support"),
   number("normalReadCount", "Normal Read Count"), number("tumorReadCount", "Tumor Read Count"),
@@ -126,7 +126,8 @@ export function svRowSource(parts: TablePart[], db: string, genes: string[], pin
     with: allRows(parts, db, genes, pin),
     columns: SV_COLUMNS,
     select: "*",
-    defaultOrder: "drv DESC, gene1, gene2",
+    // the portal's default: Annotation, descending (StructuralVariantTable 190-198)
+    defaultOrder: SV_ANNOTATION_ORDER + " DESC, gene1, gene2",
     tiebreak: "sid, ord, svid",
   };
 }
