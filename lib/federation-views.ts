@@ -12,6 +12,7 @@ import { clinicalTable } from "./custom-data.ts";
 import { splitBucketSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
 import { finiteSql } from "./sql-number.ts";
 import { linesCtes, type LineSpec } from "./treatment-lines.ts";
+import { type AlterationEvent, mutationTypeFilter, eventProfileTypes } from "./alteration-events.ts";
 import { VIEW_ATTR_RE } from "./custom-data-names.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
 import { DAYS_PER_MONTH } from "./time-units.ts";
@@ -268,13 +269,16 @@ export type EnrichAlteration = "mutation" | "cna" | "amp" | "homdel" | "sv";
 export const ENRICH_PANEL_TYPE: Record<EnrichAlteration, string> = {
   mutation: "MUTATION_EXTENDED", cna: "COPY_NUMBER_ALTERATION", amp: "COPY_NUMBER_ALTERATION", homdel: "COPY_NUMBER_ALTERATION", sv: "STRUCTURAL_VARIANT"
 };
+/** each alteration type's calls (uncalled mutations excluded; high-level copy number only) */
+const EVENT_TYPE_COND: Record<EnrichAlteration, string> = {
+  mutation: "g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'",
+  sv: "g.variant_type = 'structural_variant'",
+  amp: "g.variant_type = 'cna' AND g.cna_alteration >= 2",
+  homdel: "g.variant_type = 'cna' AND g.cna_alteration <= -2",
+  cna: "g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2",
+};
 /** one alteration type's calls, made on a panel covering the gene (an off-panel call is in neither side) */
-export const enrichEventCond = (a: EnrichAlteration): string => "NOT g.off_panel AND " + (
-  a === "mutation" ? "g.variant_type = 'mutation' AND g.mutation_status != 'UNCALLED'"
-  : a === "sv" ? "g.variant_type = 'structural_variant'"
-  : a === "amp" ? "g.variant_type = 'cna' AND g.cna_alteration >= 2"
-  : a === "homdel" ? "g.variant_type = 'cna' AND g.cna_alteration <= -2"
-  : "g.variant_type = 'cna' AND abs(g.cna_alteration) >= 2");
+export const enrichEventCond = (a: EnrichAlteration): string => "NOT g.off_panel AND " + EVENT_TYPE_COND[a];
 
 /** Per gene: the cohort's samples with that alteration type in it (uncalled mutations excluded, as the
  *  portal's gene tables exclude them; high-level copy number only). Counts only. */
@@ -320,6 +324,77 @@ export function enrichWesSql(cohortSql: string, study: string, db: string, alter
     "FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = " + sq(ENRICH_PANEL_TYPE[alteration]) + "\n" +
     "  AND sp.gene_panel_id = 'WES' AND " + inCohortSamples(covSid)
+  ));
+}
+
+/** The selected event types' calls, made on a panel covering the gene: the mutation types by the portal's
+ *  filter (mutationTypeFilter), uncalled mutations excluded; amplification and deep deletion; structural
+ *  variants. An off-panel call is in neither side. */
+export function enrichEventsCond(events: readonly AlterationEvent[]): string {
+  const mut = mutationTypeFilter(events);
+  const or: string[] = [];
+  // a blank mutation_type is stored '' (the column is not nullable): an unknown type, kept by NOT IN as the portal keeps it
+  if (mut) or.push("(" + EVENT_TYPE_COND.mutation +
+    (mut.op === "all" ? "" : " AND lower(g.mutation_type) " + (mut.op === "in" ? "IN" : "NOT IN") + " (" + mut.types.map(sq).join(", ") + ")") + ")");
+  const amp = events.includes("amp"), del = events.includes("homdel");
+  if (amp || del) or.push("(" + EVENT_TYPE_COND[amp && del ? "cna" : amp ? "amp" : "homdel"] + ")");
+  if (events.includes("sv")) or.push("(" + EVENT_TYPE_COND.sv + ")");
+  return "NOT g.off_panel AND (" + (or.join(" OR ") || "0") + ")";
+}
+
+/** Per gene: the cohort's samples with any of the selected event types in it. Counts only. */
+export function enrichEventsAlteredSql(cohortSql: string, study: string, db: string, events: readonly AlterationEvent[], pin: string | null, driver: boolean): AggregateSql {
+  const sid = bareSampleId("g.sample_unique_id", study);
+  return aggregateSql((
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT g.hugo_gene_symbol AS gene, uniqExact(g.sample_unique_id) AS altered\n" +
+    "FROM " + db + ".genomic_event_derived g\n" +
+    (driver && pin ? driverJoin(pin) : "") +
+    "WHERE " + genomicStudySql(study, "g") + " AND " + enrichEventsCond(events) + "\n" +
+    "  AND " + inCohortSamples(sid) + (driver && pin ? " AND ann.is_driver" : "") + "\n" +
+    "GROUP BY gene"
+  ));
+}
+
+/** the cohort's samples' gene panels for the selected event types' profiles, one row per sample */
+function enrichEventsPanelsCte(cohortSql: string, study: string, db: string, events: readonly AlterationEvent[]): string {
+  const covSid = bareSampleId("sp.sample_unique_id", study);
+  const types = eventProfileTypes(events);
+  return "WITH cohort AS (" + cohortSql + "),\n" +
+    "ps AS (\n" +
+    "  SELECT sp.sample_unique_id AS s, groupUniqArray(sp.gene_panel_id) AS panels\n" +
+    "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
+    "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type IN (" + (types.map(sq).join(", ") || "''") + ")\n" +
+    // copy number from the discrete profile only, the one the portal's tab asks (a log2 profile's panels are not its)
+    "    AND (sp.alteration_type != 'COPY_NUMBER_ALTERATION' OR sp.genetic_profile_id IN (SELECT stable_id FROM " + db + ".genetic_profile\n" +
+    "      WHERE genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND datatype = 'DISCRETE'))\n" +
+    "    AND " + inCohortSamples(covSid) + "\n" +
+    "  GROUP BY s\n" +
+    ")\n";
+}
+
+/** Per gene: the cohort's samples profiled for it by a (non-WES) panel of any selected type's profile, as
+ *  the portal's union of a case's panels (CMM-STM-2) — each sample once, however many of its panels list
+ *  the gene: samples are grouped by their set of panels, and each set joined to its genes once. Samples
+ *  with a whole-exome profile are counted by enrichEventsWesSql instead. Counts only. */
+export function enrichEventsPanelProfiledSql(cohortSql: string, study: string, db: string, events: readonly AlterationEvent[]): AggregateSql {
+  return aggregateSql((
+    enrichEventsPanelsCte(cohortSql, study, db, events) +
+    ", sets AS (SELECT arraySort(panels) AS panels, count() AS n FROM ps WHERE NOT has(panels, 'WES') GROUP BY panels)\n" +
+    "SELECT gene, sum(n) AS profiled FROM (\n" +
+    "  SELECT DISTINCT sets.panels AS panels, sets.n AS n, gptg.gene AS gene\n" +
+    "  FROM sets ARRAY JOIN sets.panels AS panel\n" +
+    "  INNER JOIN " + db + ".gene_panel_to_gene_derived gptg ON gptg.gene_panel_id = panel\n" +
+    ")\n" +
+    "GROUP BY gene"
+  ));
+}
+
+/** The cohort's samples with a whole-exome profile among the selected types': profiled for every gene, so one number. */
+export function enrichEventsWesSql(cohortSql: string, study: string, db: string, events: readonly AlterationEvent[]): AggregateSql {
+  return aggregateSql((
+    enrichEventsPanelsCte(cohortSql, study, db, events) +
+    "SELECT count() AS n FROM ps WHERE has(panels, 'WES')"
   ));
 }
 
