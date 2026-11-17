@@ -302,7 +302,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - Ours alone: with two cohorts, one menu per chart, the cohort's name added to the file name
     - [ ] The hide-download switch (CTS-MD-12): with the Data-governance switches
   - [ ] The bar's popover "Gene altered in 92.77% of 982 patients" with the type table to 2 dp, the study link and "Query this study" (ours an SVG title) (CTS-CH-7, CTS-STM-5, CTS-MD-2)
-  - [ ] Stack and legend order (Multiple at the bottom, Mutation on top; ours the reverse); Multiple `#666` (ours `#6e7a83`) (CTS-CH-3, CTS-CH-4)
+  - [x] Stack and legend order as the portal's: Multiple at the bottom, then protein and mRNA low / high, deep deletion, amplification, structural variant, Mutation on top (OrderedAlterationLabelMap); the legend the kinds present, reversed (Mutation first); Multiple `#666` (CTS-CH-3, CTS-CH-4) (#328)
   - [ ] The profiled strip: "+" and "−" rows for every data type, with hover counts (ours rows only where a group lacks a type) (CTS-CH-5, CTS-CH-6, CTS-MD-8)
   - [ ] The "Show Genomic Alteration Types" toggle (CTS-OC-3)
   - [ ] A gene with no alterations: grey tab label, "There are no alterations in this gene." (CTS-GT-4, CTS-MD-10)
