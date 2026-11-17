@@ -6,9 +6,16 @@ import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 import { SEG_TAB, SEG_TABS } from "../../_ui/toolbar.ts";
 import { Tabs, TabsList, TabsTrigger } from "../../_ui/tabs";
-import { cancertypesPanelSvg } from "../../../lib/views/cancertypes/figure.ts";
+import { cancertypesPanelSvg, categoryLabel } from "../../../lib/views/cancertypes/figure.ts";
 import { frame, palette } from "../../../lib/svg-kit";
 import { useState } from "react";
+import { DraftInput } from "./parts.tsx";
+
+/** a threshold box as the portal's reads it: everything but digits and "." dropped; nothing readable, null */
+function thresholdOf(text: string): number | null {
+  const n = parseFloat(text.replace(/[^0-9.]/g, ""));
+  return Number.isFinite(n) ? n : null;
+}
 
 /** Tabs over a body, the portal's gene / group selectors. */
 function Pills({ items, on, set }: { items: string[]; on: string; set: (x: string) => void }) {
@@ -40,25 +47,35 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   );
 }
 
+
 /** the cancertypes view's settings row */
 function Controls({ c }: { c: KindCardCtx }) {
   const { spec, busy, patch } = c;
   const cats = c.attrs.filter((a) => a.kind !== "num").map((a) => a.attribute);
-  const by = spec.groupBy || "CANCER_TYPE";
+  const by: string = spec.groupBy || "";
+  // what the portal's default chose for the last result, named beside it (the next run may choose again)
+  const chosen: string | undefined = !by ? c.v?.cancertypes?.groupBy : undefined;
+  const freq = spec.show !== "count";
+  const units = spec.unit === "sample" ? "samples" : "patients", Units = spec.unit === "sample" ? "Samples" : "Patients";
+  // a commit that leaves the document as it was still resets the boxes to what is applied
+  const [commits, setCommits] = useState(0);
+  const commit = (p: Record<string, unknown>) => { setCommits((n) => n + 1); patch(p); };
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
-        <label className="tbfield" data-tip="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute">
-          category <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v === "CANCER_TYPE" ? undefined : v })}>
+        <label className="tbfield" data-tip="the portal's category type: the study, the cancer type or the detailed cancer type — or any other sample attribute. Until one is chosen, the portal's default: the study for several studies, the detailed cancer type for a study of one cancer type, else the cancer type">
+          category <OptionSelect value={by} disabled={busy} onValueChange={(v) => patch({ groupBy: v || undefined, minSamples: undefined, minAltered: undefined })}>
+            <option value="">{"portal default" + (chosen ? " (" + categoryLabel(chosen) + ")" : "")}</option>
             <option value="study">Cancer Study</option>
             <option value="CANCER_TYPE">Cancer Type</option>
             <option value="CANCER_TYPE_DETAILED">Cancer Type Detailed</option>
-            {!cats.includes(by) && !["study", "CANCER_TYPE", "CANCER_TYPE_DETAILED"].includes(by) && <option value={by}>{by}</option>}
+            {by && !cats.includes(by) && !["study", "CANCER_TYPE", "CANCER_TYPE_DETAILED"].includes(by) && <option value={by}>{by}</option>}
             {cats.filter((a) => a !== "CANCER_TYPE" && a !== "CANCER_TYPE_DETAILED").map((a) => <option key={a} value={a}>{a}</option>)}
           </OptionSelect>
         </label>
         <label className="tbfield" data-tip="count patients (as the portal does by default — a patient counts in each group one of their samples is in) or samples">
-          count by <OptionSelect value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy} onValueChange={(v) => patch({ unit: v === "sample" ? "sample" : undefined })}>
+          count by <OptionSelect value={spec.unit === "sample" ? "sample" : "patient"} disabled={busy}
+            onValueChange={(v) => patch({ unit: v === "sample" ? "sample" : undefined, minSamples: undefined, minAltered: undefined })}>
             <option value="patient">patients</option><option value="sample">samples</option>
           </OptionSelect>
         </label>
@@ -67,16 +84,29 @@ function Controls({ c }: { c: KindCardCtx }) {
             <option value="any">any alteration</option><option value="driver">drivers</option>
           </OptionSelect>
         </label>
-        <label className="tbfield" data-tip="groups with fewer profiled patients (or samples) than this are pooled into one bar, never dropped">
-          min group <OptionSelect value={String(spec.minSamples ?? 10)} disabled={busy} onValueChange={(v) => patch({ minSamples: Number(v) })}>
-            {[...new Set([1, 10, 50, 100, 200, 500, spec.minSamples ?? 10])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
-          </OptionSelect>
+      </div>
+      <div className="tbz"><span className="tbl">filter</span>
+        <label className="tbfield" data-tip={"the portal's Min. # Total: a category is shown only with at least this many profiled " + units + "; empty, the portal's default: 10, or 0 when no category of the chart has more than 10. Applies on Enter"}>
+          Min. # Total {Units}
+          {/* unset, each panel and gene tab works out its own default, so the box names none */}
+          <DraftInput key={"total" + commits} value={spec.minSamples == null ? "" : String(spec.minSamples)} placeholder="default" disabled={busy} width="4.5rem" title={"Min. # Total " + Units}
+            onCommit={(t) => { const n = thresholdOf(t); commit({ minSamples: n === null ? undefined : Math.ceil(n) }); }} />
+        </label>
+        <label className="tbfield" data-tip={(freq ? "the portal's Min. % Altered: a category is shown only with at least this share of its profiled " : "the portal's Min. # Altered: a category is shown only with at least this many altered ") + units + ". Applies on Enter"}>
+          {freq ? "Min. % Altered " : "Min. # Altered "}{Units}
+          <DraftInput key={"altered" + commits} value={String(spec.minAltered ?? 0) + (freq ? "%" : "")} disabled={busy} width="4.5rem" title={(freq ? "Min. % Altered " : "Min. # Altered ") + Units}
+            onCommit={(t) => { const n = thresholdOf(t); commit({ minAltered: n ? n : undefined }); }} />
         </label>
       </div>
       <div className="tbz"><span className="tbl">view</span>
         <label className="tbfield" data-tip="the y axis: each group's altered share, or its altered count">
-          y-axis <OptionSelect value={spec.show === "count" ? "count" : "frequency"} disabled={busy} onValueChange={(v) => patch({ show: v === "count" ? "count" : undefined })}>
+          y-axis <OptionSelect value={freq ? "frequency" : "count"} disabled={busy} onValueChange={(v) => patch({ show: v === "count" ? "count" : undefined, minAltered: undefined })}>
             <option value="frequency">Alteration Frequency</option><option value="count">Absolute Counts</option>
+          </OptionSelect>
+        </label>
+        <label className="tbfield" data-tip="the portal's Sort X-Axis By: highest bar first, or the categories alphabetically (a study by its id)">
+          sort x-axis by <OptionSelect value={spec.sort === "alphabetical" ? "alphabetical" : "value"} disabled={busy} onValueChange={(v) => patch({ sort: v === "alphabetical" ? "alphabetical" : undefined })}>
+            <option value="value">Y-Axis Values</option><option value="alphabetical">Alphabetically</option>
           </OptionSelect>
         </label>
       </div>
@@ -92,7 +122,7 @@ export const cancertypesUi: KindUi<"cancertypes"> = {
   genes: true,
   maxCohorts: 2,
   defaults: (known) => ({ kind: "cancertypes", genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] }),
-  sub: (spec) => "by " + (spec.groupBy || "CANCER_TYPE") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled " + (spec.unit === "sample" ? "samples" : "patients"),
+  sub: (spec) => "by " + (spec.groupBy || "the portal's default category") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled " + (spec.unit === "sample" ? "samples" : "patients"),
   Controls,
   body: (c) => c.v.cancertypes ? <CancertypesBody v={c.v} /> : null,
 };

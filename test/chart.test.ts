@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange, portalRound1, portalClinicalValue, portalPercentage } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange, portalRound1, portalClinicalValue, portalPercentage, portalVaf } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -192,4 +192,9 @@ test("C1 (PAT-STM-10): portalClinicalValue rounds non-integer numbers, returns e
   // "1e3": parseFloat 1000 but parseInt 1, so the portal treats it as a non-integer and writes "1000.0"
   const cases: [string, string][] = [["0.4881", "0.5"], ["64", "64"], ["Primary", "Primary"], ["4.0", "4.0"], ["1e3", "1000.0"], ["", ""]];
   for (const [x, want] of cases) assert.equal(portalClinicalValue(x), want, JSON.stringify(x));
+});
+
+test("F1: portalVaf gives 4 decimals below 0.01, otherwise 2", () => {
+  const cases: [number, string][] = [[0.1754, "0.18"], [0.0098, "0.0098"], [0.005, "0.0050"], [0.01, "0.01"], [0, "0.0000"], [1, "1.00"], [0.38, "0.38"]];
+  for (const [f, want] of cases) assert.equal(portalVaf(f), want, String(f));
 });
