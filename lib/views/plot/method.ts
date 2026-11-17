@@ -44,9 +44,14 @@ export function plotMethod(t: PlotTrace): MethodRecord {
         detail: "The plot:moments queries above: per study, over the " + u + "s with a value on both axes, n, Σx, Σy, Σxy, Σx² and Σy². Six sums, no individual value; added across studies, exactly." });
       steps.push({ kind: "statistic", title: "Pearson's r and the least-squares line from the pooled sums",
         detail: "r = (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); slope = (nΣxy − ΣxΣy) / (nΣx² − (Σx)²), intercept = (Σy − slope·Σx) / n." });
-      steps.push({ kind: "statistic", title: "No Spearman",
-        detail: "A rank correlation needs one ranking of every " + u + " of every study, which per-study sums cannot give, so none is reported." });
-      functions.push("pearsonFromMoments", "regressionFromMoments");
+      if (st.spearman != null) {
+        steps.push({ kind: "fetch", title: "Every study's pairs, ranked together", scope, rowsOut: d.n,
+          detail: "The plot:points queries above: every study's (x, y) pairs, " + fmtN(d.n) + " in all; Spearman's ρ is Pearson's r of their ranks over the pooled pairs, as the portal computes it over several studies (PLT-MD-2).",
+          params: [["Spearman ties", "average rank: tied values share the mean of the ranks they span, as scipy's spearmanr and cbioportal.org rank them (PLT-STM-5)"]] });
+        functions.push("spearmanRho");
+      } else steps.push({ kind: "statistic", title: "No Spearman",
+        detail: "A rank correlation needs one ranking of every " + u + " of every study, which per-study sums cannot give, and not every study handed over its pairs, so none is reported." });
+      functions.push("pearsonR", "regressionFromMoments");
     } else {
       steps.push({ kind: "fetch", title: "Correlate the pairs in the database", scope, rowsOut: d.n,
         detail: "The plot:stats query above, over the " + fmtN(d.n) + " " + u + "s with a value on both axes (log-transformed first where an axis is on a log scale): " +
@@ -80,9 +85,14 @@ export function plotMethod(t: PlotTrace): MethodRecord {
         "slope = (n * S[\"sxy\"] - S[\"sx\"] * S[\"sy\"]) / vx if n >= 2 and vx > 0 else None",
         "intercept = (S[\"sy\"] - slope * S[\"sx\"]) / n if slope is not None else None",
         "RESULT.update({\"plot:pearson\": pearson, \"plot:slope\": slope, \"plot:intercept\": intercept, \"plot:pPearson\": p_of(pearson, n)})",
-        "print(f\"n = {n}, Pearson r = {pearson}, p = {p_of(pearson, n)}, line y = {slope} x + {intercept}\")");
-      // r is reported to 4 decimals (pearsonFromMoments)
-      check = { "plot:pearson": { v: st.pearson, abs: 5e-5 + 1e-12 }, "plot:slope": { v: st.slope }, "plot:intercept": { v: st.intercept, abs: 1e-9 }, "plot:pPearson": { v: st.pPearson } };
+        "print(f\"n = {n}, Pearson r = {pearson}, p = {p_of(pearson, n)}, line y = {slope} x + {intercept}\")",
+        ...(st.spearman != null ? [
+          "# Spearman's rho over the pooled pairs (computed here, from every study's pairs)",
+          "spearman = " + pyNum(st.spearman),
+          "RESULT[\"plot:pSpearman\"] = p_of(spearman, n)",
+          "print(f\"Spearman rho = {spearman} (p = {p_of(spearman, n)})\")"] : []));
+      check = { "plot:pearson": { v: st.pearson, abs: 1e-9 }, "plot:slope": { v: st.slope }, "plot:intercept": { v: st.intercept, abs: 1e-9 }, "plot:pPearson": { v: st.pPearson },
+        ...(st.spearman != null ? { "plot:pSpearman": { v: st.pSpearman } } : {}) };
     } else {
       python.push(
         "# what the plot:stats query returned",
