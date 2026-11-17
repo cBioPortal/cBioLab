@@ -23,8 +23,16 @@ export interface CancertypesView {
   groupBy?: string;
   /** count OncoKB drivers only, or any alteration (default) */
   measure?: "driver" | "any";
-  /** groups with fewer profiled samples than this are pooled into one "other" bar (default 10) */
+  /**
+   * the portal's Min. # Total: a group is drawn only with at least this many profiled units (patients or
+   * samples). Unset: 10 when the panel's largest group has more than 10, else 0 (per gene tab). Groups not
+   * drawn are counted in the panel's `categories`.
+   */
   minSamples?: number;
+  /** the portal's Min. % Altered (frequencies drawn: a percentage) or Min. # Altered (counts drawn: a count); default 0 */
+  minAltered?: number;
+  /** the portal's Sort X-Axis By: by the y-axis value (default), or alphabetically by group (a study by its id) */
+  sort?: "alphabetical";
   /** draw percentages (default) or counts */
   show?: "frequency" | "count";
   /** count patients (default, as the portal does — a patient counts in each group a sample of theirs is in) or samples */
@@ -48,16 +56,25 @@ export interface CancertypesGroup {
   /** units profiled for each data type at all (any gene) — the portal's "+" rows */
   profiledFor?: { mutation: number; cna: number; sv: number };
 }
-export interface CancertypesPanel {
-  cohort: string; samples: number; profiled: number; altered: number;
+/** a panel's (or one gene tab's) drawn groups */
+export interface CancertypesGroups {
   groups: CancertypesGroup[];
-  /** groups under the size floor, pooled into one — counted, never dropped */
-  pooled?: CancertypesGroup & { count: number };
+  /** every group, drawn or not; with `filtered`, the figure says "<groups> of <categories> categories are shown" */
+  categories: number;
+  /** the Min. # Total applied (the view's, or its default for this panel) */
+  minSamples: number;
+  /** a threshold above 0 hides some group (the portal's filter alert) */
+  filtered?: true;
+}
+export interface CancertypesPanel extends CancertypesGroups {
+  cohort: string; samples: number; profiled: number; altered: number;
   /** the same, one gene at a time (the portal's per-gene tabs) */
-  perGene?: { gene: string; groups: CancertypesGroup[]; pooled?: CancertypesGroup & { count: number } }[];
+  perGene?: ({ gene: string } & CancertypesGroups)[];
 }
 export interface CancertypesResult {
-  groupBy: string; measure: "driver" | "any"; genes: string[]; minSamples: number; show: "frequency" | "count";
+  groupBy: string; measure: "driver" | "any"; genes: string[];
+  /** the view's Min. # Total, or null for the default (each panel's `minSamples` is the one applied) */
+  minSamples: number | null; minAltered: number; sort?: "alphabetical"; show: "frequency" | "count";
   unit: "patient" | "sample";
   panels: CancertypesPanel[];
   excluded?: { study: string; reason: string }[];
