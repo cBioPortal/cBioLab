@@ -809,7 +809,7 @@
           {
             "kind": "transform",
             "title": "SP124409's spectrum",
-            "detail": "Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in percent.",
+            "detail": "Each channel's count in mutational_signatures_counts_SBS for SP124409, and its share of the sample's total over every channel, in whole percent (rounded half up, as the portal rounds it; the shares need not add to 100).",
             "params": [
               [
                 "total",
@@ -836,7 +836,7 @@
           "file": "lib/views/signatures/run.ts, lib/views/signatures/sql.ts, lib/views/signatures/data.ts, lib/table-query.ts",
           "commit": null
         },
-        "verification": "The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total, which the script recomputes.",
+        "verification": "The contributions are listed as the study stores them; the spectrum's shares are each channel's count over the sample's total in whole percent, which the script recomputes.",
         "check": {
           "signatures:total": {
             "v": 1566
@@ -852,7 +852,7 @@
             "abs": 1e-12
           },
           "signatures:A[C>A]G:percent": {
-            "v": 0.06385696040868455,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
@@ -862,22 +862,22 @@
             "abs": 1e-12
           },
           "signatures:C[C>A]A:percent": {
-            "v": 0.1277139208173691,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:C[C>A]C:percent": {
-            "v": 0.1277139208173691,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:C[C>A]G:percent": {
-            "v": 0.06385696040868455,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:C[C>A]T:percent": {
-            "v": 0.06385696040868455,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
@@ -887,12 +887,12 @@
             "abs": 1e-12
           },
           "signatures:G[C>A]C:percent": {
-            "v": 0.19157088122605365,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:G[C>A]G:percent": {
-            "v": 0.1277139208173691,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
@@ -902,32 +902,32 @@
             "abs": 1e-12
           },
           "signatures:T[C>A]A:percent": {
-            "v": 0.1277139208173691,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:T[C>A]C:percent": {
-            "v": 0.3831417624521073,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:T[C>A]G:percent": {
-            "v": 0.1277139208173691,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:T[C>A]T:percent": {
-            "v": 0.06385696040868455,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:A[C>G]A:percent": {
-            "v": 0.06385696040868455,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
           "signatures:A[C>G]C:percent": {
-            "v": 0.06385696040868455,
+            "v": 0,
             "rel": 1e-9,
             "abs": 1e-12
           },
@@ -938,7 +938,7 @@
           },
           "…": {
             "more": 77,
-            "sha256": "c53ca7cc184a66b9"
+            "sha256": "dae489211b7aa8af"
           }
         }
       }

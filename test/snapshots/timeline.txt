@@ -245,45 +245,45 @@ Patient alterations — patients to choose from: 5,368; the first 25, tab-separa
 P-0000012 (msk_chord_2024); samples: P-0000012-T02-IM3 (Primary), P-0000012-T03-IM3 (Metastasis)
 Mutations: 31 rows; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	proteinChange	annotation	mutationType	vaf	freq
-  Breast	P-0000012-T03-IM3	ATRX	K983*	Likely Oncogenic	Nonsense	0.1978	3.3
-  Breast	P-0000012-T03-IM3	BLM	A363fs	Likely Oncogenic	FS del	0.1276	1.4
-  Breast	P-0000012-T03-IM3	FBXW7	G61*	Likely Oncogenic · Level 3A	Nonsense	0.2281	4.5
-  Breast	P-0000012-T03-IM3	FBXW7	X413_splice	Likely Oncogenic · Level 3A	Splice	0.2553	4.5
-  Breast	P-0000012-T03-IM3	MAP3K1	E302*	Likely Oncogenic	Nonsense	0.1743	3.1
-  Breast	P-0000012-T03-IM3	MAP3K1	X696_splice	Likely Oncogenic	Splice	0.2007	3.1
-  Breast	P-0000012-T03-IM3	PTPRD	E915*	Likely Oncogenic	Nonsense	0.1764	4.3
-  Breast	P-0000012-T03-IM3	PTPRD	P1338T	Unknown	Missense	0.298	4.3
-  Breast	P-0000012-T03-IM3	PTPRT	G969V	Unknown	Missense	0.1422	4.8
-  Breast	P-0000012-T03-IM3	PTPRT	X1053_splice	Likely Oncogenic	Splice	0.0508	4.8
-  Breast	P-0000012-T03-IM3	SMARCA4	E1211*	Likely Oncogenic · Level 3A	Nonsense	0.2076	4.3
-  Breast	P-0000012-T02-IM3	TP53	T256P	Likely Oncogenic	Missense	0.5022	52.4
-  Breast	P-0000012-T03-IM3	TP53	P67Qfs*56	Likely Oncogenic	FS del	0.4018	52.4
-  Breast	P-0000012-T03-IM3	ATR	R2431M	Unknown	Missense	0.1743	2.7
-  Breast	P-0000012-T03-IM3	AXIN2	I375M	Unknown	Missense	0.1369	2.1
-  Breast	P-0000012-T03-IM3	BRIP1	D393V	Unknown	Missense	0.146	1.4
-  Breast	P-0000012-T03-IM3	CCNE1	A47V	Unknown	Missense	0.1494	0.5
-  Breast	P-0000012-T03-IM3	CREBBP	M2161I	Unknown	Missense	0.2481	3.4
-  Breast	P-0000012-T03-IM3	DOT1L	W305C	Unknown	Missense	0.1584	2.3
-  Breast	P-0000012-T03-IM3	FLT4	S293R	Unknown	Missense	0.1787	2.8
-  Breast	P-0000012-T03-IM3	HGF	W547Cfs*35	Unknown	FS del	0.1412	2.2
-  Breast	P-0000012-T03-IM3	KDM5A	N212I	Unknown	Missense	0.2159	1.8
-  Breast	P-0000012-T03-IM3	KMT2C	K3105N	Unknown	Missense	0.1786	6.5
-  Breast	P-0000012-T03-IM3	NSD1	V1780F	Unknown	Missense	0.1942	2.1
-  Breast	P-0000012-T03-IM3	PDGFRA	L465M	Unknown	Missense	0.2035	2.1
+  Breast	P-0000012-T03-IM3	ATRX	K983*	Likely Oncogenic	Nonsense	0.1978	3.334664536741214
+  Breast	P-0000012-T03-IM3	BLM	A363fs	Likely Oncogenic	FS del	0.1276	1.409744408945687
+  Breast	P-0000012-T03-IM3	FBXW7	G61*	Likely Oncogenic · Level 3A	Nonsense	0.2281	4.472843450479234
+  Breast	P-0000012-T03-IM3	FBXW7	X413_splice	Likely Oncogenic · Level 3A	Splice	0.2553	4.472843450479234
+  Breast	P-0000012-T03-IM3	MAP3K1	E302*	Likely Oncogenic	Nonsense	0.1743	3.1389776357827475
+  Breast	P-0000012-T03-IM3	MAP3K1	X696_splice	Likely Oncogenic	Splice	0.2007	3.1389776357827475
+  Breast	P-0000012-T03-IM3	PTPRD	E915*	Likely Oncogenic	Nonsense	0.1764	4.329419282690311
+  Breast	P-0000012-T03-IM3	PTPRD	P1338T	Unknown	Missense	0.298	4.329419282690311
+  Breast	P-0000012-T03-IM3	PTPRT	G969V	Unknown	Missense	0.1422	4.788721143861331
+  Breast	P-0000012-T03-IM3	PTPRT	X1053_splice	Likely Oncogenic	Splice	0.0508	4.788721143861331
+  Breast	P-0000012-T03-IM3	SMARCA4	E1211*	Likely Oncogenic · Level 3A	Nonsense	0.2076	4.333067092651757
+  Breast	P-0000012-T02-IM3	TP53	T256P	Likely Oncogenic	Missense	0.5022	52.412140575079874
+  Breast	P-0000012-T03-IM3	TP53	P67Qfs*56	Likely Oncogenic	FS del	0.4018	52.412140575079874
+  Breast	P-0000012-T03-IM3	ATR	R2431M	Unknown	Missense	0.1743	2.6677316293929714
+  Breast	P-0000012-T03-IM3	AXIN2	I375M	Unknown	Missense	0.1369	2.056873552200655
+  Breast	P-0000012-T03-IM3	BRIP1	D393V	Unknown	Missense	0.146	1.3538338658146964
+  Breast	P-0000012-T03-IM3	CCNE1	A47V	Unknown	Missense	0.1494	0.5351437699680511
+  Breast	P-0000012-T03-IM3	CREBBP	M2161I	Unknown	Missense	0.2481	3.4424920127795526
+  Breast	P-0000012-T03-IM3	DOT1L	W305C	Unknown	Missense	0.1584	2.2563897763578273
+  Breast	P-0000012-T03-IM3	FLT4	S293R	Unknown	Missense	0.1787	2.751597444089457
+  Breast	P-0000012-T03-IM3	HGF	W547Cfs*35	Unknown	FS del	0.1412	2.2044728434504792
+  Breast	P-0000012-T03-IM3	KDM5A	N212I	Unknown	Missense	0.2159	1.8410543130990416
+  Breast	P-0000012-T03-IM3	KMT2C	K3105N	Unknown	Missense	0.1786	6.505591054313099
+  Breast	P-0000012-T03-IM3	NSD1	V1780F	Unknown	Missense	0.1942	2.1365814696485623
+  Breast	P-0000012-T03-IM3	PDGFRA	L465M	Unknown	Missense	0.2035	2.13258785942492
   … 6 more rows
 Copy Number Alterations: 3 rows; the first 3, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	samples	gene	cna	annotation	cytoband	freq
-  Breast	P-0000012-T03-IM3	CDK4	AMP	Oncogenic · Level 4	12q14.1	1.6
-  Breast	P-0000012-T02-IM3	MCL1	AMP	Oncogenic	1q21.2	1.5
-  Breast	P-0000012-T02-IM3	RIT1	AMP	Unknown	1q22	0.7
+  Breast	P-0000012-T03-IM3	CDK4	AMP	Oncogenic · Level 4	12q14.1	1.5575079872204474
+  Breast	P-0000012-T02-IM3	MCL1	AMP	Oncogenic	1q21.2	1.5095846645367412
+  Breast	P-0000012-T02-IM3	RIT1	AMP	Unknown	1q22	0.7388769071012061
 Structural Variants: 0 rows; the first 0, tab-separated (the web app's view pages and downloads every row, with every column):
-  cohort	samples	gene1	gene2	class	eventInfo	breakpointType	connectionType
+  cohort	samples	gene1	gene2	status	class	eventInfo	connectionType
   CAVEAT (tell the user): P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
   METHOD:
     - Count the patients per cohort and study: The alterations:counts query above: every patient of each cohort, with the count of the patient's samples and how many rows each of the three tables lists for them over those samples (a mutation, a gene's deep copy-number call, a structural variant — each counted once however many samples carry it).
         Breast · msk_chord_2024: 5,368
     - Sort them together and take one page: The alterations:rows query above: the patients of every cohort and study combined in one query, sorted patients with any alteration first, then by patient id, and the 25 rows of the first page taken. Every other page, and the download, is the same query at another offset.
-    - Read P-0000012's three tables: The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.
+    - Read P-0000012's three tables: The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.
         Mutations: 31 rows
         Copy Number Alterations: 3 rows
         Structural Variants: 0 rows

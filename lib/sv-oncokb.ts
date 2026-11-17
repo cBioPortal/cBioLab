@@ -78,6 +78,48 @@ export const svCellSql = (f: string, pr = "pr", a1 = "a1", a2 = "a2") =>
 export const svDriverSql = (pr: string, a1 = "a1", a2 = "a2") =>
   "toUInt8(if(" + pr + ".found = 1, " + pr + ".driver, greatest(" + a1 + ".driver, " + a2 + ".driver)))";
 
+/** a genomic_event_derived structural-variant row's key, as svDriverKeySetSql lists the drivers' */
+export const SV_EVENT_KEY = "concat(sample_unique_id, '\\t', hugo_gene_symbol, '\\t', ifNull(sv_event_info, ''))";
+
+/** The keys (SV_EVENT_KEY) of `studies`' structural variants of `genes` that are drivers at the pin. */
+export const svDriverKeySetSql = (db: string, pin: string, studies: string[], genes: string[]): string =>
+  "SELECT DISTINCT " + SV_EVENT_KEY + " AS k FROM (" + svDriverKeysSql(db, pin, studies, genes) + ") WHERE hugo_gene_symbol IN (" + genes.map(sq).join(", ") + ")";
+
+/**
+ * The structural variants that are drivers at the pin, as genomic_event_derived keys their rows
+ * (sample_unique_id, hugo_gene_symbol, sv_event_info), one row per partner gene: OncoKB's call for
+ * the pair with no tumour type, the query the portal's oncoprint asks (cancerTypeForOncoKb with no
+ * tumour types), or, where the store holds no row for the pair (a study not synced), either partner's
+ * gene-level Fusion call. `studies` narrows it to those studies' variants.
+ */
+export function svDriverKeysSql(db: string, pin: string, studies?: string[], genes?: string[]): string {
+  const only = (studies?.length ? " AND cs.cancer_study_identifier IN (" + studies.map(sq).join(", ") + ")" : "") +
+    (genes?.length ? " AND (g1.hugo_gene_symbol IN (" + genes.map(sq).join(", ") + ") OR g2.hugo_gene_symbol IN (" + genes.map(sq).join(", ") + "))" : "");
+  const geneCall = (alias: string) =>
+    "LEFT JOIN (SELECT hugo_gene_symbol AS gene, toUInt8(max(is_driver)) AS driver FROM " + ONCOKB_TABLE +
+    " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'SV' AND alteration = 'Fusion' GROUP BY gene) " + alias;
+  return "SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (\n" +
+    "  SELECT v.sample_unique_id AS sample_unique_id, v.event_info AS sv_event_info, [v.gene1, v.gene2] AS genes,\n" +
+    "         " + svDriverSql("pr") + " AS driver\n" +
+    "  FROM (SELECT concat(cs.cancer_study_identifier, '_', smp.stable_id) AS sample_unique_id, ifNull(sv.event_info, '') AS event_info,\n" +
+    "               ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2, sv.class AS class,\n" +
+    "               " + siteKey("sv.site1_entrez_gene_id") + " AS k1, " + siteKey("sv.site2_entrez_gene_id") + " AS k2\n" +
+    "        FROM " + db + ".structural_variant sv\n" +
+    "        JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id\n" +
+    "        JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "        JOIN " + db + ".sample smp ON smp.internal_id = sv.sample_id\n" +
+    "        LEFT JOIN " + db + ".gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id\n" +
+    "        LEFT JOIN " + db + ".gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id\n" +
+    "        WHERE gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'" + only + ") v\n" +
+    "  LEFT JOIN (SELECT site1_entrez, site2_entrez, sv_type, toUInt8(max(oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found\n" +
+    "             FROM " + ONCOKB_SV_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND tumor_type = ''\n" +
+    "             GROUP BY site1_entrez, site2_entrez, sv_type) pr\n" +
+    "    ON pr.site1_entrez = v.k1 AND pr.site2_entrez = v.k2 AND pr.sv_type = " + svTypeSql("v.") + "\n" +
+    "  " + geneCall("a1") + " ON a1.gene = v.gene1\n" +
+    "  " + geneCall("a2") + " ON a2.gene = v.gene2\n" +
+    ") ARRAY JOIN genes AS hugo_gene_symbol WHERE driver = 1 AND hugo_gene_symbol != ''";
+}
+
 /**
  * The portal's OncoKB sort value of a call, as SQL: [oncogenic, sensitive level, resistance level, diagnostic
  * level, prognostic level] scored as oncokb-frontend-commons OncoKB.tsx sortValue and OncoKbUtils 367-421

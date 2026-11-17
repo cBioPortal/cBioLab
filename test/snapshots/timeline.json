@@ -845,6 +845,160 @@
           ],
           "source": {
             "label": "primary"
+          },
+          "sampleAttrs": {
+            "P-0000012-T02-IM3": [
+              [
+                "CANCER_TYPE",
+                "Breast Cancer"
+              ],
+              [
+                "DIAGNOSIS_DESCRIPTION",
+                "Breast"
+              ],
+              [
+                "ICD_O_HISTOLOGY_DESCRIPTION",
+                "Infiltrating Duct Carcinoma"
+              ],
+              [
+                "CANCER_TYPE_DETAILED",
+                "Breast Invasive Ductal Carcinoma"
+              ],
+              [
+                "SAMPLE_TYPE",
+                "Primary"
+              ],
+              [
+                "MSI_TYPE",
+                "Indeterminate"
+              ],
+              [
+                "GENE_PANEL",
+                "IMPACT341"
+              ],
+              [
+                "SOMATIC_STATUS",
+                "Matched"
+              ],
+              [
+                "SAMPLE_CLASS",
+                "Tumor"
+              ],
+              [
+                "MUTATION_COUNT",
+                "1"
+              ],
+              [
+                "FRACTION_GENOME_ALTERED",
+                "0.3146"
+              ],
+              [
+                "TMB_NONSYNONYMOUS",
+                "1.109155301"
+              ],
+              [
+                "MSI_COMMENT",
+                "MICROSATELLITE INSTABILITY-INDETERMINATE. See MSI note below."
+              ],
+              [
+                "MSI_SCORE",
+                "4.1"
+              ],
+              [
+                "ONCOTREE_CODE",
+                "IDC"
+              ],
+              [
+                "PRIMARY_SITE",
+                "Breast"
+              ],
+              [
+                "SAMPLE_COVERAGE",
+                "344"
+              ]
+            ],
+            "P-0000012-T03-IM3": [
+              [
+                "CANCER_TYPE",
+                "Non-Small Cell Lung Cancer"
+              ],
+              [
+                "CLINICAL_GROUP",
+                "3B"
+              ],
+              [
+                "CLINICAL_SUMMARY",
+                "Distant"
+              ],
+              [
+                "DIAGNOSIS_DESCRIPTION",
+                "Lung and Bronchus"
+              ],
+              [
+                "ICD_O_HISTOLOGY_DESCRIPTION",
+                "Adenocarcinoma, Nos"
+              ],
+              [
+                "CANCER_TYPE_DETAILED",
+                "Lung Adenocarcinoma"
+              ],
+              [
+                "SAMPLE_TYPE",
+                "Metastasis"
+              ],
+              [
+                "MSI_TYPE",
+                "Stable"
+              ],
+              [
+                "GENE_PANEL",
+                "IMPACT341"
+              ],
+              [
+                "SOMATIC_STATUS",
+                "Matched"
+              ],
+              [
+                "SAMPLE_CLASS",
+                "Tumor"
+              ],
+              [
+                "MUTATION_COUNT",
+                "30"
+              ],
+              [
+                "FRACTION_GENOME_ALTERED",
+                "0.1844"
+              ],
+              [
+                "TMB_NONSYNONYMOUS",
+                "32.16550372"
+              ],
+              [
+                "MSI_COMMENT",
+                "MICROSATELLITE STABLE (MSS). See MSI note below."
+              ],
+              [
+                "MSI_SCORE",
+                "0.47"
+              ],
+              [
+                "METASTATIC_SITE",
+                "Neck"
+              ],
+              [
+                "ONCOTREE_CODE",
+                "LUAD"
+              ],
+              [
+                "PRIMARY_SITE",
+                "Lung"
+              ],
+              [
+                "SAMPLE_COVERAGE",
+                "428"
+              ]
+            ]
           }
         },
         "position": {
@@ -1421,7 +1575,7 @@
                   110,
                   446,
                   "",
-                  3.3,
+                  3.334664536741214,
                   "SNP",
                   "23",
                   76937801,
@@ -1456,7 +1610,7 @@
                   43,
                   294,
                   "",
-                  1.4,
+                  1.409744408945687,
                   "DEL",
                   "15",
                   91298168,
@@ -1491,7 +1645,7 @@
                   130,
                   440,
                   "",
-                  4.5,
+                  4.472843450479234,
                   "SNP",
                   "4",
                   153332775,
@@ -1526,7 +1680,7 @@
                   85,
                   248,
                   "",
-                  4.5,
+                  4.472843450479234,
                   "SNP",
                   "4",
                   153249542,
@@ -1561,7 +1715,7 @@
                   72,
                   341,
                   "",
-                  3.1,
+                  3.1389776357827475,
                   "SNP",
                   "5",
                   56160630,
@@ -1596,7 +1750,7 @@
                   57,
                   227,
                   "",
-                  3.1,
+                  3.1389776357827475,
                   "SNP",
                   "5",
                   56174930,
@@ -1631,7 +1785,7 @@
                   94,
                   439,
                   "",
-                  4.3,
+                  4.329419282690311,
                   "SNP",
                   "9",
                   8486074,
@@ -1666,7 +1820,7 @@
                   135,
                   318,
                   "",
-                  4.3,
+                  4.329419282690311,
                   "SNP",
                   "9",
                   8436666,
@@ -1701,7 +1855,7 @@
                   63,
                   380,
                   "",
-                  4.8,
+                  4.788721143861331,
                   "SNP",
                   "20",
                   40748610,
@@ -1736,7 +1890,7 @@
                   13,
                   243,
                   "",
-                  4.8,
+                  4.788721143861331,
                   "SNP",
                   "20",
                   40739128,
@@ -1771,7 +1925,7 @@
                   82,
                   313,
                   "",
-                  4.3,
+                  4.333067092651757,
                   "SNP",
                   "19",
                   11144050,
@@ -1806,7 +1960,7 @@
                   114,
                   113,
                   "",
-                  52.4,
+                  52.412140575079874,
                   "SNP",
                   "17",
                   7577515,
@@ -1841,7 +1995,7 @@
                   88,
                   131,
                   "",
-                  52.4,
+                  52.412140575079874,
                   "DEL",
                   "17",
                   7579487,
@@ -1876,7 +2030,7 @@
                   84,
                   398,
                   "",
-                  2.7,
+                  2.6677316293929714,
                   "SNP",
                   "3",
                   142178126,
@@ -1911,7 +2065,7 @@
                   89,
                   561,
                   "",
-                  2.1,
+                  2.056873552200655,
                   "SNP",
                   "17",
                   63534396,
@@ -1946,7 +2100,7 @@
                   92,
                   538,
                   "",
-                  1.4,
+                  1.3538338658146964,
                   "SNP",
                   "17",
                   59876623,
@@ -1981,7 +2135,7 @@
                   39,
                   222,
                   "",
-                  0.5,
+                  0.5351437699680511,
                   "SNP",
                   "19",
                   30303904,
@@ -2016,7 +2170,7 @@
                   67,
                   203,
                   "",
-                  3.4,
+                  3.4424920127795526,
                   "SNP",
                   "16",
                   3778565,
@@ -2051,7 +2205,7 @@
                   61,
                   324,
                   "",
-                  2.3,
+                  2.2563897763578273,
                   "SNP",
                   "19",
                   2207631,
@@ -2086,7 +2240,7 @@
                   42,
                   193,
                   "",
-                  2.8,
+                  2.751597444089457,
                   "SNP",
                   "5",
                   180056365,
@@ -2108,7 +2262,7 @@
               },
               {
                 "…": "5 more",
-                "sha256": "d4abadf16183afb1"
+                "sha256": "4d9a6623302ab43a"
               }
             ],
             "offset": 0,
@@ -2186,7 +2340,7 @@
                   "AMP",
                   "Oncogenic · Level 4",
                   "12q14.1",
-                  1.6
+                  1.5575079872204474
                 ]
               },
               {
@@ -2200,7 +2354,7 @@
                   "AMP",
                   "Oncogenic",
                   "1q21.2",
-                  1.5
+                  1.5095846645367412
                 ]
               },
               {
@@ -2214,7 +2368,7 @@
                   "AMP",
                   "Unknown",
                   "1q22",
-                  0.7
+                  0.7388769071012061
                 ]
               }
             ],
@@ -2249,8 +2403,24 @@
                 "numeric": false
               },
               {
+                "id": "status",
+                "name": "Status",
+                "numeric": false,
+                "unsorted": true
+              },
+              {
                 "id": "class",
                 "name": "Variant Class",
+                "numeric": false
+              },
+              {
+                "id": "pos1",
+                "name": "Site 1 Position",
+                "numeric": false
+              },
+              {
+                "id": "pos2",
+                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -2259,13 +2429,18 @@
                 "numeric": false
               },
               {
+                "id": "connectionType",
+                "name": "Connection Type",
+                "numeric": false
+              },
+              {
                 "id": "breakpointType",
                 "name": "Breakpoint Type",
                 "numeric": false
               },
               {
-                "id": "connectionType",
-                "name": "Connection Type",
+                "id": "svAnnotation",
+                "name": "Additional Annotation",
                 "numeric": false
               },
               {
@@ -2281,16 +2456,6 @@
               {
                 "id": "site2",
                 "name": "Site 2 Description",
-                "numeric": false
-              },
-              {
-                "id": "pos1",
-                "name": "Site 1 Position",
-                "numeric": false
-              },
-              {
-                "id": "pos2",
-                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -2319,16 +2484,6 @@
                 "numeric": false
               },
               {
-                "id": "status",
-                "name": "Status",
-                "numeric": false
-              },
-              {
-                "id": "svAnnotation",
-                "name": "Study Annotation",
-                "numeric": false
-              },
-              {
                 "id": "comments",
                 "name": "Comments",
                 "numeric": false
@@ -2338,18 +2493,18 @@
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "defaults": [
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "query": {},
@@ -2404,7 +2559,7 @@
           {
             "kind": "fetch",
             "title": "Read P-0000012's three tables",
-            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event (both genes and breakpoints, class, event info), the highest read counts among its samples. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
             "params": [
               [
                 "Mutations",
