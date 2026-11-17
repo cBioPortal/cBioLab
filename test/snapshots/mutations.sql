@@ -192,7 +192,7 @@ rows AS (
   LEFT JOIN ct0 AS ct ON ct.sid = v.sid LEFT JOIN mc0 AS mc ON mc.sid = v.sid
   LEFT JOIN cta0 AS cta ON cta.sid = v.sid LEFT JOIN cn0 AS cn ON cn.sid = v.sid AND cn.g = v.gene1
 )
-SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS n, count() AS all, count() - uniqExact((study, patient, ifNull(proteinChange, ''))) AS dup FROM rows GROUP BY cohort, study
+SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS n, count() AS all, count() - uniqExact((study, patient, ifNull(proteinChange, ''))) AS dup, uniqExactIf(sid, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS ns, uniqExactIf(patient, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS np FROM rows GROUP BY cohort, study
 
 -- view 0 mutations: mutations:rows · msk_chord_2024
 WITH ann AS (SELECT alteration, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level,

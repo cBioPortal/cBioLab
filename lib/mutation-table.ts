@@ -2,9 +2,11 @@
 // cBioPortal's Mutations tab lists. Its rows name samples, so — like the clinical table — the query
 // lives here, outside lib/federation*.ts's aggregate builders, and runs only through
 // PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
+// The one other reader is the lollipop narrowed by the table's search (mutationRowKeysSql), which
+// BaseResolver.lollipopCounts builds only on a patient-level participant and refuses everywhere else.
 import { mutationStudySql, sq } from "./compiler.ts";
-import type { QueryColumn, RowSource } from "./table-query.ts";
-import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
+import { whereSql, type QueryColumn, type RowSource, type TableQuery } from "./table-query.ts";
+import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS, LOLLIPOP_OWN_FILTERS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
@@ -84,7 +86,7 @@ export const MUTATION_ANNOTATION_ORDER = "arrayConcat(" + oncokbSortSql("oncogen
   ", [toFloat64(0), toFloat64(hot), toFloat64(0)])";
 
 /** Shown unless the view names its columns: the portal's own default set. */
-export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "mutCount"];
+export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "copyNumber", "vaf", "mutCount"];
 
 /**
  * The lollipop grid's cell a mutation falls in, spelled as the grid labels it ("Missense · Driver"):
@@ -388,5 +390,24 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     tiebreak: "sid, ord, proteinChange",
     // the same change in one patient's several samples (MutationUtils groupMutationsByGeneAndPatientAndProteinChange; one gene per table)
     duplicateKey: "(study, patient, ifNull(proteinChange, ''))",
+    units: { sample: "sid", patient: "patient" },
   };
 }
+
+/**
+ * The rows one part's table keeps under the query `q` — its search over the shown columns and its
+ * column filters — as `(sid, proteinChange, mutationType, rowKeySql)`, the lollipop's own key for a
+ * mutation or fusion row: two calls of one change in one sample differ by their genomic position or
+ * alleles (a fusion's, by site 1). The table's Alteration and Protein Position filters are left out: they are the grid's
+ * and the plot's own selection, which narrow the table alone (the portal's badge counts ignore the
+ * badge filter, and a selected codon narrows only the table).
+ */
+export function mutationRowKeysSql(part: TablePart, db: string, gene: string, pin: string | null, pins: VariantPins, oql: LollipopOql | undefined, q: TableQuery): string {
+  const src = mutationRowSource([part], db, gene, pin, pins, oql);
+  return src.with + "SELECT sid, proteinChange, ifNull(mutationType, '') AS mutationType, " + rowKeySql("chr", "start", "end", "ref", "var") + " AS rk FROM rows\n" +
+    "WHERE " + whereSql(src, { ...q, filters: Object.fromEntries(Object.entries(q.filters || {}).filter(([id]) => !LOLLIPOP_OWN_FILTERS.has(id))) }, MUTATION_DEFAULT_COLUMNS);
+}
+
+/** a row's genomic position and alleles as one string (a fusion: site 1's chromosome and position), the same for the table's rows and the lollipop's */
+export const rowKeySql = (chr: string, start: string, end: string, ref: string, alt: string): string =>
+  "concat(ifNull(toString(" + chr + "), ''), ':', ifNull(toString(" + start + "), ''), '-', ifNull(toString(" + end + "), ''), ':', ifNull(toString(" + ref + "), ''), '>', ifNull(toString(" + alt + "), ''))";

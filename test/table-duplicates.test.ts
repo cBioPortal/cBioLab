@@ -82,14 +82,14 @@ describe("D1 countsSql over a source with a duplicate key", () => {
   test("D1 the mutations table's counts select dup keyed on study, patient and protein change (one gene per table)", () => {
     const s = mutationRowSource(PARTS, "db", "KRAS", null, PINS);
     const sql = countsSql(s, {}, ["sample"]);
-    const m = /count\(\) - uniqExact\((.*)\) AS dup FROM rows GROUP BY cohort, study$/.exec(sql);
+    const m = /count\(\) - uniqExact\((.*?)\) AS dup\b[\s\S]* FROM rows GROUP BY cohort, study$/.exec(sql);
     assert.ok(m, "the mutations counts select a dup");
     for (const c of ["study", "patient", "proteinChange"]) assert.match(m[1], new RegExp("\\b" + c + "\\b"), "the key names " + c);
   });
   test("D1 the sv table's counts select dup keyed on study, patient and both breakpoints", () => {
     const s = svRowSource(PARTS, "db", ["ALK"], null);
     const sql = countsSql(s, {}, ["sample"]);
-    const m = /count\(\) - uniqExact\((.*)\) AS dup FROM rows GROUP BY cohort, study$/.exec(sql);
+    const m = /count\(\) - uniqExact\((.*?)\) AS dup\b[\s\S]* FROM rows GROUP BY cohort, study$/.exec(sql);
     assert.ok(m, "the sv counts select a dup");
     for (const c of ["study", "patient", "site1Chr", "site1Pos", "site2Chr", "site2Pos"]) assert.match(m[1], new RegExp("\\b" + c + "\\b"), "the key names " + c);
   });

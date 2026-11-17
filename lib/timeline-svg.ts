@@ -5,8 +5,8 @@
 // lib/view-svg.ts for the MCP figure, so both are the same drawing.
 import { esc, frame, caption, palette, label, textWidth, textOn, fmtNum, r1, FS, SW, type SvgOpts } from "./svg-kit.ts";
 import {
-  buildTracks, flattenTracks, axisTicks, dayScale, sampleMarks, numericResult, attr, yearLabel, formatDays, monthTicks,
-  COLOR_KEY, SHAPE_KEY, POINT_COLOR, YEAR, type TlItem, type TlTrack, type SampleMark,
+  buildTracks, flattenTracks, axisTicks, dayScale, sampleMarks, numericResult, attr, formatDays, axisMarks,
+  COLOR_KEY, SHAPE_KEY, POINT_COLOR, type TlItem, type TlTrack, type SampleMark,
 } from "./timeline-tracks.ts";
 import type { PatientEvent, PatientTimeline } from "./types.ts";
 
@@ -133,40 +133,21 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   const H = y + 6;
   const parts: string[] = [];
 
-  // the axis: a year line and label at each year start; a cut as a squiggle. Labels that would
-  // touch a cut or the label before them are left out (the year lines stay), and the end labels
-  // are kept inside the figure.
   parts.push(`<line x1="${HW}" y1="${AXIS_H - 0.5}" x2="${HW + PW}" y2="${AXIS_H - 0.5}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
-  const cuts = ticks.filter((tk) => tk.trim).map((tk) => X(tk.start));
-  let lastRight = -Infinity;
-  for (const tk of ticks) {
-    if (tk.trim) {
-      const cx = X(tk.start);
-      parts.push(`<g transform="translate(${cx.toFixed(1)} 0)"><title>${tk.trim.years} years with no events, cut</title>` +
+  // the axis: a year line and label at each year start; a cut as a squiggle with a guide down the
+  // plot; the months inside a wide year as short ticks, some labelled (axisMarks, shared)
+  for (const m of axisMarks(ticks, X, HW, W - 2, (t) => textWidth(t, FS.small))) {
+    if (m.kind === "cut")
+      parts.push(`<g transform="translate(${m.x.toFixed(1)} 0)"><title>${m.years} years with no events, cut</title>` +
         `<path d="M-6 ${AXIS_H - 9} q3 -6 6 0 t6 0" fill="none" stroke="${pal.muted}" stroke-width="1.2"/>` +
         `<line x1="0" x2="0" y1="${AXIS_H}" y2="${H - 4}" stroke="${pal.muted}" stroke-width="${SW.hair}" stroke-dasharray="2 3"/></g>`);
-      lastRight = Math.max(lastRight, cx + 8);
-      continue;
-    }
-    for (let d = Math.ceil(tk.start / YEAR) * YEAR; d <= tk.end; d += YEAR) {
-      const x = X(d), xx = x.toFixed(1);
-      const text = yearLabel(d), w = textWidth(text, FS.small);
-      const cx = Math.min(Math.max(x, HW + w / 2), W - 2 - w / 2);
-      const clear = cx - w / 2 > lastRight + 6 && cuts.every((c) => Math.abs(c - cx) > w / 2 + 8);
-      parts.push(`<line x1="${xx}" x2="${xx}" y1="${AXIS_H - 4}" y2="${H - 4}" stroke="${d === 0 ? pal.muted : pal.line}" stroke-width="${SW.hair}"/>`);
-      if (clear) { parts.push(label(cx, AXIS_H - 8, text, { size: FS.small, fill: pal.muted, anchor: "middle" })); lastRight = cx + w / 2; }
-      // the months inside a wide year: short ticks on the axis, some labelled, as the portal's axis
-      for (const m of monthTicks(d, X(d + YEAR) - x)) {
-        if (m.day > tk.end) break;
-        const mx = X(m.day);
-        parts.push(`<line x1="${r1(mx)}" x2="${r1(mx)}" y1="${AXIS_H - 3}" y2="${AXIS_H}" stroke="${pal.muted}" stroke-width="${SW.hair}"/>`);
-        if (!m.label) continue;
-        const mw = textWidth(m.label, FS.small);
-        if (mx - mw / 2 > lastRight + 6 && mx + mw / 2 < W - 2 && cuts.every((c) => Math.abs(c - mx) > mw / 2 + 8)) {
-          parts.push(label(mx, AXIS_H - 8, m.label, { size: FS.small, fill: pal.muted, anchor: "middle" }));
-          lastRight = mx + mw / 2;
-        }
-      }
+    else if (m.kind === "year") {
+      const xx = m.x.toFixed(1);
+      parts.push(`<line x1="${xx}" x2="${xx}" y1="${AXIS_H - 4}" y2="${H - 4}" stroke="${m.day === 0 ? pal.muted : pal.line}" stroke-width="${SW.hair}"/>`);
+      if (m.label) parts.push(label(m.label.x, AXIS_H - 8, m.label.text, { size: FS.small, fill: pal.muted, anchor: "middle" }));
+    } else {
+      parts.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${AXIS_H - 3}" y2="${AXIS_H}" stroke="${pal.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) parts.push(label(m.x, AXIS_H - 8, m.label, { size: FS.small, fill: pal.muted, anchor: "middle" }));
     }
   }
 

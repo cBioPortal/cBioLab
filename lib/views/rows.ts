@@ -37,6 +37,8 @@ function queryReads(q: TableQuery, shown: string[]): string[] {
 export type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; study: string; total: number; all: number }[]; total: number; all: number; offset: number; groups: number; values?: ColumnValues;
   /** rows beyond the first with each duplicate key, over every row (a source with RowSource.duplicateKey) */
   duplicates?: number;
+  /** the distinct samples and patients among the rows the query keeps (a source with RowSource.units), when every part reports them */
+  kept?: { samples: number; patients: number };
   /** with `locate`: the patient's place in the list's one order and the rows either side of it — null when the query leaves it out */
   position?: { index: number; prev: Record<string, unknown> | null; next: Record<string, unknown> | null } | null };
 
@@ -96,7 +98,8 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
     return { rows: [], lists: [], total: 0, all: 0, offset: 0, groups: groups.length, values: mergeValues(values.column, values.numeric, got as Record<string, unknown>[][]) };
   }
   const lists: Rows["lists"] = [];
-  let all = 0, duplicates = 0, dupParts = 0, parts = 0;
+  let all = 0, duplicates = 0, dupParts = 0, parts = 0, unitParts = 0;
+  const kept = { samples: 0, patients: 0 };
   await Promise.all(groups.map(async (g) => {
     const counts = await g.backend.counts(g.parts, reads);
     for (const p of g.parts) {
@@ -108,6 +111,11 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
       const dup = c?.dup;
       if (!c) dupParts++;
       else if (typeof dup === "number" && Number.isInteger(dup) && dup >= 0 && dup <= c.all) { duplicates += dup; dupParts++; }
+      // a part with no rows has nothing to count; one that reports no units leaves the sums unknown, not smaller
+      if (!c) unitParts++;
+      else if (typeof c.ns === "number" && typeof c.np === "number" && Number.isInteger(c.ns) && Number.isInteger(c.np) && c.ns >= 0 && c.np >= 0 && c.ns <= c.n && c.np <= c.ns) {
+        kept.samples += c.ns; kept.patients += c.np; unitParts++;
+      }
     }
   }));
   const total = groups.reduce((n, g) => n + g.total, 0);
@@ -139,7 +147,7 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
   })() : Promise.resolve(undefined)]);
   const order = (l: { cohort: string; study: string }) => ctx.vNames.indexOf(l.cohort) * 1000 + ctx.vStudies.indexOf(l.study);
   lists.sort((a, b) => order(a) - order(b));
-  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}), ...(parts && dupParts === parts ? { duplicates } : {}) };
+  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}), ...(parts && dupParts === parts ? { duplicates } : {}), ...(parts && unitParts === parts ? { kept } : {}) };
 }
 
 /** A view's query as the document gives it, with an older `sort.attribute` read as `sort.column`. */
