@@ -238,7 +238,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Table defaults: Copy # and Allele Freq (T) shown; Mutation Type as the portal's coloured label (ours `Missense_Mutation`); sorted by Annotation ↓ (KRAS: G12C first; ours "drivers, then codon", A11_G12dup first) (MUT-COL-38, MUT-COL-11, MUT-COL-T1, MUT-TB-9, MUT-STM-10)
     - [x] Mutation Type as the portal's coloured label (#245)
   - [ ] The Annotation column's icons, cards and header. The OncoKB level by tumour type, hotspots and CIViC are under *Mutation annotation breadth* (MUT-COL-7, MUT-AN-1…6)
-  - [ ] Table search and column filters reach the lollipop and badges (search "G12D": table 59 rows, lollipop still 14 stems / 223) (MUT-TB-3, MUT-FM-1, MUT-FM-3, MUT-STM-4)
+  - [x] Table search and column filters reach the lollipop and badges (search "G12D": table 59 of 223, badges 59); the grid's own cells and the stem selection still narrow only the table, and the frequency ignores them all (MUT-TB-3, MUT-FM-1, MUT-FM-3, MUT-STM-4)
   - [ ] The Y-Axis Max slider; axis "# patients" (ours "# KRAS Mutations"); top tick at the data, "≥" when capped (142; ours niced to 150) (MUT-LP-2, MUT-LP-6, MUT-STM-17)
   - [ ] Stem tooltip "142 mutated of 594 profiled patients / AA Change: G12D/V/C/A/S/R" (ours a native SVG title); hover highlights the table's rows (MUT-LP-10, MUT-LP-11)
   - [ ] Columns: Gene, Cancer Type, Copy #, ASCN (5), VS, Center, Allele Freq (N), normal reads, Exon, clinical attributes, namespace; the annotation sources are under *Mutation annotation breadth* (MUT-COL-2…37)

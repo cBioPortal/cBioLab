@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "mutation-search-lollipop";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "mutation-search-lollipop": ["node", "--env-file=.env.local", "scripts/check-mutation-search-lollipop.ts"],
 };
 
 interface Mutant {
@@ -525,6 +526,15 @@ const MUTANTS: Mutant[] = [
   { id: "fusion-only-gene-dropped", layer: "counts", guard: "mutation-fusions", file: "lib/views/hotspots/run.ts",
     effect: "A gene with fusions but no mutations disappears from the Mutations tab's lollipop, with its Fusion badge and frequency, where the portal keeps it.",
     find: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));", replace: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i])).filter((h) => h.mutated > 0);" },
+  { id: "lollipop-ignores-table-search", layer: "counts", guard: "mutation-search-lollipop", file: "lib/federation.ts",
+    effect: "A search in the Mutations tab's table leaves the lollipop and badges counting every mutation, where the portal's follow the table.",
+    find: "m AS (SELECT * FROM ma WHERE gene != ", replace: "m AS (SELECT * FROM ma WHERE 1 OR gene != " },
+  { id: "lollipop-badge-filter-narrows-badges", layer: "counts", guard: "mutation-search-lollipop", file: "lib/mutation-table.ts",
+    effect: "Hiding a badge narrows the badges' own counts, where the portal's badge counts ignore the badge filter.",
+    find: "const LOLLIPOP_OWN_FILTERS = new Set([\"alteration\", \"proteinPos\"]);", replace: "const LOLLIPOP_OWN_FILTERS = new Set([\"proteinPos\"]);" },
+  { id: "results-table-alteration-to-lollipop", layer: "counts", guard: "unit", file: "app/portal/results-layout.ts",
+    effect: "The table's Alteration filter (the grid's own selection) is handed to the lollipop as a row filter, so hiding a badge also shrinks every badge.",
+    find: "filter(([id]) => id !== \"alteration\" && id !== \"proteinPos\")", replace: "filter(([id]) => id !== \"proteinPos\")" },
   { id: "germline-case-sensitive", layer: "counts", guard: "mutation-tab-states", file: "lib/federation.ts",
     effect: "A mutation whose status is spelled 'Germline' or 'germline' counts as somatic in the Somatic Mutation Frequency, where the portal matches germline in any case.",
     find: "AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "AND ifNull(status, '') != 'GERMLINE') AS somatic_samples" },
