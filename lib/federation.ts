@@ -39,7 +39,7 @@ export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLaye
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
-import { pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
+import { checkQuery, pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
 export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
@@ -73,6 +73,7 @@ import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
+import { MUTATION_COLUMNS, mutationRowKeysSql } from "./mutation-table.ts";
 import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 import { variantPins, type VariantPins } from "./variant-annotation.ts";
 
@@ -418,6 +419,12 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  */
 /** the query's lines a Mutations tab follows, and how their DRIVER reads */
 export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
+/**
+ * The Mutations tab's table query for one gene (its search over the shown columns, its column filters),
+ * which the portal's lollipop and badges follow (MUT-FM-1); the table's Alteration and Protein Position
+ * filters, the grid's and the plot's own selection, are not applied to them.
+ */
+export interface LollipopRows extends Pick<TableQuery, "search" | "filters" | "columns"> { gene: string }
 /** each gene's mutation filter under the query's lines, where one applies */
 export function mutationFilters(oql: LollipopOql, genes: string[], o: { study: string; db: string; oncokbPin: string | null; hotspotPins: VariantPins | null }): MutationFilters {
   const out: MutationFilters = {};
@@ -575,8 +582,14 @@ const filteredGenesSql = (genes: string[], filters?: MutationFilters): string =>
   !filters || !Object.keys(filters).length ? ""
     : "\n             AND (" + genes.map((g) => "(`GENE.hugoGeneSymbol` = " + sq(g) + (filters[g] ? " AND " + filters[g] : "") + ")").join("\n               OR ") + ")";
 
+/**
+ * The mutation table's rows for one gene under its search and column filters (lib/mutation-table.ts
+ * mutationRowKeysSql): `keys` selects their (sid, proteinChange, mutationType).
+ */
+export interface LollipopRowKeys { gene: string; keys: string }
+
 function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string, hotspotPins: VariantPins | null = null,
-  filters?: MutationFilters, fusionLines?: string[]): string {
+  filters?: MutationFilters, fusionLines?: string[], rowKeys?: LollipopRowKeys): string {
   const floor = Math.max(1, Math.floor(minCount));
   const fusionDriver = pin ? svDriverSql("vn") : "toUInt8(1)";
   const fusionFilter = fusionLines ? oqlFusionFilterSql(fusionLines, "v.gene1", "v.gene2", fusionDriver) : null;
@@ -606,7 +619,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "           WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'\n" +
     "             AND (sv.site1_entrez_gene_id IN (" + entrezOf(db, genes) + ") OR sv.site2_entrez_gene_id IN (" + entrezOf(db, genes) + "))\n" +
     "             AND " + inCohortSamples("smp.stable_id") + "),\n" +
-    "     m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
+    "     " + (rowKeys ? "ma" : "m") + " AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
     "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver, toUInt8(0) AS sv, gene AS rgene\n" +
     "           FROM " + db + ".mutation_derived\n" +
     "           WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ")\n" +
@@ -620,14 +633,16 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     (pin ? "\n           LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''\n" +
       "           LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''" : "") +
     (fusionFilter ? "\n           WHERE " + fusionFilter : "") + "),\n" +
+    // the table's search and filters narrow its gene's rows here, as the portal's filtered data does the lollipop's and badges'
+    (rowKeys ? "     m AS (SELECT * FROM ma WHERE gene != " + sq(rowKeys.gene) + " OR (sid, change, ifNull(mtype, '')) IN (\n" + rowKeys.keys + ")),\n" : "") +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
 /** Per (codon, change): distinct patients (the height), raw rows (the label's ordering), and the change's
  * driver status and protein impact class (its commonest), so the plot can be filtered by class in the browser. */
 export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null,
-  filters?: MutationFilters, fusionLines?: string[]): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines) +
+  filters?: MutationFilters, fusionLines?: string[], rowKeys?: LollipopRowKeys): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines, rowKeys) +
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
     "FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
 }
@@ -638,8 +653,8 @@ export function lollipopChangesSql(cohortSql: string, genes: string[], study: st
  * membership test compares pos through ifNull rather than letting NULL fail the tuple match.
  */
 export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null,
-  filters?: MutationFilters, fusionLines?: string[]): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines) +
+  filters?: MutationFilters, fusionLines?: string[], rowKeys?: LollipopRowKeys): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines, rowKeys) +
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
     "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
@@ -1277,7 +1292,8 @@ export interface AggregateCapable {
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
-  lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number, oql?: LollipopOql): Promise<LollipopReport>;
+  /** `rows`: the mutation table's search and filters for one gene, which narrow that gene's stems and badges */
+  lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number, oql?: LollipopOql, rows?: LollipopRows): Promise<LollipopReport>;
   profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): CohortSql;
@@ -1626,7 +1642,7 @@ abstract class BaseResolver implements AggregateCapable {
     };
   }
 
-  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql): Promise<LollipopReport> {
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, rows?: LollipopRows): Promise<LollipopReport> {
     const pin = this.ctx.oncokbPin ?? null;
     const empty: LollipopReport = { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: !!pin };
     if (!genes.length) return empty;
@@ -1635,9 +1651,12 @@ abstract class BaseResolver implements AggregateCapable {
     const hotspotPins = await variantPins();
     const filters = oql ? mutationFilters(oql, genes, { study: this.study, db, oncokbPin: pin, hotspotPins }) : undefined;
     const fusionLines = oql?.lines;
+    if (rows) { const bad = checkQuery(rows, MUTATION_COLUMNS); if (bad) throw new Error("rows: " + bad); }
+    const rowKeys = rows && genes.includes(rows.gene)
+      ? { gene: rows.gene, keys: mutationRowKeysSql({ cohort: "", study: this.study, cohortSql: cohort }, db, rows.gene, pin, hotspotPins, oql, rows) } : undefined;
     const [c, t, tot, cs] = await Promise.all([
-      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines), conn),
-      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines), conn),
+      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, rowKeys), conn),
+      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, rowKeys), conn),
       this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters, fusionLines ? { lines: fusionLines, pin } : undefined), conn),
       this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
     ]);

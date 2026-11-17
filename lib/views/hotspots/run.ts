@@ -8,6 +8,8 @@ import { isGrch38 } from "../../mutation-cell-text.ts";
 import { studyGenomeSql } from "../../federation-views.ts";
 import { hasViewAggregates } from "../../federation.ts";
 import type { HotspotsView, HotspotGene } from "./types.ts";
+import { checkQuery, describeQuery } from "../../table-query.ts";
+import { MUTATION_COLUMNS, lollipopNarrowing } from "../../mutation-table.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
@@ -22,11 +24,17 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const hide = [...new Set(hv.hide || [])];
   { const e = checkCodons(hv.codons, uniq); if (e) return untimed({ kind: "hotspots", error: e }); }
   const codons = pruneCodons(hv.codons && Object.fromEntries(Object.entries(hv.codons).map(([g, ps]) => [g, [...new Set(ps)].sort((a, b) => a - b)])), uniq);
+  if (hv.table !== undefined) {
+    if (!hv.table || typeof hv.table !== "object" || !uniq.includes(hv.table.gene)) return untimed({ kind: "hotspots", error: "table names a gene of the view (" + uniq.join(", ") + "), not " + String((hv.table as { gene?: unknown } | null)?.gene ?? "none") });
+    const bad = checkQuery(hv.table, MUTATION_COLUMNS);
+    if (bad) return untimed({ kind: "hotspots", error: "table: " + bad });
+  }
+  const narrowing = hv.table && lollipopNarrowing(hv.table);
   const cn = vNames[0];
   const studies = cohorts[cn].studies;
   // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
   const [reports, proteins] = await Promise.all([
-    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql))),
+    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql, hv.table))),
     Promise.all(uniq.map((g) => fetchProteinInfo(g)))
   ]);
   // every queried gene, an empty one included: the portal keeps its tab and draws its plot empty
@@ -54,6 +62,8 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
       " Colour is the codon's dominant mutation type, putative drivers before VUS" +
       (annotated ? " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
+      (narrowing ? " " + narrowing.gene + "'s stems and badges count only the mutations its table keeps, " + describeQuery(narrowing, MUTATION_COLUMNS) +
+          ", as the portal's lollipop follows its table's search and filters; its Somatic Mutation Frequency does not." : "") +
       (empty.length ? " " + empty.join(", ") + (empty.length === 1 ? " has" : " have") + " no mutations in “" + cn + "”: " + (empty.length === 1 ? "its plot is" : "their plots are") +
         " drawn empty, with no somatic mutation frequency, as the portal draws a gene with none." : "") +
       " Structural variants are counted as the portal's Mutations tab counts them: in the Fusion badge of each queried partner, and in the somatic frequency of their site 1 gene only; they have no codon, so no stem, and the mutation table lists them." +

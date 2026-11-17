@@ -3,7 +3,7 @@
 // lives here, outside lib/federation*.ts's aggregate builders, and runs only through
 // PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
 import { mutationStudySql, sq } from "./compiler.ts";
-import type { QueryColumn, RowSource } from "./table-query.ts";
+import { whereSql, type QueryColumn, type RowSource, type TableQuery } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
@@ -337,4 +337,25 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     defaultOrder: "drv DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",
   };
+}
+
+/**
+ * The rows one part's table keeps under the query `q` — its search over the shown columns and its
+ * column filters — as `(sid, proteinChange, mutationType)`, the lollipop's own key for a mutation or
+ * fusion row. The table's Alteration and Protein Position filters are left out: they are the grid's
+ * and the plot's own selection, which narrow the table alone (the portal's badge counts ignore the
+ * badge filter, and a selected codon narrows only the table).
+ */
+export function mutationRowKeysSql(part: TablePart, db: string, gene: string, pin: string | null, pins: VariantPins, oql: LollipopOql | undefined, q: TableQuery): string {
+  const src = mutationRowSource([part], db, gene, pin, pins, oql);
+  return src.with + "SELECT sid, proteinChange, ifNull(mutationType, '') AS mutationType FROM rows\n" +
+    "WHERE " + whereSql(src, { ...q, filters: lollipopFilters(q) }, MUTATION_DEFAULT_COLUMNS);
+}
+/** the table's filters that are the lollipop's own selection: its grid's cells and its stems */
+const LOLLIPOP_OWN_FILTERS = new Set(["alteration", "proteinPos"]);
+const lollipopFilters = (q: TableQuery) => Object.fromEntries(Object.entries(q.filters || {}).filter(([id]) => !LOLLIPOP_OWN_FILTERS.has(id)));
+/** the part of a table query that narrows the lollipop, or null when nothing does */
+export function lollipopNarrowing<Q extends TableQuery>(q: Q): Q | null {
+  const filters = lollipopFilters(q);
+  return (q.search || "").trim() || Object.keys(filters).length ? { ...q, filters } : null;
 }

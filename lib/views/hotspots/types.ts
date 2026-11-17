@@ -2,6 +2,7 @@
 import type {  } from "../../types.ts";
 
 import type { DriverSettings } from "../../driver-settings.ts";
+import type { LollipopRows } from "../../federation.ts";
 export interface HotspotsView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number;
@@ -25,7 +26,14 @@ export interface HotspotsView {
    * filters the mutation table to those protein positions. Applied where the figure is drawn, so a
    * change re-runs nothing.
    */
-  codons?: Record<string, number[]> }
+  codons?: Record<string, number[]>;
+  /**
+   * The mutation table's query for one of `genes` (its search over the shown columns and its column
+   * filters): that gene's stems and badges count only the rows the table keeps, as the portal's
+   * filtered data. The table's Alteration and Protein Position filters (this grid's and these stems'
+   * selection) are not applied here; the Somatic Mutation Frequency ignores it.
+   */
+  table?: LollipopRows }
 /** Recurrent protein changes in one gene, with the cohort's mutated total. */
 /** One drawn stem: a codon, its height (distinct patient + change pairs), and how it is coloured. */
 export interface LollipopPosition {

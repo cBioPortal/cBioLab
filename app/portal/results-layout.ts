@@ -168,10 +168,13 @@ const pinsOf = (q: ResultsQuery) => ({ ...(q.exp ? { exp: q.exp } : {}), ...(q.p
  * value filter set on that column from the table becomes the grid's selection. The stems selected
  * on the plot (its `codons`, for the tab's one gene) become the table's filter on its Protein
  * Position column, and a value filter set there from the table selects those stems. A condition or
- * range filter on either column is not a set of cells or codons, so it leaves the plot alone.
+ * range filter on either column is not a set of cells or codons, so it leaves the plot alone. The
+ * table's search and its other column filters become the plot's `table`: its stems and badges count
+ * only the mutations the table keeps, as the portal's filtered data (MUT-FM-1).
  */
 export function linkMutations(vs: View[], changed: number): View[] {
-  const [lp, tb] = vs as unknown as [{ hide?: string[]; genes?: string[]; codons?: Record<string, number[]> } & View, { gene?: string; filters?: Record<string, unknown> } & View];
+  const [lp, tb] = vs as unknown as [{ hide?: string[]; genes?: string[]; codons?: Record<string, number[]>; table?: unknown } & View,
+    { gene?: string; filters?: Record<string, unknown>; search?: string; columns?: string[] } & View];
   const gene = tb.gene || (lp.genes || [])[0] || "";
   if (changed === 0) {
     const hide = lp.hide || [];
@@ -195,7 +198,17 @@ export function linkMutations(vs: View[], changed: number): View[] {
     const picked = [...new Set((pf?.values || []).map(Number).filter((n) => Number.isInteger(n) && n >= 0))].sort((a, b) => a - b);
     next = { ...next, codons: pruneCodons({ ...(next.codons || {}), [gene]: picked }, gene ? [gene] : []) };
   }
+  const table = tableQueryFor(tb, gene);
+  if (JSON.stringify(table) !== JSON.stringify(next.table)) next = { ...next, table } as typeof next;
   return next === lp ? vs : [next as View, tb];
+}
+
+/** the table's search and its column filters other than the plot's own (Alteration, Protein Position), for the plot; undefined when none */
+function tableQueryFor(tb: { search?: string; filters?: Record<string, unknown>; columns?: string[] }, gene: string) {
+  const filters = Object.fromEntries(Object.entries(tb.filters || {}).filter(([id]) => id !== "alteration" && id !== "proteinPos"));
+  const search = (tb.search || "").trim();
+  if (!gene || (!search && !Object.keys(filters).length)) return undefined;
+  return { gene, ...(search ? { search } : {}), ...(Object.keys(filters).length ? { filters } : {}), ...(tb.columns ? { columns: tb.columns } : {}) };
 }
 
 /**
@@ -325,7 +338,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       chooser: { label: "gene", options: genes, locks: ["gene", "genes"],
         value: (vs: View[]) => String(((vs[1] as unknown as { gene?: string }).gene) || genes[0]),
         // a new gene keeps the grid's selection (it is about classes, not this gene) and starts the table's own query over
-        apply: (vs: View[], g: string) => linkMutations([{ ...vs[0], genes: [g], codons: undefined } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0) },
+        apply: (vs: View[], g: string) => linkMutations([{ ...vs[0], genes: [g], codons: undefined, table: undefined } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0) },
       link: linkMutations },
     ...(svHeld && data.svs ? [svTab(genes, queried)] : []),
     ...(expr && !multi ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: queried })] }] : []),
