@@ -10,11 +10,26 @@
  *       median = q3 = its value, and the figure draws no box.
  *   S*  lib/plot.ts plotStatsSql — Spearman's ρ with tied values sharing their average rank
  *       (PLT-STM-5), against scipy 1.18.1 spearmanr, and its independence of row order.
+ *   L*  lib/plot.ts axisSelect — a categorical axis's labels as the portal writes them, counted
+ *       over every sample of coadread_tcga_pan_can_atlas_2018 (docs/legacy-spec/04-plots.md §3:
+ *       PLT-DT-3 Mutation Type, DT-4 Mutated vs Wild-type, DT-9 Variant vs No Variant, DT-11
+ *       discrete copy number; cbioportal-frontend cd8c6df PlotsTabUtils.tsx; counts from
+ *       docs/legacy-spec/parity/04-plots.md §3 Q6). L5/L6 are the cox and logistic covariates'
+ *       labels (`labels: "model"`), which keep cBioLab's own ("Not mutated", "Structural variant").
+ *       L1 KRAS mutation type: ⊆ {Missense, Inframe, Truncating, Splice, Promoter, Other,
+ *          Multiple, No mutation, Not profiled}, has "No mutation", no "Not mutated"
+ *       L2 KRAS mutated: {Mutated, No mutation, Not profiled}
+ *       L3 TCF7L2 SV: ⊆ {With Structural Variants, No Structural Variants, Not profiled for
+ *          structural variants}; With Structural Variants = 4
+ *       L4 KRAS gistic: Deep Deletion 1, Shallow Deletion 67, Diploid 390, Gain 128, Amplification 6
+ *       L5 L2 with labels "model": {Mutated, Not mutated, Not profiled}
+ *       L6 L3 with labels "model": ⊆ {Structural variant, No structural variant, Not profiled}
  *
  * Run: node --env-file=.env.local scripts/check-plot-stats.ts
  */
 import { chQuery } from "../lib/ch.ts";
-import { plotBoxSql, plotStatsSql } from "../lib/plot.ts";
+import { axisSelect, plotBoxSql, plotStatsSql, type AxisCtx, type PlotAxis } from "../lib/plot.ts";
+import { compileCohortDef } from "../lib/cohort2.ts";
 
 /** [row id, values, expected q1, median, q3, lo, hi] */
 type BoxCase = [string, number[], number, number, number, number, number];
@@ -64,6 +79,47 @@ for (const [id, x, y, rho] of RANKS) {
   const sql = plotStatsSql(vals(x), vals(y), "SELECT 1");
   const r = (await chQuery<Record<string, unknown>>(sql)).data[0] || {};
   ok(close(Number(r.spearman), rho), id, "ρ " + r.spearman + " — expected " + rho);
+}
+
+/** [row id, axis, model labels, labels allowed, labels required, exact counts] */
+type LabelCase = [string, PlotAxis, boolean, string[], string[], Record<string, number>];
+const COADREAD = "coadread_tcga_pan_can_atlas_2018";
+const KRAS_MUT: PlotAxis = { source: "alteration", gene: "KRAS", by: "mutated" };
+const TCF7L2_SV: PlotAxis = { source: "alteration", gene: "TCF7L2", by: "sv" };
+const SV_LABELS = ["With Structural Variants", "No Structural Variants", "Not profiled for structural variants"];
+const LABELS: LabelCase[] = [
+  ["L1 KRAS Mutation Type: the portal's classes and \"No mutation\" (PLT-DT-3)", { source: "alteration", gene: "KRAS", by: "mutationType" }, false,
+    ["Missense", "Inframe", "Truncating", "Splice", "Promoter", "Other", "Multiple", "No mutation", "Not profiled"], ["No mutation"], {}],
+  ["L2 KRAS Mutated vs Wild-type: Mutated / No mutation / Not profiled (PLT-DT-4)", KRAS_MUT, false,
+    ["Mutated", "No mutation", "Not profiled"], ["Mutated", "No mutation", "Not profiled"], {}],
+  ["L3 TCF7L2 Variant vs No Variant: the portal's SV labels, 4 with one (PLT-DT-9)", TCF7L2_SV, false,
+    SV_LABELS, ["With Structural Variants"], { "With Structural Variants": 4 }],
+  ["L4 KRAS gistic: the portal's copy-number levels and Q6's row totals (PLT-DT-11)", { source: "molecular", profileType: "gistic", gene: "KRAS", discrete: true }, false,
+    ["Deep Deletion", "Shallow Deletion", "Diploid", "Gain", "Amplification"], ["Deep Deletion", "Shallow Deletion", "Diploid", "Gain", "Amplification"],
+    { "Deep Deletion": 1, "Shallow Deletion": 67, "Diploid": 390, "Gain": 128, "Amplification": 6 }],
+  ["L5 KRAS mutated as a model covariate keeps \"Not mutated\"", KRAS_MUT, true,
+    ["Mutated", "Not mutated", "Not profiled"], ["Mutated", "Not mutated", "Not profiled"], {}],
+  ["L6 TCF7L2 SV as a model covariate keeps cBioLab's labels", TCF7L2_SV, true,
+    ["Structural variant", "No structural variant", "Not profiled"], [], {}],
+];
+
+{
+  const cohortSql = compileCohortDef(null, { study: COADREAD });
+  for (const [id, axis, model, allowed, required, counts] of LABELS) {
+    try {
+      // `labels` is the covariates' switch on AxisCtx (lib/federation.ts coxRows / logisticRows)
+      const ctx = { study: COADREAD, unit: "sample", cohortSql, ...(model ? { labels: "model" } : {}) } as AxisCtx;
+      const sql = "WITH cohort AS (" + cohortSql + "),\n     xs AS (" + axisSelect(axis, ctx, "cat") + ")\nSELECT v, count() AS n FROM xs GROUP BY v ORDER BY v";
+      const got = new Map((await chQuery<{ v: string; n: string }>(sql)).data.map((r) => [String(r.v), Number(r.n)]));
+      const stray = [...got.keys()].filter((l) => !allowed.includes(l));
+      const lacking = required.filter((l) => !got.has(l));
+      const off = Object.entries(counts).filter(([l, n]) => got.get(l) !== n);
+      ok(!stray.length && !lacking.length && !off.length, id,
+        [...got].map(([l, n]) => l + " " + n).join(", ") +
+        (stray.length ? " — unexpected " + stray.join(", ") : "") + (lacking.length ? " — missing " + lacking.join(", ") : "") +
+        (off.length ? " — expected " + off.map(([l, n]) => l + " " + n).join(", ") : ""));
+    } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+  }
 }
 
 console.log(failures ? "\n" + failures + " of " + checks + " plot statistics checks FAILED" : "\nall " + checks + " plot statistics checks passed");

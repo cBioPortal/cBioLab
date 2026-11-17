@@ -267,6 +267,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] p from r rounded to 5 decimals first, as the portal computes it (ours from the full-precision r; no shown value differs in the audit's four scatters)
   - [ ] The quick-plot "Examples" pills (Mut# vs Dx, FGA vs Dx, mRNA vs CNA, …) (PLT-QP-1…12, PLT-LY-1)
   - [ ] Mutation axis: VAF, CCF and Clonality groupings; SV Variant Type; the portal's labels "No mutation", "With Structural Variants" (ours "Not mutated", "Structural variant"). Driver vs VUS is under *Driver-annotation settings* (PLT-AX-2, PLT-DT-3…10, PLT-MD-4, PLT-MD-12)
+    - [x] The portal's category names: "No mutation" (mutation type, mutated, Driver vs VUS), "With Structural Variants" / "No Structural Variants" / "Not profiled for structural variants", "Deep Deletion" / "Shallow Deletion"; cox and logistic covariates keep "Not mutated" (their documented reference). coadread KRAS: Missense 216 · Inframe 1 · Truncating 1 · No mutation 316 · Not profiled 60; gistic 1 / 67 / 390 / 128 / 6 (PLT-DT-3…5, PLT-DT-9, PLT-DT-11) (#289)
+      - [ ] SV "Not profiled for structural variants" counts against the portal: its coadread SV case list holds 4 samples, ours counts 534 profiled; not compared
   - [ ] Waterfall / Ordered samples (Treatment Response, mRNA); limit values such as ">8" (ours drops them as non-numeric) (PLT-PT-1, PLT-PT-2, PLT-WF-1…7, PLT-AX-3, PLT-AX-5, PLT-LV-1…4, PLT-MD-8, PLT-MD-9, PLT-STM-19, PLT-STM-20)
   - [ ] Downloads: SVG, PNG, PDF, Data (`plot.txt`) (PLT-DL-1, PLT-DL-2)
   - [ ] Search Case(s) and Search Mutation(s); scatter drag-select with "Selected: N samples" → Study View; legend click to highlight (PLT-UT-1, PLT-UT-2, PLT-UT-8, PLT-SC-5, PLT-HL-1…5)
