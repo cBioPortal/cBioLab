@@ -14,6 +14,22 @@ export const ONCOKB_TUMOR_TYPE_TABLE = "annotation.oncokb_tumor_type";
  * Entrez id, OncoKB SV type, tumour type) of a synced study, each id '' where its site names no gene
  */
 export const ONCOKB_SV_TABLE = "annotation.oncokb_sv";
+/**
+ * OncoKB's cancer gene list, licensed with ONCOKB_TABLE: one row per gene of the portal's gene table at
+ * each release, `cancer_gene` whether the list has it, `oncokb_annotated` whether OncoKB curates it
+ */
+export const ONCOKB_CANCER_GENE_TABLE = "annotation.oncokb_cancer_gene";
+/**
+ * The Entrez ids (`entrez`, UInt32) of OncoKB's cancer genes at the pin, as SQL — the portal's
+ * isOncoKbCancerGene. The table is new: a reader asks oncokbCancerGenesStoredSql first and, with
+ * nothing stored at its pin, leaves the cancer-gene part out and says so, rather than reading every
+ * gene as not a cancer gene.
+ */
+export const oncokbCancerGeneSql = (pin: string): string =>
+  "SELECT toUInt32(entrez_gene_id) AS entrez FROM " + ONCOKB_CANCER_GENE_TABLE + " FINAL WHERE oncokb_version = '" + pin.replace(/'/g, "''") + "' AND cancer_gene";
+/** how many genes the store holds at the pin, as SQL (0 rows' count when none, an error when the table is absent) */
+export const oncokbCancerGenesStoredSql = (pin: string): string =>
+  "SELECT count() AS n FROM " + ONCOKB_CANCER_GENE_TABLE + " WHERE oncokb_version = '" + pin.replace(/'/g, "''") + "'";
 /** every public source's annotations, one row per (source, release, variant), the source's JSON in `data` */
 export const VARIANT_TABLE = "annotation.variant";
 /** Genome Nexus's source in VARIANT_TABLE for each reference genome (one service, and one release line, per genome) */

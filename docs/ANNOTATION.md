@@ -17,6 +17,7 @@ Every source's annotations live in one ClickHouse database, `annotation`, apart 
 | `annotation.oncokb` | OncoKB, licensed: mutations by protein change, gene-level copy-number calls | those granted `SELECT` on this table — the licence |
 | `annotation.oncokb_tumor_type` | OncoKB by tumour type, licensed with `annotation.oncokb`: each somatic mutation as the portal's mutation table asks about it (gene, protein change, mutation type, the sample's tumour type), with its four highest levels and OncoKB's whole answer in `data`. Read by the mutation table at the OncoKB pin, falling back to `annotation.oncokb` | those granted `SELECT` on this table |
 | `annotation.oncokb_sv` | OncoKB for structural variants, licensed with `annotation.oncokb`: each structural variant as the portal asks about it (site 1 and site 2 genes, OncoKB's SV type, the sample's tumour type), and again with no tumour type (the portal's driver call), with its four highest levels and OncoKB's whole answer in `data`. Read at the OncoKB pin by the structural-variant table and the Mutations tab's fusion rows (the cell from the tumour-type call, the driver status from the one with none) and the lollipop's Fusion badge, falling back to the partners' gene-level `Fusion` rows in `annotation.oncokb` | those granted `SELECT` on this table |
+| `annotation.oncokb_cancer_gene` | OncoKB's cancer gene list (`/utils/cancerGeneList`), licensed with `annotation.oncokb`: one row per gene of the portal's gene table at each release, `cancer_gene` whether the list has it (the portal's isOncoKbCancerGene: the last element of the Annotation sort, Study View's gene-table icon), `oncokb_annotated` whether OncoKB curates it, the entry as JSON in `data`. Read at the OncoKB pin through `oncokbCancerGeneSql`, after `oncokbCancerGenesStoredSql` says the pin has rows; no view reads it yet | those granted `SELECT` on this table |
 | `annotation.variant` | every public source, one row per (source, release, genomic variant): the variant's coordinates as the warehouse spells them, the source's annotation as JSON in `data` | everyone with the app's read access |
 | `annotation.sync_run` | every source's sync runs, by `source` and `version` | everyone with the app's read access |
 
@@ -107,6 +108,7 @@ npm run annotate -- oncokb --verify 300 --release v7.5   # re-ask the service fo
 npm run annotate -- oncokb --all --create           # also create the store, as a user allowed to
 npm run annotate -- oncokb_tumor_type --all         # OncoKB by tumour type, every study's somatic mutations
 npm run annotate -- oncokb_sv --all                 # OncoKB for structural variants, by gene pair and tumour type
+npm run annotate -- oncokb_cancer_gene --all        # OncoKB's cancer gene list (one request; a row per gene)
 npm run annotate -- genome_nexus --all              # every GRCh37 study's variants
 npm run annotate -- genome_nexus_grch38 --all       # every GRCh38 study's
 ```
