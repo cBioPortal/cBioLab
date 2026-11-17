@@ -22,7 +22,7 @@
  *   VT Variant Type upper-cased for mutation rows too (Y8).
  *   T  Mutation Type: the row's value is the raw stored text (Y1, T23); search (T21), value lists and
  *      value filters (T22) and the sort (T20) run on the portal's label.
- *   O  the column order (O2, for the ids PR G adds, at the places its interface names); Y9 every new column hidden by default.
+ *   O  the column order (O2, for the ids PR G adds, at the places its interface names); Y9 every new column hidden by default but copyNumber, which the portal shows (MUT-COL-38).
  *   Y10 missing values sort last both ways.
  *   N1-N5 Allele Freq (T) and the read counts as the portal writes them (MUT-STM-5/6): the vaf text is ''
  *      for none, 4 decimals below 0.01, else 2 with trailing zeros; the vaf value is that same text
@@ -114,7 +114,8 @@ for (const [id, name, tip, numeric] of NEW) {
   if (!c) continue;
   ok(`${id} header tooltip is the portal's`, typeof tip === "string" ? c.tip === tip : tip.test(c.tip || ""), JSON.stringify(c.tip));
   if (numeric !== null) ok(`${id} numeric ${numeric}`, c.numeric === numeric, String(c.numeric));
-  ok(`Y9 ${id} hidden by default (not in MUTATION_DEFAULT_COLUMNS)`, !MUTATION_DEFAULT_COLUMNS.includes(id), MUTATION_DEFAULT_COLUMNS.join(","));
+  if (id === "copyNumber") ok("Y9 copyNumber shown by default (in MUTATION_DEFAULT_COLUMNS, MUT-COL-38)", MUTATION_DEFAULT_COLUMNS.includes(id), MUTATION_DEFAULT_COLUMNS.join(","));
+  else ok(`Y9 ${id} hidden by default (not in MUTATION_DEFAULT_COLUMNS)`, !MUTATION_DEFAULT_COLUMNS.includes(id), MUTATION_DEFAULT_COLUMNS.join(","));
 }
 const legend = (id: string, words: string[]) => {
   const tip = MUTATION_COLUMNS.find((c) => c.id === id)?.tip || "";
@@ -157,7 +158,8 @@ ok("O5 the existing columns keep their order (Protein Position and Alteration wh
 {
   const res = await run("TP53");
   const shown = typeof res === "string" ? null : res.mutations!.shown;
-  ok("Y9 a view naming no columns shows none of the new ones", !!shown && NEW_IDS.every((i) => !shown.includes(i)), typeof res === "string" ? res : JSON.stringify(shown));
+  ok("Y9 a view naming no columns shows none of the new ones but copyNumber", !!shown && NEW_IDS.every((i) => i === "copyNumber" || !shown.includes(i)), typeof res === "string" ? res : JSON.stringify(shown));
+  ok("Y9 a view naming no columns shows copyNumber (MUT-COL-38)", !!shown && shown.includes("copyNumber"), typeof res === "string" ? res : JSON.stringify(shown));
 }
 
 // ---- each column's values, row by row ----------------------------------------------------------

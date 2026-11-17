@@ -1,6 +1,7 @@
 // The evolution view's spec and result, added to lib/types.ts's maps by the declaration at the end.
 import type { TableRows, TimelineResult } from "../../types.ts";
 import type { TableQuery } from "../../table-query.ts";
+import type { AxisTick } from "../../timeline-tracks.ts";
 
 /** The mutation table as the spec holds it: its query, and its page size. */
 export interface EvolutionTableQuery extends TableQuery {
@@ -36,6 +37,8 @@ export interface EvolutionView extends TableQuery {
   logScale?: boolean;
   /** the line chart's y axis spans the VAFs drawn rather than 0 to 1 (default false) */
   dataRange?: boolean;
+  /** the line chart's time axis draws every year, rather than cutting runs of four or more years with no event (default false), as the timeline's expandGaps */
+  expandGaps?: boolean;
 }
 
 /**
@@ -84,8 +87,10 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   x: "time" | "sequence";
   /** sequence was not asked for, but these samples have no collection day, so the samples are drawn in sequence */
   noDay?: string[];
+  /** placed by day: the patient's timeline axis, a tick a year from the first to the last of all the patient's events, empty stretches of four or more years cut, as the portal's line chart shares the timeline's axis */
+  axis?: AxisTick[];
   /** the display as drawn, from the spec */
-  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean };
+  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean };
 }
 
 declare module "../../types.ts" {

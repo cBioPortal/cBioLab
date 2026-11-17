@@ -100,10 +100,10 @@ cBioLab numbers for PFS/DFS/DSS and the chosen clinical attributes read from `/a
 | G2 Include OS | SV-4, MD-2 | partition curves; hidden ("Only (C) KRAS" 1 < Min. 3) | Male 310, Female 280, KRAS 221 overlapping; 3-group p 0.910 | 🔶 not partitions |
 | G2′ partitions OS (cBioLab only) | STM-3 | not shown | Only M 191/37, Only F 178/37, M∩K 119/27, F∩K 102/19; p 0.858 | ? legacy hides it |
 | G2 clinical (Exclude), Sex / Weight | STM-6, 7 | < 10^-10 / Wilcoxon 1.085e-5 (labelled Wilcoxon though 3 groups sent) | not run on identical exclusive groups | ? |
-| R1 Altered / Unaltered | RV-3 | 222 / 372 | 222 / 312 | 🔶 Unaltered |
-| R1 OS n/events | RV-3 | 221/46, 369/74 | 221/46, 309/64 | 🔶 (group differs) |
-| R1 OS p; Unaltered median | STM-3 | 0.632; 65.85 (51.48 - NA) | 0.616; 65.9 mo | 🔶 (group differs) |
-| R1 PFS p (type table) | SV-5 | 0.0191 | 0.0339 (API) | 🔶 (group differs) |
+| R1 Altered / Unaltered | RV-3 | 222 / 372 | 222 / 372 (2026-11-17; was 312) | ✅ |
+| R1 OS n/events | RV-3 | 221/46, 369/74 | 221/46, 369/74 | ✅ |
+| R1 OS p | STM-3 | 0.632 | 0.632 | ✅ |
+| R1 PFS p (type table) | SV-5 | 0.0191 | 0.0191 (2026-11-17, the page; was 0.0339) | ✅ |
 
 Data version: every n, event count and median agrees exactly on identical groups, so the warehouse and cbioportal.org hold the same clinical data. All survival mismatches trace to group definitions (Unaltered, Include partitions), not arithmetic.
 
@@ -190,7 +190,7 @@ Data version: every n, event count and median agrees exactly on identical groups
 |---|---|---|---|
 | CMP-RV-1 | 🟡 | B | Always "Comparison/Survival", even without survival data |
 | CMP-RV-2 | 🟡 | BC | Sub-tabs Overlap, Survival, Clinical, Genomic Alterations, generic assays (`results-layout.ts:228-235`); no mRNA, Protein, DNA Methylation |
-| CMP-RV-3 | 🔶 | BC | Altered 222 ✅; Unaltered = not altered AND profiled for every type (`results-layout.ts:97`) → 312 vs legacy 372; no Unprofiled, per-gene/track or user groups; fixed selection |
+| CMP-RV-3 | 🔶 | BC | Altered 222 ✅; 2026-11-17: Unaltered = not altered AND not totally unprofiled (profiled for some queried gene in some selected alteration profile, `resultsGroups`) → 372 as legacy, OS 369/74, p 0.632 as legacy; msk_impact_2017 ZFHX3 399 / 7,740 samples as the portal's rule over its panel data. Still no Unprofiled, per-gene/track or user groups; fixed selection |
 | CMP-RV-4 | 🟡 | B | OQL note on the page; no group selector or overlap select on RV |
 | CMP-RV-5 | ❌ | C | No `comparison_*` params; groups fixed |
 | CMP-RV-6 | ❌ | C | As SV-8 |
@@ -224,7 +224,7 @@ Data version: every n, event count and median agrees exactly on identical groups
 | CMP-STM-5 | ❌ | C | No HR |
 | CMP-STM-6 | ✅ | C | Pearson χ², no Yates, patient attrs per patient; p identical (Race, Subtype, Stage, Sex) |
 | CMP-STM-7 | 🔶 | C | Reported p = Welch t (2) / Welch ANOVA (3+) from moments (`clinical/run.ts:96-115`); Mann-Whitney / Kruskal-Wallis computed (matches legacy) but not on portal and not in q |
-| CMP-STM-8 | 🟡 | C | BH same formula; n = attributes tested (8 on the portal) — legacy quirk of hidden survival attributes not copied, but q differs because the attribute set differs |
+| CMP-STM-8 | 🟡 | BC | BH same formula; 2026-11-17: n counts the attributes the portal tests but does not list (each survival endpoint's pair, AGE_LAST_FU_YEARS, BIRTH_YEAR): coadread G1 n 52 (was 44), Patient Weight q 1.003e-6 against the portal's 1.022e-6 over 53 — the one left is OTHER_PATIENT_ID, refused past 200 values (QUESTIONS.md: its values are patient identifiers) |
 | CMP-STM-9 | 🟡 | BC | Overlap counts and Exclude sizes identical on G2; no iterative exclusion; refused when groups differ in >1 condition or nest |
 | CMP-STM-10 | 🔶 | B | p `pDigits` (2 sig ≥ 0.001, `lib/chart/format.ts:47-53`) vs `toConditionalPrecision(3)`; median 1 decimal vs 2; no HR / landmark formats |
 | CMP-STM-11 | 🟡 | B | Group chip = patients only; per-curve n and at-risk counts ✅ |

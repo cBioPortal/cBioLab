@@ -14,11 +14,11 @@ const level = (opts: readonly { bit: string; color: string; label: string }[], b
   const o = opts.find((x) => x.bit === bit)!;
   return [o.label, o.color];
 };
-const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["mutation", "Mutation", MUT], ["amp", "Amplification", AMP],
-  ["homdel", "Deep Deletion", DEL], ["sv", "Structural Variant", SV],
-  ["mrnaHigh", ...level(STYLE.glyph.mrna.options, "MRNA_HIGH")], ["mrnaLow", ...level(STYLE.glyph.mrna.options, "MRNA_LOW")],
-  ["protHigh", ...level(STYLE.glyph.protein.options, "PROT_HIGH")], ["protLow", ...level(STYLE.glyph.protein.options, "PROT_LOW")],
-  ["multiple", "Multiple Alterations", MULTI]];
+/** the kinds in the portal's stack order, bottom first (CancerSummaryContent OrderedAlterationLabelMap); its legend lists them reversed */
+const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["multiple", "Multiple Alterations", MULTI],
+  ["protLow", ...level(STYLE.glyph.protein.options, "PROT_LOW")], ["protHigh", ...level(STYLE.glyph.protein.options, "PROT_HIGH")],
+  ["mrnaLow", ...level(STYLE.glyph.mrna.options, "MRNA_LOW")], ["mrnaHigh", ...level(STYLE.glyph.mrna.options, "MRNA_HIGH")],
+  ["homdel", "Deep Deletion", DEL], ["amp", "Amplification", AMP], ["sv", "Structural Variant", SV], ["mutation", "Mutation", MUT]];
 const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string, string][] = [["mutation", "Mutation data", "mutation"], ["cna", "CNA data", "CNA"], ["sv", "Structural variant data", "structural variant"]];
 
 /** the portal's name for a category type (CancerSummaryContainer GroupByOptions); any other attribute by its own name */
@@ -45,7 +45,9 @@ const PAD = 8, PLOT_H = 240, MARK_ROW = 13, LABEL_H = 150;
  * more groups than fit it grows (`grown`) rather than squeezing bars below a label's height. `gene`
  * picks one gene's bars (the portal's per-gene tabs); omitted, the genes together.
  */
-export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean } = {}):
+export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean;
+  /** the page shows its own popover per bar (CTS-CH-7): each bar's marks name their group (data-group) and carry their text as an aria-label, not a <title> */
+  popover?: boolean } = {}):
   { body: string; width: number; height: number; grown: boolean } {
   const p = palette(o.theme), pn = r.panels[panel];
   const src = o.gene && pn.perGene ? pn.perGene.find((x) => x.gene === o.gene) || pn : pn;
@@ -102,10 +104,11 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
       const h = (T + PLOT_H) - ys(Math.min(ys.domain[1], value(g, k)));
       if (h <= 0) continue;
       y0 -= h;
-      out.push(`<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
+      out.push(o.popover ? `<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}" data-group="${esc(g.key)}" role="img" aria-label="${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}"/>`
+        : `<rect x="${x}" y="${r1(y0)}" width="${r1(bw)}" height="${r1(h)}" fill="${col}"><title>${esc(g.label + " — " + name + ": " + fmtInt(Number(g[k] ?? 0)) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s")}</title></rect>`);
     }
     const alt = value(g, "altered");
-    out.push(`<rect x="${x}" y="${r1(ys(alt))}" width="${r1(bw)}" height="${r1(T + PLOT_H - ys(alt))}" fill="none"><title>${esc(g.label + ": " + fmtPct(100 * g.altered / (g.profiled || 1)) + " (" + fmtInt(g.altered) + " / " + fmtInt(g.profiled) + " " + r.unit + "s" + (g.samples > g.profiled ? ", " + fmtInt(g.samples) + " in the group" : "") + ")")}</title></rect>`);
+    if (!o.popover) out.push(`<rect x="${x}" y="${r1(ys(alt))}" width="${r1(bw)}" height="${r1(T + PLOT_H - ys(alt))}" fill="none"><title>${esc(g.label + ": " + fmtPct(100 * g.altered / (g.profiled || 1)) + " (" + fmtInt(g.altered) + " / " + fmtInt(g.profiled) + " " + r.unit + "s" + (g.samples > g.profiled ? ", " + fmtInt(g.samples) + " in the group" : "") + ")")}</title></rect>`);
   });
   // what each group was profiled for, where groups differ
   let y = T + PLOT_H + 4;
@@ -119,7 +122,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const bl = bandLabels(groups.map((g) => g.label), centers, band, y, p, { maxH: LABEL_H });
   out.push(bl.svg);
   y += bl.height + 6;
-  const items: LegendItem[] = CT_KINDS.filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
+  const items: LegendItem[] = [...CT_KINDS].reverse().filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
   const lg = legend(items, L, y, W - L - PAD, p, { size: FS.small });
   out.push(lg.svg);
   y += lg.height;

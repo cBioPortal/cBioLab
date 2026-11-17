@@ -225,7 +225,7 @@ describe("the lollipop draws every codon, the way the portal's mutation tab does
   test("the protein runs to its length, with its Pfam domain named on the backbone", () => {
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;
     assert.ok(svg.includes(">189aa<") && svg.includes(">Ras<"));
-    assert.ok(svg.includes("># KRAS Mutations<"), "the portal's y-axis label");
+    assert.ok(svg.includes("># patients<"), "the portal's y-axis label (the results page's)");
   });
   test("the figure is the plot alone; the frequency and the Driver/VUS counts travel in its caption", () => {
     const g = { ...kras(), ids: { refseq: "NM_004985", ensembl: "ENST00000311936.3", ccds: "CCDS8702", uniprotAccession: "P01116", uniprotName: "RASK_HUMAN" } };
