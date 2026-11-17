@@ -19,6 +19,8 @@ function HotspotsCard({ ctx, v, vi }: CardProps) {
         const nx = { ...vv }; if (h) nx.hide = h; else delete nx.hide; return nx;
       })} codons={docView(vi).codons} onCodons={(c) => updateViewLocal(vi, (vv: any) => {
         const nx = { ...vv }; if (c) nx.codons = c; else delete nx.codons; return nx;
+      })} yMax={docView(vi).yMax} onYMax={(y) => updateViewLocal(vi, (vv: any) => {
+        const nx = { ...vv }; if (y) nx.yMax = y; else delete nx.yMax; return nx;
       })} />
     </>}
   </>;

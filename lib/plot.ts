@@ -22,6 +22,7 @@ import type { VariantPins } from "./variant-annotation.ts";
 import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { parseOql, oqlCasesSql } from "./oql.ts";
 import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP, ALTERATION_GENE_SET_CAP } from "./plot-oql.ts";
+import { portalR5 } from "./chart/format.ts";
 import { oqlStatements } from "./oql-parse.ts";
 import { profiledCasesSql, inCohortSamples, inCohortPatients } from "./cohort2.ts";
 
@@ -968,10 +969,12 @@ export function spearmanRho(x: readonly number[], y: readonly number[]): number 
 
 /**
  * A two-sided p-value for a correlation coefficient, from Student's t on n-2 degrees of
- * freedom — the same test the portal applies to the same coefficients.
+ * freedom, the test the portal applies (PlotUtils.ts computeCorrelationPValue, PLT-STM-6) to the
+ * coefficient as it keeps it, rounded to 5 decimals (portalR5): one that rounds to ±1 has p = 0.
  */
-export function corrPValue(r: number | null, n: number): number | null {
-  if (r == null || !Number.isFinite(r) || n <= 2) return null;
+export function corrPValue(r0: number | null, n: number): number | null {
+  if (r0 == null || !Number.isFinite(r0) || n <= 2) return null;
+  const r = portalR5(r0);
   if (Math.abs(r) >= 1) return 0;
   const t = Math.abs(r) * Math.sqrt((n - 2) / (1 - r * r));
   return 2 * studentTail(t, n - 2);
