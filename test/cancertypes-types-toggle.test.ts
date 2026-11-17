@@ -21,7 +21,7 @@ import { cancertypesPanelSvg } from "../lib/views/cancertypes/figure.ts";
 import { cancertypesTsv } from "../lib/views/cancertypes/tsv.ts";
 import { runCancertypes } from "../lib/views/cancertypes/run.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
-import type { ViewResult, ViewParticipation } from "../lib/types.ts";
+import type { ViewResult, ViewResultOf, ViewParticipation } from "../lib/types.ts";
 import type { CancertypesGroup } from "../lib/views/cancertypes/types.ts";
 import { PRIMARY } from "../lib/ch.ts";
 
@@ -29,7 +29,7 @@ const grp = (key: string, label: string, profiled: number, mutation: number, amp
   ({ key, label, samples, profiled, altered: mutation + amp, mutation, amp, homdel: 0, sv: 0, multiple: 0 });
 const withFor = (g: CancertypesGroup, sv: number) => ({ ...g, profiledFor: { mutation: g.profiled, cna: g.profiled, sv } });
 
-type Ct = NonNullable<ViewResult["cancertypes"]>;
+type Ct = NonNullable<ViewResultOf<"cancertypes">["cancertypes"]>;
 const base: Ct = { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, minAltered: 0, show: "frequency", unit: "sample",
   panels: [{ cohort: "all", samples: 300, profiled: 290, altered: 120,
     groups: [withFor(grp("a", "GroupA", 100, 40, 20), 100), withFor(grp("b", "GroupB", 150, 30, 0, 160), 0)],
