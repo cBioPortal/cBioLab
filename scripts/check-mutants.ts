@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-sv";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "patient-sv": ["node", "--env-file=.env.local", "scripts/check-patient-sv.ts"],
 };
 
 interface Mutant {
@@ -702,6 +703,18 @@ const MUTANTS: Mutant[] = [
     effect: "The Patient page offers Genomic Evolution to a patient with several samples but no mutation with a VAF, where the portal hides the tab (PTB-MD-3).",
     find: " || data.vaf !== true ? [] :",
     replace: " ? [] :" },
+  { id: "patient-sv-key-unsorted", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table keys a row by its fields in order, so a fusion recorded A–B in one sample and B–A in another is two rows, where the portal shows one.",
+    find: "return \"arrayStringConcat(arraySort([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"]), '_')\";",
+    replace: "return \"arrayStringConcat([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"], '_')\";" },
+  { id: "patient-sv-row-per-sample", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table lists an event once per sample carrying it, where the portal lists it once naming the samples.",
+    find: "  FROM s GROUP BY k\\n",
+    replace: "  FROM s GROUP BY k, sid\\n" },
+  { id: "patient-sv-status-sortable", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table offers a sort by Status, which the portal does not sort.",
+    find: "{ ...text(\"status\", \"Status\"), unsorted: true },",
+    replace: "text(\"status\", \"Status\")," },
   { id: "tracks-select-all-counts-with-data", layer: "counts", guard: "unit", file: "app/_oncoprint/track-edits.ts",
     effect: "\"Select all (N)\" leaves out the listed rows at 0%, so its N is smaller than the portal's for the same list.",
     find: "return { n: listed.length,",

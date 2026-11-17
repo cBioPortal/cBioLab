@@ -42,6 +42,8 @@ export interface QueryColumn {
   num?: string;
   /** an order other than text/num (protein change by codon, say) */
   order?: string;
+  /** a column the portal does not sort by: refused as a sort, drawn without a sort control */
+  unsorted?: boolean;
 }
 
 /** A table's rows. `with` defines `rows`, which carries `cohort` and `study` columns. */

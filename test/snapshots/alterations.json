@@ -726,8 +726,24 @@
                 "numeric": false
               },
               {
+                "id": "status",
+                "name": "Status",
+                "numeric": false,
+                "unsorted": true
+              },
+              {
                 "id": "class",
                 "name": "Variant Class",
+                "numeric": false
+              },
+              {
+                "id": "pos1",
+                "name": "Site 1 Position",
+                "numeric": false
+              },
+              {
+                "id": "pos2",
+                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -736,13 +752,18 @@
                 "numeric": false
               },
               {
+                "id": "connectionType",
+                "name": "Connection Type",
+                "numeric": false
+              },
+              {
                 "id": "breakpointType",
                 "name": "Breakpoint Type",
                 "numeric": false
               },
               {
-                "id": "connectionType",
-                "name": "Connection Type",
+                "id": "svAnnotation",
+                "name": "Additional Annotation",
                 "numeric": false
               },
               {
@@ -758,16 +779,6 @@
               {
                 "id": "site2",
                 "name": "Site 2 Description",
-                "numeric": false
-              },
-              {
-                "id": "pos1",
-                "name": "Site 1 Position",
-                "numeric": false
-              },
-              {
-                "id": "pos2",
-                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -796,16 +807,6 @@
                 "numeric": false
               },
               {
-                "id": "status",
-                "name": "Status",
-                "numeric": false
-              },
-              {
-                "id": "svAnnotation",
-                "name": "Study Annotation",
-                "numeric": false
-              },
-              {
                 "id": "comments",
                 "name": "Comments",
                 "numeric": false
@@ -815,18 +816,18 @@
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "defaults": [
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "query": {},
@@ -840,22 +841,22 @@
                   "P-0024249-T01-IM6",
                   "IRS2",
                   "CHMP1A",
+                  "SOMATIC",
                   "TRANSLOCATION",
+                  "16:89721445",
+                  "13:110437384",
                   "Protein Fusion: mid-exon  {IRS2:CHMP1A}",
-                  "IMPPRECISE",
                   "3to5",
+                  "IMPPRECISE",
+                  "IRS2 (NM_003749) - CHMP1A (NM_002768) rearrangement: t(13;16)(q34;q24.3)(chr13:g.110437384::chr16:g.89721445)",
                   "NA",
                   "Intron of CHMP1A(-):1Kb before exon 2",
                   "Exon 1 of IRS2(-)",
-                  "16:89721445",
-                  "13:110437384",
                   0,
                   10,
                   0,
                   "NA",
                   "NA",
-                  "SOMATIC",
-                  "IRS2 (NM_003749) - CHMP1A (NM_002768) rearrangement: t(13;16)(q34;q24.3)(chr13:g.110437384::chr16:g.89721445)",
                   "NA"
                 ]
               },
@@ -868,22 +869,22 @@
                   "P-0024249-T01-IM6",
                   "TCF7L2",
                   "",
+                  "SOMATIC",
                   "DELETION",
+                  "10:114917851",
+                  "10:115014274",
                   "TCF7L2-intragenic",
-                  "PRECISE",
                   "3to5",
+                  "PRECISE",
+                  "TCF7L2 (NM_001146274) rearrangement: c.1318+23_chr10:g.115014274del",
                   "NA",
                   "Intron of TCF7L2(+):23bp after exon 12",
                   "IGR: 296Kb before HABP2(+)",
-                  "10:114917851",
-                  "10:115014274",
                   96423,
                   23,
                   4714,
                   "NA",
                   "NA",
-                  "SOMATIC",
-                  "TCF7L2 (NM_001146274) rearrangement: c.1318+23_chr10:g.115014274del",
                   "NA"
                 ]
               },
@@ -896,22 +897,22 @@
                   "P-0024249-T01-IM6",
                   "TMPRSS2",
                   "ERG",
+                  "SOMATIC",
                   "DELETION",
+                  "21:39890681",
+                  "21:42870724",
                   "Protein Fusion: out of frame  {TMPRSS2:ERG}",
-                  "IMPPRECISE",
                   "3to5",
+                  "IMPPRECISE",
+                  "TMPRSS2 (NM_001135099) - ERG (NM_004449) fusion ( TMPRSS2 exon 1 fused to ERG exons 4 -11): c.56-608:TMPRSS2_c.39+56905:ERGdel",
                   "NA",
                   "Intron of ERG(-):57Kb after exon 3",
                   "Intron of TMPRSS2(-):608bp before exon 2",
-                  "21:39890681",
-                  "21:42870724",
                   2980043,
                   105,
                   41084,
                   "NA",
                   "NA",
-                  "SOMATIC",
-                  "TMPRSS2 (NM_001135099) - ERG (NM_004449) fusion ( TMPRSS2 exon 1 fused to ERG exons 4 -11): c.56-608:TMPRSS2_c.39+56905:ERGdel",
                   "NA"
                 ]
               }

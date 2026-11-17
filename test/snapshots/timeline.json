@@ -2051,8 +2051,24 @@
                 "numeric": false
               },
               {
+                "id": "status",
+                "name": "Status",
+                "numeric": false,
+                "unsorted": true
+              },
+              {
                 "id": "class",
                 "name": "Variant Class",
+                "numeric": false
+              },
+              {
+                "id": "pos1",
+                "name": "Site 1 Position",
+                "numeric": false
+              },
+              {
+                "id": "pos2",
+                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -2061,13 +2077,18 @@
                 "numeric": false
               },
               {
+                "id": "connectionType",
+                "name": "Connection Type",
+                "numeric": false
+              },
+              {
                 "id": "breakpointType",
                 "name": "Breakpoint Type",
                 "numeric": false
               },
               {
-                "id": "connectionType",
-                "name": "Connection Type",
+                "id": "svAnnotation",
+                "name": "Additional Annotation",
                 "numeric": false
               },
               {
@@ -2083,16 +2104,6 @@
               {
                 "id": "site2",
                 "name": "Site 2 Description",
-                "numeric": false
-              },
-              {
-                "id": "pos1",
-                "name": "Site 1 Position",
-                "numeric": false
-              },
-              {
-                "id": "pos2",
-                "name": "Site 2 Position",
                 "numeric": false
               },
               {
@@ -2121,16 +2132,6 @@
                 "numeric": false
               },
               {
-                "id": "status",
-                "name": "Status",
-                "numeric": false
-              },
-              {
-                "id": "svAnnotation",
-                "name": "Study Annotation",
-                "numeric": false
-              },
-              {
                 "id": "comments",
                 "name": "Comments",
                 "numeric": false
@@ -2140,18 +2141,18 @@
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "defaults": [
               "samples",
               "gene1",
               "gene2",
+              "status",
               "class",
               "eventInfo",
-              "breakpointType",
               "connectionType"
             ],
             "query": {},
