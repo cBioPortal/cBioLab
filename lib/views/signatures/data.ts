@@ -105,6 +105,21 @@ export function pctText(v: number | null): string {
   return 100 * v < 1 ? "<1%" : Math.round(100 * v) + "%";
 }
 
+/**
+ * The signature table as the portal's Copy and Download write it (LazyMobXTable's downloadData over
+ * ClinicalInformationMutationalSignatureTable's columns, serializeData): a header of "Mutational
+ * Signature" and each profiled sample's id, then a line per signature in the order given (the
+ * table's sort; its search does not narrow it), each contribution as the table writes it (pctText);
+ * tab-separated, every line ended by CRLF. The portal saves it as table.tsv.
+ */
+export function signatureTableTsv(rows: SignatureRow[], samples: string[]): string {
+  const lines = [["Mutational Signature", ...samples], ...rows.map((r) => [r.name, ...samples.map((_, i) => pctText(r.values[i]?.value ?? null))])];
+  return lines.map((l) => l.join("\t") + "\r\n").join("");
+}
+
+/** the file the portal saves a table's download as */
+export const TABLE_TSV = "table.tsv";
+
 const SBS_CLASSES = ["C>A", "C>G", "C>T", "T>A", "T>C", "T>G"];
 const ID_CLASSES = ["1bp deletion", "1bp insertion", ">1bp deletion", ">1bp insertion", "Microhomology"];
 

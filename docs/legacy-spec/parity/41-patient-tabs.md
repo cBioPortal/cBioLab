@@ -152,7 +152,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-MS-4 | ✅ | B | "Sample: SP1003 \| Single Base Substitution (SBS) count: 347" + ⓘ |
 | PTB-MS-5 | 🟡 | B | Category strip, contexts, "Single Base Substitution (%)" ✅; no SVG/PNG/PDF button |
 | PTB-MS-6 | ✅ | C | Row click → COSMIC v3.3 reference below (`reference.ts`) |
-| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; paged 25 of 65 (legacy all); extra "Signature contributions" bar chart; no download (tracked) |
+| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; paged 25 of 65 (legacy all); extra "Signature contributions" bar chart; Copy / Download as the portal's table.tsv ✅ (every row in the table's sort, the search not narrowing it, "<1%"/whole percents, CRLF; pancan_pcawg_2020 DO1000: 65 rows, SBS40 65%, SBS5 22%, SBS1 13% as the API's 0.654/0.2208/0.1252) |
 
 ### §5 Files & Links, resources, pathology, tissue, trials, custom tabs
 

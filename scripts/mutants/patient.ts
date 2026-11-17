@@ -64,4 +64,8 @@ export const mutants: Mutant[] = [
     effect: "A timeline sample's tooltip lists its attributes as they come, where the portal sorts them by key.",
     find: "  return [...merged].sort(([a], [b]) => a.localeCompare(b));\n}",
     replace: "  return [...merged];\n}" },
+  { id: "signatures-table-tsv-lf", layer: "counts", guard: "unit", file: "lib/views/signatures/data.ts",
+    effect: "The Mutational Signatures table's Copy / Download ends its lines with LF, where the portal's table.tsv (serializeData) ends each with CRLF.",
+    find: "return lines.map((l) => l.join(\"\\t\") + \"\\r\\n\").join(\"\");",
+    replace: "return lines.map((l) => l.join(\"\\t\") + \"\\n\").join(\"\");" },
 ];
