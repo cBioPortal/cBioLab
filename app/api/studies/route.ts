@@ -1,7 +1,8 @@
 import { directConnections, withoutFailedQueries, PORTAL, PRIMARY, studiesChangeWhileRunning } from "../../../lib/ch.ts";
-import { studiesFor, type StudyRow } from "../../../lib/study-list.ts";
+import { studiesFor, studyAbout, type StudyRow } from "../../../lib/study-list.ts";
 import { federationPeers, peerPatientKinds, remoteStudies } from "../../../lib/federation-remote.ts";
-import { instanceForStudy, restrictedByName } from "../../../lib/federation.ts";
+import { instanceForStudy, restrictedByName, studyRouting } from "../../../lib/federation.ts";
+import { peerForStudy } from "../../../lib/federation-remote.ts";
 import { portalHold, type PortalHold } from "../../../lib/legacy-link.ts";
 import type { StudyAccess } from "../../../lib/view-coverage.ts";
 import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
@@ -36,9 +37,20 @@ async function studiesEntry(_version: string): Promise<string> {
 /** what the reachable instances returned, when one of them did not answer */
 class Partial extends Error { constructor(readonly rows: StudyRow[]) { super("an instance did not answer"); } }
 
-export async function GET() {
+export async function GET(req: Request) {
   await connection();
   try {
+    // ?about=<study>: one study's name, description and PubMed id, for the Explore header; a peer's
+    // study has none here (its database is not this instance's to read)
+    const one = new URL(req.url).searchParams.get("about");
+    if (one != null) {
+      if (!/^[A-Za-z0-9._-]{1,120}$/.test(one)) return Response.json({ error: "a study id is letters, digits, '.', '_' and '-' (at most 120)" }, { status: 400 });
+      const study = one;
+      if (await peerForStudy(study)) return Response.json({ about: null });
+      const conn = (await studyRouting()).get(study);
+      if (!conn) return Response.json({ error: "Study '" + study + "' not found" }, { status: 400 });
+      return Response.json({ about: await studyAbout(study, conn) });
+    }
     let studies: StudyRow[];
     try { studies = await throughCache(async () => studiesEntry(await cacheVersion()), allStudies); }
     catch (e) { if (!(e instanceof Partial)) throw e; studies = e.rows; }

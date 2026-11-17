@@ -28,6 +28,8 @@ export interface TableView extends TableQuery {
 }
 export interface TableResult extends TableRows<string> {
   unit: "sample" | "patient";
+  /** the attributes the studies hold, when the table holds fewer (at most TABLE_COLUMNS_MAX) */
+  attributesOf?: number;
   /** with `unit: "sample"`, the attributes that are the sample's patient's, not its own */
   patientAttrs?: string[];
   /**

@@ -17,7 +17,7 @@ import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
 import { FloatingTip } from "../_ui/tooltip.tsx";
 import { ImageDownload } from "./image-download.tsx";
-import { saveBlob } from "./chart-files.ts";
+import { saveBlob } from "../../lib/study-view-download.ts";
 import { TIMELINE_ZIP, timelineDataFiles } from "../../lib/timeline-tables.ts";
 import { strToU8, zipSync } from "fflate";
 

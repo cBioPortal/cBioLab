@@ -1,7 +1,7 @@
 "use client";
 // The gene tables' Freq cell: its tooltip (gene-tables-cases.md GP1–GP2) names the gene panels,
 // and each name opens a dialog listing that panel's genes (GP6–GP11).
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { api } from "./api.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
@@ -17,17 +17,23 @@ export function usePanelTips(kind: GeneTableKind, studies: string[]) {
   const { tip, move, hide, live } = useHoverTip<Tip>();
   const [open, setOpen] = useState<Listed | null>(null);
 
+  // the request the open dialog waits for; a reply to an earlier one (or after closing) is dropped
+  const asked = useRef(0);
+  const close = () => { asked.current++; setOpen(null); };
   const show = async (panel: string) => {
     hide();
+    const mine = ++asked.current;
     setOpen({ panel });
+    const answer = (l: Listed) => { if (asked.current === mine) setOpen(l); };
     let error = "";
     for (const study of studies) {
-      const r = await api.genes({ panel: { id: panel, study } });
+      const r = await api.genes({ panel: { id: panel, study } }).catch(() => null);
+      if (!r) { error = "the server could not be reached"; continue; }
       const j = await r.json().catch(() => ({ error: "the server's answer could not be read" }));
-      if (r.ok) { setOpen({ panel, genes: j.genes as string[] }); return; }
+      if (r.ok) return answer({ panel, genes: j.genes as string[] });
       error = j.error || "the panel's genes could not be read";
     }
-    setOpen({ panel, error: error || "no study is selected" });
+    answer({ panel, error: error || "no study is selected" });
   };
 
   const cell = (row: GeneTableRow, text: string) => {
@@ -57,7 +63,7 @@ export function usePanelTips(kind: GeneTableKind, studies: string[]) {
         </div>
       </FloatingTip>
     )}
-    <Dialog open={!!open} onOpenChange={(o) => { if (!o) setOpen(null); }}>
+    <Dialog open={!!open} onOpenChange={(o) => { if (!o) close(); }}>
       <DialogContent>
         <DialogHeader><DialogTitle data-test="gene-panel-modal-title">{open?.panel}</DialogTitle></DialogHeader>
         <div className="max-h-[calc(100vh-210px)] overflow-y-auto" data-test="gene-panel-modal-body">

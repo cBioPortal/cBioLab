@@ -32,4 +32,5 @@ built in `lib/study-view-clinical-tab.ts` and `lib/study-view-case-files.ts`.
 | CT9 | ⚠ Too many samples | Not applied: the table pages in the database, so no row limit is needed (the portal refuses past 6,500,000 ÷ attributes rows) | CDT:368-390; STV-STM-12 |
 | CT10 | Download name | `<study>_clinical_data.tsv`, or `combined_study_clinical_data.tsv` for several studies | CDT:425-428; SPS `clinicalDataDownloadFilename` |
 | CT11 | Download header | Patient ID, Sample ID, then (several studies) Cancer Study, then each column's display name, tab-separated | LMT:386-392; CDT:244-252 |
+| CT13 | One column per attribute | An attribute charted at both levels (several studies, one recording it per patient and another per sample) is one column, where its first chart in the CT2 order puts it | review of #274 |
 | CT12 | Download lines | Every row the search keeps, in the table's sort; a missing value is empty (not NA); each line, the header and the last included, ends in CRLF. ⚠ The portal writes at most 500 rows (its download fetcher's cap, a legacy bug) | LMT:393-430; SER:3-28; CDT:445 |
