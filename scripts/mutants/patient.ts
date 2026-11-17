@@ -64,4 +64,8 @@ export const mutants: Mutant[] = [
     effect: "A timeline sample's tooltip lists its attributes as they come, where the portal sorts them by key.",
     find: "  return [...merged].sort(([a], [b]) => a.localeCompare(b));\n}",
     replace: "  return [...merged];\n}" },
+  { id: "signatures-download-drops-reference", layer: "counts", guard: "unit", file: "lib/views/signatures/figure.ts",
+    effect: "The Mutational Signatures download leaves out the chosen signature's reference profile that the page draws under the spectrum, unlike the portal's mutationalBarChart file.",
+    find: "const sc = spectrumChart(s, W, 8, p, true);",
+    replace: "const sc = spectrumChart({ ...s, reference: null }, W, 8, p, true);" },
 ];
