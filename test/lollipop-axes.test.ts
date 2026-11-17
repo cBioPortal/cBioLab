@@ -1,5 +1,5 @@
 // The lollipop's axes as the portal labels them (MUT-LP-6): the tick interval, the x and y ticks and
-// their labels, the y title, and the figure drawing them. Row ids are the spec table's (A1–A15).
+// their labels, the y title, and the figure drawing them. Row ids are the spec table's (A1–A18).
 // Legacy: react-mutation-mapper LollipopPlotNoTooltip.tsx (calculateTickInterval, calculateTicks,
 // xTicks, axisTicks, yMaxLabel) and resultsView/mutation/Mutations.tsx (the y title formatter).
 // New exports are read off the module at run time, so this file loads before they exist.
@@ -41,16 +41,17 @@ const positions = (ts: Tick[]) => ts.map((t) => t.pos);
 const labelled = (ts: Tick[]) => ts.filter((t) => t.label != null && t.label !== "").map((t) => [t.pos, t.label] as [number, string]);
 const range = (from: number, to: number, step: number) => Array.from({ length: Math.floor((to - from) / step) + 1 }, (_, i) => from + i * step);
 
-const panels = (genes: HotspotGene[], yMax?: Record<string, number>) =>
-  (svgLib.lollipopPanelsSvg as (...a: unknown[]) => string)(genes, { width: 720 }, "", undefined, ...(yMax === undefined ? [] : [yMax]));
+const panelsAt = (width: number, genes: HotspotGene[], yMax?: Record<string, number>) =>
+  (svgLib.lollipopPanelsSvg as (...a: unknown[]) => string)(genes, { width }, "", undefined, ...(yMax === undefined ? [] : [yMax]));
+const panels = (genes: HotspotGene[], yMax?: Record<string, number>) => panelsAt(720, genes, yMax);
 const report = (gene: string, stems: [number, number][]) => ({
   changes: stems.map(([pos, n]) => ({ gene, pos, change: "X" + pos + "Y", n, rows: n, driver: true, impact: "missense" })),
   types: stems.map(([pos, n]) => ({ gene, pos, mtype: "Missense_Mutation", driver: true, rows: n })),
   totals: [{ gene, patients: stems.reduce((s, [, n]) => s + n, 0), pairs: stems.reduce((s, [, n]) => s + n, 0), somaticSamples: 1 }],
   cohortSamples: 500, minCount: 1, annotated: true,
 });
-const gene = (stems: [number, number][], name = "G") =>
-  buildLollipopGene(name, [report(name, stems)] as never, { proteinLength: 189, transcriptId: "T", domains: [] }) as HotspotGene;
+const gene = (stems: [number, number][], name = "G", proteinLength = 189) =>
+  buildLollipopGene(name, [report(name, stems)] as never, { proteinLength, transcriptId: "T", domains: [] }) as HotspotGene;
 const A13_STEMS: [number, number][] = [[12, 136], [61, 3]];
 
 /** a drawn text's characters (lib/chart/esc.ts escapes them) */
@@ -80,23 +81,40 @@ function xAxisY(svg: string) {
   }
   assert.fail("an x axis tick mark");
 }
-/** the x axis's drawn labels, left to right, non-empty only: texts just below its line */
-function xLabels(svg: string) {
+/** the x axis's drawn labels, left to right, non-empty only: texts just below its line, with their
+ * x and text-anchor */
+function xLabelsPlaced(svg: string) {
   const axY = xAxisY(svg);
-  const out: { x: number; label: string }[] = [];
+  const out: { x: number; anchor: string; label: string }[] = [];
   for (const m of svg.matchAll(/<text ([^>]*)>([^<]*)<\/text>/g)) {
     const y = Number(m[1].match(/\by="([^"]*)"/)?.[1]);
     if (!(y > axY && y <= axY + 20) || m[2].trim() === "" || /transform=/.test(m[1])) continue;
-    out.push({ x: Number(m[1].match(/\bx="([^"]*)"/)![1]), label: unesc(m[2]) });
+    out.push({ x: Number(m[1].match(/\bx="([^"]*)"/)![1]), anchor: m[1].match(/text-anchor="([^"]*)"/)?.[1] ?? "start", label: unesc(m[2]) });
   }
-  return out.sort((a, b) => a.x - b.x).map((t) => t.label);
+  return out.sort((a, b) => a.x - b.x);
 }
-/** the y grid lines' y values (horizontal lines across the plot), top first */
-function gridYs(svg: string) {
-  const ys: number[] = [];
-  for (const m of svg.matchAll(/<line x1="([^"]*)" y1="([^"]*)" x2="([^"]*)" y2="\2"[^>]*\/>/g)) if (Number(m[3]) - Number(m[1]) > 300) ys.push(Number(m[2]));
-  return [...new Set(ys)].sort((a, b) => a - b);
+const xLabels = (svg: string) => xLabelsPlaced(svg).map((t) => t.label);
+/** the y axis line's x: the leftmost vertical line at least 100px long (stems stand right of it) */
+function yAxisX(svg: string) {
+  let best = Infinity;
+  for (const m of svg.matchAll(/<line x1="([^"]*)" y1="([^"]*)" x2="\1" y2="([^"]*)"[^>]*\/>/g))
+    if (Math.abs(Number(m[3]) - Number(m[2])) >= 100) best = Math.min(best, Number(m[1]));
+  assert.ok(Number.isFinite(best), "a y axis line");
+  return best;
 }
+/** the y axis's tick lines: horizontal lines with one end at the axis line — a short mark ending at
+ * it (x2 at the axis) or a grid line starting from it (x1 at the axis) */
+function yTickLines(svg: string) {
+  const ax = yAxisX(svg), at = (v: number) => Math.abs(v - ax) < 0.06;
+  const out: { y: number; x1: number; x2: number }[] = [];
+  for (const m of svg.matchAll(/<line x1="([^"]*)" y1="([^"]*)" x2="([^"]*)" y2="\2"[^>]*\/>/g)) {
+    const x1 = Number(m[1]), x2 = Number(m[3]);
+    if (at(x1) || at(x2)) out.push({ y: Number(m[2]), x1, x2 });
+  }
+  return out;
+}
+/** the y ticks' y values, top first */
+const tickYs = (svg: string) => [...new Set(yTickLines(svg).map((l) => l.y))].sort((a, b) => a - b);
 const headY = (svg: string, pos: number) => {
   const m = svg.match(new RegExp(`data-codon="${pos}"[^>]*>[\\s\\S]*?<circle class="lollipop-head"[^>]* cy="([^"]*)"`));
   assert.ok(m, "a head at codon " + pos);
@@ -185,9 +203,9 @@ test("A13 the figure: y title # patients, y labels 0 and 136 with the 136 head o
   assert.ok(!allTexts(svg).some((t) => /Mutations/.test(t)), "no \"# G Mutations\" title");
   const ys = yLabels(svg);
   assert.deepEqual(ys.map((t) => t.label), ["136", "0"]);
-  const grid = gridYs(svg);
-  assert.equal(headY(svg, 12), grid[0], "the 136 stem's head sits on the top tick");
-  assert.ok(Math.abs(ys[0].y - grid[0]) < 6, "the 136 label is beside the top tick");
+  const ticks = tickYs(svg);
+  assert.equal(headY(svg, 12), ticks[0], "the 136 stem's head sits on the top tick");
+  assert.ok(Math.abs(ys[0].y - ticks[0]) < 6, "the 136 label is beside the top tick");
   assert.deepEqual(xLabels(svg), ["0", "100", "189aa"]);
   assert.equal(lib.LOLLIPOP_Y_TITLE, "# patients", "lib/lollipop.ts exports LOLLIPOP_Y_TITLE");
 });
@@ -202,4 +220,44 @@ test("A15 a set maximum of 200 above every stem: y labels 0 and 200, no >=", () 
   const svg = panels([gene(A13_STEMS)], { G: 200 });
   assert.deepEqual(yLabels(svg).map((t) => t.label), ["200", "0"]);
   assert.ok(!allTexts(svg).some((t) => t.includes(">=") || t.includes("≥")), "no >=");
+});
+
+// ---- review follow-up: the ends always labelled, tick marks not grid lines, no separator ----
+test("A16 at width 400 the x labels keep 0 first and <len>aa last, in order, none overlapping (1499, 740, 393)", () => {
+  for (const len of [1499, 740, 393]) {
+    const placed = xLabelsPlaced(panelsAt(400, [gene(A13_STEMS, "G", len)]));
+    const labels = placed.map((t) => t.label);
+    assert.equal(labels[0], "0", len + ": 0 drawn first (" + labels.join(", ") + ")");
+    assert.equal(labels[labels.length - 1], len + "aa", len + ": " + len + "aa drawn last (" + labels.join(", ") + ")");
+    const boxes = placed.map((t) => {
+      const w = t.label.length * 6;
+      const left = t.anchor === "middle" ? t.x - w / 2 : t.anchor === "end" ? t.x - w : t.x;
+      return { label: t.label, x: t.x, left, right: left + w };
+    });
+    for (let i = 1; i < boxes.length; i++) {
+      assert.ok(boxes[i].x > boxes[i - 1].x, len + ": " + boxes[i].label + " right of " + boxes[i - 1].label);
+      assert.ok(boxes[i].left > boxes[i - 1].right, len + ": " + boxes[i].label + " does not overlap " + boxes[i - 1].label);
+    }
+  }
+});
+
+test("A17 the y axis draws a short mark per tick ending at the axis line, no grid lines across", () => {
+  const svg = panels([gene(A13_STEMS)]);
+  const ax = yAxisX(svg), lines = yTickLines(svg);
+  for (const l of lines) {
+    assert.ok(Math.abs(l.x2 - l.x1) <= 8, "a mark at y " + l.y + " is " + Math.abs(l.x2 - l.x1) + "px long, not a grid line");
+    assert.ok(Math.abs(Math.max(l.x1, l.x2) - ax) < 0.06, "the mark at y " + l.y + " ends at the axis line");
+  }
+  assert.equal(lines.length, 8, "one mark per tick of lollipopYTicks(136): 0, 20, …, 120, 136");
+  assert.equal(tickYs(svg).length, 8, "8 distinct tick heights");
+  assert.equal(headY(svg, 12), tickYs(svg)[0], "the 136 stem's head sits at the top mark");
+});
+
+test("A18 a length not from Genome Nexus: the subtitle reads axis runs to codon 1068, no separator", () => {
+  const g = { ...gene(A13_STEMS, "G", 1068), lengthSource: "observed", proteinLength: 1068 } as HotspotGene;
+  const svg = panels([g]);
+  const sub = allTexts(svg).find((t) => t.includes("axis runs to codon"));
+  assert.ok(sub, "a subtitle naming the axis's end");
+  assert.ok(sub.includes("axis runs to codon 1068"), "reads 1068: " + sub);
+  assert.ok(!sub.includes("1,068"), "no thousands separator: " + sub);
 });
