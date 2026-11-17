@@ -21,6 +21,16 @@ const CT_KINDS: [keyof CancertypesGroup, string, string][] = [["mutation", "Muta
   ["multiple", "Multiple Alterations", MULTI]];
 const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string, string][] = [["mutation", "Mutation data", "mutation"], ["cna", "CNA data", "CNA"], ["sv", "Structural variant data", "structural variant"]];
 
+/** the portal's name for a category type (CancerSummaryContainer GroupByOptions); any other attribute by its own name */
+export function categoryLabel(groupBy: string): string {
+  return ({ study: "Cancer Study", CANCER_TYPE: "Cancer Type", CANCER_TYPE_DETAILED: "Cancer Type Detailed" } as Record<string, string>)[groupBy] || groupBy;
+}
+
+/** the portal's filter alert, when a threshold hides some group */
+export function filterAlert(r: CtResult, g: { groups: unknown[]; categories: number; filtered?: true }): string | null {
+  return g.filtered ? g.groups.length + " of " + g.categories + " categories (" + categoryLabel(r.groupBy) + ") are shown based on filtering." : null;
+}
+
 /** a bar's band never narrows below this: labels turned 45° then sit a line of text apart */
 const MIN_BAND = 16;
 /** nor widens past this: a few groups get bars, not slabs */
@@ -39,7 +49,8 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   { body: string; width: number; height: number; grown: boolean } {
   const p = palette(o.theme), pn = r.panels[panel];
   const src = o.gene && pn.perGene ? pn.perGene.find((x) => x.gene === o.gene) || pn : pn;
-  const groups = [...src.groups, ...(src.pooled ? [src.pooled] : [])];
+  const groups = src.groups;
+  const alert = filterAlert(r, src);
   const freq = r.show === "frequency";
   const value = (g: CancertypesGroup, k: keyof CancertypesGroup) => freq ? 100 * Number(g[k] ?? 0) / (g.profiled || 1) : Number(g[k] ?? 0);
   const top = Math.max(1, ...groups.map((g) => value(g, "altered")));
@@ -51,7 +62,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const everywhere = known ? PROFILES.filter(([k]) => groups.every((g) => (g.profiledFor![k] || 0) > 0)) : [];
 
   let W = Math.max(360, o.width || 860);
-  const T = o.title === false ? 10 : 34;
+  const T = (o.title === false ? 10 : 34) + (alert ? 18 : 0);
   const ys = linear(0, freq ? Math.min(100, top) : top, T + PLOT_H, T);
   const yFmt = freq ? (v: number) => fmtNum(v) + "%" : (v: number) => fmtInt(v);
   const markW = Math.max(0, ...marked.map(([, l]) => textWidth(l, FS.small) + 6));
@@ -76,6 +87,11 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
     out.push(label(PAD, 18, head, { size: FS.title, weight: 600, fill: p.ink, maxW: W * 0.5 }));
     out.push(label(PAD + hw + 8, 18, (o.gene ? o.gene + " · " : "") + fmtInt(pn.altered) + " of " + fmtInt(pn.profiled) + " profiled " + r.unit + "s altered (" +
       fmtPct(100 * pn.altered / (pn.profiled || 1)) + ")", { size: FS.small, fill: p.muted, maxW: W - PAD - hw - 8 - PAD }));
+  }
+  if (alert) out.push(label(PAD, T - 12, alert, { size: FS.small, fill: p.ink, maxW: W - 2 * PAD }));
+  if (!groups.length) {
+    out.push(label(PAD, T + 20, "No category passes the filters.", { size: FS.body, fill: p.muted, maxW: W - 2 * PAD }));
+    return { body: out.join(""), width: W, height: T + 36, grown };
   }
   out.push(axisLeft(ys, L - 4, p, { title: yTitle, gridTo: plotR, fmt: yFmt }));
   out.push(`<line x1="${L - 4}" y1="${T + PLOT_H}" x2="${r1(plotR)}" y2="${T + PLOT_H}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
