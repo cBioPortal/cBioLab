@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "table-duplicates";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "table-duplicates": ["node", "--env-file=.env.local", "scripts/check-table-duplicates.ts"],
 };
 
 interface Mutant {
@@ -533,6 +534,12 @@ const MUTANTS: Mutant[] = [
   { id: "fusion-only-gene-dropped", layer: "counts", guard: "mutation-fusions", file: "lib/views/hotspots/run.ts",
     effect: "A gene with fusions but no mutations disappears from the Mutations tab's lollipop, with its Fusion badge and frequency, where the portal keeps it.",
     find: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));", replace: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i])).filter((h) => h.mutated > 0);" },
+  { id: "mutation-duplicates-across-patients", layer: "counts", guard: "table-duplicates", file: "lib/mutation-table.ts",
+    effect: "The Mutations table's count says it includes duplicates for one change in different patients, where the portal counts only a patient's own repeats.",
+    find: "duplicateKey: \"(study, patient, ifNull(proteinChange, ''))\"", replace: "duplicateKey: \"(study, ifNull(proteinChange, ''))\"" },
+  { id: "sv-duplicates-ignore-breakpoints", layer: "counts", guard: "table-duplicates", file: "lib/sv-table.ts",
+    effect: "The Structural Variants table counts every second SV of a patient as a duplicate, where the portal requires the same breakpoints.",
+    find: "duplicateKey: \"(study, patient, ifNull(toString(site1Chr), ''), ifNull(toString(site1Pos), ''), ifNull(toString(site2Chr), ''), ifNull(toString(site2Pos), ''))\"", replace: "duplicateKey: \"(study, patient)\"" },
   { id: "germline-case-sensitive", layer: "counts", guard: "mutation-tab-states", file: "lib/federation.ts",
     effect: "A mutation whose status is spelled 'Germline' or 'germline' counts as somatic in the Somatic Mutation Frequency, where the portal matches germline in any case.",
     find: "AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "AND ifNull(status, '') != 'GERMLINE') AS somatic_samples" },

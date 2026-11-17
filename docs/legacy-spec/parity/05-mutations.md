@@ -20,10 +20,10 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 27 |
+| ✅ match | 28 |
 | 🟡 partial | 44 |
 | 🔶 different | 18 |
-| ❌ missing | 33 |
+| ❌ missing | 32 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 7 |
@@ -229,7 +229,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-TB-1 | 🟡 | B | Unchanged: "223 KRAS mutations", "59 of 223 KRAS mutations"; no duplicate suffix |
+| MUT-TB-1 | 🟡 | B | "223 KRAS mutations", "59 of 223 KRAS mutations", with the ": includes N duplicate mutations in patients with multiple samples" suffix when N > 0; no "(page x of y)" |
 | MUT-TB-2 | 🟡 | B | Unchanged: search, columns, download CSV; no Copy |
 | MUT-TB-3 | 🔶 | B | Unchanged: search "G12D" → table 59 of 223, lollipop still 223 mutations |
 | MUT-TB-4 | 🔶 | B | Unchanged: numbered pages + per page |
@@ -283,7 +283,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-11 | ✅ | C | Copy # is the sample's discrete call for the gene; Q1 KRAS G12C rows ShallowDel / Gain / Diploid as legacy (#245) |
 | MUT-STM-12 | ❌ | C | Unchanged: no ASCN |
 | MUT-STM-13 | ? | C | gnomAD and SIGNAL columns exist (#245); blank on Q1, not comparable |
-| MUT-STM-14 | ❌ | B | Unchanged |
+| MUT-STM-14 | ✅ | B | Grouped by patient + protein change (one gene per table), Σ(group − 1) over every row, not the search (`mutationRowSource` duplicateKey) |
 | MUT-STM-15 | ❌ | B | Unchanged: no Freq in the Columns menu |
 | MUT-STM-16 | ❌ | B | Unchanged |
 | MUT-STM-17 | 🟡 | B | Unchanged: domain max(5, tallest); axis niced (0-50-100-150) |

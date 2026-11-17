@@ -88,7 +88,7 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
   const rows = r.rows.map((x) => ({ cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
     values: SV_COLUMNS.map((c) => svValue(x, c)) }));
   const columns = SV_COLUMNS.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }));
-  const sv = { genes, columns, shown, defaults: SV_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
+  const sv = { genes, ...(r.duplicates ? { duplicates: r.duplicates } : {}), columns, shown, defaults: SV_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (sub) return { kind: "sv", cohorts: vNames, sv, participation: ctx.participationFor(ctx.vStudies, true) };
   return {

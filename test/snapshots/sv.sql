@@ -64,7 +64,7 @@ rows AS (
   LEFT JOIN ann AS a1 ON a1.gene = s.gene1 AND s.gene1 != '' LEFT JOIN ann AS a2 ON a2.gene = s.gene2 AND s.gene2 != ''
   LEFT JOIN asv AS pr ON pr.site1_entrez = s.k1 AND pr.site2_entrez = s.k2 AND pr.sv_type = s.ktype AND pr.tumor_type = s.ttype
 )
-SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
+SELECT cohort, study, countIf(1) AS n, count() AS all, count() - uniqExact((study, patient, ifNull(toString(site1Chr), ''), ifNull(toString(site1Pos), ''), ifNull(toString(site2Chr), ''), ifNull(toString(site2Pos), ''))) AS dup FROM rows GROUP BY cohort, study
 
 -- view 0 sv: sv:profiled:MSK-IMPACT · msk_impact_2017
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived

@@ -20,10 +20,10 @@ Legacy: header text and "Download TSV" per gene. cBioLab: the same `sv` view per
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 28 |
+| ✅ match | 30 |
 | 🟡 partial | 12 |
 | 🔶 different | 7 |
-| ❌ missing | 5 |
+| ❌ missing | 3 |
 | 🐞 ok | 2 |
 | 🐞 copied | 0 |
 | N/A | 0 |
@@ -89,7 +89,7 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| SV-TB-1 | 🟡 | B | Unchanged: "236 TMPRSS2 structural variants"; no duplicate suffix |
+| SV-TB-1 | 🟡 | B | "236 TMPRSS2 structural variants: includes 2 duplicate structural variants in patients with multiple samples", as legacy; no "(page x of y)" |
 | SV-TB-2 | 🔶 | B | Unchanged: search, "columns (8/36)", "download CSV (236)", filter icon on every header; no Copy |
 | SV-TB-3 | 🟡 | B | Unchanged: numbered pager + per page, "Showing 1–25 of 236" |
 | SV-TB-4 | 🔶 | B | Unchanged: "drivers first, then gene 1, gene 2" (`sv-table.ts:127`): AFF3-TMPRSS2 first; legacy TMPRSS2-BRAF first |
@@ -144,13 +144,13 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 | SV-MD-4 | 🟡 | C | Listed once ✅; OncoKB SV type derived as the portal's (#219); no functionalFusion logic |
 | SV-MD-5 | 🐞 ok | C | Only studies with SV data contribute ✅; annotation read per row from one store, not from the first profile only |
 | SV-MD-6 | ✅ | C | Show only drivers / somatic now exist (#168) and, as on the portal, do not touch this tab (the `sv` view takes no driver settings) |
-| SV-MD-7 | ❌ | B | Unchanged: no duplicate suffix |
+| SV-MD-7 | ✅ | B | The duplicate suffix (Q1 TMPRSS2: 2, as legacy) |
 
 ### §6 Statistics & methods
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| SV-STM-1 | ❌ | BC | Unchanged: duplicates not computed or shown |
+| SV-STM-1 | ✅ | BC | Grouped by patient + both sites' chromosome and position, Σ(group − 1) over every row (`svRowSource` duplicateKey); TMPRSS2 2 |
 | SV-STM-2 | ❌ | C | Unchanged: no exon rank |
 | SV-STM-3 | 🔶 | C | Unchanged: driver bit, then gene 1, gene 2 |
 | SV-STM-4 | ✅ | B | 236 / 220 / 11 identical |

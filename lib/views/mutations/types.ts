@@ -26,6 +26,8 @@ export interface MutationsView extends TableQuery {
 }
 export interface MutationsResult extends TableRows<string | number | null> {
   gene: string;
+  /** rows beyond the first of one change in one patient (several samples), over every row: the portal's "includes N duplicate mutations" (MUT-STM-14); absent when none */
+  duplicates?: number;
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
   /** the Genome Nexus release its Genome Nexus columns are read at, per reference genome (null: none stored) */

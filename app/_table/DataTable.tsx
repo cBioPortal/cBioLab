@@ -90,6 +90,10 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
 }
 
 /** The pager under a table: previous, a window of page numbers, next; the rows shown; the page size. */
+/** the portal's note on a table's count for one patient's rows repeated across samples (MutationMapper multipleMutationInfo); undefined when none */
+export const duplicatesNote = (n: number | undefined, one: string, many: string): string | undefined =>
+  n ? "includes " + n.toLocaleString("en-US") + " duplicate " + (n === 1 ? one : many) + " in patients with multiple samples" : undefined;
+
 export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
   const nums: (number | null)[] = [];
   const lo = Math.max(0, p.page - 2), hi = Math.min(p.pages - 1, p.page + 2);
@@ -327,6 +331,8 @@ export interface DataTableProps<V> {
   table?: string;
   /** what a row is, plural: "mutations", "samples" */
   unit: string;
+  /** said after the count ("includes 38 duplicate mutations in patients with multiple samples") */
+  countNote?: string;
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
   onQuery: (q: TableQuery) => void;
   /** a cell drawn other than as its text (a badge, a link); the row says whose it is (study, sample) */
@@ -349,7 +355,7 @@ export interface DataTableProps<V> {
   groupBy?: string;
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -408,7 +414,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   return (
     <div className="dt">
       <div className="dt-bar">
-        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}
+        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}{countNote ? ": " + countNote : null}
           {multi ? <span className="meta"> across {t.lists.length} cohorts and studies</span> : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
