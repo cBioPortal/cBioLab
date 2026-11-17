@@ -119,4 +119,10 @@ export const mutants: Mutant[] = [
   { id: "mutation-default-columns-six", layer: "counts", guard: "unit", file: "lib/mutation-table.ts",
     effect: "The Mutations table opens without Copy # and Allele Freq (T), which the portal shows by default.",
     find: "\"mutationType\", \"copyNumber\", \"vaf\", \"mutCount\"]", replace: "\"mutationType\", \"mutCount\"]" },
+  { id: "lollipop-ymax-not-clamped", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "A Y-Axis Max typed below 1 is kept, where the portal clamps it to 1.",
+    find: "const v = Math.max(1, Math.round(input));", replace: "const v = Math.round(input);" },
+  { id: "lollipop-ymax-cap-unmarked", layer: "counts", guard: "unit", file: "lib/lollipop-svg.ts",
+    effect: "A lollipop whose tallest stem is above the set Y-Axis Max shows a plain top tick, where the portal marks the capped axis with \"≥\".",
+    find: "(cap != null && t === cap && maxN > cap ? \"≥\" : \"\")", replace: "(\"\")" },
 ];
