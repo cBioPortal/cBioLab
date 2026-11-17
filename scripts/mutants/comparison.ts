@@ -79,4 +79,8 @@ export const mutants: Mutant[] = [
     effect: "Table 1's q-values are corrected together with the rows the model was built from, whose tiny p-values are guaranteed, so every other row looks more significant than it is.",
     find: "r.role !== \"in the model\" && r.role !== \"outcome\"",
     replace: "r.role !== \"outcome\"" },
+  { id: "clinical-hidden-left-out-of-q", layer: "statistics", guard: "unit", file: "lib/views/clinical/run.ts",
+    effect: "The Comparison page's Clinical tab leaves the survival attributes cBioPortal tests but does not list out of Benjamini–Hochberg, so every q-value is smaller than the portal's (coadread Patient Weight 8.49e-7 over 44 for the portal's 1.022e-6 over 53).",
+    find: "const toTest = [...attrs, ...hidden];",
+    replace: "const toTest = [...attrs];" },
 ];
