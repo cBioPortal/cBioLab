@@ -209,4 +209,5 @@ test("Comparison/Survival › Genomic Alterations is one table over every altera
   assert.equal(view.kind, "enrichment");
   assert.equal(view.alteration, "any");
   assert.deepEqual(view.cohorts, ["Altered", "Unaltered"]);
+  assert.equal(view.minAltered, 1, "every gene tested is listed");
 });

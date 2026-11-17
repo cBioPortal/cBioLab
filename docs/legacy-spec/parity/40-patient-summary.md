@@ -22,9 +22,9 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 37 |
-| 🟡 partial | 26 |
-| 🔶 different | 10 |
+| ✅ match | 39 |
+| 🟡 partial | 27 |
+| 🔶 different | 7 |
 | ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -192,10 +192,10 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-TL-TT-1 | 🔶 | C | Hover only; no click-to-pin, no Esc, no 100 ms linger |
+| PAT-TL-TT-1 | ✅ | B | Hover shows it; gone 100 ms after the pointer leaves (the pointer may rest on it); a click pins it, a second click or × lets it go; Esc and leaving the page close it |
 | PAT-TL-TT-2 | 🟡 | C | Attributes with `_`→space, DATE / START / END formatted + "(day n)" ✅; no Markdown links / iframe |
 | PAT-TL-TT-3 | 🔶 | C | Sample row: event attributes + "· sample n"; no sample clinical attributes |
-| PAT-TL-TT-4 | 🔶 | C | Up to 4 events stacked + "and N more"; no `[<] i of n [>]` paging or keys |
+| PAT-TL-TT-4 | 🟡 | B | One event at a time, "‹ i of n events ›", ←/↓ previous and →/↑/space next, wrapping ✅ (msk_chord P-0000012 Treatment: 1 of 2 → 2 of 2); no "Plotted y value is the max of simultaneous events" on line-chart rows |
 
 ### §3 Timeline — axis, zoom, download
 
@@ -246,9 +246,9 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-SV-1 | 🟡 | C | All SV rows of the patient; merged by (gene1, gene2, class, event, pos1, pos2), unsorted — A–B and B–A stay apart (`patient-alterations.ts:221`) |
+| PAT-SV-1 | ✅ | BC | One row per the portal's key, both genes, positions and chromosomes and the class sorted (generateStructuralVariantId), so A–B and B–A merge; the row's fields one record's: paad_msk_2025 C-873T8K's 4 FGFR2/MYOF records (both orders, 2 samples) are 1 row on both sides (`check:patient-sv`) |
 | PAT-SV-2 | 🟡 | B | Empty: "0 Structural Variants … no rows" ✅; no "not profiled" alert (lgg) |
-| PAT-SV-3 | 🔶 | B | Samples · Gene 1 · Gene 2 · Variant Class · Event Info · Breakpoint Type · Connection Type; no Status badge, no Annotation (tracked), +13 optional columns |
+| PAT-SV-3 | 🟡 | B | Samples · Gene 1 · Gene 2 · Status (s / g badge, not sortable) · Variant Class · Event Info · Connection Type ✅; Breakpoint Type hidden ✅; no Annotation (tracked), +13 optional columns |
 | PAT-SV-4 | 🐞 ok | C | No SV gene filter |
 | PAT-SV-5 | ❌ | C | No server column config (tracked: Instance defaults) |
 

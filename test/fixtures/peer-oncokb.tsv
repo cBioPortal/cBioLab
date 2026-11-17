@@ -24,7 +24,7 @@ CNA	MYC	AMPLIFICATION	Oncogenic	Gain-of-function
 CNA	CDKN2A	DELETION	Oncogenic	Loss-of-function		
 CNA	FAT1	DELETION	Likely Oncogenic	Likely Loss-of-function		
 SV	ALK	Fusion	Oncogenic	Gain-of-function	LEVEL_1	
-SV	ERG	Fusion	Oncogenic	Gain-of-function	LEVEL_4	
+SV	ERG	Fusion	Oncogenic	Gain-of-function	LEVEL_4	LEVEL_R2
 SV	NTRK1	Fusion	Oncogenic	Gain-of-function	LEVEL_1	
 SV	TTN	Fusion	Unknown	Unknown		
 MUTATION	STK11	F354L	Likely Neutral	Likely Neutral		

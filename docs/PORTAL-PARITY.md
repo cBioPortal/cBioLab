@@ -407,6 +407,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The driver / VUS / tier / germline filters by the DB `driver_filter` (CMM-AT-6); off-panel calls stay out of both sides (invariant 7; the portal counts them)
   - [x] Every altered gene tested (ours `minAltered: 5`, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested, DYNC2H1 q 0.0503 vs 0.239; CNA 6,512 vs 6,156 significant; G5 mutation 145 vs 336; see bugs) (CMM-STM-7, CMM-AL-4) (#228)
   - [ ] Every row (ours ≤300, and the frequency scatter and bar plot are built from those 300; the expression tabs' cap is under them) (CMM-AL-5, CMM-FS, CMM-BP-2, CMM-GN, CMM-EX-5)
+    - [x] Genomic Alterations: every gene tested listed (G2 22,871 rows, as the portal's), the volcano and frequency scatter drawing every one; the bar plot already ranked every tested gene (#228); a two-group tie enriched in the second group (CMM-STM-3) (#294)
+    - [ ] The expression tabs past their 1,500 cap (CMM-GN, CMM-EX-5)
   - [ ] Patient-level enrichment: the Sample / Patient select (CMM-AL-4, CMM-MD-5)
   - [x] Formats: p and q "< 10^-10" (ours "1.1e-82"), altered % to 2 dp (ours 1), the volcano's y capped at 10 (ours to 82) (CMM-STM-9, CMM-STM-3, CMM-AL-5, CMM-VO-1) (#236)
     - [ ] Group headers "(A) Basal": the ordinals come with the group selector's (CMP-GS-7)
@@ -425,12 +427,13 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Tabs: Genomic Evolution second, and only for patients with several samples (see bugs); no Clinical Trials placeholder, which the portal does not have (PAT-TAB, PTB-TAB-2, PTB-TAB-3, PTB-MD-2, PTB-MD-3, PTB-MD-12) (#269)
     - [ ] Uncalled mutations' reads toward the Genomic Evolution gate (legacy counts called or uncalled); Files & Links only with resource data (ours a placeholder on every patient) (PTB-TAB-2)
   - [ ] Timeline: drag-zoom, PDF/PNG/SVG/ZIP download, month ticks, tooltips pinned and paged, the sample row's clinical data in its tooltip (PAT-TL-ZM-1, PAT-TL-ZM-3, PAT-TL-ZM-4, PAT-TL-TT-1…4)
+    - [x] Tooltips pinned by a click, lingering 100 ms, closed by Esc, and paged "‹ i of n events ›" with the arrow keys (PAT-TL-TT-1, PAT-TL-TT-4) (#317)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
   - [ ] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15)
   - [ ] Cohort column: "72%" and "<1%" (ours "72.5%"), the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
   - [x] Browser title "Patient: P04" (ours "cbio-lab") (PAT-SH-1) (#296)
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
-  - [ ] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3)
+  - [x] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3) (#303)
   - [ ] Clinical Data tab as Attribute | Value and Attribute × sample, and the Timeline Data tables (ours two wide tables of raw values) (PTB-CD-1…4, PTB-STM-11)
 
 ## Medium — annotation depth and per-sample viewers
