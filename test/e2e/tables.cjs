@@ -141,7 +141,7 @@ async function tables({ browser, ok, BASE }) {
       const all = await count("TMPRSS2");
       const selected = await page.locator("[role=tab][aria-selected=true]").allInnerTexts();
       ok("results: ?tab=Structural Variants opens the tab on the first gene, with the portal's TMPRSS2 count",
-        selected.includes("Structural Variants") && all.all === 236, selected.join(", ") + " · " + JSON.stringify(all));
+        selected.some((t) => t.startsWith("Structural Variants")) && all.all === 236, selected.join(", ") + " · " + JSON.stringify(all));
       const heads = (await page.locator(".dt-table thead th").allInnerTexts()).map((x) => x.trim()).filter(Boolean);
       ok("results: the SV table shows the portal's default columns, in its order",
         ["Sample ID", "Cancer Type Detailed", "Gene 1", "Gene 2", "Annotation (OncoKB)", "Connection Type", "Event Info", "Variant Class"].every((c, i) => heads[i]?.startsWith(c)),
