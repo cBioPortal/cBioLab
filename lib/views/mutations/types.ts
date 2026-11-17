@@ -19,7 +19,7 @@ export interface MutationsView extends TableQuery {
    * false` shows every one (the portal's "Do not filter by OQL")
    */
   oql?: string[]; useOql?: boolean;
-  /** how a line's DRIVER reads: the page's driver settings */
+  /** the page's driver settings: each row's driver call (its Alteration cell, the default order) and how a line's DRIVER reads */
   drivers?: DriverSettings;
   /** rows per page (default 25, at most 1000); every page and the download are slices of one order */
   rows?: number;

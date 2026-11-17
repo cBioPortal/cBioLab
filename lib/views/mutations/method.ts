@@ -2,12 +2,18 @@
 import { type TableLists, type MethodRecord, tableSteps } from "../../method.ts";
 import { BUILD_COMMIT } from "../../build-info.ts";
 
+/**
+ * `drivers`: with the page's driver settings, what calls a row a putative driver under them (lib/driver-settings.ts
+ * driverSourceText); without, the rule is OncoKB at the pin or a Cancer Hotspot.
+ */
 export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin: string | null; variantPins: string; queryText: string; sortName: string | null; desc: boolean; shown: number;
-  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; duplicates?: number }): MethodRecord {
+  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; drivers?: string; duplicates?: number }): MethodRecord {
   const steps = tableSteps({ label: "mutations", what: t.gene + " mutation calls", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
     source: "every called " + t.gene + " mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" +
       (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") +
-      (t.oncokbPin && t.variantPins ? "; a driver when OncoKB calls it oncogenic or its genomic variant is a Cancer Hotspot of its kind in the stored " + t.variantPins + " annotation (a splice-site hotspot for a splice mutation, single-residue or in-frame indel otherwise)" : "") +
+      (t.drivers !== undefined
+        ? "; a putative driver by the page's driver settings: " + t.drivers + " (each source only where it is switched on and this deployment stores it; a study's own calls and tiers only where the study holds any; with none annotating, every row is counted by its type alone)"
+        : t.oncokbPin && t.variantPins ? "; a driver when OncoKB calls it oncogenic or its genomic variant is a Cancer Hotspot of its kind in the stored " + t.variantPins + " annotation (a splice-site hotspot for a splice mutation, single-residue or in-frame indel otherwise)" : "") +
       (t.variantPins ? "; HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL from the stored " + t.variantPins + " annotation of its genomic variant" : "") +
       "; HGVSg from its coordinates; allele frequency = variant / (variant + reference) reads, the matched normal's likewise (4 decimals below 0.01, none at 0); " +
       "Copy # the sample's call for the gene in the study's discrete copy-number profile; Exon from the canonical transcript of the stored Genome Nexus annotation. " +
