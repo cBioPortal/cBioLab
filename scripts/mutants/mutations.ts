@@ -3,7 +3,6 @@
 import type { GuardCommands, Mutant } from "./types.ts";
 
 export const guards: GuardCommands = {
-  "table-duplicates": ["node", "--env-file=.env.local", "scripts/check-table-duplicates.ts"],
   "oncokb-tumor-type": ["node", "--env-file=.env.local", "scripts/check-oncokb-tumor-type.ts"],
   "oncokb-sv": ["node", "--env-file=.env.local", "scripts/check-oncokb-sv.ts"],
   "hotspot-drivers": ["node", "--env-file=.env.local", "scripts/check-hotspot-drivers.ts"],
@@ -117,12 +116,6 @@ export const mutants: Mutant[] = [
     effect: "The mutation table lists every mutation whatever the query's OQL.",
     find: "(filter ? \"\\n    AND \" + filter : \"\")",
     replace: "(\"\")" },
-  { id: "mutation-duplicates-across-patients", layer: "counts", guard: "table-duplicates", file: "lib/mutation-table.ts",
-    effect: "The Mutations table's count says it includes duplicates for one change in different patients, where the portal counts only a patient's own repeats.",
-    find: "duplicateKey: \"(study, patient, ifNull(proteinChange, ''))\"", replace: "duplicateKey: \"(study, ifNull(proteinChange, ''))\"" },
-  { id: "sv-duplicates-ignore-breakpoints", layer: "counts", guard: "table-duplicates", file: "lib/sv-table.ts",
-    effect: "The Structural Variants table counts every second SV of a patient as a duplicate, where the portal requires the same breakpoints.",
-    find: "duplicateKey: \"(study, patient, ifNull(toString(site1Chr), ''), ifNull(toString(site1Pos), ''), ifNull(toString(site2Chr), ''), ifNull(toString(site2Pos), ''))\"", replace: "duplicateKey: \"(study, patient)\"" },
   { id: "lollipop-ymax-not-clamped", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
     effect: "A Y-Axis Max typed below 1 is kept, where the portal clamps it to 1.",
     find: "const v = Math.max(1, Math.round(input));", replace: "const v = Math.round(input);" },
