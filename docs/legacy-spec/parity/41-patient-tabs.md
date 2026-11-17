@@ -22,8 +22,8 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 22 |
-| 🟡 partial | 17 |
+| ✅ match | 23 |
+| 🟡 partial | 16 |
 | 🔶 different | 10 |
 | ❌ missing | 29 |
 | 🐞 ok | 0 |
@@ -213,7 +213,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-STM-3 | ❌ | C | No heatmap clustering |
 | PTB-STM-4 | ✅ | BC | Stored fraction; "<1%" below 1 %, else whole % (`data.ts:93-96`); 36/34/27/2 % |
 | PTB-STM-5 | ✅ | C | p < 0.05 bold; p = 0 also bolds (legacy bug not copied) |
-| PTB-STM-6 | 🟡 | BC | Counts and total 347 ✅; % = 100·count/total unrounded (`figure.ts:89`), legacy rounds to integers |
+| PTB-STM-6 | ✅ | BC | Counts and total 347 ✅; % = round(100·count/total), 0 when the total is 0 (`spectrumPct`), as legacy; the multi-sample tooltip bug not copied |
 | PTB-STM-7 | ✅ | C | Ported (`data.ts:212-226`) |
 | PTB-STM-8 | ✅ | C | COSMIC v3.3, key = first word of NAME |
 | PTB-STM-9 | N/A | — | Unused store quirks |
