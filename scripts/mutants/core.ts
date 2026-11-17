@@ -153,4 +153,8 @@ export const mutants: Mutant[] = [
     effect: "A plot's correlation is shown to 2 decimals from the full-precision r, where the portal rounds its 5-decimal value (0.124996 shows 0.12, the portal 0.13).",
     find: "export const portalCorr = (r: number): string => portalR5(r).toFixed(2);",
     replace: "export const portalCorr = (r: number): string => r.toFixed(2);" },
+  { id: "results-unaltered-every-gene", layer: "cohorts", guard: "cohort-logic", file: "lib/cohort2.ts",
+    effect: "The Results page's Unaltered group requires profiling for every queried gene, not any of them, so samples on a panel without one gene drop out of it (msk_impact_2017 KRAS + ZFHX3: 8,136 for 10,945 profiled).",
+    find: ".join(leaf.anyGene ? \"\\n  UNION DISTINCT\\n\" : \"\\n  INTERSECT DISTINCT\\n\"));",
+    replace: ".join(\"\\n  INTERSECT DISTINCT\\n\"));" },
 ];

@@ -10,7 +10,7 @@
 // | F5   | Zero rows, plain: the header line alone                                                |
 // | F6   | Zero rows, transposed: a single column STUDY_ID\nSAMPLE_ID\n<gene>…                    |
 // | F7   | fileList portalFile: mutations → mutations.txt, sv → structural_variants.txt           |
-// | F8   | fileList portalFile: the first discrete CNA profile in list order → cna.txt; a second → its name + ".txt" |
+// | F8   | fileList: the first discrete CNA profile in list order is file "cna" → cna.txt; a second → profile:<id>, its name + ".txt" |
 // | F9   | fileList portalFile: other profiles → name + ".txt"                                    |
 // | F10  | fileList portalFile: a profile with no name → profile id + ".txt"                      |
 // | F11  | SV matrix joins every record's events (duplicates kept, groupArray) with a single space |
@@ -77,7 +77,8 @@ test("F7 portalFile: mutations and structural variants", () => {
 });
 
 test("F8 portalFile: only the first discrete copy-number profile is cna.txt; a second is its name", () => {
-  assert.equal(portalFile("profile:gistic"), "cna.txt");
+  assert.equal(portalFile("cna"), "cna.txt");
+  assert.equal(portalFile("profile:gistic"), undefined);
   assert.equal(portalFile("profile:rae"), "Putative copy-number from RAE.txt");
 });
 
