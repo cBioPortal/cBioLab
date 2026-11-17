@@ -29,7 +29,8 @@ export function axisLeft(s: Scale, x: number, pal: AxisPal, o: { title?: string;
   for (const t of s.ticks) {
     const y = s(t);
     if (o.gridTo != null) out.push(`<line x1="${x}" y1="${r1(y)}" x2="${o.gridTo}" y2="${r1(y)}" stroke="${pal.line}" stroke-width="${SW.hair}"/>`);
-    out.push(label(x - TICK_GAP, y + FS.small * 0.35, fmt(t), { size: FS.small, fill: pal.muted, anchor: "end" }));
+    const text = fmt(t);
+    if (text) out.push(label(x - TICK_GAP, y + FS.small * 0.35, text, { size: FS.small, fill: pal.muted, anchor: "end" }));
   }
   if (o.line) out.push(`<line x1="${x}" y1="${s.range[0]}" x2="${x}" y2="${s.range[1]}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
   if (o.title) {
@@ -43,7 +44,7 @@ export function axisLeft(s: Scale, x: number, pal: AxisPal, o: { title?: string;
 /**
  * A value axis below the plot, its line at `y`. Labels are centred on their ticks except where that
  * would cross [minX, maxX] (the figure's edges), where they are pulled in; labels that would touch
- * are thinned to every second (third, …) tick.
+ * are thinned to every second (third, …) tick. A tick whose label is empty is drawn as a mark alone.
  */
 export function axisBottom(s: Scale, y: number, pal: AxisPal, o: { title?: string; gridTo?: number; fmt?: (v: number) => string; minX?: number; maxX?: number; line?: boolean } = {}): string {
   const fmt = o.fmt || s.fmt;
@@ -58,6 +59,7 @@ export function axisBottom(s: Scale, y: number, pal: AxisPal, o: { title?: strin
   const collides = (k: number) => {
     let prev = -Infinity;
     for (let i = 0; i < placed.length; i += k) {
+      if (!placed[i].text) continue;
       if (placed[i].left < prev + 6) return true;
       prev = placed[i].left + placed[i].w;
     }
@@ -68,7 +70,7 @@ export function axisBottom(s: Scale, y: number, pal: AxisPal, o: { title?: strin
   placed.forEach((p, i) => {
     if (o.gridTo != null) out.push(`<line x1="${r1(p.cx)}" y1="${o.gridTo}" x2="${r1(p.cx)}" y2="${y}" stroke="${pal.line}" stroke-width="${SW.hair}"/>`);
     out.push(`<line x1="${r1(p.cx)}" y1="${y}" x2="${r1(p.cx)}" y2="${y + 3}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
-    if (i % every === 0) out.push(label(p.left, y + TICK_GAP + FS.small, p.text, { size: FS.small, fill: pal.muted }));
+    if (i % every === 0 && p.text) out.push(label(p.left, y + TICK_GAP + FS.small, p.text, { size: FS.small, fill: pal.muted }));
   });
   if (o.line !== false) out.push(`<line x1="${s.range[0]}" y1="${y}" x2="${s.range[1]}" y2="${y}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
   if (o.title) {

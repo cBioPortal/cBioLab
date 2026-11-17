@@ -1,7 +1,7 @@
 // The lollipop figure: the plot alone, one panel per gene, and its caption's words for what the app
 // shows beside it as controls. Imports only the drawing kit and lib/lollipop.ts, so the app draws
 // it in the browser (app/_lollipop/HotspotsBody.tsx) from the same code the server uses for MCP.
-import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, lollipopGeneEmpty, type AlterationCell, type CodonSelection } from "./lollipop.ts";
+import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, lollipopGeneEmpty, defaultYMax, lollipopXTicks, lollipopYTicks, LOLLIPOP_Y_TITLE, type AlterationCell, type CodonSelection } from "./lollipop.ts";
 
 import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, legend, label, textWidth, textOn,
@@ -39,7 +39,7 @@ export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[
  * The lollipop, drawn as cBioPortal's results-page mutation tab draws it (react-mutation-mapper's
  * LollipopPlotNoTooltip / LollipopMutationPlot): a protein backbone with its Pfam domains, one
  * grey stem per codon topped by a 2.8px head in the codon's colour, a linear y axis of
- * "# GENE Mutations" whose max is at least 5, and one label on the tallest stem. What the rules
+ * "# patients" whose max is at least 5, and one label on the tallest stem. What the rules
  * decide lives in lib/lollipop.ts; this only places it, at the width it is given. The plots alone,
  * one panel per gene, with a caption: the app draws its own controls beside them, and
  * lib/view-svg.ts's hotspotsSvg wraps them for a figure that stands alone.
@@ -53,15 +53,16 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
   for (const g of genes) {
     const len = Math.max(1, g.proteinLength);
     const maxN = Math.max(0, ...g.positions.map((q) => q.n));
-    const yTitle = "# " + g.gene + " Mutations";
+    const yTitle = LOLLIPOP_Y_TITLE;
     const head = 18, yTop = top + head + LABEL_ROOM, yBase = yTop + STEM;
-    // a maximum the reader set is the axis's top exactly (a tick there, "≥" on it when a stem is taller and so
-    // capped, as the portal's axis reads); the default, the tallest stem with a floor of 5, is rounded
-    const cap = yMax?.[g.gene] != null ? Math.max(1, yMax[g.gene]) : null;
-    const ys = cap != null ? linear(0, cap, yBase, yTop, { nice: false, count: 4 }) : linear(0, Math.max(5, maxN), yBase, yTop, { count: 4 });
-    // a stem counts patients, so a set maximum's axis has whole ticks only (a maximum of 1 or 2 reads 0, 1(, 2))
-    if (cap != null) ys.ticks = [...new Set([...ys.ticks.filter((t) => Number.isInteger(t) && t < cap && ys(t) - ys(cap) > 12), cap])];
-    const yFmt = (t: number) => (cap != null && t === cap && maxN > cap ? "≥" : "") + fmtInt(t);
+    // the portal's axis: 0 to the maximum exactly (the reader's, else the default), labelled only at its ends,
+    // the top ">= " when a stem is taller and so drawn capped there
+    const cap = yMax?.[g.gene] != null ? Math.max(1, yMax[g.gene]) : defaultYMax(g);
+    const yt = lollipopYTicks(cap, maxN > cap);
+    const ys = linear(0, cap, yBase, yTop, { nice: false, count: 4 });
+    ys.ticks = yt.map((t) => t.pos);
+    const yLabel = new Map(yt.map((t) => [t.pos, t.label ?? ""]));
+    const yFmt = (t: number) => yLabel.get(t) ?? "";
     const L = 8 + leftAxisWidth(ys, yTitle, yFmt);
     const plotW = W - L - R;
     const x = (pos: number) => L + plotW * Math.min(pos, len) / len;
@@ -83,12 +84,13 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
         (fits ? label(dx + dw / 2, yBase + DOMAIN / 2 + FS.small * 0.35, d.name, { size: FS.small, fill: textOn(d.color), anchor: "middle", maxW: room }) : "") + `</g>`);
     }
 
-    // x axis: round codon steps, and the protein's length at its end in place of any tick it would touch
+    // x axis: the portal's steps, "0" and "<length>aa" at the ends, every other step between labelled
     const axY = yBase + DOMAIN + 4;
-    const xs = linear(0, len, L, L + plotW, { nice: false, count: Math.max(2, Math.floor(plotW / 90)) });
-    const endText = fmtInt(len) + "aa", endW = textWidth(endText, FS.small);
-    xs.ticks = [...xs.ticks.filter((t) => t < len && xs(t) + textWidth(fmtInt(t), FS.small) / 2 + 8 < x(len) - endW), len];
-    out.push(axisBottom(xs, axY, p, { minX: L - 20, maxX: W - 2, fmt: (t) => t === len ? endText : fmtInt(t) }));
+    const xt = lollipopXTicks(len);
+    const xs = linear(0, len, L, L + plotW, { nice: false, count: 2 });
+    xs.ticks = xt.map((t) => t.pos);
+    const xLabel = new Map(xt.map((t) => [t.pos, t.label ?? ""]));
+    out.push(axisBottom(xs, axY, p, { minX: L - 20, maxX: W - 2, fmt: (t) => xLabel.get(t) ?? "" }));
 
     // stems, heads, tooltips; a selected codon's head drawn larger and last, over its neighbours, as
     // the portal draws it (radius 5 for 2.8). Each stem names its gene and codon, for the app's click.
