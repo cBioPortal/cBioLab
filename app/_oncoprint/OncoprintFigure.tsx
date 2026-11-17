@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { zoomedTip } from "./zoomed-tip.ts";
+import { clusterSort } from "./track-edits.ts";
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
@@ -170,7 +171,15 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const [detail, setDetail] = useState<Record<string, ColumnDetail | "loading">>({});
   const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** the track whose menu is open, and where to put it */
-  const [trackMenu, setTrackMenu] = useState<{ ti: number; x: number; y: number } | null>(null);
+  const [trackMenu, setTrackMenu] = useState<{ ti: number; cx: number; cy: number } | null>(null);
+  useEffect(() => {
+    // the menu is fixed at the click point, so it would drift from its row on a scroll
+    if (!trackMenu) return;
+    const close = () => setTrackMenu(null);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => { window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); };
+  }, [trackMenu]);
   /** a drag across the plot: canvas x of where it started and where it is now */
   const [sel, setSel] = useState<{ x0: number; x1: number; live: boolean } | null>(null);
   /**
@@ -842,9 +851,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <option value={sortKeys[0]}>{sortKeys[0]}</option>}
               <option value="genomic">genomic staircase</option>
               <option value="id">{data.unit} id</option>
-              {[...new Set(data.tracks.filter((t) => t.kind === "heatmap" && t.profileType).map((t) => t.profileType!))].map((pt) => (
-                <option key={"cluster:" + pt} value={"cluster:" + pt}>cluster by {pt}</option>
-              ))}
+              {/* clustering is chosen from a heatmap row's menu; the select only shows it, as the portal's Sort menu */}
+              {data.tracks.some((t) => t.kind === "heatmap" && t.profileType) &&
+                <option value={sortKeys[0]?.startsWith("cluster:") ? sortKeys[0] : ""} disabled>sorted by heatmap clustering order</option>}
               {data.tracks.filter((t) => t.kind !== "gene" && !/\(no data\)$/.test(t.label)).flatMap((t) => [
                 <option key={t.label} value={t.label}>{t.label} ↑</option>,
                 <option key={"-" + t.label} value={"-" + t.label}>{t.label} ↓</option>])}
@@ -905,7 +914,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               const x = e.clientX - rect.left, y = e.clientY - rect.top;
               if (x >= GEOM.gutter) { setTrackMenu(null); return; }
               const ti = Math.floor((y - GEOM.header) / (GEOM.rowH + GEOM.rowGap));
-              setTrackMenu(ti >= 0 && ti < data.tracks.length ? { ti, x, y } : null);
+              setTrackMenu(ti >= 0 && ti < data.tracks.length ? { ti, cx: e.clientX, cy: e.clientY } : null);
             }} />
           {trackMenu && (() => {
             const t = data.tracks[trackMenu.ti];
@@ -920,7 +929,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 onClick={() => { act(); setTrackMenu(null); }}>{label}{on && <Check className="ml-auto" />}</MenuItem>
             );
             return (
-              <div className="onco-trackmenu" style={{ left: Math.min(trackMenu.x, cssW - 210), top: trackMenu.y + 6 }}
+              <div className="onco-trackmenu" style={{ left: Math.min(trackMenu.cx, window.innerWidth - 220),
+                ...(trackMenu.cy > window.innerHeight * 0.6 ? { bottom: window.innerHeight - trackMenu.cy + 6 } : { top: trackMenu.cy + 6 }) }}
                 onMouseLeave={() => setTrackMenu(null)}>
                 <span className="meta onco-trackmenu-name">{t.label + (t.sublabel || "")}
                   {t.members && t.members.length > 1 && <><br />{t.members.join(" · ")}</>}</span>
@@ -929,6 +939,14 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 {props.onRemoveTrack && (!props.canRemoveTrack || props.canRemoveTrack(t.key ?? t.label)) && item("Remove track", false, () => props.onRemoveTrack!(t.key ?? t.label))}
                 {props.onExpandTrack && t.members && t.members.length > 1 &&
                   item("Expand into " + t.members.length + " rows", false, () => props.onExpandTrack!(t.key ?? t.label))}
+                {t.kind === "heatmap" && t.profileType && (() => {
+                  // the portal's heatmap group header (Cluster / Don't cluster); each of the profile's rows carries it here
+                  const mine = "cluster:" + t.profileType;
+                  return <>
+                    {item("Cluster", sortKeys[0] === mine, () => onSortKeys(clusterSort(sortKeys, t.profileType!)))}
+                    {item("Don't cluster", sortKeys[0] !== mine, () => { if (sortKeys[0] === mine) onSortKeys(clusterSort(sortKeys, null)); })}
+                  </>;
+                })()}
                 {item("Sort a-Z", isKey(""), () => setPrimary(key("")), sortable)}
                 {item("Sort Z-a", isKey("-"), () => setPrimary(key("-")), sortable)}
                 {item("Don't sort by this", sortable && !isKey("") && !isKey("-"), () => setPrimary(null), sortable)}

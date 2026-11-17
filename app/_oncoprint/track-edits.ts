@@ -173,3 +173,12 @@ export function withClinicalTab(v: V, ticked: string[], autoTracks: string[]): V
   if (hidden.length) next.hideTracks = hidden; else delete next.hideTracks;
   return pruneSort(next);
 }
+
+/**
+ * The sort keys after a heatmap profile's "Cluster" (its profile) or "Don't cluster" (null): one
+ * profile is clustered at a time, its key first (ResultsViewOncoprintUtils makeTrackGroupHeader).
+ */
+export function clusterSort(keys: string[], profileType: string | null): string[] {
+  const rest = keys.filter((k) => !k.replace(/^-/, "").startsWith("cluster:"));
+  return profileType ? ["cluster:" + profileType, ...rest].slice(0, 4) : rest;
+}
