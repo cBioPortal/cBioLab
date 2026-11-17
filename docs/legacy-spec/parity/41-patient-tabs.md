@@ -23,9 +23,9 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | Verdict | Count |
 |---|---|
 | ✅ match | 22 |
-| 🟡 partial | 16 |
+| 🟡 partial | 17 |
 | 🔶 different | 10 |
-| ❌ missing | 30 |
+| ❌ missing | 29 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
 | N/A | 3 |
@@ -140,7 +140,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-CD-1 | 🔶 | B | Two cards "Patient", "Samples"; no Timeline Data section |
 | PTB-CD-2 | 🔶 | B | One row, attributes as columns (P04 · 4 · 1:DECEASED · 22 …); per-column filter + CSV ✅; no Attribute \| Value, no priority order, no 1-decimal format, no panel links |
 | PTB-CD-3 | 🔶 | B | One row per sample, patient attributes repeated; legacy one column per sample |
-| PTB-CD-4 | ❌ | B | No per-event-type timeline tables |
+| PTB-CD-4 | 🟡 | B | Timeline Data: a table per event type, START_DATE · STOP_DATE · EVENT_TYPE · each attribute key in first-seen order, PATIENT_ID and STYLE_* left out, days as recorded, each sortable (as text) and filterable ✅ (lgg P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows — the portal API's counts); laid out as its own card under the two tables |
 
 ### §4 Mutational Signatures
 
