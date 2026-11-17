@@ -4,6 +4,7 @@
 // The cells, the quartiles and the coefficients arrive already computed, which is why the same
 // picture draws for a hundred cases or four hundred thousand. The only cases drawn one by one are
 // the points the engine chose (every case under the cap, the outliers over it), at most POINTS_CAP.
+import { STYLE } from "../../oncoprint-style.ts";
 import type { DrawnResultOf } from "../../types.ts";
 import type { HighlightPoint, PlotData, PlotLayer } from "../../plot.ts";
 import { fromLog, toLog, type LogRule } from "../../plot-log.ts";
@@ -95,6 +96,9 @@ function sharedGroups(h: PlotLayer, key: number, mark: (pt: HighlightPoint) => s
   (h.shared || []).forEach((pt, i) => { const o = h.sharedOwners?.[i] ?? 0; (by.get(o) ?? by.set(o, []).get(o)!).push(...mark(pt)); });
   return [...by.entries()].map(([o, marks]) => layerGroup(key, marks, o)).join("");
 }
+
+/** a fill that needs an outline to show on the page: a gene colouring's not-profiled point */
+const WHITE_FILL = STYLE.plotGene.fill["not profiled for mutations"];
 
 function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W: number, p: Pal): string {
   const { x0, x1, y0, y1 } = d.extent!, [gx, gy] = d.grid!;
@@ -330,7 +334,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
       const rBase = PLOT_POINT_R;
       for (const pt of byGroup.get(g.g)!) {
         const fill = pt.c != null && colorKey.length ? fillOf(pt.c) : base;
-        const ring = pt.r != null && !isAbsent(pt.r) ? ringOf(pt.r) : null;
+        const ring = pt.r != null && (d.ringAbsent ? pt.r !== "" : !isAbsent(pt.r)) ? ringOf(pt.r) : null;
         const pc = cx + jitterFor(pt.id) * half * 0.9;
         if (pt.v > vhi || pt.v < vlo) {
           ptOffScale++;
@@ -339,7 +343,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
         }
         baseMarks.push(`<circle${caseAttr(pt.id)} ${dotAt(pc, pt.v)} ` +
           `r="${rBase}" fill="${fill}" fill-opacity="0.85" ` +
-          (ring ? `stroke="${ring}" stroke-width="${r1(rBase * 0.36)}"` : halo(p)) + `/>`);
+          (ring ? `stroke="${ring}" stroke-width="${r1(rBase * 0.36)}"` : fill === WHITE_FILL ? `stroke="${STYLE.plotGene.outline}" stroke-width="1"` : halo(p)) + `/>`);
       }
     }
     out.push(layerGroup("base", baseMarks));
@@ -403,14 +407,15 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
   }
 
   const keyItems = (keys: { label: string; color: string }[], ring: boolean): LegendItem[] =>
-    keys.map((k) => ({ label: k.label, color: k.color, kind: "dot" as const, ...(ring ? { opacity: 0.6 } : {}) }));
+    keys.map((k) => ({ label: k.label, color: k.color, kind: "dot" as const, ...(ring ? { opacity: 0.6 } : {}),
+      ...(k.color === WHITE_FILL ? { stroke: STYLE.plotGene.outline } : {}) }));
   if (colorKey.length) {
     const items = keyItems(colorKey, false);
     if (fillOthers.size || fillNoValue) items.push({ label: otherLabel(fillOthers.size, fillNoValue), color: OTHER, kind: "dot" });
     const lg = legend(items, 8, y, W - 16, p, { title: d.colorLabel || "colour" }); out.push(lg.svg); y += lg.height;
   }
   // a ring means "this case also has that", so absence gets no ring and no key entry
-  const rings = ringKey.filter((k) => !isAbsent(k.label));
+  const rings = d.ringAbsent ? ringKey : ringKey.filter((k) => !isAbsent(k.label));
   if (rings.length) {
     const items = keyItems(rings, true);
     if (ringOthers.size) items.push({ label: otherLabel(ringOthers.size, false), color: OTHER, kind: "dot", opacity: 0.6 });

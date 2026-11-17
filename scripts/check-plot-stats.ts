@@ -28,8 +28,7 @@
  * Run: node --env-file=.env.local scripts/check-plot-stats.ts
  */
 import { chQuery, DB } from "../lib/ch.ts";
-import * as plot from "../lib/plot.ts";
-import { plotBoxSql, plotStatsSql, axisSelect, type PlotAxis } from "../lib/plot.ts";
+import { plotBoxSql, plotStatsSql, axisSelect, oncoprintClassSql, type PlotAxis } from "../lib/plot.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { sq } from "../lib/compiler.ts";
 import { resolverFor, hasFederatedPlot } from "../lib/federation.ts";
@@ -105,18 +104,13 @@ const CLASSES: [string, string, string, string][] = [
   ["K12", "Silent", "", "Other"],
 ];
 {
-  const classSql = (plot as Record<string, unknown>).oncoprintClassSql as ((mt: string, pc: string) => string) | undefined;
-  if (typeof classSql !== "function") {
-    for (const [id, mt, pc, want] of CLASSES) ok(false, id + " oncoprintClassSql(" + mt + ", '" + pc + "')", "lib/plot.ts exports no oncoprintClassSql — expected " + want);
-  } else {
-    try {
-      const rows = CLASSES.map(([id, mt, pc]) => "(" + sq(id) + ", " + sq(mt) + ", " + sq(pc) + ")").join(", ");
-      const sql = "SELECT id, " + classSql("mt", "pc") + " AS c FROM values('id String, mt String, pc String', " + rows + ")";
-      const got = new Map((await chQuery<{ id: string; c: string }>(sql)).data.map((r) => [r.id, r.c]));
-      for (const [id, mt, pc, want] of CLASSES) ok(got.get(id) === want, id + " oncoprintClassSql(" + mt + ", '" + pc + "')", "got " + got.get(id) + " — expected " + want);
-    } catch (e) {
-      for (const [id, , , want] of CLASSES) ok(false, id + " oncoprintClassSql", "threw: " + String((e as Error).message).slice(0, 200) + " — expected " + want);
-    }
+  try {
+    const rows = CLASSES.map(([id, mt, pc]) => "(" + sq(id) + ", " + sq(mt) + ", " + sq(pc) + ")").join(", ");
+    const sql = "SELECT id, " + oncoprintClassSql("mt", "pc") + " AS c FROM values('id String, mt String, pc String', " + rows + ")";
+    const got = new Map((await chQuery<{ id: string; c: string }>(sql)).data.map((r) => [r.id, r.c]));
+    for (const [id, mt, pc, want] of CLASSES) ok(got.get(id) === want, id + " oncoprintClassSql(" + mt + ", '" + pc + "')", "got " + got.get(id) + " — expected " + want);
+  } catch (e) {
+    for (const [id, , , want] of CLASSES) ok(false, id + " oncoprintClassSql", "threw: " + String((e as Error).message).slice(0, 200) + " — expected " + want);
   }
 }
 
@@ -178,26 +172,26 @@ const svSamplesSql = (gene: string) =>
   " AND hugo_gene_symbol = " + sq(gene) + " AND variant_type = 'structural_variant'";
 /** per sample of the study: CNA-profiled, SV-profiled, has an SV of the gene */
 async function ringFacts(gene: string) {
-  const sql = "SELECT countIf(has_sv) AS sv, countIf(has_sv AND cp) AS svCna, countIf(NOT cp AND NOT vp) AS np, countIf(NOT cp AND vp AND NOT has_sv) AS diploidExtra, count() AS total FROM (\n" +
+  const sql = "SELECT countIf(has_sv) AS sv, countIf(has_sv AND cp) AS svCna, countIf(NOT cp AND NOT has_sv) AS np, count() AS total FROM (\n" +
     "SELECT sd.sample_unique_id IN (" + profiledSql(gene, "COPY_NUMBER_ALTERATION") + ") AS cp,\n" +
     "       sd.sample_unique_id IN (" + profiledSql(gene, "STRUCTURAL_VARIANT") + ") AS vp,\n" +
     "       sd.sample_unique_id IN (" + svSamplesSql(gene) + ") AS has_sv\n" +
     "FROM " + DB + ".sample_derived sd WHERE sd.cancer_study_identifier = " + sq(COAD) + ")";
   const r = (await chQuery<Record<string, string>>(sql)).data[0];
-  return { sv: Number(r.sv), svCna: Number(r.svCna), np: Number(r.np), diploidExtra: Number(r.diploidExtra), total: Number(r.total) };
+  return { sv: Number(r.sv), svCna: Number(r.svCna), np: Number(r.np), total: Number(r.total) };
 }
 
 await guarded("N1 KRAS copyNumberSv, coadread", async () => {
   const f = await ringFacts("KRAS");
   const got = await labelCounts({ source: "alteration", gene: "KRAS", by: "copyNumberSv" } as never);
   const id = "N1 KRAS copyNumberSv, coadread (warehouse: " + f.sv + " samples with a KRAS SV, " + f.svCna + " of them CNA-profiled; " +
-    f.np + " profiled for neither; " + f.diploidExtra + " SV-profiled only, no SV → Diploid; " + f.total + " samples)";
-  const cna: Record<string, number> = { "Deep Deletion": 1, "Shallow Deletion": 67, Diploid: 390 + f.diploidExtra, Gain: 128, Amplification: 6 };
+    f.np + " not profiled for copy number and with no SV → Not profiled (invariant 7); " + f.total + " samples)";
+  const cna: Record<string, number> = { "Deep Deletion": 1, "Shallow Deletion": 67, Diploid: 390, Gain: 128, Amplification: 6 };
   if (!f.svCna) sameCounts(id, got, { ...cna, ...(f.sv ? { "Structural Variant": f.sv } : {}), ...(f.np ? { "Not profiled": f.np } : {}) });
   else {
     // an SV outranks the copy-number call of a CNA-profiled sample; which level it leaves is not in the table, so the levels are checked as a sum
     const levels = Object.keys(cna).reduce((a, l) => a + (got.get(l) ?? 0), 0);
-    const want = 592 + f.diploidExtra - f.svCna;
+    const want = 592 - f.svCna;
     const total = [...got.values()].reduce((a, n) => a + n, 0);
     ok(levels === want && got.get("Structural Variant") === f.sv && (got.get("Not profiled") ?? 0) === f.np && total === 594, id,
       "got " + show(got) + " — expected the five levels to sum to " + want + ", Structural Variant " + f.sv + ", Not profiled " + f.np + ", total 594");

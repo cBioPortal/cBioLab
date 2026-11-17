@@ -29,7 +29,7 @@ SELECT replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') AS alt_case,
       SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53'))))) AS p0
 FROM snapshot_db.sample_derived sd
 LEFT JOIN (
-     SELECT sample_unique_id, mutation_type, mutation_variant, variant_type, cna_alteration
+     SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
      WHERE startsWith(genetic_profile_stable_id, 'msk_impact_50k_2026_') AND cancer_study_identifier = 'msk_impact_50k_2026' AND hugo_gene_symbol IN ('TP53')
        AND mutation_status != 'UNCALLED'
@@ -85,7 +85,7 @@ SELECT replaceOne(sd.patient_unique_id, 'msk_impact_50k_2026_', '') AS alt_case,
       SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'TP53'))))) AS p0
 FROM snapshot_db.sample_derived sd
 LEFT JOIN (
-     SELECT sample_unique_id, mutation_type, mutation_variant, variant_type, cna_alteration
+     SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
      WHERE startsWith(genetic_profile_stable_id, 'msk_impact_50k_2026_') AND cancer_study_identifier = 'msk_impact_50k_2026' AND hugo_gene_symbol IN ('TP53')
        AND mutation_status != 'UNCALLED'

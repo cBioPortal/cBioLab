@@ -76,8 +76,8 @@ async function plotSpecHere(study: string, raw: any): Promise<PlotRequest> {
   const axes = resolveAxes({ x: raw.x as PlotAxis, y: raw.y as PlotAxis, colorBy: raw.colorBy as PlotAxis | undefined, ringBy: raw.ringBy as PlotAxis | undefined },
     [{ study, catalog }]);
   validateAxis(axes.x, "x", { cohort: true }); validateAxis(axes.y, "y");
-  if (axes.colorBy) validateAxis(axes.colorBy, "colorBy");
-  if (axes.ringBy) validateAxis(axes.ringBy, "ringBy");
+  if (axes.colorBy) validateAxis(axes.colorBy, "colorBy", { colour: true });
+  if (axes.ringBy) validateAxis(axes.ringBy, "ringBy", { colour: true });
   const bins = Array.isArray(raw.bins) && raw.bins.length === 2 ? [Number(raw.bins[0]), Number(raw.bins[1])] as [number, number] : undefined;
   const range = plotRangeOf(raw.range, { x: logRuleOf(axes.x), y: logRuleOf(axes.y) });
   return { x: axes.x, y: axes.y, unit: raw.unit === "patient" ? "patient" : "sample",

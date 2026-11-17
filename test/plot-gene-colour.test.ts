@@ -12,7 +12,8 @@ import { runPlot, categoryOrder } from "../lib/views/plot/run.ts";
 import { validateAxis, type PlotData } from "../lib/plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
-import type { ViewResultOf } from "../lib/types.ts";
+import { viewToSvg } from "../lib/view-svg.ts";
+import type { DrawnResultOf, ViewResultOf } from "../lib/types.ts";
 
 type Plot = ViewResultOf<"plot">;
 const TOP = { source: "alteration", gene: "KRAS", by: "topMutationType" };
@@ -81,11 +82,13 @@ describe("plot: colouring by a gene", () => {
     assert.equal(legend.get("Not profiled [ring]")?.toLowerCase(), "#000000");
   });
 
-  test("U3 validateAxis: topMutationType and copyNumberSv take one gene, and are refused for a gene set naming the rule", () => {
+  test("U3 validateAxis: topMutationType and copyNumberSv colour points: one gene as a colour or ring; refused as an axis, a covariate or for a gene set", () => {
     for (const by of ["topMutationType", "copyNumberSv"]) {
-      assert.doesNotThrow(() => validateAxis({ source: "alteration", gene: "KRAS", by } as never, "colour"), by + " with one gene");
-      assert.throws(() => validateAxis({ source: "alteration", genes: ["KRAS", "NRAS"], by } as never, "colour"),
-        /colour axis: a gene SET only supports by:"mutated"/, by + " with a gene set");
+      assert.doesNotThrow(() => validateAxis({ source: "alteration", gene: "KRAS", by } as never, "colorBy", { colour: true }), by + " as a colour");
+      assert.throws(() => validateAxis({ source: "alteration", gene: "KRAS", by } as never, "covariate 1"),
+        /covariate 1 axis: by:".*" colours a plot's points by a gene; give it as a plot's colorBy or ringBy, not as an axis/, by + " as a covariate (review of #305: its not-profiled label would be a level)");
+      assert.throws(() => validateAxis({ source: "alteration", genes: ["KRAS", "NRAS"], by } as never, "colorBy", { colour: true }),
+        /colorBy axis: a gene SET only supports by:"mutated"/, by + " with a gene set");
     }
   });
 
@@ -94,9 +97,43 @@ describe("plot: colouring by a gene", () => {
     assert.ok(order, "a topMutationType axis has an order of its own");
     assert.deepEqual(order(["Other", "Not profiled for mutations", "Missense", "Not mutated", "Inframe", "Truncating", "Splice", "Promoter"]),
       ["Promoter", "Splice", "Truncating", "Inframe", "Missense", "Other", "Not mutated", "Not profiled for mutations"]);
+    // Promoter and Other are never keyed ".driver" (PlotsTabUtils.tsx:2985-2989), so they have no (Driver) entry
     assert.deepEqual(order(["Missense (VUS)", "Not mutated", "Other (VUS)", "Inframe (Driver)", "Promoter (VUS)", "Truncating (VUS)",
-      "Not profiled for mutations", "Splice (VUS)", "Missense (Driver)", "Truncating (Driver)", "Inframe (VUS)", "Splice (Driver)", "Promoter (Driver)"]),
-    ["Promoter (Driver)", "Promoter (VUS)", "Splice (Driver)", "Splice (VUS)", "Truncating (Driver)", "Truncating (VUS)", "Inframe (Driver)", "Inframe (VUS)",
+      "Not profiled for mutations", "Splice (VUS)", "Missense (Driver)", "Truncating (Driver)", "Inframe (VUS)", "Splice (Driver)"]),
+    ["Promoter (VUS)", "Splice (Driver)", "Splice (VUS)", "Truncating (Driver)", "Truncating (VUS)", "Inframe (Driver)", "Inframe (VUS)",
       "Missense (Driver)", "Missense (VUS)", "Other (VUS)", "Not mutated", "Not profiled for mutations"]);
+  });
+});
+
+describe("the box figure coloured by a gene (review of #305)", () => {
+  // a box drawn as its points; a ring by a gene's copy number draws Diploid and Not profiled too
+  const render = (points: { id: string; c?: string; r?: string }[], legend: { label: string; color: string; ring?: boolean }[], ringAbsent: boolean) =>
+    viewToSvg({ kind: "plot", plot: { shape: "box", n: points.length, x: { label: "CNA", kind: "cat" }, y: { label: "mRNA", kind: "num" },
+      groups: [{ g: "A", n: points.length, lo: 0, hi: 10, q1: 2, median: 4, q3: 6, loWhisker: 0, hiWhisker: 10 }], overlay: "points",
+      points: points.map((p, i) => ({ g: "A", v: 2 + i, ...p })), legend, colorLabel: "KRAS", ringLabel: "KRAS", ...(ringAbsent ? { ringAbsent: true } : {}) } } as unknown as DrawnResultOf<"plot">)!;
+  const circle = (svg: string, id: string) => svg.match(new RegExp('<circle data-id="' + id + '"[^>]*>'))![0];
+  const attr = (tag: string, name: string) => tag.match(new RegExp("\\s" + name + '="([^"]*)"'))?.[1];
+  const texts = (svg: string) => [...svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+
+  test("V1 a not-profiled point's white fill is outlined, so it shows on a white plot, and so is its key", () => {
+    const svg = render([{ id: "a", c: "Not profiled for mutations" }, { id: "b", c: "Not mutated" }],
+      [{ label: "Not profiled for mutations", color: "#ffffff" }, { label: "Not mutated", color: "#c4e5f5" }], false);
+    assert.equal(attr(circle(svg, "a"), "fill"), "#ffffff");
+    assert.equal(attr(circle(svg, "a"), "stroke"), STYLE.plotGene.outline);
+    assert.match(svg, new RegExp('<circle cx="[^"]*" cy="[^"]*" r="[^"]*" fill="#ffffff" stroke="' + STYLE.plotGene.outline + '"/>'), "the key's dot is outlined too");
+  });
+
+  test("V2 a gene's copy-number ring strokes Diploid grey and Not profiled black, and keys them", () => {
+    const svg = render([{ id: "a", c: "Not mutated", r: "Diploid" }, { id: "b", c: "Not mutated", r: "Not profiled" }, { id: "c", c: "Not mutated", r: "Gain" }],
+      [{ label: "Not mutated", color: "#c4e5f5" }, { label: "Diploid", color: "#bebebe", ring: true }, { label: "Not profiled", color: "#000000", ring: true },
+        { label: "Gain", color: "#ff8c9f", ring: true }], true);
+    assert.equal(attr(circle(svg, "a"), "stroke"), "#bebebe");
+    assert.equal(attr(circle(svg, "b"), "stroke"), "#000000");
+    assert.ok(texts(svg).includes("Diploid") && texts(svg).includes("Not profiled"), "both are in the ring's key");
+  });
+
+  test("V3 another ring leaves absence unringed, as before", () => {
+    const svg = render([{ id: "a", c: "Not mutated", r: "Diploid" }], [{ label: "Not mutated", color: "#c4e5f5" }, { label: "Diploid", color: "#bebebe", ring: true }], false);
+    assert.notEqual(attr(circle(svg, "a"), "stroke"), "#bebebe");
   });
 });

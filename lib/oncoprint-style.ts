@@ -119,6 +119,8 @@ export const STYLE = {
   // the rest these. The ring's amplification, deep deletion and SV are the glyph's colours.
   plotGene: {
     fill: { "not mutated": "#c4e5f5", "not profiled for mutations": "#ffffff" } as Record<string, string>,
+    // a white fill's outline (the portal's LIGHT_GREY stroke), so a not-profiled point shows on a white plot
+    outline: "#d3d3d3",
     ring: { "amplification": "#ff0000", "gain": "#ff8c9f", "diploid": "#bebebe", "shallow deletion": "#2aced4", "deep deletion": "#0000ff",
       "structural variant": "#8b00c9", "not profiled": "#000000" } as Record<string, string>,
   },

@@ -4,7 +4,7 @@ import type { ViewResult } from "../../types.ts";
 import { pearsonR, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
 import { logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
-import { fitOf, portalBox, spearmanRho, corrPValue, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
+import { fitOf, portalBox, ringsAbsence, spearmanRho, corrPValue, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
@@ -127,7 +127,8 @@ export function categoryOrder(cat: PlotRequest["x"], rest: (a: string, b: string
     if (cat.by === "mutationType") return listed([...MUT_TYPES.flatMap((t) => [t, t + " (Driver)", t + " (VUS)"]), ...NO_MUTATION]);
     if (cat.by === "driver") return listed(["Driver", "VUS", ...NO_MUTATION]);
     // the portal's legend order (PlotsTabUtils.tsx mutationLegendOrder): each class's Driver before its VUS, then none
-    if (cat.by === "topMutationType") return listed([...["Promoter", "Splice", "Truncating", "Inframe", "Missense", "Other"].flatMap((t) => [t + " (Driver)", t + " (VUS)", t]),
+    if (cat.by === "topMutationType") return listed([...["Promoter", "Splice", "Truncating", "Inframe", "Missense", "Other"]
+      .flatMap((t) => t === "Promoter" || t === "Other" ? [t + " (VUS)", t] : [t + " (Driver)", t + " (VUS)", t]),
       "Not mutated", "Not profiled for mutations"]);
     if (cat.by === "copyNumberSv") return listed(["Amplification", "Gain", "Diploid", "Shallow Deletion", "Deep Deletion", "Structural Variant", OQL_NOT_PROFILED]);
     if (cat.by === "cna") return listed(["Deep deletion", "Neutral", "Amplification", OQL_NOT_PROFILED]);
@@ -185,6 +186,7 @@ async function drawAll(rc: PlotCasesCapable, def: Def, spec: PlotRequest, data: 
     data.pointSet = { rule: "all", drawn: all.length };
     if (spec.colorBy) data.legend = legendFor(all.map((x) => x.c || ""), false, spec.colorBy);
     if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(all.map((x) => x.r || ""), true, spec.ringBy)];
+    if (ringsAbsence(spec.ringBy)) data.ringAbsent = true;
     return;
   }
   const all = await rc.plotScatterPoints(def, spec);
@@ -757,6 +759,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
             data.pointSet = { rule: "all", drawn: pts.length };
             if (spec.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""), false, spec.colorBy);
             if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true, spec.ringBy)];
+            if (ringsAbsence(spec.ringBy)) data.ringAbsent = true;
           }
         }
         // Without the points, a density: every site bins over one shared range, so the counts add.

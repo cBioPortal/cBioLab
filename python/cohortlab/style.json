@@ -340,6 +340,7 @@
       "not mutated": "#c4e5f5",
       "not profiled for mutations": "#ffffff"
     },
+    "outline": "#d3d3d3",
     "ring": {
       "amplification": "#ff0000",
       "gain": "#ff8c9f",
