@@ -171,8 +171,8 @@ test("patient mode's coverage counts the patients with several samples, and the 
 
 test("an alteration axis answers for every case in the cohort, not only the altered ones", () => {
   const sql = axisSelect(alt, ctx, "cat");
-  assert.match(sql, /LEFT JOIN/, "a case with no mutation still has an answer: 'Not mutated'");
-  assert.match(sql, /Not mutated/);
+  assert.match(sql, /LEFT JOIN/, "a case with no mutation still has an answer: 'No mutation'");
+  assert.match(sql, /No mutation/);
   assert.match(sql, /Multiple/, "a case with two classes is its own category rather than being picked between");
   assert.match(axisSelect({ source: "alteration", gene: "MDM2", by: "cna" }, ctx, "cat"), /Amplification|Deep deletion/);
 });

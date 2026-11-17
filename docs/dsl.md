@@ -396,10 +396,13 @@ and the pair decides the shape — the portal's own rule:
 study's own description of that profile (`genetic_profile`: its alteration type and datatype), never
 from its name: a **mutation** profile (MAF) groups cases by mutation type, or with `by: "mutated"`
 mutated or not; a **structural-variant** profile by whether the case has one; a **discrete
-copy-number** profile by its own calls (Deep deletion, Shallow deletion, Diploid, Gain,
+copy-number** profile by its own calls (Deep Deletion, Shallow Deletion, Diploid, Gain,
 Amplification, drawn in that order); and a **continuous** one (mRNA, z-scores, log2 copy number,
 protein) is a number. A case with no mutation, SV or high-level call in the gene is the wild-type
-answer only when it is profiled for that gene; otherwise it is **Not profiled**. A profile a study
+answer only when it is profiled for that gene; otherwise it is **Not profiled**. The categories carry
+the portal's names: "No mutation", "With Structural Variants" / "No Structural Variants" / "Not profiled
+for structural variants" (a cox or logistic covariate keeps "Not mutated", "Structural variant" and
+"No structural variant", the reference levels its documents name). A profile a study
 does not have is refused with the list it does have, and one that two pooled studies describe
 differently is refused, never read as one thing. A **generic-assay** profile (mutational signatures,
 arm-level copy number, methylation probes, phosphosites, treatment response, …) reads one `entity`
@@ -413,7 +416,7 @@ document may also give directly: `{"source":"molecular","profileType","gene","di
 `{"source":"alteration","gene","by":"mutationType"|"mutated"|"driver"|"cna"|"sv"}`. `by: "driver"` is the
 portal's "Driver vs VUS": Driver when any of the case's mutations is a putative driver by the view's
 `drivers` sources (OncoKB, the study's `cbp_driver` and `cbp_driver_tiers`), VUS when none is,
-Not mutated, Not profiled. A view that holds `drivers` also splits a mutation type into
+No mutation, Not profiled. A view that holds `drivers` also splits a mutation type into
 "Missense (Driver)" / "Missense (VUS)" and so on, as the portal's Plots tab colours them.
 
 number × number draws a **density scatter**, number × category a **box**, category × category a
@@ -2400,7 +2403,7 @@ Non-small cell lung cancer in MSK-CHORD (7,809 patients). The first view groups 
 
 ### Example 21: Plot axes from the study's own profiles: ERBB2 copy number against expression
 
-TCGA breast cancer (PanCancer Atlas), every sample. The first view groups ERBB2 mRNA z-scores (relative to all samples) by ERBB2's GISTIC copy-number call, from Shallow deletion to Amplification: the 122 amplified samples sit far above the rest. The second groups fraction of genome altered by TP53's mutation type from the study's mutation profile; the 18 samples not in that profile are Not profiled, not counted as unmutated.
+TCGA breast cancer (PanCancer Atlas), every sample. The first view groups ERBB2 mRNA z-scores (relative to all samples) by ERBB2's GISTIC copy-number call, from Shallow Deletion to Amplification: the 122 amplified samples sit far above the rest. The second groups fraction of genome altered by TP53's mutation type from the study's mutation profile; the 18 samples not in that profile are Not profiled, not counted as unmutated.
 
 ```json
 {

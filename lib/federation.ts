@@ -2367,7 +2367,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const db = this.instance.conn.db, conn = this.instance.conn;
     const kindsMap = await this.clinicalKinds(covariates);
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()), labels: "model" as const };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     // a patient not profiled for a covariate's gene has no value to fit, so the fit leaves them
     // out (in the query the method record re-runs) and counts them, rather than coding "unknown"
@@ -2458,7 +2458,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kindsMap = await this.clinicalKinds([outcome, ...covariates]);
     const outcomeKind = axisKind(outcome, (a) => kindsMap.get(a));
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()), labels: "model" as const };
     const outcomeSel = { label: "y0", sel: axisSelect(outcome, ctx, outcomeKind) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     // as for Cox: not profiled for the outcome's or a covariate's gene is left out and counted
