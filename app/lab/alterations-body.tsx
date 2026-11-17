@@ -6,7 +6,7 @@
 // picker, as for every view.
 import React, { useEffect, useMemo, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { Popover, PopoverContent, PopoverTrigger } from "../_ui/popover";
+import { GearMenu } from "../_ui/gear-menu.tsx";
 import { RadioGroup, RadioGroupItem } from "../_ui/radio-group";
 import { Settings } from "lucide-react";
 import { sampleMarks } from "../../lib/timeline-tracks.ts";
@@ -125,8 +125,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               })}
               num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : x.toLocaleString()}
               colHead={(id) => id === "gene" && (key === "mutations" || key === "cna") && marks.size > 1 && a.mixedPanels?.[key]
-                ? <GenesProfiledMenu value={(spec.genes as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
-                    onChange={(g) => patch({ genes: g === "any" ? undefined : g })} /> : null}
+                ? <GenesProfiledMenu table={key} value={(spec.genesProfiled as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
+                    onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} /> : null}
               cell={(id, x, row) => id === "samples" ? sampleCell(x)
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
@@ -164,25 +164,24 @@ function SvStatus({ value }: { value: string }) {
     : <span className="text-xs text-[#9d9d9d]" data-tip={value}>{value}</span>;
 }
 
+/** where the gene filter menus' open state outlives the card remounting when a pick re-runs the view */
+const MENU_STORE = new Map<string, boolean>();
+
 /**
  * The portal's gene filter in the Gene header (GeneFilterMenu, PAT-MT-6), offered when the samples in
  * view were sequenced with different panels and a row's gene is missing from one: every gene, or only
- * those profiled in all the samples. It sets the view's `genes` (both tables read it).
+ * those profiled in all the samples. It sets the view's `genesProfiled` (both tables read it).
  */
-function GenesProfiledMenu({ value, what, disabled, onChange }: { value: "any" | "all"; what: string; disabled: boolean; onChange: (g: "any" | "all") => void }) {
+function GenesProfiledMenu({ table, value, what, disabled, onChange }: { table: string; value: "any" | "all"; what: string; disabled: boolean; onChange: (g: "any" | "all") => void }) {
+  const id = "genes-profiled-" + table;
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button type="button" className="ml-1 text-muted-foreground hover:text-foreground" aria-label="filter genes by the samples' gene panels"
-          data-tip={value === "all" ? "showing genes profiled in all samples" : "different gene panels were used for the samples"}><Settings className="size-3.5" /></button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 p-3 text-sm">
-        <p className="mb-2">Different gene panels were used for the samples. Filter {what} for:</p>
-        <RadioGroup value={value} onValueChange={(v) => onChange(v === "all" ? "all" : "any")} disabled={disabled} aria-label="genes profiled in">
-          <label className="flex items-center gap-2" htmlFor="genes-profiled-any"><RadioGroupItem id="genes-profiled-any" value="any" /> Genes profiled in any sample</label>
-          <label className="flex items-center gap-2" htmlFor="genes-profiled-all"><RadioGroupItem id="genes-profiled-all" value="all" /> Genes profiled in all samples</label>
-        </RadioGroup>
-      </PopoverContent>
-    </Popover>
+    <GearMenu menuId={id} menuStore={MENU_STORE} title={value === "all" ? "showing genes profiled in all samples" : "different gene panels were used for the samples"}
+      ariaLabel="filter genes by the samples' gene panels" className="ml-1 h-5 px-1" label={<Settings className="size-3.5" />} wide>
+      <p className="mb-2 text-sm">Different gene panels were used for the samples. Filter {what} for:</p>
+      <RadioGroup value={value} onValueChange={(v) => onChange(v === "all" ? "all" : "any")} disabled={disabled} aria-label="genes profiled in">
+        <label className="flex items-center gap-2 text-sm" htmlFor={id + "-any"}><RadioGroupItem id={id + "-any"} value="any" /> Genes profiled in any sample</label>
+        <label className="flex items-center gap-2 text-sm" htmlFor={id + "-all"}><RadioGroupItem id={id + "-all"} value="all" /> Genes profiled in all samples</label>
+      </RadioGroup>
+    </GearMenu>
   );
 }

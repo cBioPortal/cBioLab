@@ -295,27 +295,27 @@ describe("alterations: a page or a column's values", () => {
   });
 });
 
-describe("alterations: a federation peer that serves patient alterations", () => {
-  // the peer pages each table itself; it answers with its own OncoKB version
-  const peer = (tables: Tables) => {
-    const reqs: Record<string, unknown>[] = [];
-    return {
-      reqs,
-      instance: { id: "peer", mode: "aggregate-only", label: "Peer Hospital", conn: { id: "peer" } }, peerUrl: "http://peer.invalid", patientKinds: new Set(["alterations"]),
-      patientRows: async (req: { table: string; mode: string; query: TableQuery; limit?: number; offset?: number; patient?: string; column?: string }) => {
-        reqs.push(req as never);
-        const rows: Row[] = filtered(tables(req.table, { with: req.table === "alterations:samples" && (req as { samples?: string }).samples === "cohort" ? "SELECT * FROM (" : "" } as RowSource), req.query)
-          .map((r) => ({ ...r, study: "p" }));
-        const kept = rows.filter((r) => !r._out);
-        switch (req.mode) {
-          case "counts": return { counts: [{ cohort: "A", study: "p", n: kept.length, all: rows.length }], oncokbPin: "peer-v2" };
-          case "page": return { rows: kept.slice(req.offset!, req.offset! + req.limit!), oncokbPin: "peer-v2" };
-          case "rank": { const i = kept.findIndex((r) => r.patient === req.patient); return { rank: i < 0 ? null : i }; }
-          default: return { values: [] };
-        }
-      },
-    };
+// the peer pages each table itself; it answers with its own OncoKB version
+const peer = (tables: Tables) => {
+  const reqs: Record<string, unknown>[] = [];
+  return {
+    reqs,
+    instance: { id: "peer", mode: "aggregate-only", label: "Peer Hospital", conn: { id: "peer" } }, peerUrl: "http://peer.invalid", patientKinds: new Set(["alterations"]),
+    patientRows: async (req: { table: string; mode: string; query: TableQuery; limit?: number; offset?: number; patient?: string; column?: string }) => {
+      reqs.push(req as never);
+      const rows: Row[] = filtered(tables(req.table, { with: req.table === "alterations:samples" && (req as { samples?: string }).samples === "cohort" ? "SELECT * FROM (" : "" } as RowSource), req.query)
+        .map((r) => ({ ...r, study: "p" }));
+      const kept = rows.filter((r) => !r._out);
+      switch (req.mode) {
+        case "counts": return { counts: [{ cohort: "A", study: "p", n: kept.length, all: rows.length }], oncokbPin: "peer-v2" };
+        case "page": return { rows: kept.slice(req.offset!, req.offset! + req.limit!), oncokbPin: "peer-v2" };
+        case "rank": { const i = kept.findIndex((r) => r.patient === req.patient); return { rank: i < 0 ? null : i }; }
+        default: return { values: [] };
+      }
+    },
   };
+};
+describe("alterations: a federation peer that serves patient alterations", () => {
 
   test("the peer's patient is drawn from its own tables, marked as from the peer, annotated with the peer's OncoKB version", async () => {
     const p = peer(study());
@@ -413,15 +413,15 @@ describe("PAT-MT-6: the gene filter (legacy GeneFilterMenu, PAT-STM-15)", () => 
     return study()(table, src);
   };
 
-  test("PAT-MT-6 GF1: genes other than any or all is refused, naming genes", async () => {
-    const v = await run({ genes: "some" } as never, one());
-    assert.match(v.error!, /genes/);
+  test("PAT-MT-6 GF1: genesProfiled other than any or all is refused, naming genesProfiled", async () => {
+    const v = await run({ genesProfiled: "some" } as never, one());
+    assert.match(v.error!, /genesProfiled/);
   });
 
-  test("PAT-MT-6 GF2: genes all and genes any are not refused", async () => {
-    for (const genes of ["all", "any"] as const) {
-      const v = await run({ genes }, one());
-      assert.equal(v.error, undefined, genes + ": " + String(v.error));
+  test("PAT-MT-6 GF2: genesProfiled all and any are not refused (local patient)", async () => {
+    for (const genesProfiled of ["all", "any"] as const) {
+      const v = await run({ genesProfiled }, one());
+      assert.equal(v.error, undefined, genesProfiled + ": " + String(v.error));
     }
   });
 
@@ -435,18 +435,44 @@ describe("PAT-MT-6: the gene filter (legacy GeneFilterMenu, PAT-STM-15)", () => 
     }
   });
 
-  test("PAT-MT-6 GF4: mixedPanels is read from the mixed-mutations and mixed-cna counts", async () => {
+  test("PAT-MT-6 GF4: with 2 samples in view, mixedPanels is read from the mixed-mutations and mixed-cna counts", async () => {
     const v = await run({}, one(withMixed(2, 0)));
     assert.equal(v.error, undefined, String(v.error));
     assert.deepEqual(alt(v).mixedPanels, { mutations: true, cna: false });
   });
 
-  test("PAT-MT-6 GF5: the all source narrows the rows on inAll = 1, the any source does not (text smoke test)", () => {
+  test("PAT-MT-6 GF4b: with 1 sample in view, no mixed panel and the mixed counts are never asked", async () => {
+    const t = withMixed(2, 2);
+    const p = local("db1", (table, src) => table === "alterations:samples" ? [P1_SAMPLES[0]] : t(table, src));
+    const v = await run({}, ctx({ A: cohort({ s1: 2 }) }, { s1: p }));
+    assert.equal(v.error, undefined, String(v.error));
+    assert.deepEqual(alt(v).mixedPanels, { mutations: false, cna: false });
+    assert.ok(!p.asked.some((l) => l === "alterations:mixed-mutations" || l === "alterations:mixed-cna"), p.asked.join());
+  });
+
+  test("PAT-MT-6 GF5: coverage is computed and kept on by cover (text smoke test)", () => {
     const part = { cohort: "A", study: "s1", cohortSql: "SELECT 1" };
-    const all = alterationSource("mutations", part, "P1", "db", null, [], "patient", "all").with;
-    const any = alterationSource("mutations", part, "P1", "db", null, [], "patient", "any").with;
-    assert.notEqual(all, any);
-    assert.ok(all.includes("inAll = 1"));
-    assert.ok(!any.includes("inAll = 1"));
+    const w = (cover: { genes: "any" | "all"; inAll: boolean }) => alterationSource("mutations", part, "P1", "db", null, [], "patient", cover).with;
+    const all = w({ genes: "all", inAll: false });
+    assert.ok(all.includes("inAll = 1") && all.includes("miss AS"));
+    const any = w({ genes: "any", inAll: false });
+    assert.ok(!any.includes("inAll = 1") && !any.includes("miss AS"));
+    const shown = w({ genes: "any", inAll: true });
+    assert.ok(shown.includes("miss AS") && !shown.includes("inAll = 1"));
+  });
+
+  test("PAT-MT-6 GF6: genesProfiled all is refused for a peer's patient, naming federation; any is not", async () => {
+    const c = () => ctx({ A: cohort({ p: 2 }) }, { p: peer(study()) });
+    const v = await run({ genesProfiled: "all" }, c());
+    assert.match(v.error!, /genesProfiled/);
+    assert.match(v.error!, /federation/);
+    const ok = await run({ genesProfiled: "any" }, c());
+    assert.equal(ok.error, undefined, String(ok.error));
+  });
+
+  test("PAT-MT-6 GF7: genesProfiled all says so in the caveat", async () => {
+    const v = await run({ genesProfiled: "all" }, one());
+    assert.equal(v.error, undefined, String(v.error));
+    assert.match(v.caveat!, /genes profiled in every sample in view/);
   });
 });

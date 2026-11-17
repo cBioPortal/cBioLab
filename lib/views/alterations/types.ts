@@ -30,7 +30,7 @@ export interface AlterationsView extends TableQuery {
    * the Mutations and CNA tables' rows: every one ("any", the default) or only those whose gene every
    * sample in view was profiled for ("all") — the portal's "Genes profiled in any / all samples" (PAT-MT-6)
    */
-  genes?: "any" | "all";
+  genesProfiled?: "any" | "all";
   /** each table's own query (the top-level columns/search/filters/sort are the patient list's) */
   mutations?: AlterationTableQuery;
   cna?: AlterationTableQuery;

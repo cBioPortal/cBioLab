@@ -66,6 +66,6 @@ export const mutants: Mutant[] = [
     replace: "  return [...merged];\n}" },
   { id: "patient-genes-all-ignored", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
     effect: "The Patient mutation table's \"Genes profiled in all samples\" keeps a gene one sample's panel leaves out (FX-P33's EGFR).",
-    find: "      missCte(p, patient, db, \"MUTATION_EXTENDED\", samples) +",
-    replace: "      missCte(p, patient, db, \"MUTATION_EXTENDED\", samples).replace(\"NOT IN ('', 'WES') AND\", \"NOT IN ('', 'WES') AND 0 AND\") +" },
+    find: "      (covered ? missCte(p, patient, db, \"MUTATION_EXTENDED\", samples) : \"\") +",
+    replace: "      (covered ? missCte(p, patient, db, \"MUTATION_EXTENDED\", samples).replace(\"AND (gg.gene, vs.su) NOT IN\", \"AND 0 AND (gg.gene, vs.su) NOT IN\") : \"\") +" },
 ];

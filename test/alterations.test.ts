@@ -56,8 +56,9 @@ describe("the alterations view's tables", () => {
       assert.match(sql, /ck AS \(SELECT 'P-1' AS pid\)/, t + ": the cohort is a CTE");
       assert.match(sql, inCohort, t);
     }
-    // the mutations table's Copy # column and its gene-panel check (genes profiled in all samples) read the same samples as its rows
-    assert.equal(alterationSource("mutations", part, "P-1", "db", null, [], "cohort").with.match(/IN \(SELECT sid FROM ck\)/g)!.length, 3);
+    // the mutations table's Copy # column reads the same samples as its rows, and so does its gene-panel check (genes profiled in all samples) when it is asked
+    assert.equal(alterationSource("mutations", part, "P-1", "db", null, [], "cohort").with.match(/IN \(SELECT sid FROM ck\)/g)!.length, 2);
+    assert.equal(alterationSource("mutations", part, "P-1", "db", null, [], "cohort", { genes: "any", inAll: true }).with.match(/IN \(SELECT sid FROM ck\)/g)!.length, 3);
     assert.match(patientSamplesSource(part, "P-1", "db", "cohort").with, /\) WHERE id IN \(SELECT sid FROM ck\)/);
     assert.doesNotMatch(patientSamplesSource(part, "P-1", "db").with, /SELECT sid FROM/);
     const list = alterationPatientRowSource([{ ...part, source: "here" }], "db", "cohort").with;
