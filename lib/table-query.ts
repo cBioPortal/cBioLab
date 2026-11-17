@@ -54,6 +54,11 @@ export interface RowSource {
   defaultOrder: string;
   /** after any sort, so the order is total and every page and the download agree */
   tiebreak: string;
+  /**
+   * what makes two rows the same event seen twice (a tuple over `rows`): the count of rows beyond the
+   * first with each key, over every row, is the table's duplicates (the portal's "includes N duplicate …")
+   */
+  duplicateKey?: string;
 }
 
 export const SEARCH_MAX = 200;
@@ -195,7 +200,8 @@ export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study
 
 /** Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. */
 export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): PatientSql {
-  return patientSql(src.with + "SELECT cohort, study, countIf(" + whereSql(src, q, defaults) + ") AS n, count() AS all FROM rows GROUP BY cohort, study");
+  return patientSql(src.with + "SELECT cohort, study, countIf(" + whereSql(src, q, defaults) + ") AS n, count() AS all" +
+    (src.duplicateKey ? ", count() - uniqExact(" + src.duplicateKey + ") AS dup" : "") + " FROM rows GROUP BY cohort, study");
 }
 
 /**

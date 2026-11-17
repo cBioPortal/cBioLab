@@ -336,5 +336,7 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     select: "*",
     defaultOrder: "drv DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",
+    // the same change in one patient's several samples (MutationUtils groupMutationsByGeneAndPatientAndProteinChange; one gene per table)
+    duplicateKey: "(study, patient, ifNull(proteinChange, ''))",
   };
 }

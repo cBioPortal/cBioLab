@@ -1,7 +1,7 @@
 // What the table views share: their rows run in the database through lib/table-query.ts, paged
 // across the participants that hold them.
 import { PATIENT_KIND_NAMES, type PatientKind } from "../disclosure.ts";
-import { isPatientLevel, peerRowsFor, type PatientLevelCapable, type PeerRowsRequest, type RemotePatientRows, type Resolver } from "../federation.ts";
+import { isPatientLevel, peerRowsFor, type PatientLevelCapable, type PeerRowsRequest, type RemotePatientRows, type Resolver, type RowCounts } from "../federation.ts";
 import type { TablePart } from "../mutation-table.ts";
 import { cleanQuery, describeQuery, mergeValues, type ColumnValues, type RowSource, type TableQuery } from "../table-query.ts";
 import type { TableRows, ViewResult } from "../types.ts";
@@ -35,6 +35,8 @@ function queryReads(q: TableQuery, shown: string[]): string[] {
 }
 
 export type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; study: string; total: number; all: number }[]; total: number; all: number; offset: number; groups: number; values?: ColumnValues;
+  /** rows beyond the first with each duplicate key, over every row (a source with RowSource.duplicateKey) */
+  duplicates?: number;
   /** with `locate`: the patient's place in the list's one order and the rows either side of it — null when the query leaves it out */
   position?: { index: number; prev: Record<string, unknown> | null; next: Record<string, unknown> | null } | null };
 
@@ -56,7 +58,7 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
   // one backend per database — or per peer, for a view whose rows a peer may page itself (`remote`)
   type Backend = {
     page: (parts: TablePart[], limit: number, offset: number) => Promise<Record<string, unknown>[]>;
-    counts: (parts: TablePart[], reads: string[]) => Promise<{ cohort: string; study: string; n: number; all: number }[]>;
+    counts: (parts: TablePart[], reads: string[]) => Promise<RowCounts[]>;
     values: (parts: TablePart[], reads: string[], column: string) => Promise<Record<string, unknown>[]>;
     rank: (parts: TablePart[], study: string, patient: string) => Promise<number | null>;
   };
@@ -94,13 +96,14 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
     return { rows: [], lists: [], total: 0, all: 0, offset: 0, groups: groups.length, values: mergeValues(values.column, values.numeric, got as Record<string, unknown>[][]) };
   }
   const lists: Rows["lists"] = [];
-  let all = 0;
+  let all = 0, duplicates: number | undefined;
   await Promise.all(groups.map(async (g) => {
     const counts = await g.backend.counts(g.parts, reads);
     for (const p of g.parts) {
       const c = counts.find((x) => x.cohort === p.cohort && x.study === p.study);
       lists.push({ cohort: p.cohort, study: p.study, total: c?.n || 0, all: c?.all || 0 });
       g.total += c?.n || 0; all += c?.all || 0;
+      if (c?.dup != null) duplicates = (duplicates || 0) + c.dup;
     }
   }));
   const total = groups.reduce((n, g) => n + g.total, 0);
@@ -132,7 +135,7 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
   })() : Promise.resolve(undefined)]);
   const order = (l: { cohort: string; study: string }) => ctx.vNames.indexOf(l.cohort) * 1000 + ctx.vStudies.indexOf(l.study);
   lists.sort((a, b) => order(a) - order(b));
-  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}) };
+  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}), ...(duplicates !== undefined ? { duplicates } : {}) };
 }
 
 /** A view's query as the document gives it, with an older `sort.attribute` read as `sort.column`. */
