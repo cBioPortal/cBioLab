@@ -211,6 +211,12 @@ export function resolveQuery(o: QueryOptions | null, entries: string[], studies:
   return { ...out, entries: entries.map((e) => (isBare(e) ? e.replace(/:\s*$/, "").trim() + ": " + def : e)) };
 }
 
+const KIND_TYPE: Partial<Record<ProfileKind, "MUTATION" | "CNA" | "SV">> = { mut: "MUTATION", cna: "CNA", sv: "SV" };
+/** the alteration kinds among a selection, as profile types */
+export function alterationKinds(kinds: Set<ProfileKind>): ("MUTATION" | "CNA" | "SV")[] {
+  return (["mut", "cna", "sv"] as ProfileKind[]).filter((k) => kinds.has(k)).map((k) => KIND_TYPE[k]!);
+}
+
 /** an entry that names a gene and no alterations ("TP53", or "TP53:"), which the defaults fill */
 const isBare = (e: string) => !/:\s*\S/.test(e);
 
@@ -452,6 +458,8 @@ export interface ChosenQuery {
   exp?: string;
   prot?: string;
   ifHeld?: boolean;
+  /** the alteration profiles the options select (the portal's selectedMolecularProfiles): what the Results page's Unaltered group checks profiling in */
+  kinds?: ("MUTATION" | "CNA" | "SV")[];
   /** the case set as a clause every group keeps, or null */
   clause: Clause | null;
   /** the header's case set and profiles, in words */
@@ -488,6 +496,7 @@ export function chosenQuery(o: QueryOptions | null, data: (QueryOptionsData & { 
   const without = studies.length > 1 ? studiesWithoutCaseSet(full.caseSet, studies, data.caseSets) : [];
   return {
     waiting: false, entries: r.entries, exp: r.exp, prot: r.prot, ...(r.ifHeld ? { ifHeld: true } : {}),
+    kinds: alterationKinds(effectiveKinds(full, typed, studies.length, heldKinds(data.profiles))),
     clause: caseSetClause(full, studies),
     summary: { caseSet, profiles: named.join(", ") },
     notes: [

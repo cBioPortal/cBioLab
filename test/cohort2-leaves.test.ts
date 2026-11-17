@@ -96,6 +96,25 @@ describe("profiled leaf", () => {
     assert.equal(sql.match(/INTERSECT DISTINCT/g)?.length, 1);
     assert.match(sql, /'TP53'[\s\S]*'KRAS'/);
   });
+  test("anyGene: each gene's clause joined by UNION DISTINCT, not intersected; false is the intersection", () => {
+    const per = (g: string) => one({ kind: "profiled", type: "MUTATION", gene: g });
+    const any = one({ kind: "profiled", type: "MUTATION", genes: ["KRAS", "TP53"], anyGene: true });
+    assert.equal(any.match(/UNION DISTINCT/g)?.length, 1);
+    assert.doesNotMatch(any, /INTERSECT DISTINCT/);
+    assert.match(any, /'KRAS'[\s\S]*UNION DISTINCT[\s\S]*'TP53'/);
+    const every = one({ kind: "profiled", type: "MUTATION", genes: ["KRAS", "TP53"] });
+    assert.equal(every.match(/INTERSECT DISTINCT/g)?.length, 1);
+    assert.doesNotMatch(every, /UNION DISTINCT/);
+    assert.equal(one({ kind: "profiled", type: "MUTATION", genes: ["KRAS", "TP53"], anyGene: false }), every);
+    assert.equal(any.replace("UNION DISTINCT", "INTERSECT DISTINCT"), every, "the same per-gene clauses, only the join differs");
+    for (const g of ["KRAS", "TP53"]) assert.match(per(g), new RegExp("WHERE gene = '" + g + "'"));
+  });
+  test("anyGene without genes, or not true/false, is refused", () => {
+    const msg = /`anyGene` \(true or false\) goes with `genes`/;
+    assert.throws(() => one({ kind: "profiled", type: "CNA", anyGene: true }), msg);
+    assert.throws(() => one({ kind: "profiled", type: "CNA", gene: "KRAS", anyGene: true }), msg);
+    assert.throws(() => one({ kind: "profiled", type: "CNA", genes: ["KRAS"], anyGene: "yes" }), msg);
+  });
   test("refused: an unknown type, gene and genes together, an empty list, too many genes, a bad symbol", () => {
     assert.throws(() => one({ kind: "profiled", type: "RNA" }), /type must be MUTATION, CNA, or SV/);
     assert.throws(() => one({ kind: "profiled", type: "CNA", gene: "A", genes: ["B"] }), /`gene` or `genes`, not both/);
@@ -297,6 +316,7 @@ describe("readback", () => {
     assert.equal(text({ kind: "clinical", attribute: "TMB", op: ">=", value: 10, percentile: 0.75, percentileOf: "LUAD" }), "TMB >= 10 (75th percentile of LUAD)");
     assert.equal(text({ kind: "clinical", attribute: "TMB", op: ">=", value: 10, percentile: 0.5 }), "TMB >= 10 (50th percentile)");
     assert.equal(text({ kind: "profiled", type: "MUTATION", genes: ["tp53", "kras"] }), "profiled for TP53, KRAS MUTATION");
+    assert.equal(text({ kind: "profiled", type: "MUTATION", genes: ["kras", "tp53"], anyGene: true }), "profiled for any of KRAS, TP53 MUTATION");
     assert.equal(text({ kind: "profiled", type: "CNA", gene: "egfr" }), "profiled for EGFR CNA");
     assert.equal(text({ kind: "profiled", type: "SV" }), "profiled for SV");
     assert.equal(text({ kind: "derived", metric: "alteredGenes", range: { gt: 3, lte: 9 } }), "alteredGenes > 3 and ≤ 9 genes");

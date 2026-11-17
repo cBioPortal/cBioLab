@@ -159,6 +159,22 @@ async function profiledGeneList(study: string, type: "MUTATION" | "CNA", genes: 
     list.size > 0 && same(list, expected), diff("gene list", list, expected) + " · each gene: " + singles.map(n).join(" / "));
 }
 
+/**
+ * `anyGene`: profiled for at least one of the genes is exactly the union of the one-gene clauses (the
+ * Results page's Unaltered group: not wholly unprofiled). A study whose panels differ in the genes
+ * makes the union differ from the intersection, so the check is not trivial there.
+ */
+async function profiledAnyGene(study: string, type: "MUTATION" | "CNA", genes: string[], strict: boolean) {
+  const [list, every, ...singles] = await Promise.all([
+    leaf(study, { kind: "profiled", type, genes, anyGene: true } as Clause),
+    leaf(study, { kind: "profiled", type, genes } as Clause),
+    ...genes.map((gene) => leaf(study, { kind: "profiled", type, gene } as Clause)),
+  ]);
+  const expected = singles.slice(1).reduce((a, b) => or(a, b), singles[0]);
+  record(study, "profiled", `profiled for ${type} in any of ${genes.join(", ")} is the union of each gene's profiled patients` + (strict ? ", larger than the intersection" : ""),
+    list.size > 0 && same(list, expected) && (!strict || list.size > every.size), diff("any gene", list, expected) + " · every gene: " + n(every) + " · each gene: " + singles.map(n).join(" / "));
+}
+
 /** A categorical attribute's values partition the patients who have one; a threshold splits a number. */
 async function clinicalPartition(study: string, attribute: string, values: string[], numeric: string, cut: number) {
   const recorded = await leaf(study, { kind: "clinical", attribute, op: "!=", value: "" } as Clause);
@@ -381,6 +397,9 @@ await splitByHand(CHORD, { all: [{ kind: "clinical", attribute: "CANCER_TYPE", v
   [{ name: "PIK3CA", where: { kind: "oql", q: "PIK3CA: MUT" } }, { name: "TP53", where: { kind: "oql", q: "TP53: MUT" } }], "neither");
 await profiledGeneList(CHORD, "MUTATION", ["KRAS", "NRAS", "BRAF", "NTRK3", "SOX9"]);
 await profiledGeneList("brca_tcga", "CNA", ["KRAS", "TP53", "PIK3CA"]);
+// ZFHX3 is on IMPACT410/468 but not IMPACT341, KRAS on all three: the union is larger than the intersection
+await profiledAnyGene("msk_impact_2017", "MUTATION", ["KRAS", "ZFHX3"], true);
+await profiledAnyGene("brca_tcga", "CNA", ["KRAS", "TP53"], false);
 await lineNesting(CHORD);
 await heldOutHalves(CHORD);
 

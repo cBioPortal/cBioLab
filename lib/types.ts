@@ -111,6 +111,8 @@ export interface GeneStateFacet {
   overlap?: number;
 }
 
+/** the most genes one `profiled` clause names */
+export const PROFILED_MAX_GENES = 32;
 export interface ProfiledLeaf {
   kind: "profiled"; type: "MUTATION" | "CNA" | "SV";
   /**
@@ -128,6 +130,12 @@ export interface ProfiledLeaf {
    * (the Results page's Unaltered group). Give `gene` or `genes`, not both.
    */
   genes?: string[];
+  /**
+   * With `genes`: profiled for ANY one of them rather than every one — the samples not wholly
+   * unprofiled for the list (the portal's Results page Unaltered group: unaltered, and profiled for
+   * some queried gene in some selected profile).
+   */
+  anyGene?: boolean;
 }
 /**
  * One of the study's own sample lists: by `id` (a bare id gets the study prefix), or by `category`
