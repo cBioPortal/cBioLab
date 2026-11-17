@@ -278,7 +278,7 @@ describe("the figure, text and method", () => {
     const out = kindText(signaturesKind, v);
     assert.match(out[0], /SBS7a \(UV\): 75% \* \| 40%/);
     assert.match(out[0], /… 1 more signatures at 0/);
-    assert.match(out[0], /T1's spectrum: 40 mutations in 2 channels; largest: T\[C>T\]G 30 \(75\.0%\)/);
+    assert.match(out[0], /T1's spectrum: 40 mutations in 2 channels; largest: T\[C>T\]G 30 \(75%\)/);
     assert.match(out[0], /Not profiled for mutational signatures: T3/);
     assert.equal(signaturesKind.title!(v as never), "Mutational signatures — P1");
     assert.match(kindText(signaturesKind, { ...v, signatures: { ...v.signatures, patient: null } })[0], /patients to choose from/);

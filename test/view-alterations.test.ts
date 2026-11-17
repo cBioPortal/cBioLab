@@ -183,7 +183,7 @@ describe("alterations: the list and the first patient's tables", () => {
     const row = Object.fromEntries(cols.map((id, i) => [id, t.mutations!.rows[0].values[i]]));
     assert.equal(row.annotation, "Oncogenic · Level 1");
     assert.equal(row.vaf, 0.18);
-    assert.equal(row.freq, 12.345, "Cohort % keeps 4 decimals so the browser rounds it once (A1)");
+    assert.equal(row.freq, 12.345, "Cohort % is passed unrounded so the browser rounds it once (A1)");
     assert.equal(row.altCount, null, "an empty number is missing, not 0");
     assert.equal(row.refCount, null);
     assert.equal(row.copy, "", "missing text is blank");
@@ -195,13 +195,13 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.equal(cna.annotation, "Likely Oncogenic", "no level, no level suffix");
   });
 
-  test("A1 (PAT-STM-2): the Cohort % cell keeps 4 decimals in both the mutations and cna tables", async () => {
+  test("A1 (PAT-STM-2): the Cohort % cell is unrounded in both the mutations and cna tables (the browser rounds it once)", async () => {
     const mut = [{ ...MUT[0], freq: 72.47191 }];
     const cna = [{ ...CNA[0], freq: 72.47191 }];
     const t = alt(await run({ mutations: { columns: ["gene", "freq"] }, cna: { columns: ["gene", "freq"] } }, one(study({ mut, cna })))).tables;
     for (const k of ["mutations", "cna"] as const) {
       const i = t[k]!.columns.findIndex((c) => c.id === "freq");
-      assert.equal(t[k]!.rows[0].values[i], 72.4719, k);
+      assert.equal(t[k]!.rows[0].values[i], 72.47191, k);
     }
   });
 

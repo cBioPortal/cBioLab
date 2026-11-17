@@ -23,8 +23,8 @@ const number = (id: string, name: string, expr = id): QueryColumn => ({ id, name
 const annotation: QueryColumn = { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: "drv",
   text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))" };
 const samples = text("samples", "Samples");
-/** the share of the study's samples profiled for the gene that carry the same kind of alteration in it, in percent */
-const freq = number("freq", "Cohort %", "round(freq, 1)");
+/** the share of the study's samples profiled for the gene that carry the same kind of alteration in it, in percent, unrounded: the page writes it as the portal does, and filters and sorts what it rounds */
+const freq = number("freq", "Cohort %");
 
 export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   mutations: [
