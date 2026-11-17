@@ -22,10 +22,10 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 43 |
-| 🟡 partial | 27 |
-| 🔶 different | 4 |
-| ❌ missing | 13 |
+| ✅ match | 41 |
+| 🟡 partial | 26 |
+| 🔶 different | 6 |
+| ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
@@ -115,9 +115,9 @@ Data version: every row set, read count and cohort numerator matches, so the war
 | PAT-URL-1 | 🔶 | BC | `/portal/patient?…&tab=<Title>` (title, not path id `/patient/<tab>`); unknown tab → Summary ✅ |
 | PAT-URL-2 | ✅ | B | `studyId` + `caseId` / `sampleId` accepted (also `study`/`patient`/`sample`); sample wins (`page.tsx:57`) |
 | PAT-URL-3 | 🟡 | C | Page state in `?changes=` (GE settings, collapse etc., invariant 9); no `resourceUrl`, plots params, `geneset_list` |
-| PAT-URL-4 | 🟡 | B | `#navCaseIds=study:patient,…` read as a cohort of those patients (an id without its study refused, as PAT-URL-6) ✅; stepped through in the cohort list's order, not the link's; no POSTed list; the page's own links still carry the cohort's definition (`?cohort=`) |
+| PAT-URL-4 | 🔶 | B | `#navCaseIds=` ignored (no pager shown); cohort carried as a definition `?cohort=` / stored `?s=` (`cohort-navigation.ts:21`); no POSTed list |
 | PAT-URL-5 | ✅ | C | `PatientView` keyed by study\|patient\|sample (`page.tsx:62`) |
-| PAT-URL-6 | 🐞 ok | C | `#navCaseIds` ids without their study are refused, named, and the patient shown without the pager (`navigationFromHash`), where the portal's parseCohortIds throws: the bug not copied |
+| PAT-URL-6 | 🐞 ok | C | No id-list parsing at all, so no `this.studyId` crash |
 
 ### §1 Header
 
@@ -147,8 +147,8 @@ Data version: every row set, read count and cohort numerator matches, so the war
 |---|---|---|---|
 | PAT-NAV-1 | ✅ | B | First / prev / [2] / "3 patients" / next / last; ends disabled |
 | PAT-NAV-2 | ✅ | B | Typed 3 + Enter → P05 |
-| PAT-NAV-3 | ✅ | B | "N patients" opens the Study View over the cohort in a new window (tooltip "Open all patients in study view"): lgg P01, P04, P05 → "3 patients match"; the searchable list stays as its own button |
-| PAT-NAV-4 | ✅ | B | ⊖ "Exclude the current patient": the cohort's definition excluding the patient (a `not` patient-list clause), opened at the next patient, the previous when it was the last: P04 of 3 → P05, "2 of 2 patients" |
+| PAT-NAV-3 | 🔶 | B | "N patients" opens a searchable list dialog in place, not study view |
+| PAT-NAV-4 | ❌ | C | No exclude-patient button |
 | PAT-NAV-5 | ✅ | C | `patientHref` uses patient mode (`cohort-navigation.ts:42`) |
 
 ### §1.4 Tabs

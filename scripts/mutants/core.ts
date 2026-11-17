@@ -149,4 +149,8 @@ export const mutants: Mutant[] = [
     effect: "The Patient page's ⊖ steps on but keeps the patient in the cohort, so the count does not drop and the patient comes round again.",
     find: "  return { def: { ...nav.def, all }, order: nav.order };\n}",
     replace: "  return { def: nav.def, order: nav.order };\n}" },
+  { id: "corr-shown-unrounded-r", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
+    effect: "A plot's correlation is shown to 2 decimals from the full-precision r, where the portal rounds its 5-decimal value (0.124996 shows 0.12, the portal 0.13).",
+    find: "export const portalCorr = (r: number): string => portalR5(r).toFixed(2);",
+    replace: "export const portalCorr = (r: number): string => r.toFixed(2);" },
 ];
