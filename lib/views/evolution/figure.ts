@@ -48,9 +48,12 @@ function sampleKey(samples: EvolutionSample[], y: number, W: number, p: ReturnTy
 const yOf = (c: EvolutionCell): number | null => c.status === "called" || c.status === "uncalled" ? c.vaf : c.status === "absent" ? 0 : null;
 const real = (c: EvolutionCell) => (c.status === "called" || c.status === "uncalled") && c.vaf != null;
 
-/** The cells a mutation's line runs through: from its first to its last sample with variant reads, as the portal trims it. */
-export function lineCells(m: EvolutionMutation): { i: number; c: EvolutionCell }[] {
-  const all = m.cells.map((c, i) => ({ i, c }));
+/**
+ * The cells a mutation's line runs through: from its first to its last sample with variant reads, as
+ * the portal trims it; with `only`, through those samples alone (a group's, in order).
+ */
+export function lineCells(m: EvolutionMutation, only?: number[]): { i: number; c: EvolutionCell }[] {
+  const all = (only ?? m.cells.map((_, i) => i)).map((i) => ({ i, c: m.cells[i] }));
   const a = all.findIndex((x) => real(x.c));
   if (a < 0) return [];
   let b = all.length - 1;
@@ -89,10 +92,29 @@ function timeAxis(ticks: AxisTick[], X: (day: number) => number, left: number, r
 /** the time axis's title */
 const TIME_TITLE = "Time from diagnosis, when each sample was collected";
 
+/**
+ * The samples' numbered markers under the plot, from `y0`: a row per group (Group by), labelled at
+ * the left in the group's colour, as the portal's VAF chart gives each group its own track; samples
+ * at the same x within a group stack. Returns the y below the last row.
+ */
+function markerRows(groups: { value: string; color: string | null; samples: number[] }[], samples: EvolutionSample[], xs: number[], y0: number, left: number, p: ReturnType<typeof palette>, out: string[]): number {
+  let y = y0;
+  for (const g of groups) {
+    const seen = new Map<number, number>();
+    const rows = g.samples.map((i) => { const k = Math.round(xs[i]); const n = seen.get(k) || 0; seen.set(k, n + 1); return n; });
+    g.samples.forEach((i, k) => out.push(marker(xs[i], y + MARK_R + rows[k] * (2 * MARK_R + 2), samples[i])));
+    if (groups.length > 1 && g.value) out.push(label(left - 6, y + MARK_R + FS.small * 0.35, g.value, { size: FS.small, fill: g.color ?? p.ink, anchor: "end", maxW: left - 12 }));
+    y += (Math.max(0, ...rows) + 1) * (2 * MARK_R + 2);
+  }
+  return y;
+}
+
 function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const out: string[] = [];
-  const ys = drawn.flatMap((m) => lineCells(m).map((x) => yOf(x.c)).filter((y): y is number => y != null));
+  // the samples' groups (Group by): a line per mutation and group, a marker row per group
+  const groups = e.groupBy?.groups ?? [{ value: "", color: null, samples: samples.map((_, i) => i) }];
+  const ys = drawn.flatMap((m) => groups.flatMap((g) => lineCells(m, g.samples)).map((x) => yOf(x.c)).filter((y): y is number => y != null));
   const top = 14, H = 220;
   let y: Scale;
   if (d.logScale) {
@@ -101,7 +123,9 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
   } else y = d.dataRange && ys.length ? linear(Math.min(...ys), Math.max(...ys), top + H, top) : linear(0, 1, top + H, top, { nice: false });
   const yv = (t: number) => y(d.logScale ? Math.max(t, LOG_FLOOR) : t);
   const yTitle = "Variant allele frequency";
-  const left = leftAxisWidth(y, yTitle) + 8, right = W - 16;
+  // grouped, the left margin also holds each group's label (at most a fifth of the width)
+  const groupW = groups.length > 1 ? Math.min(W / 5, Math.max(0, ...groups.map((g) => textWidth(g.value, FS.small))) + 12) : 0;
+  const left = Math.max(leftAxisWidth(y, yTitle), groupW) + 8, right = W - 16;
   // the samples along x: evenly in order, or by the day each was collected
   const pad = 20;
   let xs: number[], bottom: number;
@@ -112,12 +136,7 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
     else X = linear(Math.min(...days), Math.max(...days), left + pad, right - pad);
     xs = days.map((t) => X(t));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));
-    const markTop = top + H + 12;
-    // samples taken the same day stack their markers
-    const seen = new Map<number, number>();
-    const rows = xs.map((x) => { const k = Math.round(x); const n = seen.get(k) || 0; seen.set(k, n + 1); return n; });
-    samples.forEach((s, i) => out.push(marker(xs[i], markTop + MARK_R + rows[i] * (2 * MARK_R + 2), s)));
-    const axY = markTop + (Math.max(...rows) + 1) * (2 * MARK_R + 2) + 4;
+    const axY = markerRows(groups, samples, xs, top + H + 12, left, p, out) + 4;
     if (e.axis?.length) {
       out.push(...timeAxis(e.axis, X, left, right, axY, top, p));
       bottom = axY + 38;
@@ -128,19 +147,20 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
   } else {
     xs = samples.map((_, i) => samples.length === 1 ? (left + right) / 2 : left + pad + i * (right - left - 2 * pad) / (samples.length - 1));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));
-    samples.forEach((s, i) => out.push(marker(xs[i], top + H + 12 + MARK_R, s)));
-    bottom = top + H + 12 + 2 * MARK_R + 6;
+    bottom = markerRows(groups, samples, xs, top + H + 12, left, p, out) + 6;
   }
   out.push(`<line x1="${left}" y1="${r1(top + H)}" x2="${right}" y2="${r1(top + H)}" stroke="${p.muted}" stroke-width="${SW.line}"/>`);
-  for (const m of drawn) {
-    const pts = lineCells(m);
+  for (const m of drawn) for (const grp of groups) {
+    const pts = lineCells(m, grp.samples);
+    if (!pts.length) continue;
+    const ink = grp.color ?? p.ink;
     const g: string[] = [];
     let prev: { x: number; y: number } | null = null, gap = false;
     for (const { i, c } of pts) {
       const t = yOf(c);
       if (t == null) { gap = true; continue; }
       const pt = { x: xs[i], y: yv(t) };
-      if (prev) g.push(`<line x1="${r1(prev.x)}" y1="${r1(prev.y)}" x2="${r1(pt.x)}" y2="${r1(pt.y)}" stroke="${p.ink}" stroke-width="${SW.line}" stroke-opacity="0.55"${gap ? ` stroke-dasharray="3 3"` : ""}/>`,
+      if (prev) g.push(`<line x1="${r1(prev.x)}" y1="${r1(prev.y)}" x2="${r1(pt.x)}" y2="${r1(pt.y)}" stroke="${ink}" stroke-width="${SW.line}" stroke-opacity="0.55"${gap ? ` stroke-dasharray="3 3"` : ""}/>`,
         `<line x1="${r1(prev.x)}" y1="${r1(prev.y)}" x2="${r1(pt.x)}" y2="${r1(pt.y)}" stroke="transparent" stroke-width="8"/>`);
       prev = pt; gap = false;
     }
@@ -148,9 +168,9 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
       const t = yOf(c);
       if (t == null) continue;
       const x = r1(xs[i]), yy = r1(yv(t));
-      g.push(c.status === "called" ? `<circle data-s="${i}" cx="${x}" cy="${yy}" r="3" fill="${p.ink}"/>`
-        : c.status === "uncalled" ? `<circle data-s="${i}" cx="${x}" cy="${yy}" r="3" fill="${p.bg}" stroke="${p.ink}" stroke-width="${SW.line}"/>`
-        : `<rect data-s="${i}" x="${r1(xs[i] - 2.5)}" y="${r1(yv(t) - 2.5)}" width="5" height="5" fill="${p.bg}" stroke="${p.ink}" stroke-width="${SW.line}"/>`);
+      g.push(c.status === "called" ? `<circle data-s="${i}" cx="${x}" cy="${yy}" r="3" fill="${ink}"/>`
+        : c.status === "uncalled" ? `<circle data-s="${i}" cx="${x}" cy="${yy}" r="3" fill="${p.bg}" stroke="${ink}" stroke-width="${SW.line}"/>`
+        : `<rect data-s="${i}" x="${r1(xs[i] - 2.5)}" y="${r1(yv(t) - 2.5)}" width="5" height="5" fill="${p.bg}" stroke="${ink}" stroke-width="${SW.line}"/>`);
     }
     out.push(`<g class="evo-line"${m.key ? ` data-key="${esc(m.key)}"` : ""}><title>${esc(mutationTip(m, samples))}</title>${g.join("")}</g>`);
   }

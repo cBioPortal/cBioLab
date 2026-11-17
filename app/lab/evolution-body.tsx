@@ -13,8 +13,9 @@ import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./pati
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
+import { OptionSelect } from "../_ui/choice.tsx";
 
-type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; expandGaps?: boolean; mutations?: Record<string, unknown> } & Record<string, unknown>;
+type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; expandGaps?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
 export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: {
   v: { evolution: EvolutionResult; caveat?: string } & Record<string, unknown>; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
@@ -108,6 +109,15 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
                 data-tip="a line per mutation through its VAF in each sample" onClick={() => patch({ chart: undefined })}>Line chart</Button>
               <Button type="button" variant={chart === "heatmap" ? "default" : "outline"} size="sm" className={TB} aria-pressed={chart === "heatmap"}
                 data-tip="a row per mutation, a column per sample, coloured by VAF" onClick={() => patch({ chart: "heatmap" })}>Heatmap</Button>
+            </div>
+            <div className="tbz">
+              <span className="meta">Group by</span>
+              <OptionSelect value={spec.groupBy || ""} ariaLabel="group the samples by" disabled={chart === "heatmap" || !e.groupOptions?.length} className="max-w-56"
+                title={chart === "heatmap" ? "only the line chart is grouped" : !e.groupOptions?.length ? "the samples have no clinical attributes to group by" : "a line per mutation and group of samples sharing a value, each group in its colour, as the portal's Group by"}
+                onValueChange={(v) => patch({ groupBy: v || undefined })}>
+                <option value="">None</option>
+                {(e.groupOptions || []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+              </OptionSelect>
             </div>
             <div className="tbz">
               <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>

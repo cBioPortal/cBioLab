@@ -909,11 +909,58 @@
             "end": 1299
           }
         ],
+        "groupOptions": [
+          {
+            "id": "MUTATION_COUNT",
+            "name": "Mutation Count"
+          },
+          {
+            "id": "FRACTION_GENOME_ALTERED",
+            "name": "Fraction Genome Altered"
+          },
+          {
+            "id": "SAMPLE_TYPE",
+            "name": "Sample Type"
+          },
+          {
+            "id": "CANCER_TYPE",
+            "name": "Cancer Type"
+          },
+          {
+            "id": "CANCER_TYPE_DETAILED",
+            "name": "Cancer Type Detailed"
+          },
+          {
+            "id": "GENE_PANEL",
+            "name": "Gene Panel"
+          },
+          {
+            "id": "ONCOTREE_CODE",
+            "name": "Oncotree Code"
+          },
+          {
+            "id": "SAMPLE_COLLECTION_METHOD",
+            "name": "Sample Collection Method"
+          },
+          {
+            "id": "SOMATIC_STATUS",
+            "name": "Somatic Status"
+          },
+          {
+            "id": "SPECIMEN_PRESERVATION_TYPE",
+            "name": "Specimen Preservation Type"
+          },
+          {
+            "id": "TMB_NONSYNONYMOUS",
+            "name": "TMB (nonsynonymous)"
+          }
+        ],
         "display": {
           "chart": "line",
           "logScale": false,
           "dataRange": false,
-          "expandGaps": false
+          "expandGaps": false,
+          "groupBy": null
         }
       },
       "participation": {

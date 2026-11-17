@@ -10,7 +10,9 @@ import { PATIENT_ID } from "../../patient-timeline.ts";
 import { axisTicks, timelineAxisItems, sampleDays, sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
-import { plural, refuse } from "../shared.ts";
+import { plural, refuse, type ViewResolver } from "../shared.ts";
+import { patientSampleAttributes } from "../../patient-sample-attributes.ts";
+import { groupOptions, sampleGroups } from "./groups.ts";
 import {
   EVOLUTION_COLUMNS, EVOLUTION_DEFAULT_COLUMNS, EVOLUTION_PATIENT_COLUMNS, EVOLUTION_PATIENT_DEFAULT_COLUMNS,
   evolutionMutationsSource, evolutionPatientsSource, evolutionSamplesSource,
@@ -72,7 +74,8 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   const mq = viewQuery(view.mutations || {});
   { const bad = checkQuery(mq, EVOLUTION_COLUMNS); if (bad) return no("mutations: " + bad); }
   if (ctx.table != null && ctx.table !== "mutations") return no("table is mutations, or none for the patient list");
-  const display = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange, expandGaps: !!view.expandGaps } as const;
+  if (view.groupBy != null && (typeof view.groupBy !== "string" || !view.groupBy)) return no("groupBy is the id of a sample clinical attribute (one of the result's groupOptions), e.g. \"SAMPLE_TYPE\"");
+  const display = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange, expandGaps: !!view.expandGaps, groupBy: view.groupBy ?? null } as const;
 
   // who may answer: a local patient-level participant (no peer serves this view's rows)
   const { holders, excluded } = rowHolders(ctx);
@@ -177,6 +180,20 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     // the line chart placed by day is drawn on the patient timeline's axis, built from the same items
     const axis = x === "time" && display.chart === "line" ? axisTicks(timelineAxisItems(events), !view.expandGaps).ticks : null;
     const cut = !!axis?.some((t) => t.trim);
+    // the line chart's Group by: the samples' own clinical attributes, read where the patient lives
+    let options: { id: string; name: string }[] | null = null, grouping: EvolutionResult["groupBy"] | null = null;
+    if (display.chart === "line") {
+      const attrs = await patientSampleAttributes(ctx.resolvers[want.study] as unknown as ViewResolver & PatientLevelCapable, want.study, want.id, "evolution:sample-attributes")
+        .catch((err: Error) => { if (view.groupBy) throw new Error("groupBy: the samples' clinical attributes could not be read (" + err.message + ")"); return null; });
+      if (attrs) {
+        options = groupOptions(attrs.columns, attrs.bySample, samples);
+        if (view.groupBy) {
+          const opt = options.find((o) => o.id === view.groupBy);
+          if (!opt) return no("groupBy " + JSON.stringify(view.groupBy) + " is not an attribute of " + want.id + "'s samples; " + (options.length ? "these are: " + options.map((o) => o.id + " (" + o.name + ")").join(", ") : "they have none"));
+          grouping = { attribute: opt.id, name: opt.name, groups: sampleGroups(samples, attrs.bySample, opt.id) };
+        }
+      }
+    }
     const undrawn = over ? "the mutation table's query keeps " + m.total.toLocaleString("en-US") + " mutations; one figure draws at most " + EVOLUTION_DRAW_MAX.toLocaleString("en-US") + " — narrow the table's search or filters" : undefined;
     const notSeq = samples.filter((s) => !s.panel).map((s) => s.id);
     const npCells = drawn ? drawn.reduce((a, d) => a + d.cells.filter((c) => c.status === "np").length, 0) : 0;
@@ -186,7 +203,8 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     return {
       kind: "evolution", cohorts: vNames,
       evolution: { ...list, patient: { ...want, samples }, position, mutations: table, drawn, ...(undrawn ? { undrawn } : {}), noVaf, x,
-        ...(!view.sequential && noDay.length ? { noDay } : {}), ...(axis ? { axis } : {}), display },
+        ...(!view.sequential && noDay.length ? { noDay } : {}), ...(axis ? { axis } : {}),
+        ...(options ? { groupOptions: options } : {}), ...(grouping ? { groupBy: grouping } : {}), display },
       method: evolutionMethod({ cohorts: vNames, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length, lists: r.lists, excluded, instances: r.groups,
         patient: want, samples: samples.length, table: { total: m.total, all: m.all, queryText: tq }, drawn: drawn?.length ?? null, noVaf }),
       participation: ctx.participationFor(ctx.vStudies, true),
@@ -200,6 +218,8 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
         "not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene" + (notSeq.length ? " or the sample was not sequenced for mutations (" + notSeq.join(", ") + ")" : "") +
         " — never 0" + (npCells ? " (" + plural(npCells, "such cell") + " here)" : "") + ". " +
         (display.chart === "line" ? "A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment" +
+          (grouping ? "; grouped by " + grouping.name + " as the portal's Group by: a line per mutation and group, through that group's samples alone, each group in its colour (" +
+            grouping.groups.map((g) => (g.value || "no value") + ": " + g.samples.map((i) => samples[i].label).join(", ")).join("; ") + ")" : "") +
           (display.logScale ? "; the y axis is log-scaled, a VAF of 0 sitting at its floor of 0.001" : "") + (display.dataRange ? "; the y axis spans the VAFs drawn rather than 0 to 1" : "") + ". "
           : "The heatmap colours each sample's VAF from 0 to 1; grey is not found, white with a bar is not profiled. ") +
         "Fusions recorded as mutations are left out, as the portal leaves them out. " +

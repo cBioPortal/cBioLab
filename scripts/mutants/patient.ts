@@ -72,4 +72,8 @@ export const mutants: Mutant[] = [
     effect: "The Genomic Evolution line chart's time axis ends at the last sample, not the patient's last clinical event, so it is shorter than the portal's (the timeline's axis).",
     find: "axisTicks(timelineAxisItems(events), !view.expandGaps)",
     replace: "axisTicks(timelineAxisItems(events.filter((ev) => sampleDays([ev]).size > 0)), !view.expandGaps)" },
+  { id: "evolution-group-lines-joined", layer: "counts", guard: "unit", file: "lib/views/evolution/figure.ts",
+    effect: "Grouped (Group by), each group's line runs through every sample, joining samples of different groups, where the portal draws a mutation's line within one group's samples (splitMutationsBySampleGroup).",
+    find: "    const pts = lineCells(m, grp.samples);",
+    replace: "    const pts = lineCells(m);" },
 ];

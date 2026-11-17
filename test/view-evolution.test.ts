@@ -19,6 +19,10 @@ import { axisTicks, timelineAxisItems } from "../lib/timeline-tracks.ts";
 import { timelineSvg } from "../lib/timeline-svg.ts";
 import { palette } from "../lib/svg-kit.ts";
 import { kindText } from "./support/kind-text.ts";
+import { groupOptions, sampleGroups } from "../lib/views/evolution/groups.ts";
+import { clinicalColor } from "../lib/oncoprint-style.ts";
+import type { EvolutionSample } from "../lib/views/evolution/types.ts";
+import { FS } from "../lib/svg-kit.ts";
 
 type Row = Record<string, unknown>;
 type Tables = (table: string, src: RowSource) => Row[];
@@ -211,7 +215,7 @@ describe("evolution: the patient drawn", () => {
     const w = await run({ chart: "heatmap", logScale: true, dataRange: true }, one(study({ muts: [MUTS[2]] })));
     assert.deepEqual(evo(w).drawn, []);
     assert.equal(evo(w).noVaf, 1);
-    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false });
+    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false, groupBy: null });
     assert.match(w.caveat!, /The heatmap colours each sample's VAF/);
   });
 
@@ -475,5 +479,255 @@ describe("evolution: its row sources name one patient and live only with patient
     assert.match(pageSql(evolutionSamplesSource(part, "P-1", "db"), {}, [], 10, 0), /AS sid, ifNull\(pn\.panel, ''\) AS panel/);
     // a sample id reaches SQL only through sq()
     assert.match(pageSql(evolutionMutationsSource(part, "P-1", "db", ["a'b"]), {}, [], 10, 0), /'a\\'b'/);
+  });
+});
+
+describe("evolution: Group by, by the rule table (R1–R8)", () => {
+  // the study's sample attributes, in the study's order; PATIENT_ONLY is a patient attribute, NOBODY no sample carries
+  const META = [
+    { id: "SAMPLE_TYPE", name: "Sample Type", patient: 0 },
+    { id: "NOBODY", name: "Nobody", patient: 0 },
+    { id: "ONLY_T1", name: "Only T1", patient: 0 },
+    { id: "TISSUE", name: "Tissue", patient: 0 },
+    { id: "PATIENT_ONLY", name: "Patient only", patient: 1 },
+  ];
+  // T1 Primary, T2 Metastasis, T3 Primary: groups Primary [0, 2], Metastasis [1]
+  const ATTRS: Row[] = [
+    { cohort: "patient", study: "s1", patient: "P1", sample: "T1", m: { SAMPLE_TYPE: "Primary", ONLY_T1: "X", TISSUE: "Brain" } },
+    { cohort: "patient", study: "s1", patient: "P1", sample: "T2", m: { SAMPLE_TYPE: "Metastasis", TISSUE: "Brain" } },
+    { cohort: "patient", study: "s1", patient: "P1", sample: "T3", m: { SAMPLE_TYPE: "Primary", TISSUE: "Brain" } },
+  ];
+  // called in every sample: grouped by SAMPLE_TYPE its Primary line joins T1 to T3, never through T2
+  const ALL3: Row = { ...MUTS[0], gene: "PIK3CA", proteinChange: "E545K", start: "1",
+    cells: [cell(1, "T1", "called", 0.3, 3, 7), cell(2, "T2", "called", 0.6, 6, 4), cell(3, "T3", "called", 0.2, 2, 8)] };
+  const MUTS3 = [MUTS[0], MUTS[1], ALL3];
+  const grouped = (o: { muts?: Row[] } = {}) => {
+    const t: Tables = (table, src) => table === "evolution:sample-attributes" ? ATTRS : study({ muts: o.muts ?? MUTS3 })(table, src);
+    const res = { ...local("db1", t), viewMeta: async () => META };
+    return { c: ctx({ A: cohort({ s1: 3 }) }, { s1: res }), res };
+  };
+  const g = (view: Partial<EvolutionView>, o: { muts?: Row[] } = {}) => run(view, grouped(o).c);
+
+  const sm = (id: string): EvolutionSample => ({ id, type: "", label: id, color: "#000", day: null, panel: null });
+  const S5 = ["a", "b", "c", "d", "e"].map(sm);
+  const by = (vals: (string | undefined)[]): Record<string, [string, string][]> =>
+    Object.fromEntries(vals.map((v, i) => [S5[i].id, v ? [["K", v]] as [string, string][] : []]));
+
+  // the figure's parts
+  const lines = (svg: string) => [...svg.matchAll(/<g class="evo-line"( data-key="([^"]*)")?><title>.*?<\/title>(.*?)<\/g>/g)].map((m) => {
+    const body = m[3];
+    const pts = [...body.matchAll(/<(circle|rect) data-s="(\d+)" [^>]*?(?:cx="([-\d.]+)" cy="([-\d.]+)"|x="([-\d.]+)" y="([-\d.]+)")[^>]*>/g)].map((p) => ({
+      s: Number(p[2]), tag: p[0], x: p[3] != null ? Number(p[3]) : Number(p[5]) + 2.5, y: p[4] != null ? Number(p[4]) : Number(p[6]) + 2.5 }));
+    const segs = [...body.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)" stroke="([^"]+)"[^>]*>/g)]
+      .map((l) => ({ x1: Number(l[1]), y1: Number(l[2]), x2: Number(l[3]), y2: Number(l[4]), stroke: l[5] })).filter((l) => l.stroke !== "transparent");
+    return { key: m[2], pts, segs };
+  });
+  const markers = (svg: string) => [...svg.matchAll(/<g><title>([^:<]+): ([^ <]+)[^<]*<\/title><circle cx="([-\d.]+)" cy="([-\d.]+)" r="7"/g)]
+    .map((m) => ({ label: m[1], id: m[2], x: Number(m[3]), y: Number(m[4]) }));
+  const endTexts = (svg: string) => [...svg.matchAll(/<text x="([-\d.]+)" y="([-\d.]+)" font-size="\d+" fill="([^"]+)" text-anchor="end"[^>]*>(?:<title>[^<]*<\/title>)?([^<]*)<\/text>/g)]
+    .map((m) => ({ x: Number(m[1]), y: Number(m[2]), fill: m[3], text: m[4] }));
+  const svgOf = async (view: Partial<EvolutionView>) => {
+    const v = await g({ sequential: true, ...view });
+    assert.equal(v.error, undefined, String(v.error));
+    return evolutionSvg(v as never, { width: 900, theme: "light" })!;
+  };
+
+  test("GB1 R1: groupOptions keeps the columns some sample carries, in the columns' order", () => {
+    const cols = [{ id: "A", name: "a" }, { id: "B", name: "b" }, { id: "C", name: "c" }, { id: "D", name: "d" }];
+    const bs = { a: [["C", "1"]], b: [["A", "x"], ["C", "2"]], z: [["D", "q"]] } as Record<string, [string, string][]>;
+    assert.deepEqual(groupOptions(cols, bs, [sm("a"), sm("b"), sm("c")]), [{ id: "A", name: "a" }, { id: "C", name: "c" }]);
+    assert.deepEqual(groupOptions(cols, {}, [sm("a")]), []);
+  });
+
+  test("GB2 R2: a group per value in order of its first sample; samples by index in order; no-value samples one last group", () => {
+    const gs = sampleGroups(S5, by(["m", undefined, "p", "m", undefined]), "K");
+    assert.deepEqual(gs.map((x) => [x.value, x.samples]), [["m", [0, 3]], ["p", [2]], ["", [1, 4]]]);
+    assert.equal(gs[2].color, null);
+    const first = sampleGroups(S5, by([undefined, "z", "y", "z", "y"]), "K");
+    assert.deepEqual(first.map((x) => [x.value, x.samples]), [["z", [1, 3]], ["y", [2, 4]], ["", [0]]]);
+    assert.deepEqual(sampleGroups(S5, by(["a", "b", "a", "b", "a"]), "K").map((x) => x.value), ["a", "b"], "no no-value group when every sample has one");
+    assert.deepEqual(sampleGroups(S5, by(["a", "b", "c", "d", "e"]), "OTHER").map((x) => [x.value, x.samples]), [["", [0, 1, 2, 3, 4]]], "another attribute's values are not this one's");
+  });
+
+  test("GB3 R3: colours: the k-th valued group clinicalColor(k), the no-value group null, a lone group null", () => {
+    const gs = sampleGroups(S5, by(["a", "b", "c", undefined, "d"]), "K");
+    assert.deepEqual(gs.map((x) => x.color), [clinicalColor(0), clinicalColor(1), clinicalColor(2), clinicalColor(3), null]);
+    assert.equal(clinicalColor(0), "#3366cc");
+    assert.equal(clinicalColor(1), "#dc3912");
+    assert.deepEqual(sampleGroups(S5, by(["a", undefined, undefined, undefined, undefined]), "K").map((x) => x.color), ["#3366cc", null], "one valued group and the no-value group: two groups");
+    assert.deepEqual(sampleGroups(S5, by(["a", "a", "a", "a", "a"]), "K").map((x) => x.color), [null]);
+    assert.deepEqual(sampleGroups(S5, by([]), "K").map((x) => [x.value, x.color]), [["", null]]);
+  });
+
+  test("GB4 R4: lineCells(m, only) through only's samples, in its order, trimmed to real VAFs; none gives []; no only is all samples", () => {
+    const m = (st: string[], vaf: (number | null)[] = st.map(() => 0.3)): EvolutionMutation => ({ key: "k", gene: "G", proteinChange: "P", mutationType: "",
+      cells: st.map((s, i) => ({ status: s as never, vaf: s === "absent" ? 0 : vaf[i], alt: null, ref: null })) });
+    const x = m(["called", "absent", "np", "uncalled", "absent", "called"]);
+    assert.deepEqual(lineCells(x, [1, 2, 3, 4]).map((c) => c.i), [3]);
+    assert.deepEqual(lineCells(x, [0, 2, 4, 5]).map((c) => c.i), [0, 2, 4, 5]);
+    assert.deepEqual(lineCells(x, [1, 3, 5]).map((c) => c.i), [3, 5]);
+    assert.deepEqual(lineCells(x, [5, 3, 1]).map((c) => c.i), [5, 3], "in only's order");
+    assert.deepEqual(lineCells(x, [1, 2, 4]), [], "no real VAF in the group");
+    assert.deepEqual(lineCells(m(["absent", "uncalled", "called"], [0, null, null]), [1, 2]), [], "called or uncalled without a vaf is not real");
+    assert.deepEqual(lineCells(x).map((c) => c.i), [0, 1, 2, 3, 4, 5]);
+    assert.deepEqual(lineCells(m(["absent", "called", "np", "uncalled", "absent"])).map((c) => c.i), [1, 2, 3]);
+    assert.deepEqual(lineCells(x, [0, 3]).map((c) => c.c), [x.cells[0], x.cells[3]]);
+  });
+
+  test("GB5 R5: grouped, a line per mutation and group with a real VAF, each with the mutation's data-key", async () => {
+    const v = await g({ sequential: true, groupBy: "SAMPLE_TYPE" });
+    const e = evo(v);
+    const svg = evolutionSvg(v as never, { width: 900, theme: "light" })!;
+    const ls = lines(svg);
+    // TP53: Primary [T1] and Metastasis [T2]; EGFR: Primary [T3] (T1 absent trimmed) and Metastasis [T2]; PIK3CA: both
+    const keys = e.drawn!.map((m) => m.key);
+    assert.equal(keys.length, 3);
+    for (const k of keys) assert.equal(ls.filter((l) => l.key === k).length, 2, k);
+    assert.equal(ls.length, 6);
+    const only: Row[] = [{ ...MUTS[0], cells: [cell(1, "T1", "absent", 0, 0, 10), cell(2, "T2", "called", 0.4, 4, 6), cell(3, "T3", "absent", 0, 0, 10)] }];
+    const w = await g({ sequential: true, groupBy: "SAMPLE_TYPE" }, { muts: only });
+    const lw = lines(evolutionSvg(w as never, { width: 900, theme: "light" })!);
+    assert.equal(lw.length, 1, "no line for the Primary group, where the mutation has no real VAF");
+    assert.deepEqual(lw[0].pts.map((p) => p.s), [1]);
+  });
+
+  test("GB6 R5: grouped, no segment joins samples of different groups", async () => {
+    const v = await g({ sequential: true, groupBy: "SAMPLE_TYPE" });
+    const groups = evo(v).groupBy!.groups;
+    const svg = evolutionSvg(v as never, { width: 900, theme: "light" })!;
+    const at = new Map(markers(svg).map((m) => [m.id, m.x]));
+    const xs = evo(v).patient!.samples.map((s) => at.get(s.id)!);
+    const groupOfX = (x: number) => groups.findIndex((gr) => gr.samples.some((i) => Math.abs(xs[i] - x) < 0.2));
+    let n = 0;
+    for (const l of lines(svg)) for (const s of l.segs) {
+      n++;
+      assert.equal(groupOfX(s.x1), groupOfX(s.x2), JSON.stringify(s));
+    }
+    assert.ok(n >= 1, "PIK3CA's Primary line has a segment T1–T3");
+    const pik = lines(svg).filter((l) => l.key === evo(v).drawn![2].key);
+    assert.ok(pik.some((l) => l.segs.some((s) => Math.abs(s.x1 - xs[0]) < 0.2 && Math.abs(s.x2 - xs[2]) < 0.2)), "Primary joins T1 to T3");
+    assert.ok(!pik.some((l) => l.segs.some((s) => [s.x1, s.x2].some((x) => Math.abs(x - xs[1]) < 0.2))), "nothing joins T2");
+  });
+
+  test("GB7 R5: a group's lines and points take its colour, stroke and fill", async () => {
+    const v = await g({ sequential: true, groupBy: "SAMPLE_TYPE" });
+    const groups = evo(v).groupBy!.groups;
+    assert.deepEqual(groups.map((x) => [x.value, x.color, x.samples]), [["Primary", "#3366cc", [0, 2]], ["Metastasis", "#dc3912", [1]]]);
+    const svg = evolutionSvg(v as never, { width: 900, theme: "light" })!;
+    for (const l of lines(svg)) {
+      const gi = groups.findIndex((gr) => gr.samples.includes(l.pts[0].s));
+      const col = groups[gi].color!;
+      assert.ok(l.pts.every((p) => groups[gi].samples.includes(p.s)), "a line's points are one group's");
+      for (const s of l.segs) assert.equal(s.stroke, col);
+      for (const p of l.pts) {
+        if (/^<circle/.test(p.tag) && !/stroke=/.test(p.tag)) assert.match(p.tag, new RegExp(`fill="${col}"`), "a called point is filled in the group's colour");
+        else assert.match(p.tag, new RegExp(`stroke="${col}"`), "an uncalled or VAF-0 point is outlined in the group's colour");
+      }
+    }
+  });
+
+  test("GB8 R5: ungrouped, a line per mutation in the default ink", async () => {
+    const v = await g({ sequential: true });
+    assert.equal(evo(v).groupBy, undefined);
+    const ink = palette("light").ink;
+    const ls = lines(evolutionSvg(v as never, { width: 900, theme: "light" })!);
+    assert.deepEqual(ls.map((l) => l.key), evo(v).drawn!.map((m) => m.key));
+    for (const l of ls) {
+      for (const s of l.segs) assert.equal(s.stroke, ink);
+      for (const p of l.pts) assert.match(p.tag, new RegExp(`(fill|stroke)="${ink}"`));
+    }
+    const pik = ls[2];
+    assert.equal(pik.segs.length, 2, "T1–T2–T3");
+  });
+
+  test("GB9 R6: grouped, each group's markers on their own row, groups top to bottom; valued groups labelled at the left in their colour", async () => {
+    const svg = await svgOf({ groupBy: "SAMPLE_TYPE" });
+    const mk = markers(svg);
+    const y = (id: string) => mk.find((m) => m.id === id)!.y;
+    assert.equal(y("T1"), y("T3"), "Primary's samples share a row");
+    assert.ok(y("T2") > y("T1"), "Metastasis's row below Primary's");
+    const left = Math.min(...mk.map((m) => m.x));
+    const labels = endTexts(svg).filter((t) => t.y > 14 + 220 + 12);
+    const prim = labels.find((t) => t.text === "Primary"), met = labels.find((t) => t.text === "Metastasis");
+    assert.ok(prim && met, JSON.stringify(labels));
+    assert.equal(prim!.fill, "#3366cc");
+    assert.equal(met!.fill, "#dc3912");
+    assert.ok(prim!.x < left && met!.x < left, "at the left of the markers");
+    assert.ok(Math.abs(prim!.y - (y("T1") + FS.small * 0.35)) < 0.2 && Math.abs(met!.y - (y("T2") + FS.small * 0.35)) < 0.2, "each on its group's row");
+  });
+
+  test("GB10 R6: the no-value group has its own last row, unlabelled", async () => {
+    const svg = await svgOf({ groupBy: "ONLY_T1" });
+    const mk = markers(svg);
+    const y = (id: string) => mk.find((m) => m.id === id)!.y;
+    assert.equal(y("T2"), y("T3"));
+    assert.ok(y("T2") > y("T1"));
+    const labels = endTexts(svg).filter((t) => t.y > 14 + 220 + 12);
+    assert.deepEqual(labels.map((t) => [t.text, t.fill]), [["X", "#3366cc"]]);
+    assert.ok(!labels.some((t) => Math.abs(t.y - (y("T2") + FS.small * 0.35)) < 1), "nothing labels the no-value row");
+  });
+
+  test("GB11 R6: ungrouped, one marker row and no group labels", async () => {
+    const svg = await svgOf({});
+    const mk = markers(svg).filter((m) => ["T1", "T2", "T3"].includes(m.id));
+    assert.equal(mk.length >= 3, true);
+    const rowYs = new Set(mk.filter((m) => m.y > 14 + 220).map((m) => m.y));
+    assert.equal(rowYs.size, 1);
+    assert.deepEqual(endTexts(svg).filter((t) => t.y > 14 + 220 + 12), []);
+  });
+
+  test("GB12 R7: a groupBy that is not a non-empty string is refused", async () => {
+    for (const bad of ["", 5, true, ["SAMPLE_TYPE"], {}]) {
+      const v = await g({ groupBy: bad } as never);
+      assert.match(v.error ?? "", /^groupBy is the id of a sample clinical attribute/, JSON.stringify(bad));
+    }
+  });
+
+  test("GB13 R7: a groupBy the patient's samples do not carry is refused, listing the available ids", async () => {
+    for (const bad of ["NOPE", "NOBODY", "PATIENT_ONLY"]) {
+      const v = await g({ groupBy: bad });
+      assert.ok(v.error, bad);
+      assert.match(v.error!, new RegExp(bad));
+      assert.match(v.error!, /SAMPLE_TYPE/);
+      assert.match(v.error!, /ONLY_T1/);
+      assert.match(v.error!, /TISSUE/);
+      assert.doesNotMatch(v.error!.replace(JSON.stringify(bad), ""), /NOBODY|PATIENT_ONLY/, "only the available ids are listed");
+    }
+  });
+
+  test("GB14 R7: a valid groupBy yields evolution.groupBy and display.groupBy; groupOptions are listed for the line chart", async () => {
+    const v = await g({ groupBy: "SAMPLE_TYPE" });
+    assert.equal(v.error, undefined, String(v.error));
+    const e = evo(v);
+    assert.deepEqual(e.groupBy, { attribute: "SAMPLE_TYPE", name: "Sample Type", groups: [
+      { value: "Primary", color: "#3366cc", samples: [0, 2] }, { value: "Metastasis", color: "#dc3912", samples: [1] }] });
+    assert.equal(e.display.groupBy, "SAMPLE_TYPE");
+    const opts = [{ id: "SAMPLE_TYPE", name: "Sample Type" }, { id: "ONLY_T1", name: "Only T1" }, { id: "TISSUE", name: "Tissue" }];
+    assert.deepEqual(e.groupOptions, opts);
+    const u = evo(await g({}));
+    assert.deepEqual(u.groupOptions, opts, "listed for the line chart ungrouped too");
+    assert.equal(u.groupBy, undefined);
+    assert.equal(u.display.groupBy, null);
+    assert.deepEqual(evo(await g({ groupBy: "TISSUE" })).groupBy!.groups, [{ value: "Brain", color: null, samples: [0, 1, 2] }]);
+  });
+
+  test("GB15 R7: for the heatmap, neither groupOptions nor the grouping is computed", async () => {
+    const { c, res } = grouped();
+    const v = await run({ chart: "heatmap", groupBy: "SAMPLE_TYPE" }, c);
+    assert.equal(v.error, undefined, String(v.error));
+    const e = evo(v);
+    assert.equal(e.groupOptions, undefined);
+    assert.equal(e.groupBy, undefined);
+    assert.ok(!res.asked.includes("evolution:sample-attributes"), "the samples' attributes are not read");
+  });
+
+  test("GB16 R8: the caveat, grouped, says grouped by <name> and lists each group's sample labels, no value as \"no value\"", async () => {
+    const v = await g({ groupBy: "SAMPLE_TYPE" });
+    assert.match(v.caveat!, /grouped by Sample Type/);
+    assert.match(v.caveat!, /Primary: 1, 3; Metastasis: 2/);
+    const w = await g({ groupBy: "ONLY_T1" });
+    assert.match(w.caveat!, /grouped by Only T1/);
+    assert.match(w.caveat!, /X: 1; no value: 2, 3/);
+    assert.doesNotMatch((await g({})).caveat!, /grouped by/);
   });
 });
