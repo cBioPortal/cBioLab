@@ -84,14 +84,32 @@ export function pdfFonts(svg: string): string {
 }
 
 /** saves a PDF of the figure, a page its own size */
-async function savePdf(file: string, svg: string): Promise<void> {
-  const blob = await svgToPdf(pdfFonts(svg));
+function saveBlob(file: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = file;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+/** a standalone SVG (standaloneSvg) saved as a PDF */
+export async function savePdf(file: string, svg: string): Promise<void> {
+  saveBlob(file, await svgToPdf(pdfFonts(svg)));
+}
+
+/** a standalone SVG (standaloneSvg) saved as a PNG at twice its size */
+export async function savePng(file: string, svg: string): Promise<void> {
+  const img = new Image();
+  const src = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  try {
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error("the figure could not be drawn as an image")); img.src = src; });
+    const cv = document.createElement("canvas");
+    cv.width = Math.ceil(img.naturalWidth * 2); cv.height = Math.ceil(img.naturalHeight * 2);
+    const g = cv.getContext("2d")!;
+    g.scale(2, 2); g.drawImage(img, 0, 0);
+    saveBlob(file, await new Promise<Blob>((res, rej) => cv.toBlob((b) => b ? res(b) : rej(new Error("the PNG could not be made")), "image/png")));
+  } finally { URL.revokeObjectURL(src); }
 }
 
 /**

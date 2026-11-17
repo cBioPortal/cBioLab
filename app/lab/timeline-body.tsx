@@ -7,7 +7,8 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { timelineSvg, timelineSummary } from "../../lib/timeline-svg.ts";
-import { formatDays, sampleMarks, attr } from "../../lib/timeline-tracks.ts";
+import { formatDays, sampleMarks, sampleTipRows, attr, SAMPLE_TRACK } from "../../lib/timeline-tracks.ts";
+import { canonicalEventName } from "../../lib/event-names.ts";
 import type { PatientEvent, TimelineResult } from "../../lib/types";
 import { PatientNav, PatientsDialog, patientKeys } from "./patient-nav.tsx";
 import { ChevronsUpDown } from "lucide-react";
@@ -122,7 +123,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
         {drawn && (p!.events.length
           ? <div dangerouslySetInnerHTML={{ __html: drawn.svg }} />
           : <p className="meta tl-empty">{p!.patient} has no timeline events recorded.</p>)}
-        {tip && p && <EventTip x={tip.x} y={tip.y} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} page={tip.page} pinned={tip.pinned}
+        {tip && p && <EventTip x={tip.x} y={tip.y} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} sampleAttrs={p.sampleAttrs} page={tip.page} pinned={tip.pinned}
           onPage={(n) => setTip((t) => t && { ...t, page: n })} onClose={() => setTip(null)} onHold={holdTip} onLeave={() => { if (!tip.pinned) dropTip(); }} />}
       </div>
       {p && drawn && <p className="note vfoot">{timelineSummary(p, drawn.layout, !!spec.expandGaps)} Click a track with ▾ to fold its sub-tracks into one row.</p>}
@@ -145,8 +146,10 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
  * with several events on the mark, "‹ i of n events ›" pages through them (the keys do too). Pinned, it
  * stays until clicked again, Esc, or a close; hovered, the pointer may move onto it.
  */
-function EventTip({ x, y, events, marks, page, pinned, onPage, onClose, onHold, onLeave }: {
+function EventTip({ x, y, events, marks, sampleAttrs, page, pinned, onPage, onClose, onHold, onLeave }: {
   x: number; y: number; events: PatientEvent[]; marks: Map<string, { label: string; color: string }>; page: number; pinned: boolean;
+  /** each sample's own clinical attributes, which a sample row's tooltip lists */
+  sampleAttrs?: Record<string, [string, string][]>;
   onPage: (n: number) => void; onClose: () => void; onHold: () => void; onLeave: () => void;
 }) {
   const n = events.length, i = Math.min(page, n - 1), e = events[i];
@@ -165,12 +168,28 @@ function EventTip({ x, y, events, marks, page, pinned, onPage, onClose, onHold, 
           </span>}
           {pinned && <button type="button" className="px-1" aria-label="close the tooltip" onClick={onClose}>×</button>}
         </div>
-        <table><tbody>
+        {sid && SAMPLE_TRACK.test(canonicalEventName(e.type)) ? <SampleRows e={e} sid={sid} own={sampleAttrs?.[sid] || []} /> : <table><tbody>
           {e.attrs.filter(([a]) => !/^STYLE_/i.test(a)).map(([a, v], j) => <tr key={j}><th>{a.replace(/_/g, " ")}</th><td>{v}</td></tr>)}
           <tr><th>{e.end != null && e.end > e.start ? "START" : "DATE"}</th><td>{formatDays(e.start)} <span className="dim">(day {e.start})</span></td></tr>
           {e.end != null && e.end > e.start && <tr><th>END</th><td>{formatDays(e.end)} <span className="dim">(day {e.end})</span></td></tr>}
-        </tbody></table>
+        </tbody></table>}
       </div>
     </FloatingTip>
+  );
+}
+
+/**
+ * A sample row's tooltip as the portal's (PAT-TL-TT-3): SAMPLE ID, then the event's attributes merged
+ * with the sample's own clinical attributes, keys upper-cased with spaces for "_", sorted by key, then
+ * START DATE. (The portal repeats SAMPLE ID among the attributes; listed once here.)
+ */
+function SampleRows({ e, sid, own }: { e: PatientEvent; sid: string; own: [string, string][] }) {
+  const rows = sampleTipRows(e, own);
+  return (
+    <table><tbody>
+      <tr><th>SAMPLE ID</th><td className="mono">{sid}</td></tr>
+      {rows.map(([k, v]) => <tr key={k}><th>{k}</th><td>{v}</td></tr>)}
+      <tr><th>START DATE</th><td>{formatDays(e.start)} <span className="dim">(day {e.start})</span></td></tr>
+    </tbody></table>
   );
 }

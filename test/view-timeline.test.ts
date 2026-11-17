@@ -269,3 +269,31 @@ describe("timeline: pages, values, and several participants", () => {
     assert.equal(no.error, "R7 is not a patient of this cohort in p1");
   });
 });
+
+describe("timeline: PAT-TL-TT-3 sample attributes", () => {
+  const withAttrs = (rowsPage: () => Promise<unknown>) => {
+    const l = local("s1", { A: THREE });
+    return {
+      ...l,
+      viewAggregate: async () => [],
+      viewMeta: async () => [{ id: "AGE", name: "Age", patient: 1, datatype: "NUMBER" }, { id: "GRADE", name: "Grade", patient: 0, datatype: "STRING" }, { id: "SITE", name: "Site", patient: 0, datatype: "STRING" }],
+      rowsPage: (...a: Parameters<typeof l.rowsPage>) => (a[0] === "timeline:sample-attributes" ? rowsPage() : l.rowsPage(...a)),
+    };
+  };
+  test("RA1 PAT-TL-TT-3: sampleAttrs holds each sample's own attributes only, empty values left out", async () => {
+    const r = withAttrs(async () => ({ rows: [
+      { sample: "T1", patient: "P2", m: { AGE: "50", GRADE: "II", SITE: "" } },
+      { sample: "T2", patient: "P2", m: { AGE: "50", GRADE: "III", SITE: "Lung" } },
+    ], total: 2 }));
+    const v = await run({}, ctx({ A: { s1: 3 } }, { s1: r }));
+    assert.equal(v.error, undefined);
+    assert.deepEqual(v.timeline.patient!.sampleAttrs, { T1: [["GRADE", "II"]], T2: [["GRADE", "III"], ["SITE", "Lung"]] });
+  });
+  test("RA2 PAT-TL-TT-3: a failing read does not refuse the timeline; sampleAttrs is absent", async () => {
+    const r = withAttrs(async () => { throw new Error("boom"); });
+    const v = await run({}, ctx({ A: { s1: 3 } }, { s1: r }));
+    assert.equal(v.error, undefined);
+    assert.equal(v.timeline.patient!.patient, "P2");
+    assert.equal(v.timeline.patient!.sampleAttrs, undefined);
+  });
+});
