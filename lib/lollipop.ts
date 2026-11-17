@@ -118,7 +118,7 @@ export function nextYMax(input: number, def: number): number | undefined | null 
 
 /**
  * The view's `yMax` (each gene's y-axis maximum, the portal's Y-Axis Max) refused when malformed: an
- * object from a gene of the view to a positive number. Below 1 is clamped to 1 where it is drawn.
+ * object from a gene of the view to a whole number of at least 1 (the control clamps what is typed to that).
  */
 export function checkYMax(yMax: unknown, genes: readonly string[]): string | null {
   if (yMax == null) return null;
@@ -126,9 +126,15 @@ export function checkYMax(yMax: unknown, genes: readonly string[]): string | nul
   if (typeof yMax !== "object" || Array.isArray(yMax)) return shape;
   for (const [g, v] of Object.entries(yMax as Record<string, unknown>)) {
     if (!genes.includes(g)) return "yMax." + g + ": not a gene of this view — its genes are " + genes.join(", ");
-    if (typeof v !== "number" || !Number.isFinite(v)) return "yMax." + g + ": " + shape;
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 1) return "yMax." + g + ": a whole number of at least 1 — " + shape;
   }
   return null;
+}
+
+/** the view's y-axis maxima kept for the genes it draws; undefined when none is left */
+export function pruneYMax(yMax: Record<string, number> | undefined, genes: readonly string[]): Record<string, number> | undefined {
+  const kept = Object.entries(yMax || {}).filter(([g]) => genes.includes(g));
+  return kept.length ? Object.fromEntries(kept) : undefined;
 }
 
 export function pruneCodons(codons: CodonSelection | undefined, genes: readonly string[]): CodonSelection | undefined {

@@ -59,7 +59,8 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
     // capped, as the portal's axis reads); the default, the tallest stem with a floor of 5, is rounded
     const cap = yMax?.[g.gene] != null ? Math.max(1, yMax[g.gene]) : null;
     const ys = cap != null ? linear(0, cap, yBase, yTop, { nice: false, count: 4 }) : linear(0, Math.max(5, maxN), yBase, yTop, { count: 4 });
-    if (cap != null && !ys.ticks.includes(cap)) ys.ticks = [...ys.ticks.filter((t) => t < cap && ys(t) - ys(cap) > 12), cap];
+    // a stem counts patients, so a set maximum's axis has whole ticks only (a maximum of 1 or 2 reads 0, 1(, 2))
+    if (cap != null) ys.ticks = [...new Set([...ys.ticks.filter((t) => Number.isInteger(t) && t < cap && ys(t) - ys(cap) > 12), cap])];
     const yFmt = (t: number) => (cap != null && t === cap && maxN > cap ? "≥" : "") + fmtInt(t);
     const L = 8 + leftAxisWidth(ys, yTitle, yFmt);
     const plotW = W - L - R;

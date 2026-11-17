@@ -24,6 +24,8 @@ const svgLib = await import("../lib/lollipop-svg.ts");
 const { runHotspots } = await import("../lib/views/hotspots/run.ts");
 const { Untimed } = await import("../lib/views/run.ts");
 const { hotspotsSvg } = await import("../lib/views/hotspots/figure.ts");
+const { dataPart } = await import("../app/_oncoprint/view-data.ts");
+const { resultsLayout } = await import("../app/portal/results-layout.ts");
 const { renderToStaticMarkup } = await import("react-dom/server");
 const { createElement } = await import("react");
 const { HotspotsBody } = await import("../app/_lollipop/HotspotsBody.tsx");
@@ -78,6 +80,8 @@ test("Y3 checkYMax refuses a malformed yMax, naming the problem", () => {
   assert.match(checkYMax({ EGFR: 5 }, ["KRAS"]) ?? "", /EGFR.*not a gene of this view/);
   assert.match(checkYMax({ KRAS: "a" }, ["KRAS"]) ?? "", /yMax\.KRAS/);
   assert.match(checkYMax({ KRAS: Infinity }, ["KRAS"]) ?? "", /yMax\.KRAS/);
+  for (const v of [2.5, 0, -3]) assert.match(checkYMax({ KRAS: v }, ["KRAS"]) ?? "", /yMax\.KRAS.*a whole number of at least 1/, String(v));
+  assert.equal(checkYMax({ KRAS: 1 }, ["KRAS"]), null);
 });
 
 test("Y4 a maximum below the tallest stem: the top tick reads ≥10, the stem is capped there", () => {
@@ -157,4 +161,42 @@ test("Y9 the control's range runs from 1 to the default maximum", () => {
   assert.ok(range, "a range input");
   assert.match(range, /min="1"/);
   assert.match(range, /max="40"/);
+});
+
+test("Y10 pruneYMax keeps the view's genes, undefined when none is left", () => {
+  assert.equal(typeof lib.pruneYMax, "function", "lib/lollipop.ts exports pruneYMax");
+  const prune = lib.pruneYMax as (y: Record<string, number> | undefined, genes: string[]) => Record<string, number> | undefined;
+  assert.deepEqual(prune({ KRAS: 10, TP53: 20 }, ["KRAS"]), { KRAS: 10 });
+  assert.equal(prune({ TP53: 20 }, ["KRAS"]), undefined);
+  assert.equal(prune(undefined, ["KRAS"]), undefined);
+});
+
+test("Y11 dataPart of a hotspots view strips yMax", () => {
+  const base = { kind: "hotspots", genes: ["KRAS"], cohorts: ["Q"] };
+  assert.deepEqual(dataPart({ ...base, yMax: { KRAS: 10 } }), dataPart(base));
+});
+
+test("Y12 the Mutations tab's gene chooser leaves the lollipop with no yMax", () => {
+  const rq = { studies: ["a"], filters: [], entries: ["KRAS", "TP53"], genes: ["KRAS", "TP53"] };
+  const rdata = { expr: "rna_seq_v2_mrna", cna: "gistic", clinical: ["AGE"], numeric: ["MUTATION_COUNT"], expressionAcross: true,
+    held: { every: ["MUTATION", "CNA"], some: ["SV"] } };
+  const l = resultsLayout(rq as never, rdata as never);
+  const tab = l.tabs.find((t) => t.title === "Mutations")!;
+  const views = tab.views!.map((i) => l.doc.views![i]).map((v) => (v.kind === "hotspots" ? { ...v, yMax: { KRAS: 10 } } : v));
+  const next = tab.chooser!.apply(views as never, "TP53") as unknown as Record<string, unknown>[];
+  const lp = next.find((v) => v.kind === "hotspots");
+  assert.ok(lp, "a lollipop view");
+  assert.deepEqual(lp.genes, ["TP53"]);
+  assert.equal(lp.yMax, undefined);
+});
+
+test("Y13 a set maximum has whole, distinct ticks topped by the cap", () => {
+  for (const cap of [1, 2, 3]) {
+    const labels = [...yTicks(panels([gene([[12, 40]])], { G: cap }))].sort((a, b) => b.y - a.y).map((t) => t.label);
+    const nums = labels.map((s) => Number(s.replace("≥", "")));
+    assert.ok(nums.every(Number.isInteger), cap + ": " + labels.join(","));
+    assert.equal(new Set(nums).size, nums.length, cap + ": " + labels.join(","));
+    assert.equal(labels.at(-1), "≥" + cap);
+    if (cap === 1) assert.deepEqual(labels, ["0", "≥1"]);
+  }
 });

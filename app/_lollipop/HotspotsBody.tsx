@@ -50,7 +50,7 @@ function YAxisMax({ gene, value, onChange }: { gene: HotspotGene; value?: number
       <span>Y-Axis Max:</span>
       <input type="range" min={1} max={def} step={1} value={Math.min(shown, def)} aria-label={"y axis maximum for " + gene.gene} onChange={(e) => set(Number(e.target.value))} />
       <input type="number" min={1} step={1} value={shown} className="w-16 rounded border px-1" aria-label={"y axis maximum for " + gene.gene + ", any value"}
-        onChange={(e) => set(Number(e.target.value))} />
+        onChange={(e) => { if (e.target.value.trim() !== "") set(Number(e.target.value)); }} />
     </label>
   );
 }
