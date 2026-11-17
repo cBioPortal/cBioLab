@@ -32,6 +32,7 @@ function oncokb(list: unknown = LIST): string[] {
     const path = new URL(url).pathname.replace(/^\/api\/v1/, "");
     asked.push(path);
     if (path === "/utils/cancerGeneList") return Response.json(list);
+    if (path === "/info") return Response.json({ dataVersion: { version: "v7.7" }, apiVersion: { version: "v1.7.0" } });
     return new Response("not stubbed: " + path, { status: 404 });
   }) as typeof fetch;
   return asked;
@@ -170,4 +171,47 @@ test("C5 the key space is the genes the warehouse's alterations name, positive E
 test("C5 its release is OncoKB's: the data version, with the API version alongside", async () => {
   globalThis.fetch = (async () => Response.json({ dataVersion: { version: "v8.1" }, apiVersion: { version: "v1.6" } })) as unknown as typeof fetch;
   assert.deepEqual(await src.release(), { version: "v8.1", extra: { api_version: "v1.6" } });
+});
+
+// ---- R: ONCOKB_CANCER_GENE_STORE_AS, the release the list is stored under ---------------------
+
+const STORE_AS = "ONCOKB_CANCER_GENE_STORE_AS";
+const LIVE = { version: "v7.7", extra: { api_version: "v1.7.0" } };
+let savedStoreAs: string | undefined;
+function storeAs(v: string | undefined): void {
+  if (v === undefined) delete process.env[STORE_AS];
+  else process.env[STORE_AS] = v;
+}
+beforeEach(() => { savedStoreAs = process.env[STORE_AS]; });
+afterEach(() => { storeAs(savedStoreAs); });
+
+test("R1 unset: OncoKB's live release", async () => {
+  storeAs(undefined);
+  const asked = oncokb();
+  assert.deepEqual(await src.release(), LIVE);
+  assert.deepEqual(asked, ["/info"]);
+});
+
+test("R2 set to another release: stored under it, the live API and data release in api_version", async () => {
+  storeAs("v7.5");
+  oncokb();
+  assert.deepEqual(await src.release(), { version: "v7.5", extra: { api_version: "v1.7.0 (data v7.7)" } });
+});
+
+test("R3 the value is trimmed", async () => {
+  storeAs(" v7.5 ");
+  oncokb();
+  assert.deepEqual(await src.release(), { version: "v7.5", extra: { api_version: "v1.7.0 (data v7.7)" } });
+});
+
+test("R4 set to the live release: the live release unchanged", async () => {
+  storeAs("v7.7");
+  oncokb();
+  assert.deepEqual(await src.release(), LIVE);
+});
+
+test("R5 empty: the live release", async () => {
+  storeAs("");
+  oncokb();
+  assert.deepEqual(await src.release(), LIVE);
 });

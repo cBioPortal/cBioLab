@@ -71,7 +71,14 @@ export const oncokbCancerGeneSource: AnnotationSource = {
   keySpace: (portalDb: string, study: string | null) =>
     "SELECT DISTINCT toString(g.entrez_gene_id) AS entrez_gene_id FROM " + portalDb + ".genomic_event_derived AS g WHERE g.entrez_gene_id > 0" +
     (study == null ? "" : " AND g.cancer_study_identifier = " + sq(study)),
-  release: () => oncokbSource.release(),
+  // OncoKB's live release; or, with ONCOKB_CANCER_GENE_STORE_AS, the list stored under that release's label so
+  // it lines up with the rest of the store's pin, the live API and data release kept in api_version
+  release: async () => {
+    const live = await oncokbSource.release();
+    const as = (process.env.ONCOKB_CANCER_GENE_STORE_AS || "").trim();
+    if (!as || as === live.version) return live;
+    return { version: as, extra: { ...live.extra, api_version: (String(live.extra.api_version || "") + " (data " + live.version + ")").trim() } };
+  },
 
   async annotate(keys: Row[]): Promise<Row[]> {
     const genes = await cancerGeneList();
