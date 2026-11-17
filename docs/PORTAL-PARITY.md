@@ -261,6 +261,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Several studies: on pooled values, where every study may show its values (was a size-weighted approximation of each study's quartiles); coadread + brca KRAS CNA × mRNA, all five boxes = the portal's rule on cbioportal.org's data (Diploid 943.23 · 1197.34 · 1495.2, was 947.72 · 1198.24 · 1492.25) (PLT-MD-2) (#280)
       - [ ] A study that may not show its values still pools by the size-weighted approximation, and says so
   - [ ] "Color samples by" the first gene by default: fill by mutation type, stroke by CNA, with a legend, scatters included (ours plain points; colour only on box plots, when chosen) (PLT-CL-1…4, PLT-CL-8, PLT-SC-6)
+    - [x] A scatter drawn as its points takes the fill and ring a box takes, with their keys titled by the colouring axes; a density scatter says why it has no per-case colour (PLT-CL-8, PLT-SC-6) (#300)
+    - [ ] The first queried gene by default (mutation type fill, copy-number stroke), the top alteration per sample, the portal's legend order and placement (PLT-CL-1…4, PLT-STM-14…17)
   - [ ] Discrete × discrete as bars: Bar, Stacked (the portal's default), 100% stacked, Sort By, Horizontal Bars (ours a table only) (PLT-PT-6, PLT-UT-4…6, PLT-BR-1…8, PLT-STM-12)
   - [x] Correlation text as the portal's: "Spearman: -0.06 (p = 0.185)" then "Pearson: -0.04 (p = 0.359)", `toFixed(2)` and `toConditionalPrecision(p, 3, 0.01)` (was "Pearson r = −0.038 (p = 0.36) · Spearman ρ = −0.055 (p = 0.19)") (PLT-SC-2, PLT-STM-4…6, PLT-STM-22) (#234)
     - [ ] In the right gutter on two lines each, as the portal places it (ours one line above the plot)

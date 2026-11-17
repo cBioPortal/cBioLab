@@ -2173,10 +2173,15 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "scatter") return [];
+    // the fill and ring categories travel with every case, as a box's points carry them; not with
+    // the sparse cells an outliers layer draws in its own colour
+    const colorSel = !sparse && spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
+    const ringSel = !sparse && spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
     const r = await this.runPatientRows<ChRow>(sparse ? "plot:outliers" : "plot:points",
-      plotScatterPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, cap, sparse), conn);
+      plotScatterPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, cap, sparse, colorSel, ringSel), conn);
     if (r.data.length > cap) return null;
-    return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }));
+    return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y),
+      ...(colorSel ? { c: String(p.c ?? "") } : {}), ...(ringSel ? { r: String(p.r ?? "") } : {}) }));
   }
 
   /**

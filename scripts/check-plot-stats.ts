@@ -10,11 +10,19 @@
  *       median = q3 = its value, and the figure draws no box.
  *   S*  lib/plot.ts plotStatsSql — Spearman's ρ with tied values sharing their average rank
  *       (PLT-STM-5), against scipy 1.18.1 spearmanr, and its independence of row order.
+ *   C*  lib/plot.ts plotScatterPointsSql — a scatter's points coloured and ringed (PLT-CL-8,
+ *       PLT-SC-6; cbioportal-frontend cd8c6df PlotsTabUtils.tsx:1877-2397), rows C1–C3 of the case
+ *       table for colouring a scatter's points: over coadread_tcga_pan_can_atlas_2018, every sample,
+ *       x AGE, y FRACTION_GENOME_ALTERED, each row carries `c` / `r`, the case's category from the
+ *       colorSel / ringSel given ("" where it has none), counted against a separate query joining the
+ *       axis selects.
  *
  * Run: node --env-file=.env.local scripts/check-plot-stats.ts
  */
 import { chQuery } from "../lib/ch.ts";
-import { plotBoxSql, plotStatsSql } from "../lib/plot.ts";
+import { axisSelect, plotBoxSql, plotScatterPointsSql, plotStatsSql, type PlotAxis } from "../lib/plot.ts";
+import { compileCohortDef } from "../lib/cohort2.ts";
+import { OQL_NOT_PROFILED } from "../lib/plot-oql.ts";
 
 /** [row id, values, expected q1, median, q3, lo, hi] */
 type BoxCase = [string, number[], number, number, number, number, number];
@@ -64,6 +72,62 @@ for (const [id, x, y, rho] of RANKS) {
   const sql = plotStatsSql(vals(x), vals(y), "SELECT 1");
   const r = (await chQuery<Record<string, unknown>>(sql)).data[0] || {};
   ok(close(Number(r.spearman), rho), id, "ρ " + r.spearman + " — expected " + rho);
+}
+
+{
+  const study = "coadread_tcga_pan_can_atlas_2018";
+  const cohortSql = compileCohortDef(null, { study });
+  const ctx = { study, unit: "sample" as const, cohortSql };
+  const sel = (a: PlotAxis, kind: "num" | "cat") => axisSelect(a, ctx, kind);
+  const xSel = sel({ source: "clinical", attribute: "AGE" }, "num");
+  const ySel = sel({ source: "clinical", attribute: "FRACTION_GENOME_ALTERED" }, "num");
+  const kras = sel({ source: "alteration", gene: "KRAS", by: "mutated" }, "cat");
+  const sex = sel({ source: "clinical", attribute: "SEX" }, "cat");
+  // colorSel and ringSel are plotScatterPointsSql's optional trailing arguments
+  const pointsSql = plotScatterPointsSql as unknown as (x: string, y: string, cohort: string, cap?: number, sparse?: undefined,
+    colorSel?: string, ringSel?: string) => unknown;
+  const rowsOf = async (colorSel?: string, ringSel?: string) =>
+    (await chQuery<Record<string, unknown>>(String(pointsSql(xSel, ySel, cohortSql, undefined, undefined, colorSel, ringSel)))).data;
+  /** per category of `catSel`, the plotted samples (a value on both axes), "" for one without a category */
+  const countsBy = async (catSel: string) => new Map((await chQuery<Record<string, unknown>>(
+    "WITH cohort AS (" + cohortSql + "),\n     xs AS (" + xSel + "),\n     ys AS (" + ySel + "),\n     cs AS (" + catSel + ")\n" +
+    "SELECT ifNull(cs.v, '') AS k, count() AS n FROM xs INNER JOIN ys ON ys.id = xs.id LEFT JOIN cs ON cs.id = xs.id GROUP BY k")).data
+    .map((r) => [String(r.k), Number(r.n)]));
+  const tally = (rows: Record<string, unknown>[], col: string) => {
+    const m = new Map<string, number>();
+    for (const r of rows) { const k = r[col] == null ? "(missing)" : String(r[col]); m.set(k, (m.get(k) || 0) + 1); }
+    return m;
+  };
+  const show = (m: Map<string, number>) => [...m].sort().map(([k, n]) => (k || "\"\"") + "=" + n).join(" ");
+  const caseRow = async (id: string, f: () => Promise<void>) => {
+    try { await f(); } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+  };
+
+  await caseRow("C1 no colour or ring: 581 rows", async () => {
+    const rows = await rowsOf();
+    ok(rows.length === 581, "C1 no colour or ring: 581 rows", "rows " + rows.length + " — expected 581");
+  });
+
+  await caseRow("C2 colorSel KRAS mutated", async () => {
+    const rows = await rowsOf(kras);
+    const c = tally(rows, "c");
+    const allowed = new Set(["Mutated", "Not mutated", "No mutation", OQL_NOT_PROFILED, "Not profiled"]);
+    const want = (await countsBy(kras)).get("Mutated") || 0;
+    ok(rows.length === 581 && [...c.keys()].every((k) => allowed.has(k)) && (c.get("Mutated") || 0) === want,
+      "C2 colorSel KRAS mutated: every c a KRAS category, Mutated counted as a separate join counts it",
+      "rows " + rows.length + ", c: " + show(c) + " — expected 581 rows, Mutated=" + want);
+  });
+
+  await caseRow("C3 colorSel KRAS mutated, ringSel SEX", async () => {
+    const rows = await rowsOf(kras, sex);
+    const r = tally(rows, "r");
+    const want = await countsBy(sex);
+    const keys = new Set([...r.keys(), ...want.keys()]);
+    ok(rows.length === 581 && [...r.keys()].every((k) => k === "Male" || k === "Female" || k === "") &&
+      [...keys].every((k) => (r.get(k) || 0) === (want.get(k) || 0)),
+    "C3 colorSel KRAS mutated, ringSel SEX: every r Male, Female or \"\", counted as a separate join counts them",
+    "rows " + rows.length + ", r: " + show(r) + " — expected 581 rows, " + show(want));
+  });
 }
 
 console.log(failures ? "\n" + failures + " of " + checks + " plot statistics checks FAILED" : "\nall " + checks + " plot statistics checks passed");

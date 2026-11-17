@@ -822,13 +822,16 @@ export function plotHighlightCountSql(cohortSql: string, highlightSql: string): 
  * builders and is reachable only from `PatientLevelResolver`.
  */
 export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP,
-  sparse?: SparseCells): PatientSql {
+  sparse?: SparseCells, colorSel?: string, ringSel?: string): PatientSql {
   const limit = "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+  // each case's fill and ring category, as a box's points carry them; "" where it has none
   if (!sparse) return patientSql("WITH cohort AS (" + cohortSql + "),\n" +
     "     xs AS (" + xSel + "),\n" +
-    "     ys AS (" + ySel + ")\n" +
-    "SELECT xs.id AS id, xs.v AS x, ys.v AS y\n" +
-    "FROM xs INNER JOIN ys ON ys.id = xs.id\n" + limit);
+    "     ys AS (" + ySel + ")" +
+    (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") + (ringSel ? ",\n     rs AS (" + ringSel + ")" : "") + "\n" +
+    "SELECT xs.id AS id, xs.v AS x, ys.v AS y" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + "\n" +
+    "FROM xs INNER JOIN ys ON ys.id = xs.id" +
+    (colorSel ? "\nLEFT JOIN cs ON cs.id = xs.id" : "") + (ringSel ? "\nLEFT JOIN rs ON rs.id = xs.id" : "") + "\n" + limit);
   // the cases of every cell holding at most `cellMax` of them, binned exactly as plotBinsSql
   // bins the density over the same extent and grid
   const [bx, by] = clampGrid(sparse.grid), e = sparse.extent;
@@ -1003,7 +1006,7 @@ function lgamma(z: number): number {
 /** one drawn value, with its case id and whatever it is coloured by */
 export interface PlotPoint { id: string; g: string; v: number; c?: string; r?: string }
 /** one drawn scatter case, with its id */
-export interface PlotXYPoint { id: string; x: number; y: number }
+export interface PlotXYPoint { id: string; x: number; y: number; c?: string; r?: string }
 /**
  * Whether the plotted cohort's own cases are drawn as points. `all`: every case, at or under the
  * points cap. `none`: density alone, and `why` says why. Subsets drawn in colour over it are the
