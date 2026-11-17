@@ -52,7 +52,8 @@ does, the PR says so and cites the ID.
   - `npx eslint <files>`;
   - `UPDATE_SNAPSHOTS=1` for intended output changes, after reading the diff. This includes
     `test/snapshots/kinds.json` when help text changes;
-  - `npm run docs:gen` when a view kind's doc changes.
+  - `npm run docs:gen` when a view kind's doc changes, to read the result; don't commit
+    `docs/dsl.md` (it is regenerated on master after merge).
 - **Memory is tight:** an 11 GB box, with other sessions running. Your `serve-<port>.sh` dev server is
   already running; don't start a second one. Use headless Chromium only when you need to look, and
   close it when done.
@@ -68,8 +69,12 @@ does, the PR says so and cites the ID.
 
 - **Commits:** coherent commits whose message body says what changed and what was verified. End them
   with the attribution lines your session was given.
-- **Tick the tracker in the same change:** in `PORTAL-PARITY.md`, mark the item `- [x] … (#<PR>)`.
-  Leave what you didn't do as unticked sub-items.
+- **Don't edit `PORTAL-PARITY.md` or `docs/dsl.md`** in your PR (every PR would conflict on them).
+  Put a `## Tracker` section in the PR body instead: the items it ticks, quoted, and the unticked
+  sub-items to add for what you didn't do, worded as they should appear. The Merger applies them on
+  master after the merge. Scorecards (`docs/legacy-spec/parity/NN-*.md`) you still update in the PR.
+- **Planted bugs go in your area's file** under `scripts/mutants/` (or a new file for a new area),
+  never in `scripts/check-mutants.ts`.
 - **Rebase on `origin/master`** right before pushing. Then
   `git push -u origin <branch>` and `gh pr create --base master`.
 - **PR body sections:**
@@ -77,6 +82,7 @@ does, the PR says so and cites the ID.
   - spec IDs covered, and IDs deliberately left out with why;
   - Verification: tests, numbers compared against cbioportal.org, what you looked at;
   - Not done / follow-ups;
+  - `## Tracker`: the PORTAL-PARITY items to tick and sub-items to add;
   - a `## Preview` line with the page path a reviewer should open.
 - **Don't merge,** and don't mention anyone with a bare `@`.
 - **Report back:** the PR URL, what you verified (with numbers), what's incomplete or uncertain, and
