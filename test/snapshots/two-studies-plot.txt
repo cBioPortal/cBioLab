@@ -6,12 +6,13 @@ Cohorts:
 - TP53 mut: 699 patients — OQL[TP53: MUT] — across 2 studies
 
 Plot (scatter): AGE vs TMB_NONSYNONYMOUS — 968 patients, binned onto a 240x160 grid (the payload is bins, never points).
-  Pearson r=−0.131 p=4.2e-5; Spearman rho=—; least-squares slope −0.128
-  968 of 1,053 patients have a value on both axes (82 have no AGE; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman rank correlation is not reported for a federated plot: it needs the pooled GLOBAL ranking, which per-site aggregates cannot reconstruct exactly. Point layers — “KRAS mut”: 175 patients, 158 patients drawn as points; “TP53 mut”: 699 patients, 652 patients drawn as points (58 drawn by an earlier layer). The statistics are over the whole plotted cohort.
+  Pearson r=−0.131 p=4.2e-5; Spearman rho=−0.117 p=0.0003; least-squares slope −0.128
+  968 of 1,053 patients have a value on both axes (82 have no AGE; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman's rank correlation is over every study's pairs ranked together, as the portal ranks them. Point layers — “KRAS mut”: 175 patients, 158 patients drawn as points; “TP53 mut”: 699 patients, 652 patients drawn as points (58 drawn by an earlier layer). The statistics are over the whole plotted cohort.
   METHOD:
     - Sum each study's pairs [Lung (TCGA) · luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018]: The plot:moments queries above: per study, over the patients with a value on both axes, n, Σx, Σy, Σxy, Σx² and Σy². Six sums, no individual value; added across studies, exactly.
     - Pearson's r and the least-squares line from the pooled sums: r = (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); slope = (nΣxy − ΣxΣy) / (nΣx² − (Σx)²), intercept = (Σy − slope·Σx) / n.
-    - No Spearman: A rank correlation needs one ranking of every patient of every study, which per-study sums cannot give, so none is reported.
+    - Every study's pairs, ranked together [Lung (TCGA) · luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018]: The plot:points queries above: every study's (x, y) pairs, 968 in all; Spearman's ρ is Pearson's r of their ranks over the pooled pairs, as the portal computes it over several studies (PLT-MD-2).
+        Spearman ties: average rank: tied values share the mean of the ranks they span, as scipy's spearmanr and cbioportal.org rank them (PLT-STM-5)
     - p-values: For each coefficient r over n points: t = |r|·√((n − 2)/(1 − r²)), two-sided Student's t on n − 2 degrees of freedom; p = 0 when |r| = 1, none for n ≤ 2 (the portal's PLT-STM-6).
     In the database, the coefficients and quartiles are checked against scipy 1.18.1 (pearsonr, spearmanr) and the portal's jStat rule on known values by scripts/check-plot-stats.ts.
 

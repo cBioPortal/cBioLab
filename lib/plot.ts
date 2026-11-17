@@ -573,7 +573,8 @@ export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): Agg
  * are additive across sites and sufficient for Pearson's r and the OLS line (lib/stats.ts's
  * pearsonFromMoments / regressionFromMoments), the same sufficient-statistic argument
  * pairMomentsSql already makes for co-expression. Spearman is deliberately not here: a rank
- * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct.
+ * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct
+ * (spearmanRho ranks the pairs of the sites that may show them).
  */
 export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
   return aggregateSql(pairCte(xSel, ySel, cohortSql) +
@@ -916,6 +917,37 @@ export function portalFit(m: FitSums): PlotFit | null {
 export function fitOf(sums: FitSums): { fit?: PlotFit & { sums: FitSums } } {
   const f = Object.values(sums).every(Number.isFinite) ? portalFit(sums) : null;
   return f ? { fit: { ...f, sums } } : {};
+}
+
+/** ranks 1..n, tied values sharing the mean of the ranks they span */
+function averageRanks(v: readonly number[]): number[] {
+  const n = v.length, idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => v[a] - v[b]);
+  const r = new Array<number>(n);
+  for (let i = 0; i < n;) {
+    let j = i;
+    while (j + 1 < n && v[idx[j + 1]] === v[idx[i]]) j++;
+    for (let k = i; k <= j; k++) r[idx[k]] = (i + j) / 2 + 1;
+    i = j + 1;
+  }
+  return r;
+}
+
+/**
+ * Spearman's ρ over pairs, as plotStatsSql computes it in the database and the portal over pooled
+ * studies (PLT-STM-5): Pearson's r of the ranks, tied values sharing their average rank. Null
+ * unless each axis has two distinct values.
+ */
+export function spearmanRho(x: readonly number[], y: readonly number[]): number | null {
+  const n = Math.min(x.length, y.length);
+  const spread = (v: readonly number[]) => v.some((a) => a !== v[0]);
+  if (n < 2 || !spread(x) || !spread(y)) return null;
+  const rx = averageRanks(x), ry = averageRanks(y), m = (n + 1) / 2;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) {
+    const a = rx[i] - m, b = ry[i] - m;
+    sxy += a * b; sxx += a * a; syy += b * b;
+  }
+  return Math.max(-1, Math.min(1, sxy / Math.sqrt(sxx * syy)));
 }
 
 /**
