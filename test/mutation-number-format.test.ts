@@ -17,14 +17,14 @@ test("N6 portalVaf: 2 decimals from 0.01, 4 below", () => {
   assert.equal(portalVaf(0.5), "0.50");
 });
 
-/** the rows the row source would return: vaf as its SQL computes it, the raw counts */
+/** rows as the row source's SQL returns them: vaf the ratio, vafText the portal's text ('' for none), a count of 0 or less NULL */
 const CRAFTED: Record<string, unknown>[] = [
-  { sid: "S-ratio", vaf: 79 / 601, altCount: 79, refCount: 522 },
-  { sid: "S-small", vaf: 3 / 997, altCount: 3, refCount: 994 },
-  { sid: "S-zero-alt", vaf: 0, altCount: 0, refCount: 300 },
-  { sid: "S-zero-ref", vaf: 1, altCount: 40, refCount: 0 },
-  { sid: "S-neg", vaf: null, altCount: -1, refCount: 200 },
-  { sid: "S-missing", vaf: null, altCount: null, refCount: 150 },
+  { sid: "S-ratio", vaf: 79 / 601, vafText: "0.13", altCount: 79, refCount: 522 },
+  { sid: "S-trailing", vaf: 0.30172, vafText: "0.30", altCount: 175, refCount: 405 },
+  { sid: "S-small", vaf: 3 / 997, vafText: "0.0030", altCount: 3, refCount: 994 },
+  { sid: "S-zero-alt", vaf: null, vafText: "", altCount: null, refCount: 300 },
+  { sid: "S-zero-ref", vaf: 1, vafText: "1.00", altCount: 40, refCount: null },
+  { sid: "S-neg", vaf: null, vafText: "", altCount: null, refCount: 200 },
 ];
 
 const local = {
@@ -57,25 +57,22 @@ async function table(): Promise<Map<string, Record<string, unknown>>> {
   return new Map(res.mutations!.rows.map((x) => [x.sample, { vaf: x.values[at("vaf")], altCount: x.values[at("altCount")], refCount: x.values[at("refCount")] }]));
 }
 
-test("N2 the vaf value is the whole ratio, not rounded", async () => {
+test("N2 the vaf value is the portal's text, the same string as on screen and in the CSV", async () => {
   const t = await table();
-  assert.equal(t.get("S-ratio")?.vaf, 79 / 601);
-  assert.equal(t.get("S-small")?.vaf, 3 / 997);
+  assert.equal(t.get("S-ratio")?.vaf, "0.13");
+  assert.equal(t.get("S-trailing")?.vaf, "0.30");
+  assert.equal(t.get("S-small")?.vaf, "0.0030");
+  assert.equal(t.get("S-zero-ref")?.vaf, "1.00");
 });
 
-test("N3 a vaf of 0 (alt = 0) is null", async () => {
-  assert.equal((await table()).get("S-zero-alt")?.vaf, null);
-});
-
-test("N4 a negative or missing count: vaf null and that count null", async () => {
+test("N3 N4 no frequency (alt 0, a negative or missing count): vaf null", async () => {
   const t = await table();
-  assert.deepEqual(t.get("S-neg"), { vaf: null, altCount: null, refCount: 200 });
-  assert.deepEqual(t.get("S-missing"), { vaf: null, altCount: null, refCount: 150 });
+  for (const s of ["S-zero-alt", "S-neg"]) assert.equal(t.get(s)?.vaf, null, s);
 });
 
-test("N5 altCount / refCount of 0 are null; positive counts kept", async () => {
+test("N5 a count the SQL leaves NULL (0 or less) is null; positive counts kept", async () => {
   const t = await table();
   assert.deepEqual(t.get("S-zero-alt"), { vaf: null, altCount: null, refCount: 300 });
-  assert.deepEqual(t.get("S-zero-ref"), { vaf: 1, altCount: 40, refCount: null });
-  assert.deepEqual(t.get("S-ratio"), { vaf: 79 / 601, altCount: 79, refCount: 522 });
+  assert.deepEqual(t.get("S-zero-ref"), { vaf: "1.00", altCount: 40, refCount: null });
+  assert.deepEqual(t.get("S-ratio"), { vaf: "0.13", altCount: 79, refCount: 522 });
 });

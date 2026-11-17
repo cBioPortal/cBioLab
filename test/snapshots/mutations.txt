@@ -5,31 +5,31 @@ Cohorts:
 
 KRAS mutations: 1,373 of 2,411 rows kept by the query; the first 25, tab-separated (the web app's view pages and downloads every row, with every column):
   cohort	sample	proteinChange	annotation	vaf	mutCount
-  Colorectal	P-0044990-T01-IM6	G12D	Oncogenic · Level 1	0.927797833935018	9
-  Colorectal	P-0066632-T01-IM7	G12D	Oncogenic · Level 1	0.8962962962962963	7
-  Colorectal	P-0011108-T01-IM5	G12D	Oncogenic · Level 1	0.8883774453394706	9
-  Colorectal	P-0046395-T01-IM6	G13D	Oncogenic · Level 1	0.8137254901960784	10
-  Colorectal	P-0018448-T01-IM6	G12D	Oncogenic · Level 1	0.7985143918291551	16
-  Colorectal	P-0055331-T01-IM6	G12A	Oncogenic · Level 1	0.7964071856287425	9
-  Colorectal	P-0057020-T01-IM6	G12C	Oncogenic · Level 1	0.7920353982300885	7
-  Colorectal	P-0012877-T01-IM5	G12D	Oncogenic · Level 1	0.7906574394463668	10
-  Colorectal	P-0005029-T01-IM5	G13D	Oncogenic · Level 1	0.7862318840579711	3
-  Colorectal	P-0015210-T01-IM6	G12D	Oncogenic · Level 1	0.7753623188405797	5
-  Colorectal	P-0000739-T01-IM3	G12C	Oncogenic · Level 1	0.7681365576102418	7
-  Colorectal	P-0078660-T01-IM7	G12C	Oncogenic · Level 1	0.7630331753554502	13
-  Colorectal	P-0007990-T01-IM5	G12S	Oncogenic · Level 1	0.7590511860174781	7
-  Colorectal	P-0050517-T01-IM6	G12V	Oncogenic · Level 1	0.7510729613733905	10
-  Colorectal	P-0039168-T01-IM6	G12S	Oncogenic · Level 1	0.7439126784214946	4
-  Colorectal	P-0041600-T01-IM6	G12V	Oncogenic · Level 1	0.7414634146341463	6
-  Colorectal	P-0046742-T01-IM6	G13D	Oncogenic · Level 1	0.7244094488188977	7
-  Colorectal	P-0008735-T01-IM5	G12C	Oncogenic · Level 1	0.723404255319149	10
-  Colorectal	P-0089247-T01-IM7	G12V	Oncogenic · Level 1	0.7223796033994334	8
-  Colorectal	P-0057012-T01-IM6	G12V	Oncogenic · Level 1	0.7204081632653061	9
-  Colorectal	P-0012653-T01-IM5	G13D	Oncogenic · Level 1	0.7184466019417476	4
-  Colorectal	P-0042211-T01-IM6	G12D	Oncogenic · Level 1	0.7178423236514523	8
-  Colorectal	P-0087879-T01-IM7	G13D	Oncogenic · Level 1	0.7177914110429447	8
-  Colorectal	P-0077659-T01-IM7	G12R	Oncogenic · Level 1	0.7161290322580646	38
-  Colorectal	P-0039633-T01-IM6	G12V	Oncogenic · Level 1	0.712171052631579	19
+  Colorectal	P-0044990-T01-IM6	G12D	Oncogenic · Level 1	0.93	9
+  Colorectal	P-0066632-T01-IM7	G12D	Oncogenic · Level 1	0.90	7
+  Colorectal	P-0011108-T01-IM5	G12D	Oncogenic · Level 1	0.89	9
+  Colorectal	P-0046395-T01-IM6	G13D	Oncogenic · Level 1	0.81	10
+  Colorectal	P-0018448-T01-IM6	G12D	Oncogenic · Level 1	0.80	16
+  Colorectal	P-0055331-T01-IM6	G12A	Oncogenic · Level 1	0.80	9
+  Colorectal	P-0057020-T01-IM6	G12C	Oncogenic · Level 1	0.79	7
+  Colorectal	P-0012877-T01-IM5	G12D	Oncogenic · Level 1	0.79	10
+  Colorectal	P-0005029-T01-IM5	G13D	Oncogenic · Level 1	0.79	3
+  Colorectal	P-0015210-T01-IM6	G12D	Oncogenic · Level 1	0.78	5
+  Colorectal	P-0000739-T01-IM3	G12C	Oncogenic · Level 1	0.77	7
+  Colorectal	P-0078660-T01-IM7	G12C	Oncogenic · Level 1	0.76	13
+  Colorectal	P-0007990-T01-IM5	G12S	Oncogenic · Level 1	0.76	7
+  Colorectal	P-0050517-T01-IM6	G12V	Oncogenic · Level 1	0.75	10
+  Colorectal	P-0039168-T01-IM6	G12S	Oncogenic · Level 1	0.74	4
+  Colorectal	P-0041600-T01-IM6	G12V	Oncogenic · Level 1	0.74	6
+  Colorectal	P-0046742-T01-IM6	G13D	Oncogenic · Level 1	0.72	7
+  Colorectal	P-0008735-T01-IM5	G12C	Oncogenic · Level 1	0.72	10
+  Colorectal	P-0089247-T01-IM7	G12V	Oncogenic · Level 1	0.72	8
+  Colorectal	P-0057012-T01-IM6	G12V	Oncogenic · Level 1	0.72	9
+  Colorectal	P-0012653-T01-IM5	G13D	Oncogenic · Level 1	0.72	4
+  Colorectal	P-0042211-T01-IM6	G12D	Oncogenic · Level 1	0.72	8
+  Colorectal	P-0087879-T01-IM7	G13D	Oncogenic · Level 1	0.72	8
+  Colorectal	P-0077659-T01-IM7	G12R	Oncogenic · Level 1	0.72	38
+  Colorectal	P-0039633-T01-IM6	G12V	Oncogenic · Level 1	0.71	19
   … 1,348 more rows
   CAVEAT (tell the user): Every KRAS mutation call in the cohort's samples, one row per call; uncalled mutations are left out, as the portal leaves them out. Structural variants with KRAS as either partner are rows too, as the portal's Mutations tab lists them: type Fusion, the protein change built from their genes, no allele counts or Genome Nexus columns; their annotation is the pair's OncoKB call in the sample's tumour type, their driver status the pair's call with no tumour type (as the portal asks each), or the partners' gene-level Fusion calls where the pair has none stored. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level for the gene). HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL are Genome Nexus GRCh37 2.2.3-vep116-clinvar20260208+f2, GRCh38 1.4.1-vepNA-clinvar20250106+f2, read from the offline store; HGVSc and SIFT, PolyPhen-2 and AlphaMissense are on the canonical transcript of KRAS (MSKCC overrides). Genome Nexus's GRCh38 service has no SIGNAL, so it is empty for a GRCh38 study; gnomAD and dbSNP are blank for the few variants Genome Nexus cannot serve myvariant.info's record of. Not yet annotated, so blank in those columns: msk_chord_2024. Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. Showing 1,373 of 2,411 mutations: rows Protein Change matches /^G1[23]/; Allele Freq (T) ≥ 0.2. Sorted by Allele Freq (T) (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. 
   METHOD:

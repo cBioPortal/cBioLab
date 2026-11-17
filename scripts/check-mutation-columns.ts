@@ -25,15 +25,16 @@
  *   O  the column order (O2, for the ids PR G adds, at the places its interface names); Y9 every new column hidden by default.
  *   Y10 missing values sort last both ways.
  *   N1-N5 Allele Freq (T) and the read counts as the portal writes them (MUT-STM-5/6): the vaf text is ''
- *      for none or 0, 4 decimals below 0.01, else 2 with trailing zeros; the vaf value the whole ratio;
- *      altCount / refCount null when 0 or less.
+ *      for none, 4 decimals below 0.01, else 2 with trailing zeros; the vaf value is that same text
+ *      (null for none); altCount / refCount null when 0 or less.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQueryRows, connById } from "../lib/ch.ts";
 import { PatientLevelResolver } from "../lib/federation.ts";
-import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource } from "../lib/mutation-table.ts";
+import * as mutationTable from "../lib/mutation-table.ts";
+import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS } from "../lib/mutation-table.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
 import type { ViewRun } from "../lib/views/run.ts";
 import type { CohortDef } from "../lib/types.ts";
@@ -337,12 +338,12 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
 // ---- N1-N5: Allele Freq (T) and the read counts as the portal writes them -------------------------
 
 {
-  // N1 the vaf column's text, as the row source exposes it, over constant values
-  const vafText = mutationRowSource([{ cohort: "c", study: STUDY, cohortSql: "SELECT 1" }], conn.db, "TP53", null, {} as never)
-    .columns.find((c) => c.id === "vaf")?.text;
+  // N1 the vaf text rule (lib/mutation-table.ts VAF_TEXT, which the rows select as vafText) over constant values
+  const vafText = (mutationTable as Record<string, unknown>).VAF_TEXT as string | undefined;
+  // a 0 frequency never reaches the rule: the row SQL makes vaf NULL when the alt count is 0 or less (N3)
   const N1: [number | null, string][] = [[0.31, "0.31"], [0.5, "0.50"], [0.0098, "0.0098"], [0.00004, "0.0000"], [0.999, "1.00"],
-    [0.005, "0.0050"], [0.125, "0.13"], [0, ""], [null, ""]];
-  if (!vafText) ok("N1 the vaf column has a text expression", false, "none");
+    [0.005, "0.0050"], [0.125, "0.13"], [null, ""]];
+  if (!vafText) ok("N1 lib/mutation-table.ts exports VAF_TEXT, the vaf text rule", false, "not exported");
   else {
     let got: string;
     try {
@@ -355,21 +356,21 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
   }
 }
 {
-  // N2 the value is the whole ratio, hand-computed from t_alt_count / (t_alt_count + t_ref_count);
+  // N2 the value is the portal's text of t_alt_count / (t_alt_count + t_ref_count), worked out by hand;
   // the fixture has no tumor ratio below 0.01
-  const N2: [string, string, string, number, string][] = [
-    ["TP53", "FX-P01-T1", "R273H", 79 / 601, "79/601 = 0.13145, not 0.131"],
-    ["TP53", "FX-P09-T1", "R175H", 175 / 580, "175/580 = 0.30172, not 0.302"],
-    ["TP53", "FX-P13-T1", "R273H", 68 / 671, "68/671 = 0.10134, not 0.101"],
-    ["KRAS", "FX-P01-T1", "G12C", 88 / 239, "88/239 = 0.36820, not 0.368"],
+  const N2: [string, string, string, string, string][] = [
+    ["TP53", "FX-P01-T1", "R273H", "0.13", "79/601 = 0.1314"],
+    ["TP53", "FX-P09-T1", "R175H", "0.30", "175/580 = 0.3017, trailing zero kept"],
+    ["TP53", "FX-P13-T1", "R273H", "0.10", "68/671 = 0.1013, trailing zero kept"],
+    ["KRAS", "FX-P01-T1", "G12C", "0.37", "88/239 = 0.3682"],
   ];
   for (const [gene, sample, change, want, why] of N2) {
     const rows = await tab(gene);
-    const name = `N2 ${gene} ${sample} ${change}: vaf is the whole ratio ${why}`;
+    const name = `N2 ${gene} ${sample} ${change}: vaf is the text ${JSON.stringify(want)} (${why})`;
     if (typeof rows === "string") { ok(name, false, rows); continue; }
     const r = rows.find((x) => x.sample === sample && v(x, "proteinChange") === change);
     const got = r ? v(r, "vaf") : "no such row";
-    ok(name, typeof got === "number" && Math.abs(got - want) < 1e-12, show(got));
+    ok(name, got === want, show(got));
   }
   // its text as N1: TP53's only rows written "0.30" (FX-P09, 0.3017) and "0.10" (FX-P13, 0.1013), trailing zero kept
   for (const [q, n] of [["0.30", 1], ["0.10", 1]] as [string, number][]) {

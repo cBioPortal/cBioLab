@@ -23,11 +23,9 @@ function mutationValue(r: Record<string, unknown>, id: string, pin: string | boo
       const o = String(r.oncogenicity || ""), lv = String(r.level || "");
       return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
     }
-    // the whole ratio, which the table writes as the portal does (lib/chart/format.ts portalVaf: 4 decimals below
-    // 0.01, else 2); 0 is shown as no value, as the portal shows NA for it (TumorAlleleFreqColumnFormatter)
-    case "vaf": return r.vaf == null || Number(r.vaf) === 0 ? null : Number(r.vaf);
-    // a read count of 0 or less is shown blank, as the portal's read columns do (MUT-STM-6)
-    case "altCount": case "refCount": return r[id] == null || Number(r[id]) <= 0 ? null : Number(r[id]);
+    // as the portal writes it on screen and in its download, from the SQL's one rule (lib/mutation-table.ts VAF_TEXT)
+    case "vaf": return r.vafText ? String(r.vafText) : null;
+    case "altCount": case "refCount": return num(r[id]);
     case "alteration": return alterationOf(String(r.mutationType ?? ""), Number(r.drv) === 1, pin);
     case "mutCount": case "start": case "end": case "vafNormal": case "normalAltCount": case "normalRefCount": return num(r[id]);
     case "proteinPos": return r.pos == null ? "" : String(r.pos);
