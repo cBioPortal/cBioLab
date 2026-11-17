@@ -90,7 +90,12 @@ export function statusRowSource(t: StatusTable, parts: TablePart[], lines: { lin
 }
 
 /** A gene-by-sample file: each queried gene's mutations, structural variants, or values in one molecular profile. */
-export type MatrixFile = { kind: "mutations" } | { kind: "sv" } | { kind: "profile"; profile: string; discrete: boolean };
+export type MatrixFile = { kind: "mutations" } | { kind: "sv" } | { kind: "profile"; profile: string; discrete: boolean }
+  /** the portal's cna.txt: each study's own selected (first) discrete copy-number profile, by study */
+  | { kind: "cna"; profiles: Record<string, string> };
+
+/** a file the portal writes for every queried sample, NP for a study without its kind of profile (RDL-STM-4); the rest list their holders' samples (RDL-STM-5) */
+export const everySample = (f: MatrixFile): boolean => f.kind !== "profile";
 
 export function matrixColumns(genes: string[]): FileColumn[] {
   return [{ id: "sample", name: "Sample ID", numeric: false }, { id: "patient", name: "Patient ID", numeric: false },
@@ -112,11 +117,12 @@ function matrixValues(f: MatrixFile, study: string, db: string, genes: string[],
       "    FROM " + db + ".genomic_event_derived WHERE " + genomicStudySql(study) + " AND variant_type = 'structural_variant'\n" +
       "      AND hugo_gene_symbol IN " + inGenes + " AND " + inCohortSamples(bare, cohort) + " GROUP BY sid, gene",
     missing: "NA", type: "SV" };
+  const profile = f.kind === "cna" ? f.profiles[study] : f.profile;
   return {
     values: "SELECT " + bare + " AS sid, hugo_gene_symbol AS gene, any(ifNull(alteration_value, 'NA')) AS val\n" +
-      "    FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study) + " AND profile_type = " + sq(f.profile) + "\n" +
+      "    FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study) + " AND profile_type = " + sq(profile) + "\n" +
       "      AND hugo_gene_symbol IN " + inGenes + " AND " + inCohortSamples(bare, cohort) + " GROUP BY sid, gene",
-    missing: "NA", type: f.discrete ? "CNA" : null };
+    missing: "NA", type: f.kind === "cna" || f.discrete ? "CNA" : null };
 }
 
 /**
@@ -125,12 +131,22 @@ function matrixValues(f: MatrixFile, study: string, db: string, genes: string[],
  * structural variants (event info; NA when none) or its value in the profile (NA when none is
  * stored) — NP where its panel did not cover the gene in that data type (mutations, structural
  * variants and discrete copy number; the panels record nothing finer for the other profiles).
- * The query's OQL is not in effect, as on the portal: every call of the gene is listed.
+ * The query's OQL is not in effect, as on the portal: every call of the gene is listed. A part whose
+ * study `holds` no such profile still has a row per sample, NP in every gene (the portal's file lists
+ * every queried sample); none of its data is read.
  */
-export function matrixRowSource(f: MatrixFile, parts: TablePart[], genes: string[], db: string): RowSource {
+export function matrixRowSource(f: MatrixFile, parts: TablePart[], genes: string[], db: string, holds: (part: TablePart) => boolean = () => true): RowSource {
   if (!parts.length) throw new Error("matrixRowSource needs at least one part");
   const ctes: string[] = [], selects: string[] = [];
   parts.forEach((p, i) => {
+    if (!holds(p)) {
+      ctes.push("c" + i + " AS (" + p.cohortSql + ")");
+      selects.push(
+        "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord, s.pid AS patient, s.sid AS sid" +
+        genes.map((_, j) => ", 'NP' AS g" + j).join("") + "\n" +
+        "  FROM (SELECT DISTINCT pid, sid FROM c" + i + ") s\n");
+      return;
+    }
     const v = matrixValues(f, p.study, db, genes, "c" + i);
     ctes.push("c" + i + " AS (" + p.cohortSql + "),\n" + "v" + i + " AS (\n    " + v.values + ")" +
       (v.type ? genes.map((g, j) => ",\n" + "p" + i + "_" + j + " AS (" + profiledCasesSql(g, v.type!, { study: p.study, db, unit: "sample" }) + ")").join("") : ""));

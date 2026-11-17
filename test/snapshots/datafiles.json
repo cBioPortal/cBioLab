@@ -454,9 +454,9 @@
             "rows": 996
           },
           {
-            "id": "profile:gistic",
-            "name": "Putative copy-number alterations from GISTIC",
-            "description": "per sample and gene: its value in gistic (copy number alteration, discrete); NA when none is stored; NP when its panel did not cover the gene",
+            "id": "cna",
+            "name": "Copy-number Alterations (OQL is not in effect)",
+            "description": "per sample and gene: its value in its study's discrete copy-number profile (gistic); NA when none is stored; NP when its panel did not cover the gene",
             "group": "data",
             "portalFile": "cna.txt",
             "rows": 996
