@@ -15,6 +15,7 @@ import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { cn } from "../../lib/cn";
 import { FIELD, TB } from "../_ui/toolbar.ts";
+import { saveText } from "../../lib/study-view-download";
 
 
 
@@ -22,7 +23,7 @@ import { FIELD, TB } from "../_ui/toolbar.ts";
 
 export interface Col<T> { key: string; label: string; num?: boolean; value: (r: T) => string | number | null; render?: (r: T) => React.ReactNode; title?: string }
 
-export function PortalTable<T>({ rows, cols, initialSort, search, filters, selected, onSelect, pageSize = 25, note, wide, bar }: {
+export function PortalTable<T>({ rows, cols, initialSort, search, filters, selected, onSelect, pageSize = 25, note, wide, bar, download }: {
   rows: T[]; cols: Col<T>[]; initialSort: { key: string; desc?: boolean };
   /** the text a row is found by */
   search?: (r: T) => string;
@@ -35,22 +36,27 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
   wide?: boolean;
   /** controls of the card's own, first in the table's bar */
   bar?: React.ReactNode;
+  /** the portal's Copy and Download: `tsv` writes every row (the search and filters do not narrow it) in the table's sort, saved as `file` */
+  download?: { file: string; tsv: (sorted: T[]) => string };
 }) {
   const [sort, setSort] = useState(initialSort);
   const [q, setQ] = useState("");
   const [on, setOn] = useState<boolean[]>(() => (filters || []).map((f) => !!f.on));
   const [page, setPage] = useState(0);
-  const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+  const sorted = useMemo(() => {
     const col = cols.find((c) => c.key === sort.key) || cols[0];
-    const out = rows.filter((r) => (!needle || !search || search(r).toLowerCase().includes(needle)) && (filters || []).every((f, i) => !on[i] || f.test(r)));
-    return out.sort((a, b) => {
+    return [...rows].sort((a, b) => {
       const x = col.value(a), y = col.value(b);
       if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
       const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
       return sort.desc ? -c : c;
     });
-  }, [rows, cols, sort, q, on, search, filters]);
+  }, [rows, cols, sort]);
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return sorted.filter((r) => (!needle || !search || search(r).toLowerCase().includes(needle)) && (filters || []).every((f, i) => !on[i] || f.test(r)));
+  }, [sorted, q, on, search, filters]);
+  const [copied, setCopied] = useState<"copied" | "failed" | null>(null);
   const pages = Math.max(1, Math.ceil(shown.length / pageSize)), pg = Math.min(page, pages - 1);
   return (
     <div className="pb-tablewrap">
@@ -60,6 +66,16 @@ export function PortalTable<T>({ rows, cols, initialSort, search, filters, selec
           <label key={f.label} className="chk"><Checkbox checked={on[i]} onCheckedChange={(c) => { setOn((o) => o.map((x, j) => j === i ? (c === true) : x)); setPage(0); }} /> {f.label}</label>
         ))}
         {search && <Input type="search" placeholder="search" className={cn(FIELD, "w-44")} value={q} onChange={(e) => { setQ(e.target.value); setPage(0); }} />}
+        {download && <>
+          <Button type="button" variant="outline" size="sm" className={TB} data-tip="copy every row as tab-separated text"
+            onClick={() => {
+              const said = (r: "copied" | "failed") => { setCopied(r); setTimeout(() => setCopied(null), 1500); };
+              if (!navigator.clipboard) { said("failed"); return; }
+              navigator.clipboard.writeText(download.tsv(sorted)).then(() => said("copied"), () => said("failed"));
+            }}>{copied === "copied" ? "Copied" : copied === "failed" ? "Copy failed" : "Copy"}</Button>
+          <Button type="button" variant="outline" size="sm" className={TB} data-tip={"download every row as " + download.file}
+            onClick={() => saveText(download.file, download.tsv(sorted))}>Download</Button>
+        </>}
       </div>
       <table className={cn("pb-table", wide && "w-full")}>
         <thead><tr>{cols.map((c) => (

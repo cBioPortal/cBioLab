@@ -94,7 +94,7 @@ jobs:
 
   gate-warehouse:
     if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
       contents: read
@@ -105,6 +105,8 @@ jobs:
       RECORD: "1"
       REPORT_DIR: ${{ github.workspace }}/verification-report
       CLICKHOUSE_MAX_INFLIGHT: "4"
+      # cbioportal.org's answers, one file per request (check-portal-parity.ts), restored from the day's cache
+      PORTAL_CACHE: ${{ github.workspace }}/.portal-cache
     steps:
       - uses: actions/checkout@v5
 
@@ -168,6 +170,20 @@ jobs:
           done
           true
 
+      - &portal-day
+        name: Today (cbioportal.org's answers are cached for a UTC day)
+        id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+
+      # one live request to www.cbioportal.org per question per day, however many runs ask it; a miss
+      # fetches live (check-portal-parity.ts retries) and the job saves what it fetched under today's key
+      - &portal-cache
+        name: Cache cbioportal.org's answers
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.portal-cache
+          key: portal-answers-${{ steps.day.outputs.day }}
+
       - name: Gate, warehouse lane (peer database, cBioPortal, cohort logic, pooled paths, examples, method scripts, Explore checks)
         run: scripts/gate.sh warehouse
 
@@ -181,7 +197,7 @@ jobs:
 
   gate-e2e:
     if: github.event_name != 'merge_group'
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 40
     permissions:
       contents: read
@@ -224,7 +240,7 @@ jobs:
   planted-bugs:
     needs: gate-warehouse
     if: ${{ (!cancelled()) && github.event_name != 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
       contents: read
@@ -232,6 +248,8 @@ jobs:
       RECORD: "1"
       REPORT_DIR: ${{ github.workspace }}/verification-report
       CLICKHOUSE_MAX_INFLIGHT: "4"
+      # cbioportal.org's answers, one file per request (check-portal-parity.ts), restored from the day's cache
+      PORTAL_CACHE: ${{ github.workspace }}/.portal-cache
     steps:
       - uses: actions/checkout@v5
 
@@ -260,6 +278,9 @@ jobs:
           git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
           echo "MUTANT_CHANGED=$RUNNER_TEMP/changed.txt" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/changed.txt"
+
+      - *portal-day
+      - *portal-cache
 
       - name: Planted bugs
         run: npm run check:mutants
