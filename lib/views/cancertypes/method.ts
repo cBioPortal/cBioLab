@@ -3,14 +3,14 @@ import type { MethodRecord, MethodStep } from "../../method.ts";
 import { BUILD_COMMIT } from "../../build-info.ts";
 
 export interface CancertypesTrace {
-  genes: string[]; groupBy: string; measure: "driver" | "any"; oncokbPin: string | null; minSamples: number;
+  genes: string[]; groupBy: string; measure: "driver" | "any"; oncokbPin: string | null; minAltered: number; show: "frequency" | "count";
   /** the query's OQL lines, when the view follows them */
   oql?: string[];
   unit: "patient" | "sample";
   /** the view set no groupBy: how the portal's default was reached (several studies; else one study's distinct cancer types) */
   byDefault?: { studies: number; cancerTypes?: number };
   perSite: { cohort: string; study: string; groups: number; profiled: number }[];
-  panels: { cohort: string; groups: number; pooled: number; profiled: number; altered: number }[];
+  panels: { cohort: string; groups: number; categories: number; minSamples: number; profiled: number; altered: number }[];
 }
 
 /** how a sample's group value is read, when the portal reads it its own way (extendSamplesWithCancerType) */
@@ -43,9 +43,9 @@ export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
   if (new Set(t.perSite.map((s) => s.cohort)).size < t.perSite.length)
     steps.push({ kind: "transform", title: "Add each group's counts across studies", detail: "Groups are matched by their folded value; the counts add exactly." });
   for (const p of t.panels) steps.push({
-    kind: "transform", title: "Pool the small groups", scope: p.cohort,
-    detail: p.pooled ? p.pooled + " group" + (p.pooled === 1 ? "" : "s") + " with fewer than " + t.minSamples + " profiled " + t.unit + "s drawn as one pooled bar; " + p.groups + " drawn on their own."
-      : "Every group has at least " + t.minSamples + " profiled " + t.unit + "s; none pooled.",
+    kind: "transform", title: "Filter the groups", scope: p.cohort,
+    detail: p.groups + " of " + p.categories + " groups drawn: those with at least " + Math.max(1, p.minSamples) + " profiled " + t.unit + (Math.max(1, p.minSamples) === 1 ? "" : "s") +
+      (t.minAltered > 0 ? " and " + (t.show === "count" ? "at least " + t.minAltered + " altered" : "at least " + t.minAltered + "% altered") : "") + ".",
     params: [["profiled", p.profiled.toLocaleString("en-US")], ["altered", p.altered.toLocaleString("en-US")]],
   });
   return { steps, implementation: { functions: [], file: "lib/views/cancertypes/run.ts", commit: BUILD_COMMIT } };
