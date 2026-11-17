@@ -31,7 +31,7 @@ const withFor = (g: CancertypesGroup, sv: number) => ({ ...g, profiledFor: { mut
 
 type Ct = NonNullable<ViewResultOf<"cancertypes">["cancertypes"]>;
 const base: Ct = { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, minAltered: 0, show: "frequency", unit: "sample",
-  panels: [{ cohort: "all", samples: 300, profiled: 290, altered: 120,
+  panels: [{ cohort: "all", samples: 300, profiled: 290, altered: 120, profiledTypes: ["sv", "mutation", "cna"],
     groups: [withFor(grp("a", "GroupA", 100, 40, 20), 100), withFor(grp("b", "GroupB", 150, 30, 0, 160), 0)],
     categories: 5, minSamples: 10, filtered: true }] } as Ct;
 const hide = (c: Ct): Ct => ({ ...c, alterationTypes: false } as Ct);
@@ -85,7 +85,10 @@ describe("cancertypes: Show Genomic Alteration Types", () => {
     const body = cancertypesPanelSvg(hide(base), 0).body;
     assert.ok(body.includes("2 of 5 categories (Cancer Type) are shown based on filtering."));
     assert.ok(body.includes("Structural variant data"), "the SV profiled row");
-    assert.equal((body.match(/>\+</g) || []).length, 1, "one '+', for A's SV");
+    const marks = (b: string) => (b.match(/>[+\u2212]</g) || []).join("");
+    const shown = cancertypesPanelSvg(base, 0).body;
+    assert.equal(marks(body), marks(shown), "the strip's + / − marks are the shown chart's");
+    assert.ok(body.includes("<title>Not profiled</title>"), "B's SV: not profiled");
   });
 
   test("T6 shown (true) is identical to the key absent", () => {
