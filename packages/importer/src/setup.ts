@@ -75,7 +75,9 @@ async function loadReferencePanels(conn: WriteConn, dataDir: string, log: Log): 
   const list = JSON.parse((await fetchOnce("https://api.github.com/repos/cBioPortal/datahub/contents/reference_data/gene_panels", listFile)).toString("utf8")) as { name: string }[];
   const genes = await GeneResolver.load(conn);
   log("Loading " + list.length + " datahub gene panels");
-  for (const { name } of list.filter((f) => f.name.startsWith("data_gene_panel_"))) {
+  const panels = list.filter((f) => f.name.startsWith("data_gene_panel_"));
+  let missing = 0;
+  for (const { name } of panels) {
     let text: string;
     try {
       text = (await fetchOnce(DATAHUB_MEDIA + "reference_data/gene_panels/" + name, path.join(dataDir, "upstream", "gene_panels", name))).toString("utf8");
@@ -83,10 +85,14 @@ async function loadReferencePanels(conn: WriteConn, dataDir: string, log: Log): 
       // datahub lists the panel but serves no content for it (its LFS object is missing upstream)
       if (!/\(HTTP 404\)$/.test((e as Error).message)) throw e;
       log(name + ": not loaded; datahub lists it but serves no content for it (HTTP 404)");
+      missing++;
       continue;
     }
     const r = await importGenePanel(conn, genes, text);
     if (r.warning) log(name + ": " + r.warning);
+  }
+  if (panels.length && missing === panels.length) {
+    throw new Error("datahub served none of its " + panels.length + " gene panels (HTTP 404 for every one): check " + DATAHUB_MEDIA);
   }
 }
 

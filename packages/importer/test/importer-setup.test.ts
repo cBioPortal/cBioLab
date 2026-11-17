@@ -104,6 +104,15 @@ test("a panel datahub lists but serves no content for is named in the log and th
   assert.equal(logs.at(-1), "Database ready");
 });
 
+test("datahub serving none of its panels stops setup, naming where it looked", async () => {
+  const files = upstream();
+  delete files[PANEL_MEDIA + "data_gene_panel_impact.txt"];
+  delete files[PANEL_MEDIA + "data_gene_panel_bad.txt"];
+  serve(files);
+  ch = database();
+  await assert.rejects(setupDatabase(ch.conn, dataDir(), () => undefined), /served none of its 2 gene panels/);
+});
+
 test("a panel that fails to download for any other reason stops setup", async () => {
   const files = upstream();
   serve(files);
