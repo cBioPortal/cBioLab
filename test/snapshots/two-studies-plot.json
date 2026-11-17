@@ -36,11 +36,11 @@
         "shape": "scatter",
         "n": 968,
         "x": {
-          "label": "AGE",
+          "label": "Diagnosis Age",
           "kind": "num"
         },
         "y": {
-          "label": "TMB_NONSYNONYMOUS",
+          "label": "TMB (nonsynonymous)",
           "kind": "num"
         },
         "extent": {
@@ -240,14 +240,14 @@
           }
         ],
         "stats": {
-          "pearson": -0.1312,
-          "spearman": null,
+          "pearson": -0.13121337028381513,
+          "spearman": -0.11706432914584441,
           "slope": -0.12815725764648467,
           "intercept": 18.373049900699872,
-          "pPearson": 0.000042245416729427556,
-          "pSpearman": null
+          "pPearson": 0.00004224541664106695,
+          "pSpearman": 0.00026220187704929787
         },
-        "note": "2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman rank correlation is not reported for a federated plot: it needs the pooled GLOBAL ranking, which per-site aggregates cannot reconstruct exactly.",
+        "note": "2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman's rank correlation is over every study's pairs ranked together, as the portal ranks them.",
         "coverage": {
           "total": 1053,
           "nx": 971,
@@ -648,7 +648,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "968 of 1,053 patients have a value on both axes (82 have no AGE; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman rank correlation is not reported for a federated plot: it needs the pooled GLOBAL ranking, which per-site aggregates cannot reconstruct exactly. Point layers — “KRAS mut”: 175 patients, 158 patients drawn as points; “TP53 mut”: 699 patients, 652 patients drawn as points (58 drawn by an earlier layer). The statistics are over the whole plotted cohort.",
+      "note": "968 of 1,053 patients have a value on both axes (82 have no Diagnosis Age; 3 have no TMB (nonsynonymous)); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman's rank correlation is over every study's pairs ranked together, as the portal ranks them. Point layers — “KRAS mut”: 175 patients, 158 patients drawn as points; “TP53 mut”: 699 patients, 652 patients drawn as points (58 drawn by an earlier layer). The statistics are over the whole plotted cohort.",
       "method": {
         "steps": [
           {
@@ -664,9 +664,17 @@
             "detail": "r = (nΣxy − ΣxΣy) / √((nΣx² − (Σx)²)(nΣy² − (Σy)²)); slope = (nΣxy − ΣxΣy) / (nΣx² − (Σx)²), intercept = (Σy − slope·Σx) / n."
           },
           {
-            "kind": "statistic",
-            "title": "No Spearman",
-            "detail": "A rank correlation needs one ranking of every patient of every study, which per-study sums cannot give, so none is reported."
+            "kind": "fetch",
+            "title": "Every study's pairs, ranked together",
+            "scope": "Lung (TCGA) · luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018",
+            "rowsOut": 968,
+            "detail": "The plot:points queries above: every study's (x, y) pairs, 968 in all; Spearman's ρ is Pearson's r of their ranks over the pooled pairs, as the portal computes it over several studies (PLT-MD-2).",
+            "params": [
+              [
+                "Spearman ties",
+                "average rank: tied values share the mean of the ranks they span, as scipy's spearmanr and cbioportal.org rank them (PLT-STM-5)"
+              ]
+            ]
           },
           {
             "kind": "statistic",
@@ -676,7 +684,8 @@
         ],
         "implementation": {
           "functions": [
-            "pearsonFromMoments",
+            "spearmanRho",
+            "pearsonR",
             "regressionFromMoments",
             "corrPValue"
           ],
@@ -686,8 +695,8 @@
         "verification": "In the database, the coefficients and quartiles are checked against scipy 1.18.1 (pearsonr, spearmanr) and the portal's jStat rule on known values by scripts/check-plot-stats.ts.",
         "check": {
           "plot:pearson": {
-            "v": -0.1312,
-            "abs": 0.000050000001000000005
+            "v": -0.13121337028381513,
+            "abs": 1e-9
           },
           "plot:slope": {
             "v": -0.12815725764648467
@@ -697,7 +706,10 @@
             "abs": 1e-9
           },
           "plot:pPearson": {
-            "v": 0.000042245416729427556
+            "v": 0.00004224541664106695
+          },
+          "plot:pSpearman": {
+            "v": 0.00026220187704929787
           }
         }
       }
@@ -708,11 +720,11 @@
         "shape": "box",
         "n": 998,
         "x": {
-          "label": "SEX",
+          "label": "Sex",
           "kind": "cat"
         },
         "y": {
-          "label": "TMB_NONSYNONYMOUS",
+          "label": "TMB (nonsynonymous)",
           "kind": "num"
         },
         "groups": [
@@ -1003,7 +1015,7 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "note": "998 of 1,053 patients have a value on both axes (52 have no SEX; 3 have no TMB_NONSYNONYMOUS); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each group's box is computed over every study's values together, as the portal computes it. Point layers — “KRAS mut”: 175 patients, 164 patients drawn as points. The statistics are over the whole plotted cohort.",
+      "note": "998 of 1,053 patients have a value on both axes (52 have no Sex; 3 have no TMB (nonsynonymous)); only those are drawn. 2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each group's box is computed over every study's values together, as the portal computes it. Point layers — “KRAS mut”: 175 patients, 164 patients drawn as points. The statistics are over the whole plotted cohort.",
       "method": {
         "steps": [
           {

@@ -69,7 +69,7 @@ export type PlotAxis =
    * "(Driver)" and "(VUS)" as the portal's Plots tab colours them. The plot view puts its own
    * settings here; without them a mutation type is its class alone.
    */
-  | { source: "alteration"; gene: string; by?: AlterationBy; drivers?: DriverSettings }
+  | { source: "alteration"; gene: string; by?: AlterationBy; drivers?: DriverSettings; label?: string }
   | { source: "alteration"; genes: string[]; by?: "mutated" }
   /**
    * An OQL query, its statements separated by ";", a new line or ",". `by: "any"` (the default)
@@ -177,8 +177,11 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 }
 
 /** what an axis is called on the figure */
-export function axisLabel(a: PlotAxis): string {
-  if (a.source === "clinical") return a.log ? a.attribute + LOG_SUFFIX.log2 : a.attribute;
+export function axisLabel(a: PlotAxis, names?: ReadonlyMap<string, string>): string {
+  if (a.source === "clinical") {
+    const name = names?.get(a.attribute) || a.attribute;
+    return a.log ? name + LOG_SUFFIX.log2 : name;
+  }
   if (a.source === "molecular") {
     const name = a.label || a.gene + " " + a.profileType;
     return a.log ? name + LOG_SUFFIX.log2 : name;
@@ -193,6 +196,7 @@ export function axisLabel(a: PlotAxis): string {
     return (q.length > 48 ? q.slice(0, 47) + "…" : q) + (a.by === "statement" ? " (OQL, by line)" : " (OQL)");
   }
   if (a.source === "alteration") {
+    if ("label" in a && a.label) return a.label;
     const genes = alterationGenes(a);
     const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
     return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : a.by === "driver" ? " driver vs VUS" : " mutation status");
@@ -265,6 +269,7 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
     return;
   }
   if (a.source === "alteration") {
+    if ("label" in a && a.label != null && (typeof a.label !== "string" || a.label.length > 200)) throw new Error(which + " axis: an alteration axis's label is a title of at most 200 characters");
     const genes = alterationGenes(a);
     if (!genes.length) throw new Error(which + " axis: an alteration axis needs a gene, a gene set, or an OQL query");
     for (const g of genes) if (!GENE_RE.test(g)) throw new Error(which + " axis: '" + g + "' is not a valid gene symbol");
@@ -573,7 +578,8 @@ export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): Agg
  * are additive across sites and sufficient for Pearson's r and the OLS line (lib/stats.ts's
  * pearsonFromMoments / regressionFromMoments), the same sufficient-statistic argument
  * pairMomentsSql already makes for co-expression. Spearman is deliberately not here: a rank
- * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct.
+ * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct
+ * (spearmanRho ranks the pairs of the sites that may show them).
  */
 export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
   return aggregateSql(pairCte(xSel, ySel, cohortSql) +
@@ -916,6 +922,37 @@ export function portalFit(m: FitSums): PlotFit | null {
 export function fitOf(sums: FitSums): { fit?: PlotFit & { sums: FitSums } } {
   const f = Object.values(sums).every(Number.isFinite) ? portalFit(sums) : null;
   return f ? { fit: { ...f, sums } } : {};
+}
+
+/** ranks 1..n, tied values sharing the mean of the ranks they span */
+function averageRanks(v: readonly number[]): number[] {
+  const n = v.length, idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => v[a] - v[b]);
+  const r = new Array<number>(n);
+  for (let i = 0; i < n;) {
+    let j = i;
+    while (j + 1 < n && v[idx[j + 1]] === v[idx[i]]) j++;
+    for (let k = i; k <= j; k++) r[idx[k]] = (i + j) / 2 + 1;
+    i = j + 1;
+  }
+  return r;
+}
+
+/**
+ * Spearman's ρ over pairs, as plotStatsSql computes it in the database and the portal over pooled
+ * studies (PLT-STM-5): Pearson's r of the ranks, tied values sharing their average rank. Null
+ * unless each axis has two distinct values.
+ */
+export function spearmanRho(x: readonly number[], y: readonly number[]): number | null {
+  const n = Math.min(x.length, y.length);
+  const spread = (v: readonly number[]) => v.some((a) => a !== v[0]);
+  if (n < 2 || !spread(x) || !spread(y)) return null;
+  const rx = averageRanks(x), ry = averageRanks(y), m = (n + 1) / 2;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) {
+    const a = rx[i] - m, b = ry[i] - m;
+    sxy += a * b; sxx += a * a; syy += b * b;
+  }
+  return Math.max(-1, Math.min(1, sxy / Math.sqrt(sxx * syy)));
 }
 
 /**
