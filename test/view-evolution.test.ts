@@ -15,6 +15,9 @@ import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult, PatientEvent } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
 import type { EvolutionView, EvolutionResult, EvolutionMutation, EvolutionCell } from "../lib/views/evolution/types.ts";
+import { axisTicks, timelineAxisItems } from "../lib/timeline-tracks.ts";
+import { timelineSvg } from "../lib/timeline-svg.ts";
+import { palette } from "../lib/svg-kit.ts";
 import { kindText } from "./support/kind-text.ts";
 
 type Row = Record<string, unknown>;
@@ -208,7 +211,7 @@ describe("evolution: the patient drawn", () => {
     const w = await run({ chart: "heatmap", logScale: true, dataRange: true }, one(study({ muts: [MUTS[2]] })));
     assert.deepEqual(evo(w).drawn, []);
     assert.equal(evo(w).noVaf, 1);
-    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true });
+    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false });
     assert.match(w.caveat!, /The heatmap colours each sample's VAF/);
   });
 
@@ -286,6 +289,173 @@ describe("evolution: cells, lines and the figure", () => {
     assert.deepEqual(lintSvg(evolutionSvg(same as never, { width: 700 })!), [], "samples collected the same day stack");
   });
 });
+
+describe("evolution: the time axis is the patient timeline's axis", () => {
+  const sp = (id: string, start: number): PatientEvent => ({ type: "Specimen", start, end: null, attrs: [["SAMPLE_ID", id]] });
+  const events: PatientEvent[] = [sp("T1", 0), sp("T2", 461), sp("T3", 1343), { type: "Treatment", start: 1854, end: null, attrs: [] }];
+  const timed = (view: Partial<EvolutionView> = {}) => run(view, one(study(), {}, { events }));
+
+  test("time mode carries the timeline's trimmed ticks, covering events beyond the last sample", async () => {
+    const e = evo(await timed());
+    assert.equal(e.x, "time");
+    assert.ok(e.axis);
+    assert.equal(e.axis![0].start, -20);
+    assert.equal(e.axis![e.axis!.length - 1].end, 1874);
+    assert.deepEqual(e.axis, axisTicks(timelineAxisItems(events), true).ticks);
+  });
+
+  test("sequence mode has no axis", async () => {
+    const e = evo(await timed({ sequential: true }));
+    assert.equal(e.x, "sequence");
+    assert.equal(e.axis, undefined);
+  });
+
+  test("expandGaps keeps long empty runs as ordinary ticks; without it they are cut", async () => {
+    const far = [sp("T1", 0), sp("T2", 2500), sp("T3", 2500)];
+    const open = evo(await run({ expandGaps: true }, one(study(), {}, { events: far }))).axis!;
+    assert.deepEqual(open, axisTicks(timelineAxisItems(far), false).ticks);
+    assert.ok(open.every((t) => !t.trim));
+    const cut = evo(await run({}, one(study(), {}, { events: far }))).axis!;
+    assert.ok(cut.some((t) => t.trim));
+  });
+
+  test("expandGaps is true or false", async () => {
+    const r = await run({ expandGaps: "yes" } as never, one());
+    assert.match(r.error!, /expandGaps/);
+    assert.match(r.error!, /true or false/);
+  });
+
+  test("the figure labels years, or falls back to the days title without an axis", async () => {
+    const v = await timed();
+    const svg = evolutionSvg(v as never, { width: 900 })!;
+    assert.match(svg, />0</);
+    assert.match(svg, />1y</);
+    assert.doesNotMatch(svg, /Days from diagnosis/);
+    const bare = structuredClone(v) as typeof v & { evolution: EvolutionResult };
+    delete bare.evolution.axis;
+    assert.match(evolutionSvg(bare as never, { width: 900 })!, /Days from diagnosis/);
+  });
+});
+
+describe("evolution: the axis by the rule table (R1–R7)", () => {
+  const sp = (id: string, start: number): PatientEvent => ({ type: "Specimen", start, end: null, attrs: [["SAMPLE_ID", id]] });
+  // like lgg_ucsf_2014 P04: samples at 0/461/1075/1343, an event at 1854
+  const P04: PatientEvent[] = [sp("T1", 0), sp("T2", 461), sp("T4", 1075), sp("T3", 1343), { type: "Treatment", start: 1854, end: null, attrs: [] }];
+  const FAR: PatientEvent[] = [sp("T1", 0), sp("T2", 2500), sp("T3", 2500)];
+  const on = (events: PatientEvent[], view: Partial<EvolutionView> = {}) => run(view, one(study(), {}, { events }));
+  const verticals = (svg: string) => [...svg.matchAll(/<line x1="([-\d.]+)" x2="([-\d.]+)" y1="([-\d.]+)" y2="([-\d.]+)" stroke="([^"]+)"[^>]*>/g)]
+    .filter((m) => m[1] === m[2]).map((m) => ({ x: Number(m[1]), y1: Number(m[3]), y2: Number(m[4]), stroke: m[5], tag: m[0] }));
+
+  test("E6 R1: the axis is present for the line chart placed by day", async () => {
+    const e = evo(await on(P04));
+    assert.equal(e.display.chart, "line");
+    assert.equal(e.x, "time");
+    assert.ok(e.axis && e.axis.length > 0);
+  });
+
+  test("E7 R1: no axis for the heatmap, nor for sequential or forced-sequence placement", async () => {
+    assert.equal(evo(await on(P04, { chart: "heatmap" })).axis, undefined);
+    const seq = evo(await on(P04, { sequential: true }));
+    assert.equal(seq.x, "sequence");
+    assert.equal(seq.axis, undefined);
+    const forced = evo(await on(P04.filter((e) => attrId(e) !== "T3")));
+    assert.equal(forced.x, "sequence");
+    assert.equal(forced.axis, undefined);
+  });
+
+  test("E8 R2: an event with an empty or blank type, outside the others' range, does not extend the axis", async () => {
+    const extra: PatientEvent[] = [...P04, { type: "", start: 6000, end: null, attrs: [] }, { type: "   ", start: -3000, end: -2900, attrs: [] }];
+    const e = evo(await on(extra));
+    const plain = evo(await on(P04));
+    assert.deepEqual(e.axis, plain.axis);
+    assert.equal(e.axis![0].start, -20);
+    assert.equal(e.axis![e.axis!.length - 1].end, 1874);
+  });
+
+  test("E9 R2: the axis is axisTicks(timelineAxisItems(events), !expandGaps), and ends where timelineSvg's axis does", async () => {
+    const extra: PatientEvent[] = [...P04, { type: "", start: 6000, end: null, attrs: [] }];
+    for (const expandGaps of [false, true]) {
+      for (const events of [extra, FAR]) {
+        const e = evo(await on(events, { expandGaps }));
+        assert.deepEqual(e.axis, axisTicks(timelineAxisItems(events), !expandGaps).ticks);
+        const { layout } = timelineSvg({ study: "s1", patient: "P1", events, samples: [], source: { label: "Local" } }, { expandGaps });
+        const tl = axisTicks(layout.rows.flatMap((r) => r.items), !expandGaps).ticks;
+        assert.equal(e.axis![e.axis!.length - 1].end, tl[tl.length - 1].end);
+        assert.deepEqual(e.axis, tl);
+      }
+    }
+  });
+
+  test("E10 R3: display.expandGaps is false by default and true when the view sets it", async () => {
+    assert.equal(evo(await on(P04)).display.expandGaps, false);
+    assert.equal(evo(await on(P04, { expandGaps: true })).display.expandGaps, true);
+    assert.equal(evo(await on(P04, { chart: "heatmap", expandGaps: true })).display.expandGaps, true);
+  });
+
+  test("E11 R4: the caveat says empty stretches are cut only when some tick is cut", async () => {
+    const v = await on(FAR);
+    assert.ok(evo(v).axis!.some((t) => t.trim));
+    assert.match(v.caveat!, /empty stretches of four or more years cut/);
+    const w = await on(P04);
+    assert.ok(!evo(w).axis!.some((t) => t.trim));
+    assert.doesNotMatch(w.caveat!, /empty stretches of four or more years cut/);
+  });
+
+  test("E12 R4: with expandGaps the caveat says every year shown and not cut", async () => {
+    const v = await on(FAR, { expandGaps: true });
+    assert.match(v.caveat!, /every year shown/);
+    assert.doesNotMatch(v.caveat!, /cut/);
+  });
+
+  test("E13 R4: no gap and no expandGaps mentions neither", async () => {
+    const v = await on(P04);
+    assert.match(v.caveat!, /timeline axis/);
+    assert.doesNotMatch(v.caveat!, /cut/);
+    assert.doesNotMatch(v.caveat!, /every year shown/);
+  });
+
+  test("E14 R4: the heatmap's caveat does not mention the timeline axis", async () => {
+    for (const events of [P04, FAR]) {
+      const v = await on(events, { chart: "heatmap" });
+      assert.equal(evo(v).x, "time");
+      assert.doesNotMatch(v.caveat!, /timeline axis/);
+    }
+  });
+
+  test("E15 R5: the line chart at width 900 for P04 draws month ticks", async () => {
+    const v = await on(P04);
+    const svg = evolutionSvg(v as never, { width: 900, theme: "light" })!;
+    const ticks = verticals(svg).filter((l) => Math.abs(l.y2 - l.y1 - 3) < 0.05);
+    assert.ok(ticks.length > 0, "month ticks (3 px) under the axis");
+    assert.match(svg, />4m</);
+  });
+
+  test("E16 R7: the time axis is titled", async () => {
+    const svg = evolutionSvg(await on(P04) as never, { width: 900 })!;
+    assert.match(svg, /Time from diagnosis, when each sample was collected/);
+  });
+
+  test("E17 R7: a cut draws a dashed guide up through the plot", async () => {
+    const svg = evolutionSvg(await on(FAR) as never, { width: 900, theme: "light" })!;
+    const g = svg.match(/<g transform="translate\([^"]*\)"><title>\d+ years with no events, cut<\/title>.*?<\/g>/);
+    assert.ok(g, "a cut group");
+    const guide = verticals(g![0]).find((l) => /stroke-dasharray/.test(l.tag));
+    assert.ok(guide, "dashed guide in the cut");
+    assert.equal(guide!.y1, 14, "from the plot's top");
+    assert.ok(guide!.y2 > 14 + 220, "down to the axis");
+  });
+
+  test("E18 R7: the day-0 year line is muted; other year lines use the line colour", async () => {
+    const p = palette("light");
+    const svg = evolutionSvg(await on(P04) as never, { width: 900, theme: "light" })!;
+    const guides = verticals(svg).filter((l) => l.y1 === 14 && !/stroke-dasharray/.test(l.tag));
+    assert.equal(guides.length, 6, "years 0 to 5y");
+    assert.equal(guides[0].stroke, p.muted);
+    assert.ok(guides.slice(1).every((l) => l.stroke === p.line), JSON.stringify(guides.map((l) => l.stroke)));
+  });
+});
+
+const attrId = (e: PatientEvent) => e.attrs.find(([k]) => k === "SAMPLE_ID")?.[1];
 
 describe("evolution: its row sources name one patient and live only with patient-level participants", () => {
   const part = { cohort: "c", study: "x", cohortSql: "SELECT '' AS pid" };
