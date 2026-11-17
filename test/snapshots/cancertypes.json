@@ -466,8 +466,8 @@
             "perGene": [
               {
                 "gene": "KRAS",
-                "altered": 9050,
                 "profiled": 48179,
+                "altered": 9050,
                 "groups": [
                   {
                     "key": "pancreatic cancer",
@@ -900,8 +900,8 @@
               },
               {
                 "gene": "NRAS",
-                "altered": 1280,
                 "profiled": 48179,
+                "altered": 1280,
                 "groups": [
                   {
                     "key": "melanoma",
@@ -1334,8 +1334,8 @@
               },
               {
                 "gene": "HRAS",
-                "altered": 609,
                 "profiled": 48179,
+                "altered": 609,
                 "groups": [
                   {
                     "key": "salivary gland cancer",

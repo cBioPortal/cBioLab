@@ -72,7 +72,7 @@ export interface CancertypesPanel extends CancertypesGroups {
    * the same, one gene at a time (the portal's per-gene tabs); `altered` / `profiled` the gene's altered and
    * profiled units in the whole cohort, each once, before the filters
    */
-  perGene?: ({ gene: string; altered: number; profiled?: number } & CancertypesGroups)[];
+  perGene?: ({ gene: string; altered: number; profiled: number } & CancertypesGroups)[];
 }
 export interface CancertypesResult {
   groupBy: string; measure: "driver" | "any"; genes: string[];

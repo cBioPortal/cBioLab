@@ -116,8 +116,8 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
         if (r.grp === ALL_KEY) {
           if (r.gene === "*") { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.profiled += Number(r.profiled); t.altered += Number(r.altered); cohortTotal.set(n, t); }
           else {
-            const t = geneTotal.get(n + "\0" + r.gene) || { profiled: 0, altered: 0 };
-            t.profiled += Number(r.profiled); t.altered += Number(r.altered); geneTotal.set(n + "\0" + r.gene, t);
+            const key = n + "\0" + r.gene, t = geneTotal.get(key) || { profiled: 0, altered: 0 };
+            t.profiled += Number(r.profiled); t.altered += Number(r.altered); geneTotal.set(key, t);
           }
           continue;
         }
@@ -145,8 +145,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
     // the cohort's own totals count each unit once, though a patient can sit in two groups
     const ct = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 };
     panels.push({ cohort: n, samples: ct.samples, profiled: ct.profiled, altered: ct.altered, ...arrange(all),
-      ...(genes.length > 1 ? { perGene: genes.map((gene) => ({ gene, altered: geneTotal.get(n + "\0" + gene)?.altered || 0,
-        profiled: geneTotal.get(n + "\0" + gene)?.profiled || 0, ...arrange([...(byGene.get(gene) || new Map()).values()]) })) } : {}) });
+      ...(genes.length > 1 ? { perGene: genes.map((gene) => ({ gene, ...(geneTotal.get(n + "\0" + gene) ?? { profiled: 0, altered: 0 }), ...arrange([...(byGene.get(gene) || new Map()).values()]) })) } : {}) });
   }
   if (!panels.some((p) => p.profiled)) return refuse("cancertypes", ctx, "no " + unit + " in " + (vNames.length === 1 ? "this cohort" : "these cohorts") +
     " was profiled for " + (genes.length === 1 ? genes[0] : "any of " + genes.join(", ")));

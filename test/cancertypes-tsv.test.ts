@@ -98,11 +98,11 @@ describe("cancertypesTsv (Cancer Types Summary data download)", () => {
   });
 
   test("R8: a gene tab uses that gene's perGene groups and counts", async () => {
-    const kras: CancertypesGroups & { gene: string; altered: number } = {
-      gene: "KRAS", altered: 1, groups: [grp("Lung", 10, { amp: 1 })], categories: 1, minSamples: 0,
+    const kras: CancertypesGroups & { gene: string; altered: number; profiled: number } = {
+      gene: "KRAS", altered: 1, profiled: 10, groups: [grp("Lung", 10, { amp: 1 })], categories: 1, minSamples: 0,
     };
-    const tp53: CancertypesGroups & { gene: string; altered: number } = {
-      gene: "TP53", altered: 8, groups: [grp("Colon", 4, { mutation: 1 }), grp("Lung", 10, { mutation: 7 })], categories: 2, minSamples: 0,
+    const tp53: CancertypesGroups & { gene: string; altered: number; profiled: number } = {
+      gene: "TP53", altered: 8, profiled: 14, groups: [grp("Colon", 4, { mutation: 1 }), grp("Lung", 10, { mutation: 7 })], categories: 2, minSamples: 0,
     };
     const p = panel([grp("Lung", 10, { mutation: 7, amp: 1 })], { perGene: [kras, tp53] });
     const r = result([p], { genes: ["TP53", "KRAS"] });

@@ -31,7 +31,17 @@ export function categoryLabel(groupBy: string): string {
  * unit of any panel's cohort, before the filters.
  */
 export function cancertypesUnaltered(r: CtResult, gene: string | null): boolean {
-  return r.panels.every((pn) => !(gene ? pn.perGene?.find((x) => x.gene === gene)?.altered ?? pn.altered : pn.altered));
+  return r.panels.every((pn) => !geneSource(pn, gene).altered);
+}
+
+/** `gene` profiled in no unit of any panel's cohort (its tab's tip says so rather than "no alterations") */
+export function cancertypesUnprofiled(r: CtResult, gene: string | null): boolean {
+  return r.panels.every((pn) => !geneSource(pn, gene).profiled);
+}
+
+/** what one gene's tab draws of a panel: its perGene entry, or the panel itself (the genes together, or a one-gene query) */
+export function geneSource(pn: CtResult["panels"][number], gene: string | null | undefined): CtResult["panels"][number] | NonNullable<CtResult["panels"][number]["perGene"]>[number] {
+  return (gene && pn.perGene?.find((x) => x.gene === gene)) || pn;
 }
 
 /** the portal's filter alert, when a threshold hides some group */
@@ -56,7 +66,7 @@ const PAD = 8, PLOT_H = 240, MARK_ROW = 13, LABEL_H = 150;
 export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean } = {}):
   { body: string; width: number; height: number; grown: boolean } {
   const p = palette(o.theme), pn = r.panels[panel];
-  const src = o.gene && pn.perGene ? pn.perGene.find((x) => x.gene === o.gene) || pn : pn;
+  const src = geneSource(pn, o.gene);
   const groups = src.groups;
   const alert = filterAlert(r, src);
   const freq = r.show === "frequency";
@@ -93,12 +103,12 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   if (o.title !== false) {
     const head = pn.cohort, hw = Math.min(textWidth(head, FS.title, 600), W * 0.5);
     out.push(label(PAD, 18, head, { size: FS.title, weight: 600, fill: p.ink, maxW: W * 0.5 }));
-    const tot = src !== pn && "profiled" in src && src.profiled !== undefined ? { altered: src.altered, profiled: src.profiled } : pn;
+    const tot = src;
     out.push(label(PAD + hw + 8, 18, (o.gene ? o.gene + " · " : "") + fmtInt(tot.altered) + " of " + fmtInt(tot.profiled) + " profiled " + r.unit + "s altered (" +
       fmtPct(100 * tot.altered / (tot.profiled || 1)) + ")", { size: FS.small, fill: p.muted, maxW: W - PAD - hw - 8 - PAD }));
   }
   if (alert) out.push(label(PAD, T - 12, alert, { size: FS.small, fill: p.ink, maxW: W - 2 * PAD }));
-  if (!groups.length || src.altered === 0) {
+  if (!groups.length || cancertypesUnaltered(r, o.gene ?? null)) {
     out.push(label(PAD, T + 20, groups.length ? "There are no alterations in this gene." : "No category passes the filters.", { size: FS.body, fill: p.muted, maxW: W - 2 * PAD }));
     return { body: out.join(""), width: W, height: T + 36, grown };
   }

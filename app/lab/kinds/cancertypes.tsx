@@ -6,7 +6,7 @@ import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 import { SEG_TAB, SEG_TABS } from "../../_ui/toolbar.ts";
 import { Tabs, TabsList, TabsTrigger } from "../../_ui/tabs";
-import { cancertypesPanelSvg, cancertypesUnaltered, categoryLabel } from "../../../lib/views/cancertypes/figure.ts";
+import { cancertypesPanelSvg, cancertypesUnaltered, cancertypesUnprofiled, categoryLabel } from "../../../lib/views/cancertypes/figure.ts";
 import { frame, palette } from "../../../lib/svg-kit";
 import { cancertypesTsv } from "../../../lib/views/cancertypes/tsv.ts";
 import { savePdf, savePng, standaloneSvg } from "../chart-files.ts";
@@ -26,12 +26,12 @@ function thresholdOf(text: string): number | null {
 }
 
 /** Tabs over a body, the portal's gene / group selectors; a `muted` one's label is grey, as the portal's tab for a gene with no alterations */
-function Pills({ items, on, set, muted }: { items: string[]; on: string; set: (x: string) => void; muted?: (x: string) => boolean }) {
+function Pills({ items, on, set, muted, unprofiled }: { items: string[]; on: string; set: (x: string) => void; muted?: (x: string) => boolean; unprofiled?: (x: string) => boolean }) {
   return (
     <Tabs value={on} onValueChange={set} className="my-2">
       <TabsList className={SEG_TABS}>
-        {items.map((x) => <TabsTrigger key={x} value={x} className={cn(SEG_TAB, muted?.(x) && x !== on && "!text-[#bbb]")}
-          {...(muted?.(x) ? { "data-tip": "no alterations in " + x } : {})}>{x}</TabsTrigger>)}
+        {items.map((x) => <TabsTrigger key={x} value={x} className={cn(SEG_TAB, muted?.(x) && "opacity-60")}
+          {...(muted?.(x) ? { "data-tip": (unprofiled?.(x) ? "not profiled for " : "no alterations in ") + x } : {})}>{x}</TabsTrigger>)}
       </TabsList>
     </Tabs>
   );
@@ -88,7 +88,8 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   };
   return (
     <div className="pb">
-      {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} muted={(x) => x !== ALL && cancertypesUnaltered(r, x)} />}
+      {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} muted={(x) => x !== ALL && cancertypesUnaltered(r, x)}
+        unprofiled={(x) => cancertypesUnprofiled(r, x)} />}
       {r.panels.map((_, i) => <div key={i}>
         <Downloads r={r} panel={i} gene={gene === ALL ? null : gene} />
         <DrawAtWidth draw={draw(i)} deps={[r, gene]} />
