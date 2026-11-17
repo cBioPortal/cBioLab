@@ -249,3 +249,13 @@ export function portalPercentAltered(altered: number, sequenced: number): string
   if (p < 0.03 && fixed.endsWith("0")) fixed = percent.toFixed();
   return fixed + "%";
 }
+
+/**
+ * A value rounded to `sig` significant digits, kept a number: what a result's long per-gene columns
+ * carry when they need not hold every bit (the page writes p and q to 3 digits). Not finite → as is.
+ */
+export const roundSig = (x: number, sig: number): number => Number.isFinite(x) && x !== 0 ? Number(x.toPrecision(sig)) : x;
+/** A value rounded to `places` decimal places, kept a number (a mean the page writes to 2 places). */
+export const roundPlaces = (x: number, places: number): number => Number.isFinite(x) ? Math.round(x * 10 ** places) / 10 ** places : x;
+/** A byte count in megabytes, one decimal: "2.5 MB". */
+export const fmtMb = (bytes: number): string => (bytes / 1e6).toFixed(1) + " MB";

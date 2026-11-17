@@ -181,3 +181,15 @@ export async function survivalLeftOutCaveat(ctx: ViewRun, months: string, status
     : "") +
     (unknown.size ? "Not known for " + [...unknown].join(", ") + ", which send only their counts: how many of their patients lack a status or a time. " : "");
 }
+
+/**
+ * The most a result's every-row columns (a page's `all`) may hold, as JSON: past it the page lists
+ * the view's capped rows and says why, so a page's whole response (with its points, method record and
+ * other views) stays under the host's ~4.5 MB.
+ */
+export const ALL_ROWS_MAX_BYTES = 2_000_000;
+/** the columns, or why they are left out (their size, against the limit) */
+export function allRowsWithin<T>(cols: T): { all: T } | { tooBig: number } {
+  const n = JSON.stringify(cols).length;
+  return n <= ALL_ROWS_MAX_BYTES ? { all: cols } : { tooBig: n };
+}
