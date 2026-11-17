@@ -7,6 +7,8 @@
  *
  *   M  one row per key: both genes, positions and chromosomes and the class, sorted. FX-P49's
  *      EML4-ALK fusion, in T1 and T2 alike, is one row naming both samples
+ *   P  each table's profile and the samples it holds (data_gene_panel_matrix.txt: FX-P49's two samples
+ *      in all three; the fixture has no sample outside a profile, so that branch is checked on the warehouse)
  *   K  the key, run on ClickHouse over literal rows: a fusion recorded A–B and B–A is one key;
  *      another position, chromosome or class is another (the fixture holds no A–B / B–A pair)
  *   F  a merged row's fields are one record's (Gene 1 and Gene 2 never both the same partner)
@@ -88,6 +90,16 @@ for (const id of ["FX-P49", "FX-P51"]) {
   }
   const sorted = await svRows("FX-P51", { sort: { column: "status" } });
   ok("S a sort by Status is refused, naming the column", typeof sorted === "string" && /status is not sortable/.test(sorted), String(sorted).slice(0, 160));
+}
+
+// ---- P: which samples each table's profile holds (the not-profiled alerts) ------------------------
+{
+  // data_gene_panel_matrix.txt profiles both of FX-P49's samples for mutations, cna (DISCRETE) and structural variants
+  const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: "FX-P49" } }, ctx) as { alterations?: AlterationsResult; error?: string };
+  const pr = r.alterations?.profiling;
+  const both = ["FX-P49-T1", "FX-P49-T2"];
+  ok("P FX-P49: the study holds all three profiles", !!pr && pr.mutations.study && pr.cna.study && pr.sv.study, JSON.stringify(pr));
+  ok("P FX-P49: each profile holds both samples", !!pr && (["mutations", "cna", "sv"] as const).every((t) => JSON.stringify([...pr[t].profiled].sort()) === JSON.stringify(both)), JSON.stringify(pr));
 }
 
 // ---- K: the key on literal rows -----------------------------------------------------------------

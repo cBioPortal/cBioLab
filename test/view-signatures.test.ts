@@ -6,7 +6,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runSignatures } from "../lib/views/signatures/run.ts";
 import { signaturePatientsSource, signatureValuesSource } from "../lib/views/signatures/sql.ts";
-import { SIGNIFICANT_P, channelClass, defaultVersion, natural, pairsOf, pctText, signatureFamilies, signatureRows, spectrumOf, spectrumPct, spectrumUnit, versionLabel } from "../lib/views/signatures/data.ts";
+import { TABLE_TSV, signatureTableTsv, SIGNIFICANT_P, channelClass, defaultVersion, natural, pairsOf, pctText, signatureFamilies, signatureRows, spectrumOf, spectrumPct, spectrumUnit, versionLabel } from "../lib/views/signatures/data.ts";
 import { COUNT_TIP, ROW_CLICK_HINT, channelColor, channelTick, countAxisMax, countLabel, indelBox, percentAxisMax, referenceAxisMax, referenceTick,
   spectrumAxisTitle, spectrumTick, typeOption } from "../lib/views/signatures/data.ts";
 import { REFERENCE_SOURCE, referenceChannel, referenceKey, referenceProfile, referenced } from "../lib/views/signatures/reference.ts";
@@ -21,7 +21,7 @@ import { pagedTable } from "../lib/views/rows.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
-import type { SignaturesView, SignaturesResult } from "../lib/views/signatures/types.ts";
+import type { SignatureRow, SignaturesView, SignaturesResult } from "../lib/views/signatures/types.ts";
 import { kindText } from "./support/kind-text.ts";
 
 type Row = Record<string, unknown>;
@@ -424,6 +424,26 @@ describe("the portal's spectrum chart: colours, labels, axes and the COSMIC refe
   });
 });
 
+describe("signatures: PAT-STM-12 sample order", () => {
+  const samples = [{ sid: "T01", type: "Primary" }, { sid: "T02", type: "Primary" }];
+  const build = (patientTimeline: () => Promise<unknown>) => {
+    const t = (table: string, src: RowSource): Row[] => table === "signatures:samples" ? samples.map((x) => ({ cohort: "A", study: "s1", patient: "P1", ...x })) : tables()(table, src);
+    return { ...local(t), patientTimeline };
+  };
+  test("G1 PAT-STM-12: the patient's samples are numbered by their events: T02 is 1, T01 is 2", async () => {
+    const resolver = build(async () => ({ events: [{ type: "Sample acquisition", start: -40, end: null, attrs: [["SAMPLE_ID", "T01"]] }, { type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }));
+    const s = sig(await run({ patient: { study: "s1", id: "P1" } }, ctx({ resolver })));
+    assert.deepEqual(s.patient!.samples.map((x) => x.id), ["T02", "T01"]);
+    assert.deepEqual(s.patient!.samples.map((x) => x.label), ["1", "2"]);
+  });
+  test("G2 PAT-STM-12: a refused timeline does not refuse the view", async () => {
+    const resolver = build(async () => { throw new Error("timeline refused"); });
+    const v = await run({ patient: { study: "s1", id: "P1" } }, ctx({ resolver }));
+    assert.equal(err(v), undefined, String(err(v)));
+    assert.ok(sig(v).patient);
+  });
+});
+
 test("S1 (PTB-STM-6): spectrumPct is Math.round(100*count/total), 0 when total is 0", () => {
   const cases: [number, number, number][] = [[1, 3, 33], [2, 3, 67], [1, 8, 13], [0, 0, 0], [5, 0, 0]];
   for (const [c, t, want] of cases) assert.equal(spectrumPct(c, t), want, c + "/" + t);
@@ -448,4 +468,43 @@ test("S1 (PTB-STM-6): the figure's channel tooltips state whole percents", async
   const tips = [...svg.matchAll(/<title>[^<]* of 40 single base substitutions \(([^)]*)\)/g)].map((m) => m[1]);
   assert.ok(tips.length > 0);
   for (const t of tips) assert.match(t, /^\d+%/, t);
+});
+
+describe("signatureTableTsv: the Mutational Signatures table's Copy/Download", () => {
+  const sv = (value: number | null) => ({ value, p: null });
+  const row = (name: string, values: (number | null)[]): SignatureRow =>
+    ({ entity: "e_" + name, name, description: "", url: "", values: values.map(sv) });
+
+  test("TD1 (R1): line 1 is the header, samples in the order given", () => {
+    const lines = signatureTableTsv([], ["S2", "S1"]).split("\r\n");
+    assert.equal(lines[0], "Mutational Signature\tS2\tS1");
+  });
+  test("TD2 (R2): one line per row in the order given, not re-sorted", () => {
+    const out = signatureTableTsv([row("SBS5", [0.1]), row("SBS1", [0.5])], ["S1"]);
+    assert.equal(out, "Mutational Signature\tS1\r\nSBS5\t10%\r\nSBS1\t50%\r\n");
+  });
+  test("TD3 (R3): contributions written as getMutationalSignaturePercentage", () => {
+    const vals = [0, 0.003, 0.0099, 0.01, 0.3749, 0.375, 1, null];
+    const want = ["<1%", "<1%", "<1%", "1%", "37%", "38%", "100%", "NA"];
+    const samples = vals.map((_, i) => "S" + i);
+    const out = signatureTableTsv([row("SBS1", vals)], samples);
+    assert.equal(out.split("\r\n")[1], ["SBS1", ...want].join("\t"));
+  });
+  test("TD4 (R4): every line ends with CRLF, no other breaks, no trailing tab", () => {
+    const out = signatureTableTsv([row("A", [0.2, 0.3]), row("B", [0.4, 0.5])], ["S1", "S2"]);
+    assert.ok(out.endsWith("\r\n"));
+    assert.equal(out.match(/\r\n/g)!.length, 3);
+    assert.equal(out.replace(/\r\n/g, "").match(/[\r\n]/), null);
+    assert.ok(!/\t\r\n/.test(out));
+  });
+  test("TD5 (R5): a missing value is NA, one column per sample", () => {
+    const out = signatureTableTsv([row("SBS1", [0.2])], ["S1", "S2", "S3"]);
+    assert.equal(out.split("\r\n")[1], "SBS1\t20%\tNA\tNA");
+  });
+  test("TD6 (R6): zero rows gives the header line alone", () => {
+    assert.equal(signatureTableTsv([], ["S1"]), "Mutational Signature\tS1\r\n");
+  });
+  test("TD7 (R7): TABLE_TSV is table.tsv", () => {
+    assert.equal(TABLE_TSV, "table.tsv");
+  });
 });

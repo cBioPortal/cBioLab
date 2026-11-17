@@ -4,7 +4,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import {
-  selectableProfiles, defaultProfiles, defaultOptions, defaultOql, effectiveKinds, kindsInQuery, readThreshold, resolveQuery,
+  selectableProfiles, defaultProfiles, defaultOptions, defaultOql, effectiveKinds, selectedProfiles, kindsInQuery, readThreshold, resolveQuery,
   heldKinds, defaultCaseSet, caseSetOptions, multiCaseSetCount, studiesWithoutCaseSet, caseSetClause, caseSetProblem, profilesProblem,
   parseCaseIds, optionsProblem, writeOptions, readOptions, completeOptions, chosenQuery, legacyQueryParams, caseSetSampleCount, queryLimitProblem, mixedGenomes, MIXED_GENOME_WARNING, EVERY_STUDY, CUSTOM_CASE_SET, type CaseSetInfo, type QueryOptions,
 } from "../lib/query-options.ts";
@@ -72,6 +72,24 @@ describe("the default alterations of a bare gene", () => {
     assert.deepEqual([...effectiveKinds(opts({ mut: "mutations" }), ["TP53", "KRAS: AMP"], 1, sv)].sort(), ["cna", "mut", "sv"]);
     // several studies: the choice alone
     assert.deepEqual([...effectiveKinds(opts({ mut: "*" }), ["TP53", "KRAS: AMP"], 2, sv)].sort(), ["mut"]);
+  });
+  test("selectedProfiles: one study, each chosen id as its profile, in the portal's kind order; a kind the query implies by its type (row 11)", () => {
+    const o = opts({ prot: "rppa_Zscores", mrna: "rna_seq_v2_mrna_median_Zscores", mut: "mutations", meth: "methylation_hm450" });
+    assert.deepEqual(selectedProfiles(o, new Set(["prot", "mrna", "mut", "meth"] as const), 1),
+      [{ profile: "mutations" }, { profile: "rna_seq_v2_mrna_median_Zscores" }, { profile: "methylation_hm450" }, { profile: "rppa_Zscores" }]);
+    // KRAS: AMP and an SV the Results page adds: their data types; implied mRNA / protein name no id, so nothing
+    assert.deepEqual(selectedProfiles(opts({ mut: "mutations" }), new Set(["cna", "mut", "sv", "mrna", "prot"] as const), 1),
+      [{ profile: "mutations" }, { type: "SV" }, { type: "CNA" }]);
+    assert.deepEqual(selectedProfiles(opts({ mrna: "rna_seq_v2_mrna_median_Zscores" }), new Set(["mrna"] as const), 1), [{ profile: "rna_seq_v2_mrna_median_Zscores" }]);
+  });
+  test("selectedProfiles: several studies, EVERY_STUDY as the data type, an id read in each study holding it, methylation left out (row 11)", () => {
+    const o = opts({ mut: EVERY_STUDY, sv: EVERY_STUDY, cna: EVERY_STUDY, mrna: "rna_seq_v2_mrna_median_all_sample_Zscores", meth: EVERY_STUDY, prot: "rppa_Zscores" });
+    assert.deepEqual(selectedProfiles(o, new Set(["mut", "sv", "cna", "mrna", "meth", "prot"] as const), 3), [
+      { type: "MUTATION" }, { type: "SV" }, { type: "CNA" },
+      { profile: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true }, { profile: "rppa_Zscores", ifHeld: true },
+    ]);
+    assert.deepEqual(selectedProfiles(opts({ meth: EVERY_STUDY }), new Set(["meth"] as const), 2), []);
+    assert.deepEqual(selectedProfiles(opts({ mut: EVERY_STUDY }), new Set(["mut", "mrna", "prot"] as const), 2), [{ type: "MUTATION" }]);
   });
   test("thresholds are read as numbers of 0 or more", () => {
     assert.equal(readThreshold("2.0"), 2);
@@ -276,6 +294,21 @@ describe("the Results page's reading of its options", () => {
   test("no options: the query as typed, every case", () => {
     assert.deepEqual(chosenQuery(null, data, ["brca_tcga"], ["TP53"]), { waiting: false, entries: ["TP53"], clause: null, summary: null, notes: [] });
     assert.equal(chosenQuery(opts({ mut: "mutations" }), null, ["brca_tcga"], ["TP53"]).waiting, true);
+  });
+  test("the selected profiles (the portal's selectedMolecularProfiles), which Unaltered checks profiling in (row 12)", () => {
+    assert.equal(chosenQuery(null, data, ["brca_tcga"], ["TP53"]).selected, undefined, "no options: none");
+    const mutExp = opts({ mut: "mutations", mrna: "rna_seq_v2_mrna_median_Zscores" });
+    assert.deepEqual(chosenQuery(mutExp, data, ["brca_tcga"], ["TP53"]).selected, [{ profile: "mutations" }, { profile: "rna_seq_v2_mrna_median_Zscores" }]);
+    assert.deepEqual(chosenQuery(opts({ mut: "mutations", cna: "gistic" }), data, ["brca_tcga"], ["TP53"]).selected, [{ profile: "mutations" }, { profile: "gistic" }]);
+    assert.deepEqual(chosenQuery(opts({ mrna: "rna_seq_v2_mrna_median_Zscores" }), data, ["brca_tcga"], ["TP53: EXP>2"]).selected, [{ profile: "rna_seq_v2_mrna_median_Zscores" }]);
+    assert.deepEqual(chosenQuery(mutExp, data, ["brca_tcga"], ["TP53", "KRAS: AMP"]).selected,
+      [{ profile: "mutations" }, { type: "CNA" }, { profile: "rna_seq_v2_mrna_median_Zscores" }], "a kind the query asks for, by its type");
+    for (const [o, typed] of [[mutExp, ["TP53", "KRAS: AMP"]], [opts({ cna: "gistic" }), ["TP53"]], [opts({ mut: "mutations", prot: "rppa_Zscores" }), ["TP53"]]] as const) {
+      const c = chosenQuery(o, data, ["brca_tcga"], [...typed]);
+      assert.deepEqual(c.selected, selectedProfiles(o, effectiveKinds(o, [...typed], 1, held), 1), typed.join(";"));
+    }
+    const m = chosenQuery(opts({ mut: "*", mrna: "rna_seq_v2_mrna_median_all_sample_Zscores" }, { caseSet: "all" }), { profiles: [], caseSets: [] }, ["a", "b"], ["TP53"], true);
+    assert.deepEqual(m.selected, [{ type: "MUTATION" }, { profile: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true }]);
   });
   test("profiles, case set and the header's words", () => {
     const c = chosenQuery(opts({ mut: "mutations", mrna: "rna_seq_v2_mrna_median_Zscores" }, { z: "1.5", caseSet: "brca_tcga_sequenced" }), data, ["brca_tcga"], ["TP53", "KRAS: G12D"]);

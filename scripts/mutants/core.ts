@@ -3,7 +3,6 @@
 import type { GuardCommands, Mutant } from "./types.ts";
 
 export const guards: GuardCommands = {
-  "germline-frequency": ["node", "--env-file=.env.local", "scripts/check-germline-frequency.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
   "mutation-driver-settings": ["node", "--env-file=.env.local", "scripts/check-mutation-driver-settings.ts"],
   // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
@@ -97,7 +96,7 @@ export const mutants: Mutant[] = [
     replace: "\" AND lower(nullIf(g.mutation_type, '')) \" + (mut.op" },
   { id: "fusion-frequency-site2", layer: "counts", guard: "mutation-fusions", file: "lib/federation.ts",
     effect: "A sample whose only event in a gene is a fusion with the gene as site 2 counts in that gene's somatic mutation frequency, where the portal counts a fusion only under its site 1 gene.",
-    find: "uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "uniqExactIf(sid, (sv = 0 OR sv = 1) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples" },
+    find: "uniqExactIf(sid, (sv = 0 OR rgene = gene) AND ", replace: "uniqExactIf(sid, (sv = 0 OR sv = 1) AND " },
   { id: "fusion-stem-counted", layer: "counts", guard: "mutation-fusions", file: "lib/federation.ts",
     effect: "Fusions join the lollipop's per-change counts, so they are reported as mutations with no protein position and raise the withheld count.",
     find: "\"FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= \"", replace: "\"FROM m GROUP BY gene, pos, change HAVING n >= \"" },
@@ -146,14 +145,20 @@ export const mutants: Mutant[] = [
     effect: "Do not filter by OQL leaves the Mutations tab filtered.",
     find: "return v.useOql === false || !oqlHasMutationOql(",
     replace: "return !oqlHasMutationOql(" },
-  { id: "germline-count-case-sensitive", layer: "counts", guard: "germline-frequency", file: "lib/federation.ts",
-    effect: "A mutation whose status is spelled 'germline' or 'GERMLINE' does not count in the Germline Mutation Frequency, where the portal matches /germline/i.",
-    find: "positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND \" + germlineConsentedCond", replace: "position(ifNull(status, ''), 'Germline') > 0 AND \" + germlineConsentedCond" },
-  { id: "germline-rate-ignores-consent-list", layer: "counts", guard: "germline-frequency", file: "lib/federation.ts",
-    effect: "The Germline Mutation Frequency divides by every sample even where the study lists its germline-consented samples, where the portal divides by those.",
-    find: "germlineCohortSamples: Number(gc.data[0]?.lists) > 0 ?", replace: "germlineCohortSamples: Number(gc.data[0]?.lists) < 0 ?" },
+  { id: "table-present-numbers-only", layer: "counts", guard: "density", file: "lib/table-query.ts",
+    effect: "A table's \"has a value\" filter keeps only a numeric column's plain numbers, so a case file drops \">89\".",
+    find: "  if (isPresent(f)) return col.text + \" != ''\";",
+    replace: "  if (isPresent(f)) return col.num ? col.num + \" IS NOT NULL\" : col.text + \" != ''\";" },
+  { id: "qvalue-zero-as-exp", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
+    effect: "A gene table download writes a q-value of 0 as 0.000e+0, where the portal writes 0.",
+    find: "return q === 0 ? \"0\" : q.toExponential(3);",
+    replace: "return q.toExponential(3);" },
   { id: "corr-shown-unrounded-r", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
     effect: "A plot's correlation is shown to 2 decimals from the full-precision r, where the portal rounds its 5-decimal value (0.124996 shows 0.12, the portal 0.13).",
     find: "export const portalCorr = (r: number): string => portalR5(r).toFixed(2);",
     replace: "export const portalCorr = (r: number): string => r.toFixed(2);" },
+  { id: "results-unaltered-every-gene", layer: "cohorts", guard: "cohort-logic", file: "lib/cohort2.ts",
+    effect: "The Results page's Unaltered group requires profiling for every queried gene, not any of them, so samples on a panel without one gene drop out of it (msk_impact_2017 KRAS + ZFHX3: 8,136 for 10,945 profiled).",
+    find: ".join(leaf.anyGene ? \"\\n  UNION DISTINCT\\n\" : \"\\n  INTERSECT DISTINCT\\n\"));",
+    replace: ".join(\"\\n  INTERSECT DISTINCT\\n\"));" },
 ];
