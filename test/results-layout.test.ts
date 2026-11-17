@@ -227,3 +227,14 @@ test("SV-1 the page keeps a tab's badge beside its name (arrange carries it thro
   assert.equal(layout.tabs[0].title, "Structural Variants");
   assert.equal(layout.tabs[1].badge, undefined);
 });
+
+test("Comparison/Survival › Genomic Alterations is one table over every alteration type, Altered against Unaltered (CMM-AT-2, CMM-RV)", () => {
+  const l = resultsLayout(q(["a"], ["KRAS"]), data());
+  const ga = l.tabs.find((t) => t.title === "Comparison/Survival")!.sub!.find((s) => s.title === "Genomic Alterations")!;
+  assert.equal(ga.views?.length, 1, "one table, not one per alteration type");
+  const view = l.doc.views![ga.views![0]] as any;
+  assert.equal(view.kind, "enrichment");
+  assert.equal(view.alteration, "any");
+  assert.deepEqual(view.cohorts, ["Altered", "Unaltered"]);
+  assert.equal(view.minAltered, 1, "every gene tested is listed");
+});

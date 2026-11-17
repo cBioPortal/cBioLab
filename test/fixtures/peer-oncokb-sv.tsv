@@ -19,3 +19,4 @@ site1_entrez	site2_entrez	sv_type	tumor_type	oncogenicity	mutation_effect	highes
 57670	673	FUSION	Lung Adenocarcinoma	Likely Oncogenic	Gain-of-function	LEVEL_3B				
 57670	673	FUSION		Oncogenic	Gain-of-function	LEVEL_3B				
 2263	2263	FUSION		Resistance	Gain-of-function		LEVEL_R2			
+972	3084	FUSION		Oncogenic	Gain-of-function					
