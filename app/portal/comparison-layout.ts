@@ -60,7 +60,7 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
     // one table over every alteration type, under the portal's type tree, listing every gene tested
     { title: "Genomic Alterations", views: [v("Genomic Alterations", { kind: "enrichment", alteration: "any", minAltered: 1, allRows: true, measure })] },
     ...(mutationsOk ? [{ title: "Mutations", views: [v("Mutations", { kind: "mutcompare" })] }] : []),
-    ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })],
+    ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, allRows: true, ...e.extra })],
       // the portal's tab offers the data set alone
       locks: ["log2", "geneSets"] })) : []),
     // the portal's generic-assay tab offers the data set alone

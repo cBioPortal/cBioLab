@@ -298,7 +298,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Filters and sort, as the portal's (CancerSummaryContent chartData, groupKeysSorted): a category is shown with profiled patients, at least the Min. # Total of them (default 10, or 0 when no category has more than 10; per gene tab) and at least the Min. % / # Altered; "40 of 58 categories (Cancer Type) are shown based on filtering." when a threshold hides some; Sort X-Axis By Y-Axis Values (count mode by count) or Alphabetically (a study by its id); changing the category or count-by resets both thresholds, the y-axis the altered one. msk_impact_2017 `TP53 KRAS PIK3CA`: 40 of 58; Colorectal, Small Cell Lung, Small Bowel first; by count NSCLC first; alphabetically Adrenocortical Carcinoma, Ampullary Cancer, Anal Cancer — as the portal (CTS-CT-3…7, CTS-CT-10, CTS-CH-1, CTS-SO-1…3, CTS-STM-6) (#291)
     - Ours alone: the thresholds are text boxes without the sliders (CTS-CT-8, CTS-CT-9 not done); they live in the document and so are shared by the gene tabs, each tab's default worked out on its own data; nothing shown says "No category passes the filters." with the controls kept (the portal's "No data to plot." replaces them); ties keep more-profiled first (the portal's stable sort keeps first appearance)
     - As the portal, on purpose: the Min. % Altered compares the portal's float, (altered / profiled) * 100, so 29 of 100 is 28.999999999999996 and hidden at 29
-  - [ ] Downloads: SVG, PNG, PDF, Data TSV (CTS-DL-1…3, CTS-MD-12)
+  - [x] Downloads: each chart's SVG, PNG, PDF and Data (cancer_types_summary.*), as drawn — gene tab, filters, order; the Data file the portal's (CancerSummaryChart getData): per shown category, a row per kind with the unrounded y, the portal's key (mutated, amp, homdel, structuralVariant, multiple…) and the count. msk_impact_2017 `TP53 KRAS PIK3CA`: Colorectal Cancer mutated 90.4276985743381 / 888, structuralVariant 3, amp 1, homdel 1, multiple 18 — the portal's counts (CTS-DL-1…3) (#295)
+    - Ours alone: with two cohorts, one menu per chart, the cohort's name added to the file name
+    - [ ] The hide-download switch (CTS-MD-12): with the Data-governance switches
   - [ ] The bar's popover "Gene altered in 92.77% of 982 patients" with the type table to 2 dp, the study link and "Query this study" (ours an SVG title) (CTS-CH-7, CTS-STM-5, CTS-MD-2)
   - [ ] Stack and legend order (Multiple at the bottom, Mutation on top; ours the reverse); Multiple `#666` (ours `#6e7a83`) (CTS-CH-3, CTS-CH-4)
   - [ ] The profiled strip: "+" and "−" rows for every data type, with hover counts (ours rows only where a group lacks a type) (CTS-CH-5, CTS-CH-6, CTS-MD-8)
@@ -416,7 +418,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Every altered gene tested (ours `minAltered: 5`, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested, DYNC2H1 q 0.0503 vs 0.239; CNA 6,512 vs 6,156 significant; G5 mutation 145 vs 336; see bugs) (CMM-STM-7, CMM-AL-4) (#228)
   - [ ] Every row (ours ≤300, and the frequency scatter and bar plot are built from those 300; the expression tabs' cap is under them) (CMM-AL-5, CMM-FS, CMM-BP-2, CMM-GN, CMM-EX-5)
     - [x] Genomic Alterations: every gene tested listed (G2 22,871 rows, as the portal's), the volcano and frequency scatter drawing every one; the bar plot already ranked every tested gene (#228); a two-group tie enriched in the second group (CMM-STM-3) (#294)
-    - [ ] The expression tabs past their 1,500 cap (CMM-GN, CMM-EX-5)
+    - [x] The expression tabs past their 1,500 cap: every gene tested listed and drawn on the volcano (brca Basal vs LumA RNA-seq 20,026, as the portal's, p identical) (CMM-EX-5) (#297)
+    - [ ] The generic-assay tabs' tables past 300 (CMM-GN)
   - [ ] Patient-level enrichment: the Sample / Patient select (CMM-AL-4, CMM-MD-5)
   - [x] Formats: p and q "< 10^-10" (ours "1.1e-82"), altered % to 2 dp (ours 1), the volcano's y capped at 10 (ours to 82) (CMM-STM-9, CMM-STM-3, CMM-AL-5, CMM-VO-1) (#236)
     - [ ] Group headers "(A) Basal": the ordinals come with the group selector's (CMP-GS-7)
