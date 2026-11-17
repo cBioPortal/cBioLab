@@ -160,7 +160,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-CH-4 | 🟡 | B | Only types present ✅; order Mutation · Amplification · Deep Deletion · Structural Variant · Multiple (legacy Mutation · SV · Amp · Deep Del · Multiple) |
 | CTS-CH-5 | 🔶 | BC | Rows "Mutation data / CNA data / Structural variant data" with "+" only for a type some group lacks; when every group has it, one line "Every group was profiled for mutation, CNA and structural variant data." (`figure.ts:39-42, 101-105`); no "−"; no mRNA/protein rows; per-type profiled counts identical to legacy (Q3) |
 | CTS-CH-6 | ❌ | B | No scatter tooltip |
-| CTS-CH-7 | ✅ | BC | A popover per bar, as CancerSummaryChart's: "Summary for <group>" (by study with several drawn: the study's name, linked), "Gene altered in 92.77% of 982 patients", a row per type "p% (n patients)" in the portal's order; by study, "Query this study" opens Results for that study and the query |
+| CTS-CH-7 | ✅ | BC | A popover per bar, as CancerSummaryChart's: "Summary for <group>" (by study with several drawn: the study's name, linked), "Gene altered in 92.77% of 982 patients", a row per type "p% (n patients)" in the portal's order. "Query this study" is a deliberate omission: left out by the user's decision |
 | CTS-CH-8 | 🔶 | B | Raw values ✅ for attributes; by study the label is the study id (`sql.ts:35`), not the study name |
 | CTS-CH-9 | 🟡 | C | No profiled unit → refusal "no patient in this cohort was profiled for …" (`run.ts:98`); "No data to plot" cannot occur (nothing filtered); no "There are no alterations in this gene." |
 
@@ -186,7 +186,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | ID | verdict | how | note |
 |---|---|---|---|
 | CTS-MD-1 | ✅ | BC | Samples ↔ patients changes every numerator and denominator (Q1 both modes identical to legacy); captions follow the unit (see bug 1 for exceptions); no thresholds to reset |
-| CTS-MD-2 | ✅ | BC | Default Cancer Study with study names (#287); the popover links the study and "Query this study"; counts per study identical |
+| CTS-MD-2 | ✅ | BC | Default Cancer Study with study names (#287); the popover links the study; counts per study identical. "Query this study" is a deliberate omission: left out by the user's decision |
 | CTS-MD-3 | 🔶 | B | Default Cancer Type → 1 bar for coadread |
 | CTS-MD-4 | ✅ | B | Single gene: no "All Queried Genes" |
 | CTS-MD-5 | 🟡 | BC | The query's OQL applied (the view's `oql`), EXP/PROT as mRNA / protein high and low segments; the OQL banner is the page's note (tracked) |

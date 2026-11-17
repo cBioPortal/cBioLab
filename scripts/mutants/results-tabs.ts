@@ -99,12 +99,4 @@ export const mutants: Mutant[] = [
     effect: "A popover percentage of 1.005 shows 1%, where the portal's lodash round shows 1.01%.",
     find: "const [m, e] = (String(x) + \"e\").split(\"e\");\n  const shifted = Math.round(+(m + \"e\" + (+e + 2)));",
     replace: "const shifted = Math.round(x * 100);" },
-  { id: "cts-study-query-drops-gene-oql", layer: "counts", guard: "unit", file: "lib/views/cancertypes/tip.ts",
-    effect: "\"Query this study for KRAS\" on a KRAS: AMP query opens every KRAS alteration, where the bar counts amplifications.",
-    find: "const lines = view.oql ? view.oql.filter((l) => !gene || parseOql(l)[0]?.gene === gene) : gene ? [gene] : genes;",
-    replace: "const lines = gene ? [gene] : view.oql ?? genes;" },
-  { id: "cts-study-query-ignores-case-set", layer: "counts", guard: "unit", file: "lib/views/cancertypes/tip.ts",
-    effect: "\"Query this study\" from a page queried over cases with mutation data opens every case of the study.",
-    find: "if (page.caseSet !== \"all\") return",
-    replace: "if (false) return" },
 ];
