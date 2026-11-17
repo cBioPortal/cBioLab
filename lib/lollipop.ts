@@ -3,6 +3,7 @@
 // from the portal is a bug here rather than a design choice. Pure except fetchProteinInfo.
 import type { LollipopReport } from "./federation.ts";
 import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hotspots/types.ts";
+import type { TableQuery } from "./table-query.ts";
 
 // ---- mutation types: getCanonicalMutationType / getProteinImpactTypeFromCanonical ----------
 
@@ -436,4 +437,19 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}),
     somaticSamples, cohortSamples, tally, ...(protein?.ids ? { ids: protein.ids } : {})
   };
+}
+
+/** the mutation table's filters that are the lollipop's own selection — its grid's cells and its stems — and so never narrow it */
+export const LOLLIPOP_OWN_FILTERS: ReadonlySet<string> = new Set(["alteration", "proteinPos"]);
+/**
+ * The part of the mutation table's query that narrows the lollipop and badges (the portal's filtered
+ * data): its search and its column filters other than LOLLIPOP_OWN_FILTERS; null when nothing does.
+ */
+export function lollipopNarrowing<Q extends TableQuery>(q: Q): Q | null {
+  const filters = Object.fromEntries(Object.entries(q.filters || {}).filter(([id]) => !LOLLIPOP_OWN_FILTERS.has(id)));
+  const search = (q.search || "").trim();
+  if (!search && !Object.keys(filters).length) return null;
+  const out = { ...q } as Q;
+  delete out.filters; delete out.search; delete out.sort;
+  return { ...out, ...(search ? { search } : {}), ...(Object.keys(filters).length ? { filters } : {}) };
 }
