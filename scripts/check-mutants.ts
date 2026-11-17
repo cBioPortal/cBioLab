@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "mutation-driver-settings";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "mutation-driver-settings": ["node", "--env-file=.env.local", "scripts/check-mutation-driver-settings.ts"],
 };
 
 interface Mutant {
@@ -517,6 +518,15 @@ const MUTANTS: Mutant[] = [
   { id: "fusion-only-gene-dropped", layer: "counts", guard: "mutation-fusions", file: "lib/views/hotspots/run.ts",
     effect: "A gene with fusions but no mutations disappears from the Mutations tab's lollipop, with its Fusion badge and frequency, where the portal keeps it.",
     find: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));", replace: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i])).filter((h) => h.mutated > 0);" },
+  { id: "lollipop-oncokb-ignores-settings", layer: "counts", guard: "mutation-driver-settings", file: "lib/federation.ts",
+    effect: "With OncoKB switched off in the page's driver settings, the Mutations tab's badges and stems still count OncoKB's oncogenic calls as drivers, where the portal calls them VUS.",
+    find: "  if (src.oncokb) or.push(", replace: "  if (pin) or.push(" },
+  { id: "lollipop-unannotated-all-vus", layer: "counts", guard: "mutation-driver-settings", file: "lib/federation.ts",
+    effect: "With every driver source off, the Mutations tab files every mutation as VUS, where the portal counts them by type alone.",
+    find: "if (annotating === \"0\") { driver = \"1\"; fusionDriver = \"toUInt8(1)\"; }", replace: "if (annotating === \"0\") { driver = \"0\"; fusionDriver = \"toUInt8(0)\"; }" },
+  { id: "mutation-table-oncokb-ignores-settings", layer: "counts", guard: "unit", file: "lib/mutation-table.ts",
+    effect: "With OncoKB switched off, the mutation table still calls OncoKB's oncogenic mutations drivers (its Alteration cell and default order), where the portal calls them VUS.",
+    find: "  if (drivers.oncokb && pin) or.push(oncokb);", replace: "  if (pin) or.push(oncokb);" },
   { id: "germline-case-sensitive", layer: "counts", guard: "mutation-tab-states", file: "lib/federation.ts",
     effect: "A mutation whose status is spelled 'Germline' or 'germline' counts as somatic in the Somatic Mutation Frequency, where the portal matches germline in any case.",
     find: "AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "AND ifNull(status, '') != 'GERMLINE') AS somatic_samples" },

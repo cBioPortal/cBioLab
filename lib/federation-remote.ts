@@ -13,6 +13,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, CohortSizes, ExploreResult } from "./types.ts";
+import type { DriverSettings } from "./driver-settings.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, PairOql, LollipopOql, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
 import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers, PlotCell } from "./plot.ts";
 import type { Moments } from "./stats.ts";
@@ -397,11 +398,11 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     this.remember(r);
     return r.variantCounts || { variants: [], totals: [], minCount };
   }
-  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql): Promise<LollipopReport> {
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, drivers?: DriverSettings): Promise<LollipopReport> {
     this.guard(def);
     if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: false };
     const r = await this.call("aggregates",
-      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}) });
+      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}), ...(drivers ? { lollipopDrivers: drivers } : {}) });
     this.remember(r);
     // a peer on an older build answers without these; refuse by name rather than draw nothing
     if (!r.lollipopCounts)

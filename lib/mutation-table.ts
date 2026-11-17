@@ -10,6 +10,8 @@ import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
+import { offeredSources, tieredSql } from "./driver-sql.ts";
+import { PUTATIVE_DRIVER, type ResolvedDrivers } from "./driver-settings.ts";
 import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
 import { mutationTypeLabelSql } from "./mutation-type.ts";
@@ -80,18 +82,18 @@ export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange"
  * its protein impact class (the lollipop's own mapping, lib/lollipop.ts) and driver status — every
  * mutation a driver when no OncoKB version is pinned, as the lollipop counts them then.
  */
-export function alterationSql(pin: string | null): string {
+export function alterationSql(pin: string | boolean | null): string {
   const klass = "transform(" + impactSql("mutationType") + ", [" + IMPACT_TYPES.map((k) => "'" + k + "'").join(", ") + "], [" +
     IMPACT_TYPES.map((k) => "'" + IMPACT_COLORS[k].label + "'").join(", ") + "], 'Other')";
   return "concat(" + klass + ", " + (pin ? "if(drv = 1, ' · Driver', ' · VUS')" : "' · Driver'") + ")";
 }
 /** The same, in the browser, for a row the table returned. */
-export function alterationOf(mutationType: string, driver: boolean, pin: string | null): string {
+export function alterationOf(mutationType: string, driver: boolean, pin: string | boolean | null): string {
   return cellLabel(cellOf(impactType(canonicalType(mutationType)), pin ? driver : true));
 }
 
 /** How each column reads off the rows: as text (search, text filters, value lists), as a number, and its order. */
-function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
+function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColumn {
   const str = (x: string) => "ifNull(toString(" + x + "), '')";
   const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
   switch (c.id) {
@@ -128,8 +130,36 @@ const SIGNAL_TEXT = "if(signalFreq IS NULL, NULL, if(signalFreq = 0, '0', " +
 /** One (cohort, study) part of a table: the cohort's SQL as that study's resolver compiles it. */
 export interface TablePart { cohort: string; study: string; cohortSql: string }
 
+/**
+ * A mutation row's driver call. Without `drivers`, OncoKB at the pin (the sample's tumour type's call
+ * where one is stored; never a germline mutation, which the portal asks about by HGVSc) or a Cancer
+ * Hotspot. With the page's settings (lib/driver-settings.ts), any switched-on source that is offered,
+ * as the portal's annotateMutationPutativeDriver: the study's Putative_Driver call, a counted tier,
+ * that OncoKB call, a hotspot.
+ */
+function mutationDrvSql(p: TablePart, db: string, gene: string, pin: string | null, pins: VariantPins, gn: boolean, drivers?: ResolvedDrivers): string {
+  const oncokb = "(NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0)))";
+  const hotspot = gn && HOTSPOT_GENES.has(gene) ? hotspotCondSql("m.mutationType", "ifNull(g.gd, '')") : null;
+  if (!drivers) return pin ? "toUInt8(" + oncokb + (hotspot ? " OR " + hotspot : "") + ")" : "toUInt8(0)";
+  const or: string[] = [];
+  if (drivers.custom) or.push("ifNull(m.driverFilter, '') = " + sq(PUTATIVE_DRIVER));
+  if (drivers.tiers === null) or.push("ifNull(m.driverTiersFilter, '') != ''");
+  else if (drivers.tiers.length) or.push("ifNull(m.driverTiersFilter, '') IN (" + drivers.tiers.map(sq).join(", ") + ")");
+  if (drivers.oncokb && pin) or.push(oncokb);
+  if (drivers.hotspots && hotspot) or.push(hotspot);
+  return unannotatedOr(p, db, gene, drivers, pin, pins, or.length ? "toUInt8(" + or.join(" OR ") + ")" : "toUInt8(0)");
+}
+
+/** `drv`, or 1 for every row when no source annotates (the grid then files every mutation in its class's one cell) */
+function unannotatedOr(p: TablePart, db: string, gene: string, drivers: ResolvedDrivers, pin: string | null, pins: VariantPins, drv: string): string {
+  const src = offeredSources(drivers, pin, pins);
+  if (src.sure) return drv;
+  if (!src.byTier) return "toUInt8(1)";
+  return "if(" + tieredSql(db, p.study, sq(gene)) + ", " + drv + ", toUInt8(1))";
+}
+
 /** A part's rows, every column the table has, labelled with its cohort, study and document order. */
-function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql): { ctes: string; rows: string } {
+function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): { ctes: string; rows: string } {
   const filter = oql ? oqlMutationFilterSql(oql.lines, gene, { study: p.study, db, oncokbPin: pin, ...(oql.drivers !== undefined ? { drivers: oql.drivers, hotspotPins: pins } : {}) }) : null;
   const pre = sq(p.study + "_");
   const attr = (name: string, as: string) =>
@@ -141,7 +171,8 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "m" + i + " AS (\n" +
     "  SELECT patientId AS pid, sampleId AS sid, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
     "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos,\n" +
-    "         center, validationStatus AS vs, normalAltCount AS nAlt, normalRefCount AS nRef\n" +
+    "         center, validationStatus AS vs, normalAltCount AS nAlt, normalRefCount AS nRef" +
+    (drivers ? ", driverFilter, driverTiersFilter" : "") + "\n" +
     "  FROM " + db + ".mutation_derived\n" +
     "  WHERE " + mutationStudySql(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n" +
@@ -160,9 +191,8 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
     // a germline mutation has no protein-change call: the portal asks OncoKB about it by HGVSc
     // (StoreUtils queryOncoKbData), which this store does not hold
-    (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n" +
-      "         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0)))" + (gn && HOTSPOT_GENES.has(gene) ? " OR " + hotspotCondSql("m.mutationType", "ifNull(g.gd, '')") : "") + ") AS drv,\n"
-      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
+    (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n         "
+      : "         '' AS oncogenicity, '' AS level, ") + mutationDrvSql(p, db, gene, pin, pins, !!gn, drivers) + " AS drv,\n" +
     "         m.mutationType AS mutationType, upper(m.variantType) AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
@@ -175,7 +205,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     (gn ? "  LEFT JOIN g" + i + " AS g ON g.chr = m.chr AND g.start = m.start AND g.end = m.end AND g.ref = m.ref AND g.var = m.var\n" : "") +
     "  LEFT JOIN ct" + i + " AS ct ON ct.sid = m.sid LEFT JOIN mc" + i + " AS mc ON mc.sid = m.sid\n" +
     "  LEFT JOIN cta" + i + " AS cta ON cta.sid = m.sid LEFT JOIN cn" + i + " AS cn ON cn.sid = m.sid AND cn.g = " + sq(gene) + "\n";
-  return { ctes: ctes + (gn ? gn + ",\n" : ""), rows: rows + "  UNION ALL\n" + fusionRows(p, i, db, gene, pin, oql) };
+  return { ctes: ctes + (gn ? gn + ",\n" : ""), rows: rows + "  UNION ALL\n" + fusionRows(p, i, db, gene, pin, pins, oql, drivers) };
 }
 
 /**
@@ -247,16 +277,16 @@ function fusionCtes(p: TablePart, i: number, db: string, gene: string, pin: stri
  * variant is never germline for the driver call (ResultsViewPageStoreUtils, isGermline false). Under
  * the query's OQL, the fusions a line of either partner wants (lib/oql.ts oqlFusionFilterSql).
  */
-function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, oql?: LollipopOql): string {
-  const drv = pin ? svDriverSql("vn", "va1", "va2") : "toUInt8(0)";
+function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): string {
+  const drv = drivers ? unannotatedOr(p, db, gene, drivers, pin, pins, pin && drivers.oncokb ? svDriverSql("vn", "va1", "va2") : "toUInt8(0)")
+    : pin ? svDriverSql("vn", "va1", "va2") : "toUInt8(0)";
   const filter = oql ? oqlFusionFilterSql(oql.lines, "v.gene1", "v.gene2", drv) : null;
   return "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
     "         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
-    (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level, " +
-        drv + " AS drv,\n"
-      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
+    (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level, "
+      : "         '' AS oncogenicity, '' AS level, ") + drv + " AS drv,\n" +
     "         'Fusion' AS mutationType, upper(v.class) AS variantType,\n" +
     "         NULL AS vaf, NULL AS altCount, NULL AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,\n" +
@@ -301,8 +331,8 @@ function tumorTypeCtes(p: TablePart, i: number, db: string): string {
     "    k.tumorType AS tumorType FROM m" + i + " AS m LEFT JOIN k" + i + " AS k ON k.sid = m.sid),\n";
 }
 
-function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql): string {
-  const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins, oql));
+function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): string {
+  const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins, oql, drivers));
   return "WITH " +
     (pin
       ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
@@ -328,11 +358,11 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
  * and SIGNAL at the pin of the study's reference genome (`pins`), when it has one. With no sort,
  * drivers come first, then by codon. All parts must live in the database this runs in.
  */
-export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql): RowSource {
+export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): RowSource {
   if (!parts.length) throw new Error("mutationRowSource needs at least one part");
   return {
-    with: allRows(parts, db, gene, pin, pins, oql),
-    columns: MUTATION_COLUMNS.map((c) => queryColumn(c, pin)),
+    with: allRows(parts, db, gene, pin, pins, oql, drivers),
+    columns: MUTATION_COLUMNS.map((c) => queryColumn(c, drivers ? true : pin)),
     select: "*",
     defaultOrder: "drv DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",

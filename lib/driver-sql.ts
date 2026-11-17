@@ -1,9 +1,10 @@
 // The driver rule of lib/driver-settings.ts as SQL over genomic_event_derived rows, for the views
 // that classify in the database (a plot's Driver-vs-VUS axis), and the germline test the oncoprint
 // reads its events with. Server-side: it reaches the OncoKB store's SQL in lib/oql.ts.
-import { sq } from "./compiler.ts";
+import { mutationStudySql, sq } from "./compiler.ts";
 import { driverEventSql } from "./oql.ts";
 import { PUTATIVE_DRIVER, type ResolvedDrivers } from "./driver-settings.ts";
+import type { VariantPins } from "./variant-annotation.ts";
 
 /**
  * The same rule as SQL over a genomic_event_derived row (`g` names its table, "" for unqualified
@@ -25,3 +26,19 @@ export function driverCondSql(s: ResolvedDrivers, pin: string | null | undefined
 /** a genomic_event_derived row is a germline mutation, as SQL */
 export const germlineCondSql = (g = ""): string =>
   "(" + (g ? g + "." : "") + "variant_type = 'mutation' AND positionCaseInsensitive(" + (g ? g + "." : "") + "mutation_status, 'germline') > 0)";
+
+/**
+ * The page's driver sources as a view can read them: OncoKB only at a pin, Cancer Hotspots only with
+ * Genome Nexus pins (the portal's sources the deployment offers). `sure`: some source is on whatever
+ * the data holds; with none but "every tier" (`byTier`), something is annotated only where the data
+ * carries a tier.
+ */
+export function offeredSources(d: ResolvedDrivers, pin: string | null, hotspotPins: VariantPins | null): { oncokb: boolean; hotspots: boolean; sure: boolean; byTier: boolean } {
+  const oncokb = d.oncokb && !!pin, hotspots = d.hotspots && !!hotspotPins && Object.values(hotspotPins).some(Boolean);
+  const sure = oncokb || hotspots || d.custom || (d.tiers !== null && d.tiers.length > 0);
+  return { oncokb, hotspots, sure, byTier: !sure && d.tiers === null };
+}
+
+/** whether any of the study's mutations of the genes (`list`, quoted and comma-separated) carries a custom driver tier (cbp_driver_tiers), as SQL */
+export const tieredSql = (db: string, study: string, list: string): string =>
+  "(SELECT count() > 0 FROM " + db + ".mutation_derived WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ") AND ifNull(driverTiersFilter, '') != '')";
