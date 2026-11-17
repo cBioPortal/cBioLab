@@ -3,6 +3,8 @@
 import type { GuardCommands, Mutant } from "./types.ts";
 
 export const guards: GuardCommands = {
+  // the Add chart Freq's samples with data, run on the fixture study's connection b
+  "chart-freq": ["node", "--env-file=.env.local", "scripts/check-chart-freq.ts"],
   // the Case Lists chart's counts, run on the fixture study's connection b
   "case-lists": ["node", "--env-file=.env.local", "scripts/check-case-lists.ts"],
   // the gene tables' Freq-tooltip panels, run on the fixture study's connection b
@@ -252,4 +254,24 @@ export const mutants: Mutant[] = [
     effect: "The Explore header shows a study's whole description on its first line, where the portal shows the first line and puts the rest under ⊕.",
     find: "first: descriptionParts(s.description.split(/\\n+/g)[0]),",
     replace: "first: descriptionParts(s.description)," },
+  { id: "add-chart-uncounted-as-zero", layer: "counts", guard: "chart-freq", file: "lib/explore.ts",
+    effect: "An attribute Explore's query was not asked for reads 0% in Add chart, greyed and uncheckable, though samples have data for it.",
+    find: "    counted: (a: string) => (!attrAllow.length || attrAllow.includes(a)) && (cl.get(st) || []).length < FACET_ATTR_LIMIT,",
+    replace: "    counted: () => true," },
+  { id: "chart-freq-patients", layer: "counts", guard: "chart-freq", file: "lib/explore.ts",
+    effect: "The Add chart Freq counts a patient attribute's patients, where the portal counts their selected samples (a patient with two samples counts once).",
+    find: "const withData = (r: ChRow) => r.type === \"sample\" ? Number(r.np) : samplesOf.get(String(r.a));",
+    replace: "const withData = (r: ChRow) => Number(r.np);" },
+  { id: "add-chart-zero-checkable", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "An attribute no selected sample has data for can be checked in Add chart, where the portal greys it out.",
+    find: "return { ...r, freq, disabled: freq === 0 };",
+    replace: "return { ...r, freq, disabled: false };" },
+  { id: "add-chart-by-name", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "Add chart lists its attributes by name alone, where the portal puts the ones most samples have data for first.",
+    find: "rank(b.freq) - rank(a.freq) || a.name.localeCompare(b.name)",
+    replace: "a.name.localeCompare(b.name)" },
+  { id: "add-chart-uncheck-keeps-mixed", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "Turning a chart off also drops an any-of filter that names another attribute too.",
+    find: "leaves.every((l) => isClinicalLeaf(l) && l.attribute === attribute)",
+    replace: "leaves.some((l) => isClinicalLeaf(l) && l.attribute === attribute)" },
 ];
