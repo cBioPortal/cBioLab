@@ -270,6 +270,21 @@ describe("timeline: pages, values, and several participants", () => {
   });
 });
 
+describe("timeline: tables (PTB-CD-4)", () => {
+  test("R1 PTB-CD-4: tables that is not a boolean is refused, naming tables", async () => {
+    const v = await run({ tables: "yes" }, ctx({ A: { s1: 3 } }, { s1: local("s1", { A: THREE }) }));
+    assert.match(v.error!, /tables/);
+  });
+
+  test("R2 PTB-CD-4: tables true is not refused, its data the same as without", async () => {
+    const c = () => ctx({ A: { s1: 3 } }, { s1: local("s1", { A: THREE }) });
+    const on = await run({ tables: true }, c());
+    const off = await run({}, c());
+    assert.equal(on.error, undefined);
+    assert.deepEqual(on.timeline, off.timeline);
+  });
+});
+
 describe("timeline: PAT-TL-TT-3 sample attributes", () => {
   const withAttrs = (rowsPage: () => Promise<unknown>) => {
     const l = local("s1", { A: THREE });

@@ -305,7 +305,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - Ours alone: with two cohorts, one menu per chart, the cohort's name added to the file name
     - [ ] The hide-download switch (CTS-MD-12): with the Data-governance switches
   - [ ] The bar's popover "Gene altered in 92.77% of 982 patients" with the type table to 2 dp, the study link and "Query this study" (ours an SVG title) (CTS-CH-7, CTS-STM-5, CTS-MD-2)
-  - [ ] Stack and legend order (Multiple at the bottom, Mutation on top; ours the reverse); Multiple `#666` (ours `#6e7a83`) (CTS-CH-3, CTS-CH-4)
+  - [x] Stack and legend order as the portal's: Multiple at the bottom, then protein and mRNA low / high, deep deletion, amplification, structural variant, Mutation on top (OrderedAlterationLabelMap); the legend the kinds present, reversed (Mutation first); Multiple `#666` (CTS-CH-3, CTS-CH-4) (#328)
   - [ ] The profiled strip: "+" and "−" rows for every data type, with hover counts (ours rows only where a group lacks a type) (CTS-CH-5, CTS-CH-6, CTS-MD-8)
   - [ ] The "Show Genomic Alteration Types" toggle (CTS-OC-3)
   - [ ] A gene with no alterations: grey tab label, "There are no alterations in this gene." (CTS-GT-4, CTS-MD-10)
@@ -392,6 +392,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The table's download and column menu; the row click's plot and its controls (CMP-CL-2, CMP-CL-3, CMP-CL-4)
   - [x] Numeric clinical attributes by Wilcoxon / Kruskal-Wallis (ours report Welch t / Welch ANOVA: G1 Weight 2.80e-7 vs the portal's 3.86e-8, MSI MANTIS 0.0745 vs 0.798; ours computes the rank p, matching, but does not show it) (CMP-STM-7) (#233)
     - [ ] q over the same n as the portal's: it counts its 8 hidden survival attributes and OTHER_PATIENT_ID (G1 Weight q 1.022e-6; ours 8.49e-7 over 44; p identical)
+      - [x] The hidden survival attributes, AGE_LAST_FU_YEARS and BIRTH_YEAR tested and counted, not listed: n 52, Weight q 1.003e-6 (#310)
+      - [ ] OTHER_PATIENT_ID: waits on the >200-value question (QUESTIONS.md, invariant 10)
   - [x] Survival: the survival-type table (PFS, DFS, DSS with p and q, the Min. # patients filter) and a way to pick the endpoint on the tab (ours OS only), on the Comparison page and Results › Comparison/Survival; the tab only with survival data, opening on the portal's first endpoint (CMP-SV-1, CMP-SV-5, CMP-SV-6, CMP-STM-4, CMP-PG-4) (#227)
     - [ ] The table's hidden `# in <group>` and median columns, its column menu and download; Min. # as a slider (ours a number field) (CMP-SV-5)
     - [ ] The plot header's attribute description, the multi-study description warning, the axis titles from the attributes ("Probability of Overall Survival", "Overall Survival (Months)") (CMP-SV-7, CMP-KM-2)
@@ -448,6 +450,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
   - [x] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3) (#303)
   - [ ] Clinical Data tab as Attribute | Value and Attribute × sample, and the Timeline Data tables (ours two wide tables of raw values) (PTB-CD-1…4, PTB-STM-11)
+    - [x] The Timeline Data tables, one per event type (PTB-CD-4) (#316)
 
 ## Medium — annotation depth and per-sample viewers
 

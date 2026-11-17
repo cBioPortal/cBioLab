@@ -17,7 +17,8 @@
  * gives it), only the bugs that diff could affect are planted: those in a changed file, those whose
  * guard's own files changed, and those an edited area file defines or guards. A diff that touches
  * this script, scripts/mutants/types.ts, the workflow or the dependencies plants every bug, as does
- * a run without MUTANT_CHANGED (master, the merge queue, and locally).
+ * a run without MUTANT_CHANGED (the nightly run, planted-bugs-nightly.yml, and locally). A push to
+ * master is selective too, by its own diff.
  * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads
  * (or REPORT_DIR/mutants.json when REPORT_DIR is set, as in CI).
  */
@@ -43,15 +44,18 @@ const CORE_GUARDS: GuardCommands = {
 type Planted = Mutant & { source: string };
 
 /**
- * Every scripts/mutants/<area>.ts but types.ts: its `guards` and its `mutants`. One file per area,
- * so a pull request adds its bugs beside its own and never edits a list another one edits. A
+ * Every .ts file under scripts/mutants/ but types.ts: its `guards` and its `mutants`. An area's
+ * established bugs sit in scripts/mutants/<area>.ts; a pull request adds its own in a new file,
+ * scripts/mutants/<area>/<feature>.ts, so two pull requests never append to the same list. A
  * duplicate id, a guard defined twice or a bug naming no defined guard stops the run here.
  */
 const MUTANT_DIR = join(ROOT, "scripts", "mutants");
 const GUARD_CMD: GuardCommands = { ...CORE_GUARDS };
 const GUARD_SOURCE: Record<string, string> = {};
 const MUTANTS: Planted[] = [];
-for (const f of readdirSync(MUTANT_DIR).filter((n) => n.endsWith(".ts") && n !== "types.ts").sort()) {
+const MUTANT_FILES = (readdirSync(MUTANT_DIR, { recursive: true }) as string[])
+  .filter((n) => n.endsWith(".ts") && n !== "types.ts").sort();
+for (const f of MUTANT_FILES) {
   const source = "scripts/mutants/" + f;
   const area = await import(pathToFileURL(join(MUTANT_DIR, f)).href) as { guards?: GuardCommands; mutants?: Mutant[] };
   if (!Array.isArray(area.mutants)) throw new Error(source + " exports no `mutants` array");
@@ -94,7 +98,7 @@ function run(dir: string, guard: string, file?: string): { ok: boolean; failures
   // the warehouse anew, and one that changes only what is done with the answer gets the same answer.
   // Never the unit guard's: its tests answer statements with stubs, which would be kept as the warehouse's.
   const { RECORD, REPORT_DIR, CH_RUN_CACHE, ...rest } = process.env;
-  const env = { ...rest, PORTAL_CACHE: join(dir, ".portal-cache"),
+  const env = { ...rest, PORTAL_CACHE: process.env.PORTAL_CACHE || join(dir, ".portal-cache"),
     ...(guard === "unit" ? {} : { CH_RUN_CACHE: CH_RUN_CACHE || join(dir, ".ch-cache") }) };
   const r = spawnSync(cmd, args, { cwd: dir, env, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
   const out = (r.stdout || "") + (r.stderr || "");
@@ -145,7 +149,7 @@ function selection(): { mutants: Planted[]; changed: number | null; reason: stri
 }
 /** every planted bug run against its guard in the copy at `dir`; the exit code */
 function plantAll(): number {
-  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".venv"]);
+  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".portal-cache", ".venv"]);
   cpSync(ROOT, dir, { recursive: true, filter: (src) => !SKIP.has(src.split("/").pop()!) });
   symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"));
   mkdirSync(join(dir, "docs/verification"), { recursive: true });

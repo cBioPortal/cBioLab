@@ -1390,6 +1390,8 @@ filtered, sorted table; the page is the reader's and is not.
   \`{"op": "contains"|"notContains"|"equals"|"notEquals"|"startsWith"|"endsWith"|"regex", "value": "…"}\`
   (case-insensitive but for \`regex\`, RE2 syntax) or \`{"values": ["…", …]}\` (≤500 exact values; \`""\`
   is blank); a numeric column takes \`{"min"?: n, "max"?: n}\` (inclusive; a blank value fails it).
+  Any column takes \`{"present": true}\`: the rows with a value, whatever it is (a numeric
+  column's \`>89\` included).
 - \`sort: {"column": id, "desc"?: true}\` — numbers as numbers, missing values last either way.
 
 All four run in the database across every cohort and study together, so the order is global and
@@ -1399,7 +1401,7 @@ column id or a filter that does not suit its column is refused with the ids acce
 \`POST /api/view-page {doc, view, offset, limit}\` returns another page; \`{doc, view, values:
 "<column>"}\` returns the values that column takes among the rows the rest of the query keeps
 (distinct values with counts, or a numeric column's range) — what its filter offers.
-\`POST /api/table {doc, view}\` streams every row kept, every column, as CSV.
+\`POST /api/table {doc, view}\` streams every row kept, every column, as CSV; for the Download tab's gene-by-sample files, \`format:"tsv"\` or \`"tsv-transposed"\` gives the portal's Tab Delimited Format or Transposed Matrix file instead.
 
 ### Plot axes
 

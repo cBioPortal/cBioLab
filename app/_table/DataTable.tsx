@@ -40,11 +40,13 @@ function clean(q: TableQuery): TableQuery {
 
 function isRange(f: ColumnFilter): f is { min?: number; max?: number } { return "min" in f || "max" in f; }
 function isValues(f: ColumnFilter): f is { values: string[] } { return "values" in f; }
+function isPresent(f: ColumnFilter): f is { present: true } { return "present" in f; }
 
 /** A filter in a few words, for its chip. */
 function filterText(f: ColumnFilter): string {
   if (isRange(f)) return f.min != null && f.max != null ? f.min + " – " + f.max : f.min != null ? "≥ " + f.min : "≤ " + f.max;
   if (isValues(f)) return f.values.length === 1 ? "= " + (f.values[0] || "(blank)") : "one of " + f.values.length;
+  if (isPresent(f)) return "has a value";
   return OP_LABELS[f.op] + " “" + f.value + "”";
 }
 
@@ -188,8 +190,8 @@ function FilterMenu({ col, current, vi, docJson, table, onApply }: {
   const vals = useColumnValues(col.id, vi, docJson, table);
   const v = vals.status === "loaded" ? vals.v : null;
   const cur = current;
-  const [op, setOp] = useState<TextFilterOp>(cur && !isRange(cur) && !isValues(cur) ? cur.op : "contains");
-  const [text, setText] = useState(cur && !isRange(cur) && !isValues(cur) ? cur.value : "");
+  const [op, setOp] = useState<TextFilterOp>(cur && !isRange(cur) && !isValues(cur) && !isPresent(cur) ? cur.op : "contains");
+  const [text, setText] = useState(cur && !isRange(cur) && !isValues(cur) && !isPresent(cur) ? cur.value : "");
   const [picked, setPicked] = useState<Set<string> | null>(cur && isValues(cur) ? new Set(cur.values) : null);
   const [find, setFind] = useState("");
   const [lo, setLo] = useState(cur && isRange(cur) && cur.min != null ? String(cur.min) : "");
