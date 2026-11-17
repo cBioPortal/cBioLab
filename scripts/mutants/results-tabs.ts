@@ -91,4 +91,12 @@ export const mutants: Mutant[] = [
     effect: "Malformed driver settings on the Download view are taken without a word.",
     find: "if (view.drivers !== undefined) try { resolveDrivers(view.drivers); }",
     replace: "if (false) try { resolveDrivers(view.drivers); }" },
+  { id: "cts-tip-links-one-study", layer: "counts", guard: "unit", file: "lib/views/cancertypes/tip.ts",
+    effect: "A popover grouped by study links its study when only that study is drawn, where the portal shows \"Summary for\" and no link.",
+    find: "const links = r.groupBy === \"study\" && src.groups.length > 1;",
+    replace: "const links = r.groupBy === \"study\";" },
+  { id: "cts-tip-round-plain", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
+    effect: "A popover percentage of 1.005 shows 1%, where the portal's lodash round shows 1.01%.",
+    find: "const [m, e] = (String(x) + \"e\").split(\"e\");\n  const shifted = Math.round(+(m + \"e\" + (+e + 2)));",
+    replace: "const shifted = Math.round(x * 100);" },
 ];
