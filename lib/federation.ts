@@ -1744,27 +1744,19 @@ abstract class BaseResolver implements AggregateCapable {
    * Which of these axes' clinical attributes the STUDY declares as numbers. Only it knows: it
    * declared them. An attribute it does not declare has no answer here rather than a guess.
    */
-  protected async clinicalKinds(axes: PlotAxis[]): Promise<Map<string, "num" | "cat">> {
-    return (await this.clinicalMeta(axes)).kinds;
-  }
-
-  /** each clinical axis's type as the study declares it, and its display name (the portal's axis title, PLT-DT-19) */
-  protected async clinicalMeta(axes: (PlotAxis | undefined)[]): Promise<{ kinds: Map<string, "num" | "cat">; names: Map<string, string> }> {
+  protected async clinicalKinds(axes: (PlotAxis | undefined)[]): Promise<Map<string, "num" | "cat">> {
     const db = this.instance.conn.db;
     const attrs = axes.filter((a) => a?.source === "clinical").map((a) => (a as { attribute: string }).attribute);
-    const kinds = new Map<string, "num" | "cat">(), names = new Map<string, string>();
-    if (!attrs.length) return { kinds, names };
+    const kinds = new Map<string, "num" | "cat">();
+    if (!attrs.length) return kinds;
     const meta = await this.runQuiet<ChRow>(aggregateSql(
-      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name\n" +
+      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
       "FROM " + clinicalMetaTable(db) + " cam\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
       "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")"))
       .catch(() => ({ data: [] as ChRow[] }));
-    for (const r of meta.data) {
-      kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
-      if (r.name) names.set(String(r.a), String(r.name));
-    }
-    return { kinds, names };
+    for (const r of meta.data) kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
+    return kinds;
   }
 
   /**
@@ -1781,8 +1773,8 @@ abstract class BaseResolver implements AggregateCapable {
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
 
-    const { kinds, names } = await this.clinicalMeta([spec.x, spec.y, spec.colorBy]);
-    const title = (a: PlotAxis) => axisLabel(a, names);
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
+    const title = (a: PlotAxis) => axisLabel(a);
     const kindOf = (attr: string) => kinds.get(attr);
     const xk = axisKind(spec.x, kindOf), yk = axisKind(spec.y, kindOf);
     const shape = plotShape(xk, yk);
@@ -1876,9 +1868,9 @@ abstract class BaseResolver implements AggregateCapable {
    */
   async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
     validateAxis(spec.x, "x", { cohort: true }); validateAxis(spec.y, "y");
-    const { kinds, names } = await this.clinicalMeta([spec.x, spec.y]);
+    const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
-    return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(spec.x, names), yLabel: axisLabel(spec.y, names) };
+    return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(spec.x), yLabel: axisLabel(spec.y) };
   }
 
   /** what an OQL axis needs from this participant: its pinned OncoKB version and its profiles */

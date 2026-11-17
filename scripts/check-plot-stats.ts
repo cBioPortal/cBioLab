@@ -10,7 +10,7 @@
  *       median = q3 = its value, and the figure draws no box.
  *   S*  lib/plot.ts plotStatsSql — Spearman's ρ with tied values sharing their average rank
  *       (PLT-STM-5), against scipy 1.18.1 spearmanr, and its independence of row order.
- *   T*  lib/federation.ts plotAxisKinds / plot — an axis's title as the portal writes it (PLT-DT-19;
+ *   T*  lib/clinical-titles.ts titledAxes (its clinicalNamesSql, run here) then lib/federation.ts plotAxisKinds / plot — an axis's title as the portal writes it (PLT-DT-19;
  *       cbioportal-frontend cd8c6df PlotsTabUtils.tsx getAxisLabel): a clinical attribute by its
  *       display name, " (log2(value + 1))" after it on a log scale, and the colour axis likewise.
  *       Read against the warehouse's coadread_tcga_pan_can_atlas_2018, all samples; the names are
@@ -22,6 +22,7 @@ import { chQuery } from "../lib/ch.ts";
 import { plotBoxSql, plotStatsSql, type PlotAxis } from "../lib/plot.ts";
 import { resolverFor, hasFederatedPlot } from "../lib/federation.ts";
 import { studyProfiles } from "../lib/analysis.ts";
+import { titledAxes } from "../lib/clinical-titles.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 
 /** [row id, values, expected q1, median, q3, lo, hi] */
@@ -81,22 +82,25 @@ for (const [id, x, y, rho] of RANKS) {
   const FGA = clin("FRACTION_GENOME_ALTERED");
   const is = (id: string, what: string, got: unknown, want: string) => ok(got === want, id + " " + what, JSON.stringify(got) + " — expected " + JSON.stringify(want));
 
+  // the titles go onto the axes as every view puts them there (lib/clinical-titles.ts), its
+  // clinicalNamesSql run against this study through the resolver's viewMeta
+  const titled = (axes: Record<string, PlotAxis | undefined>) => titledAxes(axes, { [STUDY]: r }, [STUDY]);
   if (!hasFederatedPlot(r)) ok(false, "T7 plotAxisKinds", STUDY + "'s resolver has no plotAxisKinds");
   else {
-    const k = await r.plotAxisKinds({ x: clin("MUTATION_COUNT"), y: FGA });
+    const k = await r.plotAxisKinds(await titled({ x: clin("MUTATION_COUNT"), y: FGA }) as { x: PlotAxis; y: PlotAxis });
     is("T7", "plotAxisKinds xLabel", k.xLabel, "Mutation Count");
     is("T7", "plotAxisKinds yLabel", k.yLabel, "Fraction Genome Altered");
   }
 
-  const t8 = await r.plot(null, { x: clin("CANCER_TYPE_DETAILED"), y: FGA, unit: "sample" });
+  const t8 = await r.plot(null, { ...await titled({ x: clin("CANCER_TYPE_DETAILED"), y: FGA }) as { x: PlotAxis; y: PlotAxis }, unit: "sample" });
   is("T8", "plot x.label", t8.x.label, "Cancer Type Detailed");
   is("T8", "plot y.label", t8.y.label, "Fraction Genome Altered");
 
-  const t9 = await r.plot(null, { x: clin("AGE"), y: clin("FRACTION_GENOME_ALTERED", true), unit: "sample" });
+  const t9 = await r.plot(null, { ...await titled({ x: clin("AGE"), y: clin("FRACTION_GENOME_ALTERED", true) }) as { x: PlotAxis; y: PlotAxis }, unit: "sample" });
   is("T9", "plot x.label", t9.x.label, "Diagnosis Age");
   is("T9", "plot y.label (log)", t9.y.label, "Fraction Genome Altered (log2(value + 1))");
 
-  const t10 = await r.plot(null, { x: clin("CANCER_TYPE_DETAILED"), y: FGA, unit: "sample", colorBy: clin("SEX") });
+  const t10 = await r.plot(null, { ...await titled({ x: clin("CANCER_TYPE_DETAILED"), y: FGA, colorBy: clin("SEX") }) as { x: PlotAxis; y: PlotAxis; colorBy: PlotAxis }, unit: "sample" });
   is("T10", "plot colorLabel (" + t10.shape + ")", t10.colorLabel, "Sex");
 }
 

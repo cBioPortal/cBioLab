@@ -1,6 +1,8 @@
 // Logistic view: a multivariate logistic regression on the Cox view's covariate coding, fit
 // from per-patient rows inside each local study (patient-level participants only).
 import { logisticRegression, type LogisticRow } from "../../stats.ts";
+import { titledAxes } from "../../clinical-titles.ts";
+import type { PlotAxis } from "../../plot.ts";
 import type { ViewResult, CoxCovariate } from "../../types.ts";
 import { isPatientLevel } from "../../federation.ts";
 import { axisLabel, validateAxis, type AxisKind } from "../../plot.ts";
@@ -28,6 +30,8 @@ export async function runLogistic(view: DocView, c: ViewRun): Promise<ViewResult
     validateAxis(lv.outcome, "outcome");
     const named = await assayEntitiesKnown(c, { outcome: lv.outcome, ...Object.fromEntries((lv.covariates || []).map((cv, i) => ["covariate " + (i + 1), cv])) }, vStudies);
     lv = { ...lv, outcome: named.outcome, ...(Array.isArray(lv.covariates) ? { covariates: lv.covariates.map((cv, i) => ({ ...named["covariate " + (i + 1)], ...(cv.reference != null ? { reference: cv.reference } : {}) }) as CoxCovariate) } : {}) };
+    const titled = await titledAxes<Record<string, PlotAxis | undefined>>({ outcome: lv.outcome, ...Object.fromEntries((lv.covariates || []).map((cv, i) => ["c" + i, cv])) }, resolvers, vStudies);
+    lv = { ...lv, outcome: titled.outcome!, ...(Array.isArray(lv.covariates) ? { covariates: lv.covariates.map((cv, i) => (titled["c" + i] || cv) as CoxCovariate) } : {}) };
   }
   catch (e) { return untimed({ kind: "logistic", error: (e as Error).message }); }
   const outcomeLabel = axisLabel(lv.outcome);

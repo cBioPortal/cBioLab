@@ -10,6 +10,7 @@ import { fitOf, portalBox, spearmanRho, corrPValue, DEFAULT_BINS, CATEGORY_CAP, 
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
 import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
+import { titledAxes } from "../../clinical-titles.ts";
 import { OQL_NOT_PROFILED } from "../../plot-oql.ts";
 import { naturalSort } from "./natural-sort.ts";
 import { fmtInt, fmtNum } from "../../chart/format.ts";
@@ -614,6 +615,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
     axes = resolveAxes({ x: pv.x, y: pv.y, colorBy: pv.colorBy, ringBy: pv.ringBy }, catalogs);
     axes = await assayEntitiesKnown(c, axes, sites) as typeof axes;
     axes = withDrivers(axes, pv.drivers);
+    axes = await titledAxes(axes, resolvers, sites);
     range = plotRangeOf(pv.range, axisLogs(axes));
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   let spec = { x: axes.x, y: axes.y, unit,

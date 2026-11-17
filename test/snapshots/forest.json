@@ -17,7 +17,7 @@
         "all patients"
       ],
       "forest": {
-        "exposure": "TP53 mutation status",
+        "exposure": "TP53: Mutated vs Wild Type",
         "exposedLabel": "TP53 mutated",
         "endpoint": "OS",
         "strata": "CANCER_TYPE",
