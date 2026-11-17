@@ -108,7 +108,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The patient header's significant-signatures badge (no warehouse study has a p-value profile yet, so it would show nothing today)
   - [ ] The signature table's download (the portal's table exports; ours is client-side `PortalTable` with no CSV)
   - [ ] A browser check: the kind is still `e2ePending`
-  - [ ] The signature table unpaged (ours 25 of 65 rows), spectrum % rounded (PTB-MS-7, PTB-STM-6) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
+  - [ ] The signature table unpaged (ours 25 of 65 rows) (PTB-MS-7)
+    - [x] Spectrum % rounded to whole percents (PTB-STM-6) (#290) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
 - [x] **Comparison → mRNA, Protein and DNA methylation tabs** — `diffexpr` laid out as the portal's tab: volcano and the clicked gene's box plot per group (a `plot` by cohort), then the gene table with the "High expression/methylation in" filter and "Significant only"; profiles picked as the portal picks them, 2 groups (PR #159)
   - [x] More than 2 groups: 3 to 10 compared by one-way ANOVA (p-values checked against cbioportal.org's), the table a mean and SD per group, no volcano, as the portal's
     - [x] Where there is no volcano, the box plot's place before a gene is clicked is one line saying to click a gene (expression and generic-assay tabs alike); the portal leaves an empty 360px box there
@@ -432,7 +433,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Tooltips pinned by a click, lingering 100 ms, closed by Esc, and paged "‹ i of n events ›" with the arrow keys (PAT-TL-TT-1, PAT-TL-TT-4) (#317)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
   - [ ] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15)
-  - [ ] Cohort column: "72%" and "<1%" (ours "72.5%"), the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
+  - [ ] Cohort column: the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
+    - [x] "72%" and "<1%" as the portal writes them (#290)
+  - [x] The header's tooltip tables write non-integers to one decimal (PAT-STM-10) (#290)
   - [x] Browser title "Patient: P04" (ours "cbio-lab") (PAT-SH-1) (#296)
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
   - [x] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3) (#303)
