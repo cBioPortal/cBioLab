@@ -637,17 +637,28 @@ export function reservedColor(value: string, S: Style = STYLE): string | undefin
   return S.palette.reserved[value.replace(/\s/g, "").toLowerCase()];
 }
 
-/**
- * Colour for a categorical cell: a per-track override first
- * (`display.colors[trackLabel][value]` — the portal's Edit Colors), then the value's reserved
- * colour, then the palette's cycle.
- */
 /** a generic assay's threshold category k's colour: the portal's four, in turn */
 export function thresholdColor(k: number, S: Style = STYLE): string {
   const c = S.glyph.assayThreshold.colors;
   return c[k % c.length];
 }
 
+/**
+ * A stacked row's (the mutation spectrum's) colour for its category j: the reader's own for that
+ * category, else the portal's fill (OncoprintUtils 1466-1474, MUTATION_SPECTRUM_FILLS).
+ */
+export function stackColor(track: { label: string; stack?: readonly string[] }, j: number, S: Style = STYLE,
+  colors?: Record<string, Record<string, string>>): string {
+  const cat = track.stack ? track.stack[j] : undefined;
+  const override = cat != null && colors && colors[track.label] ? colors[track.label][cat] : undefined;
+  return override || S.glyph.spectrum.colors[j % S.glyph.spectrum.colors.length];
+}
+
+/**
+ * Colour for a categorical cell: a per-track override first
+ * (`display.colors[trackLabel][value]` — the portal's Edit Colors), then the value's reserved
+ * colour, then the palette's cycle.
+ */
 export function trackCategoryColor(track: { label: string; categories?: string[]; profiledFor?: string }, code: number, S: Style = STYLE,
   colors?: Record<string, Record<string, string>>): string {
   const value = track.categories && track.categories[code];

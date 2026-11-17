@@ -236,7 +236,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-SC-2 | ✅ | B | 44×38 bins cut as the portal cuts them (FGA 0–1, MC from 0), a plasma dot per bin, the "# samples" legend; the middle label is the count at the middle of the bar (⚠ C6, [density-cases](density-cases.md)) |
 | STS-SC-3 | ✅ | BC | Pearson and Spearman with p, as the portal writes them; shown whenever n > 2 (⚠ S9) |
 | STS-SC-4 | ✅ | B | "Number of Samples", the x range to 2 places, the y range as formatRange |
-| STS-SC-5 | 🔶 | B | Swap Axes, Log Scale X / Y on the MC axis (kept by the browser); no Download yet |
+| STS-SC-5 | 🔶 | B | Swap Axes, Log Scale X / Y on the MC axis (kept by the browser); Download ▸ SVG, PDF with the legend and coefficients inside the file ([download-cases](download-cases.md) FG8). Not yet: Data |
 | STS-SC-6 | 🟡 | C | Drag a box → two range clauses (MC rounded to whole counts, FGA by span) (`explore-charts.tsx:89-92`); no custom bins added to the bar charts |
 | STS-SC-7 | ✅ | C | Own filters included (the plot is drawn over the draft) |
 | STS-SC-8 | 🐞 ok | C | Legacy dead code / out-of-range bin bug not present |
@@ -263,7 +263,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-KM-3 | 🔶 | B | Full KM with axes, number-at-risk table and "median 81.4 mo · n = 590 · 120 events" line |
 | STS-KM-4 | 🐞 ok | C | No selection on the curve (legacy's is dead code) |
 | STS-KM-5 | 🟡 | C | Left truncation is an analysis-view caveat, not offered on Explore's card |
-| STS-KM-6 | ❌ | B | No download |
+| STS-KM-6 | 🔶 | B | Download ▸ SVG, PDF of the curve with its number-at-risk table and legend ([download-cases](download-cases.md) FG9). Not yet: Data |
 
 ### §11 Added charts
 
@@ -290,7 +290,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-DL-1 | 🟡 | B | Categorical charts (clinical pie or list, generic-assay categorical, gene state): Download ▸ Summary Data, as the portal writes it ([download-cases](download-cases.md) SD1–SD16). Not yet: Full Data, a numeric chart's Data, SVG, PDF, the gene tables' Data |
+| STS-DL-1 | 🟡 | B | Categorical charts (clinical pie or list, generic-assay categorical, gene state): Download ▸ Summary Data, as the portal writes it ([download-cases](download-cases.md) SD1–SD16). SVG and PDF of every chart but the gene tables, Data Types and Case Lists (FG1–FG10). Not yet: Full Data, a numeric chart's Data |
 | STS-DL-2 | ❌ | C | No download-hide switch (tracked: Data-governance switches) |
 | STS-DL-3 | ❌ | C | n/a — nothing to download (legacy TSV bugs therefore absent) |
 

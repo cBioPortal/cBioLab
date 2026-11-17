@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 
 from .contract import Contract, Track
-from .style import BITS, STYLE, bar_band, cell_layers, heat_rgb, format_gutter_pct, gene_legend, glyph_presence, resolve_style, style_for_display, track_category_color, track_label_text, track_sublabel_text, fit_sublabel
+from .style import BITS, STYLE, stack_color, bar_band, cell_layers, heat_rgb, format_gutter_pct, gene_legend, glyph_presence, resolve_style, style_for_display, track_category_color, track_label_text, track_sublabel_text, fit_sublabel
 
 _G = STYLE["geometry"]
 _MUT = BITS["MISSENSE"] | BITS["TRUNCATING"] | BITS["INFRAME"] | BITS["SPLICE"] | BITS["OTHER_MUT"] | BITS["PROMOTER"]
@@ -145,7 +145,7 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
                     for j, n in enumerate(counts):
                         if total:
                             ya, yb = y0 + int(round(ROW_H * acc / total)), y0 + int(round(ROW_H * (acc + n) / total))
-                            img[ya:yb, x0:x1] = _rgb(S["glyph"]["spectrum"]["colors"][j])
+                            img[ya:yb, x0:x1] = _rgb(stack_color(t, j, S, colors))
                         acc += n
                 elif t.meta.get("bar"):
                     (b0, b1), negative = bar_band(t.meta, code)

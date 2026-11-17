@@ -12,6 +12,8 @@ import { fmtInt } from "../../lib/chart/format.ts";
 import type { CohortDef, View } from "../../lib/types.ts";
 import type { PlotCell } from "../../lib/plot.ts";
 import { ChartMenu } from "./partitions.tsx";
+import { densityFigureSvg, figureActions, standaloneSvg } from "./chart-files.ts";
+import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import {
   FGA, MUTATION_COUNT, correlationLines, densityAxes, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
   densityTitle, densityView, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensitySettings
@@ -56,6 +58,9 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
   const [loading, setLoading] = useState(false);
   const want = useRef("");
   const key = JSON.stringify([studies, draft, ep, hasScatter, axes]);
+  // the density figure as a file, set by the drawn chart; a save that fails says why under the chart
+  const densityFile = useRef<(() => string | null) | null>(null);
+  const [fileError, setFileError] = useState<{ chart: string; message: string } | null>(null);
 
   useEffect(() => {
     if (!studies.length || (!ep && !hasScatter)) return;
@@ -91,6 +96,11 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
       <div className="card xc-card" data-chart="survival">
         <div className="xc-head">
           <span className="xc-title">{ep === "OS" ? "Overall survival" : ep + " survival"} of the selection</span>
+          <ChartMenu label="the survival chart" actions={[{ label: "Download", title: "save this chart as a file",
+            sub: figureActions((ep === "OS" ? "Overall" : ep) + " survival", () => {
+              const curves = res?.survival?.curves;
+              return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" })) : null;
+            }, (message) => setFileError({ chart: "survival", message })) }]} />
           {endpoints && endpoints.length > 1 && (
             <Choice className="w-28" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
               options={endpoints.map((x) => [x, x] as const)} />
@@ -99,6 +109,7 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
         <div className="xc-body">
           {res && res.survival && res.survival.curves && (res.survival.curves.length ? km(res.survival.curves) : <p className="note">no patient in the selection has a {ep} time and status</p>)}
           {res && res.survival && res.survival.error && <p className="note">{res.survival.error}</p>}
+          {fileError?.chart === "survival" && <p className="note">{fileError.message}</p>}
           {stale && <div className="xc-wait"><span className="spinner" /> {res ? "updating…" : "loading…"}</div>}
         </div>
       </div>
@@ -114,12 +125,16 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
             ...(["x", "y"] as const).filter((k) => logOffered(axes[k].attribute)).map((k) => ({
               label: "Log Scale " + k.toUpperCase(), checked: axes[k].log,
               title: axes[k].log ? "draw " + DENSITY_NAMES[axes[k].attribute] + " on a linear scale" : "draw " + DENSITY_NAMES[axes[k].attribute] + " as ln(1 + count)",
-              onClick: () => saveDensity({ ...dset, [k + "Log"]: !axes[k].log }) }))]} />
+              onClick: () => saveDensity({ ...dset, [k + "Log"]: !axes[k].log }) })),
+            { label: "Download", title: "save this chart as a file",
+              sub: figureActions(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]),
+                () => densityFile.current ? densityFile.current() : null, (message) => setFileError({ chart: "density", message })) }]} />
         </div>
         <div className="xc-body">
           {plot && plot.shape === "scatter" && !plot.grid && <p className="note">No data to plot.</p>}
           {plot && plot.shape === "scatter" && plot.grid &&
-            <Density data={plot} axes={axes} onSelect={(box, span) => addClauses(densitySelection(box, dset, span))} />}
+            <Density data={plot} axes={axes} figure={densityFile} onSelect={(box, span) => addClauses(densitySelection(box, dset, span))} />}
+          {fileError?.chart === "density" && <p className="note">{fileError.message}</p>}
           {res && res.plot && res.plot.error && <p className="note">{res.plot.error}</p>}
           {stale && <div className="xc-wait"><span className="spinner" /> {res ? "updating…" : "loading…"}</div>}
         </div>
@@ -129,7 +144,9 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
 }
 
 /** the portal's density: a dot per non-empty bin coloured by its count, the legend and coefficients beside it, a drag box to filter */
-function Density({ data, axes, onSelect }: { data: PlotData; axes: { x: DensityAxis; y: DensityAxis };
+function Density({ data, axes, figure, onSelect }: { data: PlotData; axes: { x: DensityAxis; y: DensityAxis };
+  /** set to draw the chart as a file */
+  figure: React.MutableRefObject<(() => string | null) | null>;
   onSelect: (box: { x0: number; x1: number; y0: number; y1: number }, span: { x: number; y: number }) => void }) {
   const { ref, width } = useWidth(260);
   const LEGEND_W = 92;
@@ -152,6 +169,10 @@ function Density({ data, axes, onSelect }: { data: PlotData; axes: { x: DensityA
   const lines = correlationLines({ pearson: data.stats?.pearson ?? null, spearman: data.stats?.spearman ?? null }, bins.reduce((a, b) => a + b.n, 0));
   const cw = PW / gx, ch = PH / gy, r = Math.max(1, Math.min(cw, ch) / 2);
   const svgRef = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    figure.current = () => svgRef.current ? densityFigureSvg(svgRef.current, legend, lines) : null;
+    return () => { figure.current = null; };
+  });
   const [drag, setDrag] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const vx = (px: number) => e.x0 + (e.x1 - e.x0) * Math.min(1, Math.max(0, (px - L) / PW));
   const vy = (py: number) => e.y0 + (e.y1 - e.y0) * Math.min(1, Math.max(0, (T + PH - py) / PH));

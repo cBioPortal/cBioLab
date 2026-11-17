@@ -103,11 +103,14 @@ function riskTable(curves: KmCurve[], xs: ReturnType<typeof linear>, y0: number,
     const st = seriesStyle(i), cy = y0 + ROW * (i + 1) + ROW / 2, ty = cy + FS.small * 0.35;
     out.push(`<line x1="8" y1="${cy}" x2="24" y2="${cy}" stroke="${st.color}" stroke-width="${SW.series}"` + (st.dash ? ` stroke-dasharray="${st.dash}"` : "") + `/>`);
     out.push(label(28, ty, c.cohort, { size: FS.small, fill: p.ink, maxW: nameW }));
+    let right = -Infinity;
     xs.ticks.forEach((t, k) => {
       if (k % every) return;
       const text = fmtInt(at(c, t)), w = textWidth(text, FS.small), x = xs(t);
-      // centred on its tick, pulled in at the right edge
+      // centred on its tick, pulled in at the edges; a count that would touch the one before it is left out
       const left = Math.min(Math.max(x - w / 2, L - 4), W - 4 - w);
+      if (left < right + 6) return;
+      right = left + w;
       out.push(`<text x="${Math.round(left * 10) / 10}" y="${Math.round(ty * 10) / 10}" font-size="${FS.small}" fill="${p.muted}">` +
         `<title>${esc(c.cohort + ": " + text + " at risk at " + fmtNum(t) + " months")}</title>${text}</text>`);
     });

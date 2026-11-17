@@ -202,7 +202,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
       - Ours alone: a patient whose samples disagree counts once as "Mixed"; the portal counts each sample's value. Nothing under the pointer with a value: ours "no data", the portal "NaN"
   - [x] The mutation spectrum track (ONC-TT-3, ONC-STM-6) (#199)
     - [x] Its Freq in Tracks › Clinical (the portal's % of samples sequenced) (#258)
-    - [ ] Edit Colors
+    - [x] Edit Colors: the spectrum row's track menu edits its six categories' colours (display.colors, as the clinical rows'), used by the canvas, the SVG, both legends and the Python port (OncoprintUtils 1466-1474) (#265)
     - [x] The Tabular download names clinical rows by display name (`Mutation spectrum (C>A)`, `Diagnosis Age`), as the portal (ONC-DL-4)
     - Not as the portal, on purpose: a case whose substitutions are all ref = alt (one row in the warehouse) has no spectrum here; the portal keeps six zeros, draws no data, and writes 0 in its TSV
   - [x] Heatmaps: expression blue→black→red, methylation fixed to [0, 1] (white at 0.35), VAF yellow→teal, a patient's value max |x| (ONC-TT-5…7, ONC-TT-12, ONC-STM-7) (#200)
@@ -320,7 +320,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
     - [x] Summary Data for every categorical chart (clinical pie or list, generic-assay categorical, gene state): Category, count, percentage of every case with NA last, as the portal writes it; disabled, saying why, when the chart holds only its most frequent values (STS-DL-1; [download-cases](legacy-spec/parity/download-cases.md) SD1–SD16) (PR #257 open)
     - [ ] Full Data, and a numeric, density or survival chart's Data: per-case files, read through the patient-level path (with "Download clinical data", STV-AB-4)
-    - [ ] SVG and PDF of each chart (the bars are HTML today, so each chart needs a figure to save)
+    - [x] SVG and PDF of each chart: a pie or list chart as its pie with the legend below, bars, density (its legend inside the file) and survival as drawn; the gene tables, Data Types and Case Lists have none, as in the portal (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) FG1–FG10) (PR #270 open)
     - [x] The gene tables' Data: every gene, the portal's columns (CNA's profiled and altered under their own headers) (STS-DL-1; [gene-tables-cases](legacy-spec/parity/gene-tables-cases.md) GD1–GD11) (PR #261 open)
   - [x] Empty selection: the "filtered out all the samples" message in place of the charts, the filter bar kept (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (PR #260 open)
   - [x] Case lists: all of them, by kind across studies, counted in samples, Freq of the selected samples (STS-OT-2; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (PR #260 open)
