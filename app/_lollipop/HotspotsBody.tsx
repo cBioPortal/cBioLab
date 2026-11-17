@@ -38,7 +38,7 @@ function GeneSummary({ g, grch38 }: { g: HotspotGene; grch38: boolean }) {
 }
 
 /** One gene's plot: the renderer's figure, its stems clickable (use-stem-clicks.ts). */
-function GenePlot({ gene, selected, onSelect }: { gene: HotspotGene; selected: number[]; onSelect: (next: number[]) => void }) {
+function GenePlot({ gene, selected, onSelect, annotated }: { gene: HotspotGene; selected: number[]; onSelect: (next: number[]) => void; annotated: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const [legend, setLegend] = useState(false);
   useStemClicks(box, {
@@ -51,7 +51,7 @@ function GenePlot({ gene, selected, onSelect }: { gene: HotspotGene; selected: n
         <LollipopTools legend={legend} onLegend={setLegend} filename={gene.gene + "_mutation_diagram"}
           svg={() => { const w = box.current?.getBoundingClientRect().width; return w ? lollipopPanelsSvg([gene], { width: Math.round(w), theme: "light" }, "", { [gene.gene]: selected }) : null; }} />
       </div>
-      {legend && <ColorLegend />}
+      {legend && <ColorLegend drivers={annotated} />}
       <div ref={box}>
         <DrawAtWidth draw={(width) => lollipopPanelsSvg([gene], { width }, "", { [gene.gene]: selected })} deps={[gene, selected.join(",")]} />
       </div>
@@ -117,10 +117,10 @@ export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons }: { 
       )}
       {drawn.map((d, i) => (
         <div key={d.gene.gene} className="lp-gene">
-          <GenePlot gene={d.gene} selected={picked(d.gene.gene)} onSelect={(next) => pick(d.gene.gene, next)} />
+          <GenePlot gene={d.gene} selected={picked(d.gene.gene)} onSelect={(next) => pick(d.gene.gene, next)} annotated={v.annotated !== false} />
           <div className="lp-side">
             <GeneSummary g={genes[i]} grch38={!!v.grch38} />
-            <AlterationGrid tally={genes[i].tally} classes={classes} hide={hide} onHide={set} />
+            <AlterationGrid tally={genes[i].tally} classes={classes} hide={hide} onHide={set} annotated={v.annotated !== false} />
           </div>
         </div>
       ))}

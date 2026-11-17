@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "sv-levels" | "enrichment-events" | "patient-sv";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "mutation-driver-settings" | "sv-levels" | "enrichment-events" | "patient-sv";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -51,6 +51,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
   "sv-levels": ["node", "--env-file=.env.local", "scripts/check-sv-levels.ts"],
   "patient-vaf": ["node", "--env-file=.env.local", "scripts/check-patient-vaf.ts"],
+  "mutation-driver-settings": ["node", "--env-file=.env.local", "scripts/check-mutation-driver-settings.ts"],
   // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
   "enrichment-events": ["node", "--env-file=.env.local", "scripts/check-enrichment-events.ts"],
   "patient-sv": ["node", "--env-file=.env.local", "scripts/check-patient-sv.ts"],
@@ -560,7 +561,7 @@ const MUTANTS: Mutant[] = [
     find: "(x.driver ? drivers : every).add(e.gene)", replace: "every.add(e.gene)" },
   { id: "fusion-oql-totals-unannotated", layer: "counts", guard: "mutation-fusions", file: "lib/federation.ts",
     effect: "Under DRIVER or FUSION_DRIVER the lollipop's somatic frequency counts VUS fusions, as its totals read no OncoKB pin and take every fusion for a driver.",
-    find: "lollipopCte(cohortSql, genes, study, 1, fusions?.pin ?? null,", replace: "lollipopCte(cohortSql, genes, study, 1, null," },
+    find: "pins.pin : fusions?.pin ?? null,", replace: "pins.pin : null," },
   { id: "fusion-genes-reordered", layer: "counts", guard: "mutation-fusions", file: "lib/sv-oncokb.ts",
     effect: "A fusion's protein change names its genes in the other order (\"ALK-EML4 Fusion\" for EML4 at site 1), where the portal keeps the stored order.",
     find: "concat(\" + g1 + \", '-', \" + g2 + \", ' Fusion')", replace: "concat(\" + g2 + \", '-', \" + g1 + \", ' Fusion')" },
@@ -588,6 +589,15 @@ const MUTANTS: Mutant[] = [
   { id: "fusion-only-gene-dropped", layer: "counts", guard: "mutation-fusions", file: "lib/views/hotspots/run.ts",
     effect: "A gene with fusions but no mutations disappears from the Mutations tab's lollipop, with its Fusion badge and frequency, where the portal keeps it.",
     find: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));", replace: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i])).filter((h) => h.mutated > 0);" },
+  { id: "lollipop-oncokb-ignores-settings", layer: "counts", guard: "mutation-driver-settings", file: "lib/federation.ts",
+    effect: "With OncoKB switched off in the page's driver settings, the Mutations tab's badges and stems still count OncoKB's oncogenic calls as drivers, where the portal calls them VUS.",
+    find: "  if (src.oncokb) or.push(", replace: "  if (pin) or.push(" },
+  { id: "lollipop-unannotated-all-vus", layer: "counts", guard: "mutation-driver-settings", file: "lib/driver-sql.ts",
+    effect: "With every driver source off, the Mutations tab files every mutation as VUS, where the portal counts them by type alone.",
+    find: "annotating === \"0\" ? \"toUInt8(1)\"", replace: "annotating === \"0\" ? \"toUInt8(0)\"" },
+  { id: "mutation-table-oncokb-ignores-settings", layer: "counts", guard: "unit", file: "lib/mutation-table.ts",
+    effect: "With OncoKB switched off, the mutation table still calls OncoKB's oncogenic mutations drivers (its Alteration cell and default order), where the portal calls them VUS.",
+    find: "  if (drivers.oncokb && pin) or.push(oncokb);", replace: "  if (pin) or.push(oncokb);" },
   { id: "oncokb-sv-oncoprint-primary-only", layer: "counts", guard: "unit", file: "lib/annotation.ts",
     effect: "A study on a second instance has its fusions' pair calls looked up on the primary, finds none, and draws every fusion as a VUS.",
     find: "const c = connOf ? connOf(s) : PRIMARY;", replace: "const c = PRIMARY;" },
@@ -816,6 +826,14 @@ const MUTANTS: Mutant[] = [
     effect: "The Patient table's Allele Freq filter reads the unrounded VAF, so a range up to the value shown (0.3371) drops the row that shows it.",
     find: "round(g.vaf, 4) AS vaf",
     replace: "g.vaf AS vaf" },
+  { id: "sample-tip-patient-attrs", layer: "counts", guard: "unit", file: "lib/views/timeline/run.ts",
+    effect: "A timeline sample's tooltip lists its patient's attributes as the sample's own, where the portal lists the sample's.",
+    find: "const cols = meta.filter((m) => Number(m.patient) !== 1)",
+    replace: "const cols = meta.filter(() => true)" },
+  { id: "sample-tip-unsorted", layer: "counts", guard: "unit", file: "lib/timeline-tracks.ts",
+    effect: "A timeline sample's tooltip lists its attributes as they come, where the portal sorts them by key.",
+    find: "  return [...merged].sort(([a], [b]) => a.localeCompare(b));\n}",
+    replace: "  return [...merged];\n}" },
   { id: "tracks-select-all-counts-with-data", layer: "counts", guard: "unit", file: "app/_oncoprint/track-edits.ts",
     effect: "\"Select all (N)\" leaves out the listed rows at 0%, so its N is smaller than the portal's for the same list.",
     find: "return { n: listed.length,",

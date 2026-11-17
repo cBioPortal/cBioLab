@@ -206,9 +206,14 @@ export function linkMutations(vs: View[], changed: number): View[] {
  * on one view that takes them (the oncoprint's menu, the plot's) is made on every other, so the
  * tabs agree on what a driver is. The sources travel to every such view; what is hidden (VUS,
  * germline) travels from an oncoprint, since a plot draws every mutation and offers no such
- * filter. A plot follows only when it holds settings — the Results page's own Plots tab does.
+ * filter. A plot follows only when it holds settings — the Results page's own Plots tab does; so do
+ * the Mutations tab's lollipop and table, whose Driver/VUS split follows the sources (the portal's
+ * putativeDriver), and which take them without offering a menu.
  * `prev` and `next` are the page's views before and after one edit.
  */
+/** views that follow the page's driver sources without a settings menu of their own */
+const FOLLOW_SOURCES = new Set<string>(["hotspots", "mutations"]);
+
 export function syncDrivers(prev: View[], next: View[]): View[] {
   const takes = (v: View) => v.kind === "oncoprint" || v.kind === "plot";
   const at = next.findIndex((v, i) => takes(v) && prev[i] && v.kind === prev[i].kind &&
@@ -216,7 +221,7 @@ export function syncDrivers(prev: View[], next: View[]): View[] {
   if (at < 0) return next;
   const from = driversOf(next[at] as never) || {}, fromOncoprint = next[at].kind === "oncoprint";
   return next.map((v, i) => {
-    if (i === at || !takes(v)) return v;
+    if (i === at || !(takes(v) || FOLLOW_SOURCES.has(v.kind))) return v;
     const own = driversOf(v as never) || {};
     const merged = compactDrivers({ hideVus: own.hideVus, hideGermline: own.hideGermline,
       ...(fromOncoprint ? { hideVus: from.hideVus, hideGermline: from.hideGermline } : {}),
@@ -224,7 +229,7 @@ export function syncDrivers(prev: View[], next: View[]): View[] {
     if (v.kind === "oncoprint") return withDrivers(v, merged);
     const pv = v as unknown as { drivers?: DriverSettings };
     if (pv.drivers == null) return v;
-    // a plot draws every mutation, so it keeps sources alone
+    // a plot (and the Mutations tab) draws every mutation, so it keeps sources alone
     const sources = compactDrivers({ oncokb: from.oncokb, hotspots: from.hotspots, custom: from.custom, tiers: from.tiers }) || {};
     return { ...v, drivers: sources } as View;
   });
@@ -291,8 +296,9 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   // every tab draws the queried patients, as cBioPortal's do; only Comparison/Survival compares groups
   const queried = ["Queried"], both = ["Altered", "Unaltered"];
   const v = (title: string, view: Record<string, unknown>) => ({ title, view: view as unknown as View });
-  // the Mutations tab follows the query's lines where they narrow mutations, as the portal's
-  const mutOql = { oql: q.entries, ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}) };
+  // the Mutations tab follows the query's lines where they narrow mutations, and its Driver/VUS split the
+  // page's driver settings, with or without DRIVER in the query, as the portal's
+  const mutOql = { oql: q.entries, drivers: {} };
   const queryHasOql = q.entries.some((x) => { try { return parseOql(x).some((e) => hasOql(e.specs)); } catch { return false; } });
   // Mutual Exclusivity's tracks are the query's lines, named as the portal names them (2 or more to pair)
   const meTracks = new Set(q.entries.map((x) => { try { return oqlTrackName(x); } catch { return x; } })).size;

@@ -22,9 +22,9 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 40 |
+| ✅ match | 41 |
 | 🟡 partial | 26 |
-| 🔶 different | 7 |
+| 🔶 different | 6 |
 | ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -194,7 +194,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 |---|---|---|---|
 | PAT-TL-TT-1 | ✅ | B | Hover shows it; gone 100 ms after the pointer leaves (the pointer may rest on it); a click pins it, a second click or × lets it go; Esc and leaving the page close it |
 | PAT-TL-TT-2 | 🟡 | C | Attributes with `_`→space, DATE / START / END formatted + "(day n)" ✅; no Markdown links / iframe |
-| PAT-TL-TT-3 | 🔶 | C | Sample row: event attributes + "· sample n"; no sample clinical attributes |
+| PAT-TL-TT-3 | ✅ | B | Sample row: SAMPLE ID, then the event's attributes merged with the sample's own clinical attributes, keys upper-cased with spaces, sorted, then START DATE (lgg P04_Pri: CANCER TYPE Glioma … TMB NONSYNONYMOUS 0.4); SAMPLE ID once, the portal's repeat not copied; a peer's patient has no sample attributes to add |
 | PAT-TL-TT-4 | 🟡 | B | One event at a time, "‹ i of n events ›", ←/↓ previous and →/↑/space next, wrapping ✅ (msk_chord P-0000012 Treatment: 1 of 2 → 2 of 2); no "Plotted y value is the max of simultaneous events" on line-chart rows |
 
 ### §3 Timeline — axis, zoom, download
