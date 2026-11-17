@@ -280,6 +280,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Contingency table rows and columns in the same order, natural sort otherwise (was by marginal total) (PLT-TB-3) (#241)
     - [ ] Filter categories and Sort by Median (PLT-AX-9, PLT-AX-10, PLT-STM-9)
   - [ ] Clinical attributes by display name with their ⓘ description, in the select, axis title and tooltip (ours `MUTATION_COUNT`) (PLT-AX-2, PLT-DT-19)
+    - [x] Axis titles as the portal's getAxisLabel writes them, in the figure, caption and tooltip: a clinical attribute's display name ("Mutation Count", "Diagnosis Age"), "KRAS: Mutations", "KRAS: Mutated vs Wild Type", "KRAS: Driver vs VUS Mutations", "TCF7L2: Variant vs No Variant" (PLT-DT-19) (#298)
+    - [ ] The select by display name and priority, with the ⓘ description (PLT-AX-2)
 - [ ] **Results → Cancer Types Summary tab** ([02-cancer-types-summary](legacy-spec/parity/02-cancer-types-summary.md))
   - [x] The query's OQL: what counts as altered is what its lines match, each under its gene (CancerSummaryContainer: oqlFilteredAlterationsByGeneBySampleKey), DRIVER by the page's settings; mRNA and protein high / low are kinds of their own, in the oncoprint's colours; a unit's alterations count once per type, so an amplification and a deep deletion are one copy-number kind (alterationCountHelpers uniqBy alterationType). msk_impact_2017 `KRAS: MUT=G12D`, `TP53: HOMDEL`: NSCLC 64 / 1567, Pancreatic 150 / 487, Colorectal 125 / 982, as the portal
     - Ours alone: of an amplification and a deep deletion in one unit, the amplification is shown; the portal shows the first it meets
