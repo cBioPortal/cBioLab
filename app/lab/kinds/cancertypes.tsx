@@ -18,30 +18,36 @@ import { CloudDownload } from "lucide-react";
 import { useState } from "react";
 import { DraftInput } from "./parts.tsx";
 import { FloatingTip, useHoverTip, type TipBox } from "../../_ui/tooltip.tsx";
-import { cancertypesTip } from "../../../lib/views/cancertypes/tip.ts";
-import { resultsHref } from "../../portal/query-editor.tsx";
+import { cancertypesStudyQuery, cancertypesTip, type CancertypesStudyQuery } from "../../../lib/views/cancertypes/tip.ts";
+import { exploreHref, resultsHref } from "../../portal/query-editor.tsx";
+import { readOptions } from "../../../lib/query-options.ts";
+import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 
 /**
  * A bar's popover, the portal's (CancerSummaryChart): its group, "Gene altered in P% of N patients" and the
  * type table; grouped by study with several studies drawn, the study's name links to its page and "Query this
- * study" opens the Results page for that study alone — this gene on a gene tab, the whole query on All.
+ * study" opens the Results page for that study alone — this gene's lines on a gene tab, the whole query on All —
+ * or, where that page would count something else, is disabled with the reason.
  */
-function BarPopover({ r, panel, gene, groupKey, query, at, live }: { r: DrawnResultOf<"cancertypes">["cancertypes"]; panel: number; gene: string | null;
-  groupKey: string; query: string; at: TipBox; live: ReturnType<typeof useHoverTip>["live"] }) {
+function BarPopover({ r, panel, gene, groupKey, link, at, live }: { r: DrawnResultOf<"cancertypes">["cancertypes"]; panel: number; gene: string | null;
+  groupKey: string; link: (gene: string | null) => CancertypesStudyQuery; at: TipBox; live: ReturnType<typeof useHoverTip>["live"] }) {
   const t = cancertypesTip(r, panel, gene, groupKey);
   if (!t) return null;
+  const q = t.study ? link(gene) : null;
+  const label = "Query this study" + (gene ? " for " + gene : "");
   return (
     <FloatingTip at={at} live={live} className="onco-tip">
-      <strong>{t.study ? <a href={"/lab?tab=explore&study=" + encodeURIComponent(t.study)} target="_blank" rel="noreferrer">{t.header} ↗</a> : t.header}</strong>
+      <strong>{t.study ? <a href={exploreHref(t.study)} target="_blank" rel="noreferrer">{t.header} ↗</a> : t.header}</strong>
       <p className="my-1">{t.altered}</p>
       <table className="text-sm [&_td]:pr-3 [&_th]:pr-3 [&_th]:text-left">
         <thead><tr><th>Alteration</th><th>Frequency</th></tr></thead>
         <tbody>{t.rows.map(([name, freq]) => <tr key={name}><td>{name}</td><td className="tabular-nums">{freq}</td></tr>)}</tbody>
       </table>
-      {t.study && <Button asChild size="sm" className="mt-1">
-        <a href={resultsHref({ studies: [t.study], filters: [], query: gene ?? query })} target="_blank" rel="noreferrer">
-          Query this study{gene ? " for " + gene : ""}</a>
-      </Button>}
+      {t.study && q && ("why" in q
+        ? <><Button size="sm" className="mt-1" disabled>{label}</Button><p className="meta my-1">{q.why}</p></>
+        : <Button asChild size="sm" className="mt-1">
+          <a href={resultsHref({ studies: [t.study], filters: [], query: q.query, options: q.options })} target="_blank" rel="noreferrer">{label}</a>
+        </Button>)}
     </FloatingTip>
   );
 }
@@ -103,7 +109,7 @@ function Downloads({ r, panel, gene }: { r: DrawnResultOf<"cancertypes">["cancer
   );
 }
 
-function CancertypesBody({ v, query }: { v: DrawnResultOf<"cancertypes">; query: string }) {
+function CancertypesBody({ v, spec, catalog }: { v: DrawnResultOf<"cancertypes">; spec: any; catalog: ProfileInfo[] }) {
   const r = v.cancertypes;
   const ALL = "All Queried Genes";
   const [gene, setGene] = useState(ALL);
@@ -111,8 +117,12 @@ function CancertypesBody({ v, query }: { v: DrawnResultOf<"cancertypes">; query:
   const onMove = (panel: number) => (e: React.PointerEvent) => {
     const el = (e.target as Element).closest?.("[data-group]");
     const b = el?.getBoundingClientRect();
-    hover.move(el && b ? { panel, key: el.getAttribute("data-group") || "", at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom } } : null, e.clientX, e.clientY);
+    const key = el?.getAttribute("data-group") || "";
+    const same = hover.tip && el && hover.tip.panel === panel && hover.tip.key === key;
+    hover.move(same ? hover.tip : el && b ? { panel, key, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom } } : null, e.clientX, e.clientY);
   };
+  const link = (g: string | null) => cancertypesStudyQuery(spec, r.genes, g,
+    typeof window !== "undefined" && window.location.pathname === "/portal/results" ? readOptions(new URLSearchParams(window.location.search)).options : null, catalog);
   // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls
   const draw = (i: number) => (width: number) => {
     const c = cancertypesPanelSvg(r, i, { width, gene: gene === ALL ? null : gene, title: r.panels.length > 1 || gene !== ALL, popover: true });
@@ -123,11 +133,11 @@ function CancertypesBody({ v, query }: { v: DrawnResultOf<"cancertypes">; query:
       {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} />}
       {r.panels.map((_, i) => <div key={i}>
         <Downloads r={r} panel={i} gene={gene === ALL ? null : gene} />
-        <div onPointerMove={onMove(i)} onPointerLeave={(e) => hover.move(null, e.clientX, e.clientY)}>
+        <div onPointerMove={onMove(i)} onPointerDown={onMove(i)} onPointerLeave={(e) => hover.move(null, e.clientX, e.clientY)}>
           <DrawAtWidth draw={draw(i)} deps={[r, gene]} />
         </div>
       </div>)}
-      {hover.tip && <BarPopover r={r} panel={hover.tip.panel} gene={gene === ALL ? null : gene} groupKey={hover.tip.key} query={query} at={hover.tip.at} live={hover.live} />}
+      {hover.tip && <BarPopover r={r} panel={hover.tip.panel} gene={gene === ALL ? null : gene} groupKey={hover.tip.key} link={link} at={hover.tip.at} live={hover.live} />}
     </div>
   );
 }
@@ -209,5 +219,5 @@ export const cancertypesUi: KindUi<"cancertypes"> = {
   defaults: (known) => ({ kind: "cancertypes", genes: known.genes.length ? known.genes.slice(0, 5) : ["TP53", "KRAS"] }),
   sub: (spec) => "by " + (spec.groupBy || "the portal's default category") + (spec.measure === "driver" ? ", drivers" : ", any alteration") + ", % of profiled " + (spec.unit === "sample" ? "samples" : "patients"),
   Controls,
-  body: (c) => c.v.cancertypes ? <CancertypesBody v={c.v} query={(c.spec.oql || c.v.cancertypes.genes).join("\n")} /> : null,
+  body: (c) => c.v.cancertypes ? <CancertypesBody v={c.v} spec={c.spec} catalog={c.catalog || []} /> : null,
 };
