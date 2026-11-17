@@ -46,7 +46,7 @@ jobs:
   # Its own job, so a pull request shows lint as a check of its own, and in a couple of minutes
   # rather than after the gate's build and e2e.
   lint:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
@@ -71,7 +71,7 @@ jobs:
         run: npm run lint
 
   gate-local:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -94,7 +94,7 @@ jobs:
 
   gate-warehouse:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -197,7 +197,7 @@ jobs:
 
   gate-e2e:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
@@ -240,7 +240,7 @@ jobs:
   planted-bugs:
     needs: gate-warehouse
     if: ${{ (!cancelled()) && github.event_name != 'merge_group' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -297,7 +297,7 @@ jobs:
   verification-report:
     needs: [gate-warehouse, planted-bugs]
     if: ${{ (always()) && github.event_name != 'merge_group' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
@@ -312,7 +312,7 @@ jobs:
   # a pull request's changed lines in lib/ and mcp/ covered, no new file there that no unit test loads,
   # and each area's coverage at or above its floor. It needs the base branch's history for the diff.
   coverage:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
@@ -350,7 +350,7 @@ jobs:
   # fails the run; the findings are kept as the quality-report artifact, Semgrep's as SARIF.
   reports:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
