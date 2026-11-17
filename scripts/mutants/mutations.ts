@@ -123,4 +123,10 @@ export const mutants: Mutant[] = [
   { id: "cancer-gene-partial-read-as-complete", layer: "counts", guard: "oncokb-cancer-gene", file: "lib/annotation-store.ts",
     effect: "A cancer gene list whose sync left genes unstored reads as complete, so a gene not yet stored reads as no cancer gene.",
     find: "count() > 0 AND argMax(note, (finished_at, run_id)) = 'complete'", replace: "count() > 0" },
+  { id: "lollipop-ymax-not-clamped", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "A Y-Axis Max typed below 1 is kept, where the portal clamps it to 1.",
+    find: "const v = Math.max(1, Math.round(input));", replace: "const v = Math.round(input);" },
+  { id: "lollipop-ymax-cap-unmarked", layer: "counts", guard: "unit", file: "lib/lollipop-svg.ts",
+    effect: "A lollipop whose tallest stem is above the set Y-Axis Max shows a plain top tick, where the portal marks the capped axis with \"≥\".",
+    find: "(cap != null && t === cap && maxN > cap ? \"≥\" : \"\")", replace: "(\"\")" },
 ];
