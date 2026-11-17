@@ -20,6 +20,7 @@ export const plotDoc: KindDoc = {
   //            // P is one of the study's profiles; what it is (mutations, SVs, discrete or
   //            // continuous copy number, mRNA, protein) comes from the study's own description
   //        | {"source":"alteration","gene":G,"by":"mutated|mutationType|driver|cna|sv"?}  // what a profile axis resolves to; driver: Driver vs VUS
+  //        | {"source":"alteration","gene":G,"by":"topMutationType|copyNumberSv"}  // colorBy / ringBy as the portal colours by a gene: top mutation class, copy number with SV over it
   //        | {"source":"alteration","genes":[G,...(2-20)],"by":"mutated"?}  // any-of-N as one category; only "mutated"
   //        | {"source":"alteration","oql":"KRAS: G12C, STK11: MUT","by":"any|statement"?}
   //            // any: Altered / Unaltered / Not profiled; statement: one group per statement (max 6)

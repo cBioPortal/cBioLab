@@ -126,6 +126,10 @@ export function categoryOrder(cat: PlotRequest["x"], rest: (a: string, b: string
   if (cat.source === "alteration" && "gene" in cat) {
     if (cat.by === "mutationType") return listed([...MUT_TYPES.flatMap((t) => [t, t + " (Driver)", t + " (VUS)"]), ...NO_MUTATION]);
     if (cat.by === "driver") return listed(["Driver", "VUS", ...NO_MUTATION]);
+    // the portal's legend order (PlotsTabUtils.tsx mutationLegendOrder): each class's Driver before its VUS, then none
+    if (cat.by === "topMutationType") return listed([...["Promoter", "Splice", "Truncating", "Inframe", "Missense", "Other"].flatMap((t) => [t + " (Driver)", t + " (VUS)", t]),
+      "Not mutated", "Not profiled for mutations"]);
+    if (cat.by === "copyNumberSv") return listed(["Amplification", "Gain", "Diploid", "Shallow Deletion", "Deep Deletion", "Structural Variant", OQL_NOT_PROFILED]);
     if (cat.by === "cna") return listed(["Deep deletion", "Neutral", "Amplification", OQL_NOT_PROFILED]);
     if (cat.by === "sv") return listed(["Structural variant", "No structural variant", OQL_NOT_PROFILED]);
     return listed(["Mutated", ...NO_MUTATION]);
@@ -179,8 +183,8 @@ async function drawAll(rc: PlotCasesCapable, def: Def, spec: PlotRequest, data: 
     if (!all || !all.length) return;
     data.points = all; data.overlay = "points";
     data.pointSet = { rule: "all", drawn: all.length };
-    if (spec.colorBy) data.legend = legendFor(all.map((x) => x.c || ""));
-    if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(all.map((x) => x.r || ""), true)];
+    if (spec.colorBy) data.legend = legendFor(all.map((x) => x.c || ""), false, spec.colorBy);
+    if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(all.map((x) => x.r || ""), true, spec.ringBy)];
     return;
   }
   const all = await rc.plotScatterPoints(def, spec);
@@ -751,8 +755,8 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           if (pts.length && pts.length <= POINTS_CAP) {
             data.points = pts; data.overlay = "points";
             data.pointSet = { rule: "all", drawn: pts.length };
-            if (pv.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""));
-            if (pv.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)];
+            if (spec.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""), false, spec.colorBy);
+            if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true, spec.ringBy)];
           }
         }
         // Without the points, a density: every site bins over one shared range, so the counts add.
@@ -763,7 +767,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           await peerSafe(sites.map((s) => resolvers[s]), async () => {
             const violin = poolViolin(await Promise.all(sites.map((s) => fr[s].plotViolinCounts(doc.cohorts[cn], spec, xk, yk, vBins, range))));
             box.violin = violin; box.violinBins = vBins; box.violinExtent = range; box.overlay = "violin";
-            if (spec.colorBy) { box.colorLabel = axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || "")); }
+            if (spec.colorBy) { box.colorLabel = axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || ""), false, spec.colorBy); }
             box.note += " The density behind each box is binned by every site over one shared range, the pooled whiskers and up to" +
               " one whisker span beyond them, so its counts add exactly; a value past that range is off the figure and not in it.";
           }, (why) => { box.note += " No density is drawn behind the boxes: " + why + "."; });

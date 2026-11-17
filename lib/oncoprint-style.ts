@@ -113,6 +113,15 @@ export const STYLE = {
     notProfiled: { fill: "#ffffff", stripe: { color: "#bebebe", band: [0.475, 0.525] as [number, number] }, label: "Not profiled" },
     unalteredLabel: "No alterations"
   },
+  // A plot's points coloured by a gene, as the portal's Plots tab colours them (cbioportal-frontend
+  // PlotsTabUtils.tsx noMutationAppearance, notProfiledMutationsAppearance, cnaToAppearance,
+  // svAppearance, notProfiledCnaAndSvAppearance): a mutation class takes the glyph's own colour,
+  // the rest these. The ring's amplification, deep deletion and SV are the glyph's colours.
+  plotGene: {
+    fill: { "not mutated": "#c4e5f5", "not profiled for mutations": "#ffffff" } as Record<string, string>,
+    ring: { "amplification": "#ff0000", "gain": "#ff8c9f", "diploid": "#bebebe", "shallow deletion": "#2aced4", "deep deletion": "#0000ff",
+      "structural variant": "#8b00c9", "not profiled": "#000000" } as Record<string, string>,
+  },
   ramps: {
     sequential: { from: [222, 235, 247], to: [8, 72, 135] },            // #deebf7 -> #084887
     diverging: { low: [33, 102, 172], mid: [255, 255, 255], high: [178, 24, 43] },  // #2166ac -> white -> #b2182b

@@ -41,7 +41,7 @@ SELECT replaceOne(sd.patient_unique_id, 'crc_apc_impact_2020_', '') AS alt_case,
       SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'PIK3CA'))))) AS p2
 FROM snapshot_db.sample_derived sd
 LEFT JOIN (
-     SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
+     SELECT sample_unique_id, mutation_type, mutation_variant, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
      WHERE startsWith(genetic_profile_stable_id, 'crc_apc_impact_2020_') AND cancer_study_identifier = 'crc_apc_impact_2020' AND hugo_gene_symbol IN ('TP53','KRAS','PIK3CA')
        AND mutation_status != 'UNCALLED'
@@ -93,7 +93,7 @@ SELECT replaceOne(sd.patient_unique_id, 'crc_apc_impact_2020_', '') AS alt_case,
       SELECT gene_panel_id FROM snapshot_db.gene_panel_to_gene_derived WHERE gene = 'PIK3CA'))))) AS p2
 FROM snapshot_db.sample_derived sd
 LEFT JOIN (
-     SELECT sample_unique_id, mutation_type, variant_type, cna_alteration
+     SELECT sample_unique_id, mutation_type, mutation_variant, variant_type, cna_alteration
      FROM snapshot_db.genomic_event_derived
      WHERE startsWith(genetic_profile_stable_id, 'crc_apc_impact_2020_') AND cancer_study_identifier = 'crc_apc_impact_2020' AND hugo_gene_symbol IN ('TP53','KRAS','PIK3CA')
        AND mutation_status != 'UNCALLED'

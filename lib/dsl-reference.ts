@@ -1430,7 +1430,12 @@ profile lacks is refused with the closest it has. A patient-level assay's value 
 patient's samples. The engine runs a profile axis as the lower-level forms it resolves to, which a
 document may also give directly: \`{"source":"molecular","profileType","gene","discrete"?}\`,
 \`{"source":"assay","profileType","entity","categorical"?,"patientLevel"?}\` and
-\`{"source":"alteration","gene","by":"mutationType"|"mutated"|"driver"|"cna"|"sv"}\`. \`by: "driver"\` is the
+\`{"source":"alteration","gene","by":"mutationType"|"mutated"|"driver"|"cna"|"sv"|"topMutationType"|"copyNumberSv"}\`. The last two
+colour points as the portal's Plots tab colours them by a gene: \`topMutationType\` is each case's best
+mutation class by the portal's render priority ("Missense (Driver)", "Truncating (VUS)", or "Missense"
+without \`drivers\`; "Not mutated"; "Not profiled for mutations"), for \`colorBy\`; \`copyNumberSv\` is its
+strongest discrete copy-number call ("Amplification" … "Deep Deletion", "Diploid" with none), "Structural
+Variant" over it, "Not profiled" for neither, for \`ringBy\`. \`by: "driver"\` is the
 portal's "Driver vs VUS": Driver when any of the case's mutations is a putative driver by the view's
 \`drivers\` sources (OncoKB, the study's \`cbp_driver\` and \`cbp_driver_tiers\`), VUS when none is,
 Not mutated, Not profiled. A view that holds \`drivers\` also splits a mutation type into
