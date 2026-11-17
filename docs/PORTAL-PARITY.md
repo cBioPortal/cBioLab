@@ -75,7 +75,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [x] Patient: Allele Freq is rounded twice, to 3 decimals (`lib/views/alterations/run.ts:32`), then `toFixed(2)` (`app/lab/alterations-body.tsx:102`): 10/57 = 0.1754 shows "0.17". 5 of 64 rows wrong on TCGA-A6-2671 ([40-patient-summary](legacy-spec/parity/40-patient-summary.md)) (#183)
 - [x] Patient: an unknown patient (`?caseId=NOPE`) prints "no patient NOPE in lgg_ucsf_2014", then lays out every tab, each refusing on an empty cohort ([40-patient-summary](legacy-spec/parity/40-patient-summary.md)) (#183)
 - [x] Patient: Genomic Evolution is offered to single-sample patients, then refuses (TCGA-A6-2671, msk P-0000004); `app/portal/patient-layout.ts:57` does not check for two samples with allele counts ([40-patient-summary](legacy-spec/parity/40-patient-summary.md), [41-patient-tabs](legacy-spec/parity/41-patient-tabs.md)) (#183)
-  - [ ] Also hidden when no mutation has VAF > 0 (PTB-MD-3)
+  - [x] Also hidden when no mutation has VAF > 0 (PTB-MD-3) (#269)
 
 ## High — daily-use features, data already loaded
 
@@ -408,7 +408,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Mutation table: the portal's Mutation Type labels ("FS del"; ours `Frame_Shift_Del`), mRNA Expr., a Samples column only with several samples. Copy # beyond AMP/HOMDEL is under *OQL coverage*, the Annotation under *Mutation annotation breadth* (PAT-MT-2, PAT-MT-5, PAT-STM-4)
   - [ ] Default sort Annotation ↓, 10 rows (ours gene-grouped, driver genes first, 25) (PAT-MT-1, PAT-CNA-3)
   - [ ] "Study is not profiled for …" alerts and the not-profiled marks: grey pills, Gene panel column, panel modal (ours: lgg shows empty CNA and SV tables) (PAT-CNA-2, PAT-SV-2, PAT-NP-1, PAT-GP-2…4)
-  - [ ] Tabs: Genomic Evolution second, and only for patients with several samples (see bugs); no Clinical Trials placeholder, which the portal does not have (PAT-TAB, PTB-TAB-2, PTB-TAB-3, PTB-MD-2, PTB-MD-3, PTB-MD-12)
+  - [x] Tabs: Genomic Evolution second, and only for patients with several samples (see bugs); no Clinical Trials placeholder, which the portal does not have (PAT-TAB, PTB-TAB-2, PTB-TAB-3, PTB-MD-2, PTB-MD-3, PTB-MD-12) (#269)
+    - [ ] Uncalled mutations' reads toward the Genomic Evolution gate (legacy counts called or uncalled); Files & Links only with resource data (ours a placeholder on every patient) (PTB-TAB-2)
   - [ ] Timeline: drag-zoom, PDF/PNG/SVG/ZIP download, month ticks, tooltips pinned and paged, the sample row's clinical data in its tooltip (PAT-TL-ZM-1, PAT-TL-ZM-3, PAT-TL-ZM-4, PAT-TL-TT-1…4)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
   - [ ] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15)
