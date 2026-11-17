@@ -149,8 +149,14 @@ describe("every listed gene (CMM-AL-5, CMM-FS)", () => {
     assert.deepEqual([...e.all.gene].sort(), Object.keys(site.A.altered).sort());
     for (let i = 1; i < e.all.p.length; i++) assert.ok(e.all.p[i - 1] <= e.all.p[i], "p order at " + i);
     // rows are the head of all, value for value
+    // `all` carries p and q to 4 significant digits, one more than the page writes; the rest exactly
     const every = fromColumns(e.all, e.groups);
-    assert.deepEqual(every.slice(0, e.rows.length), e.rows);
+    const near = (a: number, b: number) => Math.abs(a - b) <= 5e-4 * Math.abs(b);
+    every.slice(0, e.rows.length).forEach((g, k) => {
+      const r = e.rows[k];
+      assert.ok(near(g.p, r.p) && near(g.q, r.q), r.gene);
+      assert.deepEqual({ ...g, p: 0, q: 0 }, { ...r, p: 0, q: 0 });
+    });
     // the columns carry the counts the resolver answered
     const i = e.all.gene.indexOf("G0123");
     assert.deepEqual(e.all.altered[i], [site.A.altered.G0123, site.B.altered.G0123]);
