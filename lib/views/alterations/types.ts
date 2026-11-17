@@ -31,6 +31,8 @@ export interface AlterationsView extends TableQuery {
   cna?: AlterationTableQuery;
   sv?: AlterationTableQuery;
 }
+/** A mutation's reads in one sample: allele frequency alt / (alt + ref). A mutation row's `detail.reads` lists them in the patient's sample order. */
+export interface AlleleReads { sample: string; alt: number; ref: number }
 export interface AlterationsResult extends TableRows<string | number | null> {
   /** the patient listed, with their samples (none on a page request), or null when the list is empty */
   patient: { study: string; id: string; samples: PatientSample[];
