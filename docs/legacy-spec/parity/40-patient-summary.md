@@ -23,16 +23,16 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 | Verdict | Count |
 |---|---|
 | ✅ match | 41 |
-| 🟡 partial | 26 |
+| 🟡 partial | 27 |
 | 🔶 different | 6 |
-| ❌ missing | 14 |
+| ❌ missing | 13 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
 | ? | 0 |
 | **Total IDs** | **92** |
 
-**Overall: 43.5 %** (✅ 35 + 🐞ok 4 + N/A 1 = 40 of 92). Counting 🟡 as half: 57.1 %.
+**Overall: 50.0 %** (✅ 41 + 🐞ok 4 + N/A 1 = 46 of 92). Counting 🟡 as half: 64.7 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
@@ -45,7 +45,7 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 | TL tracks | 6 | 1 | 3 | 0 | 0 | 1 | 1 | Order/nesting right; labels not upper-cased; tie order differs |
 | TL events | 6 | 5 | 1 | 0 | 0 | 0 | 0 | Glyphs, stacks, sample markers, diamond, line charts |
 | TL tooltips | 4 | 0 | 1 | 3 | 0 | 0 | 0 | Hover-only, ≤4 events stacked; no pin/paging/sample clinical rows |
-| TL axis/zoom | 5 | 1 | 2 | 0 | 2 | 0 | 0 | Year ticks and trims; no month ticks, drag-zoom or download |
+| TL axis/zoom | 5 | 1 | 3 | 0 | 1 | 0 | 0 | Year ticks and trims; PDF/PNG/SVG download; no month ticks, drag-zoom or Data (ZIP) |
 | GO genomic overview | 9 | 9 | 0 | 0 | 0 | 0 | 0 | Close igv port; side columns' numbers identical |
 | MT mutations table | 6 | 0 | 2 | 2 | 2 | 0 | 0 | Same rows; one max VAF not per-sample bars; no mRNA, no gene filter |
 | CNA table | 5 | 1 | 2 | 1 | 0 | 1 | 0 | Same 74 rows; empty table instead of "not profiled" alert |
@@ -204,7 +204,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 | PAT-TL-ZM-1 | 🟡 | B | Year ticks "0, 1y … 5y" ✅; no month minor ticks |
 | PAT-TL-ZM-2 | 🟡 | B | ≥4 empty years cut to a dashed mark ✅; restored by an "every year" checkbox (in the document), not by clicking it |
 | PAT-TL-ZM-3 | ❌ | C | No drag-to-zoom, no cursor line |
-| PAT-TL-ZM-4 | ❌ | C | No download (PDF/PNG/SVG/ZIP) |
+| PAT-TL-ZM-4 | 🟡 | C | Download ▸ PDF / PNG / SVG of the timeline as drawn (folded tracks, every year or not), named timeline, as legacy (lgg_ucsf_2014 P04 saved in all three); no Data (ZIP) yet (needs the Timeline Data tables, #316) |
 | PAT-TL-ZM-5 | ✅ | C | Card width (ResizeObserver) |
 
 ### §4 Genomic Overview

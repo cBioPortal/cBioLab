@@ -16,6 +16,7 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
 import { FloatingTip } from "../_ui/tooltip.tsx";
+import { ImageDownload } from "./image-download.tsx";
 
 type Spec = { patient?: { study: string; id: string }; collapsed?: string[]; expandGaps?: boolean } & Record<string, unknown>;
 
@@ -114,6 +115,8 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
               </label>
               <Button type="button" variant="outline" size="sm" className={TB} disabled={!collapsed.length} data-tip="unfold every nested track"
                 onClick={() => patch({ collapsed: undefined })}><ChevronsUpDown />expand all tracks</Button>
+              <ImageDownload name="timeline" formats={["pdf", "png", "svg"]} label="download the timeline" tip="download the timeline as drawn (its folded tracks, every year or not)"
+                svg={() => p ? timelineSvg(p, { width, collapsed, expandGaps: !!spec.expandGaps, theme: "light" }).svg : null} />
             </div>
           </div>
         </div>

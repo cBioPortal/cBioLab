@@ -64,4 +64,8 @@ export const mutants: Mutant[] = [
     effect: "A timeline sample's tooltip lists its attributes as they come, where the portal sorts them by key.",
     find: "  return [...merged].sort(([a], [b]) => a.localeCompare(b));\n}",
     replace: "  return [...merged];\n}" },
+  { id: "timeline-download-interactive-marks", layer: "counts", guard: "unit", file: "lib/timeline-svg.ts",
+    effect: "The Timeline's downloaded SVG carries the page's event hooks (class=\"tl-m\" data-ev) on every mark, unlike the portal's file.",
+    find: "const tag = (ix: number[]) => (o.interactive ? ",
+    replace: "const tag = (ix: number[]) => (true ? " },
 ];
