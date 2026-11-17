@@ -29,7 +29,7 @@ function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean })
   if (!c.numeric) return x == null ? "" : String(x);
   if (x == null || x === "") return null;
   const n = Number(x);
-  return c.id === "vaf" ? Math.round(n * 1e4) / 1e4 : c.id === "freq" ? Math.round(n * 10) / 10 : n;
+  return c.id === "freq" ? Math.round(n * 10) / 10 : n;
 }
 
 /** A mutation's reads in each sample carrying it with allele counts, in the patient's sample order: what its Allele Freq cell draws. */

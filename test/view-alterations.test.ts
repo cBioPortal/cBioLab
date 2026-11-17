@@ -178,12 +178,12 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.match(v.caveat!, /The patient list: 2 patients\. Sorted with patients who have any alteration first, then by patient id across the cohort;/);
   });
 
-  test("each cell as the table shows it: OncoKB's call with its level, numbers as numbers, allele frequency to 4 places, rounded once (V1: 10/57 is 0.1754, 3/500 is 0.006), and Cohort % to 1, blanks", async () => {
+  test("each cell as the table shows it: OncoKB's call with its level, numbers as numbers, allele frequency as the source gives it (its SQL rounds it to 4 places, once: check:patient-vaf V), and Cohort % to 1, blanks", async () => {
     const t = alt(await run({ mutations: { columns: ["gene", "annotation", "vaf", "freq", "altCount", "refCount", "copy", "start"] } }, one())).tables;
     const cols = t.mutations!.columns.map((c) => c.id);
     const row = Object.fromEntries(cols.map((id, i) => [id, t.mutations!.rows[0].values[i]]));
     assert.equal(row.annotation, "Oncogenic · Level 1");
-    assert.equal(row.vaf, 0.1754);
+    assert.equal(row.vaf, 10 / 57, "not rounded again in the runner: the source already holds the 4-place value the filter reads");
     assert.equal(row.freq, 12.3);
     assert.equal(row.altCount, null, "an empty number is missing, not 0");
     assert.equal(row.refCount, null);
@@ -366,9 +366,9 @@ describe("allele frequency and per-sample reads", () => {
     const t = alt(await run({ mutations: { columns: ["gene", "vaf"] } }, one(study({ mut })))).tables.mutations!;
     return { t, v: t.rows[0].values[t.columns.map((c) => c.id).indexOf(id)] };
   };
-  test("V1 PAT-MT-3: the vaf cell is rounded once, to 4 decimals", async () => {
-    assert.equal((await cell(MUT, "vaf")).v, 0.1754);
-    assert.equal((await cell([{ ...MUT[0], vaf: 3 / 500 }], "vaf")).v, 0.006);
+  test("V1 PAT-MT-3: the vaf cell is the source's value, not rounded again (the SQL rounds it once, to 4 places, for cell, filter and search alike)", async () => {
+    assert.equal((await cell([{ ...MUT[0], vaf: 0.1754 }], "vaf")).v, 0.1754);
+    assert.equal((await cell([{ ...MUT[0], vaf: 0.006 }], "vaf")).v, 0.006);
   });
   test("D1 PAT-MT-3: a row's reads become detail.reads in sample order", async () => {
     const { t } = await cell([{ ...MUT[0], reads: [["S1", 38, 157], ["S2", 190, 90]] }], "gene");

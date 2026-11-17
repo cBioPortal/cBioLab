@@ -33,6 +33,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
   const allMarks = useMemo(() => new Map((p?.samples || []).map((m) => [m.id, m])), [p]);
   // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
   const marks = useMemo(() => p?.shown ? new Map([...allMarks].filter(([id]) => p.shown!.includes(id))) : allMarks, [p, allMarks]);
+  // the Allele Freq bars' slots: one per sample in view, in sample order, as the Samples column's
+  const slot = useMemo(() => new Map([...marks.keys()].map((id, i) => [id, i])), [marks]);
   const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch({ patient: to }); };
   // the mutation or copy-number row clicked: the genomic overview zooms to its gene, and its Reset view lets go
   // (the portal's onMutationTableRowClick / onCnaTableRowClick / onResetViewClick); one row at a time across the tables
@@ -77,12 +79,11 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
     const tip = lines.length ? lines.join("\n") : undefined;
     if (marks.size === 1) return <span data-tip={tip}>{reads[0] ? portalVaf(vaf(reads[0])) : ""}</span>;
     if (!reads.length) return <span />;
-    const order = [...allMarks.keys()];
     return (
-      <svg width={order.length * 6 + (order.length - 1) * 3} height={12} data-tip={tip} role="img" aria-label={"allele frequency: " + lines.join("; ")}>
+      <svg width={slot.size * 6 + (slot.size - 1) * 3} height={12} data-tip={tip} role="img" aria-label={"allele frequency: " + lines.join("; ")}>
         {reads.map((r) => {
-          const h = vaf(r) * 12, i = order.indexOf(r.sample);
-          return <rect key={r.sample} x={i * 9} y={12 - h} width={6} height={h} fill={allMarks.get(r.sample)?.color} />;
+          const h = vaf(r) * 12;
+          return <rect key={r.sample} x={(slot.get(r.sample) ?? 0) * 9} y={12 - h} width={6} height={h} fill={marks.get(r.sample)?.color} />;
         })}
       </svg>);
   };
