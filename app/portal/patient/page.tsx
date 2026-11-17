@@ -80,6 +80,21 @@ function useEvolutionDrawable(study: string, patient: string | null, samples: nu
 }
 const EVOLUTION_COHORT = "Patient";
 
+/** The tab's title and description while the page shows them (PAT-SH-1), put back when it leaves. */
+function useDocumentTitle(title: string | null, description: string | null) {
+  useEffect(() => {
+    if (!title) return;
+    const meta = document.querySelector<HTMLMetaElement>("meta[name='description']");
+    const was = { title: document.title, description: meta?.content ?? null };
+    document.title = title;
+    if (meta && description) meta.content = description;
+    return () => {
+      document.title = was.title;
+      if (meta && was.description != null) meta.content = was.description;
+    };
+  }, [title, description]);
+}
+
 export default function PatientPage() {
   const q = useLinkParams();
   const study = (q.get("study") || q.get("studyId") || "").replace(ID, "");
@@ -143,6 +158,8 @@ function PatientView({ study, patient, sample, nav, tab, note }: { study: string
     ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known || (!sample && (!record || vaf == null)), samples: record?.samples.length, vaf: vaf ?? undefined })
     : null, [basics, known, study, patient, sample, record, vaf]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
   const page = usePageDoc(fresh);
+  // the portal's title, "Patient: P04" or "Sample: P04_Pri", and "<id> from <study name>"
+  useDocumentTitle(query ? (sample ? "Sample: " + sample : "Patient: " + patient) : null, query && basics ? (sample || patient) + " from " + basics.name : null);
   const shell = (body: React.ReactNode) => <><SiteHeader page={sample ? "sample" : "patient"} /><main className="analysis-main">{body}</main></>;
   if (!study || !query) return shell(<p className="note">This page shows one patient, or one sample: give the study and the patient as <code>?study=&lt;study id&gt;&amp;patient=&lt;patient id&gt;</code>, or a sample as <code>?study=&lt;study id&gt;&amp;sample=&lt;sample id&gt;</code>.</p>);
   if (error || owner.error) return shell(<div className="error">{error || owner.error}</div>);
