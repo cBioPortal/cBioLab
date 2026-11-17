@@ -6,9 +6,10 @@ import type { ViewResult, CoxCovariate, PlotAxis } from "../../types.ts";
 import { isPatientLevel, type EndpointColumns } from "../../federation.ts";
 import { validateAxis, axisLabel, isAbsent, OQL_NOT_PROFILED, MULTIPLE, type AxisKind } from "../../plot.ts";
 import { resolveProfileAxis } from "../../plot-profile.ts";
+import { titledAxes } from "../../clinical-titles.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, refuse, studyCatalogs, plural, ATTR_NAME, assayEntitiesKnown } from "../shared.ts";
-import { buildCoxColumns, notProfiledNote } from "../covariates.ts";
+import { buildCoxColumns, covariateLabel, notProfiledNote } from "../covariates.ts";
 import type { ForestView, ForestRow, ForestResult, ForestPooled } from "./types.ts";
 
 export const FOREST_MIN_PATIENTS = 30, FOREST_MIN_EVENTS = 10, FOREST_MAX_STRATA = 30, FOREST_MAX_COVARIATES = 4;
@@ -139,10 +140,15 @@ export async function runForest(view: ForestView, ctx: ViewRun): Promise<ViewRes
     const named = await assayEntitiesKnown(ctx, { exposure, ...Object.fromEntries(covariates.map((cv, i) => ["covariate " + (i + 1), cv])) }, vStudies);
     exposure = named.exposure!;
     covariates = covariates.map((cv, i) => named["covariate " + (i + 1)] as CoxCovariate || cv);
+    const titled = await titledAxes<Record<string, PlotAxis | undefined>>({ exposure, ...Object.fromEntries(covariates.map((cv, i) => ["c" + i, cv])) }, resolvers, vStudies);
+    exposure = titled.exposure!;
+    covariates = covariates.map((cv, i) => titled["c" + i] as CoxCovariate || cv);
   } catch (e) { return no((e as Error).message); }
   if (exposure.source === "none") return no("the exposure axis is \"none\"; name a gene's alteration or an attribute");
-  const stratumAxis: PlotAxis[] = byStudy || byCohort ? [] : [{ source: "clinical", attribute: strata }];
+  const stratumAxis: PlotAxis[] = byStudy || byCohort ? [] : [(await titledAxes({ s: { source: "clinical", attribute: strata } as PlotAxis }, resolvers, vStudies)).s!];
   const axes: PlotAxis[] = [exposure, ...stratumAxis, ...covariates];
+  /** the strata attribute as the views name it: its display name */
+  const strataName = stratumAxis.length ? axisLabel(stratumAxis[0]) : strata;
   const covAt = 1 + stratumAxis.length;
 
   // per-patient rows from every patient-level participant; the stratum is the attribute, the study or the cohort
@@ -162,9 +168,9 @@ export async function runForest(view: ForestView, ctx: ViewRun): Promise<ViewRes
   }
   if (!raw.length) return no(excludedRemote.length && !patientLevelTotal
     ? "no patient-level participant could answer: " + excludedRemote.map((e) => e.study).join(", ") + " answer" + (excludedRemote.length === 1 ? "s" : "") + " with counts only, and a Cox fit needs patient rows"
-    : "no patient had a " + endpointLabel + " time, the exposure" + (stratumAxis.length ? ", a " + strata : "") + (covariates.length ? " and every covariate" : "") + " on record");
+    : "no patient had a " + endpointLabel + " time, the exposure" + (stratumAxis.length ? ", a " + strataName : "") + (covariates.length ? " and every covariate" : "") + " on record");
   const k = kinds!;
-  if (stratumAxis.length && k[1] === "num") return no(strata + " is numeric; strata is a categorical attribute, \"study\" or \"cohort\"");
+  if (stratumAxis.length && k[1] === "num") return no(strataName + " is numeric; strata is a categorical attribute, \"study\" or \"cohort\"");
   const threshold = view.threshold == null ? undefined : Number(view.threshold);
   if (k[0] === "num" && !Number.isFinite(threshold)) return no(axisLabel(exposure) + " is numeric: give a threshold, and patients at or above it are the exposed");
   if (k[0] !== "num" && threshold != null) return no(axisLabel(exposure) + " is categorical: name the exposed level with exposed, not a threshold");
@@ -193,8 +199,8 @@ export async function runForest(view: ForestView, ctx: ViewRun): Promise<ViewRes
     : exposure.source === "alteration" ? alterationName(exposure) : axisLabel(exposure) + " altered";
   const n = patients.length, events = patients.reduce((a, r) => a + r.event, 0);
   const missing = Math.max(0, patientLevelTotal - raw.length - notProfiled);
-  const stratWord = byStudy ? "study" : byCohort ? "cohort" : strata;
-  const covNames = covariates.map((c) => axisLabel(c));
+  const stratWord = byStudy ? "study" : byCohort ? "cohort" : strataName;
+  const covNames = covariates.map((c) => covariateLabel(c));
   const result: ForestResult = { exposure: axisLabel(exposure), exposedLabel, endpoint: endpointLabel, strata: stratWord, covariates: covNames,
     ...fit, n, events, notProfiled, missing, ...(excludedRemote.length ? { excludedRemote } : {}) };
   const pct = (x: number) => (100 * x).toFixed(0) + "%";
@@ -205,11 +211,11 @@ export async function runForest(view: ForestView, ctx: ViewRun): Promise<ViewRes
     ...(vStudies.length > 1 ? { studies: vStudies } : {}),
     caveat: "Hazard ratio of " + endpointLabel + " for " + exposedLabel + " (exposed) against the rest, fit by Cox regression (Efron ties) within each " + stratWord +
       (covNames.length ? ", adjusted there for " + covNames.join(", ") + " (coded as the cox view codes covariates, within each row)" : ", univariate") + ". " +
-      plural(n, "patient") + " and " + plural(events, "event") + " had a time, the exposure" + (stratumAxis.length ? " and a " + strata : "") + (covNames.length ? " and every covariate" : "") + "; " +
+      plural(n, "patient") + " and " + plural(events, "event") + " had a time, the exposure" + (stratumAxis.length ? " and a " + strataName : "") + (covNames.length ? " and every covariate" : "") + "; " +
       fit.rows.length + " " + (fit.rows.length === 1 ? "row was" : "rows were") + " estimated. " +
       (exposure.source === "alteration" ? "Panel-aware: a patient not profiled for the gene is left out, never counted as unaltered." + notProfiledNote(notProfiled) + " " : "") +
       (missing ? plural(missing, "patient") + " lacked the endpoint, the stratum or a covariate and were left out. " : "") +
-      (multiple ? plural(multiple, "patient") + " whose samples carry different values of " + strata + " were left out: they belong to no one stratum. " : "") +
+      (multiple ? plural(multiple, "patient") + " whose samples carry different values of " + strataName + " were left out: they belong to no one stratum. " : "") +
       (uncoded ? plural(uncoded, "patient") + " had an exposure value that could not be coded and were left out. " : "") +
       (pooledRow ? "“" + pooledRow.label + "” pools " + (pooledRow.pooled!.length <= 12 ? pooledRow.pooled!.join(", ") : pooledRow.pooled!.length + " strata") + " (each under " + o.minPatients + " patients or " + o.minEvents + " events, or past the " + o.maxStrata + " largest), fit with a baseline hazard of its own per stratum. " : "") +
       (fit.left.length ? "Not estimated: " + fit.left.slice(0, 12).map((l) => l.label + " (" + l.reason + ")").join("; ") + (fit.left.length > 12 ? "; and " + (fit.left.length - 12) + " more" : "") + ". " : "") +

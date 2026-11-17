@@ -96,6 +96,49 @@ function sharedGroups(h: PlotLayer, key: number, mark: (pt: HighlightPoint) => s
   return [...by.entries()].map(([o, marks]) => layerGroup(key, marks, o)).join("");
 }
 
+/**
+ * How a plot's points take their fill and ring: the key names the commonest categories, and
+ * everything past it — and a case with no value — is one grey "other" with a key entry of its own,
+ * rather than a colour nobody can look up. A ring means "this case also has that", so absence gets
+ * no ring and no key entry. A box's points and density and a scatter's points share it.
+ */
+function pointColours(d: PlotData, pts: { c?: string; r?: string }[], violin: { c?: string }[] = []) {
+  const colorKey = (d.legend || []).filter((k) => !k.ring);
+  const ringKey = (d.legend || []).filter((k) => k.ring);
+  const byLabel = new Map((d.legend || []).map((k) => [k.label, k.color]));
+  const fillKeyed = new Set(colorKey.map((k) => k.label)), ringKeyed = new Set(ringKey.map((k) => k.label));
+  const fillOthers = new Set<string>(), ringOthers = new Set<string>();
+  let fillNoValue = false;
+  for (const b of violin) if (b.c != null && !fillKeyed.has(b.c)) { if (b.c === "") fillNoValue = true; else fillOthers.add(b.c); }
+  for (const pt of pts) {
+    if (pt.c != null && !fillKeyed.has(pt.c)) { if (pt.c === "") fillNoValue = true; else fillOthers.add(pt.c); }
+    if (pt.r != null && !isAbsent(pt.r) && !ringKeyed.has(pt.r)) ringOthers.add(pt.r);
+  }
+  const fillOf = (lab: string) => fillKeyed.has(lab) ? byLabel.get(lab)! : OTHER;
+  const ringOf = (lab: string) => ringKeyed.has(lab) ? byLabel.get(lab)! : OTHER;
+  const otherLabel = (n: number, noValue: boolean) =>
+    "other (" + [n ? n + " more categor" + (n === 1 ? "y" : "ies") : "", noValue ? "no value" : ""].filter(Boolean).join(", ") + ")";
+  const keyItems = (keys: { label: string; color: string }[], ring: boolean): LegendItem[] =>
+    keys.map((k) => ({ label: k.label, color: k.color, kind: "dot" as const, ...(ring ? { opacity: 0.6 } : {}) }));
+  /** the fill and ring keys, stacked from `y` down; the svg and where they end */
+  const legends = (y: number, W: number, p: Pal): { svg: string; y: number } => {
+    const out: string[] = [];
+    if (colorKey.length) {
+      const items = keyItems(colorKey, false);
+      if (fillOthers.size || fillNoValue) items.push({ label: otherLabel(fillOthers.size, fillNoValue), color: OTHER, kind: "dot" });
+      const lg = legend(items, 8, y, W - 16, p, { title: d.colorLabel || "colour" }); out.push(lg.svg); y += lg.height;
+    }
+    const rings = ringKey.filter((k) => !isAbsent(k.label));
+    if (rings.length) {
+      const items = keyItems(rings, true);
+      if (ringOthers.size) items.push({ label: otherLabel(ringOthers.size, false), color: OTHER, kind: "dot", opacity: 0.6 });
+      const lg = legend(items, 8, y, W - 16, p, { title: (d.ringLabel || "ring") + " (ring)" }); out.push(lg.svg); y += lg.height;
+    }
+    return { svg: out.join(""), y };
+  };
+  return { colorKey, ringKey, fillKeyed, fillOf, ringOf, legends };
+}
+
 function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotData, W: number, p: Pal): string {
   const { x0, x1, y0, y1 } = d.extent!, [gx, gy] = d.grid!;
   const hs = drawnLayers(d);
@@ -131,9 +174,15 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
     : cellMax ? d.bins!.filter((b) => b.n > cellMax) : d.bins!;
   // under point layers the plotted cohort is a floor-raised shade, so its faintest cells still read
   const own = d.xyPoints || [];
+  const colours = pointColours(d, own);
   out.push(layerGroup("base", [
     ...shaded.map((b) => cell(b, base, hs.length ? 0.3 + 0.7 * shade(b.n) : shade(b.n))),
-    ...own.map((pt) => `<circle${caseAttr(pt.id)} cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${base}" fill-opacity="0.7" ${halo(p)}/>`)]));
+    ...own.map((pt) => {
+      const fill = pt.c != null && colours.colorKey.length ? colours.fillOf(pt.c) : base;
+      const ring = pt.r != null && !isAbsent(pt.r) ? colours.ringOf(pt.r) : null;
+      return `<circle${caseAttr(pt.id)} cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${fill}" fill-opacity="${pt.c != null ? 0.85 : 0.7}" ` +
+        (ring ? `stroke="${ring}" stroke-width="${r1(PLOT_POINT_R * 0.36)}"` : halo(p)) + `/>`;
+    })]));
   const dot = (pt: { id: string; x: number; y: number }, color: string) =>
     `<circle${caseAttr(pt.id)} cx="${r1(xs(pt.x))}" cy="${r1(ys(pt.y))}" r="${PLOT_POINT_R}" fill="${color}" fill-opacity="0.9" ${halo(p)}/>`;
   for (const h of hs) {
@@ -175,6 +224,7 @@ function scatter(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: Pl
       { size: FS.body, fill: p.ink, maxW: W - L - 32 }));
     y += FS.body + 10;
   }
+  { const k = colours.legends(y, W, p); out.push(k.svg); y = k.y; }
   const hk = layerItems(d);
   if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "point layers" }); out.push(lg.svg); y += lg.height + 4; }
   const cap = caption((v.note ? v.note + "  " : "") + (shaded.length
@@ -263,23 +313,8 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
     const total = [...byClass.values()].reduce((a, n) => a + n, 0);
     if (total > (vioMax.get(b.g) || 0)) vioMax.set(b.g, total);
   }
-  const colorKey = (d.legend || []).filter((k) => !k.ring);
-  const ringKey = (d.legend || []).filter((k) => k.ring);
-  const byLabel = new Map((d.legend || []).map((k) => [k.label, k.color]));
-  // The key names the commonest categories. Everything past it — and a case with no value — is
-  // one grey "other" with a key entry of its own, rather than a colour nobody can look up.
-  const fillKeyed = new Set(colorKey.map((k) => k.label)), ringKeyed = new Set(ringKey.map((k) => k.label));
-  const fillOthers = new Set<string>(), ringOthers = new Set<string>();
-  let fillNoValue = false;
-  for (const b of d.violin || []) if (b.c != null && !fillKeyed.has(b.c)) { if (b.c === "") fillNoValue = true; else fillOthers.add(b.c); }
-  for (const pt of d.points || []) {
-    if (pt.c != null && !fillKeyed.has(pt.c)) { if (pt.c === "") fillNoValue = true; else fillOthers.add(pt.c); }
-    if (pt.r != null && !isAbsent(pt.r) && !ringKeyed.has(pt.r)) ringOthers.add(pt.r);
-  }
-  const fillOf = (lab: string) => fillKeyed.has(lab) ? byLabel.get(lab)! : OTHER;
-  const ringOf = (lab: string) => ringKeyed.has(lab) ? byLabel.get(lab)! : OTHER;
-  const otherLabel = (n: number, noValue: boolean) =>
-    "other (" + [n ? n + " more categor" + (n === 1 ? "y" : "ies") : "", noValue ? "no value" : ""].filter(Boolean).join(", ") + ")";
+  const colours = pointColours(d, d.points || [], d.violin || []);
+  const { colorKey, ringKey, fillKeyed, fillOf, ringOf } = colours;
   const vBins = d.violinBins || 40;
   let offScale = 0, ptOffScale = 0;
   /** a value off the axis: a triangle at the frame's edge pointing the way it lies */
@@ -402,20 +437,7 @@ function box(v: DrawnResultOf<"plot"> | DrawnResultOf<"coexpression">, d: PlotDa
     y = T + PLOT + bottomAxisHeight(numTitle) + 12;
   }
 
-  const keyItems = (keys: { label: string; color: string }[], ring: boolean): LegendItem[] =>
-    keys.map((k) => ({ label: k.label, color: k.color, kind: "dot" as const, ...(ring ? { opacity: 0.6 } : {}) }));
-  if (colorKey.length) {
-    const items = keyItems(colorKey, false);
-    if (fillOthers.size || fillNoValue) items.push({ label: otherLabel(fillOthers.size, fillNoValue), color: OTHER, kind: "dot" });
-    const lg = legend(items, 8, y, W - 16, p, { title: d.colorLabel || "colour" }); out.push(lg.svg); y += lg.height;
-  }
-  // a ring means "this case also has that", so absence gets no ring and no key entry
-  const rings = ringKey.filter((k) => !isAbsent(k.label));
-  if (rings.length) {
-    const items = keyItems(rings, true);
-    if (ringOthers.size) items.push({ label: otherLabel(ringOthers.size, false), color: OTHER, kind: "dot", opacity: 0.6 });
-    const lg = legend(items, 8, y, W - 16, p, { title: (d.ringLabel || "ring") + " (ring)" }); out.push(lg.svg); y += lg.height;
-  }
+  { const k = colours.legends(y, W, p); out.push(k.svg); y = k.y; }
   const hk = layerItems(d);
   if (hk.length) { const lg = legend(hk, 8, y, W - 16, p, { title: "point layers" }); out.push(lg.svg); y += lg.height; }
   y += 4;

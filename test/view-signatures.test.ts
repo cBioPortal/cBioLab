@@ -12,7 +12,7 @@ import { COUNT_TIP, ROW_CLICK_HINT, channelColor, channelTick, countAxisMax, cou
 import { REFERENCE_SOURCE, referenceChannel, referenceKey, referenceProfile, referenced } from "../lib/views/signatures/reference.ts";
 import { COSMIC_REFERENCE } from "../lib/views/signatures/cosmic-reference.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
-import { signaturesSvg, FIGURE_SIGNATURES } from "../lib/views/signatures/figure.ts";
+import { signaturesSvg, signaturesSpectrumSvg, FIGURE_SIGNATURES } from "../lib/views/signatures/figure.ts";
 import { signaturesKind } from "../lib/views/signatures/kind.ts";
 import { signaturesMethod } from "../lib/views/signatures/method.ts";
 import { pageSql } from "../lib/table-query.ts";
@@ -424,6 +424,26 @@ describe("the portal's spectrum chart: colours, labels, axes and the COSMIC refe
   });
 });
 
+describe("signatures: PAT-STM-12 sample order", () => {
+  const samples = [{ sid: "T01", type: "Primary" }, { sid: "T02", type: "Primary" }];
+  const build = (patientTimeline: () => Promise<unknown>) => {
+    const t = (table: string, src: RowSource): Row[] => table === "signatures:samples" ? samples.map((x) => ({ cohort: "A", study: "s1", patient: "P1", ...x })) : tables()(table, src);
+    return { ...local(t), patientTimeline };
+  };
+  test("G1 PAT-STM-12: the patient's samples are numbered by their events: T02 is 1, T01 is 2", async () => {
+    const resolver = build(async () => ({ events: [{ type: "Sample acquisition", start: -40, end: null, attrs: [["SAMPLE_ID", "T01"]] }, { type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }));
+    const s = sig(await run({ patient: { study: "s1", id: "P1" } }, ctx({ resolver })));
+    assert.deepEqual(s.patient!.samples.map((x) => x.id), ["T02", "T01"]);
+    assert.deepEqual(s.patient!.samples.map((x) => x.label), ["1", "2"]);
+  });
+  test("G2 PAT-STM-12: a refused timeline does not refuse the view", async () => {
+    const resolver = build(async () => { throw new Error("timeline refused"); });
+    const v = await run({ patient: { study: "s1", id: "P1" } }, ctx({ resolver }));
+    assert.equal(err(v), undefined, String(err(v)));
+    assert.ok(sig(v).patient);
+  });
+});
+
 test("S1 (PTB-STM-6): spectrumPct is Math.round(100*count/total), 0 when total is 0", () => {
   const cases: [number, number, number][] = [[1, 3, 33], [2, 3, 67], [1, 8, 13], [0, 0, 0], [5, 0, 0]];
   for (const [c, t, want] of cases) assert.equal(spectrumPct(c, t), want, c + "/" + t);
@@ -448,6 +468,41 @@ test("S1 (PTB-STM-6): the figure's channel tooltips state whole percents", async
   const tips = [...svg.matchAll(/<title>[^<]* of 40 single base substitutions \(([^)]*)\)/g)].map((m) => m[1]);
   assert.ok(tips.length > 0);
   for (const t of tips) assert.match(t, /^\d+%/, t);
+});
+
+describe("PTB-MS-5: the spectrum download", () => {
+  const exp = (v: unknown, o: Record<string, unknown> = {}) => signaturesSpectrumSvg(v as never, { width: 900, theme: "light", ...o });
+  test("D1: no spectrum or no patient is null", async () => {
+    const v = await run({});
+    const s = sig(v);
+    assert.equal(exp({ ...v, signatures: { ...s, spectrum: null } }), null);
+    assert.equal(exp({ ...v, signatures: { ...s, patient: null } }), null);
+  });
+  test("D2: the spectrum alone, with its head", async () => {
+    const v = await run({});
+    const s = sig(v), out = exp(v)!;
+    assert.ok(out.startsWith("<svg"));
+    assert.ok(out.includes(`Sample: ${s.spectrum!.sample} |`));
+    assert.ok(out.includes(`count: ${s.spectrum!.total}`));
+  });
+  test("D3: a chosen reference is drawn, otherwise not", async () => {
+    const v = await run({ signature: "SBS1", ymax: 40 });
+    assert.ok(sig(v).reference);
+    const out = exp(v)!;
+    assert.match(out, />COSMIC Reference</);
+    assert.match(out, />SBS1 \(%\)</);
+    assert.match(signaturesSvg(v as never, { theme: "light" })!, />SBS1 \(%\)</);
+    assert.doesNotMatch(exp(await run({}))!, /COSMIC Reference|SBS1 \(%\)/);
+  });
+  test("D4: the contributions part of the full figure is left out", async () => {
+    const v = await run({ signature: "SBS1" });
+    assert.match(signaturesSvg(v as never, { theme: "light" })!, /Signature contributions/);
+    assert.doesNotMatch(exp(v)!, /Signature contributions/);
+  });
+  test("D5: the light theme uses literal colours", async () => {
+    const v = await run({ signature: "SBS1" });
+    assert.doesNotMatch(exp(v, { theme: "light" })!, /var\(--/);
+  });
 });
 
 describe("signatureTableTsv: the Mutational Signatures table's Copy/Download", () => {

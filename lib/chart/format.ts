@@ -36,6 +36,12 @@ export function portalVaf(f: number): string {
 }
 
 /**
+ * A VAF as the portal's Genomic Evolution tooltip writes it (mutationTooltip,
+ * PatientViewMutationsTabUtils.tsx): always 2 decimals — 0.0098 → "0.01", 0.375 → "0.38".
+ */
+export const portalEvolutionVaf = (f: number): string => f.toFixed(2);
+
+/**
  * A share of a Study View chart (0–100), as cbioportal.org writes it (`getFrequencyStr`,
  * StudyViewUtils.tsx): "0%", one decimal, "99.9%" for anything from 99.9 up to but short of 100,
  * "<0.1%" below a tenth, "NA" when negative or not a number.
@@ -225,6 +231,25 @@ export const portalLocale = (x: number): string => x.toLocaleString("en-US");
 export const portalRange = (min: number, max: number): string =>
   min === max ? portalLocale(min) : "(" + portalLocale(min) + ", " + portalLocale(max) + "]";
 
+/** a MutSig / GISTIC q-value as the portal's gene-table download writes it (getQValue, StudyViewUtils.tsx:2431): 0 as "0", else 3-digit exponential */
+export function portalQValue(q: number): string {
+  return q === 0 ? "0" : q.toExponential(3);
+}
+
+/** a q-value as the portal's MutSig and GISTIC icon tooltips write it: `(q || 0).toExponential(3)` (MutSig.tsx, Gistic.tsx) */
+export function portalQTip(q: number): string {
+  return (q || 0).toExponential(3);
+}
+
+/**
+ * A filtered table's samples and patients as the portal's reset panel writes them (PatientSampleSummary):
+ * "3 samples / 2 patients", or one count for both when they are equal, "5 samples/patients".
+ */
+export function portalKeptUnits(samples: number, patients: number): string {
+  if (samples !== patients) return samples + (samples === 1 ? " sample" : " samples") + " / " + patients + (patients === 1 ? " patient" : " patients");
+  return samples + (samples === 1 ? " sample/patient" : " samples/patients");
+}
+
 /**
  * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",
  * "<1%" below one percent, else the whole percent, Math.round's (2.5 → "3%").
@@ -257,3 +282,15 @@ export const roundSig = (x: number, sig: number): number => Number.isFinite(x) &
 export const roundPlaces = (x: number, places: number): number => Number.isFinite(x) ? Math.round(x * 10 ** places) / 10 ** places : x;
 /** A byte count in megabytes, one decimal: "2.5 MB". */
 export const fmtMb = (bytes: number): string => (bytes / 1e6).toFixed(1) + " MB";
+
+/**
+ * A number rounded to two decimals as lodash's _.round(x, 2) does it, by shifting the exponent so 1.005 rounds
+ * to 1.01 (Math.round(1.005 * 100) / 100 gives 1): the Cancer Types Summary popover's percentages
+ * (CancerSummaryChart percentageRounder), printed as JavaScript prints the number (90.43, 0.1, 100).
+ */
+export function portalRound2(x: number): number {
+  const [m, e] = (String(x) + "e").split("e");
+  const shifted = Math.round(+(m + "e" + (+e + 2)));
+  const [m2, e2] = (String(shifted) + "e").split("e");
+  return +(m2 + "e" + (+e2 - 2));
+}

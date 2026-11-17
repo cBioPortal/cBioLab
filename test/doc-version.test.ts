@@ -184,3 +184,20 @@ describe("2.5 → 2.6", () => {
     assert.match(upgrade.changes.join(" "), /2 oncoprint views .*Study of origin/);
   });
 });
+
+describe("2.9 → 2.10", () => {
+  test("the current version is 2.10, read as a number after 2.9, not before it", () => {
+    assert.equal(DOC_VERSION, "2.10");
+    const d = { dsl: "2.10", cohorts: { A: { all: [] } } };
+    assert.equal(upgradeDocument(d).doc, d);
+    assert.throws(() => upgradeDocument({ dsl: "2.11", cohorts: {} }), /written for DSL 2\.11; this server reads up to 2\.10/);
+  });
+  test("a 2.9 document upgrades with no changes, its profiled clauses as they were", () => {
+    const profiled: Clause = { kind: "profiled", type: "MUTATION", genes: ["KRAS", "TP53"] } as Clause;
+    const { doc, upgrade } = upgradeDocument({ dsl: "2.9", cohorts: { A: { all: [profiled] } }, views: [{ kind: "survival", cohorts: ["A"] }] }) as any;
+    assert.equal(doc.dsl, "2.10");
+    assert.deepEqual(doc.cohorts, { A: { all: [profiled] } });
+    assert.deepEqual(doc.views, [{ kind: "survival", cohorts: ["A"] }]);
+    assert.deepEqual(upgrade?.changes ?? [], []);
+  });
+});

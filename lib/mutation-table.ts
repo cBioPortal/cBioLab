@@ -2,9 +2,11 @@
 // cBioPortal's Mutations tab lists. Its rows name samples, so — like the clinical table — the query
 // lives here, outside lib/federation*.ts's aggregate builders, and runs only through
 // PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
+// The one other reader is the lollipop narrowed by the table's search (mutationRowKeysSql), which
+// BaseResolver.lollipopCounts builds only on a patient-level participant and refuses everywhere else.
 import { mutationStudySql, sq } from "./compiler.ts";
-import type { QueryColumn, RowSource } from "./table-query.ts";
-import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS } from "./lollipop.ts";
+import { whereSql, type QueryColumn, type RowSource, type TableQuery } from "./table-query.ts";
+import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS, LOLLIPOP_OWN_FILTERS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
@@ -83,8 +85,14 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
 export const MUTATION_ANNOTATION_ORDER = "arrayConcat(" + oncokbSortSql("oncogenicity", "level", "resistanceLevel", "diagnosticLevel", "prognosticLevel") +
   ", [toFloat64(0), toFloat64(hot), toFloat64(0)])";
 
+/**
+ * A row's allele frequency as the portal writes it on screen and in its download (MUT-STM-5): 4 decimals below
+ * 0.01, else 2, trailing zeros kept; '' for none. The one rule: the table's cell, its search and its CSV all read it.
+ */
+export const VAF_TEXT = "if(vaf IS NULL, '', if(vaf < 0.01, toDecimalString(vaf, 4), toDecimalString(vaf, 2)))";
+
 /** Shown unless the view names its columns: the portal's own default set. */
-export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "mutCount"];
+export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "copyNumber", "vaf", "mutCount"];
 
 /**
  * The lollipop grid's cell a mutation falls in, spelled as the grid labels it ("Missense · Driver"):
@@ -113,7 +121,8 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
-    case "vaf": return { ...c, text: str("round(vaf, 2)"), num: num("vaf") };
+    // as the screen and the download show it (the rows' vafText), so a search finds the shown number
+    case "vaf": return { ...c, text: "vafText", num: num("vaf") };
     // the portal sorts HGVSc by the number after "c." (Hgvsc.tsx), ClinVar by its significance
     case "hgvsc": return { ...c, text: "hgvsc", order: "toInt64OrNull(extract(hgvsc, 'c\\.(-?[0-9]+)'))" };
     case "clinvar": return { ...c, text: "if(clinvar = '' OR clinvarConflicting = '', clinvar, concat(clinvar, '(', clinvarConflicting, ')'))", order: "nullIf(clinvar, '')" };
@@ -203,7 +212,9 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "         " + mutationDrvSql(p, db, pin, pins, hot, drivers) + " AS drv,\n" +
     "         toUInt8(" + (pin ? hot : "0") + ") AS hot,\n" +
     "         m.mutationType AS mutationType, upper(m.variantType) AS variantType,\n" +
-    "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
+    "         if(m.altCount > 0 AND m.refCount >= 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, " + VAF_TEXT + " AS vafText,\n" +
+    // none for a 0 frequency, a count of 0 or less blank, as the portal's cells are: they sort and filter as missing
+    "         if(m.altCount > 0, m.altCount, NULL) AS altCount, if(m.refCount > 0, m.refCount, NULL) AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
     "         " + hgvsgSql("ifNull(m.chr, '')", "ifNull(m.start, 0)", "ifNull(m.end, 0)", "ifNull(m.ref, '')", "ifNull(m.var, '')") + " AS hgvsg,\n" +
     "         " + variantColumnsSql(gn ? "ifNull(g.gd, '')" : "''", gene) + ",\n" +
@@ -302,7 +313,7 @@ function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: stri
     "         " + drv + " AS drv,\n" +
     "         toUInt8(0) AS hot,\n" +
     "         'Fusion' AS mutationType, upper(v.class) AS variantType,\n" +
-    "         NULL AS vaf, NULL AS altCount, NULL AS refCount,\n" +
+    "         NULL AS vaf, '' AS vafText, NULL AS altCount, NULL AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,\n" +
     "         '' AS hgvsg,\n" +
     "         " + variantColumnsSql("''", gene) + ",\n" +
@@ -386,5 +397,24 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     // the portal's default: Annotation, descending (skin_results_view_tables_default_sort_column)
     defaultOrder: MUTATION_ANNOTATION_ORDER + " DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",
+    units: { sample: "sid", patient: "patient" },
   };
 }
+
+/**
+ * The rows one part's table keeps under the query `q` — its search over the shown columns and its
+ * column filters — as `(sid, proteinChange, mutationType, rowKeySql)`, the lollipop's own key for a
+ * mutation or fusion row: two calls of one change in one sample differ by their genomic position or
+ * alleles (a fusion's, by site 1). The table's Alteration and Protein Position filters are left out: they are the grid's
+ * and the plot's own selection, which narrow the table alone (the portal's badge counts ignore the
+ * badge filter, and a selected codon narrows only the table).
+ */
+export function mutationRowKeysSql(part: TablePart, db: string, gene: string, pin: string | null, pins: VariantPins, oql: LollipopOql | undefined, q: TableQuery): string {
+  const src = mutationRowSource([part], db, gene, pin, pins, oql);
+  return src.with + "SELECT sid, proteinChange, ifNull(mutationType, '') AS mutationType, " + rowKeySql("chr", "start", "end", "ref", "var") + " AS rk FROM rows\n" +
+    "WHERE " + whereSql(src, { ...q, filters: Object.fromEntries(Object.entries(q.filters || {}).filter(([id]) => !LOLLIPOP_OWN_FILTERS.has(id))) }, MUTATION_DEFAULT_COLUMNS);
+}
+
+/** a row's genomic position and alleles as one string (a fusion: site 1's chromosome and position), the same for the table's rows and the lollipop's */
+export const rowKeySql = (chr: string, start: string, end: string, ref: string, alt: string): string =>
+  "concat(ifNull(toString(" + chr + "), ''), ':', ifNull(toString(" + start + "), ''), '-', ifNull(toString(" + end + "), ''), ':', ifNull(toString(" + ref + "), ''), '>', ifNull(toString(" + alt + "), ''))";

@@ -267,6 +267,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Several studies: on pooled values, where every study may show its values (was a size-weighted approximation of each study's quartiles); coadread + brca KRAS CNA × mRNA, all five boxes = the portal's rule on cbioportal.org's data (Diploid 943.23 · 1197.34 · 1495.2, was 947.72 · 1198.24 · 1492.25) (PLT-MD-2) (#280)
       - [ ] A study that may not show its values still pools by the size-weighted approximation, and says so
   - [ ] "Color samples by" the first gene by default: fill by mutation type, stroke by CNA, with a legend, scatters included (ours plain points; colour only on box plots, when chosen) (PLT-CL-1…4, PLT-CL-8, PLT-SC-6)
+    - [x] A scatter drawn as its points takes the fill and ring a box takes, with their keys titled by the colouring axes; a density scatter says why it has no per-case colour (PLT-CL-8, PLT-SC-6) (#300)
+    - [ ] The first queried gene by default (mutation type fill, copy-number stroke), the top alteration per sample, the portal's legend order and placement (PLT-CL-1…4, PLT-STM-14…17)
   - [ ] Discrete × discrete as bars: Bar, Stacked (the portal's default), 100% stacked, Sort By, Horizontal Bars (ours a table only) (PLT-PT-6, PLT-UT-4…6, PLT-BR-1…8, PLT-STM-12)
   - [x] Correlation text as the portal's: "Spearman: -0.06 (p = 0.185)" then "Pearson: -0.04 (p = 0.359)", `toFixed(2)` and `toConditionalPrecision(p, 3, 0.01)` (was "Pearson r = −0.038 (p = 0.36) · Spearman ρ = −0.055 (p = 0.19)") (PLT-SC-2, PLT-STM-4…6, PLT-STM-22) (#234)
     - [ ] In the right gutter on two lines each, as the portal places it (ours one line above the plot)
@@ -287,6 +289,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] Filter categories and Sort by Median (PLT-AX-9, PLT-AX-10, PLT-STM-9)
   - [ ] Clinical attributes by display name with their ⓘ description, in the select, axis title and tooltip (ours `MUTATION_COUNT`) (PLT-AX-2, PLT-DT-19)
     - [x] Axis titles as the portal's getAxisLabel writes them, in the figure, caption and tooltip: a clinical attribute's display name ("Mutation Count", "Diagnosis Age"), "KRAS: Mutations", "KRAS: Mutated vs Wild Type", "KRAS: Driver vs VUS Mutations", "TCF7L2: Variant vs No Variant" (PLT-DT-19) (#298)
+    - [x] Every view names a clinical attribute alike: its display name resolved onto the axis once (the first any participating study declares), so a pooled plot's colour key and titles, a forest's exposure and a model's covariates say "Sex", "MSI Type"; an alteration axis written directly is titled as a profile one ("KRAS: Mutated vs Wild Type") (PLT-DT-19) (#315)
     - [ ] The select by display name and priority, with the ⓘ description (PLT-AX-2)
 - [ ] **Results → Cancer Types Summary tab** ([02-cancer-types-summary](legacy-spec/parity/02-cancer-types-summary.md))
   - [x] The query's OQL: what counts as altered is what its lines match, each under its gene (CancerSummaryContainer: oqlFilteredAlterationsByGeneBySampleKey), DRIVER by the page's settings; mRNA and protein high / low are kinds of their own, in the oncoprint's colours; a unit's alterations count once per type, so an amplification and a deep deletion are one copy-number kind (alterationCountHelpers uniqBy alterationType). msk_impact_2017 `KRAS: MUT=G12D`, `TP53: HOMDEL`: NSCLC 64 / 1567, Pancreatic 150 / 487, Colorectal 125 / 982, as the portal
@@ -426,6 +429,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Volcano drag-select and click, as the expression volcanoes have; significant points `#58ACFA` (ours by group) (CMM-VO-3, CMM-VO-5, CMM-FL-3)
 - [ ] **Results → Comparison/Survival tab** ([20-comparison-core](legacy-spec/parity/20-comparison-core.md), [21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
   - [ ] The Unaltered group as the portal's, unaltered among samples not wholly unprofiled (ours needs profiling in every type: 312 vs 372; OS p 0.616 vs 0.632); the Unprofiled and per-track groups (CMP-RV-3, CMM-RV-1…4)
+    - [x] Unaltered: not altered and profiled for some queried gene in some selected alteration profile (`profiled` `anyGene`, DSL 2.10): coadread KRAS 372, OS 369/74, p 0.632, as the portal; msk_impact_2017 ZFHX3 399 / 7,740 samples (#304)
+    - [ ] The Unprofiled group, the per-track groups, user groups and the group selector on the Results tab
+    - [ ] The Download tab's unaltered list and NP count by the same rule (`lib/views/datafiles/sql.ts` still requires every type: coadread KRAS 312; Results lane)
   - [ ] The SV, mRNA, Protein and Methylation sub-tabs (ours mutation and CNA); "Add checked genes to query"; query genes left out before q (CMM-RV-1…4, CMM-MD-9)
 - [ ] **Patient → Summary and tabs** ([40-patient-summary](legacy-spec/parity/40-patient-summary.md), [41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
   - [x] Allele Freq per sample as bars, "x variant reads out of y", 4 decimals below 0.01, sorted by the samples' VAFs in sample order (PAT-MT-3, PAT-STM-1) (#281)
