@@ -171,14 +171,14 @@ tA("A18: tie with threshold, generic-assay rows ['>3', '3'] -> 3 from the non-th
 
 tA("A19: generic-assay rows ['>3', '1'] -> 3 (DU:518-519, 489-496)", () => {
   assert.equal(assayAgg([">3", "1"]), 3);
-}, { todo: "threshold values (\">8\") are not read: 4 in the warehouse, all one BLOOD_MEASUREMENTS profile (docs/PORTAL-PARITY.md)" });
+});
 
 tA("A20: generic-assay rows ['<-4', '1'] -> -4 (DU:482-496)", () => {
   assert.equal(assayAgg(["<-4", "1"]), -4);
-}, { todo: "threshold values (\">8\") are not read: 4 in the warehouse, all one BLOOD_MEASUREMENTS profile (docs/PORTAL-PARITY.md)" });
+});
 
-tA("A21: generic-assay rows ['1', '<-4'] -> 1, legacy bug as A14 (DU:482-484)", () => {
-  assert.equal(assayAgg(["1", "<-4"]), 1);
+tA("A21 (ours, as A14): generic-assay rows ['1', '<-4'] -> -4, the value furthest from 0; the portal's signed-vs-abs bug gives its first row, 1 (DU:482-484)", () => {
+  assert.equal(assayAgg(["1", "<-4"]), -4);
 });
 
 tA("A22: patient rows [0, 0] -> 0 (DU:466-475)", () => {
