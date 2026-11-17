@@ -63,6 +63,8 @@ import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql, cancerTypeSamplesSql } from "../lib/views/cancertypes/sql.ts";
 import { lineCtes, type StudyOpts } from "../lib/views/datafiles/sql.ts";
+import { matrixRowSource } from "../lib/views/datafiles/tables.ts";
+import { pageSql } from "../lib/table-query.ts";
 import { pairCountsSql, geneCountsSql, lollipopChangesSql } from "../lib/federation.ts";
 import { oqlMutationFilterSql } from "../lib/oql.ts";
 import { mutationStudySql, sq } from "../lib/compiler.ts";
@@ -716,6 +718,24 @@ async function expectCategory(tag: string, attribute: string | null, unit: "samp
   await expectCategory("G5", "CANCER_TYPE_DETAILED", "sample", { [LUAD]: 42, [LUSC]: 13, [LC]: 2, [UNKNOWN]: 2 }, 59, noType);
   await expectCategory("G5", "CANCER_TYPE_DETAILED", "patient", { [LUAD]: 39, [LUSC]: 12, [LC]: 2, [UNKNOWN]: 2 }, 53, noType);
   await write("DROP DATABASE IF EXISTS " + noType);
+}
+
+// ==== Download: a gene-by-sample file over a study without its profile (N*) ====================
+// lib/views/datafiles/tables.ts matrixRowSource lists every queried sample, as the portal's file does: a study
+// that holds no such profile (holds false) gives each of its 59 samples NP in every gene, reading none of its data;
+// one that holds it gives the fixture's calls (TP53 mutated on its panel: not every row NP).
+{
+  const cohort = compileCohortDef(null, { study: STUDY, db: conn.db });
+  const part = [{ cohort: "Q", study: STUDY, cohortSql: cohort }];
+  for (const [tag, holds] of [["N1 without the profile", false], ["N2 with it", true]] as const) {
+    const src = matrixRowSource({ kind: "mutations" }, part, ["TP53", "KRAS"], conn.db, () => holds);
+    try {
+      const rows = (await chQuery<Row>(pageSql(src, {}, ["sample", "patient", "TP53", "KRAS"], 1000, 0), conn)).data;
+      const np = rows.filter((r) => r.g0 === "NP" && r.g1 === "NP").length;
+      ok(tag + ": a row per sample (59)", rows.length === 59, "ours " + rows.length);
+      ok(tag + (holds ? ": the fixture's calls, not NP throughout" : ": NP in every gene"), holds ? np < rows.length : np === rows.length, "NP rows " + np + " of " + rows.length);
+    } catch (e) { ok(tag + " runs", false, (e as Error).message.slice(0, 300)); }
+  }
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);

@@ -148,8 +148,9 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
     const cols = file ? matrixColumns(genes) : statusColumns(id as StatusTable, lines);
     const defs = cols.map((c) => c.id);
     const shown = shownColumns(tq, cols, defs);
-    const r = await runRows(ctx, "datafiles:" + id, file ? file.studies : holders, tq, defs, shown, n,
-      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db) : statusRowSource(id as StatusTable, parts, lines, planOf),
+    // a gene-by-sample file lists every queried sample, as the portal's: NP in a study without its profile
+    const r = await runRows(ctx, "datafiles:" + id, holders, tq, defs, shown, n,
+      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db, (st) => file.studies.includes(st)) : statusRowSource(id as StatusTable, parts, lines, planOf),
       ctx.values ? { column: ctx.values, numeric: false } : undefined);
     const lineIds = lineColumns(lines).map((c) => c.id);
     const reads = (x: Record<string, unknown>, c: FileColumn): Cell => {
@@ -168,7 +169,8 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   const lineInfo = lines.map((l, k) => ({ ...l, column: caseCols[3 + k].id }));
   const empty = { samples: 0, altered: 0, unaltered: 0, unprofiled: 0 };
   const files = (counts: DatafilesResult["counts"], perStudy: Record<string, number>): DataFile[] => [
-    ...offered.map((f) => ({ id: f.id, name: f.name, description: f.description, group: "data" as const, portalFile: f.portalFile, rows: f.studies.reduce((n, st) => n + (perStudy[st] || 0), 0),
+    ...offered.map((f) => ({ id: f.id, name: f.name, description: f.description + (f.studies.length < holders.length ? "; NP throughout for a study without it" : ""),
+      group: "data" as const, portalFile: f.portalFile, rows: holders.reduce((n, st) => n + (perStudy[st] || 0), 0),
       ...(f.studies.length < ctx.vStudies.length ? { studies: f.studies } : {}) })),
     { id: "altered", name: "Altered samples", group: "list", rows: counts.altered, description: "the samples the query alters (any line), one per row" },
     { id: "unaltered", name: "Unaltered samples", group: "list", rows: counts.unaltered,

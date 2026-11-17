@@ -124,12 +124,22 @@ function matrixValues(f: MatrixFile, study: string, db: string, genes: string[],
  * structural variants (event info; NA when none) or its value in the profile (NA when none is
  * stored) — NP where its panel did not cover the gene in that data type (mutations, structural
  * variants and discrete copy number; the panels record nothing finer for the other profiles).
- * The query's OQL is not in effect, as on the portal: every call of the gene is listed.
+ * The query's OQL is not in effect, as on the portal: every call of the gene is listed. A part whose
+ * study `holds` no such profile still has a row per sample, NP in every gene (the portal's file lists
+ * every queried sample); none of its data is read.
  */
-export function matrixRowSource(f: MatrixFile, parts: TablePart[], genes: string[], db: string): RowSource {
+export function matrixRowSource(f: MatrixFile, parts: TablePart[], genes: string[], db: string, holds: (study: string) => boolean = () => true): RowSource {
   if (!parts.length) throw new Error("matrixRowSource needs at least one part");
   const ctes: string[] = [], selects: string[] = [];
   parts.forEach((p, i) => {
+    if (!holds(p.study)) {
+      ctes.push("c" + i + " AS (" + p.cohortSql + ")");
+      selects.push(
+        "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord, s.pid AS patient, s.sid AS sid" +
+        genes.map((_, j) => ", 'NP' AS g" + j).join("") + "\n" +
+        "  FROM (SELECT DISTINCT pid, sid FROM c" + i + ") s\n");
+      return;
+    }
     const v = matrixValues(f, p.study, db, genes, "c" + i);
     ctes.push("c" + i + " AS (" + p.cohortSql + "),\n" + "v" + i + " AS (\n    " + v.values + ")" +
       (v.type ? genes.map((g, j) => ",\n" + "p" + i + "_" + j + " AS (" + profiledCasesSql(g, v.type!, { study: p.study, db, unit: "sample" }) + ")").join("") : ""));

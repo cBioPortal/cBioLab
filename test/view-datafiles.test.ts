@@ -208,7 +208,7 @@ describe("runDatafiles", () => {
     const failing = { ...local("c1", () => [], {}), viewAggregate: async () => { throw new Error("warehouse down"); } };
     assert.match(String((await run({}, ctx(one, { s1: failing }))).error), /warehouse down/);
   });
-  test("several studies: counts added, a file only some studies hold names them", async () => {
+  test("several studies: counts added, a file only some studies hold names them and lists every sample", async () => {
     const r1 = local("c1", () => [], { n: 2, altered: 1, unaltered: 1, alt_0: 1, prof_0: 2, alt_1: 0, prof_1: 2 });
     const r2 = local("c1", () => [], { n: 5, altered: 2, unaltered: 1, alt_0: 2, prof_0: 4, off_0: 1, alt_1: 0, prof_1: 5 }, [p("mutations", "MUTATION_EXTENDED", "MAF")]);
     const v = await run({}, ctx({ Q: cohort({ s1: 2, s2: 5 }) }, { s1: r1, s2: r2 }));
@@ -216,7 +216,7 @@ describe("runDatafiles", () => {
     assert.deepEqual(d.counts, { samples: 7, altered: 3, unaltered: 2, unprofiled: 2 });
     assert.equal(d.frequency[0].percent, 50);
     assert.deepEqual(d.files.find((f) => f.id === "sv")!.studies, ["s1"]);
-    assert.equal(d.files.find((f) => f.id === "sv")!.rows, 2);
+    assert.equal(d.files.find((f) => f.id === "sv")!.rows, 7, "every queried sample, NP for s2 (RDL-STM-4)");
     assert.equal(d.files.find((f) => f.id === "mutations")!.studies, undefined);
     assert.match(String(v.caveat), /counts added across studies[\s\S]*TP53: 1 altered sample outside its panel's coverage/);
   });
