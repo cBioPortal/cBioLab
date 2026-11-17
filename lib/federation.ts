@@ -42,6 +42,29 @@ import type { Moments } from "./stats.ts";
 import { checkQuery, pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
+/**
+ * Each clinical attribute's type and display name as a study declares them: a row per declaration
+ * (a, dt, name), metadata only. The resolver reads a plot's axis kinds and titles from it, and
+ * lib/clinical-titles.ts the titles every other view needs.
+ */
+export function clinicalMetaSql(attrs: string[], study: string, db: string): AggregateSql {
+  return aggregateSql("SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name\n" +
+    "FROM " + clinicalMetaTable(db) + " cam\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")");
+}
+
+/** a display name as an axis title: trimmed, cut to the 200 characters a label may hold; null when there is none */
+export function displayTitle(name: unknown): string | null {
+  const n = name == null ? "" : String(name).trim();
+  return !n ? null : n.length > 200 ? n.slice(0, 199) + "…" : n;
+}
+
+/** a clinical axis titled by its display name, unless the axis already carries a label */
+export function named(a: PlotAxis, names: ReadonlyMap<string, string>): PlotAxis {
+  return a.source === "clinical" && !a.label && names.has(a.attribute) ? { ...a, label: names.get(a.attribute)! } : a;
+}
+
 export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
   const counts = new Map<string, number>();
   for (const v of values) if (v) counts.set(v, (counts.get(v) || 0) + 1);
@@ -420,6 +443,11 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * only this instance knows what its panels cover. That is also why a federated
  * co-occurrence is more correct than one computed from pooled exports.
  */
+/**
+ * A table's rows per cohort and study: kept by the query (`n`) and every one (`all`); with RowSource.units,
+ * the distinct samples (`ns`) and patients (`np`) among those kept.
+ */
+export interface RowCounts { cohort: string; study: string; n: number; all: number; ns?: number; np?: number }
 /** the query's lines a Mutations tab follows, and how their DRIVER reads */
 export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
 /**
@@ -1374,7 +1402,7 @@ export interface PatientLevelCapable extends AggregateCapable {
   viewRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
   /** a table view's rows (lib/table-query.ts) in this instance, with their ids — see PatientLevelResolver.rowsPage */
   rowsPage(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }>;
-  rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]>;
+  rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]>;
   rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]>;
   rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null>;
   /** one patient's timeline events and samples — see PatientLevelResolver.patientTimeline */
@@ -1432,7 +1460,7 @@ export interface PeerRowsRequest {
   oncokbPin?: string | null;
 }
 export interface PeerRowsAnswer {
-  rows?: ChRow[]; counts?: { cohort: string; study: string; n: number; all: number }[]; values?: ChRow[]; rank?: number | null;
+  rows?: ChRow[]; counts?: RowCounts[]; values?: ChRow[]; rank?: number | null;
   /** the OncoKB version the peer annotated its rows with (null: not annotated) */
   oncokbPin?: string | null;
   /** which samples the peer read, echoed so a peer that ignored the request is caught */
@@ -1502,7 +1530,7 @@ export function studyAccess(r: Resolver): StudyAccess {
  * participants lack a capability, not find out from an undefined method call.
  */
 export interface FederatedPlotCapable {
-  plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }>;
+  plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis; colorBy?: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string; colorLabel?: string }>;
   plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }>;
   /** a numeric axis's lowest value here and how many values are below 0, before a log scale is drawn */
@@ -1813,25 +1841,20 @@ abstract class BaseResolver implements AggregateCapable {
    * Which of these axes' clinical attributes the STUDY declares as numbers. Only it knows: it
    * declared them. An attribute it does not declare has no answer here rather than a guess.
    */
-  protected async clinicalKinds(axes: PlotAxis[]): Promise<Map<string, "num" | "cat">> {
+  protected async clinicalKinds(axes: (PlotAxis | undefined)[]): Promise<Map<string, "num" | "cat">> {
     return (await this.clinicalMeta(axes)).kinds;
   }
 
-  /** each clinical axis's type as the study declares it, and its display name (the portal's axis title, PLT-DT-19) */
+  /** each clinical axis's type as the study declares it, and its display name (the portal's title, PLT-DT-19): one query */
   protected async clinicalMeta(axes: (PlotAxis | undefined)[]): Promise<{ kinds: Map<string, "num" | "cat">; names: Map<string, string> }> {
-    const db = this.instance.conn.db;
-    const attrs = axes.filter((a) => a?.source === "clinical").map((a) => (a as { attribute: string }).attribute);
+    const attrs = [...new Set(axes.filter((a) => a?.source === "clinical").map((a) => (a as { attribute: string }).attribute))];
     const kinds = new Map<string, "num" | "cat">(), names = new Map<string, string>();
     if (!attrs.length) return { kinds, names };
-    const meta = await this.runQuiet<ChRow>(aggregateSql(
-      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name\n" +
-      "FROM " + clinicalMetaTable(db) + " cam\n" +
-      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")"))
-      .catch(() => ({ data: [] as ChRow[] }));
+    const meta = await this.runQuiet<ChRow>(clinicalMetaSql(attrs, this.study, this.instance.conn.db)).catch(() => ({ data: [] as ChRow[] }));
     for (const r of meta.data) {
       kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
-      if (r.name) names.set(String(r.a), String(r.name));
+      const n = displayTitle(r.name);
+      if (n) names.set(String(r.a), n);
     }
     return { kinds, names };
   }
@@ -1851,7 +1874,7 @@ abstract class BaseResolver implements AggregateCapable {
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
 
     const { kinds, names } = await this.clinicalMeta([spec.x, spec.y, spec.colorBy]);
-    const title = (a: PlotAxis) => axisLabel(a, names);
+    const title = (a: PlotAxis) => axisLabel(named(a, names));
     const kindOf = (attr: string) => kinds.get(attr);
     const xk = axisKind(spec.x, kindOf), yk = axisKind(spec.y, kindOf);
     const shape = plotShape(xk, yk);
@@ -1943,11 +1966,12 @@ abstract class BaseResolver implements AggregateCapable {
    * site whose metadata classifies an attribute differently cannot quietly split the combined
    * figure into two incompatible shapes.
    */
-  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
+  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis; colorBy?: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string; colorLabel?: string }> {
     validateAxis(spec.x, "x", { cohort: true }); validateAxis(spec.y, "y");
-    const { kinds, names } = await this.clinicalMeta([spec.x, spec.y]);
+    const { kinds, names } = await this.clinicalMeta([spec.x, spec.y, spec.colorBy]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
-    return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(spec.x, names), yLabel: axisLabel(spec.y, names) };
+    return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(named(spec.x, names)), yLabel: axisLabel(named(spec.y, names)),
+      ...(spec.colorBy ? { colorLabel: axisLabel(named(spec.colorBy, names)) } : {}) };
   }
 
   /** what an OQL axis needs from this participant: its pinned OncoKB version and its profiles */
@@ -2390,9 +2414,10 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     return { rows: r.data, total: r.data.length ? Number(r.data[0].total) : 0 };
   }
   /** per part: the rows the query keeps and every row. Counts only. */
-  async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]> {
+  async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]> {
     const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db), q, defaults), this.instance.conn);
-    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all) }));
+    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all),
+      ...(x.ns != null && x.np != null ? { ns: Number(x.ns), np: Number(x.np) } : {}) }));
   }
   /** a column's distinct values with counts, or its range — what its filter offers */
   async rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {
