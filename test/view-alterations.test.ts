@@ -5,6 +5,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { vafSort } from "../lib/patient-alterations.ts";
 import { runAlterations } from "../lib/views/alterations/run.ts";
+import { ALTERATION_COLUMNS, ALTERATION_DEFAULT_COLUMNS } from "../lib/patient-alterations.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
@@ -184,7 +185,7 @@ describe("alterations: the list and the first patient's tables", () => {
     const row = Object.fromEntries(cols.map((id, i) => [id, t.mutations!.rows[0].values[i]]));
     assert.equal(row.annotation, "Oncogenic · Level 1");
     assert.equal(row.vaf, 10 / 57, "not rounded again in the runner: the source already holds the 4-place value the filter reads");
-    assert.equal(row.freq, 12.3);
+    assert.equal(row.freq, 12.345, "Cohort % is passed unrounded so the browser rounds it once (A1)");
     assert.equal(row.altCount, null, "an empty number is missing, not 0");
     assert.equal(row.refCount, null);
     assert.equal(row.copy, "", "missing text is blank");
@@ -194,6 +195,16 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.deepEqual(t.mutations!.shown, ["gene", "annotation", "vaf", "freq", "altCount", "refCount", "copy", "start"]);
     const cna = Object.fromEntries(t.cna!.columns.map((c, i) => [c.id, t.cna!.rows[0].values[i]]));
     assert.equal(cna.annotation, "Likely Oncogenic", "no level, no level suffix");
+  });
+
+  test("A1 (PAT-STM-2): the Cohort % cell is unrounded in both the mutations and cna tables (the browser rounds it once)", async () => {
+    const mut = [{ ...MUT[0], freq: 72.47191 }];
+    const cna = [{ ...CNA[0], freq: 72.47191 }];
+    const t = alt(await run({ mutations: { columns: ["gene", "freq"] }, cna: { columns: ["gene", "freq"] } }, one(study({ mut, cna })))).tables;
+    for (const k of ["mutations", "cna"] as const) {
+      const i = t[k]!.columns.findIndex((c) => c.id === "freq");
+      assert.equal(t[k]!.rows[0].values[i], 72.47191, k);
+    }
   });
 
   test("a pinned OncoKB version is named; a table's query is described in its line", async () => {
@@ -358,6 +369,35 @@ describe("alterations: PAT-STM-12 sample order", () => {
     assert.equal(v.error, undefined, String(v.error));
     assert.ok(alt(v).patient, "tables present");
     assert.match(String(v.caveat), /timeline refused/);
+  });
+});
+
+describe("PAT-SV-3: the structural variant table's columns", () => {
+  const P1 = { study: "s1", id: "P1" };
+  test("PAT-SV-3 SV1: the default SV columns, in the portal's order, without Breakpoint Type", () => {
+    assert.deepEqual(ALTERATION_DEFAULT_COLUMNS.sv, ["samples", "gene1", "gene2", "status", "class", "eventInfo", "connectionType"]);
+    assert.ok(!ALTERATION_DEFAULT_COLUMNS.sv.includes("breakpointType"));
+  });
+
+  test("PAT-SV-3 SV2: column order gene1 < gene2 < status < class < eventInfo < connectionType < breakpointType", () => {
+    const ids: string[] = ALTERATION_COLUMNS.sv.map((c) => c.id);
+    const order = ["gene1", "gene2", "status", "class", "eventInfo", "connectionType", "breakpointType"].map((id) => ids.indexOf(id));
+    assert.ok(order.every((i) => i >= 0), "all present");
+    assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  });
+
+  test("PAT-SV-3 SV3: Status is the one SV column that is not sortable", async () => {
+    const unsorted = (cols: { id: string; unsorted?: boolean }[]) => cols.filter((c) => c.unsorted).map((c) => c.id);
+    assert.deepEqual(unsorted(ALTERATION_COLUMNS.sv), ["status"]);
+    const a = alt(await run({ patient: P1 }, one()));
+    const cols = a.tables.sv!.columns as { id: string; unsorted?: boolean }[];
+    assert.equal(cols.find((c) => c.id === "status")!.unsorted, true);
+    assert.deepEqual(unsorted(cols), ["status"]);
+  });
+
+  test("PAT-SV-3 SV4: sorting SV by status is refused", async () => {
+    const v = await run({ patient: P1, sv: { sort: { column: "status" } } } as never, one());
+    assert.match(v.error!, /status is not sortable/);
   });
 });
 

@@ -10,7 +10,7 @@ import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult, AlleleReads } from "../../lib/views/alterations/types";
-import { portalVaf } from "../../lib/chart/format.ts";
+import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
@@ -120,11 +120,12 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 },
                 selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
               })}
-              num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
+              num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : x.toLocaleString()}
               cell={(id, x, row) => id === "samples" ? sampleCell(x)
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
+                : id === "status" && key === "sv" ? <SvStatus value={String(x || "")} />
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>
                 : undefined} />
           </section>);
@@ -141,4 +142,18 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
       )}
     </div>
   );
+}
+
+/**
+ * A structural variant's status as the portal's patient table draws it (react-mutation-mapper
+ * MutationStatus with s / g): a somatic "s" or germline "g" badge, anything else small and grey,
+ * the stored value on hover.
+ */
+function SvStatus({ value }: { value: string }) {
+  if (!value) return <span />;
+  const v = value.toLowerCase();
+  const kind = v.includes("somatic") ? { text: "s", bg: "#ccffff" } : v.includes("germline") ? { text: "g", bg: "#ffffcc" } : null;
+  return kind
+    ? <span className="px-[5px] text-sm font-bold text-black" style={{ background: kind.bg }} data-tip={value}>{kind.text}</span>
+    : <span className="text-xs text-[#9d9d9d]" data-tip={value}>{value}</span>;
 }

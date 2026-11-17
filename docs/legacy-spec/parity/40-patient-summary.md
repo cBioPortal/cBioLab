@@ -22,9 +22,9 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 39 |
-| 🟡 partial | 26 |
-| 🔶 different | 8 |
+| ✅ match | 41 |
+| 🟡 partial | 25 |
+| 🔶 different | 7 |
 | ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -246,9 +246,9 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-SV-1 | 🟡 | C | All SV rows of the patient; merged by (gene1, gene2, class, event, pos1, pos2), unsorted — A–B and B–A stay apart (`patient-alterations.ts:221`) |
+| PAT-SV-1 | ✅ | BC | One row per the portal's key, both genes, positions and chromosomes and the class sorted (generateStructuralVariantId), so A–B and B–A merge; the row's fields one record's: paad_msk_2025 C-873T8K's 4 FGFR2/MYOF records (both orders, 2 samples) are 1 row on both sides (`check:patient-sv`) |
 | PAT-SV-2 | 🟡 | B | Empty: "0 Structural Variants … no rows" ✅; no "not profiled" alert (lgg) |
-| PAT-SV-3 | 🔶 | B | Samples · Gene 1 · Gene 2 · Variant Class · Event Info · Breakpoint Type · Connection Type; no Status badge, no Annotation (tracked), +13 optional columns |
+| PAT-SV-3 | 🟡 | B | Samples · Gene 1 · Gene 2 · Status (s / g badge, not sortable) · Variant Class · Event Info · Connection Type ✅; Breakpoint Type hidden ✅; no Annotation (tracked), +13 optional columns |
 | PAT-SV-4 | 🐞 ok | C | No SV gene filter |
 | PAT-SV-5 | ❌ | C | No server column config (tracked: Instance defaults) |
 
@@ -269,15 +269,15 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 | ID | verdict | how | note |
 |---|---|---|---|
 | PAT-STM-1 | ✅ | BC | alt/(alt+ref) per sample, each drawn (P04's four IDH1 reads equal the portal API's: 46/75, 61/101, 38/61, 62/94); 4 decimals below 0.01, else 2 (`portalVaf`); TCGA-A6-2671 APC 10/57 shows 0.18; VAF 0 legacy bugs not copied |
-| PAT-STM-2 | 🟡 | BC | Numerator any mutation (not uncalled) ✅; denominator = samples profiled for the gene (invariant 7; equals the sequenced list on WES and IMPACT341 genes); "x.x%" not integer / "<1%"; no keyword numerator B, bar, tooltip, MutSig badge |
-| PAT-STM-3 | 🟡 | BC | Same alteration (±2) ÷ samples profiled for the gene by the CNA panel; numbers equal; "0.6%" vs "<1%"; no tooltip, no GISTIC |
+| PAT-STM-2 | 🟡 | BC | Numerator any mutation (not uncalled) ✅; denominator = samples profiled for the gene (invariant 7; equals the sequenced list on WES and IMPACT341 genes); "72%", "<1%", "0%" as getPercentage ✅ (APC on TCGA-A6-2671: portal 387/534 "72%", ours 72.47 → "72%"); no keyword numerator B, bar, tooltip, MutSig badge |
+| PAT-STM-3 | 🟡 | BC | Same alteration (±2) ÷ samples profiled for the gene by the CNA panel; numbers equal; "<1%" and rounded % as getPercentage ✅ (ANK1 27/592 "5%"); no tooltip, no GISTIC |
 | PAT-STM-4 | ❌ | B | No mRNA percentile |
 | PAT-STM-5 | ✅ | BC | ≥50 kb and \|mean\| ≥ 0.2, toFixed(1) (`igv.ts:75-84`); 48.8 %, 27.8 % |
 | PAT-STM-6 | ✅ | B | 12/28/18/55, 64, 16 |
 | PAT-STM-7 | ❌ | C | No VAF histogram / KDE plot |
 | PAT-STM-8 | ❌ | C | No header signature bar (tracked) |
 | PAT-STM-9 | ❌ | B | No TMB-H / MSI-H badges |
-| PAT-STM-10 | 🟡 | C | Span floors ✅; tooltip tables show raw values (no 1-decimal rounding, e.g. TMB 0.933333333333) |
+| PAT-STM-10 | ✅ | BC | Span floors ✅; the header's tooltip tables write a non-integer to one decimal, "< 0.1" when it rounds to 0 (`portalClinicalValue`): TCGA-A6-2671-01 Fraction Genome Altered 0.4881 → "0.5" |
 | PAT-STM-11 | 🟡 | C | `formatDays` identical (`timeline-tracks.ts:215`); 365-day ticks, trims ✅; line-chart y rule not checked |
 | PAT-STM-12 | ✅ | BC | Collection day, type rank, natural id, in the header, timeline, alteration tables and signatures alike (`withSampleDays`, `lib/views/shared.ts`): msk_chord_2024 P-0004121's T02 (day −56) is 1 and T01 (day −40) is 2, as the portal API's sample-acquisition events order them |
 | PAT-STM-13 | ✅ | BC | Sorted panel ids → P1…Pn, W for WES (`igv.ts:100-107`) |
