@@ -32,21 +32,24 @@ on:
     types: [checks_requested]
   workflow_dispatch:
 
-# A pull request's newer push cancels its older run; every push to master and every merge-queue run
-# runs to the end, in a group of its own (keyed by its commit), so neither is ever cancelled.
+# A pull request's newer push cancels its older run (one group per pull request). Pushes to master
+# share one group, verify-master, and a newer push cancels the older run: in a burst of merges only the
+# newest master commit's run finishes, and it covers the commits before it (the planted bugs those
+# skipped commits' diffs selected are planted in full nightly, planted-bugs-nightly.yml). A merge-queue
+# run, and a run started by hand, gets a group of its own (keyed by its commit) and is never cancelled.
 # In the merge queue (merge_group) only the quick checks run: lint, gate-local and coverage. The
 # warehouse and e2e lanes, the planted bugs and the reports that gather them already ran on the pull
 # request and run again on the push to master; in the queue they are skipped, which a required check
 # counts as passing.
 concurrency:
-  group: verify-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: verify-${{ github.event_name == 'pull_request' && github.ref || github.event_name == 'push' && 'master' || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
   # Its own job, so a pull request shows lint as a check of its own, and in a couple of minutes
   # rather than after the gate's build and e2e.
   lint:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
@@ -71,7 +74,7 @@ jobs:
         run: npm run lint
 
   gate-local:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -94,7 +97,7 @@ jobs:
 
   gate-warehouse:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -197,7 +200,7 @@ jobs:
 
   gate-e2e:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
@@ -240,8 +243,8 @@ jobs:
   planted-bugs:
     needs: gate-warehouse
     if: ${{ (!cancelled()) && github.event_name != 'merge_group' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
     permissions:
       contents: read
     env:
@@ -270,12 +273,26 @@ jobs:
       - name: Peer database (test/fixtures/peer-study)
         run: node --env-file=.env.local scripts/peer-db.ts --port 21999 >> "$GITHUB_ENV"
 
-      # a pull request's changed files: the checkout is its merge commit, whose first parent is the base
+      # the files this run changed, so only the bugs they can affect are planted: a pull request's (its
+      # merge commit against its first parent, the base) or a push's (the push's before..after). Every
+      # bug is planted nightly (planted-bugs-nightly.yml), and on a push with no previous commit.
       - name: Changed files
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
         run: |
-          git fetch --no-tags --depth=2 origin "$GITHUB_SHA"
-          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            git fetch --no-tags --depth=2 origin "$GITHUB_SHA"
+            git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+          elif [ -z "$BEFORE" ] || [ -z "${BEFORE//0/}" ]; then
+            echo "a push with no previous commit: every bug is planted"
+            exit 0
+          else
+            if ! git fetch --no-tags --depth=1 origin "$BEFORE" || ! git diff --name-only "$BEFORE" "$GITHUB_SHA" > "$RUNNER_TEMP/changed.txt"; then
+              echo "the push's previous commit $BEFORE cannot be read (a force push?): every bug is planted"
+              exit 0
+            fi
+          fi
           echo "MUTANT_CHANGED=$RUNNER_TEMP/changed.txt" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/changed.txt"
 
@@ -297,7 +314,7 @@ jobs:
   verification-report:
     needs: [gate-warehouse, planted-bugs]
     if: ${{ (always()) && github.event_name != 'merge_group' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
@@ -312,7 +329,7 @@ jobs:
   # a pull request's changed lines in lib/ and mcp/ covered, no new file there that no unit test loads,
   # and each area's coverage at or above its floor. It needs the base branch's history for the diff.
   coverage:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
@@ -350,7 +367,7 @@ jobs:
   # fails the run; the findings are kept as the quality-report artifact, Semgrep's as SARIF.
   reports:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read

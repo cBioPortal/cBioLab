@@ -112,7 +112,17 @@ export interface GeneStateFacet {
 }
 
 export interface ProfiledLeaf {
-  kind: "profiled"; type: "MUTATION" | "CNA" | "SV";
+  kind: "profiled";
+  /** the data type: a sample on a panel of any of the study's profiles of that type. Give `type` or `profile`. */
+  type?: "MUTATION" | "CNA" | "SV";
+  /**
+   * One of the study's profiles by its id without the study prefix (rna_seq_v2_mrna, rppa, gistic):
+   * a sample in that profile, as the portal's selected profiles cover a sample. Any data type,
+   * expression and protein included. A study without it is refused unless `ifHeld`.
+   */
+  profile?: string;
+  /** with `profile`: a study without that profile has no sample matching the clause, rather than refusing it (several studies) */
+  ifHeld?: boolean;
   /**
    * Narrow to samples profiled for THIS GENE — the panel they were run on
    * actually covers it. Without this, "profiled for mutations" includes samples
@@ -128,6 +138,12 @@ export interface ProfiledLeaf {
    * (the Results page's Unaltered group). Give `gene` or `genes`, not both.
    */
   genes?: string[];
+  /**
+   * With `genes`: profiled for ANY one of them rather than every one — the samples not wholly
+   * unprofiled for the list (the portal's Results page Unaltered group: unaltered, and profiled for
+   * some queried gene in some selected profile).
+   */
+  anyGene?: boolean;
 }
 /**
  * One of the study's own sample lists: by `id` (a bare id gets the study prefix), or by `category`
@@ -917,7 +933,10 @@ interface FacetBase {
    */
   studyCount?: number;
   attribute: string; per: "patient" | "sample"; patients: number;
-  /** a patient-level attribute: the queried samples whose patient has a value (the portal's Tracks-menu count) */
+  /**
+   * the selected samples with a value: a sample attribute's count; a patient attribute's queried samples
+   * whose patient has a value (the portal's Tracks-menu count and Add chart Freq numerator, STV-STM-3)
+   */
   samples?: number;
   /** from clinical_attribute_meta — the portal's own declarations */
   displayName?: string; description?: string;
@@ -1013,6 +1032,8 @@ export interface GeneTableRow {
   /** CNA only: 2 = amplification, -2 = deep deletion, plus its cytoband */
   cna?: number;
   cytoband?: string;
+  /** single study: MutSig's q-value (Mutated) or GISTIC's for the gene and call (CNA) */
+  qValue?: number;
 }
 
 /** one row per selected study: how the current draft distributes across them */
@@ -1068,7 +1089,9 @@ export interface ExploreResult {
    * selection has a value for it, with its stored priority: what the oncoprint's Tracks menu lists.
    * Across studies, the first study's name and priority.
    */
-  declaredAttributes?: { attribute: string; per: "patient" | "sample"; displayName?: string; priority: number }[];
+  declaredAttributes?: { attribute: string; per: "patient" | "sample"; displayName?: string; priority: number;
+    /** whether Explore's clinical query counted it (asked for it, not cut at the limit): only then is its absence from `clinical` "no data" */
+    counted?: boolean }[];
   events: { type: string; n: number }[];
   derived?: DerivedFacet[];
   /**

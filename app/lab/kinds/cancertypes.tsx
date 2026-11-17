@@ -18,6 +18,30 @@ import { CloudDownload } from "lucide-react";
 import { useState } from "react";
 import { DraftInput } from "./parts.tsx";
 import { cn } from "../../../lib/cn.ts";
+import { FloatingTip, useHoverTip, type TipBox } from "../../_ui/tooltip.tsx";
+import { cancertypesTip } from "../../../lib/views/cancertypes/tip.ts";
+import { exploreHref } from "../../portal/query-editor.tsx";
+
+/**
+ * A bar's popover, the portal's (CancerSummaryChart): its group, "Gene altered in P% of N patients" and the
+ * type table; grouped by study with several studies drawn, the study's name links to its page. The portal's
+ * "Query this study" button is left out.
+ */
+function BarPopover({ r, panel, gene, groupKey, at, live }: { r: DrawnResultOf<"cancertypes">["cancertypes"]; panel: number; gene: string | null;
+  groupKey: string; at: TipBox; live: ReturnType<typeof useHoverTip>["live"] }) {
+  const t = cancertypesTip(r, panel, gene, groupKey);
+  if (!t) return null;
+  return (
+    <FloatingTip at={at} live={live} className="onco-tip">
+      <strong>{t.study ? <a href={exploreHref(t.study)} target="_blank" rel="noreferrer">{t.header} ↗</a> : t.header}</strong>
+      <p className="my-1">{t.altered}</p>
+      <table className="text-sm [&_td]:pr-3 [&_th]:pr-3 [&_th]:text-left">
+        <thead><tr><th>Alteration</th><th>Frequency</th></tr></thead>
+        <tbody>{t.rows.map(([name, freq]) => <tr key={name}><td>{name}</td><td className="tabular-nums">{freq}</td></tr>)}</tbody>
+      </table>
+    </FloatingTip>
+  );
+}
 
 /** a threshold box as the portal's reads it: everything but digits and "." dropped; nothing readable, null */
 function thresholdOf(text: string): number | null {
@@ -81,9 +105,17 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   const r = v.cancertypes;
   const ALL = "All Queried Genes";
   const [gene, setGene] = useState(ALL);
+  const hover = useHoverTip<{ panel: number; key: string; at: TipBox }>();
+  const onMove = (panel: number) => (e: React.PointerEvent) => {
+    const el = (e.target as Element).closest?.("[data-group]");
+    const b = el?.getBoundingClientRect();
+    const key = el?.getAttribute("data-group") || "";
+    const same = hover.tip && el && hover.tip.panel === panel && hover.tip.key === key;
+    hover.move(same ? hover.tip : el && b ? { panel, key, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom } } : null, e.clientX, e.clientY);
+  };
   // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls
   const draw = (i: number) => (width: number) => {
-    const c = cancertypesPanelSvg(r, i, { width, gene: gene === ALL ? null : gene, title: r.panels.length > 1 || gene !== ALL });
+    const c = cancertypesPanelSvg(r, i, { width, gene: gene === ALL ? null : gene, title: r.panels.length > 1 || gene !== ALL, popover: true });
     return frame(c.width, c.height, c.body, palette("auto").bg, c.grown, "Cancer types summary — " + r.panels[i].cohort);
   };
   return (
@@ -92,8 +124,11 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
         unprofiled={(x) => cancertypesUnprofiled(r, x)} />}
       {r.panels.map((_, i) => <div key={i}>
         <Downloads r={r} panel={i} gene={gene === ALL ? null : gene} />
-        <DrawAtWidth draw={draw(i)} deps={[r, gene]} />
+        <div onPointerMove={onMove(i)} onPointerDown={onMove(i)} onPointerLeave={(e) => hover.move(null, e.clientX, e.clientY)}>
+          <DrawAtWidth draw={draw(i)} deps={[r, gene]} />
+        </div>
       </div>)}
+      {hover.tip && <BarPopover r={r} panel={hover.tip.panel} gene={gene === ALL ? null : gene} groupKey={hover.tip.key} at={hover.tip.at} live={hover.live} />}
     </div>
   );
 }
