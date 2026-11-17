@@ -428,6 +428,26 @@ WHERE 1
 ORDER BY gdrv DESC, gene, so, pos ASC NULLS LAST, gene, chr, start, end, ref, var, proteinChange, mutationType
 LIMIT 25 OFFSET 0
 
+-- view 1 alterations: alterations:profiled · msk_chord_2024
+WITH rows AS (
+  SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, smp.stable_id AS sid,
+         if((SELECT count() FROM (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'MUTATION_EXTENDED' AND gp.stable_id NOT LIKE '%uncalled%')) = 0, -1, toInt8(smp.internal_id IN (SELECT sample_id FROM snapshot_db.sample_profile WHERE genetic_profile_id IN (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'MUTATION_EXTENDED' AND gp.stable_id NOT LIKE '%uncalled%')))) AS mutations,
+         if((SELECT count() FROM (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE')) = 0, -1, toInt8(smp.internal_id IN (SELECT sample_id FROM snapshot_db.sample_profile WHERE genetic_profile_id IN (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE')))) AS cna,
+         if((SELECT count() FROM (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT')) = 0, -1, toInt8(smp.internal_id IN (SELECT sample_id FROM snapshot_db.sample_profile WHERE genetic_profile_id IN (SELECT gp.genetic_profile_id FROM snapshot_db.genetic_profile gp JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT')))) AS sv
+  FROM snapshot_db.sample smp JOIN snapshot_db.patient pt ON pt.internal_id = smp.patient_id JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = pt.cancer_study_id
+  WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND pt.stable_id = 'P-0000012'
+)
+SELECT *, count() OVER () AS total FROM rows
+WHERE 1
+ORDER BY sid, sid
+LIMIT 1000 OFFSET 0
+
 -- view 1 alterations: alterations:rank · msk_chord_2024
 WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'

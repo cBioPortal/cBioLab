@@ -46,6 +46,12 @@ export interface AlterationsResult extends TableRows<string | number | null> {
   position?: TimelineResult["position"];
   /** the patient's three tables; on a page or values request, only the one asked for */
   tables: Partial<Record<"mutations" | "cna" | "sv", TableRows<string | number | null>>>;
+  /**
+   * per table, whether the study holds the profile it reads (`study`) and which of the patient's
+   * samples that profile holds (`profiled`): the portal's "Study is not profiled for …" and "Sample(s)
+   * … not profiled for …" alerts. Absent for a peer's patient.
+   */
+  profiling?: Record<"mutations" | "cna" | "sv", { study: boolean; profiled: string[] }>;
   /** the OncoKB version the annotation columns read, or null when none is pinned */
   oncokbPin: string | null;
 }

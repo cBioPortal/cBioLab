@@ -16,6 +16,9 @@ import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
 
+/** what the portal's not-profiled alerts call each table's data */
+const NOT_PROFILED_FOR: Record<"mutations" | "cna" | "sv", string> = { mutations: "mutations", cna: "copy number alterations", sv: "structural variants" };
+
 /** The three tables, in the portal's order: the spec's key, and its name — its count line reads "7 Mutations", as the portal's does. */
 const TABLES = [
   { key: "mutations", name: "Mutations" },
@@ -109,9 +112,20 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
       {p && TABLES.map(({ key, name }) => {
         const t = a.tables[key];
         if (!t) return null;
+        // the portal's not-profiled alerts (PAT-CNA-2, PAT-SV-2, PAT-NP-1): no profile, no table; samples outside it named above it
+        const pr = a.profiling?.[key];
+        const what = NOT_PROFILED_FOR[key];
+        if (pr && !pr.study) return <section key={key} className="alt-table" aria-label={name}><p className="note" role="status">Study is not profiled for {what}.</p></section>;
+        const outside = pr ? [...marks.values()].filter((m) => !pr.profiled.includes(m.id)) : [];
+        const none = pr != null && outside.length === marks.size;
         return (
           <section key={key} className="alt-table" aria-label={name}>
-            <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
+            {outside.length > 0 && <p className="note flex flex-wrap items-center gap-1" role="status">
+              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
+                <svg width="14" height="14" aria-label={m.id}><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
+              </span>)} not profiled for {what}{none ? "" : "."}
+            </p>}
+            {!none && <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
               onQuery={(q) => setQuery(key, q)}
               {...(key === "sv" ? {} : {
                 onRow: (r: { values: unknown[] }) => {
@@ -129,7 +143,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "status" && key === "sv" ? <SvStatus value={String(x || "")} />
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>
-                : undefined} />
+                : undefined} />}
           </section>);
       })}
       {listOpen && (

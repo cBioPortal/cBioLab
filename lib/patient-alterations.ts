@@ -285,6 +285,40 @@ export function patientSvSource(p: TablePart, patient: string, db: string, order
   };
 }
 
+/** The profile each alteration table reads, as the portal's patient view picks it: mutations, the discrete copy-number calls, structural variants. */
+const PROFILE_OF: Record<AlterationTable, string> = {
+  mutations: "gp.genetic_alteration_type = 'MUTATION_EXTENDED' AND gp.stable_id NOT LIKE '%uncalled%'",
+  cna: "gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE'",
+  sv: "gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'",
+};
+export const PROFILED_COLUMNS: QueryColumn[] = [text("sid", "Sample ID"), number("mutations", "Profiled for mutations"), number("cna", "Profiled for copy number"), number("sv", "Profiled for structural variants")];
+
+/**
+ * Which of the patient's samples each table's profile holds, and whether the study has that profile
+ * at all (the portal's "Study is not profiled for …" and "Sample(s) … not profiled for …" alerts,
+ * PAT-CNA-2, PAT-SV-2, PAT-NP-1): a row per sample, 1 where the sample is in the study's profile for
+ * that table (sample_profile, what the portal's gene-panel data lists), and the study's `has*` flags,
+ * -1 when the study holds no such profile.
+ */
+export function patientProfiledSource(p: TablePart, patient: string, db: string): RowSource {
+  const st = sq(p.study);
+  const prof = (t: AlterationTable) => "(SELECT gp.genetic_profile_id FROM " + db + ".genetic_profile gp JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "    WHERE cs.cancer_study_identifier = " + st + " AND " + PROFILE_OF[t] + ")";
+  const col = (t: AlterationTable) => "if((SELECT count() FROM " + prof(t) + ") = 0, -1, toInt8(smp.internal_id IN (SELECT sample_id FROM " + db + ".sample_profile WHERE genetic_profile_id IN " + prof(t) + "))) AS " + t;
+  return {
+    with: "WITH rows AS (\n" +
+      "  SELECT " + sq(p.cohort) + " AS cohort, " + st + " AS study, 0 AS ord, " + sq(patient) + " AS patient, smp.stable_id AS sid,\n" +
+      "         " + ALTERATION_TABLES.map(col).join(",\n         ") + "\n" +
+      "  FROM " + db + ".sample smp JOIN " + db + ".patient pt ON pt.internal_id = smp.patient_id JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = pt.cancer_study_id\n" +
+      "  WHERE cs.cancer_study_identifier = " + st + " AND pt.stable_id = " + sq(patient) + "\n" +
+      ")\n",
+    columns: PROFILED_COLUMNS,
+    select: "*",
+    defaultOrder: "sid",
+    tiebreak: "sid",
+  };
+}
+
 /** One patient's samples with their SAMPLE_TYPE — what numbers and colours the Samples column's markers. */
 export const PATIENT_SAMPLE_COLUMNS: QueryColumn[] = [text("sid", "Sample ID"), text("type", "Sample Type")];
 export function patientSamplesSource(p: TablePart, patient: string, db: string, samples: AlterationSamples = "patient"): RowSource {

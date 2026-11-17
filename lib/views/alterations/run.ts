@@ -10,7 +10,7 @@ import { sampleMarks } from "../../timeline-tracks.ts";
 import { mutationTypeLabel } from "../../mutation-type.ts";
 import {
   ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
-  alterationDefaults, alterationSource, alterationPatientRowSource, patientSamplesSource, type AlterationPart, type AlterationTable,
+  alterationDefaults, alterationSource, alterationPatientRowSource, patientProfiledSource, patientSamplesSource, type AlterationPart, type AlterationTable,
 } from "../../patient-alterations.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
@@ -124,6 +124,22 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const marks = sampleMarks(samples, ev.events);
     return { samples: [...marks.values()].filter((m) => samples.some((x) => x.id === m.id)), order: [...marks.keys()], note: ev.note };
   };
+  /**
+   * per table, whether the study holds its profile and which of the patient's samples it holds (the
+   * portal's not-profiled alerts); a peer's patient is not asked (null)
+   */
+  const profilingOf = async (pt: { study: string; id: string }): Promise<AlterationsResult["profiling"] | null> => {
+    const res = ctx.resolvers[pt.study];
+    if (peerOf(res)) return null;
+    const page = await (res as unknown as PatientLevelCapable).rowsPage("alterations:profiled", (db) => patientProfiledSource(
+      { cohort: vNames[0], study: pt.study, cohortSql: "" }, pt.id, db), {}, ["sid"], TABLE_ROWS_MAX, 0);
+    const out = {} as NonNullable<AlterationsResult["profiling"]>;
+    for (const t of ALTERATION_TABLES) {
+      const has = page.rows.length > 0 && page.rows.every((x) => Number(x[t]) !== -1);
+      out[t] = { study: has, profiled: has ? page.rows.filter((x) => Number(x[t]) === 1).map((x) => String(x.sid)) : [] };
+    }
+    return out;
+  };
   /** one of the patient's tables, for the page (or values) the request asks of it */
   const tableRows = async (t: AlterationTable, pt: { study: string; id: string }, order: string[], inView: number): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = alterationDefaults(t, inView);
@@ -171,7 +187,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     }
     // every sample of the patient numbers the markers, as the portal's sample view keeps each sample's number;
     // with samples: "cohort", the cohort's are the ones the tables read and the card shows
-    const [smp, inCohort] = want ? await Promise.all([numbered(want), scope === "cohort" ? samplesOf(want, "cohort") : null]) : [null, null];
+    const [smp, inCohort, profiled] = want ? await Promise.all([numbered(want), scope === "cohort" ? samplesOf(want, "cohort") : null, profilingOf(want)]) : [null, null, null];
     const [position, ...tabs] = await Promise.all([
       want ? listPosition(r, !!view.patient, (first) => listRows(1, { locate: first })) : Promise.resolve(null),
       ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order, inCohort ? inCohort.length : smp!.samples.length) : Promise.resolve(null)),
@@ -188,7 +204,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     };
     return {
       kind: "alterations", cohorts: vNames,
-      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, oncokbPin: shownPin },
+      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, ...(profiled ? { profiling: profiled } : {}), oncokbPin: shownPin },
       method: alterationsMethod({ samples: scope, cohorts: vNames, oncokbPin: shownPin, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length,
         lists: r.lists, excluded, instances: r.groups, patient: want,
         tables: want ? ALTERATION_TABLES.map((t) => ({ name: ALTERATION_TABLE_NAMES[t], total: tables[t]!.total, all: tables[t]!.all, queryText: describeQuery(tables[t]!.query, tables[t]!.columns) })) : [] }),

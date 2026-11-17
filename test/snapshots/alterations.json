@@ -963,6 +963,29 @@
             "all": 3
           }
         },
+        "profiling": {
+          "mutations": {
+            "study": true,
+            "profiled": [
+              "P-0024249-T01-IM6",
+              "P-0024249-T02-IM7"
+            ]
+          },
+          "cna": {
+            "study": true,
+            "profiled": [
+              "P-0024249-T01-IM6",
+              "P-0024249-T02-IM7"
+            ]
+          },
+          "sv": {
+            "study": true,
+            "profiled": [
+              "P-0024249-T01-IM6",
+              "P-0024249-T02-IM7"
+            ]
+          }
+        },
         "oncokbPin": "v7.5"
       },
       "participation": {
