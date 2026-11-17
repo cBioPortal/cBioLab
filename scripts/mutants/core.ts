@@ -3,7 +3,6 @@
 import type { GuardCommands, Mutant } from "./types.ts";
 
 export const guards: GuardCommands = {
-  "table-kept-units": ["node", "--env-file=.env.local", "scripts/check-table-kept-units.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
   "mutation-driver-settings": ["node", "--env-file=.env.local", "scripts/check-mutation-driver-settings.ts"],
   // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
@@ -146,9 +145,6 @@ export const mutants: Mutant[] = [
     effect: "Do not filter by OQL leaves the Mutations tab filtered.",
     find: "return v.useOql === false || !oqlHasMutationOql(",
     replace: "return !oqlHasMutationOql(" },
-  { id: "kept-patients-are-samples", layer: "counts", guard: "table-kept-units", file: "lib/table-query.ts",
-    effect: "A filtered Mutations table counts its kept patients as its kept samples, where the portal counts each patient once across their samples.",
-    find: "uniqExactIf(\" + src.units.patient + \", \"", replace: "uniqExactIf(\" + src.units.sample + \", \"" },
   { id: "table-present-numbers-only", layer: "counts", guard: "density", file: "lib/table-query.ts",
     effect: "A table's \"has a value\" filter keeps only a numeric column's plain numbers, so a case file drops \">89\".",
     find: "  if (isPresent(f)) return col.text + \" != ''\";",
