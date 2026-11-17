@@ -113,7 +113,8 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
-    case "vaf": return { ...c, text: str("round(vaf, 2)"), num: num("vaf") };
+    // as the portal writes it: 4 decimals below 0.01, else 2; none for 0 or no counts ('' in its TSV)
+    case "vaf": return { ...c, text: "if(vaf IS NULL OR vaf = 0, '', if(vaf < 0.01, toDecimalString(vaf, 4), toDecimalString(vaf, 2)))", num: num("vaf") };
     // the portal sorts HGVSc by the number after "c." (Hgvsc.tsx), ClinVar by its significance
     case "hgvsc": return { ...c, text: "hgvsc", order: "toInt64OrNull(extract(hgvsc, 'c\\.(-?[0-9]+)'))" };
     case "clinvar": return { ...c, text: "if(clinvar = '' OR clinvarConflicting = '', clinvar, concat(clinvar, '(', clinvarConflicting, ')'))", order: "nullIf(clinvar, '')" };
@@ -203,7 +204,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "         " + mutationDrvSql(p, db, pin, pins, hot, drivers) + " AS drv,\n" +
     "         toUInt8(" + (pin ? hot : "0") + ") AS hot,\n" +
     "         m.mutationType AS mutationType, upper(m.variantType) AS variantType,\n" +
-    "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
+    "         if(m.altCount >= 0 AND m.refCount >= 0 AND m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
     "         " + hgvsgSql("ifNull(m.chr, '')", "ifNull(m.start, 0)", "ifNull(m.end, 0)", "ifNull(m.ref, '')", "ifNull(m.var, '')") + " AS hgvsg,\n" +
     "         " + variantColumnsSql(gn ? "ifNull(g.gd, '')" : "''", gene) + ",\n" +

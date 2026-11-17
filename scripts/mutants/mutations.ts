@@ -116,4 +116,10 @@ export const mutants: Mutant[] = [
     effect: "The mutation table lists every mutation whatever the query's OQL.",
     find: "(filter ? \"\\n    AND \" + filter : \"\")",
     replace: "(\"\")" },
+  { id: "mutation-vaf-two-decimals-always", layer: "counts", guard: "mutation-columns", file: "lib/mutation-table.ts",
+    effect: "An allele frequency below 0.01 is written with 2 decimals (0.0098 as 0.01) in the table's search and CSV, where the portal writes 4.",
+    find: "if(vaf < 0.01, toDecimalString(vaf, 4), toDecimalString(vaf, 2))", replace: "toDecimalString(vaf, 2)" },
+  { id: "mutation-vaf-value-rounded", layer: "counts", guard: "unit", file: "lib/views/mutations/run.ts",
+    effect: "The table's allele frequency arrives rounded to 3 places, so 0.0098 is drawn as 0.010.",
+    find: "Number(r.vaf) === 0 ? null : Number(r.vaf);", replace: "Number(r.vaf) === 0 ? null : Math.round(Number(r.vaf) * 1000) / 1000;" },
 ];
