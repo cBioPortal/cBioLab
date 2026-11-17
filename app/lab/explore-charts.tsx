@@ -12,7 +12,8 @@ import { fmtInt } from "../../lib/chart/format.ts";
 import type { CohortDef, View } from "../../lib/types.ts";
 import type { PlotCell } from "../../lib/plot.ts";
 import { ChartMenu } from "./partitions.tsx";
-import { densityFigureSvg, figureActions, standaloneSvg } from "./chart-files.ts";
+import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg } from "./chart-files.ts";
+import { chartFileName } from "../../lib/study-view-download.ts";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import {
   FGA, MUTATION_COUNT, correlationLines, densityAxes, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
@@ -61,6 +62,8 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
   // the density figure as a file, set by the drawn chart; a save that fails says why under the chart
   const densityFile = useRef<(() => string | null) | null>(null);
   const [fileError, setFileError] = useState<{ chart: string; message: string } | null>(null);
+  // the selection a chart's per-case file lists
+  const selection = studies.length ? { def: { ...(studies.length > 1 ? { studies } : {}), all: (draft ? draft.all : []) as CohortDef["all"] }, study: studies[0] } : null;
 
   useEffect(() => {
     if (!studies.length || (!ep && !hasScatter)) return;
@@ -97,10 +100,12 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
         <div className="xc-head">
           <span className="xc-title">{ep === "OS" ? "Overall survival" : ep + " survival"} of the selection</span>
           <ChartMenu label="the survival chart" actions={[{ label: "Download", title: "save this chart as a file",
-            sub: figureActions((ep === "OS" ? "Overall" : ep) + " survival", () => {
+            sub: [caseFileAction("Data", { kind: "survival", status: ep + "_STATUS", months: ep + "_MONTHS" }, chartFileName((ep === "OS" ? "Overall" : ep) + " survival", "data"),
+              () => selection, (message) => setFileError(message ? { chart: "survival", message } : null)),
+            ...figureActions((ep === "OS" ? "Overall" : ep) + " survival", () => {
               const curves = res?.survival?.curves;
               return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" })) : null;
-            }, (message) => setFileError({ chart: "survival", message })) }]} />
+            }, (message) => setFileError({ chart: "survival", message }))] }]} />
           {endpoints && endpoints.length > 1 && (
             <Choice className="w-28" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
               options={endpoints.map((x) => [x, x] as const)} />
@@ -127,8 +132,11 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
               title: axes[k].log ? "draw " + DENSITY_NAMES[axes[k].attribute] + " on a linear scale" : "draw " + DENSITY_NAMES[axes[k].attribute] + " as ln(1 + count)",
               onClick: () => saveDensity({ ...dset, [k + "Log"]: !axes[k].log }) })),
             { label: "Download", title: "save this chart as a file",
-              sub: figureActions(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]),
-                () => densityFile.current ? densityFile.current() : null, (message) => setFileError({ chart: "density", message })) }]} />
+              sub: [caseFileAction("Data", { kind: "density", x: axes.x.attribute, y: axes.y.attribute },
+                chartFileName(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]), "data"),
+                () => selection, (message) => setFileError(message ? { chart: "density", message } : null)),
+              ...figureActions(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]),
+                () => densityFile.current ? densityFile.current() : null, (message) => setFileError({ chart: "density", message }))] }]} />
         </div>
         <div className="xc-body">
           {plot && plot.shape === "scatter" && !plot.grid && <p className="note">No data to plot.</p>}
