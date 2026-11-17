@@ -170,19 +170,19 @@ describe("V the hotspots view checks table", () => {
     assert.match(err, /unknown column noSuchColumn/);
   });
 
-  test("V3 table omitted: the lollipop is asked as today, with no 5th argument", async () => {
+  test("V3 table omitted: the lollipop is asked as today, with no 6th argument", async () => {
     const { r, err } = await run({});
     assert.equal(err, "");
     assert.equal(r.lollipop.length, 1);
-    assert.equal((norm(r.lollipop[0]) as unknown[]).length <= 4, true, "no rows argument: " + JSON.stringify(r.lollipop[0]));
+    assert.equal(r.lollipop[0][5], undefined, "no rows argument: " + JSON.stringify(r.lollipop[0]));
   });
 
-  test("V table given and valid: passed to lollipopCounts as its 5th argument", async () => {
+  test("V table given and valid: passed to lollipopCounts as its 6th argument", async () => {
     const rows = { gene: "KRAS", search: "G12D", filters: { mutationType: { values: ["Missense"] } } };
     const { r, err, res } = await run({ table: rows });
     assert.equal(err, "", JSON.stringify(res).slice(0, 300));
     assert.equal(r.lollipop.length, 1);
-    const got = r.lollipop[0][4] as Rows;
+    const got = r.lollipop[0][5] as Rows;
     assert.equal(got?.gene, "KRAS");
     assert.equal(got?.search, "G12D");
     assert.deepEqual(got?.filters, rows.filters);
@@ -197,8 +197,8 @@ describe("V the hotspots view checks table", () => {
     assert.equal(String((res as { error?: string }).error || ""), "", JSON.stringify(res).slice(0, 300));
     assert.equal(pl.lollipop.length, 1);
     assert.equal(agg.lollipop.length, 1);
-    assert.deepEqual(norm(pl.lollipop[0][4]), { gene: "KRAS", search: "G12D" }, "the patient-level study gets the narrowing");
-    assert.equal(agg.lollipop[0][4], undefined, "the aggregate-only study gets none: " + JSON.stringify(agg.lollipop[0]));
+    assert.deepEqual(norm(pl.lollipop[0][5]), { gene: "KRAS", search: "G12D" }, "the patient-level study gets the narrowing");
+    assert.equal(agg.lollipop[0][5], undefined, "the aggregate-only study gets none: " + JSON.stringify(agg.lollipop[0]));
     const note = String((res as { note?: string }).note || "");
     assert.match(note, /\bs2\b[^.]*counted whole/, note);
     assert.doesNotMatch(note, /\bs1\b[^.]*counted whole/, "the narrowed study is not named as counted whole");
@@ -209,11 +209,11 @@ describe("V the hotspots view checks table", () => {
     ["only a sort", { gene: "KRAS", sort: { column: "proteinChange", desc: true } }],
     ["a blank search and only a proteinPos filter", { gene: "KRAS", search: "  ", filters: { proteinPos: { values: ["12"] } } }],
   ] as [string, Record<string, unknown>][]) {
-    test("V6 table holding " + what + ": no 5th argument (nothing narrows)", async () => {
+    test("V6 table holding " + what + ": no 6th argument (nothing narrows)", async () => {
       const { r, err, res } = await run({ table });
       assert.equal(err, "", JSON.stringify(res).slice(0, 300));
       assert.equal(r.lollipop.length, 1);
-      assert.equal(r.lollipop[0][4], undefined, "got " + JSON.stringify(r.lollipop[0][4]));
+      assert.equal(r.lollipop[0][5], undefined, "got " + JSON.stringify(r.lollipop[0][5]));
     });
   }
 });
@@ -225,7 +225,7 @@ const HOT = { hg19: "g1", hg38: null };
 const GENES = ["KRAS", "TP53"];
 const KEYS = "SELECT 'ROWKEY_MARK' AS sid, 'G12D' AS proteinChange, 'Missense_Mutation' AS mutationType, '12:25398284-25398284:C>T' AS rk";
 type Sql = (...a: unknown[]) => unknown;
-const withKeys = (f: Sql, gene: string) => String(f(COHORT, GENES, STUDY, 1, PIN, DB, HOT, undefined, undefined, { gene, keys: KEYS }));
+const withKeys = (f: Sql, gene: string) => String(f(COHORT, GENES, STUDY, 1, PIN, DB, HOT, undefined, undefined, undefined, { gene, keys: KEYS }));
 /** the text before each place the keys are read: the condition they sit in */
 const ahead = (sql: string, n = 400) => [...sql.matchAll(/ROWKEY_MARK/g)].map((m) => sql.slice(Math.max(0, m.index! - n), m.index!));
 
@@ -233,7 +233,7 @@ describe("S the lollipop's SQL with rowKeys", () => {
   for (const [name, f] of [["changes", lollipopChangesSql], ["types", lollipopTypesSql]] as [string, Sql][]) {
     test("S " + name + " SQL with rowKeys reads the keys, under the named gene", () => {
       const plain = String(f(COHORT, GENES, STUDY, 1, PIN, DB, HOT));
-      assert.equal(String(f(COHORT, GENES, STUDY, 1, PIN, DB, HOT, undefined, undefined, undefined)), plain, "rowKeys omitted: as today");
+      assert.equal(String(f(COHORT, GENES, STUDY, 1, PIN, DB, HOT, undefined, undefined, undefined, undefined)), plain, "rowKeys omitted: as today");
       const k = withKeys(f, "KRAS");
       assert.notEqual(k, plain);
       const at = ahead(k);
@@ -256,7 +256,7 @@ describe("S the lollipop's SQL with rowKeys", () => {
     await (r as unknown as { lollipopCounts: (...a: unknown[]) => Promise<unknown> }).lollipopCounts({ all: [] }, GENES, 1, undefined);
     const plain = Object.fromEntries(r.queries.filter((q) => q.label.startsWith("lollipop:")).map((q) => [q.label, q.sql]));
     const r2 = new PatientLevelResolver("s1", { oncokbPin: PIN }, { id: PRIMARY.id, mode: "patient-level", label: "stand-in", conn: PRIMARY });
-    await (r2 as unknown as { lollipopCounts: (...a: unknown[]) => Promise<unknown> }).lollipopCounts({ all: [] }, GENES, 1, undefined, { gene: "KRAS", search: "Zq9Search" });
+    await (r2 as unknown as { lollipopCounts: (...a: unknown[]) => Promise<unknown> }).lollipopCounts({ all: [] }, GENES, 1, undefined, undefined, { gene: "KRAS", search: "Zq9Search" });
     const rows = Object.fromEntries(r2.queries.filter((q) => q.label.startsWith("lollipop:")).map((q) => [q.label, q.sql]));
     assert.ok(plain["lollipop:totals"] && rows["lollipop:totals"], "totals ran both times");
     assert.equal(rows["lollipop:totals"], plain["lollipop:totals"], "totals ignore the table's query");
@@ -269,7 +269,7 @@ describe("S the lollipop's SQL with rowKeys", () => {
 
   test("B2 the patient-level resolver with rows.gene not among the genes: refused, naming the gene", async () => {
     const r = new PatientLevelResolver("s1", { oncokbPin: PIN }, { id: PRIMARY.id, mode: "patient-level", label: "stand-in", conn: PRIMARY });
-    await assert.rejects(() => (r as unknown as { lollipopCounts: Lollipop }).lollipopCounts({ all: [] }, ["KRAS"], 1, undefined, { gene: "EGFR", search: "L858R" }), /EGFR/);
+    await assert.rejects(() => (r as unknown as { lollipopCounts: Lollipop }).lollipopCounts({ all: [] }, ["KRAS"], 1, undefined, undefined, { gene: "EGFR", search: "L858R" }), /EGFR/);
   });
 
   test("S mutationRowKeysSql leaves out the alteration and proteinPos filters, keeps mutationType", () => {
@@ -310,7 +310,7 @@ describe("S the lollipop's SQL with rowKeys", () => {
 
 // ---------------------------------------------------------------- R: the remote path never carries the table's query
 describe("R the remote path never carries the table's search or filters", () => {
-  test("R1 the federation API has no lollipopRows: a request carrying it answers, and lollipopCounts gets no 5th argument (zod strips the unknown key)", async () => {
+  test("R1 the federation API has no lollipopRows: a request carrying it answers, and lollipopCounts gets no 6th argument (zod strips the unknown key)", async () => {
     const seen: unknown[][] = [];
     const protos = [PatientLevelResolver.prototype, AggregateResolver.prototype] as unknown as Record<string, unknown>[];
     for (const p of protos) assert.equal(Object.hasOwn(p, "lollipopCounts"), false, "lollipopCounts is inherited from BaseResolver");
@@ -329,9 +329,9 @@ describe("R the remote path never carries the table's search or filters", () => 
       for (const p of protos) delete p.lollipopCounts;
     }
     assert.equal(seen.length, 2);
-    assert.equal(seen[0][4], undefined, "lollipopRows is not passed on: " + JSON.stringify(seen[0]));
-    assert.ok(seen[0].length <= 4, "no 5th argument: " + JSON.stringify(seen[0]));
-    assert.equal(seen[1][4], undefined);
+    assert.equal(seen[0][5], undefined, "lollipopRows is not passed on: " + JSON.stringify(seen[0]));
+    assert.ok(seen[0].length <= 5, "no 6th argument: " + JSON.stringify(seen[0]));
+    assert.equal(seen[1][5], undefined);
   });
 
   test("R2 the remote resolver with rows throws, naming the study, and sends nothing; without rows it asks as before", async () => {
@@ -345,7 +345,7 @@ describe("R the remote path never carries the table's search or filters", () => 
     try {
       const r = new RemoteAggregateResolver("s1", "http://peer.invalid/api/federation/v1", { id: "peer", mode: "aggregate-only", label: "test peer", conn: PRIMARY });
       const remote = r as unknown as { lollipopCounts: Lollipop };
-      await assert.rejects(() => remote.lollipopCounts({ all: [] }, ["KRAS"], 1, undefined, { gene: "KRAS", search: "FX-P05-T1" }), /\bs1\b/);
+      await assert.rejects(() => remote.lollipopCounts({ all: [] }, ["KRAS"], 1, undefined, undefined, { gene: "KRAS", search: "FX-P05-T1" }), /\bs1\b/);
       assert.equal(bodies.length, 0, "nothing sent");
       await remote.lollipopCounts({ all: [] }, ["KRAS"], 1);
     } finally { globalThis.fetch = original; }

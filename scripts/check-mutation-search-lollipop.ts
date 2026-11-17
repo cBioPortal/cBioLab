@@ -61,7 +61,7 @@ type Counts = (def: CohortDef, genes: string[], minCount?: number, oql?: undefin
 const report = async (genes: string[], rows?: Rows): Promise<Report | string> => {
   try {
     const r = new PatientLevelResolver(STUDY, { oncokbPin: PIN }, { id: conn.id, mode: "patient-level", label: "fixture", conn });
-    return await (r.lollipopCounts as unknown as Counts).call(r, WHOLE, genes, 1, undefined, rows);
+    return await (r.lollipopCounts as unknown as Counts).call(r, WHOLE, genes, 1, undefined, undefined, rows);
   } catch (e) { return "error: " + String((e as Error).message).slice(0, 300); }
 };
 

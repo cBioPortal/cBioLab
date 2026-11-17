@@ -1058,7 +1058,7 @@ describe("the mutation table's search narrows a lollipop only on a patient-level
   test("B1 an aggregate-only resolver with the table's rows throws, naming the study and patient-level, and runs no query", async () => {
     const agg = new AggregateResolver("agg_study", { oncokbPin: "v1" }, AGG);
     const sent = await recording(async () => {
-      await assert.rejects(() => (agg.lollipopCounts as unknown as Counts).call(agg, { all: [] }, ["KRAS"], 1, undefined, ROWS),
+      await assert.rejects(() => (agg.lollipopCounts as unknown as Counts).call(agg, { all: [] }, ["KRAS"], 1, undefined, undefined, ROWS),
         (e: Error) => /agg_study/.test(e.message) && /patient-level/.test(e.message));
     });
     assert.deepEqual(sent, [], "no statement reaches the database");
@@ -1067,7 +1067,7 @@ describe("the mutation table's search narrows a lollipop only on a patient-level
   test("B1 a patient-level resolver with the same rows runs, and its lollipop SQL carries the search", async () => {
     const pl = new PatientLevelResolver("pl_study", { oncokbPin: "v1" }, PL);
     const sent = await recording(async () => {
-      await (pl.lollipopCounts as unknown as Counts).call(pl, { all: [] }, ["KRAS"], 1, undefined, ROWS);
+      await (pl.lollipopCounts as unknown as Counts).call(pl, { all: [] }, ["KRAS"], 1, undefined, undefined, ROWS);
     });
     assert.ok(sent.length > 0, "it ran");
     assert.ok(sent.some((q) => q.includes("P-0000123-T01")), "the search is compiled where the rows live");
@@ -1079,7 +1079,7 @@ describe("the mutation table's search narrows a lollipop only on a patient-level
     globalThis.fetch = (async () => { calls++; throw new Error("network must not be reached"); }) as typeof fetch;
     try {
       const r = new RemoteAggregateResolver("peer_study", "http://peer.invalid/api/federation/v1", AGG);
-      await assert.rejects(() => (r.lollipopCounts as unknown as Counts).call(r, { all: [] }, ["KRAS"], 1, undefined, ROWS), /peer_study/);
+      await assert.rejects(() => (r.lollipopCounts as unknown as Counts).call(r, { all: [] }, ["KRAS"], 1, undefined, undefined, ROWS), /peer_study/);
       assert.equal(calls, 0, "nothing is sent");
     } finally {
       globalThis.fetch = original;
