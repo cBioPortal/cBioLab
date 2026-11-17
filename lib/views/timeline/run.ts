@@ -10,6 +10,7 @@ import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { refuse, type ViewResolver } from "../shared.ts";
 import { patientSampleAttributes } from "../../patient-sample-attributes.ts";
+import { isAbortError } from "../../ch.ts";
 import type { TimelineView } from "./types.ts";
 import { timelineMethod } from "./method.ts";
 
@@ -81,7 +82,9 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
       if (!hasPatientTimeline(res)) return refuse("timeline", ctx, want.study + " cannot disclose a patient's timeline");
       patient = await (res as Resolver & PatientTimelineCapable).patientTimeline(want.id);
       if (patient.samples.length && !peerRowsFor(res, "timeline") && hasViewAggregates(res)) {
-        const attrs = await patientSampleAttributes(res as ViewResolver & PatientLevelCapable, want.study, want.id).catch(() => null);
+        // the tooltip goes without them when they cannot be read; an abandoned request still throws
+        const attrs = await patientSampleAttributes(res as ViewResolver & PatientLevelCapable, want.study, want.id)
+          .catch((e) => { if (isAbortError(e)) throw e; return null; });
         if (attrs) patient = { ...patient, sampleAttrs: attrs.bySample };
       }
     } catch (e) { return refuse("timeline", ctx, (e as Error).message); }

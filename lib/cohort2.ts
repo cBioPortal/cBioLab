@@ -32,6 +32,7 @@ import type {
   ProfiledLeaf, CaseListLeaf, OqlLeaf, GenomicDataLeaf, GenericAssayLeaf,
   SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
 } from "./types.ts";
+
 import { finiteSql, boundedNumberSql } from "./sql-number.ts";
 import { ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { aggregateSql, type AggregateSql, patientSql, type PatientSql } from "./sql-kinds.ts";
@@ -315,16 +316,38 @@ export function profiledCasesSql(gene: string, type: "MUTATION" | "CNA" | "SV", 
 export const PROFILED_MAX_GENES = 32;
 
 function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): LeafIds {
-  const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
-  if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV");
-  // A gene list is its genes' clauses AND-ed: the same samples as one clause per gene
+  // which panel rows: a data type's, or one profile's
+  let which: string, profileCheck = "";
+  if (leaf.profile != null) {
+    if (leaf.type != null) throw new Error("profiled clause: give `type` or `profile`, not both");
+    const pt = String(leaf.profile);
+    if (!/^[A-Za-z0-9_.-]{1,120}$/.test(pt)) throw new Error("profiled clause: bad profile id");
+    const id = ctx.study + "_" + pt;
+    which = "sp.genetic_profile_id = " + sq(id);
+    // a study without the profile has no panel rows for it, so matches nobody; without ifHeld that is
+    // refused instead, by the database when the context cannot confirm it (it lists continuous profiles
+    // only): a one-row check beside the rows, which the database evaluates whatever the rows' filter
+    if (leaf.ifHeld !== true && !ctx.profiles?.includes(pt))
+      profileCheck = "\n  UNION DISTINCT\nSELECT '' AS sid FROM system.one WHERE throwIf((SELECT count() FROM " + dbOf(ctx) + ".genetic_profile WHERE stable_id = " + sq(id) + ") = 0, " +
+        sq("profiled clause: profile '" + pt + "' is not in " + ctx.study) + ") != 0";
+  } else {
+    if (leaf.ifHeld != null) throw new Error("profiled clause: `ifHeld` goes with `profile`");
+    const t = PROFILED_TYPE[String(leaf.type || "").toUpperCase()];
+    if (!t) throw new Error("profiled clause: type must be MUTATION, CNA, or SV, or name a `profile`");
+    which = "sp.alteration_type = " + sq(t);
+  }
+  if (leaf.anyGene != null && (leaf.genes == null || typeof leaf.anyGene !== "boolean"))
+    throw new Error("profiled clause: `anyGene` (true or false) goes with `genes`");
+  // A gene list is its genes' clauses AND-ed (OR-ed with anyGene): the same samples as one clause per gene
   if (leaf.genes != null) {
     if (leaf.gene != null) throw new Error("profiled clause: give `gene` or `genes`, not both");
     if (!Array.isArray(leaf.genes) || !leaf.genes.length) throw new Error("profiled clause: `genes` must list at least one gene");
     const genes = [...new Set(leaf.genes.map((g) => String(g).toUpperCase().trim()))];
     if (genes.length > PROFILED_MAX_GENES)
       throw new Error("profiled clause: at most " + PROFILED_MAX_GENES + " genes; this names " + genes.length);
-    return ofSamples(genes.map((gene) => "(" + profiledLeafSql({ kind: "profiled", type: leaf.type, gene }, ctx).sql + ")").join("\n  INTERSECT DISTINCT\n"));
+    const one = (gene: string): ProfiledLeaf => leaf.profile != null ? { kind: "profiled", profile: leaf.profile, ...(leaf.ifHeld != null ? { ifHeld: leaf.ifHeld } : {}), gene } : { kind: "profiled", type: leaf.type, gene };
+    return ofSamples(genes.map((gene) => "(" + profiledLeafSql(one(gene), ctx).sql + ")")
+      .join(leaf.anyGene ? "\n  UNION DISTINCT\n" : "\n  INTERSECT DISTINCT\n"));
   }
   const db = dbOf(ctx);
   // Optional gene narrowing, resolved through the SAME panel tables as the
@@ -341,7 +364,7 @@ function profiledLeafSql(leaf: ProfiledLeaf, ctx: Ctx): LeafIds {
   }
   return ofSamples("SELECT DISTINCT " + PID("sp.sample_unique_id", ctx.study) + " AS sid\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
-    "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND sp.alteration_type = " + sq(t) + geneCond);
+    "  WHERE sp.cancer_study_identifier = " + sq(ctx.study) + " AND " + which + geneCond + profileCheck);
 }
 
 function caseListLeafSql(leaf: CaseListLeaf, ctx: Ctx): LeafIds {
@@ -684,7 +707,7 @@ function leafText(leaf: any): string {
       (leaf.percentile != null ? " (" + Math.round(leaf.percentile * 100) + "th percentile" + (leaf.percentileOf ? " of " + leaf.percentileOf : "") + ")" : ""));
     return leaf.attribute + " " + bits.join(" ");
   }
-  if (leaf.kind === "profiled") return "profiled for " + (leaf.genes?.length ? leaf.genes.map((g: string) => String(g).toUpperCase()).join(", ") + " " : leaf.gene ? String(leaf.gene).toUpperCase() + " " : "") + leaf.type;
+  if (leaf.kind === "profiled") return "profiled for " + (leaf.genes?.length ? (leaf.anyGene ? "any of " : "") + leaf.genes.map((g: string) => String(g).toUpperCase()).join(", ") + " " : leaf.gene ? String(leaf.gene).toUpperCase() + " " : "") + (leaf.profile != null ? "in " + leaf.profile : leaf.type);
   if (leaf.kind === "derived") {
     const r = (leaf as any).range || {};
     const parts = [r.gte != null ? "\u2265 " + r.gte : null, r.gt != null ? "> " + r.gt : null,

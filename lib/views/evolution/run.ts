@@ -12,6 +12,7 @@ import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { plural, refuse, type ViewResolver } from "../shared.ts";
 import { patientSampleAttributes } from "../../patient-sample-attributes.ts";
+import { isAbortError } from "../../ch.ts";
 import { groupOptions, sampleGroups } from "./groups.ts";
 import {
   EVOLUTION_COLUMNS, EVOLUTION_DEFAULT_COLUMNS, EVOLUTION_PATIENT_COLUMNS, EVOLUTION_PATIENT_DEFAULT_COLUMNS,
@@ -189,6 +190,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     // portal's Group by starts over on each patient's page)
     let options: { id: string; name: string }[] | null = null, grouping: EvolutionResult["groupBy"] | null = null, ungrouped: string | null = null;
     const attrs = attrsP ? await attrsP : null;
+    if (attrs instanceof Error && isAbortError(attrs)) throw attrs;
     if (attrs instanceof Error) {
       ungrouped = "the samples' clinical attributes could not be read (" + attrs.message + ")" + (view.groupBy ? ", so the chart is not grouped by " + view.groupBy : "");
     } else if (attrs) {
