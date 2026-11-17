@@ -28,6 +28,10 @@ test("GP9: panelNote for WES says whole-exome sequencing profiles every gene", (
   assert.match(note!, /every gene/i);
 });
 
+test("panelNote for a panel listing no genes says so", () => {
+  assert.equal(panelNote("EMPTY_PANEL", []), "This panel lists no genes.");
+});
+
 test("GP7: panelNote for an ordinary panel with genes is null", () => {
   assert.equal(panelNote("IMPACT341", ["BRAF", "EGFR", "KRAS", "TP53"]), null);
 });
