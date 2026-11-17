@@ -76,7 +76,7 @@ test("a gene-set axis compiles to hugo_gene_symbol IN (...), not a single =", ()
 test("an axis names itself the way the figure labels it", () => {
   assert.equal(axisLabel(num), "MUTATION_COUNT");
   assert.equal(axisLabel(mol), "TP53 rna_seq_mrna");
-  assert.equal(axisLabel(alt), "TP53 mutation type");
+  assert.equal(axisLabel(alt), "TP53: Mutations");
   assert.equal(axisLabel({ source: "alteration", gene: "MDM2", by: "cna" }), "MDM2 copy number");
 });
 

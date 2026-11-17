@@ -164,7 +164,7 @@ test("plot: Driver vs VUS per case, by the view's sources", () => {
   assert.match(sql, /toUInt8\(\(driver_tiers_filter != ''/);
   assert.doesNotMatch(sql, /driver_filter = 'Putative_Driver'/, "custom calls are off");
   assert.match(sql, /oncokb_version = 'v7\.5'/);
-  assert.equal(axisLabel({ source: "alteration", gene: "TP53", by: "driver" }), "TP53 driver vs VUS");
+  assert.equal(axisLabel({ source: "alteration", gene: "TP53", by: "driver" }), "TP53: Driver vs VUS Mutations");
   // OncoKB on with no store to read: refused rather than silently calling nothing
   assert.throws(() => axisSelect({ source: "alteration", gene: "TP53", by: "driver" }, { ...ctx, oncokbPin: null }, "cat"),
     /needs the version-pinned OncoKB store.*switch drivers\.oncokb off/s);
