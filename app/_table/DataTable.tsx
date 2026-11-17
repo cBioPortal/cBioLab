@@ -352,7 +352,8 @@ export interface DataTableProps<V> {
 export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
-  const multi = t.lists.length > 1;
+  // several studies' rows name their study, unless the table has a study column of its own
+  const multi = t.lists.length > 1 && !t.columns.some((c) => c.id === "study");
   // runs of one value of `groupBy` on this page: whether a row continues the run above, has more below, and is in an odd run
   const gi = groupBy ? t.columns.findIndex((c) => c.id === groupBy) : -1;
   const groups = gi < 0 ? null : (() => {

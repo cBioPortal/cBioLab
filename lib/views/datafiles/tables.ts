@@ -81,10 +81,10 @@ export function statusRowSource(t: StatusTable, parts: TablePart[], lines: { lin
   return {
     with: "WITH " + ctes + ",\n" +
       "base AS (\n" + union + "),\n" +
-      "rows AS (SELECT *, " + status + " AS status" + derived + ",\n    multiIf(status = 'altered', 0, status = 'unaltered', 1, 2) AS rank FROM base " + keep + ")\n",
+      "rows AS (SELECT *, " + status + " AS status" + derived + ",\n    multiIf(status = 'altered', 2, status = 'unaltered', 1, 0) AS rank FROM base " + keep + ")\n",
     columns: cols.map((c): QueryColumn => ({ ...c, text: text(c), ...(c.id === "altered" ? { order: "rank" } : {}) })),
     select: "*",
-    defaultOrder: "rank ASC",
+    defaultOrder: "rank DESC",
     tiebreak: "sid, ord",
   };
 }

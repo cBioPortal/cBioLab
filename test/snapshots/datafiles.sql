@@ -113,7 +113,7 @@ rows AS (SELECT *, multiIf(ev0 != '' OR ev1 != '' OR ev2 != '', 'altered', pf0 A
     multiIf(ev0 != '', ev0, pa0, 'no alteration', 'not profiled') AS c0, multiIf(ev0 != '', '1', pa0, '0', 'NP') AS m0,
     multiIf(ev1 != '', ev1, pa1, 'no alteration', 'not profiled') AS c1, multiIf(ev1 != '', '1', pa1, '0', 'NP') AS m1,
     multiIf(ev2 != '', ev2, pa2, 'no alteration', 'not profiled') AS c2, multiIf(ev2 != '', '1', pa2, '0', 'NP') AS m2,
-    multiIf(status = 'altered', 0, status = 'unaltered', 1, 2) AS rank FROM base )
+    multiIf(status = 'altered', 2, status = 'unaltered', 1, 0) AS rank FROM base )
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 0 datafiles: datafiles:cases:rows · brca_tcga_pan_can_atlas_2018
@@ -220,10 +220,10 @@ rows AS (SELECT *, multiIf(ev0 != '' OR ev1 != '' OR ev2 != '', 'altered', pf0 A
     multiIf(ev0 != '', ev0, pa0, 'no alteration', 'not profiled') AS c0, multiIf(ev0 != '', '1', pa0, '0', 'NP') AS m0,
     multiIf(ev1 != '', ev1, pa1, 'no alteration', 'not profiled') AS c1, multiIf(ev1 != '', '1', pa1, '0', 'NP') AS m1,
     multiIf(ev2 != '', ev2, pa2, 'no alteration', 'not profiled') AS c2, multiIf(ev2 != '', '1', pa2, '0', 'NP') AS m2,
-    multiIf(status = 'altered', 0, status = 'unaltered', 1, 2) AS rank FROM base )
+    multiIf(status = 'altered', 2, status = 'unaltered', 1, 0) AS rank FROM base )
 SELECT *, count() OVER () AS total FROM rows
 WHERE 1
-ORDER BY rank ASC, sid, ord
+ORDER BY rank DESC, sid, ord
 LIMIT 20 OFFSET 0
 
 -- view 0 datafiles: datafiles:counts · brca_tcga_pan_can_atlas_2018

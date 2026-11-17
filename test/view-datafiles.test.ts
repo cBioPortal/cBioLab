@@ -259,6 +259,7 @@ describe("runDatafiles", () => {
 // D6  runner rows                   altered → "1", unaltered → "0", not profiled → "NP", study id first
 // D7  no rows in the view           rows.pageSize 20 (the portal's)
 // D8  rows: 50                      rows.pageSize 50
+// D9  Altered sort                  rank = multiIf(status = 'altered', 2, status = 'unaltered', 1, 0); defaultOrder "rank DESC" (1, 0, NP); altered order "rank"
 describe("the case table, as the portal's Download tab", () => {
   const parts = [{ cohort: "C", study: "s", cohortSql: "SELECT pid, sid FROM x" }];
   const plan = () => ({ lines, opts: { study: "s", db: "d", pin: null, profiles: [] } });
@@ -285,5 +286,11 @@ describe("the case table, as the portal's Download tab", () => {
   test("D7-D8 page size: 20 by default, rows when set", async () => {
     assert.equal((df(await run({}, ctx({ Q: cohort({ s1: 3 }) }, { s1: r1() }))).pageSize), 20);
     assert.equal((df(await run({ rows: 50 }, ctx({ Q: cohort({ s1: 3 }) }, { s1: r1() }))).pageSize), 50);
+  });
+  test("D9 Altered sorts as the portal's 1 / 0 column: descending by default", () => {
+    const src = statusRowSource("cases", parts, lines, plan);
+    assert.ok(src.with.includes("multiIf(status = 'altered', 2, status = 'unaltered', 1, 0) AS rank"), "rank in the rows CTE");
+    assert.equal(src.defaultOrder, "rank DESC");
+    assert.equal(src.columns.find((x) => x.id === "altered")!.order, "rank");
   });
 });
