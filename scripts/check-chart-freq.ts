@@ -16,6 +16,7 @@
  * GP7, each fixture panel's genes by Hugo symbol, A to Z, as its data_gene_panel_*.txt lists them;
  * GP9, WES lists no genes; GP10, a panel the database does not hold is refused, naming it.
  *
+ * It also checks CS2 (study-cn-segments-cases.md): a study with no segments carries no seg flag.
  * It also checks GU3 (gene-tables-cases.md): a gene table is narrowed by its own checked genes.
  *
  * Run: node --env-file=.env.local scripts/check-chart-freq.ts
@@ -24,6 +25,7 @@
 import { readFileSync } from "node:fs";
 import { connById } from "../lib/ch.ts";
 import { buildExplore } from "../lib/explore.ts";
+import { studiesFor } from "../lib/study-list.ts";
 import { panelGenes } from "../lib/genes.ts";
 
 const STUDY = "cbiolab_peer_fixture";
@@ -151,6 +153,14 @@ try {
   ok("GU3 under KRAS: TP53 counts only the samples mutated in both", row(own, "TP53")?.altered === both && (row(own, "TP53")?.profiled ?? 0) <= kras.size,
     `TP53 ${row(own, "TP53")?.altered} of ${row(own, "TP53")?.profiled}, want ${both} of at most ${kras.size}`);
 } catch (e) { ok("GU3", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+
+// CS2 (study-cn-segments-cases.md): a study holding no copy-number segment offers no CN Segments tab
+// (the fixture holds none, so the study list's seg flag reads false for it)
+try {
+  const rows = await studiesFor(conn);
+  const mine = rows.find((r) => r.id === STUDY);
+  ok("CS2 the fixture study, with no segments, carries no seg flag", !!mine && mine.caps.seg === false, mine ? "seg=" + mine.caps.seg : "not listed");
+} catch (e) { ok("CS2", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall passed");
 process.exit(failures ? 1 : 0);
