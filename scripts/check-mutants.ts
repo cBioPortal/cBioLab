@@ -17,7 +17,8 @@
  * gives it), only the bugs that diff could affect are planted: those in a changed file, those whose
  * guard's own files changed, and those an edited area file defines or guards. A diff that touches
  * this script, scripts/mutants/types.ts, the workflow or the dependencies plants every bug, as does
- * a run without MUTANT_CHANGED (master, the merge queue, and locally).
+ * a run without MUTANT_CHANGED (the nightly run, planted-bugs-nightly.yml, and locally). A push to
+ * master is selective too, by its own diff.
  * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads
  * (or REPORT_DIR/mutants.json when REPORT_DIR is set, as in CI).
  */
@@ -148,7 +149,7 @@ function selection(): { mutants: Planted[]; changed: number | null; reason: stri
 }
 /** every planted bug run against its guard in the copy at `dir`; the exit code */
 function plantAll(): number {
-  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".venv"]);
+  const SKIP = new Set(["node_modules", ".git", ".next", ".next-gate", ".gate-cache", ".portal-cache", ".venv"]);
   cpSync(ROOT, dir, { recursive: true, filter: (src) => !SKIP.has(src.split("/").pop()!) });
   symlinkSync(join(ROOT, "node_modules"), join(dir, "node_modules"));
   mkdirSync(join(dir, "docs/verification"), { recursive: true });

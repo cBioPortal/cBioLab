@@ -6,6 +6,9 @@ import { densityGradientStops, type CorrelationLine, type DensityLegend } from "
 import { fmtInt } from "../../lib/chart/format.ts";
 import { svgToPdf } from "../_oncoprint/pdf.ts";
 import type { ChartAction } from "./partitions.tsx";
+import { caseFileDoc, caseFileFormat, type CaseFile } from "../../lib/study-view-case-files.ts";
+import type { CohortDef } from "../../lib/types.ts";
+import { api } from "./api.ts";
 
 /** the page's colour variables as the light theme's literals, so a saved figure reads the same anywhere */
 const LITERALS: [RegExp, string][] = [
@@ -128,4 +131,37 @@ export function figureActions(chartName: string, figure: () => string | null, on
         savePdf(chartFileName(chartName, "pdf"), s).catch((e) => onError("Could not make the PDF: " + String((e as Error)?.message || e)));
       } },
   ];
+}
+
+/**
+ * Fetches a per-case file (download-cases.md PC) through the patient-level table route and saves
+ * it. Answers the studies left out, that may not list their patients, or null; throws, saving
+ * nothing, when the route refuses or the file was cut short.
+ */
+export async function saveCaseFile(file: CaseFile, fileName: string, def: CohortDef, study: string): Promise<string | null> {
+  const res = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
+    body: await api.tablePayload({ doc: caseFileDoc(file, def, study), view: 0, caseFile: caseFileFormat(file) }) });
+  const text = await res.text();
+  if (!res.ok) throw new Error(text.replace(/^cannot download: /, "").trim());
+  const cut = text.indexOf("\n# DOWNLOAD INCOMPLETE: ");
+  if (cut >= 0) throw new Error(text.slice(cut + "\n# DOWNLOAD INCOMPLETE: ".length).trim());
+  saveText(fileName, text);
+  const left = res.headers.get("x-left-out");
+  return left ? decodeURIComponent(left) : null;
+}
+
+/**
+ * A chart menu's Full Data or Data entry: saves `file` for the selection `def`, saying while it
+ * works and, when it is done, which studies were left out (null clears the message).
+ */
+export function caseFileAction(label: "Full Data" | "Data", file: CaseFile, fileName: string, def: () => { def: CohortDef; study: string } | null,
+  say: (message: string | null) => void): ChartAction {
+  return { label, title: "each selected case's value, as " + fileName, onClick: () => {
+    const sel = def();
+    if (!sel) { say("select a study first"); return; }
+    say("preparing " + fileName + "…");
+    saveCaseFile(file, fileName, sel.def, sel.study)
+      .then((left) => say(left ? fileName + " leaves out the studies that may not list their patients: " + left : null))
+      .catch((e) => say("Could not download " + fileName + ": " + String((e as Error)?.message || e)));
+  } };
 }
