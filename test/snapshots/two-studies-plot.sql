@@ -787,7 +787,7 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
 ) GROUP BY id)
 SELECT vs.id AS id, gs.v AS g, vs.v AS v
 FROM vs INNER JOIN gs ON gs.id = vs.id
-LIMIT 10001
+LIMIT 50001
 
 -- view 1 plot: plot:points · lusc_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
@@ -820,4 +820,4 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
 ) GROUP BY id)
 SELECT vs.id AS id, gs.v AS g, vs.v AS v
 FROM vs INNER JOIN gs ON gs.id = vs.id
-LIMIT 10001
+LIMIT 50001
