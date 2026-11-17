@@ -300,7 +300,6 @@ export function dayScale(ticks: AxisTick[], width: number): { x: (day: number) =
   return { x, span };
 }
 
-/** A year tick's label as the portal writes it: "0", "2y", "-3y". */
 /** the portal's month on the axis (cbioportal-clinical-timeline TickIntervalEnum.MONTH) */
 export const MONTH = 30.41666;
 
@@ -328,7 +327,24 @@ export function monthTicks(yearStart: number, pxPerYear: number): { day: number;
   return out;
 }
 
+/** A year tick's label as the portal writes it: "0", "2y", "-3y". */
 export function yearLabel(startDay: number): string {
   const n = Math.round(startDay / YEAR);
   return n === 0 ? "0" : n + "y";
+}
+
+/**
+ * A sample event's tooltip rows as the portal's (TimelineStore's sample tooltip, PAT-TL-TT-3): the
+ * event's attributes merged with the sample's own clinical attributes (`own`), the event's first where
+ * both name a key, keys upper-cased with spaces for "_", sorted by key; SAMPLE_ID (shown above them)
+ * and the STYLE_* drawing hints left out.
+ */
+export function sampleTipRows(e: PatientEvent, own: [string, string][]): [string, string][] {
+  const merged = new Map<string, string>();
+  for (const [k, v] of [...e.attrs, ...own]) {
+    if (/^STYLE_/i.test(k) || k.toUpperCase() === "SAMPLE_ID") continue;
+    const key = k.toUpperCase().replace(/_/g, " ");
+    if (!merged.has(key)) merged.set(key, v);
+  }
+  return [...merged].sort(([a], [b]) => a.localeCompare(b));
 }
