@@ -213,6 +213,11 @@ checks assert rather than whatever a real warehouse happens to contain:
   KIF5B-RET's Likely Neutral against its Oncogenic tumour-type row, so a VUS row can show an Oncogenic
   cell and the reverse. The other genes of these SVs have no mutations, so each is a gene with
   fusions only.
+- **An SV with a blank `Event_Info`** (CD74-NRG1 on FX-P52-T1, with an Oncogenic `''` row in
+  `peer-oncokb-sv.tsv` and no other OncoKB row), for `check:oncokb-sv` O15: both partners are
+  drivers in `driverEventSql`, OQL `FUSION_DRIVER` and the oncoprint's SV key set. The importer
+  stores the blank as `NA`, so the fixture keys it `NA`; the `ifNull(…, '')` in the SV key is what
+  a warehouse whose `event_info` is NULL relies on. No other check queries CD74 or NRG1.
 - **Cancer Hotspots cases** on `FX-P29-T1` (`test/fixtures/peer-hotspots.tsv`, Genome Nexus's
   `hotspots` list per variant, stored in `annotation.variant` under the app's Genome Nexus pin and
   `fixture`), one mutation per case of the hotspot rule, for `check:hotspot-drivers`: a gene off the
