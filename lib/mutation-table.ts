@@ -84,7 +84,7 @@ export const MUTATION_ANNOTATION_ORDER = "arrayConcat(" + oncokbSortSql("oncogen
   ", [toFloat64(0), toFloat64(hot), toFloat64(0)])";
 
 /** Shown unless the view names its columns: the portal's own default set. */
-export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "mutCount"];
+export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "copyNumber", "vaf", "mutCount"];
 
 /**
  * The lollipop grid's cell a mutation falls in, spelled as the grid labels it ("Missense · Driver"):
