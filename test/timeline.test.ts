@@ -2,7 +2,7 @@
 // patient-view timeline — and the figure's promises about what it draws (lib/timeline-svg.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildTracks, flattenTracks, sampleMarks, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, MONTH } from "../lib/timeline-tracks.ts";
+import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, MONTH } from "../lib/timeline-tracks.ts";
 import { timelineSvg, timelineSummary } from "../lib/timeline-svg.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
@@ -174,5 +174,22 @@ describe("monthTicks (PAT-TL-ZM-1)", () => {
 
   test("M7 PAT-TL-ZM-1: negative year at 800 px/year", () => {
     assert.equal(at(monthTicks(-730, 800), 1), "-1y 11m");
+  });
+});
+
+describe("PAT-TL-TT-3: a sample event's tooltip rows", () => {
+  const tip = (attrs: [string, string][], own: [string, string][]) => sampleTipRows({ type: "Specimen", start: 0, end: null, attrs }, own);
+  test("ST1 PAT-TL-TT-3: merged, keys upper-cased with spaces for _, sorted, SAMPLE_ID left out", () => {
+    assert.deepEqual(tip([["SURGERY", "Astro"], ["SAMPLE_ID", "S1"]], [["CANCER_TYPE", "Glioma"], ["GRADE", "II"]]),
+      [["CANCER TYPE", "Glioma"], ["GRADE", "II"], ["SURGERY", "Astro"]]);
+  });
+  test("ST2 PAT-TL-TT-3: STYLE_COLOR / style_shape left out", () => {
+    assert.deepEqual(tip([["STYLE_COLOR", "red"], ["style_shape", "x"], ["A", "1"]], []), [["A", "1"]]);
+  });
+  test("ST3 PAT-TL-TT-3: a key in both keeps the event's value, once", () => {
+    assert.deepEqual(tip([["GRADE", "III"]], [["GRADE", "II"]]), [["GRADE", "III"]]);
+  });
+  test("ST4 PAT-TL-TT-3: a lower-case key becomes upper-case", () => {
+    assert.deepEqual(tip([], [["grade", "II"]]), [["GRADE", "II"]]);
   });
 });
