@@ -39,6 +39,8 @@ export interface PageTab {
   title: string; views?: number[]; sub?: { title: string; views: number[] }[]; chooser?: TabChooser; link?: TabLink; banner?: TabBanner;
   /** a tab whose view is not built yet: what it will show, which the page says in its place */
   pending?: string;
+  /** a word beside the tab's name, the portal's ("Beta!" on Structural Variants) — not part of the name the URL keeps */
+  badge?: string;
   /** view settings the portal's own tab does not offer, which the views' settings bars therefore leave out */
   locks?: string[];
 }
@@ -95,7 +97,7 @@ export function syncUrl(params: Record<string, string | null>) {
 }
 
 /** A page as written: its tabs, each with titled views (or sub-tabs of them). */
-export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser; link?: TabLink; banner?: TabBanner; pending?: string; locks?: string[] };
+export type TabSpec = { title: string; views?: { title: string; view: View }[]; sub?: { title: string; views: { title: string; view: View }[] }[]; chooser?: TabChooser; link?: TabLink; banner?: TabBanner; pending?: string; locks?: string[]; badge?: string };
 
 /** The page's one document and the tabs' index maps, from the tabs as written. */
 export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left: string[], opts: { partial?: boolean } = {}): PageLayout {
@@ -109,7 +111,7 @@ export function arrange(base: Omit<AnalysisDoc, "views">, spec: TabSpec[], left:
   });
   const tabs: PageTab[] = spec.map((t) => t.sub
     ? { title: t.title, sub: t.sub.map((s) => ({ title: s.title, views: place(t.title + " › " + s.title, s.views) })) }
-    : { title: t.title, views: place(t.title, t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.banner ? { banner: t.banner } : {}), ...(t.pending ? { pending: t.pending } : {}), ...(t.locks ? { locks: t.locks } : {}) });
+    : { title: t.title, views: place(t.title, t.views || []), ...(t.chooser ? { chooser: t.chooser } : {}), ...(t.link ? { link: t.link } : {}), ...(t.banner ? { banner: t.banner } : {}), ...(t.pending ? { pending: t.pending } : {}), ...(t.locks ? { locks: t.locks } : {}), ...(t.badge ? { badge: t.badge } : {}) });
   return { doc: { ...base, views }, tabs, titles, names, left, ...(opts.partial ? { partial: true } : {}) };
 }
 

@@ -6,7 +6,6 @@
 // picker, as for every view.
 import React, { useEffect, useMemo, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { sampleMarks } from "../../lib/timeline-tracks.ts";
 import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
@@ -33,7 +32,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
 }) {
   const [listOpen, setListOpen] = useState(false);
   const p = a.patient;
-  const allMarks = useMemo(() => sampleMarks(p?.samples || [], []), [p]);
+  // numbered on the server as the header numbers them (collection day, type, id)
+  const allMarks = useMemo(() => new Map((p?.samples || []).map((m) => [m.id, m])), [p]);
   // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
   const marks = useMemo(() => p?.shown ? new Map([...allMarks].filter(([id]) => p.shown!.includes(id))) : allMarks, [p, allMarks]);
   // the Allele Freq bars' slots: one per sample in view, in sample order, as the Samples column's
