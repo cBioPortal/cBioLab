@@ -66,6 +66,21 @@ rows AS (
 )
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
+-- view 0 sv: sv:duplicates:MSK-IMPACT · msk_impact_2017
+WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_impact_2017'),
+cs AS (SELECT DISTINCT sid FROM cohort),
+ids AS (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('ALK', 'ROS1', 'RET'))
+SELECT count() - uniqExact(ifNull(toString(pt.stable_id), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.site2_position), '')) AS duplicates
+FROM snapshot_db.structural_variant sv
+JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id
+JOIN snapshot_db.cancer_study st ON st.cancer_study_id = gp.cancer_study_id
+JOIN snapshot_db.sample smp ON smp.internal_id = sv.sample_id
+JOIN snapshot_db.patient pt ON pt.internal_id = smp.patient_id
+WHERE st.cancer_study_identifier = 'msk_impact_2017' AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'
+  AND (sv.site1_entrez_gene_id IN (SELECT entrez_gene_id FROM ids) OR sv.site2_entrez_gene_id IN (SELECT entrez_gene_id FROM ids))
+  AND smp.stable_id IN (SELECT sid FROM cs)
+
 -- view 0 sv: sv:profiled:MSK-IMPACT · msk_impact_2017
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'msk_impact_2017_', '') AS pid, replaceOne(sample_unique_id, 'msk_impact_2017_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_impact_2017'),

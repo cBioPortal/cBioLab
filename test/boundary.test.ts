@@ -503,6 +503,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "germCountsSql": () => aggregates.germCountsSql(cohortSql, "x", "db", ["BRCA1", "BRCA2"]),
     // sv: per gene, counts of the cohort's samples profiled for its structural variants and carrying one
     "svProfiledSql": () => aggregates.svProfiledSql(cohortSql, "x", "db", ["ALK", "ROS1"]),
+    "svDuplicatesSql": () => aggregates.svDuplicatesSql(cohortSql, "x", "db", ["ALK", "ROS1"]),
     "germSurvivalSql": () => aggregates.germSurvivalSql(cohortSql, "x", "db", "BRCA2"),
     "orgIncidenceSql": () => aggregates.orgIncidenceSql(cohortSql, "x", "db", { kind: "timeline", eventType: "Diagnosis", key: "TUMOR_SITE" }, { genes: ["EGFR"], alteration: "mutation", driverPin: "v7.5" }, true, "CNS/Brain"),
     "riskmodelPanelGenesSql": () => federation.riskmodelPanelGenesSql("x", "db"),

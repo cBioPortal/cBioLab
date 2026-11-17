@@ -7,7 +7,8 @@ import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } 
 import { answering, askEachSite, overLimit, plural, refuse } from "../shared.ts";
 import type { SvView, SvProfiled } from "./types.ts";
 import { svMethod } from "./method.ts";
-import { svProfiledSql } from "./sql.ts";
+import { svDuplicatesSql, svProfiledSql } from "./sql.ts";
+export { svDuplicatesNote } from "./note.ts";
 
 /** the most genes one view lists: a gene list's own limit (lib/gene-tracks.ts) */
 export const SV_MAX_GENES = 32;
@@ -69,12 +70,12 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
   if (!holders.length) return no("no study here may disclose patients' structural variants (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   const shown = shownColumns(q, SV_COLUMNS, SV_DEFAULT_COLUMNS);
   const sub = ctx.page || ctx.values;
-  let r: Rows, profiled: SvProfiled[];
+  let r: Rows, profiled: SvProfiled[], duplicates: number;
   try {
     // every holder is a local participant, and every local participant answers view aggregates
     const { ok } = answering(ctx);
     const own = Object.fromEntries(holders.map((st) => [st, ok[st]]));
-    [r, profiled] = await Promise.all([
+    [r, profiled, duplicates] = await Promise.all([
       runRows(ctx, "sv", holders, q, SV_DEFAULT_COLUMNS, shown, size, (parts) => (db) => svRowSource(parts, db, genes, pin),
         ctx.values ? { column: ctx.values, numeric: !!SV_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined),
       sub ? Promise.resolve([]) : askEachSite(ctx, own, (n, _st, res) => res.viewAggregate("sv:profiled:" + n, ctx.doc.cohorts[n], (c, s, d) => svProfiledSql(c, s, d, genes)))
@@ -83,6 +84,8 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
           return { cohort, study, gene, samples: ctx.cohorts[cohort].perStudy[study]?.samples ?? Number(a?.samples ?? 0), profiled: Number(a?.profiled ?? 0),
             altered: Number(a?.altered ?? 0), alteredProfiled: Number(a?.altered_profiled ?? 0) };
         }))),
+      sub ? Promise.resolve(0) : askEachSite(ctx, own, (n, _st, res) => res.viewAggregate("sv:duplicates:" + n, ctx.doc.cohorts[n], (c, s, d) => svDuplicatesSql(c, s, d, genes)))
+        .then((xs) => xs.reduce((sum, { answer }) => sum + Number(answer[0]?.duplicates ?? 0), 0)),
     ]);
   } catch (e) { return no((e as Error).message); }
   const rows = r.rows.map((x) => ({ cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
@@ -92,10 +95,10 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (sub) return { kind: "sv", cohorts: vNames, sv, participation: ctx.participationFor(ctx.vStudies, true) };
   return {
-    kind: "sv", cohorts: vNames, sv: { ...sv, profiled },
+    kind: "sv", cohorts: vNames, sv: { ...sv, profiled, duplicates },
     method: svMethod({ genes, oncokbPin: pin, queryText: describeQuery(q, columns),
       sortName: q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
-      shown: rows.length, lists: r.lists, excluded, instances: r.groups, profiled }),
+      shown: rows.length, lists: r.lists, excluded, instances: r.groups, profiled, duplicates }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every structural variant in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples whose gene 1 or gene 2 is " + (genes.length > 1 ? "one of " : "") + genes.join(", ") +

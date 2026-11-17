@@ -40,4 +40,6 @@ Structural variants of ALK, ROS1, RET: 131 rows; the first 25, tab-separated (th
         MSK-IMPACT · msk_impact_2017 · ALK: 52 with a call · 10945 profiled · 10945 samples
         MSK-IMPACT · msk_impact_2017 · ROS1: 43 with a call · 10945 profiled · 10945 samples
         MSK-IMPACT · msk_impact_2017 · RET: 31 with a call · 10945 profiled · 10945 samples
+    - Count the duplicate calls of patients with several samples: The sv:duplicates query above, per cohort and study: the table's calls less the distinct (patient, site 1 chromosome and position, site 2 chromosome and position) among them — a call repeated in another of the patient's samples counts once for each repeat, as the portal's duplicateStructuralVariantCountInMultipleSamples; summed.
+        duplicates: 5
     A listing and the counts its caveat names: no statistic is computed, so there is no script — the queries are the numbers.

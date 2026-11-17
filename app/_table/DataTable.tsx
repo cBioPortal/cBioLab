@@ -327,6 +327,8 @@ export interface DataTableProps<V> {
   table?: string;
   /** what a row is, plural: "mutations", "samples" */
   unit: string;
+  /** what follows the row count in the bar (the Structural Variants tab's ": includes 2 duplicate structural variants…") */
+  countNote?: string;
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
   onQuery: (q: TableQuery) => void;
   /** a cell drawn other than as its text (a badge, a link); the row says whose it is (study, sample) */
@@ -349,7 +351,7 @@ export interface DataTableProps<V> {
   groupBy?: string;
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -408,7 +410,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   return (
     <div className="dt">
       <div className="dt-bar">
-        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}
+        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}{countNote}
           {multi ? <span className="meta"> across {t.lists.length} cohorts and studies</span> : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />

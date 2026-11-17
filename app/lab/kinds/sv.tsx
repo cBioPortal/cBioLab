@@ -5,6 +5,7 @@ import { DataTable, specQuery } from "../../_table/DataTable.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindUi } from "./kind-ui.ts";
+import { svDuplicatesNote } from "../../../lib/views/sv/note.ts";
 
 // ---- Structural variants: the queried genes' structural-variant table, on the shared table (app/_table/DataTable.tsx) ----
 
@@ -13,7 +14,8 @@ function SvBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnResultOf<
   const t = v.sv;
   return (
     <div className="pb">
-      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.genes.join(", ") + " structural variants"} onQuery={onQuery}
+      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.genes.join(", ") + " structural variants"}
+        countNote={t.duplicates ? svDuplicatesNote(t.duplicates) : undefined} onQuery={onQuery}
         num={(_id, x) => x.toLocaleString()}
         cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
           // as on the portal's table, a sample id opens that sample's page, in a new tab so the table keeps its place

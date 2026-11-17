@@ -4,7 +4,7 @@ import { BUILD_COMMIT } from "../../build-info.ts";
 import type { SvProfiled } from "./types.ts";
 
 export function svMethod(t: { genes: string[]; oncokbPin: string | null; queryText: string; sortName: string | null; desc: boolean; shown: number;
-  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; profiled: SvProfiled[] }): MethodRecord {
+  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; profiled: SvProfiled[]; duplicates: number }): MethodRecord {
   const genes = t.genes.join(", ");
   const steps = [
     ...tableSteps({ label: "sv", what: "structural variants of " + genes, queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
@@ -18,7 +18,13 @@ export function svMethod(t: { genes: string[]; oncokbPin: string | null; queryTe
         "those with a call involving it; and of those, the profiled. A sample not profiled contributes no row and is not read as having none.",
       params: t.profiled.map((p) => [p.cohort + " · " + p.study + " · " + p.gene, p.altered + " with a call · " + p.profiled + " profiled · " + p.samples + " samples"] as [string, string]),
     },
+    {
+      kind: "fetch" as const, title: "Count the duplicate calls of patients with several samples",
+      detail: "The sv:duplicates query above, per cohort and study: the table's calls less the distinct (patient, site 1 chromosome and position, site 2 chromosome and position) " +
+        "among them — a call repeated in another of the patient's samples counts once for each repeat, as the portal's duplicateStructuralVariantCountInMultipleSamples; summed.",
+      params: [["duplicates", String(t.duplicates)]] as [string, string][],
+    },
   ];
-  return { steps, implementation: { functions: ["svRowSource", "svProfiledSql", "pageSql", "countsSql"], file: "lib/sv-table.ts, lib/views/sv/sql.ts, lib/table-query.ts", commit: BUILD_COMMIT },
+  return { steps, implementation: { functions: ["svRowSource", "svProfiledSql", "svDuplicatesSql", "pageSql", "countsSql"], file: "lib/sv-table.ts, lib/views/sv/sql.ts, lib/table-query.ts", commit: BUILD_COMMIT },
     verification: "A listing and the counts its caveat names: no statistic is computed, so there is no script — the queries are the numbers." };
 }

@@ -56,10 +56,20 @@
  * "Unknown" rows (G5) run over a scratch database of views onto the fixture's tables whose
  * type_of_cancer lacks nsclc.
  *
+ * The Structural Variants duplicates section (V*) runs lib/views/sv/sql.ts svDuplicatesSql — the number
+ * the tab's title reports as "includes <n> duplicate structural variant(s) in patients with multiple
+ * samples" — over the study's structural variants with a queried gene as either partner, each call
+ * once. The legacy rule is cbioportal-frontend cd8c6df ResultsViewStructuralVariantMapperDataStore.ts
+ * 34-50: group the calls by patient and both breakpoints (site 1 and site 2 chromosome and position),
+ * and count each group's calls beyond its first. From data_sv.txt: EML4-ALK at 2:42522656 / 2:29446394
+ * on FX-P45-T1, FX-P46-T1, FX-P47-T1, FX-P48-T1, FX-P49-T1 and FX-P49-T2 (FX-P49's two samples); every
+ * other call has breakpoints of its own.
+ *
  * Run: node --env-file=.env.local scripts/check-results-oql.ts (connection b must be the fixture:
  * `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
+import { svDuplicatesSql } from "../lib/views/sv/sql.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql, cancerTypeSamplesSql } from "../lib/views/cancertypes/sql.ts";
 import { lineCtes, type StudyOpts } from "../lib/views/datafiles/sql.ts";
@@ -716,6 +726,38 @@ async function expectCategory(tag: string, attribute: string | null, unit: "samp
   await expectCategory("G5", "CANCER_TYPE_DETAILED", "sample", { [LUAD]: 42, [LUSC]: 13, [LC]: 2, [UNKNOWN]: 2 }, 59, noType);
   await expectCategory("G5", "CANCER_TYPE_DETAILED", "patient", { [LUAD]: 39, [LUSC]: 12, [LC]: 2, [UNKNOWN]: 2 }, 53, noType);
   await write("DROP DATABASE IF EXISTS " + noType);
+}
+
+// ==== Structural Variants: the duplicate count (V*; SV-TB-1, SV-MD-7, SV-STM-1) ====================
+// Legacy: ResultsViewStructuralVariantMapperDataStore.ts 34-50, over every call of the tab, grouped by
+// `${patientId}_${site1Chromosome}_${site1Position}_${site2Chromosome}_${site2Position}`, Σ (group size − 1).
+// data_sv.txt by gene (sample, site 1, site 2):
+//   ALK and EML4: the one EML4-ALK call, 2:42522656 / 2:29446394, on FX-P45-T1, FX-P46-T1, FX-P47-T1, FX-P48-T1,
+//     FX-P49-T1, FX-P49-T2 — six calls of five patients (data_clinical_sample.txt: FX-P49-T1 and FX-P49-T2 are FX-P49),
+//     so one duplicate. With both genes queried the call is still one row each (V2), not one per gene.
+//   BRCA2: FX-P50-T1 13:32914000 / 13:32950000, FX-P51-T1 13:32915000 / 13:32951000 — two patients, no duplicate.
+//   KRAS: no structural variant.
+//   Without FX-P49-T2 (V5: the cohort {not: sampleList [FX-P49-T2]}, 58 samples) the ALK calls are five patients' one each.
+async function expectDuplicates(tag: string, genes: string[], want: number, cohort = compileCohortDef(null, { study: STUDY, db: conn!.db })) {
+  const name = "Structural Variants " + tag + " svDuplicatesSql [" + genes.join(", ") + "]: " + want + " duplicate" + (want === 1 ? "" : "s");
+  try {
+    const rows = (await chQuery<Row>(svDuplicatesSql(cohort, STUDY, conn!.db, genes), conn!)).data;
+    ok(name, rows.length === 1 && Number(rows[0].duplicates) === want, "ours " + JSON.stringify(rows));
+  } catch (e) {
+    ok(name, false, (e as Error).message.slice(0, 300));
+  }
+}
+{
+  await expectDuplicates("V1", ["ALK"], 1);
+  await expectDuplicates("V2 (a call between two queried genes counted once)", ["EML4", "ALK"], 1);
+  await expectDuplicates("V3 (two patients, different breakpoints)", ["BRCA2"], 0);
+  await expectDuplicates("V4 (no structural variant)", ["KRAS"], 0);
+  const without = compileCohortDef({ all: [{ not: { kind: "sampleList", ids: [STUDY + ":FX-P49-T2"] } }] } as never, { study: STUDY, db: conn!.db });
+  // the cohort is what V5 means: every sample but FX-P49-T2
+  const sids = (await chQuery<{ sid: string }>("SELECT sid FROM (" + without + ")", conn!)).data.map((r) => String(r.sid));
+  ok("Structural Variants V5 cohort: 58 samples, FX-P49-T1 in, FX-P49-T2 out",
+    sids.length === 58 && sids.includes("FX-P49-T1") && !sids.includes("FX-P49-T2"), "ours " + sids.length + " samples");
+  await expectDuplicates("V5 (a cohort without FX-P49-T2)", ["ALK"], 0, without);
 }
 
 await write("DROP DATABASE IF EXISTS " + scratch);

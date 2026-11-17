@@ -31,6 +31,9 @@ export interface SvResult extends TableRows<string | number | null> {
   oncokbPin: string | null;
   /** the panel-aware counts behind the caveat; absent on a page or a column's values */
   profiled?: SvProfiled[];
+  /** rows repeating a patient's call in another of their samples (same breakpoints), summed over the cohorts and
+   *  studies — the portal's "includes N duplicate structural variants"; absent on a page or a column's values */
+  duplicates?: number;
 }
 
 declare module "../../types.ts" {

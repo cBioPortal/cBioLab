@@ -45,3 +45,27 @@ export function svProfiledSql(cohortSql: string, study: string, db: string, gene
     "       uniqExactIf(sid, what = 'a') AS altered, uniqExactIf(sid, what = 'b') AS altered_profiled\n" +
     "FROM marks GROUP BY gene ORDER BY gene");
 }
+
+/**
+ * How many of the table's calls repeat a patient's call in another of their samples: the calls of
+ * the cohort's samples with gene 1 or gene 2 among `genes` (each once), less the distinct (patient,
+ * site 1 chromosome and position, site 2 chromosome and position) among them — the portal's
+ * duplicateStructuralVariantCountInMultipleSamples (ResultsViewStructuralVariantMapperDataStore
+ * 34-50), a missing value read as "". One row, `duplicates`. Counts only.
+ */
+export function svDuplicatesSql(cohortSql: string, study: string, db: string, genes: string[]): AggregateSql {
+  const list = geneList(genes);
+  const k = (c: string) => "ifNull(toString(" + c + "), '')";
+  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n" +
+    "cs AS (SELECT DISTINCT sid FROM cohort),\n" +
+    "ids AS (SELECT entrez_gene_id FROM " + db + ".gene WHERE hugo_gene_symbol IN (" + list + "))\n" +
+    "SELECT count() - uniqExact(" + ["pt.stable_id", "sv.site1_chromosome", "sv.site1_position", "sv.site2_chromosome", "sv.site2_position"].map(k).join(", ") + ") AS duplicates\n" +
+    "FROM " + db + ".structural_variant sv\n" +
+    "JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id\n" +
+    "JOIN " + db + ".cancer_study st ON st.cancer_study_id = gp.cancer_study_id\n" +
+    "JOIN " + db + ".sample smp ON smp.internal_id = sv.sample_id\n" +
+    "JOIN " + db + ".patient pt ON pt.internal_id = smp.patient_id\n" +
+    "WHERE st.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'\n" +
+    "  AND (sv.site1_entrez_gene_id IN (SELECT entrez_gene_id FROM ids) OR sv.site2_entrez_gene_id IN (SELECT entrez_gene_id FROM ids))\n" +
+    "  AND " + inCohortSamples("smp.stable_id", "cs"));
+}

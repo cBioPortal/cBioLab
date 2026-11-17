@@ -836,7 +836,8 @@
             "altered": 31,
             "alteredProfiled": 31
           }
-        ]
+        ],
+        "duplicates": 5
       },
       "participation": {
         "studies": [
@@ -887,12 +888,24 @@
                 "31 with a call · 10945 profiled · 10945 samples"
               ]
             ]
+          },
+          {
+            "kind": "fetch",
+            "title": "Count the duplicate calls of patients with several samples",
+            "detail": "The sv:duplicates query above, per cohort and study: the table's calls less the distinct (patient, site 1 chromosome and position, site 2 chromosome and position) among them — a call repeated in another of the patient's samples counts once for each repeat, as the portal's duplicateStructuralVariantCountInMultipleSamples; summed.",
+            "params": [
+              [
+                "duplicates",
+                "5"
+              ]
+            ]
           }
         ],
         "implementation": {
           "functions": [
             "svRowSource",
             "svProfiledSql",
+            "svDuplicatesSql",
             "pageSql",
             "countsSql"
           ],
