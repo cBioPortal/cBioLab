@@ -45,6 +45,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const withheld = hotspots.reduce((n, h) => n + h.withheld, 0);
   const observed = hotspots.filter((h) => h.lengthSource === "observed").map((h) => h.gene);
   const annotated = reports.every((r) => r.annotated);
+  const noGermline = studies.filter((_, i) => reports[i].germlineCohortSamples === undefined);
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
   const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(annotated ? {} : { annotated: false }), ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
@@ -58,6 +59,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
         : hv.drivers ? " (driver = any switched-on source of the page's driver settings: " + driverSourceText(resolveDrivers(hv.drivers), "OncoKB, pinned", "a Cancer Hotspot of its kind in the stored Genome Nexus annotation") + ")."
         : " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
+      (noGermline.length ? " " + noGermline.join(", ") + (noGermline.length === 1 ? " reports" : " report") + " no germline counts (older code), so no Germline Mutation Frequency is shown." : "") +
       (empty.length ? " " + empty.join(", ") + (empty.length === 1 ? " has" : " have") + " no mutations in “" + cn + "”: " + (empty.length === 1 ? "its plot is" : "their plots are") +
         " drawn empty, with no somatic mutation frequency, as the portal draws a gene with none." : "") +
       " Structural variants are counted as the portal's Mutations tab counts them: in the Fusion badge of each queried partner, and in the somatic frequency of their site 1 gene only; they have no codon, so no stem, and the mutation table lists them." +

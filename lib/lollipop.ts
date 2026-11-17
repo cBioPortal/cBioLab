@@ -305,9 +305,12 @@ export function fetchProteinInfo(gene: string): Promise<ProteinInfo | null> {
 export function buildLollipopGene(gene: string, reports: LollipopReport[], protein: ProteinInfo | null): HotspotGene {
   const changes = new Map<string, { pos: number | null; change: string; n: number; rows: number; impact?: string; driver: boolean }>();
   const types = new Map<string, { pos: number | null; mtype: string; driver: boolean; rows: number }>();
-  let mutated = 0, pairs = 0, somaticSamples = 0, germlineSamples = 0, cohortSamples = 0;
+  let mutated = 0, pairs = 0, somaticSamples = 0, cohortSamples = 0;
+  // the germline rate's parts: a site on older code reports neither, which leaves them unknown, not 0
+  let germlineSamples: number | undefined = 0, germlineCohortSamples: number | undefined = 0;
   for (const rep of reports) {
     cohortSamples += rep.cohortSamples;
+    germlineCohortSamples = germlineCohortSamples === undefined || rep.germlineCohortSamples === undefined ? undefined : germlineCohortSamples + rep.germlineCohortSamples;
     for (const c of rep.changes) if (c.gene === gene) {
       const k = c.pos + "\u0000" + c.change, cur = changes.get(k);
       // a class from one site is kept; a site that sent none (older code) leaves it undefined
@@ -319,7 +322,10 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
       if (cur) cur.rows += t.rows; else types.set(k, { ...t });
     }
     const tot = rep.totals.find((x) => x.gene === gene);
-    if (tot) { mutated += tot.patients; pairs += tot.pairs; somaticSamples += tot.somaticSamples; germlineSamples += tot.germlineSamples ?? 0; }
+    if (tot) { mutated += tot.patients; pairs += tot.pairs; somaticSamples += tot.somaticSamples; }
+    // a site with no total for the gene has none of its mutations; one whose total lacks the count is on older code
+    if (tot) germlineSamples = germlineSamples === undefined || tot.germlineSamples === undefined ? undefined : germlineSamples + tot.germlineSamples;
+    else if (rep.germlineCohortSamples === undefined) germlineSamples = undefined;
   }
   const observedMax = Math.max(0, ...[...changes.values()].map((c) => c.pos ?? 0));
   const proteinLength = protein?.proteinLength || observedMax || 10;
@@ -360,6 +366,6 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     // one is about the data and the other about what a site chose not to disclose
     unpositioned, withheld: Math.max(0, pairs - returned),
     ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}),
-    somaticSamples, germlineSamples, cohortSamples, tally, ...(protein?.ids ? { ids: protein.ids } : {})
+    somaticSamples, cohortSamples, tally, ...(germlineSamples !== undefined && germlineCohortSamples !== undefined ? { germlineSamples, germlineCohortSamples } : {}), ...(protein?.ids ? { ids: protein.ids } : {})
   };
 }

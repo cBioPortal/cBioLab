@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "mutation-driver-settings" | "sv-levels" | "enrichment-events" | "patient-sv";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "mutation-driver-settings" | "sv-levels" | "enrichment-events" | "patient-sv" | "germline-frequency";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "germline-frequency": ["node", "--env-file=.env.local", "scripts/check-germline-frequency.ts"],
   "sv-levels": ["node", "--env-file=.env.local", "scripts/check-sv-levels.ts"],
   "patient-vaf": ["node", "--env-file=.env.local", "scripts/check-patient-vaf.ts"],
   "mutation-driver-settings": ["node", "--env-file=.env.local", "scripts/check-mutation-driver-settings.ts"],
@@ -546,7 +547,13 @@ const MUTANTS: Mutant[] = [
     find: "\" AND vn.tumor_type = ''\\n\" : \"\")", replace: "\" AND vn.tumor_type = vk.tumorType\\n\" : \"\")" },
   { id: "fusion-frequency-site2", layer: "counts", guard: "mutation-fusions", file: "lib/federation.ts",
     effect: "A sample whose only event in a gene is a fusion with the gene as site 2 counts in that gene's somatic mutation frequency, where the portal counts a fusion only under its site 1 gene.",
-    find: "uniqExactIf(sid, (sv = 0 OR rgene = gene) AND ", replace: "uniqExactIf(sid, (sv = 0 OR sv = 1) AND " },
+    find: "uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "uniqExactIf(sid, (sv = 0 OR sv = 1) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples" },
+  { id: "germline-count-case-sensitive", layer: "counts", guard: "germline-frequency", file: "lib/federation.ts",
+    effect: "A mutation whose status is spelled 'germline' or 'GERMLINE' does not count in the Germline Mutation Frequency, where the portal matches /germline/i.",
+    find: "positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND \" + germlineConsentedSql", replace: "position(ifNull(status, ''), 'Germline') > 0 AND \" + germlineConsentedSql" },
+  { id: "germline-rate-ignores-consent-list", layer: "counts", guard: "germline-frequency", file: "lib/federation.ts",
+    effect: "The Germline Mutation Frequency divides by every sample even where the study lists its germline-consented samples, where the portal divides by those.",
+    find: "germlineCohortSamples: Number(gc.data[0]?.lists) > 0 ?", replace: "germlineCohortSamples: Number(gc.data[0]?.lists) < 0 ?" },
   { id: "fusion-stem-counted", layer: "counts", guard: "mutation-fusions", file: "lib/federation.ts",
     effect: "Fusions join the lollipop's per-change counts, so they are reported as mutations with no protein position and raise the withheld count.",
     find: "\"FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= \"", replace: "\"FROM m GROUP BY gene, pos, change HAVING n >= \"" },

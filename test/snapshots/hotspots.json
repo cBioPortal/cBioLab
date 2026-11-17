@@ -464,7 +464,6 @@
             "text": "G12D/V/C and 4 more"
           },
           "somaticSamples": 2355,
-          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -492,6 +491,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_004985",
             "ccds": "CCDS8702",
@@ -887,7 +888,6 @@
             "text": "V600E"
           },
           "somaticSamples": 624,
-          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -915,6 +915,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_004333",
             "ccds": "CCDS5863",
@@ -1544,7 +1546,6 @@
             "text": "E545K/G/D"
           },
           "somaticSamples": 1144,
-          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -1572,6 +1573,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_006218",
             "ccds": "CCDS43171",
@@ -2202,7 +2205,6 @@
             "text": "R175H/C/L"
           },
           "somaticSamples": 4088,
-          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -2230,6 +2232,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_000546",
             "ccds": "CCDS11118",
