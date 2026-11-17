@@ -8,7 +8,7 @@ import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
 import type { PatientEvent, PatientTimeline } from "../lib/types.ts";
-import { timelineDataFiles, TIMELINE_ZIP } from "../lib/timeline-tables.ts";
+import { timelineDataFiles, TIMELINE_ZIP, eventTables } from "../lib/timeline-tables.ts";
 
 const ev = (type: string, start: number, attrs: Record<string, string> = {}, end: number | null = null): PatientEvent =>
   ({ type, start, end, attrs: Object.entries(attrs) });
@@ -221,5 +221,42 @@ describe("timeline data zip (legacy downloadZippedTracks)", () => {
   });
   test("DZ7 archive name", () => {
     assert.equal(TIMELINE_ZIP, "timeline.zip");
+  });
+  const raw = (type: string, attrs: [string, string][], start = 0, end: number | null = null): PatientEvent => ({ type, start, end, attrs });
+  const NAME = /^data_timeline_[a-z0-9_-]+\.txt$/;
+  test("DZ8 safe names: lower case, characters outside a-z0-9_- become _", () => {
+    const n = (t: string) => timelineDataFiles("P", [raw(t, [])])[0].name;
+    assert.equal(n("Treatment/Surgery"), "data_timeline_treatment_surgery.txt");
+    assert.equal(n("/../../x"), "data_timeline_" + "/../../x".replace(/[^a-z0-9_-]/g, "_") + ".txt");
+    assert.equal(n("/../../x"), "data_timeline________x.txt");
+    assert.equal(n("Lab Test"), "data_timeline_lab_test.txt");
+    assert.equal(n("LAB-TEST_2"), "data_timeline_lab-test_2.txt");
+    const evil = n("..\\evil");
+    assert.ok(!evil.includes("\\") && !evil.includes(".."));
+  });
+  test("DZ9 every name is one plain file name", () => {
+    const types = ["Treatment/Surgery", "/../../x", "..\\evil", "Lab Test", "LAB-TEST_2", ".hidden", "a\\b/c"];
+    for (const f of timelineDataFiles("P", types.map(t => raw(t, [])))) {
+      assert.match(f.name, NAME);
+      const rest = f.name.slice("data_timeline_".length);
+      assert.ok(!rest.startsWith(".") && !f.name.includes("/") && !f.name.includes("\\") && !f.name.includes(".."), f.name);
+    }
+  });
+  test("DZ10 no file lost: case-only and same-name types get _2, _3", () => {
+    const fs = timelineDataFiles("P", [raw("Lab Test", [["A", "1"]]), raw("lab_test", [["B", "2"]]), raw("LAB TEST", [["C", "3"]])]);
+    assert.deepEqual(fs.map(f => f.name), ["data_timeline_lab_test.txt", "data_timeline_lab_test_2.txt", "data_timeline_lab_test_3.txt"]);
+    assert.deepEqual(lines(fs[0].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "A"], ["P", "0", "", "Lab Test", "1"]]);
+    assert.deepEqual(lines(fs[1].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "B"], ["P", "0", "", "lab_test", "2"]]);
+    assert.deepEqual(lines(fs[2].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "C"], ["P", "0", "", "LAB TEST", "3"]]);
+  });
+  test("DZ11 duplicate key: header once, row holds the first value", () => {
+    const fs = timelineDataFiles("P", [raw("Lab", [["K", "first"], ["K", "second"], ["J", "j"]])]);
+    assert.deepEqual(lines(fs[0].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "K", "J"], ["P", "0", "", "Lab", "first", "j"]]);
+  });
+  test("DZ-ET eventTables: PATIENT_ID and STYLE_* dropped, fixed columns, first value", () => {
+    const t = eventTables([raw("Lab", [["PATIENT_ID", "X"], ["STYLE_COLOR", "red"], ["K", "first"], ["K", "second"], ["style_shape", "c"]], 3, 7)]);
+    assert.equal(t.length, 1);
+    assert.deepEqual(t[0].columns, ["START_DATE", "STOP_DATE", "EVENT_TYPE", "K"]);
+    assert.deepEqual(t[0].rows, [["3", "7", "Lab", "first"]]);
   });
 });

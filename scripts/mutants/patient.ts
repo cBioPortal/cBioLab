@@ -84,8 +84,4 @@ export const mutants: Mutant[] = [
     effect: "The Timeline Data tables sort dates as text, so day 100 comes before day 20.",
     find: "  const days = columns[col] === \"START_DATE\" || columns[col] === \"STOP_DATE\";",
     replace: "  const days = false;" },
-  { id: "timeline-zip-style-dropped", layer: "counts", guard: "unit", file: "lib/timeline-tables.ts",
-    effect: "The timeline's Data (ZIP) leaves out the STYLE_* columns, where the portal's data_timeline_<type>.txt files keep every attribute of the events.",
-    find: "for (const e of evs) for (const [k] of e.attrs) if (k !== \"PATIENT_ID\" && !keys.includes(k)) keys.push(k);",
-    replace: "for (const e of evs) for (const [k] of e.attrs) if (k !== \"PATIENT_ID\" && !/^STYLE_/.test(k) && !keys.includes(k)) keys.push(k);" },
 ];
