@@ -36,9 +36,14 @@ export interface DataFile {
   description: string;
   /** what it is: a gene-by-sample matrix (the query's OQL not in effect), a sample list, or the sample matrix */
   group: "data" | "list";
+  /** a gene-by-sample file's name on the portal (mutations.txt, cna.txt, <profile name>.txt), which its Tab Delimited / Transposed downloads take */
+  portalFile?: string;
   /** rows the file holds (one per sample of the cohort, or of the list) */
   rows: number;
-  /** the studies whose samples it holds, where that is fewer than the view's: a profile only some studies have */
+  /**
+   * the studies that have this file's profile, where some queried study does not: mutations, sv and cna list the
+   * others' samples too, NP throughout (the portal's selected files); any other profile's file holds these studies' samples alone
+   */
   studies?: string[];
 }
 

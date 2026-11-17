@@ -90,7 +90,7 @@ const P1_SAMPLES = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", type:
 const MUT: Row[] = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", gene: "KRAS", proteinChange: "G12D", oncogenicity: "Oncogenic", level: "LEVEL_1",
   mutationType: "Missense_Mutation", copy: null, freq: 12.345, vaf: 10 / 57, altCount: "", refCount: null, start: "25398284" }];
 const CNA: Row[] = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", gene: "MYC", cna: "AMP", oncogenicity: "Likely Oncogenic", level: "", cytoband: "8q24.21", freq: 3.06 }];
-const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?: Row[] } = {}): Tables => (table, src) => {
+const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?: Row[]; profiled?: Row[] } = {}): Tables => (table, src) => {
   switch (table) {
     case "alterations": return o.list ?? LIST;
     // the cohort's samples of the patient: the source filters the patient's samples to the cohort's
@@ -98,6 +98,7 @@ const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?
     case "alterations:mutations": return o.mut ?? MUT;
     case "alterations:cna": return o.cna ?? CNA;
     case "alterations:sv": return o.sv ?? [];
+    case "alterations:profiled": return o.profiled ?? [];
     default: throw new Error("unexpected table " + table);
   }
 };
@@ -166,7 +167,7 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.deepEqual(a.rows.map((r) => r.patient), ["P1", "P2"]);
     assert.equal(a.total, 2);
     assert.deepEqual(a.patient && { study: a.patient.study, id: a.patient.id, samples: a.patient.samples.map((s) => s.id) },
-      { study: "s1", id: "P1", samples: ["S1a", "S1b"] });
+      { study: "s1", id: "P1", samples: ["S1b", "S1a"] });
     assert.equal(a.patient!.shown, undefined, "samples: patient reads every sample, so no subset is named");
     assert.deepEqual(a.position, { index: 0, prev: null, next: { study: "s1", id: "P2" } });
     assert.deepEqual(Object.keys(a.tables), ["mutations", "cna", "sv"]);
@@ -249,7 +250,7 @@ describe("alterations: a named patient", () => {
   test("samples: cohort reads only the cohort's samples, each keeping its number among all the patient's", async () => {
     const v = await run({ samples: "cohort" }, one());
     const a = alt(v);
-    assert.deepEqual(a.patient!.samples.map((s) => s.id), ["S1a", "S1b"]);
+    assert.deepEqual(a.patient!.samples.map((s) => s.id), ["S1b", "S1a"]);
     assert.deepEqual(a.patient!.shown, ["S1a"]);
     assert.match(v.caveat!, /Only 1 sample of P1's 2 is in the cohort, and the tables read only it \(samples: "cohort"\)/);
     assert.match(v.caveat!, /Copy # on a mutation is the gene's deep calls anywhere in the cohort's samples of the patient\./);
@@ -345,6 +346,33 @@ describe("alterations: a federation peer that serves patient alterations", () =>
   });
 });
 
+describe("alterations: PAT-STM-12 sample order", () => {
+  const T = [{ cohort: "A", study: "s1", patient: "P1", sid: "T01", type: "Primary" }, { cohort: "A", study: "s1", patient: "P1", sid: "T02", type: "Primary" }];
+  const build = (patientTimeline: () => Promise<unknown>, withs: string[] = []) => {
+    const t: Tables = (table, src) => { withs.push(src.with); return table === "alterations:samples" ? T : study()(table, src); };
+    return { ...local("db1", t), patientTimeline };
+  };
+  const mine = { patient: { study: "s1", id: "P1" } } as never;
+  test("A1 PAT-STM-12: the patient's samples are numbered by their events, and the sources get the order [T02, T01]", async () => {
+    const withs: string[] = [];
+    const resolver = build(async () => ({ events: [{ type: "Sample acquisition", start: -40, end: null, attrs: [["SAMPLE_ID", "T01"]] }, { type: "Sample acquisition", start: -56, end: null, attrs: [["SAMPLE_ID", "T02"]] }], samples: [], source: { label: "x" } }), withs);
+    const v = await run(mine, ctx({ A: cohort({ s1: 2 }) }, { s1: resolver }));
+    const ps = alt(v).patient!.samples;
+    assert.deepEqual(ps.map((s) => s.id), ["T02", "T01"]);
+    assert.deepEqual(ps.map((s) => s.label), ["1", "2"]);
+    const ordered = withs.filter((w) => w.includes("T01") && w.includes("T02"));
+    assert.ok(ordered.length > 0, "a source names both samples");
+    assert.ok(ordered.every((w) => w.indexOf("T02") < w.indexOf("T01")), "T02 precedes T01 in the source");
+  });
+  test("A2 PAT-STM-12: a refused timeline does not refuse the view; the caveat says why", async () => {
+    const resolver = build(async () => { throw new Error("timeline refused"); });
+    const v = await run(mine, ctx({ A: cohort({ s1: 2 }) }, { s1: resolver }));
+    assert.equal(v.error, undefined, String(v.error));
+    assert.ok(alt(v).patient, "tables present");
+    assert.match(String(v.caveat), /timeline refused/);
+  });
+});
+
 describe("PAT-SV-3: the structural variant table's columns", () => {
   const P1 = { study: "s1", id: "P1" };
   test("PAT-SV-3 SV1: the default SV columns, in the portal's order, without Breakpoint Type", () => {
@@ -402,4 +430,29 @@ describe("vafSort", () => {
     assert.equal(vafSort(0)("DESC"), "vaf DESC NULLS LAST");
     assert.equal(vafSort(0)("ASC"), "vaf ASC NULLS LAST");
   });
+});
+
+describe("PAT-NP-1 / PAT-CNA-2 / PAT-SV-2: which samples a study profiled", () => {
+  // each flag: 1 the sample is in the study's profile for that table, 0 it is not, -1 the study has no such profile
+  const flags = (sid: string, mutations: number, cna: number, sv: number): Row => ({ sid, mutations, cna, sv });
+
+  test("NP1: a table the study has no profile for is study:false with nobody profiled; the others list their profiled samples", async () => {
+    const t = study({ profiled: [flags("S1", 1, -1, 1), flags("S2", 1, -1, 0)] });
+    const a = alt(await run({}, one(t)));
+    assert.deepEqual(a.profiling, {
+      mutations: { study: true, profiled: ["S1", "S2"] },
+      cna: { study: false, profiled: [] },
+      sv: { study: true, profiled: ["S1"] },
+    });
+  });
+
+  test("NP2: every flag 1 profiles both samples in every table", async () => {
+    const t = study({ profiled: [flags("S1", 1, 1, 1), flags("S2", 1, 1, 1)] });
+    const a = alt(await run({}, one(t)));
+    const all = { study: true, profiled: ["S1", "S2"] };
+    assert.deepEqual(a.profiling, { mutations: all, cna: all, sv: all });
+  });
+
+  // NP3 skipped: the harness's peer resolver serves only alterations tables through patientRows and has no
+  // "alterations:profiled" mode, so there is no peer behaviour here to assert.
 });
