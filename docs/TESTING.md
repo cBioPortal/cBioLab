@@ -51,8 +51,8 @@ written this way.
 5. **What computes is run, and a planted bug proves the test.** Logic in SQL is run against the
    fixture study ([below](#the-second-database-is-a-committed-fixture-study)), never only matched
    as text, as `check:values` and `check:genefacets` run theirs. Each new rule gets planted bugs in
-   its area's file under `scripts/mutants/` (one file per area, so pull requests don't all edit one
-   list) that some check must catch; one that survives means the tests are
+   a new file of its own, `scripts/mutants/<area>/<feature>.ts` (so two pull requests never append
+   to the same list) that some check must catch; one that survives means the tests are
    not testing the rule.
 
 ## Coverage rules — new code is tested
@@ -303,7 +303,8 @@ named in the scripts).
 - `check:cohorts` — the cohort algebra (and/or/not, splits, line nesting, held-out halves) as set
   arithmetic over patient ids, and fast-check-generated definitions compared with a reference
   evaluator over the raw rows.
-- `check:mutants` — plants each bug defined under `scripts/mutants/` (one file per area: its
+- `check:mutants` — plants each bug defined under `scripts/mutants/` (an area's file
+  `scripts/mutants/<area>.ts`, and one file per change in `scripts/mutants/<area>/<feature>.ts`: its
   `mutants`, and the `guards` they need beyond `unit`, `cohort-logic` and `portal-parity`) into a
   temp copy and requires a check to fail; `node scripts/check-mutants.ts --list` loads and checks the
   files (unique ids, each guard defined once and every bug's guard defined) without planting. On a
