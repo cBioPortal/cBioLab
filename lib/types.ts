@@ -525,6 +525,8 @@ export interface PatientTimeline {
   study: string; patient: string;
   events: PatientEvent[];
   samples: PatientSample[];
+  /** each sample's own clinical attributes by id, for the sample-row tooltip; absent when not read (a peer's patient) */
+  sampleAttrs?: Record<string, [string, string][]>;
   /** the instance that holds this patient: its label, and whether it answered via federation */
   source: { label: string; remote?: boolean };
 }
