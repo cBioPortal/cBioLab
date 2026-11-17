@@ -127,7 +127,14 @@ export async function waitFor(check: () => Promise<boolean>, what: string, secon
  */
 export async function startClickhouse(bin: string, config: string, s: ClickhouseServer, detached: boolean, say: (msg: string) => void): Promise<ChildProcess> {
   const ch = spawn(bin, ["server", "--config-file=" + config], { cwd: path.dirname(config), stdio: "ignore", detached });
-  ch.on("exit", (code) => { if (code) say("ClickHouse exited (" + code + "); see " + path.join(s.dir, "server.err.log")); });
+  ch.on("exit", (code) => {
+    if (!code) return;
+    const log = path.join(s.dir, "server.err.log");
+    say("ClickHouse exited (" + code + "); " + log + ":");
+    void readFile(log, "utf8").then(
+      (t) => say(t.trim() ? t.trim().split("\n").slice(-60).join("\n") : "(empty)"),
+      (e: Error) => say("(not readable: " + e.message + ")"));
+  });
   if (detached) { ch.unref(); await writeFile(path.join(s.dir, "pid"), String(ch.pid)); }
   return ch;
 }
