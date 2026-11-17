@@ -4,6 +4,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { resultsGroups, resultsLayout, linkMutations, samplesLine, svCheckCohort } from "../app/portal/results-layout.ts";
+import { arrange } from "../app/portal/page-doc.ts";
 import type { View, Clause } from "../lib/types.ts";
 import type { SelectedProfile } from "../lib/query-options.ts";
 
@@ -230,6 +231,25 @@ test("the Structural Variants tab: shown after Mutations once the queried patien
   assert.equal(tab.chooser!.value([{ ...sv, genes: undefined }]), "ALK");
 });
 
+const svLayout = () => resultsLayout(q(["a"], ["ALK", "ROS1: FUSION"]), data({ svs: true }));
+
+test("SV-1 the Structural Variants tab is titled \"Structural Variants\" with a \"Beta!\" badge, and no other tab has a badge", () => {
+  const l = svLayout();
+  const tab = l.tabs.find((t) => t.title === "Structural Variants")!;
+  assert.equal(tab.title, "Structural Variants");
+  assert.equal((tab as { badge?: string }).badge, "Beta!");
+  for (const t of l.tabs.filter((x) => x !== tab)) assert.equal((t as { badge?: string }).badge, undefined, `${t.title} has no badge`);
+});
+
+test("SV-5 the Structural Variants tab shows the experimental-feature alert above the table", () => {
+  const l = svLayout();
+  const tab = l.tabs.find((t) => t.title === "Structural Variants")!;
+  const views = tab.views!.map((i) => l.doc.views![i]);
+  const expected = "This is an experimental feature. The structural variant gene and event info annotations might not always be correct. If you are interested in improving SV annotation and visualization together, please reach out on cbioportal@googlegroups.com";
+  assert.equal(tab.banner!.text([]), expected);
+  assert.equal(tab.banner!.text(views), expected);
+});
+
 test("the Structural Variants check: the queried patients, with Explore's filters, with a call in any queried gene", () => {
   const F = { kind: "clinical", attribute: "SEX", values: ["Female"] };
   assert.deepEqual(svCheckCohort(q(["a"], ["ALK", "RET: MUT"], [F])), { study: "a", all: [F, { kind: "oql", q: "ALK: FUSION; RET: FUSION" }] });
@@ -287,6 +307,13 @@ test("Comparison/Survival › Survival: the survival-type table, on the portal's
   assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data())), { kind: "survival", types: true, partitions: true, testAnySize: true, cohorts: ["Altered", "Unaltered"] });
   assert.deepEqual(survival(resultsLayout(q(["a"], ["KRAS"]), data({ clinical: ["PFS_MONTHS", "PFS_STATUS"] }))), { kind: "survival", types: true, partitions: true, testAnySize: true, cohorts: ["Altered", "Unaltered"], endpoint: "PFS" });
   assert.equal(survival(resultsLayout(q(["a"], ["KRAS"]), data({ clinical: ["AGE"] }))), undefined);
+});
+
+test("SV-1 the page keeps a tab's badge beside its name (arrange carries it through)", () => {
+  const layout = arrange({ study: "s" } as never, [{ title: "Structural Variants", views: [], badge: "Beta!" }, { title: "Download", views: [] }], []);
+  assert.equal(layout.tabs[0].badge, "Beta!");
+  assert.equal(layout.tabs[0].title, "Structural Variants");
+  assert.equal(layout.tabs[1].badge, undefined);
 });
 
 test("Comparison/Survival › Genomic Alterations is one table over every alteration type, Altered against Unaltered (CMM-AT-2, CMM-RV)", () => {
