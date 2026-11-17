@@ -257,6 +257,20 @@ async function patientViews({ browser, ok, BASE }) {
     } catch (e) {
       ok("overview: the genomic overview", false, String(e.message).split("\n")[0].slice(0, 200));
     }
+    // the timeline's tooltip as the portal's (PAT-TL-TT-1): hover shows it, a click pins it past the pointer leaving, Esc closes it
+    try {
+      const mark = page.locator(".tl-fig svg .tl-m").first();
+      await mark.scrollIntoViewIfNeeded();
+      await mark.hover(); await page.waitForTimeout(250);
+      const hovered = await page.locator(".tl-tip").count();
+      await mark.click(); await page.mouse.move(2, 2); await page.waitForTimeout(400);
+      const pinned = await page.locator(".tl-tip").count();
+      await page.keyboard.press("Escape"); await page.waitForTimeout(200);
+      const closed = await page.locator(".tl-tip").count();
+      ok("timeline: a hovered tooltip, pinned by a click past the pointer leaving, closed by Esc (PAT-TL-TT-1)", hovered === 1 && pinned === 1 && closed === 0, [hovered, pinned, closed].join(" "));
+    } catch (e) {
+      ok("timeline: a hovered tooltip, pinned by a click past the pointer leaving, closed by Esc (PAT-TL-TT-1)", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
     ok("overview: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }

@@ -120,6 +120,7 @@ warehouse_checks() (
   phase "oncoprint mutation spectrum" && npm run check:oncoprint-spectrum 2>&1 | summary grep -E "^FAIL|spectrum checks passed|FAILED"
   phase "OncoKB by tumour type" && npm run check:oncokb-tumor-type 2>&1 | summary grep -E "^FAIL|tumour-type checks passed|FAILED"
   phase "OncoKB for structural variants" && npm run check:oncokb-sv 2>&1 | summary grep -E "^FAIL|OncoKB SV checks passed|FAILED"
+  phase "SV calls' levels and the OncoKB sort value" && npm run check:sv-levels 2>&1 | summary grep -E "^FAIL|SV level checks passed|FAILED"
   phase "fusions on the mutations tab" && npm run check:mutation-fusions 2>&1 | summary grep -E "^FAIL|mutation fusion checks passed|FAILED"
   phase "mutation table columns"   && npm run check:mutation-columns 2>&1 | summary grep -E "^FAIL|mutation column checks passed|FAILED"
   phase "mutation tab states (empty gene, germline)" && npm run check:mutation-tab-states 2>&1 | summary grep -E "^FAIL|mutation tab state checks passed|FAILED"
@@ -130,6 +131,7 @@ warehouse_checks() (
   phase "study view density"         && npm run check:density 2>&1 | summary grep -E "^FAIL|all passed|failure"
   phase "study view case lists"      && npm run check:case-lists 2>&1 | summary grep -E "^FAIL|all passed|failure"
   phase "study view gene panels"     && npm run check:gene-panels 2>&1 | summary grep -E "^FAIL|all .*passed|failure"
+  phase "comparison alteration types" && npm run check:enrichment-events 2>&1 | summary grep -E "^FAIL|enrichment event checks"
   phase "plot statistics"           && npm run check:plot-stats 2>&1 | summary grep -E "^FAIL|plot statistics checks passed|FAILED"
   phase "warehouse checks done ($(ls "$CH_RUN_CACHE" | wc -l) distinct statements asked)"
 )
