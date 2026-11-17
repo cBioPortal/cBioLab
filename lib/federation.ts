@@ -73,7 +73,7 @@ import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
-import { MUTATION_COLUMNS, mutationRowKeysSql } from "./mutation-table.ts";
+import { MUTATION_COLUMNS, mutationRowKeysSql, rowKeySql } from "./mutation-table.ts";
 import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 import { variantPins, type VariantPins } from "./variant-annotation.ts";
 
@@ -584,7 +584,7 @@ const filteredGenesSql = (genes: string[], filters?: MutationFilters): string =>
 
 /**
  * The mutation table's rows for one gene under its search and column filters (lib/mutation-table.ts
- * mutationRowKeysSql): `keys` selects their (sid, proteinChange, mutationType).
+ * mutationRowKeysSql): `keys` selects their (sid, proteinChange, mutationType, rowKeySql).
  */
 export interface LollipopRowKeys { gene: string; keys: string }
 
@@ -607,7 +607,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "WITH cohort AS (" + cohortSql + "),\n" +
     (pin ? svCallCtes(db, genes, pin, { gene: "sva", pair: "svp" }) : "") +
     "     v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
-    "                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,\n" +
+    "                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,\n" +
     "                  " + siteKey("sv.site1_entrez_gene_id") + " AS k1, " + siteKey("sv.site2_entrez_gene_id") + " AS k2\n" +
     "           FROM " + db + ".structural_variant sv\n" +
     "           JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id\n" +
@@ -620,7 +620,8 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "             AND (sv.site1_entrez_gene_id IN (" + entrezOf(db, genes) + ") OR sv.site2_entrez_gene_id IN (" + entrezOf(db, genes) + "))\n" +
     "             AND " + inCohortSamples("smp.stable_id") + "),\n" +
     "     " + (rowKeys ? "ma" : "m") + " AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
-    "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver, toUInt8(0) AS sv, gene AS rgene\n" +
+    "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver, toUInt8(0) AS sv, gene AS rgene,\n" +
+    "                  " + rowKeySql("chr", "startPosition", "endPosition", "referenceAllele", "tumorSeqAllele") + " AS rk\n" +
     "           FROM " + db + ".mutation_derived\n" +
     "           WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ")\n" +
     "             AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
@@ -628,13 +629,13 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
     "           UNION ALL\n" +
     "           SELECT arrayJoin(arrayFilter(x -> x IN (" + list + "), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,\n" +
     "                  " + fusionProteinChangeSql("v.") + " AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,\n" +
-    "                  " + fusionDriver + " AS driver, toUInt8(1) AS sv, v.gene1 AS rgene\n" +
+    "                  " + fusionDriver + " AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, " + rowKeySql("v.chr", "v.start", "NULL", "NULL", "NULL") + " AS rk\n" +
     "           FROM v" +
     (pin ? "\n           LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''\n" +
       "           LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''" : "") +
     (fusionFilter ? "\n           WHERE " + fusionFilter : "") + "),\n" +
     // the table's search and filters narrow its gene's rows here, as the portal's filtered data does the lollipop's and badges'
-    (rowKeys ? "     m AS (SELECT * FROM ma WHERE gene != " + sq(rowKeys.gene) + " OR (sid, change, ifNull(mtype, '')) IN (\n" + rowKeys.keys + ")),\n" : "") +
+    (rowKeys ? "     m AS (SELECT * FROM ma WHERE gene != " + sq(rowKeys.gene) + " OR (sid, change, ifNull(mtype, ''), rk) IN (\n" + rowKeys.keys + ")),\n" : "") +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
@@ -1651,8 +1652,14 @@ abstract class BaseResolver implements AggregateCapable {
     const hotspotPins = await variantPins();
     const filters = oql ? mutationFilters(oql, genes, { study: this.study, db, oncokbPin: pin, hotspotPins }) : undefined;
     const fusionLines = oql?.lines;
-    if (rows) { const bad = checkQuery(rows, MUTATION_COLUMNS); if (bad) throw new Error("rows: " + bad); }
-    const rowKeys = rows && genes.includes(rows.gene)
+    if (rows) {
+      // the table's search and filters read row values (a sample id among them): only a participant that may show those rows narrows by them
+      if (!isPatientLevel(this as unknown as Resolver))
+        throw new Error(this.study + " is not patient-level here, so its lollipop cannot be narrowed by the mutation table's search or filters");
+      if (!genes.includes(rows.gene)) throw new Error("the table's gene " + rows.gene + " is not among the lollipop's genes (" + genes.join(", ") + ")");
+      const bad = checkQuery(rows, MUTATION_COLUMNS); if (bad) throw new Error("rows: " + bad);
+    }
+    const rowKeys = rows
       ? { gene: rows.gene, keys: mutationRowKeysSql({ cohort: "", study: this.study, cohortSql: cohort }, db, rows.gene, pin, hotspotPins, oql, rows) } : undefined;
     const [c, t, tot, cs] = await Promise.all([
       this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, rowKeys), conn),

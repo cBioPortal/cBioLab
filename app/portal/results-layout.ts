@@ -5,7 +5,8 @@
 import type { Clause, CohortDef, View } from "../../lib/types.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
 import { hasOql, oqlHasMutationOql, oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
-import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
+import { ALTERATION_CELLS, cellLabel, lollipopNarrowing, pruneCodons } from "../../lib/lollipop.ts";
+import type { TableQuery } from "../../lib/table-query.ts";
 import { arrange, type PageLayout, type TabBanner } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
@@ -203,12 +204,10 @@ export function linkMutations(vs: View[], changed: number): View[] {
   return next === lp ? vs : [next as View, tb];
 }
 
-/** the table's search and its column filters other than the plot's own (Alteration, Protein Position), for the plot; undefined when none */
+/** the table's search and its column filters other than the plot's own (lib/lollipop.ts lollipopNarrowing), for the plot; undefined when none */
 function tableQueryFor(tb: { search?: string; filters?: Record<string, unknown>; columns?: string[] }, gene: string) {
-  const filters = Object.fromEntries(Object.entries(tb.filters || {}).filter(([id]) => id !== "alteration" && id !== "proteinPos"));
-  const search = (tb.search || "").trim();
-  if (!gene || (!search && !Object.keys(filters).length)) return undefined;
-  return { gene, ...(search ? { search } : {}), ...(Object.keys(filters).length ? { filters } : {}), ...(tb.columns ? { columns: tb.columns } : {}) };
+  const n = gene ? lollipopNarrowing({ search: tb.search, filters: tb.filters as TableQuery["filters"], ...(tb.columns ? { columns: tb.columns } : {}) }) : null;
+  return n ? { gene, ...n } : undefined;
 }
 
 /**

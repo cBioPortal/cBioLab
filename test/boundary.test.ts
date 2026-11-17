@@ -1029,3 +1029,56 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
     });
   });
 });
+
+// The mutation table's search and filters read row values — a sample id is a fine search — so they
+// narrow a lollipop only where the rows may be shown: compiled into SQL on a patient-level
+// participant alone, refused by an aggregate-only one before any query, and never sent to a peer.
+describe("the mutation table's search narrows a lollipop only on a patient-level participant", () => {
+  const ROWS = { gene: "KRAS", search: "P-0000123-T01" };
+  type Counts = (def: unknown, genes: string[], minCount?: number, oql?: unknown, rows?: typeof ROWS) => Promise<unknown>;
+  const PINS = { GENOME_NEXUS_PIN: "g1", GENOME_NEXUS_GRCH38_PIN: "g38" };
+  /** runs `fn` with every statement answered empty and recorded, the Genome Nexus pins set so none is looked up */
+  const recording = async (fn: () => Promise<void>): Promise<string[]> => {
+    const { setChTransport } = await import("../lib/ch.ts");
+    const saved = Object.fromEntries(Object.keys(PINS).map((k) => [k, process.env[k]]));
+    Object.assign(process.env, PINS);
+    const sent: string[] = [];
+    setChTransport(async ({ query }) => { sent.push(query); return JSON.stringify({ meta: [], data: [], rows: 0 }); });
+    try { await fn(); } finally {
+      setChTransport(null);
+      for (const [k, v] of Object.entries(saved)) { if (v == null) delete process.env[k]; else process.env[k] = v; }
+    }
+    return sent;
+  };
+
+  test("B1 an aggregate-only resolver with the table's rows throws, naming the study and patient-level, and runs no query", async () => {
+    const agg = new AggregateResolver("agg_study", { oncokbPin: "v1" }, AGG);
+    const sent = await recording(async () => {
+      await assert.rejects(() => (agg.lollipopCounts as unknown as Counts).call(agg, { all: [] }, ["KRAS"], 1, undefined, ROWS),
+        (e: Error) => /agg_study/.test(e.message) && /patient-level/.test(e.message));
+    });
+    assert.deepEqual(sent, [], "no statement reaches the database");
+  });
+
+  test("B1 a patient-level resolver with the same rows runs, and its lollipop SQL carries the search", async () => {
+    const pl = new PatientLevelResolver("pl_study", { oncokbPin: "v1" }, PL);
+    const sent = await recording(async () => {
+      await (pl.lollipopCounts as unknown as Counts).call(pl, { all: [] }, ["KRAS"], 1, undefined, ROWS);
+    });
+    assert.ok(sent.length > 0, "it ran");
+    assert.ok(sent.some((q) => q.includes("P-0000123-T01")), "the search is compiled where the rows live");
+  });
+
+  test("R2 a remote peer's resolver with the table's rows throws, naming the study, without calling fetch", async () => {
+    const original = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => { calls++; throw new Error("network must not be reached"); }) as typeof fetch;
+    try {
+      const r = new RemoteAggregateResolver("peer_study", "http://peer.invalid/api/federation/v1", AGG);
+      await assert.rejects(() => (r.lollipopCounts as unknown as Counts).call(r, { all: [] }, ["KRAS"], 1, undefined, ROWS), /peer_study/);
+      assert.equal(calls, 0, "nothing is sent");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});

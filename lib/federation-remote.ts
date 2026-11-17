@@ -399,9 +399,11 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
   }
   async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, rows?: LollipopRows): Promise<LollipopReport> {
     this.guard(def);
+    // the table's search and filters read row values (a sample id among them), which never leave for a peer
+    if (rows) throw new Error(this.study + " is a federation peer's, so its lollipop cannot be narrowed by the mutation table's search or filters");
     if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: false };
     const r = await this.call("aggregates",
-      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}), ...(rows ? { lollipopRows: rows } : {}) });
+      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}) });
     this.remember(r);
     // a peer on an older build answers without these; refuse by name rather than draw nothing
     if (!r.lollipopCounts)

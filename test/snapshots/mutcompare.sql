@@ -47,7 +47,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))))
   GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),
      v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
-                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,
+                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,
                   if(ifNull(sv.site1_entrez_gene_id, 0) = 0, '', toString(sv.site1_entrez_gene_id)) AS k1, if(ifNull(sv.site2_entrez_gene_id, 0) = 0, '', toString(sv.site2_entrez_gene_id)) AS k2
            FROM snapshot_db.structural_variant sv
            JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id
@@ -80,7 +80,8 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     GROUP BY source, chr, start_position, end_position, reference_allele, variant_allele) v
   ON v.source = mu.src AND v.chr = mu.chr AND v.start_position = mu.start AND v.end_position = mu.end
     AND v.reference_allele = mu.ref AND v.variant_allele = mu.var
-  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene
+  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene,
+                  concat(ifNull(toString(chr), ''), ':', ifNull(toString(startPosition), ''), '-', ifNull(toString(endPosition), ''), ':', ifNull(toString(referenceAllele), ''), '>', ifNull(toString(tumorSeqAllele), '')) AS rk
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''
@@ -88,7 +89,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
            UNION ALL
            SELECT arrayJoin(arrayFilter(x -> x IN ('TP53'), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,
                   multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,
-                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene
+                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, concat(ifNull(toString(v.chr), ''), ':', ifNull(toString(v.start), ''), '-', ifNull(toString(NULL), ''), ':', ifNull(toString(NULL), ''), '>', ifNull(toString(NULL), '')) AS rk
            FROM v
            LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''
            LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''),
@@ -117,7 +118,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))))
   GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),
      v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
-                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,
+                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,
                   if(ifNull(sv.site1_entrez_gene_id, 0) = 0, '', toString(sv.site1_entrez_gene_id)) AS k1, if(ifNull(sv.site2_entrez_gene_id, 0) = 0, '', toString(sv.site2_entrez_gene_id)) AS k2
            FROM snapshot_db.structural_variant sv
            JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id
@@ -150,7 +151,8 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     GROUP BY source, chr, start_position, end_position, reference_allele, variant_allele) v
   ON v.source = mu.src AND v.chr = mu.chr AND v.start_position = mu.start AND v.end_position = mu.end
     AND v.reference_allele = mu.ref AND v.variant_allele = mu.var
-  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene
+  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene,
+                  concat(ifNull(toString(chr), ''), ':', ifNull(toString(startPosition), ''), '-', ifNull(toString(endPosition), ''), ':', ifNull(toString(referenceAllele), ''), '>', ifNull(toString(tumorSeqAllele), '')) AS rk
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''
@@ -158,7 +160,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
            UNION ALL
            SELECT arrayJoin(arrayFilter(x -> x IN ('TP53'), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,
                   multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,
-                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene
+                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, concat(ifNull(toString(v.chr), ''), ':', ifNull(toString(v.start), ''), '-', ifNull(toString(NULL), ''), ':', ifNull(toString(NULL), ''), '>', ifNull(toString(NULL), '')) AS rk
            FROM v
            LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''
            LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''),
@@ -207,7 +209,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal'))))))),
      v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
-                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,
+                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,
                   if(ifNull(sv.site1_entrez_gene_id, 0) = 0, '', toString(sv.site1_entrez_gene_id)) AS k1, if(ifNull(sv.site2_entrez_gene_id, 0) = 0, '', toString(sv.site2_entrez_gene_id)) AS k2
            FROM snapshot_db.structural_variant sv
            JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id
@@ -220,7 +222,8 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
              AND (sv.site1_entrez_gene_id IN (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53')) OR sv.site2_entrez_gene_id IN (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53')))
              AND smp.stable_id IN (SELECT sid FROM cohort)),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
-                  patientId AS pid, sampleId AS sid, mutationStatus AS status, 1 AS driver, toUInt8(0) AS sv, gene AS rgene
+                  patientId AS pid, sampleId AS sid, mutationStatus AS status, 1 AS driver, toUInt8(0) AS sv, gene AS rgene,
+                  concat(ifNull(toString(chr), ''), ':', ifNull(toString(startPosition), ''), '-', ifNull(toString(endPosition), ''), ':', ifNull(toString(referenceAllele), ''), '>', ifNull(toString(tumorSeqAllele), '')) AS rk
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''
@@ -228,7 +231,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
            UNION ALL
            SELECT arrayJoin(arrayFilter(x -> x IN ('TP53'), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,
                   multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,
-                  toUInt8(1) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene
+                  toUInt8(1) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, concat(ifNull(toString(v.chr), ''), ':', ifNull(toString(v.start), ''), '-', ifNull(toString(NULL), ''), ':', ifNull(toString(NULL), ''), '>', ifNull(toString(NULL), '')) AS rk
            FROM v),
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,
@@ -248,7 +251,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA'))))))),
      v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
-                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,
+                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,
                   if(ifNull(sv.site1_entrez_gene_id, 0) = 0, '', toString(sv.site1_entrez_gene_id)) AS k1, if(ifNull(sv.site2_entrez_gene_id, 0) = 0, '', toString(sv.site2_entrez_gene_id)) AS k2
            FROM snapshot_db.structural_variant sv
            JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id
@@ -261,7 +264,8 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
              AND (sv.site1_entrez_gene_id IN (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53')) OR sv.site2_entrez_gene_id IN (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53')))
              AND smp.stable_id IN (SELECT sid FROM cohort)),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
-                  patientId AS pid, sampleId AS sid, mutationStatus AS status, 1 AS driver, toUInt8(0) AS sv, gene AS rgene
+                  patientId AS pid, sampleId AS sid, mutationStatus AS status, 1 AS driver, toUInt8(0) AS sv, gene AS rgene,
+                  concat(ifNull(toString(chr), ''), ':', ifNull(toString(startPosition), ''), '-', ifNull(toString(endPosition), ''), ':', ifNull(toString(referenceAllele), ''), '>', ifNull(toString(tumorSeqAllele), '')) AS rk
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''
@@ -269,7 +273,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
            UNION ALL
            SELECT arrayJoin(arrayFilter(x -> x IN ('TP53'), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,
                   multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,
-                  toUInt8(1) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene
+                  toUInt8(1) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, concat(ifNull(toString(v.chr), ''), ':', ifNull(toString(v.start), ''), '-', ifNull(toString(NULL), ''), ':', ifNull(toString(NULL), ''), '>', ifNull(toString(NULL), '')) AS rk
            FROM v),
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,
@@ -297,7 +301,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))))
   GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),
      v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
-                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,
+                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,
                   if(ifNull(sv.site1_entrez_gene_id, 0) = 0, '', toString(sv.site1_entrez_gene_id)) AS k1, if(ifNull(sv.site2_entrez_gene_id, 0) = 0, '', toString(sv.site2_entrez_gene_id)) AS k2
            FROM snapshot_db.structural_variant sv
            JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id
@@ -330,7 +334,8 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     GROUP BY source, chr, start_position, end_position, reference_allele, variant_allele) v
   ON v.source = mu.src AND v.chr = mu.chr AND v.start_position = mu.start AND v.end_position = mu.end
     AND v.reference_allele = mu.ref AND v.variant_allele = mu.var
-  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene
+  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene,
+                  concat(ifNull(toString(chr), ''), ':', ifNull(toString(startPosition), ''), '-', ifNull(toString(endPosition), ''), ':', ifNull(toString(referenceAllele), ''), '>', ifNull(toString(tumorSeqAllele), '')) AS rk
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''
@@ -338,7 +343,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
            UNION ALL
            SELECT arrayJoin(arrayFilter(x -> x IN ('TP53'), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,
                   multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,
-                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene
+                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, concat(ifNull(toString(v.chr), ''), ':', ifNull(toString(v.start), ''), '-', ifNull(toString(NULL), ''), ':', ifNull(toString(NULL), ''), '>', ifNull(toString(NULL), '')) AS rk
            FROM v
            LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''
            LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''),
@@ -367,7 +372,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('TP53'))))
   GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),
      v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
-                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,
+                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,
                   if(ifNull(sv.site1_entrez_gene_id, 0) = 0, '', toString(sv.site1_entrez_gene_id)) AS k1, if(ifNull(sv.site2_entrez_gene_id, 0) = 0, '', toString(sv.site2_entrez_gene_id)) AS k2
            FROM snapshot_db.structural_variant sv
            JOIN snapshot_db.genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id
@@ -400,7 +405,8 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
     GROUP BY source, chr, start_position, end_position, reference_allele, variant_allele) v
   ON v.source = mu.src AND v.chr = mu.chr AND v.start_position = mu.start AND v.end_position = mu.end
     AND v.reference_allele = mu.ref AND v.variant_allele = mu.var
-  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene
+  WHERE if(positionCaseInsensitive(ifNull(mu.mutation_type, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(v.d, 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(v.d, 'hotspots')))), 1, 0) AS driver, toUInt8(0) AS sv, gene AS rgene,
+                  concat(ifNull(toString(chr), ''), ':', ifNull(toString(startPosition), ''), '-', ifNull(toString(endPosition), ''), ':', ifNull(toString(referenceAllele), ''), '>', ifNull(toString(tumorSeqAllele), '')) AS rk
            FROM snapshot_db.mutation_derived
            WHERE startsWith(molecularProfileId, 'brca_tcga_pan_can_atlas_2018_') AND studyId = 'brca_tcga_pan_can_atlas_2018' AND `GENE.hugoGeneSymbol` IN ('TP53')
              AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''
@@ -408,7 +414,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenici
            UNION ALL
            SELECT arrayJoin(arrayFilter(x -> x IN ('TP53'), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,
                   multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,
-                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene
+                  toUInt8(if(vn.found = 1, vn.driver, greatest(a1.driver, a2.driver))) AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, concat(ifNull(toString(v.chr), ''), ':', ifNull(toString(v.start), ''), '-', ifNull(toString(NULL), ''), ':', ifNull(toString(NULL), ''), '>', ifNull(toString(NULL), '')) AS rk
            FROM v
            LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''
            LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''),

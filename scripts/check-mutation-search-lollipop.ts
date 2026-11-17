@@ -19,6 +19,9 @@
  *   TP53: R175H lines 11,30,55,72,93 (FX-P03,P09,P15,P21,P30): 5 rows, 5 patients, OncoKB Oncogenic.
  *     Line 4, R273H on FX-P01-T1, is the one row whose Center is "broad.mit.edu" (data_mutations.txt
  *     column 3), a column the table hides by default.
+ *   STK11: X200_splice twice on FX-P29-T1, lines 145 (Splice_Site, 19:1221319 G>A) and 146 (Splice_Region,
+ *     19:1221320 G>T), both Cancer Hotspots (peer-hotspots.tsv lines 8, 9), so drivers: one stem 1/2.
+ *     The fixture's only change called twice in one sample; the two differ in type as well as position.
  *   ALK: no mutation; 6 "EML4-ALK Fusion" rows (data_sv.txt lines 2-7, FX-P45-T1..FX-P49-T2, two of
  *     them FX-P49-T1 and FX-P49-T2), drivers by the pair's OncoKB call (peer-oncokb-sv.tsv).
  *
@@ -170,6 +173,14 @@ await identical("F9 Center shown (every KRAS row's centre is FIXTURE)", ["KRAS"]
 // ---- F10: rows name one of the view's genes; the other is left whole
 await identical("F10 the other gene", ["KRAS", "TP53"], { gene: "TP53", search: "R175H" }, "KRAS", both);
 await narrowed("F10 the named gene", ["KRAS", "TP53"], { gene: "TP53", search: "R175H" }, "TP53", { stems: ["R175H@175 5/5 driver"], tally: { missense: [5, 0] } }, both);
+
+// ---- K: the narrowing matches rows by (sample, change, type, position and alleles); two calls of one change in one sample
+const stk = await report(["STK11"]);
+if (typeof stk !== "string")
+  ok("fixture: STK11 X200_splice 1/2 (lines 145, 146); tally splice 2/0", stems(stk, "STK11").includes("X200_splice@200 1/2 driver") &&
+    tallyOf(stk, "STK11").splice.driver === 2, stems(stk, "STK11").join(", ") + "; " + showTally(tallyOf(stk, "STK11")));
+await narrowed("K one of two calls by its Start Pos", ["STK11"], { gene: "STK11", search: "1221320", columns: ["sample", "proteinChange", "start"] }, "STK11",
+  { stems: ["X200_splice@200 1/1 driver"], tally: { splice: [1, 0] } }, stk);
 
 console.log(`\n${checks - failures}/${checks} mutation search lollipop checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
