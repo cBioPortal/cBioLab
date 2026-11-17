@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
-import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange } from "../lib/chart/format.ts";
+import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange, portalVaf } from "../lib/chart/format.ts";
 
 test("an estimate and its 95% interval read alike in every view", () => {
   assert.equal(fmtCI95(1.0123, 1.5), "95% CI 1.01–1.50");
@@ -176,4 +176,9 @@ test("portalFixed, portalLocale, portalRange: the density chart's numbers as the
   assert.equal(portalFixed(-0.33174, 4), "-0.3317"); assert.equal(portalFixed(1.0e-16, 2), "0.00"); assert.equal(portalFixed(3, 2), "3.00");
   assert.equal(portalLocale(1234), "1,234"); assert.equal(portalLocale(1234.5678), "1,234.568"); assert.equal(portalLocale(Math.log(5)), "1.609");
   assert.equal(portalRange(1234, 1234), "1,234"); assert.equal(portalRange(3, 4), "(3, 4]"); assert.equal(portalRange(Math.log(5), Math.log(6)), "(1.609, 1.792]");
+});
+
+test("F1: portalVaf gives 4 decimals below 0.01, otherwise 2", () => {
+  const cases: [number, string][] = [[0.1754, "0.18"], [0.0098, "0.0098"], [0.005, "0.0050"], [0.01, "0.01"], [0, "0.0000"], [1, "1.00"], [0.38, "0.38"]];
+  for (const [f, want] of cases) assert.equal(portalVaf(f), want, String(f));
 });

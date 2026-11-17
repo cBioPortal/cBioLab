@@ -42,6 +42,7 @@
     "check:mutation-columns": "node --env-file=.env.local scripts/check-mutation-columns.ts",
     "check:mutation-tab-states": "node --env-file=.env.local scripts/check-mutation-tab-states.ts",
     "check:table-duplicates": "node --env-file=.env.local scripts/check-table-duplicates.ts",
+    "check:patient-vaf": "node --env-file=.env.local scripts/check-patient-vaf.ts",
     "check:hotspot-drivers": "node --env-file=.env.local scripts/check-hotspot-drivers.ts",
     "check:results-oql": "node --env-file=.env.local scripts/check-results-oql.ts",
     "check:density": "node --env-file=.env.local scripts/check-density.ts",

@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "table-duplicates";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "table-duplicates" | "patient-vaf";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -50,6 +50,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
   "table-duplicates": ["node", "--env-file=.env.local", "scripts/check-table-duplicates.ts"],
+  "patient-vaf": ["node", "--env-file=.env.local", "scripts/check-patient-vaf.ts"],
 };
 
 interface Mutant {
@@ -705,6 +706,18 @@ const MUTANTS: Mutant[] = [
     effect: "A heatmap's patient column shows its samples' mean instead of the one furthest from 0, so a patient with +2 and −5 draws −1.5.",
     find: "\"argMax(\" + v + \", (abs(\" + v + \"), \" + v + \"))\"",
     replace: "\"avg(\" + v + \")\"" },
+  { id: "patient-vaf-sort-by-highest", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
+    effect: "The Patient page's Allele Freq column sorts by a mutation's highest VAF, where the portal compares the samples' VAFs in sample order (FX-P02: KRAS second instead of last).",
+    find: "c.id === \"vaf\" ? { ...c, sort: vafSort(order.length) } : c",
+    replace: "c" },
+  { id: "patient-vaf-missing-first", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
+    effect: "A sample without the mutation sorts before every VAF in the Allele Freq column, where the portal puts it last in either direction.",
+    find: "\"isNull(vafs[\" + (i + 1) + \"]) ASC, ",
+    replace: "\"isNull(vafs[\" + (i + 1) + \"]) DESC, " },
+  { id: "patient-vaf-reads-unordered", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
+    effect: "A mutation's per-sample bars and tooltip lines follow no sample order, so a bar can sit in another sample's slot.",
+    find: "arraySort(x -> \" + ordinalOf(order, \"x.1\") + \", groupArrayIf(",
+    replace: "arrayReverseSort(x -> \" + ordinalOf(order, \"x.1\") + \", groupArrayIf(" },
   { id: "patient-evolution-ignores-vaf", layer: "counts", guard: "unit", file: "app/portal/patient-layout.ts",
     effect: "The Patient page offers Genomic Evolution to a patient with several samples but no mutation with a VAF, where the portal hides the tab (PTB-MD-3).",
     find: " || data.vaf !== true ? [] :",
