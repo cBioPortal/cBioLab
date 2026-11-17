@@ -35,6 +35,8 @@ export interface CancertypesView {
   sort?: "alphabetical";
   /** draw percentages (default) or counts */
   show?: "frequency" | "count";
+  /** the portal's "Show Genomic Alteration Types": false draws one grey bar per group, its altered total, with no legend */
+  alterationTypes?: boolean;
   /** count patients (default, as the portal does — a patient counts in each group a sample of theirs is in) or samples */
   unit?: "patient" | "sample";
   /**
@@ -75,6 +77,8 @@ export interface CancertypesResult {
   groupBy: string; measure: "driver" | "any"; genes: string[];
   /** the view's Min. # Total, or null for the default (each panel's `minSamples` is the one applied) */
   minSamples: number | null; minAltered: number; sort?: "alphabetical"; show: "frequency" | "count";
+  /** the bars drawn as one per group, without their alteration types */
+  alterationTypes?: false;
   unit: "patient" | "sample";
   panels: CancertypesPanel[];
   excluded?: { study: string; reason: string }[];

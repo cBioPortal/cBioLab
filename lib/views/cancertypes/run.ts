@@ -49,6 +49,8 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
     return refuse("cancertypes", ctx, "minAltered (Min. % or # Altered) is a number, 0 or more; got " + JSON.stringify(view.minAltered).slice(0, 20));
   const alphabetical = view.sort === "alphabetical";
   const show: "frequency" | "count" = view.show === "count" ? "count" : "frequency";
+  if (view.alterationTypes !== undefined && typeof view.alterationTypes !== "boolean")
+    return refuse("cancertypes", ctx, "alterationTypes (Show Genomic Alteration Types) is true or false; got " + JSON.stringify(view.alterationTypes).slice(0, 20));
   let groupBy = String(view.groupBy ?? "").trim();
   // what can be refused without asking anyone is refused before the default category's query
   if (groupBy && groupBy !== "study" && !ATTR_NAME.test(groupBy)) return refuse("cancertypes", ctx, "groupBy is a sample attribute name or \"study\"; got " + JSON.stringify(groupBy).slice(0, 40));
@@ -147,7 +149,8 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   const groupWord = attribute ? attribute : "study";
   return {
     kind: "cancertypes", cohorts: vNames,
-    cancertypes: { groupBy: groupWord, measure, genes, minSamples, minAltered, ...(alphabetical ? { sort: "alphabetical" as const } : {}), show, unit, panels,
+    cancertypes: { groupBy: groupWord, measure, genes, minSamples, minAltered, ...(alphabetical ? { sort: "alphabetical" as const } : {}), show,
+      ...(view.alterationTypes === false ? { alterationTypes: false as const } : {}), unit, panels,
       ...(excluded.length ? { excluded } : {}) },
     method: cancertypesMethod({ genes, groupBy: groupWord, measure, oncokbPin: pin, minAltered, show, unit, ...(byDefault ? { byDefault } : {}), perSite, ...(lines ? { oql: lines } : {}),
       panels: panels.map((p) => ({ cohort: p.cohort, groups: p.groups.length, categories: p.categories, minSamples: p.minSamples, profiled: p.profiled, altered: p.altered })) }),
@@ -167,6 +170,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
         : "at least " + plural(minSamples, "profiled " + unit)) +
       (minAltered > 0 ? " and " + (show === "count" ? "at least " + plural(minAltered, "altered " + unit) : "at least " + minAltered + "% of them altered") : "") +
       "; the rest are counted in \"N of M categories are shown\". " + (alphabetical ? "Groups are in alphabetical order. " : "") +
+      (view.alterationTypes === false ? "Each bar is drawn whole, without its alteration types (the portal's Show Genomic Alteration Types unticked). " : "") +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; values are matched by name, not harmonized. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };

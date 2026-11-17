@@ -22,24 +22,24 @@ Legacy per-group numbers read from the chart component's React props (`countsByG
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 12 |
+| ✅ match | 13 |
 | 🟡 partial | 15 |
 | 🔶 different | 14 |
-| ❌ missing | 14 |
+| ❌ missing | 13 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 0 |
 | **Total IDs** | **59** |
 
-**Overall: 27.1 %** (✅ 12 + 🐞ok 1 + N/A 3 = 16 of 59). Counting 🟡 as half: 39.8 %.
+**Overall: 28.8 %** (✅ 13 + 🐞ok 1 + N/A 3 = 17 of 59). Counting 🟡 as half: 41.5 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 Shared chrome | 4 | 1 | 2 | 1 | 0 | 0 | 0 | Tab and link ✅; no OQL banner or filter warnings |
 | §1 Gene tabs (GT) | 6 | 3 | 1 | 0 | 1 | 0 | 1 | Same pill tabs; no grey label for unaltered genes |
 | §2 Category (CT) | 10 | 0 | 1 | 4 | 4 | 0 | 1 | Same 3 categories (+ any attribute); default always Cancer Type; small groups pooled, not filtered; no altered threshold, no sort select |
-| §2 Occurrence (OC) | 5 | 3 | 0 | 0 | 1 | 0 | 1 | Count By (Patients default) and Y-axis ✅; no "Show Genomic Alteration Types" |
+| §2 Occurrence (OC) | 5 | 4 | 0 | 0 | 0 | 0 | 1 | Count By (Patients default), Y-axis and "Show Genomic Alteration Types" ✅ |
 | §3 Chart (CH) | 9 | 0 | 4 | 4 | 1 | 0 | 0 | Stacked bars with same colours but reversed stack; "+" rows only where groups differ; SVG titles, not popovers; study ids as labels |
 | §4 Sorting (SO) | 4 | 1 | 0 | 2 | 1 | 0 | 0 | Frequency order identical; count mode still sorted by frequency; no Alphabetical |
 | §5 Downloads (DL) | 3 | 0 | 0 | 0 | 3 | 0 | 0 | No download at all |
@@ -146,7 +146,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 |---|---|---|---|
 | CTS-OC-1 | ✅ | BC | "count by: patients / samples", patients default (`run.ts:27`), shared across pills |
 | CTS-OC-2 | ✅ | B | "y-axis: Alteration Frequency / Absolute Counts" |
-| CTS-OC-3 | ❌ | B | No "Show Genomic Alteration Types" |
+| CTS-OC-3 | ✅ | BC | "Show Genomic Alteration Types" (default on); unticked, each bar drawn whole in #666 at its altered total, no legend; the Data download unchanged (view `alterationTypes:false`) |
 | CTS-OC-4 | ✅ | B | No per-type toggles (an extra "count: any alteration / drivers" exists) |
 | CTS-OC-5 | N/A | C | Invariant 9 (see GT-5) |
 

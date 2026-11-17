@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { CloudDownload } from "lucide-react";
 import { useState } from "react";
 import { DraftInput } from "./parts.tsx";
+import { Checkbox } from "../../_ui/checkbox";
 
 /** a threshold box as the portal's reads it: everything but digits and "." dropped; nothing readable, null */
 function thresholdOf(text: string): number | null {
@@ -156,6 +157,10 @@ function Controls({ c }: { c: KindCardCtx }) {
           sort x-axis by <OptionSelect value={spec.sort === "alphabetical" ? "alphabetical" : "value"} disabled={busy} onValueChange={(v) => patch({ sort: v === "alphabetical" ? "alphabetical" : undefined })}>
             <option value="value">Y-Axis Values</option><option value="alphabetical">Alphabetically</option>
           </OptionSelect>
+        </label>
+        <label className="tbfield" data-tip="the portal's Show Genomic Alteration Types: each bar split by kind of alteration, or drawn whole without a legend">
+          <Checkbox checked={spec.alterationTypes !== false} disabled={busy} onCheckedChange={(on) => patch({ alterationTypes: on === true ? undefined : false })} />
+          Show Genomic Alteration Types
         </label>
       </div>
     </div>
