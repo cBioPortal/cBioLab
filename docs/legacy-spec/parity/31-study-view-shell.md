@@ -137,7 +137,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-AB-1 | ✅ | B | Header counts patients and samples, `toLocaleString`; skeleton while counting; filter bar "N patients match" |
 | STV-AB-2 | 🟡 | BC | "View patients" opens `/portal/patient` on the first patient with the cohort definition for stepping (`use-explore-state.ts:189-197`); same tab, not a new window; disabled reason shown |
 | STV-AB-3 | 🔶 | B | "Save as a Cohort" (filter bar, only once filtered) — see §8 |
-| STV-AB-4 | ✅ | B | "Download clinical data" beside View patients: `<study>_clinical_data.tsv` / `combined_study_clinical_data.tsv`, through the patient-level table route ([download-cases](download-cases.md) PC2, PC9). Shown always (no `skin_hide_download_controls`) |
+| STV-AB-4 | ❌ | B | No clinical-data download |
 | STV-AB-5 | ❌ | B | No ⚙ / autosubmit setting |
 | STV-AB-6 | 🔶 | B | "Alterations: all / OncoKB drivers only" select instead of the Alteration Filter menu (tracked: Driver-annotation settings) |
 
@@ -206,16 +206,16 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-TAB-1 | 🟡 | B | Explore's Summary · Clinical Data tabs under the filter bar; Clinical Data not offered on an empty selection ([clinical-tab-cases](clinical-tab-cases.md) CT1). Not yet: CN Segments, Plots; the tab is not in the URL |
-| STV-CD-1 | ✅ | B | "loading clinical data…" until the first page; later pages and queries cover the rows with "updating…" |
-| STV-CD-2 | 🐞 ok | C | ⚠ No row limit: the table pages in the database ([clinical-tab-cases](clinical-tab-cases.md) CT9) |
-| STV-CD-3 | 🟡 | BC | Patient ID and Sample ID (links), then each visible clinical-attribute chart by priority then name ([clinical-tab-cases](clinical-tab-cases.md) CT2, CT5). Several studies: the shared table's study column, not "Cancer Study". No header tooltip with description and id yet |
-| STV-CD-4 | ✅ | BC | Grey "—" (tooltip "No data available"), http(s) values as links ([clinical-tab-cases](clinical-tab-cases.md) CT3, CT4) |
-| STV-CD-5 | ✅ | B | "N results", 20 rows a page, the shared pager ([clinical-tab-cases](clinical-tab-cases.md) CT6) |
-| STV-CD-6 | ✅ | B | Search and sort in the database over every row; ⚠ no 500-row cap or its message ([clinical-tab-cases](clinical-tab-cases.md) CT7) |
-| STV-CD-7 | ✅ | B | Download `<study>_clinical_data.tsv` of the columns shown, every row the search keeps, the portal's table layout (CRLF, empty for missing); ⚠ without the 500-row cap ([clinical-tab-cases](clinical-tab-cases.md) CT10–CT12) |
-| STV-CD-8 | ✅ | B | brca_tcga_pan_can_atlas_2018: "1,084 results", Patient ID, Sample ID, Cancer Type Detailed, Mutation Count, Fraction Genome Altered, Diagnosis Age, MSI MANTIS Score, MSIsensor Score, Overall Survival Status, Sex, Ethnicity Category, Race Category, Subtype, Tumor Type, … — the order the spec saw |
-| STV-CD-9 | 🟡 | C | The columns follow the charts (Add chart changes both); no column menu or filters of the table's own ([clinical-tab-cases](clinical-tab-cases.md) CT8). The Add chart dialog is not reachable from this tab |
+| STV-TAB-1 | ❌ | B | Explore has no tabs (page tabs are Explore / Analysis) |
+| STV-CD-1 | ❌ | B | No Clinical Data tab (Analysis `table` view is the nearest) |
+| STV-CD-2 | ❌ | C | — |
+| STV-CD-3 | ❌ | C | — |
+| STV-CD-4 | ❌ | C | — |
+| STV-CD-5 | ❌ | C | — |
+| STV-CD-6 | ❌ | C | — |
+| STV-CD-7 | ❌ | C | — (legacy 500-row download bug therefore absent) |
+| STV-CD-8 | ❌ | C | — |
+| STV-CD-9 | N/A | C | Depends on the missing tab |
 | STV-CN-1 | ❌ | B | No CN Segments on Explore (Results › CN Segments exists) |
 | STV-CN-2 | ❌ | C | No .seg download (tracked under Per-sample CN segments) |
 | STV-CN-3 | ❌ | C | — |
@@ -275,14 +275,14 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-STM-2 | ✅ | B | Samples = distinct sample ids, patients = distinct patients owning a selected sample, per study (594/594, 280/280, 1,678/1,678) |
 | STV-STM-3 | ❌ | B | No Add-chart Freq (legacy multi-study 190.7 % bug therefore not reproduced) |
 | STV-STM-4 | ❌ | B | No profile select with sample counts |
-| STV-STM-5 | 🟡 | B | Study ID, Patient ID, Sample ID, then every attribute by display name, NA where missing; checked cell by cell against the portal's API for brca_tcga_pan_can_atlas_2018 (1,084 × 60, no difference). Attributes in priority order and rows by patient id, not the API's order (PC9, PC10) |
+| STV-STM-5 | ❌ | B | No download |
 | STV-STM-6 | 🟡 | BC | Query hand-off: studies + filters as the Results page's case clauses (`StudyPicker`, `explore-sections.tsx:83-86`); profiles from the dialog |
 | STV-STM-7 | 🔶 | C | Custom data is uploaded per dataset (id, value rows) and joined to clinical reads; no "Unselected"/`custom_value` defaulting |
 | STV-STM-8 | ❌ | C | Default name "explored cohort" / "all of <study>" (`use-explore-state.ts:172-174`), not built from the filters |
 | STV-STM-9 | ❌ | C | No VS description |
 | STV-STM-10 | ❌ | C | No group counts |
 | STV-STM-11 | ✅ | C | Gene × sample limit 1,000,000 refused in the query dialog in legacy's words (PORTAL-PARITY, ticked) |
-| STV-STM-12 | 🐞 ok | C | No row limit (the table pages in the database) and no 500-row download cap (clinical-tab-cases CT7, CT9, CT12) |
+| STV-STM-12 | 🐞 ok | C | No Clinical Data tab, so neither its limits nor its 500-row download bug |
 | STV-STM-13 | 🟡 | C | Not on Explore; Results › CN Segments has its own availability rule (tracked: hide the tab when no sample has segments) |
 
 ---

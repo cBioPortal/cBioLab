@@ -270,7 +270,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Discrete × discrete as bars: Bar, Stacked (the portal's default), 100% stacked, Sort By, Horizontal Bars (ours a table only) (PLT-PT-6, PLT-UT-4…6, PLT-BR-1…8, PLT-STM-12)
   - [x] Correlation text as the portal's: "Spearman: -0.06 (p = 0.185)" then "Pearson: -0.04 (p = 0.359)", `toFixed(2)` and `toConditionalPrecision(p, 3, 0.01)` (was "Pearson r = −0.038 (p = 0.36) · Spearman ρ = −0.055 (p = 0.19)") (PLT-SC-2, PLT-STM-4…6, PLT-STM-22) (#234)
     - [ ] In the right gutter on two lines each, as the portal places it (ours one line above the plot)
-    - [ ] p from r rounded to 5 decimals first, as the portal computes it (ours from the full-precision r; no shown value differs in the audit's four scatters)
+    - [x] r rounded to 5 decimals before it is shown to 2 or tested, as the portal keeps it (`portalR5`): an r rounding to ±1 has p 0, 0.124996 shows "0.13"; coadread Mut# × FGA and AGE × FGA show the portal's strings, p 2.1191e-16 / 0.184829 from −0.34872 / −0.05509 (PLT-STM-4…6) (#285)
     - [x] Several studies: Spearman over every study's pairs ranked together, where every study may show its cases (was not reported), and Pearson's r unrounded (was 4 decimals before its p); coadread + brca Mut# × FGA, n 1,573: ρ 0.092107 (p 2.54e-4), r −0.175601 (p 2.32e-12) = scipy on cbioportal.org's data (PLT-MD-2, PLT-STM-5, PLT-STM-6) (#283)
       - [ ] A study that may not show its cases: still no Spearman, and the caption says why
   - [ ] The quick-plot "Examples" pills (Mut# vs Dx, FGA vs Dx, mRNA vs CNA, …) (PLT-QP-1…12, PLT-LY-1)
@@ -348,21 +348,18 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - ~~A KM tile per endpoint, drawn small (STS-KM-1, STS-KM-3)~~ Kept on purpose (2026-11-13): one full card with a picker.
     - [ ] The survival chart's download, and left truncation offered on the card (STS-KM-5, STS-KM-6)
   - [x] Density: x = FGA, y = mutation count, linear; 44×38 bins cut as the portal cuts them; plasma colours and legend; Pearson / Spearman text; Swap Axes and Log Scale; the portal's tooltip (STS-SC-2…5, STS-STM-15; [density-cases](legacy-spec/parity/density-cases.md)) (#222)
-    - [x] The chart's Download (Data, SVG, PDF) (STS-SC-5; download-cases FG8, PC7) (#270, PR #273 open)
+    - [ ] The chart's Download (Data, SVG, PDF): with the other downloads (STS-DL-1…3, STS-SC-5)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4, STS-MD-16)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
     - [x] Summary Data for every categorical chart (clinical pie or list, generic-assay categorical, gene state): Category, count, percentage of every case with NA last, as the portal writes it; disabled, saying why, when the chart holds only its most frequent values (STS-DL-1; [download-cases](legacy-spec/parity/download-cases.md) SD1–SD16) (#257)
-    - [x] Full Data of a clinical pie or list chart, and the Data of a clinical bar, the density and the survival chart: per-case files as the portal writes them, read through the patient-level table route (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) PC1–PC14) (PR #273 open)
-      - [ ] Gene-state and generic-assay charts' Full Data / Data: their values are not clinical rows, so they need their own row source
+    - [ ] Full Data, and a numeric, density or survival chart's Data: per-case files, read through the patient-level path (with "Download clinical data", STV-AB-4)
     - [x] SVG and PDF of each chart: a pie or list chart as its pie with the legend below, bars, density (its legend inside the file) and survival as drawn; the gene tables, Data Types and Case Lists have none, as in the portal (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) FG1–FG10) (PR #270 open)
     - [x] The gene tables' Data: every gene, the portal's columns (CNA's profiled and altered under their own headers) (STS-DL-1; [gene-tables-cases](legacy-spec/parity/gene-tables-cases.md) GD1–GD11) (#261)
   - [x] Empty selection: the "filtered out all the samples" message in place of the charts, the filter bar kept (STS-LY-11, STS-MD-14, STV-LD-6, STV-MD-6; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (#260)
   - [x] Case lists: all of them, by kind across studies, counted in samples, Freq of the selected samples (STS-OT-2; [empty-caselists-cases](legacy-spec/parity/empty-caselists-cases.md)) (#260)
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
-  - [x] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12; [clinical-tab-cases](legacy-spec/parity/clinical-tab-cases.md) CT1–CT12) (PR #274 open)
-    - [ ] Header tooltips (name, description, attribute id), "Cancer Study" as its own column, the tab in the URL
-    - [ ] The Columns menu (Clinical / Genomic / X vs Y) (STV-MD-13)
-  - [x] "Download clinical data" (⤓) for the selection: every attribute of each selected sample, `<study>_clinical_data.tsv` (STV-AB-4, STV-STM-5, STV-HD-2; download-cases PC9) (PR #273 open)
+  - [ ] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12, STV-MD-13)
+  - [ ] "Download clinical data" (⤓) for the selection (STV-AB-4, STV-STM-5, STV-HD-2)
   - [x] Filters in the URL: the bookmark, `#filterJson`, `filterAttributeId` / `filterValues` (STV-URL-2, STV-URL-3, STV-BM-1…3, STV-FB-7; see bugs) (#189)
     - [ ] A bookmark icon in the filter bar (STV-FB-7): the header's Copy link carries the filters instead
     - [ ] `sharedGroups`, `sharedCustomData` and the Plots tab's parameters (STV-URL-2): no Groups manager or Plots tab yet

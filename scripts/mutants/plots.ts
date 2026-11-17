@@ -77,4 +77,8 @@ export const mutants: Mutant[] = [
     effect: "Spearman's rho ranks tied values one after another instead of giving them their average rank, so it changes with the order the rows come back in.",
     find: "rank() OVER (ORDER BY \" + v + \") + (count() OVER (PARTITION BY \" + v + \") - 1) / 2",
     replace: "row_number() OVER (ORDER BY \" + v + \")" },
+  { id: "corr-p-unrounded-r", layer: "counts", guard: "unit", file: "lib/plot.ts",
+    effect: "A plot's correlation p-values are tested on the full-precision r, where the portal tests r rounded to 5 decimals (one rounding to 1 has p 0).",
+    find: "const r = portalR5(r0);",
+    replace: "const r = r0;" },
 ];
