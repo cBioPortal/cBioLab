@@ -13,21 +13,29 @@
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))
 
 -- view 0 mutations: mutations:counts · msk_chord_2024
-WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
-  GROUP BY alteration),
-att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
-    max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
-  FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
-  GROUP BY alteration, consequence, tumor_type),
-sva AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
-  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
-  GROUP BY gene),
-svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
-    toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found
-  FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
-    AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))))
-  GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),
+WITH ann AS (SELECT alteration, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level,
+    CAST(NULL AS Nullable(String)) AS prognostic_level, toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver
+  FROM (SELECT alteration, argMax(tuple(toString(oncogenicity), toString(highest_sensitive_level), toString(highest_resistance_level)), resolved_at) AS c
+    FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+    GROUP BY alteration)),
+att AS (SELECT alteration, consequence, tumor_type, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, toNullable(c.4) AS diagnostic_level,
+    toNullable(c.5) AS prognostic_level, toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
+  FROM (SELECT alteration, consequence, tumor_type, argMax(tuple(toString(t.oncogenicity), toString(t.highest_sensitive_level), toString(t.highest_resistance_level),
+      toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at) AS c
+    FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+    GROUP BY alteration, consequence, tumor_type)),
+sva AS (SELECT gene, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level, CAST(NULL AS Nullable(String)) AS prognostic_level,
+    toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver
+  FROM (SELECT hugo_gene_symbol AS gene, argMax(tuple(toString(oncogenicity), toString(highest_sensitive_level), toString(highest_resistance_level)), resolved_at) AS c
+    FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
+    GROUP BY gene)),
+svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, toNullable(c.4) AS diagnostic_level, toNullable(c.5) AS prognostic_level,
+    toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
+  FROM (SELECT site1_entrez, site2_entrez, sv_type, tumor_type,
+      argMax(tuple(toString(t.oncogenicity), toString(t.highest_sensitive_level), toString(t.highest_resistance_level), toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at) AS c
+    FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
+      AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))))
+    GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type)),
 c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
@@ -112,7 +120,9 @@ rows AS (
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
          if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
-         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')))) AS drv,
+         if(m.germ, '', if(tt.found = 1, tt.resistance_level, ann.resistance_level)) AS resistanceLevel, if(m.germ, '', if(tt.found = 1, tt.diagnostic_level, ann.diagnostic_level)) AS diagnosticLevel, if(m.germ, '', if(tt.found = 1, tt.prognostic_level, ann.prognostic_level)) AS prognosticLevel,
+         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
+         toUInt8((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS hot,
          m.mutationType AS mutationType, upper(m.variantType) AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
@@ -147,7 +157,10 @@ rows AS (
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          v.pid AS patient, v.sid AS sid, ct.v AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
-         if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level, toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
+         if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level,
+         if(vp.found = 1, vp.resistance_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.resistance_level, va1.resistance_level)) AS resistanceLevel, if(vp.found = 1, vp.diagnostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.diagnostic_level, va1.diagnostic_level)) AS diagnosticLevel, if(vp.found = 1, vp.prognostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.prognostic_level, va1.prognostic_level)) AS prognosticLevel,
+         toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
+         toUInt8(0) AS hot,
          'Fusion' AS mutationType, upper(v.class) AS variantType,
          NULL AS vaf, NULL AS altCount, NULL AS refCount,
          toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,
@@ -182,21 +195,29 @@ rows AS (
 SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 0 mutations: mutations:rows · msk_chord_2024
-WITH ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
-  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
-  GROUP BY alteration),
-att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
-    max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
-  FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
-  GROUP BY alteration, consequence, tumor_type),
-sva AS (SELECT hugo_gene_symbol AS gene, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, toUInt8(max(is_driver)) AS driver
-  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
-  GROUP BY gene),
-svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,
-    toUInt8(max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance'))) AS driver, toUInt8(1) AS found
-  FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
-    AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))))
-  GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type),
+WITH ann AS (SELECT alteration, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level,
+    CAST(NULL AS Nullable(String)) AS prognostic_level, toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver
+  FROM (SELECT alteration, argMax(tuple(toString(oncogenicity), toString(highest_sensitive_level), toString(highest_resistance_level)), resolved_at) AS c
+    FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+    GROUP BY alteration)),
+att AS (SELECT alteration, consequence, tumor_type, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, toNullable(c.4) AS diagnostic_level,
+    toNullable(c.5) AS prognostic_level, toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
+  FROM (SELECT alteration, consequence, tumor_type, argMax(tuple(toString(t.oncogenicity), toString(t.highest_sensitive_level), toString(t.highest_resistance_level),
+      toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at) AS c
+    FROM annotation.oncokb_tumor_type AS t WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol = 'KRAS'
+    GROUP BY alteration, consequence, tumor_type)),
+sva AS (SELECT gene, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level, CAST(NULL AS Nullable(String)) AS prognostic_level,
+    toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver
+  FROM (SELECT hugo_gene_symbol AS gene, argMax(tuple(toString(oncogenicity), toString(highest_sensitive_level), toString(highest_resistance_level)), resolved_at) AS c
+    FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'SV' AND alteration = 'Fusion'
+    GROUP BY gene)),
+svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, toNullable(c.4) AS diagnostic_level, toNullable(c.5) AS prognostic_level,
+    toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found
+  FROM (SELECT site1_entrez, site2_entrez, sv_type, tumor_type,
+      argMax(tuple(toString(t.oncogenicity), toString(t.highest_sensitive_level), toString(t.highest_resistance_level), toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at) AS c
+    FROM annotation.oncokb_sv AS t WHERE oncokb_version = 'v7.5'
+      AND (site1_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))) OR site2_entrez IN (SELECT toString(entrez_gene_id) FROM (SELECT entrez_gene_id FROM snapshot_db.gene WHERE hugo_gene_symbol IN ('KRAS'))))
+    GROUP BY site1_entrez, site2_entrez, sv_type, tumor_type)),
 c0 AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
@@ -281,7 +302,9 @@ rows AS (
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
          if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
-         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')))) AS drv,
+         if(m.germ, '', if(tt.found = 1, tt.resistance_level, ann.resistance_level)) AS resistanceLevel, if(m.germ, '', if(tt.found = 1, tt.diagnostic_level, ann.diagnostic_level)) AS diagnosticLevel, if(m.germ, '', if(tt.found = 1, tt.prognostic_level, ann.prognostic_level)) AS prognosticLevel,
+         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
+         toUInt8((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS hot,
          m.mutationType AS mutationType, upper(m.variantType) AS variantType,
          if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
@@ -316,7 +339,10 @@ rows AS (
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
          v.pid AS patient, v.sid AS sid, ct.v AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
-         if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level, toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
+         if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level,
+         if(vp.found = 1, vp.resistance_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.resistance_level, va1.resistance_level)) AS resistanceLevel, if(vp.found = 1, vp.diagnostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.diagnostic_level, va1.diagnostic_level)) AS diagnosticLevel, if(vp.found = 1, vp.prognostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.prognostic_level, va1.prognostic_level)) AS prognosticLevel,
+         toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
+         toUInt8(0) AS hot,
          'Fusion' AS mutationType, upper(v.class) AS variantType,
          NULL AS vaf, NULL AS altCount, NULL AS refCount,
          toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,

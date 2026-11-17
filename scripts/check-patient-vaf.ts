@@ -15,6 +15,8 @@
  *      direction (compareValues). FX-P02 tells this from a sort by the highest VAF: SMARCA4 0.6869 (T1),
  *      KRAS 0.1949 (T1) and 0.6786 (T2), PIK3CA 0.3371 (T1) — by sample, descending, SMARCA4, PIK3CA,
  *      KRAS; by the highest, SMARCA4, KRAS, PIK3CA.
+ *   Q  a filter and a search read that same 4-place value
+ *   D  one record per sample: a variant recorded twice in a sample is drawn once (its first record)
  *   N  null last in either direction, on a literal table run through the same ORDER BY (the fixture has
  *      no mutation in a patient's second sample alone).
  *
@@ -24,7 +26,7 @@
 import { chQuery, connById } from "../lib/ch.ts";
 import { PatientLevelResolver } from "../lib/federation.ts";
 import { runAlterations } from "../lib/views/alterations/run.ts";
-import { vafSort } from "../lib/patient-alterations.ts";
+import { firstPerSample, vafSort } from "../lib/patient-alterations.ts";
 import type { ViewRun } from "../lib/views/run.ts";
 import type { AlleleReads, AlterationsResult } from "../lib/views/alterations/types.ts";
 
@@ -50,9 +52,9 @@ const ctx = {
 } as unknown as ViewRun;
 
 type Row = { gene: string; vaf: number | null; reads: AlleleReads[] | undefined };
-async function rows(patient: string, sort?: { column: string; desc?: boolean }): Promise<Row[] | string> {
+async function rows(patient: string, sort?: { column: string; desc?: boolean }, q: Record<string, unknown> = {}): Promise<Row[] | string> {
   try {
-    const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: patient }, mutations: { columns: ["gene", "vaf"], ...(sort ? { sort } : {}) } }, ctx) as { alterations?: AlterationsResult; error?: string };
+    const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: patient }, mutations: { columns: ["gene", "vaf"], ...(sort ? { sort } : {}), ...q } }, ctx) as { alterations?: AlterationsResult; error?: string };
     const t = r.alterations?.tables.mutations;
     if (!t) return "refused: " + String(r.error);
     const at = (id: string) => t.columns.findIndex((c) => c.id === id);
@@ -92,6 +94,22 @@ for (const dir of ["ASC", "DESC"] as const) {
   const got = (await chQuery<{ name: string }>(sql, conn)).data.map((r) => r.name).join("");
   const want = dir === "ASC" ? "cdab" : "dacb";
   ok("N " + dir + ": by the first sample, a null last, then the second sample (b has no first-sample VAF)", got === want, got + ", want " + want);
+}
+
+// ---- Q: filter and search read the value the cell shows ------------------------------------------
+{
+  // PIK3CA 267/792 = 0.33712…, shown 0.3371: a range up to 0.3371 keeps it, as it reads on screen
+  const kept = genes(await rows("FX-P02", undefined, { filters: { vaf: { max: 0.3371 } } }));
+  ok("Q a range up to 0.3371 keeps PIK3CA (0.3371), not KRAS (0.6786) or SMARCA4 (0.6869)", kept === "PIK3CA", kept);
+  const found = genes(await rows("FX-P02", undefined, { search: "0.3371" }));
+  ok("Q a search for 0.3371 finds PIK3CA", found === "PIK3CA", found);
+}
+
+// ---- D: one record per sample, on a literal array (the fixture has no repeated record) ----------
+{
+  const sql = "SELECT " + firstPerSample("[('T1', 10, 90), ('T2', 5, 95), ('T1', 20, 80)]") + " AS r";
+  const r = (await chQuery<{ r: unknown[] }>(sql, conn)).data[0]?.r;
+  ok("D a sample recorded twice keeps its first record, once", JSON.stringify(r) === JSON.stringify([["T1", 10, 90], ["T2", 5, 95]]), JSON.stringify(r));
 }
 
 console.log(failures ? `${failures} of ${checks} patient VAF checks FAILED` : `all ${checks} patient VAF checks passed`);
