@@ -243,6 +243,7 @@ async function patientViews({ browser, ok, BASE }) {
       await page.locator(".segigv").first().waitFor({ state: "attached", timeout: 240000 });
       await settled(); await page.waitForTimeout(1500);
       let s = await state();
+      ok("patient page: the browser title is the portal's (PAT-SH-1)", (await page.title()) === "Patient: IM-GBM-28", await page.title());
       ok("overview: compact IGV with the sample columns", !s.navbar && s.canvases > 3 && s.cells.startsWith("1|2|3|4|1|2|3|4|4|5|4|4|") && /P1\|P1\|P1\|P1/.test(s.cells), JSON.stringify(s));
       const row = page.locator("section.alt-table[aria-label='Mutations'] tbody tr", { hasText: "TP53" }).first();
       await row.click();
