@@ -7,7 +7,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runPlot } from "../lib/views/plot/run.ts";
 import { CATEGORY_CAP, POINTS_CAP, DEFAULT_BINS, type PlotData } from "../lib/plot.ts";
-import { pearsonFromMoments, regressionFromMoments } from "../lib/stats.ts";
+import { pearsonR, regressionFromMoments } from "../lib/stats.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewResultOf } from "../lib/types.ts";
 
@@ -206,12 +206,12 @@ describe("plot: several studies, pooled from per-site aggregates", () => {
     assert.equal(calls.filter((x) => x === "bins [10,10] " + JSON.stringify(p.extent)).length, 3, "every site bins against the same grid and extent");
     assert.deepEqual(p.bins!.map((b) => [b.bx, b.by, b.n]).sort(), [[0, 0, 3], [5, 5, 1], [9, 2, 1]]);
     const pooled = { n: 5, sx: 15, sy: 12, sxy: 40, sxx: 55, syy: 34 };
-    assert.equal(p.stats!.pearson, pearsonFromMoments(pooled).r);
+    assert.equal(p.stats!.pearson, pearsonR(pooled));
     assert.equal(p.stats!.slope, regressionFromMoments(pooled).slope);
     assert.equal(p.stats!.spearman, null);
     assert.deepEqual(p.coverage, { total: 6, nx: 5, ny: 6 });
     assert.match(r.note!, /3 studies pooled \(s1, s2, s3\)\. Each site reports six sums/);
-    assert.match(r.note!, /Spearman rank correlation is not reported for a federated plot/);
+    assert.match(r.note!, /Spearman's rank correlation is not reported: it needs every study's pairs ranked together/);
     assert.deepEqual(r.studies, ["s1", "s2", "s3"]);
   });
 
