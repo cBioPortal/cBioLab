@@ -36,7 +36,7 @@ import { inGeneticAlterationDerived } from "./profile-catalog.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, clinicalMetaTable, assertCustomDataPresent } from "./custom-data.ts";
-import { finiteSql } from "./sql-number.ts";
+import { finiteSql, finiteNumber } from "./sql-number.ts";
 import { SV_EVENT_KEY } from "./sv-oncokb.ts";
 import { expressionProfileFor, type OqlPins } from "./oql.ts";
 import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
@@ -407,16 +407,36 @@ export function heatmapSql(profileType: string, genes: string[], study: string =
 // mode a patient's samples give the one furthest from 0, as heatmapSql, and a patient-level
 // assay's value goes to each of the patient's samples in sample mode. Values that are not
 // numbers are left out.
+/** the portal's threshold value (GenericAssayMolecularDataCache handleValueThreshold): ">" or "<", spaces, then a number */
+const THRESHOLD_RE = /^([><]) *(-?\d+(\.\d+)?)$/;
+const THRESHOLD_SQL = "'^[<>] *-?[0-9]+([.][0-9]+)?$'";
+/**
+ * A generic-assay value as the portal reads it: a threshold value (">90", "< 0.0015") is its
+ * number with its sign kept; any other number is itself with no sign; anything else is null.
+ */
+export function parseThresholdValue(text: string): { value: number; threshold: ">" | "<" | "" } | null {
+  const m = THRESHOLD_RE.exec(text);
+  if (m) return { value: Number(m[2]), threshold: m[1] as ">" | "<" };
+  const x = finiteNumber(text);
+  return Number.isFinite(x) ? { value: x, threshold: "" } : null;
+}
+
 export function assayHeatmapSql(profileType: string, entities: string[], study: string = STUDY, db: string = DB, unit: Unit = "patient", patientLevel = false, samples?: string | null): string {
   const strip = (col: string) => "replaceOne(" + col + ", " + sq(study + "_") + ", '')";
   const sampleLevel = unit === "sample" && patientLevel;
+  // a threshold value counts as its number; the representing value is the furthest from 0, of a
+  // tie the positive, then the one without a threshold (DataUtils selectRepresentingDataPoint)
+  const isThr = "match(g.value, " + THRESHOLD_SQL + ")";
+  const num = "if(" + isThr + ", " + finiteSql("replaceRegexpOne(g.value, '^[<>] *', '')") + ", " + finiteSql("g.value") + ")";
+  const rank = "(abs(" + num + "), " + num + ", NOT " + isThr + ")";
   return "SELECT " + (unit === "sample" ? strip(sampleLevel ? "sd.sample_unique_id" : "g.sample_unique_id") : strip("g.patient_unique_id")) + " AS pid,\n" +
-    "       g.entity_stable_id AS gene, " + furthestFromZero(finiteSql("g.value")) + " AS v\n" +
+    "       g.entity_stable_id AS gene, argMax(" + num + ", " + rank + ") AS v,\n" +
+    "       argMax(if(" + isThr + ", substring(g.value, 1, 1), ''), " + rank + ") AS t\n" +
     "FROM " + db + ".generic_assay_data_derived g\n" +
     (sampleLevel ? "JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = g.patient_unique_id\n" : "") +
     "WHERE g.profile_type = " + sq(profileType) + " AND g.profile_stable_id = " + sq(study + "_" + profileType) + "\n" +
     "  AND g.entity_stable_id IN (" + entities.map(sq).join(",") + ")\n" +
-    "  AND " + finiteSql("g.value") + " IS NOT NULL" +
+    "  AND " + num + " IS NOT NULL" +
     // a patient-level row (the patient in both id columns) has no sample to test
     (samples && !patientLevel ? fromColumnSamples("g.sample_unique_id", study, samples) : "") + "\n" +
     "GROUP BY pid, gene";
@@ -699,7 +719,7 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
     return { assay: a ? { datatype: String(a.datatype), patientLevel: a.patientLevel === true,
       ...(typeof a.pivot === "number" && Number.isFinite(a.pivot) ? { pivot: a.pivot } : {}),
       ...(a.sortOrder === "ASC" || a.sortOrder === "DESC" ? { sortOrder: a.sortOrder as "ASC" | "DESC" } : {}) } : null,
-      available: h?.available === true, values: table(h?.values, 3, "heatmap values"),
+      available: h?.available === true, values: table(h?.values, [3, 4], "heatmap values"),
       ...(typeof h?.kind === "string" && /^[A-Z_]{1,40} [A-Z0-9_-]{1,40}$/.test(h.kind) ? { kind: h.kind } : {}) };
   });
   const overlays = (Array.isArray(r.overlays) ? r.overlays : bad("overlays")).map((o: Record<string, unknown>) =>
@@ -975,15 +995,19 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
         throw new Error("heatmap: '" + h.profileType + "' is categorical; a heatmap track draws numbers");
       if (h.reference === "federation") throw new Error("heatmap: a federation reference z-scores a gene's values; '" + h.profileType + "' is a generic assay");
       const okStudies = studies.filter((_, i) => assays[i]);
-      const values = new Map<string, number>();
+      const values = new Map<string, number>(), thresholds = new Map<string, ">" | "<">();
       const fetched = await Promise.all(okStudies.map(async (s) =>
         ({ s, r: peers.has(s) ? await peerRows(s, (i) => i.heatmap[hi].values)
           : await lqRows("oncoprint:assay heatmap", assayHeatmapSql(h.profileType, h.genes, s, dbOf(s), unit, !!assays[studies.indexOf(s)]!.patientLevel, samplesOf(s)), s) })));
       for (const { s, r } of fetched)
-        for (const row of r.rows) values.set(qual(s, row[0] as string) + "|" + (row[1] as string), Number(row[2]));
+        for (const row of r.rows) {
+          const key = qual(s, row[0] as string) + "|" + (row[1] as string);
+          values.set(key, Number(row[2]));
+          if (row[3] === ">" || row[3] === "<") thresholds.set(key, row[3]);
+        }
       // the profile's pivot and sort order, as the first study holding it declares them
       const meta = assays.find((a) => a);
-      heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values, profileKind: "GENERIC_ASSAY " + meta!.datatype,
+      heatmapIn.push({ profileType: h.profileType, genes: h.genes, isVaf: false, assay: true, values, ...(thresholds.size ? { thresholds } : {}), profileKind: "GENERIC_ASSAY " + meta!.datatype,
         ...(meta?.pivot != null ? { pivot: meta.pivot } : {}), ...(meta?.sortOrder ? { sortOrder: meta.sortOrder } : {}) });
       continue;
     }

@@ -53,9 +53,13 @@ export function aggregate(t: TrackShape, cells: ArrayLike<number>, order: ArrayL
   }
   if (t.numeric) {
     // a heatmap's profiled-without-value cell (-2) is no value; the pixel is one when it has no value but such a cell
-    let sum = 0, n = 0, profiledNoValue = false;
-    for (let k = k0; k < k1; k++) { const c = cells[order ? order[k] : k]; if (c >= 0) { sum += c; n++; } else if (c === -2) profiledNoValue = true; }
-    return n ? Math.round(sum / n) : profiledNoValue ? -2 : -1;
+    // a threshold category (-3 - k) is not on the ramp: the pixel shows the first one when it has no ramp value
+    let sum = 0, n = 0, profiledNoValue = false, threshold = 0;
+    for (let k = k0; k < k1; k++) {
+      const c = cells[order ? order[k] : k];
+      if (c >= 0) { sum += c; n++; } else if (c === -2) profiledNoValue = true; else if (c <= -3 && !threshold) threshold = c;
+    }
+    return n ? Math.round(sum / n) : threshold || (profiledNoValue ? -2 : -1);
   }
   if (t.kind === "clinical" && t.categories) {
     const m = t.categories.length + 1; // + Other

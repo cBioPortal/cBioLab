@@ -9,6 +9,7 @@
 import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES, SAMPLES_TRACK, SPECTRUM_TRACK, STUDY_TRACK, type ProfiledType } from "./profile-names.ts";
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
+import { portalFixed } from "./chart/format.ts";
 import { eventWanted, oqlLevel, oqlSublabel } from "./oql-match.ts";
 import type { OqlSpec } from "./oql-parse.ts";
 import { STYLE, assayScale, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
@@ -25,6 +26,8 @@ const shownMutation = (c: number): number => { for (const b of PRIORITY_BITS) if
 export const NOT_PROFILED = -1;
 /** a heatmap cell profiled but without a value: a VAF row's "Not mutated/no VAF data", drawn in the portal's null colour */
 export const HEAT_NULL = -2;
+/** a generic assay's threshold value of category k is cell THRESHOLD_BASE - k (track.thresholds[k]) */
+export const THRESHOLD_BASE = -3;
 /** of two cells with no value, the one profiled (HEAT_NULL) first: 1 for it, 0 for not profiled */
 const missingRank = (cell: number): number => cell === HEAT_NULL ? 1 : 0;
 
@@ -176,6 +179,8 @@ export interface AssembleInput {
   /** continuous per-gene values per profile, keyed "<columnId>|<gene>" */
   /** `assay`: a generic-assay profile, whose `genes` are its entities */
   heatmap: { profileType: string; genes: string[]; isVaf: boolean; assay?: boolean; values: Map<string, number>;
+    /** a generic assay's threshold values (">90"): their sign, keyed as `values`; the value is the number */
+    thresholds?: Map<string, ">" | "<">;
     /** a generic assay's profile: its pivot threshold and sort order (genetic_profile) */
     pivot?: number; sortOrder?: "ASC" | "DESC";
     /** the profile's alteration type and datatype, "MRNA_EXPRESSION Z-SCORE": the Tabular download's row type */
@@ -555,9 +560,19 @@ export function assembleContract(input: AssembleInput): Contract {
       else { min = -3; max = 3; center = 0; }
       const span = max - min || 1;
       const cells = new Int32Array(allPids.length).fill(-1), values = new Float32Array(allPids.length).fill(NaN);
+      // a threshold value is drawn as its category (">90.00"), in order of first appearance (OncoprintUtils 471-486)
+      const thresholds: string[] = [];
       allPids.forEach((p, i) => {
         const v = h.values.get(p + "|" + gene);
         if (v === undefined) return;
+        const sign = h.thresholds?.get(p + "|" + gene);
+        if (sign && !Number.isNaN(v)) {
+          const cat = sign + portalFixed(v, 2);
+          let k = thresholds.indexOf(cat);
+          if (k < 0) k = thresholds.push(cat) - 1;
+          cells[i] = THRESHOLD_BASE - k; values[i] = v;
+          return;
+        }
         if (Number.isNaN(v)) { cells[i] = HEAT_NULL; return; }
         cells[i] = Math.round(255 * (Math.max(min, Math.min(max, tx(v))) - min) / span); values[i] = tx(v);
       });
@@ -570,7 +585,7 @@ export function assembleContract(input: AssembleInput): Contract {
           : h.isVaf ? "allele fraction, max across a patient's mutations in the gene" : "a patient's: its samples' value furthest from 0",
         // an assay's range is exact: its colour stops sit on it
         min: assay ? min : Math.round(min * 100) / 100, max: assay ? max : Math.round(max * 100) / 100,
-        center: center == null ? null : Math.round(255 * (0 - min) / span), cells, values,
+        center: center == null ? null : Math.round(255 * (0 - min) / span), cells, values, ...(thresholds.length ? { thresholds } : {}),
         ...(assay ? { stops: assay.stops, colors: assay.colors } : {}) });
     }
   }
