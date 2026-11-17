@@ -9,7 +9,7 @@ import { runPlot } from "../lib/views/plot/run.ts";
 import { pointTip } from "../lib/views/plot/point-tip.ts";
 import { legendFor } from "../lib/federation.ts";
 import { POINTS_CAP, type PlotData } from "../lib/plot.ts";
-import { viewToSvg } from "../lib/view-svg.ts";
+import { plotSvg } from "../lib/views/plot/figure.ts";
 import { LAYER_BASE } from "../lib/plot-layers.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { DrawnResultOf, ViewResultOf } from "../lib/types.ts";
@@ -125,10 +125,10 @@ describe("the scatter figure: coloured and ringed points, and their legends", ()
   const base = { shape: "scatter", n: 3, x: { label: "AGE", kind: "num" }, y: { label: "TMB", kind: "num" },
     extent: { x0: 0, x1: 10, y0: 0, y1: 10 }, grid: [10, 10], bins: [{ bx: 1, by: 1, n: 2 }, { bx: 5, by: 5, n: 1 }],
     stats: { pearson: 0.1, spearman: 0.1, slope: 0, intercept: 0, pPearson: 0.5, pSpearman: 0.5 }, pointSet: { rule: "all", drawn: 3 } };
-  const coloured = viewToSvg({ kind: "plot", plot: { ...base,
+  const coloured = plotSvg({ kind: "plot", plot: { ...base,
     xyPoints: [{ id: "a", x: 1, y: 1, c: "X" }, { id: "b", x: 1.2, y: 1.1, c: "Y", r: "R" }, { id: "c", x: 5, y: 5, c: "X" }],
     legend: [{ label: "X", color: "#111111" }, { label: "Y", color: "#222222" }, { label: "R", color: "#333333", ring: true }],
-    colorLabel: "Colour attr", ringLabel: "Ring attr" } } as unknown as DrawnResultOf<"plot">)!;
+    colorLabel: "Colour attr", ringLabel: "Ring attr" } } as unknown as DrawnResultOf<"plot">, {})!;
   /** the case's own circle, found by its data-id */
   const circle = (svg: string, id: string) => {
     const m = svg.match(new RegExp('<circle data-id="' + id + '"[^>]*>'));
@@ -158,8 +158,8 @@ describe("the scatter figure: coloured and ringed points, and their legends", ()
   });
 
   test("G4 points without c draw in the base colour, with no colour legend", () => {
-    const svg = viewToSvg({ kind: "plot", plot: { ...base,
-      xyPoints: [{ id: "a", x: 1, y: 1 }, { id: "b", x: 1.2, y: 1.1 }, { id: "c", x: 5, y: 5 }] } } as unknown as DrawnResultOf<"plot">)!;
+    const svg = plotSvg({ kind: "plot", plot: { ...base,
+      xyPoints: [{ id: "a", x: 1, y: 1 }, { id: "b", x: 1.2, y: 1.1 }, { id: "c", x: 5, y: 5 }] } } as unknown as DrawnResultOf<"plot">, {})!;
     for (const id of ["a", "b", "c"]) assert.equal(attr(circle(svg, id), "fill"), LAYER_BASE);
     const t = texts(svg);
     assert.ok(!t.includes("colour") && !t.some((s) => s.endsWith("(ring)")), "no colour or ring legend; texts: " + t.join(" | "));
