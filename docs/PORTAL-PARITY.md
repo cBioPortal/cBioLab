@@ -412,7 +412,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Volcano drag-select and click, as the expression volcanoes have; significant points `#58ACFA` (ours by group) (CMM-VO-3, CMM-VO-5, CMM-FL-3)
 - [ ] **Results → Comparison/Survival tab** ([20-comparison-core](legacy-spec/parity/20-comparison-core.md), [21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
   - [ ] The Unaltered group as the portal's, unaltered among samples not wholly unprofiled (ours needs profiling in every type: 312 vs 372; OS p 0.616 vs 0.632); the Unprofiled and per-track groups (CMP-RV-3, CMM-RV-1…4)
-    - [x] Unaltered: not altered and profiled for some queried gene in some selected alteration profile (`profiled` `anyGene`, DSL 2.10): coadread KRAS 372, OS 369/74, p 0.632, as the portal; msk_impact_2017 ZFHX3 399 / 7,740 samples (#PR)
+    - [x] Unaltered: not altered and profiled for some queried gene in some selected alteration profile (`profiled` `anyGene`, DSL 2.10): coadread KRAS 372, OS 369/74, p 0.632, as the portal; msk_impact_2017 ZFHX3 399 / 7,740 samples (#304)
     - [ ] The Unprofiled group, the per-track groups, user groups and the group selector on the Results tab
   - [ ] The SV, mRNA, Protein and Methylation sub-tabs (ours mutation and CNA); "Add checked genes to query"; query genes left out before q (CMM-RV-1…4, CMM-MD-9)
 - [ ] **Patient → Summary and tabs** ([40-patient-summary](legacy-spec/parity/40-patient-summary.md), [41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
