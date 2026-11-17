@@ -7,7 +7,7 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { signaturesSvg } from "../../lib/views/signatures/figure.ts";
-import { COUNT_TIP, ROW_CLICK_HINT, SIGNIFICANT_P, YMAX_MAX, YMAX_MIN, countLabel, pctText, typeOption } from "../../lib/views/signatures/data.ts";
+import { COUNT_TIP, ROW_CLICK_HINT, SIGNIFICANT_P, TABLE_TSV, YMAX_MAX, YMAX_MIN, countLabel, pctText, signatureTableTsv, typeOption } from "../../lib/views/signatures/data.ts";
 import type { SignaturesResult, SignatureRow } from "../../lib/views/signatures/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import { type Col, PortalTable } from "./portal-bodies.tsx";
@@ -125,7 +125,7 @@ export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }:
       {p && s.signatures.length > 0 && (
         <section className="alt-table" aria-label="Mutational signatures">
           {sp && <p className="meta">{ROW_CLICK_HINT}</p>}
-          <PortalTable wide rows={s.signatures} cols={cols} selected={chosen} onSelect={(r) => { if (!updating && canPick(r) && r !== chosen) patch({ signature: r.name }); }} initialSort={s.profiled.length ? { key: "s0", desc: true } : { key: "name" }} search={(r) => r.name + " " + r.description}
+          <PortalTable wide rows={s.signatures} cols={cols} download={{ file: TABLE_TSV, tsv: (rows) => signatureTableTsv(rows, s.profiled) }} selected={chosen} onSelect={(r) => { if (!updating && canPick(r) && r !== chosen) patch({ signature: r.name }); }} initialSort={s.profiled.length ? { key: "s0", desc: true } : { key: "name" }} search={(r) => r.name + " " + r.description}
             filters={[{ label: "above 0 in some sample", test: (r) => r.values.some((x) => (x.value ?? 0) > 0) },
               ...(s.profiles?.pvalue ? [{ label: "significant only (p < " + SIGNIFICANT_P + ")", test: (r: SignatureRow) => r.values.some((x) => x.p != null && x.p < SIGNIFICANT_P) }] : [])]}
             note={s.profiles?.contribution + (s.profiles?.pvalue ? "; bold: p < " + SIGNIFICANT_P + " in " + s.profiles.pvalue : "; no p-values recorded")} />
