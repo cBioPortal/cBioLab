@@ -200,7 +200,7 @@ function pairsOnly(spec: PlotRequest): PlotRequest {
 function colourKey(data: PlotData, spec: PlotRequest, pts: { c?: string; r?: string }[]): void {
   // a participant that predates coloured points answers without the categories: said, not drawn plain
   const unanswered = [spec.colorBy && pts.every((x) => x.c === undefined) ? "colour" : "", spec.ringBy && pts.every((x) => x.r === undefined) ? "ring" : ""].filter(Boolean);
-  if (unanswered.length) data.colourNote = "The points are not coloured: the study's participant answered without their " + unanswered.join(" and ") + " categories.";
+  if (pts.length && unanswered.length) data.colourNote = "The points are not coloured: the study's participant answered without their " + unanswered.join(" and ") + " categories.";
   if (spec.colorBy && !unanswered.includes("colour")) { data.legend = legendFor(pts.map((x) => x.c || "")); data.colorLabel = axisLabel(spec.colorBy); }
   if (spec.ringBy && !unanswered.includes("ring")) { data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)]; data.ringLabel = axisLabel(spec.ringBy); }
 }
