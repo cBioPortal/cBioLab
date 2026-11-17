@@ -86,16 +86,6 @@ export function pdfFonts(svg: string): string {
       open + '<g font-family="IBM Plex Sans">' + body + "</g>" + close);
 }
 
-/** saves a PDF of the figure, a page its own size */
-function saveBlob(file: string, blob: Blob): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = file;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
 /** a standalone SVG (standaloneSvg) saved as a PDF */
 export async function savePdf(file: string, svg: string): Promise<void> {
   saveBlob(file, await svgToPdf(pdfFonts(svg)));
