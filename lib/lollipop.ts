@@ -305,7 +305,7 @@ export function fetchProteinInfo(gene: string): Promise<ProteinInfo | null> {
 export function buildLollipopGene(gene: string, reports: LollipopReport[], protein: ProteinInfo | null): HotspotGene {
   const changes = new Map<string, { pos: number | null; change: string; n: number; rows: number; impact?: string; driver: boolean }>();
   const types = new Map<string, { pos: number | null; mtype: string; driver: boolean; rows: number }>();
-  let mutated = 0, pairs = 0, somaticSamples = 0, cohortSamples = 0;
+  let mutated = 0, pairs = 0, somaticSamples = 0, germlineSamples = 0, cohortSamples = 0;
   for (const rep of reports) {
     cohortSamples += rep.cohortSamples;
     for (const c of rep.changes) if (c.gene === gene) {
@@ -319,7 +319,7 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
       if (cur) cur.rows += t.rows; else types.set(k, { ...t });
     }
     const tot = rep.totals.find((x) => x.gene === gene);
-    if (tot) { mutated += tot.patients; pairs += tot.pairs; somaticSamples += tot.somaticSamples; }
+    if (tot) { mutated += tot.patients; pairs += tot.pairs; somaticSamples += tot.somaticSamples; germlineSamples += tot.germlineSamples ?? 0; }
   }
   const observedMax = Math.max(0, ...[...changes.values()].map((c) => c.pos ?? 0));
   const proteinLength = protein?.proteinLength || observedMax || 10;
@@ -360,6 +360,6 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     // one is about the data and the other about what a site chose not to disclose
     unpositioned, withheld: Math.max(0, pairs - returned),
     ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}),
-    somaticSamples, cohortSamples, tally, ...(protein?.ids ? { ids: protein.ids } : {})
+    somaticSamples, germlineSamples, cohortSamples, tally, ...(protein?.ids ? { ids: protein.ids } : {})
   };
 }

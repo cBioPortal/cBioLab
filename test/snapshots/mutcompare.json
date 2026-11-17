@@ -726,6 +726,7 @@
                 "text": "R175H"
               },
               "somaticSamples": 153,
+              "germlineSamples": 0,
               "cohortSamples": 171,
               "tally": {
                 "missense": {
@@ -1355,6 +1356,7 @@
                 "text": "R175H"
               },
               "somaticSamples": 53,
+              "germlineSamples": 0,
               "cohortSamples": 499,
               "tally": {
                 "missense": {

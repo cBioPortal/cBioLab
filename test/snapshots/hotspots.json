@@ -464,6 +464,7 @@
             "text": "G12D/V/C and 4 more"
           },
           "somaticSamples": 2355,
+          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -886,6 +887,7 @@
             "text": "V600E"
           },
           "somaticSamples": 624,
+          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -1542,6 +1544,7 @@
             "text": "E545K/G/D"
           },
           "somaticSamples": 1144,
+          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {
@@ -2199,6 +2202,7 @@
             "text": "R175H/C/L"
           },
           "somaticSamples": 4088,
+          "germlineSamples": 0,
           "cohortSamples": 5543,
           "tally": {
             "missense": {

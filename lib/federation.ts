@@ -134,7 +134,8 @@ export interface VariantReport { variants: VariantCount[]; totals: GeneMutationT
 export interface LollipopChange { gene: string; pos: number | null; change: string; n: number; rows: number; driver: boolean; impact?: string }
 /** Raw mutation rows of one type at one codon — what a lollipop's colour is decided from. */
 export interface LollipopType { gene: string; pos: number | null; mtype: string; driver: boolean; rows: number }
-export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number }
+/** `germlineSamples`: samples with a germline mutation of the gene (status matching /germline/i), the portal's germline rate's numerator */
+export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number; germlineSamples?: number }
 /**
  * A site's per-codon lollipop counts. `annotated` is false when no OncoKB pin was available, in
  * which case every change reads as a driver — cBioPortal's own rule when driver annotation is off.
@@ -692,7 +693,8 @@ export function lollipopTotalsSql(cohortSql: string, genes: string[], study: str
   const pin = drivers && pins ? pins.pin : fusions?.pin ?? null, hotspotPins = drivers && pins ? pins.hotspotPins : null;
   return aggregateSql(lollipopCte(cohortSql, genes, study, 1, pin, db, hotspotPins, filters, fusions?.lines, drivers) +
     "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
-    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples" +
+    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,\n" +
+    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0) AS germline_samples" +
     (drivers ? ",\n       " + annotatingSql(drivers, offeredSources(drivers, pin, hotspotPins).sure, db, study) + " AS annotating" : "") + "\n" +
     "FROM m GROUP BY gene");
 }
@@ -1690,7 +1692,8 @@ abstract class BaseResolver implements AggregateCapable {
       changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1,
         ...(x.impact ? { impact: String(x.impact) } : {}) })),
       types: t.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), mtype: String(x.mtype), driver: Number(x.driver) === 1, rows: Number(x.rows) })),
-      totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples) }))
+      totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples),
+        ...(x.germline_samples != null ? { germlineSamples: Number(x.germline_samples) } : {}) }))
     };
   }
 
