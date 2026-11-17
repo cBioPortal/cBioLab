@@ -267,10 +267,12 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Several studies: on pooled values, where every study may show its values (was a size-weighted approximation of each study's quartiles); coadread + brca KRAS CNA × mRNA, all five boxes = the portal's rule on cbioportal.org's data (Diploid 943.23 · 1197.34 · 1495.2, was 947.72 · 1198.24 · 1492.25) (PLT-MD-2) (#280)
       - [ ] A study that may not show its values still pools by the size-weighted approximation, and says so
   - [ ] "Color samples by" the first gene by default: fill by mutation type, stroke by CNA, with a legend, scatters included (ours plain points; colour only on box plots, when chosen) (PLT-CL-1…4, PLT-CL-8, PLT-SC-6)
+    - [x] A scatter drawn as its points takes the fill and ring a box takes, with their keys titled by the colouring axes; a density scatter says why it has no per-case colour (PLT-CL-8, PLT-SC-6) (#300)
+    - [ ] The first queried gene by default (mutation type fill, copy-number stroke), the top alteration per sample, the portal's legend order and placement (PLT-CL-1…4, PLT-STM-14…17)
   - [ ] Discrete × discrete as bars: Bar, Stacked (the portal's default), 100% stacked, Sort By, Horizontal Bars (ours a table only) (PLT-PT-6, PLT-UT-4…6, PLT-BR-1…8, PLT-STM-12)
   - [x] Correlation text as the portal's: "Spearman: -0.06 (p = 0.185)" then "Pearson: -0.04 (p = 0.359)", `toFixed(2)` and `toConditionalPrecision(p, 3, 0.01)` (was "Pearson r = −0.038 (p = 0.36) · Spearman ρ = −0.055 (p = 0.19)") (PLT-SC-2, PLT-STM-4…6, PLT-STM-22) (#234)
     - [ ] In the right gutter on two lines each, as the portal places it (ours one line above the plot)
-    - [ ] p from r rounded to 5 decimals first, as the portal computes it (ours from the full-precision r; no shown value differs in the audit's four scatters)
+    - [x] r rounded to 5 decimals before it is shown to 2 or tested, as the portal keeps it (`portalR5`): an r rounding to ±1 has p 0, 0.124996 shows "0.13"; coadread Mut# × FGA and AGE × FGA show the portal's strings, p 2.1191e-16 / 0.184829 from −0.34872 / −0.05509 (PLT-STM-4…6) (#285)
     - [x] Several studies: Spearman over every study's pairs ranked together, where every study may show its cases (was not reported), and Pearson's r unrounded (was 4 decimals before its p); coadread + brca Mut# × FGA, n 1,573: ρ 0.092107 (p 2.54e-4), r −0.175601 (p 2.32e-12) = scipy on cbioportal.org's data (PLT-MD-2, PLT-STM-5, PLT-STM-6) (#283)
       - [ ] A study that may not show its cases: still no Spearman, and the caption says why
   - [ ] The quick-plot "Examples" pills (Mut# vs Dx, FGA vs Dx, mRNA vs CNA, …) (PLT-QP-1…12, PLT-LY-1)
@@ -302,7 +304,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - Ours alone: with two cohorts, one menu per chart, the cohort's name added to the file name
     - [ ] The hide-download switch (CTS-MD-12): with the Data-governance switches
   - [ ] The bar's popover "Gene altered in 92.77% of 982 patients" with the type table to 2 dp, the study link and "Query this study" (ours an SVG title) (CTS-CH-7, CTS-STM-5, CTS-MD-2)
-  - [ ] Stack and legend order (Multiple at the bottom, Mutation on top; ours the reverse); Multiple `#666` (ours `#6e7a83`) (CTS-CH-3, CTS-CH-4)
+  - [x] Stack and legend order as the portal's: Multiple at the bottom, then protein and mRNA low / high, deep deletion, amplification, structural variant, Mutation on top (OrderedAlterationLabelMap); the legend the kinds present, reversed (Mutation first); Multiple `#666` (CTS-CH-3, CTS-CH-4) (#328)
   - [ ] The profiled strip: "+" and "−" rows for every data type, with hover counts (ours rows only where a group lacks a type) (CTS-CH-5, CTS-CH-6, CTS-MD-8)
   - [ ] The "Show Genomic Alteration Types" toggle (CTS-OC-3)
   - [ ] A gene with no alterations: grey tab label, "There are no alterations in this gene." (CTS-GT-4, CTS-MD-10)
@@ -389,6 +391,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The table's download and column menu; the row click's plot and its controls (CMP-CL-2, CMP-CL-3, CMP-CL-4)
   - [x] Numeric clinical attributes by Wilcoxon / Kruskal-Wallis (ours report Welch t / Welch ANOVA: G1 Weight 2.80e-7 vs the portal's 3.86e-8, MSI MANTIS 0.0745 vs 0.798; ours computes the rank p, matching, but does not show it) (CMP-STM-7) (#233)
     - [ ] q over the same n as the portal's: it counts its 8 hidden survival attributes and OTHER_PATIENT_ID (G1 Weight q 1.022e-6; ours 8.49e-7 over 44; p identical)
+      - [x] The hidden survival attributes, AGE_LAST_FU_YEARS and BIRTH_YEAR tested and counted, not listed: n 52, Weight q 1.003e-6 (#310)
+      - [ ] OTHER_PATIENT_ID: waits on the >200-value question (QUESTIONS.md, invariant 10)
   - [x] Survival: the survival-type table (PFS, DFS, DSS with p and q, the Min. # patients filter) and a way to pick the endpoint on the tab (ours OS only), on the Comparison page and Results › Comparison/Survival; the tab only with survival data, opening on the portal's first endpoint (CMP-SV-1, CMP-SV-5, CMP-SV-6, CMP-STM-4, CMP-PG-4) (#227)
     - [ ] The table's hidden `# in <group>` and median columns, its column menu and download; Min. # as a slider (ours a number field) (CMP-SV-5)
     - [ ] The plot header's attribute description, the multi-study description warning, the axis titles from the attributes ("Probability of Overall Survival", "Overall Survival (Months)") (CMP-SV-7, CMP-KM-2)
@@ -414,7 +418,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Every altered gene tested (ours `minAltered: 5`, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested, DYNC2H1 q 0.0503 vs 0.239; CNA 6,512 vs 6,156 significant; G5 mutation 145 vs 336; see bugs) (CMM-STM-7, CMM-AL-4) (#228)
   - [ ] Every row (ours ≤300, and the frequency scatter and bar plot are built from those 300; the expression tabs' cap is under them) (CMM-AL-5, CMM-FS, CMM-BP-2, CMM-GN, CMM-EX-5)
     - [x] Genomic Alterations: every gene tested listed (G2 22,871 rows, as the portal's), the volcano and frequency scatter drawing every one; the bar plot already ranked every tested gene (#228); a two-group tie enriched in the second group (CMM-STM-3) (#294)
-    - [ ] The expression tabs past their 1,500 cap (CMM-GN, CMM-EX-5)
+    - [x] The expression tabs past their 1,500 cap: every gene tested listed and drawn on the volcano (brca Basal vs LumA RNA-seq 20,026, as the portal's, p identical) (CMM-EX-5) (#297)
+    - [ ] The generic-assay tabs' tables past 300 (CMM-GN)
   - [ ] Patient-level enrichment: the Sample / Patient select (CMM-AL-4, CMM-MD-5)
   - [x] Formats: p and q "< 10^-10" (ours "1.1e-82"), altered % to 2 dp (ours 1), the volcano's y capped at 10 (ours to 82) (CMM-STM-9, CMM-STM-3, CMM-AL-5, CMM-VO-1) (#236)
     - [ ] Group headers "(A) Basal": the ordinals come with the group selector's (CMP-GS-7)
@@ -423,6 +428,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Volcano drag-select and click, as the expression volcanoes have; significant points `#58ACFA` (ours by group) (CMM-VO-3, CMM-VO-5, CMM-FL-3)
 - [ ] **Results → Comparison/Survival tab** ([20-comparison-core](legacy-spec/parity/20-comparison-core.md), [21-comparison-molecular](legacy-spec/parity/21-comparison-molecular.md))
   - [ ] The Unaltered group as the portal's, unaltered among samples not wholly unprofiled (ours needs profiling in every type: 312 vs 372; OS p 0.616 vs 0.632); the Unprofiled and per-track groups (CMP-RV-3, CMM-RV-1…4)
+    - [x] Unaltered: not altered and profiled for some queried gene in some selected alteration profile (`profiled` `anyGene`, DSL 2.10): coadread KRAS 372, OS 369/74, p 0.632, as the portal; msk_impact_2017 ZFHX3 399 / 7,740 samples (#304)
+    - [ ] The Unprofiled group, the per-track groups, user groups and the group selector on the Results tab
+    - [ ] The Download tab's unaltered list and NP count by the same rule (`lib/views/datafiles/sql.ts` still requires every type: coadread KRAS 312; Results lane)
   - [ ] The SV, mRNA, Protein and Methylation sub-tabs (ours mutation and CNA); "Add checked genes to query"; query genes left out before q (CMM-RV-1…4, CMM-MD-9)
 - [ ] **Patient → Summary and tabs** ([40-patient-summary](legacy-spec/parity/40-patient-summary.md), [41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
   - [x] Allele Freq per sample as bars, "x variant reads out of y", 4 decimals below 0.01, sorted by the samples' VAFs in sample order (PAT-MT-3, PAT-STM-1) (#281)
@@ -444,6 +452,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
   - [x] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3) (#303)
   - [ ] Clinical Data tab as Attribute | Value and Attribute × sample, and the Timeline Data tables (ours two wide tables of raw values) (PTB-CD-1…4, PTB-STM-11)
+    - [x] The Timeline Data tables, one per event type (PTB-CD-4) (#316)
 
 ## Medium — annotation depth and per-sample viewers
 

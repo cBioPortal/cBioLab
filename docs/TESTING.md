@@ -51,7 +51,8 @@ written this way.
 5. **What computes is run, and a planted bug proves the test.** Logic in SQL is run against the
    fixture study ([below](#the-second-database-is-a-committed-fixture-study)), never only matched
    as text, as `check:values` and `check:genefacets` run theirs. Each new rule gets planted bugs in
-   `scripts/check-mutants.ts` that some check must catch; one that survives means the tests are
+   a new file of its own, `scripts/mutants/<area>/<feature>.ts` (so two pull requests never append
+   to the same list) that some check must catch; one that survives means the tests are
    not testing the rule.
 
 ## Coverage rules — new code is tested
@@ -110,8 +111,9 @@ each one lands.
 
 ## Documented examples are executed and their counts pinned
 
-`npm run docs:check` (a stage of `scripts/gate.sh`) fails on drift between `lib/dsl-reference.ts`
-and `docs/dsl.md`, and EXECUTES every documented example against the live compiler. **Every
+`npm run docs:check` (a stage of `scripts/gate.sh`) notes drift between `lib/dsl-reference.ts`
+and `docs/dsl.md` (pull requests don't commit `docs/dsl.md`; it is regenerated on master after
+merges), and EXECUTES every documented example against the live compiler. **Every
 example's cohort counts are pinned** in `test/fixtures/example-counts.json` and asserted by the
 same gate, so "it still runs" is not mistaken for "it still gives the same answer". A renamed
 cohort, a moved number and a pin left behind by a deleted example all fail. After an intentional
@@ -247,7 +249,7 @@ checks assert rather than whatever a real warehouse happens to contain:
   BRCA1, a gene with no mutation, SV or panel row anywhere in the fixture: the empty-gene state.
 
 `check:enrichment-events` runs the Genomic Alterations table's any-type SQL over a scratch copy of
-the fixture's genomic tables in a database of its own (`cbiolab_check_enrichment_events`, dropped
+the fixture's genomic tables in a database of its own (`cbiolab_check_enrichment_events_<pid>_<time>`, dropped
 after), with four samples added for shapes the study does not hold: a sample whose mutation and
 copy-number panels differ, a whole-exome mutation sample, mutation types outside the portal's tree
 and blank, and a whole-exome row on a log2 copy-number profile. The study's own files are untouched,
@@ -301,11 +303,21 @@ named in the scripts).
 - `check:cohorts` — the cohort algebra (and/or/not, splits, line nesting, held-out halves) as set
   arithmetic over patient ids, and fast-check-generated definitions compared with a reference
   evaluator over the raw rows.
-- `check:mutants` — plants each bug in `scripts/check-mutants.ts` into a temp copy and requires a
-  check to fail. On a pull request CI sets `MUTANT_CHANGED` to the diff's file list and only the bugs
-  it could affect are planted: those in a changed file, and those whose guard's script or unit suites
-  changed. A diff touching the script itself, `verify.yml` or the dependencies plants every bug, as
-  does every push to master, so a test weakened far from the bug it guards is caught there.
+- `check:mutants` — plants each bug defined under `scripts/mutants/` (an area's file
+  `scripts/mutants/<area>.ts`, and one file per change in `scripts/mutants/<area>/<feature>.ts`: its
+  `mutants`, and the `guards` they need beyond `unit`, `cohort-logic` and `portal-parity`) into a
+  temp copy and requires a check to fail; `node scripts/check-mutants.ts --list` loads and checks the
+  files (unique ids, each guard defined once and every bug's guard defined) without planting. On a
+  pull request CI sets `MUTANT_CHANGED` to the diff's file list and only the bugs it could affect are
+  planted: those in a changed file, those whose guard's script or unit suites changed, and those an
+  edited area file defines or guards. A diff touching `scripts/check-mutants.ts`,
+  `scripts/mutants/types.ts`, `verify.yml` or the dependencies plants every bug. A push to master is
+  selective the same way, by the push's own diff; every bug is planted once a night on master
+  (`.github/workflows/planted-bugs-nightly.yml`, 03:17 UTC, or run by hand), so a test weakened far
+  from the bug it guards is caught within a day, and a failing night opens or updates the issue
+  "Nightly planted bugs failed". `/verification` shows the committed `docs/verification/mutants.json`,
+  refreshed from a full run (`npm run verify`, or the nightly run's `planted-bugs-nightly` artifact),
+  never from a partial one (whose file carries `selection`).
 
 The first two are gate stages. A new statistic gets a row in `lib/verification.ts`
 (`test/verification.test.ts` fails otherwise); new cohort or count logic should get a planted bug

@@ -19,6 +19,7 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
   if (vNames.length !== 1) return refuse("timeline", ctx, "a timeline view steps through one cohort's patients; this one draws " + vNames.length + " — name one in cohorts");
   const show = view.rows == null ? 25 : Math.floor(Number(view.rows));
   if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return refuse("timeline", ctx, "rows (the page size of the patient list) is 1 to " + TABLE_ROWS_MAX);
+  if (view.tables != null && typeof view.tables !== "boolean") return refuse("timeline", ctx, "tables is true (the events as tables, one per event type) or false");
   if (view.patient != null && (typeof view.patient !== "object" || typeof view.patient.study !== "string" || typeof view.patient.id !== "string" || !PATIENT_ID.test(view.patient.id)))
     return refuse("timeline", ctx, "patient is {study, id}: a study of the view's cohorts and a patient id in it, e.g. {\"study\": \"msk_chord_2024\", \"id\": \"P-0000012\"}");
   if (view.collapsed != null && (!Array.isArray(view.collapsed) || view.collapsed.some((u) => typeof u !== "string" || u.length > 300)))

@@ -84,10 +84,17 @@ export const portalPMin = (p: number): string => p === 0 || (p > 0 && Math.log10
 export const portalAlteredPct = (f: number): string => (f * 100).toFixed(2) + "%";
 
 /**
- * A correlation coefficient as cBioPortal's Plots tab writes it: `toFixed(2)`, an ASCII hyphen for
- * the sign (cbioportal-frontend ScatterPlot.tsx correlationInfo, PLT-STM-4; −0.05509 → "-0.06").
+ * A correlation coefficient as cBioPortal's Plots tab keeps it before showing or testing it: rounded
+ * to 5 decimals (cbioportal-frontend ScatterPlot.tsx pearsonCorr / spearmanCorr,
+ * `Number(…toFixed(5))`, PLT-STM-4…6).
  */
-export const portalCorr = (r: number): string => r.toFixed(2);
+export const portalR5 = (r: number): number => Number(r.toFixed(5));
+
+/**
+ * A correlation coefficient as cBioPortal's Plots tab writes it: `toFixed(2)` of its 5-decimal value,
+ * an ASCII hyphen for the sign (ScatterPlot.tsx correlationInfo, PLT-STM-4; −0.05509 → "-0.06").
+ */
+export const portalCorr = (r: number): string => portalR5(r).toFixed(2);
 
 /**
  * A regression line as cBioPortal's Plots tab labels it (regression@2.0.1 linear's `string`,
@@ -240,3 +247,13 @@ export function portalPercentAltered(altered: number, sequenced: number): string
   if (p < 0.03 && fixed.endsWith("0")) fixed = percent.toFixed();
   return fixed + "%";
 }
+
+/**
+ * A value rounded to `sig` significant digits, kept a number: what a result's long per-gene columns
+ * carry when they need not hold every bit (the page writes p and q to 3 digits). Not finite → as is.
+ */
+export const roundSig = (x: number, sig: number): number => Number.isFinite(x) && x !== 0 ? Number(x.toPrecision(sig)) : x;
+/** A value rounded to `places` decimal places, kept a number (a mean the page writes to 2 places). */
+export const roundPlaces = (x: number, places: number): number => Number.isFinite(x) ? Math.round(x * 10 ** places) / 10 ** places : x;
+/** A byte count in megabytes, one decimal: "2.5 MB". */
+export const fmtMb = (bytes: number): string => (bytes / 1e6).toFixed(1) + " MB";
