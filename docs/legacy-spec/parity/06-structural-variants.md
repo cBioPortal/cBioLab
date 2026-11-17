@@ -20,10 +20,10 @@ Legacy: header text and "Download TSV" per gene. cBioLab: the same `sv` view per
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 30 |
+| ✅ match | 28 |
 | 🟡 partial | 12 |
 | 🔶 different | 7 |
-| ❌ missing | 3 |
+| ❌ missing | 5 |
 | 🐞 ok | 2 |
 | 🐞 copied | 0 |
 | N/A | 0 |
@@ -40,8 +40,8 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 | §2 Table (TB) | 6 | 1 | 3 | 2 | 0 | 0 | 0 | Unchanged: numbered pager, header filters, CSV; default sort differs |
 | §2 Columns (COL) | 23 | 16 | 4 | 0 | 2 | 1 | 0 | Annotation reads the pair now, blank here; no Exon/Intron, no Center |
 | §3 Annotation (AN) | 5 | 1 | 1 | 3 | 0 | 0 | 0 | The portal's query; no header icons, card or empty-call icon |
-| §4 Modes (MD) | 7 | 5 | 1 | 0 | 0 | 1 | 0 | Settings leave the tab alone, as legacy; the duplicate suffix as legacy |
-| §6 Statistics (STM) | 5 | 3 | 0 | 1 | 1 | 0 | 0 | Fusions on the Mutations tab and duplicates as legacy; exon rank not shown |
+| §4 Modes (MD) | 7 | 4 | 1 | 0 | 1 | 1 | 0 | Settings leave the tab alone, as legacy; no duplicate suffix |
+| §6 Statistics (STM) | 5 | 2 | 0 | 1 | 2 | 0 | 0 | Fusions on the Mutations tab; duplicates and exon rank not shown |
 
 ---
 
@@ -51,7 +51,7 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 |---|---|---|---|
 | 1 | **Annotation column blank** on all 236 TMPRSS2 rows: the pair lookup is the portal's (#219) but prad's pairs are not in the store; plain header, no icon, no card | SV-COL-13, AN-1, AN-2, AN-4, AN-5 | SV tab: the Annotation column |
 | 2 | **Default sort** "drivers, then gene 1, gene 2" (AFF3-TMPRSS2 first) vs Annotation ↓ (TMPRSS2-BRAF first) | SV-TB-4, STM-3 | SV tab (added in this re-score) |
-| 3 | ~~**No duplicate suffix**~~ ("includes 2 duplicate structural variants…"): in (#302) | SV-TB-1, MD-7, STM-1 | SV tab (added in this re-score) |
+| 3 | **No duplicate suffix** ("includes 2 duplicate structural variants…") | SV-TB-1, MD-7, STM-1 | SV tab (added in this re-score) |
 | 4 | **No experimental-feature alert, no "Beta!"** | SV-1, SV-5 | SV tab (added in this re-score) |
 | 5 | **No Site1/Site2 Exon/Intron columns** | SV-COL-6, COL-10, STM-2 | SV tab: Exon and Intron columns |
 
@@ -89,7 +89,7 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| SV-TB-1 | 🟡 | B | "236 TMPRSS2 structural variants: includes 2 duplicate structural variants in patients with multiple samples", as legacy; no "(page x of y)" |
+| SV-TB-1 | 🟡 | B | Unchanged: "236 TMPRSS2 structural variants"; no duplicate suffix |
 | SV-TB-2 | 🔶 | B | Unchanged: search, "columns (8/36)", "download CSV (236)", filter icon on every header; no Copy |
 | SV-TB-3 | 🟡 | B | Unchanged: numbered pager + per page, "Showing 1–25 of 236" |
 | SV-TB-4 | 🔶 | B | Unchanged: "drivers first, then gene 1, gene 2" (`sv-table.ts:127`): AFF3-TMPRSS2 first; legacy TMPRSS2-BRAF first |
@@ -144,13 +144,13 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 | SV-MD-4 | 🟡 | C | Listed once ✅; OncoKB SV type derived as the portal's (#219); no functionalFusion logic |
 | SV-MD-5 | 🐞 ok | C | Only studies with SV data contribute ✅; annotation read per row from one store, not from the first profile only |
 | SV-MD-6 | ✅ | C | Show only drivers / somatic now exist (#168) and, as on the portal, do not touch this tab (the `sv` view takes no driver settings) |
-| SV-MD-7 | ✅ | B | The duplicate suffix (Q1 TMPRSS2: 2, as legacy) |
+| SV-MD-7 | ❌ | B | Unchanged: no duplicate suffix |
 
 ### §6 Statistics & methods
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| SV-STM-1 | ✅ | BC | Grouped by patient + both sites' chromosome and position, Σ(group − 1) over every row (`svRowSource` duplicateKey); TMPRSS2 2; keyed within a study, where legacy keys on the patient id alone |
+| SV-STM-1 | ❌ | BC | Unchanged: duplicates not computed or shown |
 | SV-STM-2 | ❌ | C | Unchanged: no exon rank |
 | SV-STM-3 | 🔶 | C | Unchanged: driver bit, then gene 1, gene 2 |
 | SV-STM-4 | ✅ | B | 236 / 220 / 11 identical |

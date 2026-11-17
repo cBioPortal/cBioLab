@@ -123,4 +123,10 @@ export const mutants: Mutant[] = [
   { id: "sv-duplicates-ignore-breakpoints", layer: "counts", guard: "table-duplicates", file: "lib/sv-table.ts",
     effect: "The Structural Variants table counts every second SV of a patient as a duplicate, where the portal requires the same breakpoints.",
     find: "duplicateKey: \"(study, patient, ifNull(toString(site1Chr), ''), ifNull(toString(site1Pos), ''), ifNull(toString(site2Chr), ''), ifNull(toString(site2Pos), ''))\"", replace: "duplicateKey: \"(study, patient)\"" },
+  { id: "lollipop-ymax-not-clamped", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "A Y-Axis Max typed below 1 is kept, where the portal clamps it to 1.",
+    find: "const v = Math.max(1, Math.round(input));", replace: "const v = Math.round(input);" },
+  { id: "lollipop-ymax-cap-unmarked", layer: "counts", guard: "unit", file: "lib/lollipop-svg.ts",
+    effect: "A lollipop whose tallest stem is above the set Y-Axis Max shows a plain top tick, where the portal marks the capped axis with \"≥\".",
+    find: "(cap != null && t === cap && maxN > cap ? \"≥\" : \"\")", replace: "(\"\")" },
 ];

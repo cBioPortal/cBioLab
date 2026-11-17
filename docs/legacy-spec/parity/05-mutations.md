@@ -46,7 +46,7 @@ Re-score of 2026-11-16: 30 verdicts changed, from #230 (fusions), #245 (the port
 | §7 Annotation (AN, VA) | 12 | 0 | 0 | 3 | 3 | 0 | 0 | 1 | 5 | OncoKB text badge, gene-level level; variant columns exist but blank on Q1 |
 | §8 Table controls, filters (TB, FM) | 14 | 0 | 7 | 5 | 2 | 0 | 0 | 0 | 0 | Unchanged: search does not reach the lollipop; drivers-first sort |
 | §9 Modes (MD) | 15 | 4 | 1 | 2 | 5 | 1 | 0 | 2 | 0 | Fusions and the empty gene fixed; drivers-only, germline, profiled missing |
-| §11 Statistics (STM) | 17 | 4 | 6 | 1 | 3 | 1 | 0 | 1 | 1 | Frequency with fusions, Copy # and duplicates as legacy; driver split, Freq absent |
+| §11 Statistics (STM) | 17 | 3 | 6 | 1 | 4 | 1 | 0 | 1 | 1 | Frequency with fusions and Copy # as legacy; driver split, duplicates, Freq absent |
 
 ---
 
@@ -65,7 +65,7 @@ Re-score of 2026-11-16: 30 verdicts changed, from #230 (fusions), #245 (the port
 | 9 | **Missing columns**: ASCN (5), clinical attributes, namespace, custom driver; Variant Type uncoloured | COL-8, COL-9, COL-12…17, COL-36, COL-37, COL-T2 | Custom driver annotations; Mutations tab (added in this re-score) |
 | 10 | **Annotation tracks and 3D structure** absent | TK-1…TK-4, 3D-1…3D-3, MD-10 | annotation breadth |
 | 11 | **Table chrome**: numbered pager, one-list Columns menu without Freq, CSV of rows kept, no Copy, no annotation filter | TB-1, TB-2, TB-4…TB-8, STM-15 | Mutations tab (added in this re-score) |
-| 12 | **Multi-sample counts**: the duplicate suffix is in (#302); no "n samples / m patients" | TB-1, MD-5, STM-14, STM-16, FM-5 | Mutations tab (added in this re-score) |
+| 12 | **Multi-sample counts**: no duplicate suffix, no "n samples / m patients" | TB-1, MD-5, STM-14, STM-16, FM-5 | Mutations tab (added in this re-score) |
 | 13 | **Transcript fixed to canonical** | HD-1, HD-2, MD-7 | transcript drop-down |
 
 ---
@@ -125,8 +125,8 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-LP-1 | 🟡 | B | Unchanged: [Legend 👁] [☁]; no track selector, no Y-Axis Max |
-| MUT-LP-2 | ❌ | B | Unchanged: no Y-Axis Max slider/box |
+| MUT-LP-1 | 🟡 | B | Y-Axis Max, [Legend 👁] [☁]; no track selector |
+| MUT-LP-2 | ✅ | B | "Y-Axis Max:" slider 1…default and a number box above it; below 1 read as 1; kept in the view (`yMax`), as in-tab state is (invariant 9), not local |
 | MUT-LP-3 | ✅ | C | No %/# toggle, no log scale |
 | MUT-LP-4 | 🟡 | BC | Unchanged: SVG / PNG of the plot; no PDF; `KRAS_mutation_diagram.<ext>` |
 | MUT-LP-5 | 🐞 ok | BC | Legend lists Splice as its own entry, as the stems draw it, not under Truncating as the portal's legend does (#250) |
@@ -229,7 +229,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-TB-1 | 🟡 | B | "223 KRAS mutations", "59 of 223 KRAS mutations", with the ": includes N duplicate mutations in patients with multiple samples" suffix when N > 0; no "(page x of y)" |
+| MUT-TB-1 | 🟡 | B | Unchanged: "223 KRAS mutations", "59 of 223 KRAS mutations"; no duplicate suffix |
 | MUT-TB-2 | 🟡 | B | Unchanged: search, columns, download CSV; no Copy |
 | MUT-TB-3 | 🔶 | B | Unchanged: search "G12D" → table 59 of 223, lollipop still 223 mutations |
 | MUT-TB-4 | 🔶 | B | Unchanged: numbered pages + per page |
@@ -283,10 +283,10 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-11 | ✅ | C | Copy # is the sample's discrete call for the gene; Q1 KRAS G12C rows ShallowDel / Gain / Diploid as legacy (#245) |
 | MUT-STM-12 | ❌ | C | Unchanged: no ASCN |
 | MUT-STM-13 | ? | C | gnomAD and SIGNAL columns exist (#245); blank on Q1, not comparable |
-| MUT-STM-14 | ✅ | B | Grouped by patient + protein change (one gene per table), Σ(group − 1) over every row, not the search (`mutationRowSource` duplicateKey); keyed within a study, where legacy keys on the patient id alone (two studies sharing a patient id count no duplicate here) |
+| MUT-STM-14 | ❌ | B | Unchanged |
 | MUT-STM-15 | ❌ | B | Unchanged: no Freq in the Columns menu |
 | MUT-STM-16 | ❌ | B | Unchanged |
-| MUT-STM-17 | 🟡 | B | Unchanged: domain max(5, tallest); axis niced (0-50-100-150) |
+| MUT-STM-17 | 🟡 | B | Default max(5, tallest), niced (0-50-100-150); a set Y-Axis Max is the exact top, "≥" on it when a stem is capped |
 
 ---
 
