@@ -10,6 +10,7 @@
  *   K  the key, run on ClickHouse over literal rows: a fusion recorded A–B and B–A is one key;
  *      another position, chromosome or class is another (the fixture holds no A–B / B–A pair)
  *   F  a merged row's fields are one record's (Gene 1 and Gene 2 never both the same partner)
+ *   L  the patient list's Structural Variants count is the table's rows (FX-P49: 1, though 2 records)
  *   S  Status is the stored SV status (the page draws s / g): FX-P51's BRCA2 deletion GERMLINE,
  *      its RB1 deletion SOMATIC; a sort by Status is refused (the portal does not sort it)
  *
@@ -64,6 +65,16 @@ async function svRows(patient: string, q: TableQuery = {}): Promise<Row[] | stri
     ok("M FX-P49: one row for EML4-ALK in both samples", r.length === 1 && r[0].samples === "FX-P49-T1, FX-P49-T2", JSON.stringify(r));
     ok("F its genes are one record's: EML4, ALK", r[0]?.gene1 === "EML4" && r[0]?.gene2 === "ALK", JSON.stringify(r[0]));
   }
+}
+
+// ---- L: the patient list counts the rows the table lists ------------------------------------------
+for (const id of ["FX-P49", "FX-P51"]) {
+  try {
+    const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id }, filters: { patient: { op: "equals", value: id } } }, ctx) as { alterations?: AlterationsResult; error?: string };
+    const a = r.alterations;
+    const listed = a ? a.rows[0]?.values[a.columns.findIndex((c) => c.id === "sv")] : null;
+    ok("L " + id + ": the patient list's Structural Variants equals the table's rows", a != null && Number(listed) === a.tables.sv!.total, "list " + listed + ", table " + a?.tables.sv?.total + (r.error ? " " + r.error : ""));
+  } catch (e) { ok("L " + id + ": the patient list's count", false, String((e as Error).message).slice(0, 200)); }
 }
 
 // ---- S: Status ----------------------------------------------------------------------------------
