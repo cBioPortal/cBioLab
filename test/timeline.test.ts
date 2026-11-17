@@ -4,6 +4,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
 import { timelineSvg, timelineSummary } from "../lib/timeline-svg.ts";
+import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
 import type { PatientEvent, PatientTimeline } from "../lib/types.ts";
@@ -191,6 +192,33 @@ describe("PAT-TL-TT-3: a sample event's tooltip rows", () => {
   });
   test("ST4 PAT-TL-TT-3: a lower-case key becomes upper-case", () => {
     assert.deepEqual(tip([], [["grade", "II"]]), [["GRADE", "II"]]);
+  });
+});
+
+describe("timeline download PAT-TL-ZM-4: the portal's timeline download", () => {
+  const t: PatientTimeline = { study: "s", patient: "P-1", events: EVENTS, samples: [{ id: "P-1-T02", type: "Primary" }], source: { label: "peer", remote: true } };
+  const file = (o: Parameters<typeof timelineSvg>[1]) => standaloneSvg(timelineSvg(t, { width: 900, theme: "light", ...o }).svg);
+  test("D1: not interactive unless asked", () => {
+    const off = timelineSvg(t, { theme: "light" }).svg;
+    assert.doesNotMatch(off, /data-ev=|data-uid=|class="tl-m"|class="tl-h"/);
+    const on = timelineSvg(t, { theme: "light", interactive: true }).svg;
+    assert.match(on, /data-ev=/);
+    assert.match(on, /data-uid=/);
+    assert.match(on, /class="tl-m"/);
+    assert.match(on, /class="tl-h"/);
+  });
+  test("D2: the light theme leaves no colour variables", () => {
+    assert.doesNotMatch(timelineSvg(t, { theme: "light" }).svg, /var\(--/);
+  });
+  test("D3: the file's root svg has numeric width and height and an xmlns", () => {
+    const root = /<svg\b[^>]*>/.exec(file({}))![0];
+    assert.match(root, /\swidth="\d+"/);
+    assert.match(root, /\sheight="\d+"/);
+    assert.match(root, /\sxmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  });
+  test("D4: collapsed tracks and expanded gaps change the saved figure", () => {
+    assert.notEqual(file({ collapsed: ["treatment"] }), file({}), "collapsed");
+    assert.notEqual(file({ expandGaps: false }), file({ expandGaps: true }), "expandGaps");
   });
 });
 
