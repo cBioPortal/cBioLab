@@ -106,7 +106,7 @@ jobs:
       REPORT_DIR: ${{ github.workspace }}/verification-report
       CLICKHOUSE_MAX_INFLIGHT: "4"
       # cbioportal.org's answers, one file per request (check-portal-parity.ts), restored from the day's cache
-      PORTAL_CACHE: ${{ github.workspace }}/../portal-cache
+      PORTAL_CACHE: ${{ github.workspace }}/.portal-cache
     steps:
       - uses: actions/checkout@v5
 
@@ -181,7 +181,7 @@ jobs:
         name: Cache cbioportal.org's answers
         uses: actions/cache@v4
         with:
-          path: ${{ github.workspace }}/../portal-cache
+          path: ${{ github.workspace }}/.portal-cache
           key: portal-answers-${{ steps.day.outputs.day }}
 
       - name: Gate, warehouse lane (peer database, cBioPortal, cohort logic, pooled paths, examples, method scripts, Explore checks)
@@ -249,7 +249,7 @@ jobs:
       REPORT_DIR: ${{ github.workspace }}/verification-report
       CLICKHOUSE_MAX_INFLIGHT: "4"
       # cbioportal.org's answers, one file per request (check-portal-parity.ts), restored from the day's cache
-      PORTAL_CACHE: ${{ github.workspace }}/../portal-cache
+      PORTAL_CACHE: ${{ github.workspace }}/.portal-cache
     steps:
       - uses: actions/checkout@v5
 
