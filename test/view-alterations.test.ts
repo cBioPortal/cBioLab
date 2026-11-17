@@ -331,4 +331,14 @@ describe("alterations: a federation peer that serves patient alterations", () =>
     const a = alt(await run({}, ctx({ A: cohort({ p: 2 }) }, { p }, { pin: "local-v1" })));
     assert.equal(a.oncokbPin, null);
   });
+
+  test("V1 (PAT-MT-2, PAT-CNA-4): the mutations table has no Samples column and has Copy # for a one-sample patient, the reverse for two", async () => {
+    const shown = async (view: Partial<AlterationsView>, t: Tables) => alt(await run(view, one(t))).tables.mutations!.shown!;
+    const one1 = await shown({ patient: { study: "s1", id: "P2" } }, study({ samples: [{ cohort: "A", study: "s1", patient: "P2", sid: "S2", type: "Primary" }] }));
+    assert.ok(!one1.includes("samples") && one1.includes("copy"), one1.join());
+    const two = await shown({}, study());
+    assert.ok(two.includes("samples") && !two.includes("copy"), two.join());
+    const coh = await shown({ samples: "cohort" }, study());
+    assert.ok(!coh.includes("samples"), "1 of 2 samples in the cohort: " + coh.join());
+  });
 });

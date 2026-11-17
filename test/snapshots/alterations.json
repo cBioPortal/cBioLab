@@ -423,16 +423,6 @@
                 "numeric": false
               },
               {
-                "id": "copy",
-                "name": "Copy #",
-                "numeric": false
-              },
-              {
-                "id": "freq",
-                "name": "Cohort %",
-                "numeric": true
-              },
-              {
                 "id": "vaf",
                 "name": "Allele Freq",
                 "numeric": true
@@ -445,6 +435,16 @@
               {
                 "id": "refCount",
                 "name": "Ref Reads",
+                "numeric": true
+              },
+              {
+                "id": "copy",
+                "name": "Copy #",
+                "numeric": false
+              },
+              {
+                "id": "freq",
+                "name": "Cohort %",
                 "numeric": true
               },
               {
@@ -489,9 +489,8 @@
               "proteinChange",
               "annotation",
               "mutationType",
-              "copy",
-              "freq",
-              "vaf"
+              "vaf",
+              "freq"
             ],
             "defaults": [
               "samples",
@@ -499,9 +498,8 @@
               "proteinChange",
               "annotation",
               "mutationType",
-              "copy",
-              "freq",
-              "vaf"
+              "vaf",
+              "freq"
             ],
             "query": {
               "filters": {
@@ -523,11 +521,11 @@
                   "G12V",
                   "Oncogenic · Level 1",
                   "Missense_Mutation",
-                  "",
-                  28.5,
                   0.08,
                   42,
                   512,
+                  "",
+                  28.5,
                   "SNP",
                   "12",
                   25398284,
@@ -548,11 +546,11 @@
                   "G127V",
                   "Likely Oncogenic · Level 1",
                   "Missense_Mutation",
-                  "",
-                  4.8,
                   0.62,
                   262,
                   161,
+                  "",
+                  4.8,
                   "SNP",
                   "10",
                   89692896,
@@ -573,11 +571,11 @@
                   "P151R",
                   "Likely Oncogenic",
                   "Missense_Mutation",
-                  "",
-                  52.4,
                   0.76,
                   761,
                   239,
+                  "",
+                  52.4,
                   "SNP",
                   "17",
                   7578478,

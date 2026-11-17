@@ -23,8 +23,8 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 | Verdict | Count |
 |---|---|
 | ✅ match | 35 |
-| 🟡 partial | 25 |
-| 🔶 different | 12 |
+| 🟡 partial | 26 |
+| 🔶 different | 11 |
 | ❌ missing | 15 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -225,8 +225,8 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-MT-1 | 🟡 | BC | Same rows (80/64/16); uncalled not listed (lgg has none); header "80 Mutations" ✅; 25 rows/page (legacy 10); default sort gene-grouped, driver genes first (`patient-alterations.ts:149`) vs Annotation desc; no "not profiled for mutations" alert |
-| PAT-MT-2 | 🔶 | B | Default: Samples · Gene · Protein Change · Annotation (OncoKB) · Mutation Type · Copy # · Cohort % · Allele Freq; Samples shown with 1 sample; Copy # shown with >1 sample; no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅ (17 columns) |
+| PAT-MT-1 | 🟡 | BC | Same rows (80/64/16); uncalled not listed (lgg has none); header "80 Mutations" ✅; 10 rows/page ✅; default sort gene-grouped, driver genes first (`patient-alterations.ts:149`) vs Annotation desc; no "not profiled for mutations" alert |
+| PAT-MT-2 | 🟡 | B | Default: Samples (2+ samples in view) · Gene · Protein Change · Annotation (OncoKB) · Mutation Type (the portal's labels, "FS del") · Allele Freq · Copy # (1 sample in view) · Cohort %, in the portal's order ✅ (lgg P04: Samples … Mutation Type, Allele Freq, Cohort %; TCGA-A6-2671: Gene … Allele Freq, Copy #, Cohort %); no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅; a hidden column stays in the menu where the portal excludes it |
 | PAT-MT-3 | 🔶 | B | One value = highest VAF among samples (`patient-alterations.ts:127`), 2 decimals; no bars, no reads tooltip, no header VAF plot |
 | PAT-MT-4 | 🟡 | B | Marker per carrying sample, "--" where not (equal-width slots) ✅; no grey not-profiled pill, no uncalled opacity |
 | PAT-MT-5 | ❌ | B | No mRNA Expr. column (P3 legacy 25 %, 29 % …) |
@@ -238,7 +238,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 |---|---|---|---|
 | PAT-CNA-1 | ✅ | B | ±2 only, merged by gene + call; 74/74 rows |
 | PAT-CNA-2 | 🔶 | B | lgg: "0 Copy Number Alterations … no rows", not "Study is not profiled …" |
-| PAT-CNA-3 | 🟡 | B | "74 Copy Number Alterations" ✅; 25 rows; sort driver genes first then gene |
+| PAT-CNA-3 | 🟡 | B | "74 Copy Number Alterations" ✅; 10 rows ✅; sort driver genes first then gene |
 | PAT-CNA-4 | 🟡 | B | Samples (always) · Gene · CNA (AMP/HOMDEL, not DeepDel) · Annotation (OncoKB) · Cytoband ✅ · Cohort %; no mRNA Expr., Custom Driver, GISTIC badge, Gene panel |
 | PAT-CNA-5 | 🐞 ok | C | No gene filter, so the mutation-panel-map bug cannot occur |
 

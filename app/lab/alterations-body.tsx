@@ -9,6 +9,7 @@ import { DataTable, specQuery } from "../_table/DataTable.tsx";
 import { sampleMarks } from "../../lib/timeline-tracks.ts";
 import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
+import { MutationTypeCell } from "./mutation-cells.tsx";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult } from "../../lib/views/alterations/types";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
@@ -102,6 +103,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
               cell={(id, x) => id === "samples" ? sampleCell(x)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
+                : id === "mutationType" ? <MutationTypeCell raw={x == null ? "" : String(x)} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>
                 : undefined} />

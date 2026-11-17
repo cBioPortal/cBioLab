@@ -96,7 +96,8 @@ async function patientViews({ browser, ok, BASE }) {
       await sec("Mutations").locator(".dt-sort", { hasText: "Allele Freq" }).click();
       await page.waitForFunction(() => /TP53/.test(document.querySelector("section.alt-table[aria-label='Mutations'] tbody tr")?.textContent || ""), null, { timeout: 120000 });
       await settle();
-      const vafs = (await sec("Mutations").locator("tbody tr td:last-child").allInnerTexts()).map(Number);
+      const vafAt = (await sec("Mutations").locator("thead th").allInnerTexts()).findIndex((h) => /Allele Freq/.test(h)) + 1;
+      const vafs = (await sec("Mutations").locator("tbody tr td:nth-child(" + vafAt + ")").allInnerTexts()).map(Number);
       ok("alterations: a header click sorts its own table, highest first, and no other", vafs.length === 7 && vafs.every((x, i) => i === 0 || vafs[i - 1] >= x) &&
         JSON.stringify(await sec("Copy Number Alterations").locator("tbody tr").allInnerTexts()) === JSON.stringify(cnaBefore), vafs.join(" "));
       // a filter's values come from that table
