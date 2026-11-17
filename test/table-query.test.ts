@@ -53,6 +53,14 @@ describe("shownColumns", () => {
 });
 
 describe("whereSql", () => {
+  test("{ present: true } keeps the rows with any value, a numeric column's text included", () => {
+    assert.equal(checkQuery({ filters: { name: { present: true } } }, cols), null);
+    assert.equal(checkQuery({ filters: { n: { present: true } } }, cols), null);
+    assert.match(checkQuery({ filters: { n: { present: false } as never } }, cols)!, /present: true/);
+    assert.match(checkQuery({ filters: { n: { present: true, min: 1 } as never } }, cols)!, /takes nothing else/);
+    assert.equal(whereSql(src, { filters: { n: { present: true } } }, defaults), "(toString(n) != '')");
+    assert.equal(describeQuery({ filters: { n: { present: true } } }, cols), "rows Count has a value");
+  });
   test("nothing asked keeps every row", () => assert.equal(whereSql(src, {}, defaults), "1"));
   test("search matches any shown column, case-insensitively, as text", () => {
     assert.equal(whereSql(src, { search: " G12 " }, defaults), "(positionCaseInsensitiveUTF8(name, 'G12') > 0 OR positionCaseInsensitiveUTF8(kind, 'G12') > 0)");
