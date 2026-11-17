@@ -4,7 +4,7 @@
   "app/import/import-client.tsx": 1,
   "app/import/updates/updates-client.tsx": 2,
   "app/lab/custom-data-panel.tsx": 1,
-  "app/lab/evolution-body.tsx": 3,
+  "app/lab/evolution-body.tsx": 1,
   "app/lab/genomic-overview.tsx": 1,
   "app/lab/kinds/adjusted.tsx": 2,
   "app/lab/kinds/assays.tsx": 3,
