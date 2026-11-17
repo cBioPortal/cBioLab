@@ -4,7 +4,7 @@ import {
   fmtInt, fmtNum, fmtPct, FS, SW, type SvgOpts, type LegendItem
 } from "../../svg-kit.ts";
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
-import { AMP, DEL, MULTI, MUT, SV } from "../../figures/common.ts";
+import { AMP, CT_MERGED, DEL, MULTI, MUT, SV } from "../../figures/common.ts";
 import { STYLE } from "../../oncoprint-style.ts";
 import type { CancertypesGroup } from "./types.ts";
 
@@ -115,7 +115,13 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   groups.forEach((g, i) => {
     let y0 = T + PLOT_H;
     const x = r1(X(i));
-    for (const [k, name, col] of CT_KINDS) {
+    const merged = r.alterationTypes === false;
+    if (merged) {
+      const h = (T + PLOT_H) - ys(Math.min(ys.domain[1], value(g, "altered")));
+      if (h > 0) out.push(`<rect x="${x}" y="${r1(y0 - h)}" width="${r1(bw)}" height="${r1(h)}" fill="${CT_MERGED}"` +
+        (o.popover ? ` data-group="${esc(g.key)}" role="img" aria-label="${esc(g.label + ": " + fmtInt(g.altered) + " of " + fmtInt(g.profiled) + " profiled " + r.unit + "s altered")}"` : "") + `/>`);
+    }
+    for (const [k, name, col] of merged ? [] : CT_KINDS) {
       const h = (T + PLOT_H) - ys(Math.min(ys.domain[1], value(g, k)));
       if (h <= 0) continue;
       y0 -= h;
@@ -141,7 +147,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const bl = bandLabels(groups.map((g) => g.label), centers, band, y, p, { maxH: LABEL_H });
   out.push(bl.svg);
   y += bl.height + 6;
-  const items: LegendItem[] = [...CT_KINDS].reverse().filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
+  const items: LegendItem[] = r.alterationTypes === false ? [] : [...CT_KINDS].reverse().filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
   const lg = legend(items, L, y, W - L - PAD, p, { size: FS.small });
   out.push(lg.svg);
   y += lg.height;

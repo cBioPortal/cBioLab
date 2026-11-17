@@ -33,3 +33,5 @@ export const DEL = STYLE.glyph.cna.options.find((o) => o.bit === "HOMDEL")!.colo
 export const SV = STYLE.glyph.sv.color;
 /** the Cancer Types Summary's "Multiple Alterations", the portal's (CancerSummaryContent alterationToColor) */
 export const MULTI = "#666";
+/** the Cancer Types Summary's bar with its alteration types hidden (the portal's Victory theme's first colour) */
+export const CT_MERGED = "#666";
