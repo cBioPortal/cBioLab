@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
-import { GENOME_NEXUS_SOURCES, ONCOKB_SV_TABLE, ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE, SYNC_RUN_TABLE, VARIANT_TABLE, syncedStudiesSql } from "../lib/annotation-store.ts";
+import { GENOME_NEXUS_SOURCES, ONCOKB_CANCER_GENE_TABLE, ONCOKB_SV_TABLE, ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE, SYNC_RUN_TABLE, VARIANT_TABLE, oncokbCancerGeneSql, oncokbCancerGenesStoredSql, syncedStudiesSql } from "../lib/annotation-store.ts";
 import { ANNOTATION_SOURCES, SYNC_RUN_TABLE as SYNC_RUN_WRITTEN, VARIANT_TABLE as VARIANT_WRITTEN, annotationSource, annotationStoreDdl } from "@cbiolab/annotation-sync";
 
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -14,6 +14,7 @@ test("the app reads the tables the sync writes", () => {
   assert.equal(ONCOKB_TABLE, annotationSource("oncokb").table);
   assert.equal(ONCOKB_TUMOR_TYPE_TABLE, annotationSource("oncokb_tumor_type").table);
   assert.equal(ONCOKB_SV_TABLE, annotationSource("oncokb_sv").table);
+  assert.equal(ONCOKB_CANCER_GENE_TABLE, annotationSource("oncokb_cancer_gene").table);
   assert.equal(SYNC_RUN_TABLE, SYNC_RUN_WRITTEN);
   assert.equal(VARIANT_TABLE, VARIANT_WRITTEN);
   assert.ok(ANNOTATION_SOURCES.every((s) => s.table.startsWith("annotation.")), "every source's table is in the one annotation database");
@@ -27,14 +28,14 @@ const statementsOf = (file: string) =>
 test("the migrations, run in order, create exactly what the code creates", () => {
   const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
   // 003 (annotation.record) is committed with the first source that writes it
-  assert.deepEqual(files, ["001-annotation-database.sql", "002-annotation-variant.sql", "004-oncokb-tumor-type.sql", "005-oncokb-sv.sql"]);
+  assert.deepEqual(files, ["001-annotation-database.sql", "002-annotation-variant.sql", "004-oncokb-tumor-type.sql", "005-oncokb-sv.sql", "006-oncokb-cancer-gene.sql"]);
   const statements = files.flatMap(statementsOf);
   const creates = statements.filter((s) => /^CREATE (DATABASE|TABLE) /.test(s));
   assert.deepEqual(creates, annotationStoreDdl().map(squash));
   // and grant nothing on the shared annotation database as a whole: OncoKB's licence is its table's
   assert.ok(!statements.some((s) => /^GRANT .* ON annotation\.\*/.test(s)));
   // the public sources' writer never reaches the licensed table
-  assert.ok(!statements.some((s) => /^GRANT .* ON annotation\.oncokb(_tumor_type|_sv)? TO annotation_writer/.test(s)));
+  assert.ok(!statements.some((s) => /^GRANT .* ON annotation\.oncokb(_tumor_type|_sv|_cancer_gene)? TO annotation_writer/.test(s)));
 });
 
 test("OncoKB by tumour type is licensed like OncoKB: its writer, and SELECT for the app", () => {
@@ -57,6 +58,16 @@ test("OncoKB for structural variants is licensed like OncoKB: its writer, and SE
   ]);
 });
 
+test("OncoKB's cancer gene list is licensed like OncoKB: its writer, and SELECT for the app", () => {
+  const s = annotationSource("oncokb_cancer_gene");
+  assert.equal(s.writer, "oncokb");
+  assert.deepEqual(s.needs, ["ONCOKB_TOKEN"]);
+  assert.deepEqual(statementsOf("006-oncokb-cancer-gene.sql").filter((x) => x.startsWith("GRANT ")), [
+    "GRANT SELECT, INSERT, ALTER DELETE ON annotation.oncokb_cancer_gene TO oncokb_writer",
+    "GRANT SELECT ON annotation.oncokb_cancer_gene TO cohort_lab_ro"
+  ]);
+});
+
 test("the public sources write as one writer, the app reads what they write", () => {
   for (const id of ["genome_nexus", "genome_nexus_grch38"]) {
     const s = annotationSource(id);
@@ -73,4 +84,12 @@ test("which studies a source covers, from the shared log", () => {
   assert.equal(syncedStudiesSql("oncokb"), "SELECT DISTINCT study FROM annotation.sync_run WHERE source = 'oncokb' AND (annotated_new > 0 OR already_stored > 0)");
   assert.match(syncedStudiesSql("x'; DROP"), /source = 'x' AND/, "a source id is a bare word");
   assert.match(syncedStudiesSql("genome_nexus_grch38"), /source = 'genome_nexus_grch38' AND/, "digits and all");
+});
+
+// what these return is run against the fixture by scripts/check-oncokb-cancer-gene.ts; here only that a pin is quoted
+test("the cancer gene reads quote the pin", () => {
+  for (const sql of [oncokbCancerGeneSql("v'1"), oncokbCancerGenesStoredSql("v'1")]) {
+    assert.ok(sql.includes("FROM " + ONCOKB_CANCER_GENE_TABLE), sql);
+    assert.ok(sql.includes("oncokb_version = 'v''1'"), sql);
+  }
 });
