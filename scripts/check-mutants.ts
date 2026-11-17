@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "table-kept-units";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -49,6 +49,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-fusions": ["node", "--env-file=.env.local", "scripts/check-mutation-fusions.ts"],
   "mutation-columns": ["node", "--env-file=.env.local", "scripts/check-mutation-columns.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
+  "table-kept-units": ["node", "--env-file=.env.local", "scripts/check-table-kept-units.ts"],
   "patient-vaf": ["node", "--env-file=.env.local", "scripts/check-patient-vaf.ts"],
 };
 
@@ -534,6 +535,9 @@ const MUTANTS: Mutant[] = [
   { id: "fusion-only-gene-dropped", layer: "counts", guard: "mutation-fusions", file: "lib/views/hotspots/run.ts",
     effect: "A gene with fusions but no mutations disappears from the Mutations tab's lollipop, with its Fusion badge and frequency, where the portal keeps it.",
     find: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i]));", replace: "uniq.map((gene, i) => buildLollipopGene(gene, reports, proteins[i])).filter((h) => h.mutated > 0);" },
+  { id: "kept-patients-are-samples", layer: "counts", guard: "table-kept-units", file: "lib/table-query.ts",
+    effect: "A filtered Mutations table counts its kept patients as its kept samples, where the portal counts each patient once across their samples.",
+    find: "uniqExactIf(\" + src.units.patient + \", \"", replace: "uniqExactIf(\" + src.units.sample + \", \"" },
   { id: "germline-case-sensitive", layer: "counts", guard: "mutation-tab-states", file: "lib/federation.ts",
     effect: "A mutation whose status is spelled 'Germline' or 'germline' counts as somatic in the Somatic Mutation Frequency, where the portal matches germline in any case.",
     find: "AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples", replace: "AND ifNull(status, '') != 'GERMLINE') AS somatic_samples" },

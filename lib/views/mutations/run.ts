@@ -93,7 +93,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   });
   const gn = describePins(pins);
   const shown = shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS);
-  const mutations = { gene, columns: MUTATION_COLUMNS, shown, defaults: MUTATION_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
+  const mutations = { gene, ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns: MUTATION_COLUMNS, shown, defaults: MUTATION_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
     ...(unannotated.length ? { unannotated } : {}),
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (ctx.page || ctx.values) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };
@@ -101,7 +101,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
     kind: "mutations", cohorts: vNames, mutations,
     method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, variantPins: gn, queryText: describeQuery(q, MUTATION_COLUMNS),
       sortName: q.sort ? MUTATION_COLUMNS.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
-      shown: rows.length, lists: r.lists, excluded, instances: r.groups }),
+      shown: rows.length, lists: r.lists, excluded, instances: r.groups, ...(r.kept && r.total < r.all ? { kept: r.kept } : {}) }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every " + gene + " mutation call in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples, one row per call; uncalled mutations are left out, as the portal leaves them out. " +

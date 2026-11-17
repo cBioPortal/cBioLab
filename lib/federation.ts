@@ -416,6 +416,11 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * only this instance knows what its panels cover. That is also why a federated
  * co-occurrence is more correct than one computed from pooled exports.
  */
+/**
+ * A table's rows per cohort and study: kept by the query (`n`) and every one (`all`); with RowSource.units,
+ * the distinct samples (`ns`) and patients (`np`) among those kept.
+ */
+export interface RowCounts { cohort: string; study: string; n: number; all: number; ns?: number; np?: number }
 /** the query's lines a Mutations tab follows, and how their DRIVER reads */
 export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
 /** each gene's mutation filter under the query's lines, where one applies */
@@ -1317,7 +1322,7 @@ export interface PatientLevelCapable extends AggregateCapable {
   viewRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
   /** a table view's rows (lib/table-query.ts) in this instance, with their ids — see PatientLevelResolver.rowsPage */
   rowsPage(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }>;
-  rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]>;
+  rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]>;
   rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]>;
   rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null>;
   /** one patient's timeline events and samples — see PatientLevelResolver.patientTimeline */
@@ -1375,7 +1380,7 @@ export interface PeerRowsRequest {
   oncokbPin?: string | null;
 }
 export interface PeerRowsAnswer {
-  rows?: ChRow[]; counts?: { cohort: string; study: string; n: number; all: number }[]; values?: ChRow[]; rank?: number | null;
+  rows?: ChRow[]; counts?: RowCounts[]; values?: ChRow[]; rank?: number | null;
   /** the OncoKB version the peer annotated its rows with (null: not annotated) */
   oncokbPin?: string | null;
   /** which samples the peer read, echoed so a peer that ignored the request is caught */
@@ -2307,9 +2312,10 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     return { rows: r.data, total: r.data.length ? Number(r.data[0].total) : 0 };
   }
   /** per part: the rows the query keeps and every row. Counts only. */
-  async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]> {
+  async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]> {
     const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db), q, defaults), this.instance.conn);
-    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all) }));
+    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all),
+      ...(x.ns != null && x.np != null ? { ns: Number(x.ns), np: Number(x.np) } : {}) }));
   }
   /** a column's distinct values with counts, or its range — what its filter offers */
   async rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {

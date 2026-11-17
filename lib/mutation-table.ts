@@ -336,5 +336,6 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     select: "*",
     defaultOrder: "drv DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",
+    units: { sample: "sid", patient: "patient" },
   };
 }

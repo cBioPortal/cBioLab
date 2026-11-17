@@ -26,6 +26,8 @@ export interface MutationsView extends TableQuery {
 }
 export interface MutationsResult extends TableRows<string | number | null> {
   gene: string;
+  /** when the query keeps fewer rows than there are: the distinct samples and patients of those it keeps (the portal's reset panel, MUT-FM-5) */
+  kept?: { samples: number; patients: number };
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
   /** the Genome Nexus release its Genome Nexus columns are read at, per reference genome (null: none stored) */

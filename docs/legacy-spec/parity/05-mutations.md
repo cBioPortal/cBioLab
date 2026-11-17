@@ -20,10 +20,10 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 27 |
+| ✅ match | 28 |
 | 🟡 partial | 44 |
 | 🔶 different | 18 |
-| ❌ missing | 33 |
+| ❌ missing | 32 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 7 |
@@ -242,7 +242,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-FM-2 | ❌ | C | Unchanged: no mutation-status filter |
 | MUT-FM-3 | 🟡 | B | Unchanged |
 | MUT-FM-4 | 🔶 | C | Unchanged |
-| MUT-FM-5 | 🟡 | B | Unchanged |
+| MUT-FM-5 | 🟡 | B | The filtered table's count says "(n samples / m patients)", as the portal's reset panel; in the table's title, not a panel on the lollipop; no Study View link (#tbd) |
 
 ### §9 Modes and conditions
 
@@ -285,7 +285,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-13 | ? | C | gnomAD and SIGNAL columns exist (#245); blank on Q1, not comparable |
 | MUT-STM-14 | ❌ | B | Unchanged |
 | MUT-STM-15 | ❌ | B | Unchanged: no Freq in the Columns menu |
-| MUT-STM-16 | ❌ | B | Unchanged |
+| MUT-STM-16 | ✅ | B | Distinct samples and patients of the rows the table keeps, per study, summed (`mutationRowSource` units) (#tbd) |
 | MUT-STM-17 | 🟡 | B | Unchanged: domain max(5, tallest); axis niced (0-50-100-150) |
 
 ---

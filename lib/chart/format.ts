@@ -201,3 +201,12 @@ export const portalLocale = (x: number): string => x.toLocaleString("en-US");
  */
 export const portalRange = (min: number, max: number): string =>
   min === max ? portalLocale(min) : "(" + portalLocale(min) + ", " + portalLocale(max) + "]";
+
+/**
+ * A filtered table's samples and patients as the portal's reset panel writes them (PatientSampleSummary):
+ * "3 samples / 2 patients", or one count for both when they are equal, "5 samples/patients".
+ */
+export function portalKeptUnits(samples: number, patients: number): string {
+  if (samples !== patients) return samples + (samples === 1 ? " sample" : " samples") + " / " + patients + (patients === 1 ? " patient" : " patients");
+  return samples + (samples === 1 ? " sample/patient" : " samples/patients");
+}
