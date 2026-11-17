@@ -15,7 +15,7 @@ export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin:
       "its protein change built from its genes (\"A-B Fusion\", or \"A intragenic\" / \"A intergenic\"), type Fusion, site 1's chromosome and position, the variant class as its variant type" +
       (t.oncokbPin ? ", OncoKB " + t.oncokbPin + "'s call for the pair in the sample's tumour type as its annotation and the pair's call with no tumour type as its driver status (each the partners' gene-level Fusion calls where the pair has none stored)" : "") + "." +
       (t.kept ? " Of the rows the query keeps: " + t.kept.samples + " distinct samples and " + t.kept.patients + " distinct patients, counted per study and summed (the portal's reset panel)." : ""),
-    order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : "drivers first, then by codon") + ", then sample" });
+    order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : "by the portal\'s annotation value (OncoKB\'s oncogenicity, then its highest sensitive, resistance, diagnostic and prognostic levels, then a Cancer Hotspot), then by codon") + ", then sample" });
   return { steps, implementation: { functions: ["mutationRowSource", "pageSql", "countsSql"], file: "lib/mutation-table.ts, lib/table-query.ts", commit: BUILD_COMMIT },
     verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
 }

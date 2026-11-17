@@ -14,7 +14,7 @@ import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
 import { mutationTypeLabelSql } from "./mutation-type.ts";
 import { finiteSql } from "./sql-number.ts";
-import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
+import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
 
@@ -72,6 +72,15 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
   { id: "signal", name: "SIGNAL", numeric: false, tip: "Prevalence of germline mutations in cancer patients from SIGNAL" },
 ];
 
+/**
+ * The Annotation column's order, as SQL over the table's rows: the portal's [OncoKB sort value, CIViC,
+ * hotspot, reVUE] (react-mutation-mapper Annotation.tsx 319-327; CIViC and reVUE are off, 0; a recurrent
+ * Cancer Hotspot 1, the store holding no 3D hotspots). The portal's last element, whether the gene is an
+ * OncoKB cancer gene, is the same for every row of one gene's table. Sorted descending, the portal's default.
+ */
+export const MUTATION_ANNOTATION_ORDER = "arrayConcat(" + oncokbSortSql("oncogenicity", "level", "resistanceLevel", "diagnosticLevel", "prognosticLevel") +
+  ", [toFloat64(0), toFloat64(hot), toFloat64(0)])";
+
 /** Shown unless the view names its columns: the portal's own default set. */
 export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "mutCount"];
 
@@ -98,7 +107,7 @@ function queryColumn(c: MutationColumn, pin: string | null): QueryColumn {
     case "sample": return { ...c, text: "sid" };
     case "studyOfOrigin": return { ...c, text: str("studyName") };
     // spelled as the table shows it, so search and the value list match what is on screen
-    case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: "drv" };
+    case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: MUTATION_ANNOTATION_ORDER };
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
@@ -153,6 +162,10 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     copyNumberCte(p, i, db) + ",\n" +
     (pin ? tumorTypeCtes(p, i, db) : "");
   const gn = variantAnnotationCte("g" + i, db, p.study, "SELECT chr, start, end, ref, var FROM m" + i, pins);
+  // a Cancer Hotspot (recurrent), the Annotation sort's hotspot element; the store holds no 3D hotspots. A call
+  // with any part of its genomic location missing matches none, as the portal's extractGenomicLocation gives it no location
+  const located = "ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != ''";
+  const hot = gn && HOTSPOT_GENES.has(gene) ? "(" + located + " AND " + hotspotCondSql("m.mutationType", "ifNull(g.gd, '')") + ")" : "0";
   const rows =
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
@@ -161,8 +174,10 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     // a germline mutation has no protein-change call: the portal asks OncoKB about it by HGVSc
     // (StoreUtils queryOncoKbData), which this store does not hold
     (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n" +
-      "         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0)))" + (gn && HOTSPOT_GENES.has(gene) ? " OR " + hotspotCondSql("m.mutationType", "ifNull(g.gd, '')") : "") + ") AS drv,\n"
-      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
+      "         " + ["resistance", "diagnostic", "prognostic"].map((l) => "if(m.germ, '', if(tt.found = 1, tt." + l + "_level, ann." + l + "_level)) AS " + l + "Level").join(", ") + ",\n" +
+      "         toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0)))" + (hot !== "0" ? " OR " + hot : "") + ") AS drv,\n"
+      : "         '' AS oncogenicity, '' AS level, '' AS resistanceLevel, '' AS diagnosticLevel, '' AS prognosticLevel, toUInt8(0) AS drv,\n") +
+    "         toUInt8(" + (pin ? hot : "0") + ") AS hot,\n" +
     "         m.mutationType AS mutationType, upper(m.variantType) AS variantType,\n" +
     "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
@@ -254,9 +269,13 @@ function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: stri
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
     "         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
-    (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level, " +
-        drv + " AS drv,\n"
-      : "         '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,\n") +
+    // in the mutation rows' column order (the UNION ALL matches by position)
+    (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level,\n" +
+        "         " + svCellSql("resistance_level", "vp", "va1", "va2") + " AS resistanceLevel, " + svCellSql("diagnostic_level", "vp", "va1", "va2") + " AS diagnosticLevel, " +
+        svCellSql("prognostic_level", "vp", "va1", "va2") + " AS prognosticLevel,\n" +
+        "         " + drv + " AS drv,\n"
+      : "         '' AS oncogenicity, '' AS level, '' AS resistanceLevel, '' AS diagnosticLevel, '' AS prognosticLevel, toUInt8(0) AS drv,\n") +
+    "         toUInt8(0) AS hot,\n" +
     "         'Fusion' AS mutationType, upper(v.class) AS variantType,\n" +
     "         NULL AS vaf, NULL AS altCount, NULL AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,\n" +
@@ -305,13 +324,18 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
   const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins, oql));
   return "WITH " +
     (pin
-      ? "ann AS (SELECT alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
-        "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
-        "  GROUP BY alteration),\n" +
-        "att AS (SELECT alteration, consequence, tumor_type, any(t.oncogenicity) AS oncogenicity, any(t.highest_sensitive_level) AS level,\n" +
-        "    max(t.oncogenicity IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found\n" +
-        "  FROM " + ONCOKB_TUMOR_TYPE_TABLE + " AS t WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
-        "  GROUP BY alteration, consequence, tumor_type),\n" +
+      // each call's fields from one stored answer, its latest; the gene-level store holds no diagnostic or prognostic level (NULL: unknown)
+      ? "ann AS (SELECT alteration, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level,\n" +
+        "    CAST(NULL AS Nullable(String)) AS prognostic_level, toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver\n" +
+        "  FROM (SELECT alteration, argMax(tuple(toString(oncogenicity), toString(highest_sensitive_level), toString(highest_resistance_level)), resolved_at) AS c\n" +
+        "    FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
+        "    GROUP BY alteration)),\n" +
+        "att AS (SELECT alteration, consequence, tumor_type, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, toNullable(c.4) AS diagnostic_level,\n" +
+        "    toNullable(c.5) AS prognostic_level, toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver, toUInt8(1) AS found\n" +
+        "  FROM (SELECT alteration, consequence, tumor_type, argMax(tuple(toString(t.oncogenicity), toString(t.highest_sensitive_level), toString(t.highest_resistance_level),\n" +
+        "      toString(t.highest_diagnostic_level), toString(t.highest_prognostic_level)), t.resolved_at) AS c\n" +
+        "    FROM " + ONCOKB_TUMOR_TYPE_TABLE + " AS t WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'MUTATION' AND hugo_gene_symbol = " + sq(gene) + "\n" +
+        "    GROUP BY alteration, consequence, tumor_type)),\n" +
         // the gene's structural variants' calls, for its fusion rows
         svCallCtes(db, [gene], pin, { gene: "sva", pair: "svp" })
       : "") +
@@ -334,7 +358,8 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     with: allRows(parts, db, gene, pin, pins, oql),
     columns: MUTATION_COLUMNS.map((c) => queryColumn(c, pin)),
     select: "*",
-    defaultOrder: "drv DESC, pos ASC NULLS LAST",
+    // the portal's default: Annotation, descending (skin_results_view_tables_default_sort_column)
+    defaultOrder: MUTATION_ANNOTATION_ORDER + " DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",
     units: { sample: "sid", patient: "patient" },
   };
