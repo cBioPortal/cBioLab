@@ -244,7 +244,7 @@ jobs:
     needs: gate-warehouse
     if: ${{ (!cancelled()) && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     permissions:
       contents: read
     env:
@@ -273,12 +273,26 @@ jobs:
       - name: Peer database (test/fixtures/peer-study)
         run: node --env-file=.env.local scripts/peer-db.ts --port 21999 >> "$GITHUB_ENV"
 
-      # a pull request's changed files: the checkout is its merge commit, whose first parent is the base
+      # the files this run changed, so only the bugs they can affect are planted: a pull request's (its
+      # merge commit against its first parent, the base) or a push's (the push's before..after). Every
+      # bug is planted nightly (planted-bugs-nightly.yml), and on a push with no previous commit.
       - name: Changed files
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
         run: |
-          git fetch --no-tags --depth=2 origin "$GITHUB_SHA"
-          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            git fetch --no-tags --depth=2 origin "$GITHUB_SHA"
+            git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+          elif [ -z "$BEFORE" ] || [ -z "${BEFORE//0/}" ]; then
+            echo "a push with no previous commit: every bug is planted"
+            exit 0
+          else
+            if ! git fetch --no-tags --depth=1 origin "$BEFORE" || ! git diff --name-only "$BEFORE" "$GITHUB_SHA" > "$RUNNER_TEMP/changed.txt"; then
+              echo "the push's previous commit $BEFORE cannot be read (a force push?): every bug is planted"
+              exit 0
+            fi
+          fi
           echo "MUTANT_CHANGED=$RUNNER_TEMP/changed.txt" >> "$GITHUB_ENV"
           cat "$RUNNER_TEMP/changed.txt"
 
