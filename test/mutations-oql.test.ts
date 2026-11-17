@@ -251,7 +251,7 @@ describe("U11: the Results page's Mutations views carry the query's lines (RVPS 
     }
     assert.deepEqual((views[0] as MutView).oql, (byKind(l.doc, "datafiles") as MutView).oql);
   });
-  test("drivers only when a line names DRIVER: then the Altered cohort's settings", () => {
+  test("drivers on both views, a line naming DRIVER or not: the Altered cohort's settings when one does, the page's defaults otherwise", () => {
     for (const entries of [["KRAS: MUT_DRIVER"], ["TP53: DRIVER", "KRAS"], ["BRAF: MUT_(500-600)_DRIVER"]]) {
       const { l, views } = mutTab(entries);
       for (const v of views as MutView[]) {
@@ -260,7 +260,7 @@ describe("U11: the Results page's Mutations views carry the query's lines (RVPS 
       }
     }
     for (const entries of [["KRAS"], ["KRAS: MUT=G12D", "TP53: HOMDEL"], ["EGFR: AMP"]])
-      for (const v of mutTab(entries).views as MutView[]) assert.ok(!("drivers" in v), v.kind + ": " + entries.join("; "));
+      for (const v of mutTab(entries).views as MutView[]) assert.deepEqual(v.drivers, {}, v.kind + ": " + entries.join("; "));
   });
   test("a change to the oncoprint's driver settings reaches both DRIVER views (OQL_DRIVER_KINDS holds hotspots and mutations)", () => {
     const l = resultsLayout(rq(["KRAS: MUT_DRIVER", "TP53"]) as never, rdata);
