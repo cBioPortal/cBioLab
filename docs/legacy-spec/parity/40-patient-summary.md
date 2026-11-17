@@ -22,9 +22,9 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 35 |
-| 🟡 partial | 25 |
-| 🔶 different | 12 |
+| ✅ match | 36 |
+| 🟡 partial | 26 |
+| 🔶 different | 10 |
 | ❌ missing | 15 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -227,7 +227,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 |---|---|---|---|
 | PAT-MT-1 | 🟡 | BC | Same rows (80/64/16); uncalled not listed (lgg has none); header "80 Mutations" ✅; 25 rows/page (legacy 10); default sort gene-grouped, driver genes first (`patient-alterations.ts:149`) vs Annotation desc; no "not profiled for mutations" alert |
 | PAT-MT-2 | 🔶 | B | Default: Samples · Gene · Protein Change · Annotation (OncoKB) · Mutation Type · Copy # · Cohort % · Allele Freq; Samples shown with 1 sample; Copy # shown with >1 sample; no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅ (17 columns) |
-| PAT-MT-3 | 🔶 | B | One value = highest VAF among samples (`patient-alterations.ts:127`), 2 decimals; no bars, no reads tooltip, no header VAF plot |
+| PAT-MT-3 | 🟡 | B | One sample in view: the VAF as text ✅; several: a 6-px bar per sample, VAF × 12 px, sample colour ✅ (lgg P04 IDH1 R132C four bars); tooltip "0.38 (46 variant reads out of 121 total)" per sample ✅; sort by the samples' VAFs in sample order, null last ✅ (`check:patient-vaf`); no header VAF plot; download keeps the highest VAF, not the per-sample list |
 | PAT-MT-4 | 🟡 | B | Marker per carrying sample, "--" where not (equal-width slots) ✅; no grey not-profiled pill, no uncalled opacity |
 | PAT-MT-5 | ❌ | B | No mRNA Expr. column (P3 legacy 25 %, 29 % …) |
 | PAT-MT-6 | ❌ | C | No gene filter menu |
@@ -268,7 +268,7 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-STM-1 | 🔶 | BC | alt/(alt+ref) identical per sample (88/88); table shows max over samples; 2 decimals always (no 4-decimal <0.01); double rounding misprints 5/64 (bug); VAF 0 legacy bugs not copied |
+| PAT-STM-1 | ✅ | BC | alt/(alt+ref) per sample, each drawn (P04's four IDH1 reads equal the portal API's: 46/75, 61/101, 38/61, 62/94); 4 decimals below 0.01, else 2 (`portalVaf`); TCGA-A6-2671 APC 10/57 shows 0.18; VAF 0 legacy bugs not copied |
 | PAT-STM-2 | 🟡 | BC | Numerator any mutation (not uncalled) ✅; denominator = samples profiled for the gene (invariant 7; equals the sequenced list on WES and IMPACT341 genes); "x.x%" not integer / "<1%"; no keyword numerator B, bar, tooltip, MutSig badge |
 | PAT-STM-3 | 🟡 | BC | Same alteration (±2) ÷ samples profiled for the gene by the CNA panel; numbers equal; "0.6%" vs "<1%"; no tooltip, no GISTIC |
 | PAT-STM-4 | ❌ | B | No mRNA percentile |
