@@ -4,16 +4,16 @@ import type { KindUi } from "./kind-ui.ts";
 import { TimelineBody } from "../timeline-body";
 import { useState } from "react";
 import { Input } from "../../_ui/input";
-import { eventTables, type EventTable } from "../../../lib/timeline-tables.ts";
+import { eventTables, sortEventRows, type EventTable } from "../../../lib/timeline-tables.ts";
 import type { PatientEvent } from "../../../lib/types.ts";
 
-/** One event type's table: every column sorted as text by a header click, the rows filtered by a box. */
+/** One event type's table: a header click sorts by that column (the days as numbers, the rest as text), the rows filtered by a box. */
 function EventTypeTable({ t }: { t: EventTable }) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<{ col: number; desc: boolean } | null>(null);
   const f = filter.trim().toLowerCase();
   let rows = f ? t.rows.filter((r) => r.join(" ").toLowerCase().includes(f)) : t.rows;
-  if (sort) rows = [...rows].sort((a, b) => (sort.desc ? -1 : 1) * a[sort.col].localeCompare(b[sort.col]));
+  if (sort) rows = sortEventRows(rows, t.columns, sort.col, sort.desc);
   return (
     <section data-tw className="flex flex-col gap-1.5" aria-label={t.title}>
       <div className="flex items-center gap-2">

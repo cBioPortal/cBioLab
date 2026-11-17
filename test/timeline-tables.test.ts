@@ -2,7 +2,7 @@
 // Legacy cBioPortal ClinicalEventsTables / timelineDataUtils; spec docs/legacy-spec/41-patient-tabs.md PTB-CD-4.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { eventTables } from "../lib/timeline-tables.ts";
+import { eventTables, sortEventRows } from "../lib/timeline-tables.ts";
 import type { PatientEvent } from "../lib/types.ts";
 
 const ev = (type: string, start: number, end: number | null, attrs: [string, string][] = []): PatientEvent => ({ type, start, end, attrs });
@@ -39,4 +39,40 @@ test("E5 PTB-CD-4: title is capitalised first letter, rest lower case", () => {
 
 test("E6 PTB-CD-4: no events give no tables", () => {
   assert.deepEqual(eventTables([]), []);
+});
+
+const SORT_COLS = ["START_DATE", "STOP_DATE", "EVENT_TYPE", "AGENT"];
+const sortRows = (col: number, vals: string[]): string[][] =>
+  vals.map((v) => { const r = ["1", "2", "T", "x"]; r[col] = v; return r; });
+const colOf = (rows: string[][], col: number) => rows.map((r) => r[col]);
+
+test("S1 PTB-CD-4: START_DATE sorts numerically ascending, not as text", () => {
+  const out = sortEventRows(sortRows(0, ["100", "20", "-5"]), SORT_COLS, 0, false);
+  assert.deepEqual(colOf(out, 0), ["-5", "20", "100"]);
+});
+
+test("S2 PTB-CD-4: START_DATE sorts numerically descending", () => {
+  const out = sortEventRows(sortRows(0, ["100", "20", "-5"]), SORT_COLS, 0, true);
+  assert.deepEqual(colOf(out, 0), ["100", "20", "-5"]);
+});
+
+test("S3 PTB-CD-4: a blank STOP_DATE is last in both directions", () => {
+  const rows = sortRows(1, ["30", "", "7"]);
+  assert.deepEqual(colOf(sortEventRows(rows, SORT_COLS, 1, false), 1), ["7", "30", ""]);
+  assert.deepEqual(colOf(sortEventRows(rows, SORT_COLS, 1, true), 1), ["30", "7", ""]);
+});
+
+test("S4 PTB-CD-4: a text column sorts by localeCompare, reversed when descending", () => {
+  const rows = sortRows(3, ["b", "A", "c"]);
+  const asc = ["b", "A", "c"].sort((a, b) => a.localeCompare(b));
+  assert.deepEqual(colOf(sortEventRows(rows, SORT_COLS, 3, false), 3), asc);
+  assert.deepEqual(colOf(sortEventRows(rows, SORT_COLS, 3, true), 3), [...asc].reverse());
+});
+
+test("S5 PTB-CD-4: the input array is not mutated", () => {
+  const rows = sortRows(0, ["100", "20", "-5"]);
+  const snapshot = rows.map((r) => [...r]);
+  const out = sortEventRows(rows, SORT_COLS, 0, false);
+  assert.notEqual(out, rows);
+  assert.deepEqual(rows, snapshot);
 });

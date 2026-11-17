@@ -29,3 +29,15 @@ export function eventTables(events: PatientEvent[]): EventTable[] {
     return { type, title: capitalise(type), columns, rows };
   });
 }
+
+/** A table's rows sorted by one column: the days (START_DATE, STOP_DATE) as numbers, a missing day last either way; the rest as text. */
+export function sortEventRows(rows: string[][], columns: string[], col: number, desc: boolean): string[][] {
+  const days = columns[col] === "START_DATE" || columns[col] === "STOP_DATE";
+  const dir = desc ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const x = a[col], y = b[col];
+    if (!days) return dir * x.localeCompare(y);
+    if (x === "" || y === "") return (x === "" ? 1 : 0) - (y === "" ? 1 : 0);
+    return dir * (Number(x) - Number(y));
+  });
+}
