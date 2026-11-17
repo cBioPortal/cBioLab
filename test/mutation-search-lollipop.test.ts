@@ -34,7 +34,7 @@ type ViewRun = import("../lib/views/run.ts").ViewRun;
 type EvaluatedCohort = import("../lib/views/run.ts").EvaluatedCohort;
 type ViewParticipation = import("../lib/types.ts").ViewParticipation;
 type Rows = { gene: string; search?: string; filters?: Record<string, unknown>; columns?: string[] };
-type Lollipop = (def: unknown, genes: string[], minCount?: number, oql?: unknown, rows?: Rows) => Promise<unknown>;
+type Lollipop = (def: unknown, genes: string[], minCount?: number, oql?: unknown, drivers?: unknown, rows?: Rows) => Promise<unknown>;
 
 // a stand-in warehouse: every statement answers no rows (routing answers the one study, a size one patient)
 setChTransport(async ({ query }) => {

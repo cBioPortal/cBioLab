@@ -20,10 +20,10 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 31 |
-| 🟡 partial | 43 |
-| 🔶 different | 15 |
-| ❌ missing | 33 |
+| ✅ match | 30 |
+| 🟡 partial | 44 |
+| 🔶 different | 16 |
+| ❌ missing | 32 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 7 |
@@ -82,7 +82,7 @@ Re-score of 2026-11-16: 30 verdicts changed, from #230 (fusions), #245 (the port
 | Table rows KRAS / TP53 / TMPRSS2 / ERG | TB-1, MD-11 | 223 / 332 / 240 / 220 | 223 / 332 / 240 / 220 | ✅ |
 | KRAS table defaults | COL-38 | Sample ID, Cancer Type Detailed, Protein Change, Annotation, Mutation Type, Copy #, Allele Freq (T), # Mut in Sample | the same without Copy # and Allele Freq (T) | 🔶 |
 | KRAS G12C Copy # (A6-A567, AA-3696, AA-A02W) | STM-11 | ShallowDel, Gain, Diploid | ShallowDel, Gain, Diploid | ✅ (#245) |
-| Search "G12D" | TB-3 | lollipop follows | table 59 of 223, badges 59, stems G12D and A11_G12dup ("G12dup" contains "g12d") | ✅ |
+| Search "G12D" | TB-3 | lollipop follows | table 59 of 223, lollipop 223 | 🔶 |
 
 Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11-11 and not re-run; the stem labels ("G12D/V/C and 3 more", "R175H/C") and counts above agree.
 
@@ -125,8 +125,8 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-LP-1 | 🟡 | B | Unchanged: [Legend 👁] [☁]; no track selector, no Y-Axis Max |
-| MUT-LP-2 | ❌ | B | Unchanged: no Y-Axis Max slider/box |
+| MUT-LP-1 | 🟡 | B | Y-Axis Max, [Legend 👁] [☁]; no track selector |
+| MUT-LP-2 | ✅ | B | "Y-Axis Max:" slider 1…default and a number box above it; below 1 read as 1; kept in the view (`yMax`), as in-tab state is (invariant 9), not local |
 | MUT-LP-3 | ✅ | C | No %/# toggle, no log scale |
 | MUT-LP-4 | 🟡 | BC | Unchanged: SVG / PNG of the plot; no PDF; `KRAS_mutation_diagram.<ext>` |
 | MUT-LP-5 | 🐞 ok | BC | Legend lists Splice as its own entry, as the stems draw it, not under Truncating as the portal's legend does (#250) |
@@ -231,16 +231,16 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 |---|---|---|---|
 | MUT-TB-1 | 🟡 | B | Unchanged: "223 KRAS mutations", "59 of 223 KRAS mutations"; no duplicate suffix |
 | MUT-TB-2 | 🟡 | B | Unchanged: search, columns, download CSV; no Copy |
-| MUT-TB-3 | ✅ | B | Search "G12D" → table 59 of 223, the lollipop and badges 59 too (the hotspots view's `table`, `linkMutations`) |
+| MUT-TB-3 | 🔶 | B | Unchanged: search "G12D" → table 59 of 223, lollipop still 223 mutations |
 | MUT-TB-4 | 🔶 | B | Unchanged: numbered pages + per page |
 | MUT-TB-5 | 🟡 | B | Unchanged: one list "Columns (6 of 35)"; no Clinical tab, no Freq |
 | MUT-TB-6 | 🟡 | BC | Unchanged |
 | MUT-TB-7 | ❌ | B | Unchanged: no annotation filter |
 | MUT-TB-8 | 🔶 | BC | Unchanged: CSV `cohort-lab_<study>_KRAS_mutations.csv`, every column, rows kept by filters |
 | MUT-TB-9 | 🔶 | B | Unchanged: "drivers first, then by codon": first row A11_G12dup; legacy G12C |
-| MUT-FM-1 | 🟡 | B | Search and header filters now reach the lollipop and badges; no mutation-status filter (FM-2) or tracks |
+| MUT-FM-1 | 🟡 | B | Unchanged |
 | MUT-FM-2 | ❌ | C | Unchanged: no mutation-status filter |
-| MUT-FM-3 | ✅ | B | A stem selection narrows only the table; badge counts ignore the badge filter; Somatic Mutation Frequency ignores every in-tab filter |
+| MUT-FM-3 | 🟡 | B | Unchanged |
 | MUT-FM-4 | 🔶 | C | Unchanged |
 | MUT-FM-5 | 🟡 | B | Unchanged |
 
@@ -273,7 +273,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-1 | 🟡 | BC | KRAS 36.7 %, TP53 52.9 %, TMPRSS2 41.5 % (#230), ERG 2.8 % as legacy; germline test /germline/i (#250); format still `fmtShare` |
 | MUT-STM-2 | ✅ | B | Distinct patient + change per codon; 125/125 stems identical |
 | MUT-STM-3 | 🐞 ok | BC | No mislabelled "profiled" denominator; but no denominator at all |
-| MUT-STM-4 | 🟡 | B | Totals as legacy; driver split differs where the stores are not loaded: TP53 325/7 vs 329/3 (hotspots), TMPRSS2 Fusion 0/236 vs 207/29 (no OncoKB pair calls in the pinned v7.5 store; #230 matched at v7.7); tally follows the table's search and filters |
+| MUT-STM-4 | 🟡 | B | Totals as legacy; driver split differs where the stores are not loaded: TP53 325/7 vs 329/3 (hotspots), TMPRSS2 Fusion 0/236 vs 207/29 (no OncoKB pair calls in the pinned v7.5 store; #230 matched at v7.7); tally ignores search/filters |
 | MUT-STM-5 | 🟡 | BC | Unchanged: `toFixed(2)` always (`mutations.tsx:23`) |
 | MUT-STM-6 | 🟡 | BC | Unchanged |
 | MUT-STM-7 | ✅ | BC | `MUTATION_COUNT`, identical 555/555 |
@@ -286,7 +286,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-14 | ❌ | B | Unchanged |
 | MUT-STM-15 | ❌ | B | Unchanged: no Freq in the Columns menu |
 | MUT-STM-16 | ❌ | B | Unchanged |
-| MUT-STM-17 | 🟡 | B | Unchanged: domain max(5, tallest); axis niced (0-50-100-150) |
+| MUT-STM-17 | 🟡 | B | Default max(5, tallest), niced (0-50-100-150); a set Y-Axis Max is the exact top, "≥" on it when a stem is capped |
 
 ---
 

@@ -1039,7 +1039,7 @@ describe("patient-level federation is opt-in, on both sides, per study and kind"
 // participant alone, refused by an aggregate-only one before any query, and never sent to a peer.
 describe("the mutation table's search narrows a lollipop only on a patient-level participant", () => {
   const ROWS = { gene: "KRAS", search: "P-0000123-T01" };
-  type Counts = (def: unknown, genes: string[], minCount?: number, oql?: unknown, rows?: typeof ROWS) => Promise<unknown>;
+  type Counts = (def: unknown, genes: string[], minCount?: number, oql?: unknown, drivers?: unknown, rows?: typeof ROWS) => Promise<unknown>;
   const PINS = { GENOME_NEXUS_PIN: "g1", GENOME_NEXUS_GRCH38_PIN: "g38" };
   /** runs `fn` with every statement answered empty and recorded, the Genome Nexus pins set so none is looked up */
   const recording = async (fn: () => Promise<void>): Promise<string[]> => {

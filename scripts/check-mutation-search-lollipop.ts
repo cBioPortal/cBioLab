@@ -57,7 +57,7 @@ type Report = {
   totals: { gene: string; patients: number; pairs: number; somaticSamples: number }[];
   cohortSamples: number;
 };
-type Counts = (def: CohortDef, genes: string[], minCount?: number, oql?: undefined, rows?: Rows) => Promise<Report>;
+type Counts = (def: CohortDef, genes: string[], minCount?: number, oql?: undefined, drivers?: undefined, rows?: Rows) => Promise<Report>;
 const report = async (genes: string[], rows?: Rows): Promise<Report | string> => {
   try {
     const r = new PatientLevelResolver(STUDY, { oncokbPin: PIN }, { id: conn.id, mode: "patient-level", label: "fixture", conn });

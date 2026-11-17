@@ -343,7 +343,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       chooser: { label: "gene", options: genes, locks: ["gene", "genes"],
         value: (vs: View[]) => String(((vs[1] as unknown as { gene?: string }).gene) || genes[0]),
         // a new gene keeps the grid's selection (it is about classes, not this gene) and starts the table's own query over
-        apply: (vs: View[], g: string) => linkMutations([{ ...vs[0], genes: [g], codons: undefined, table: undefined } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0) },
+        apply: (vs: View[], g: string) => linkMutations([{ ...vs[0], genes: [g], codons: undefined, table: undefined, yMax: undefined } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0) },
       link: linkMutations },
     ...(svHeld && data.svs ? [svTab(genes, queried)] : []),
     ...(expr && !multi ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: queried })] }] : []),
