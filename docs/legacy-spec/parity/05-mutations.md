@@ -155,7 +155,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | ID | verdict | how | note |
 |---|---|---|---|
 | MUT-BF-1 | 🟡 | B | Grid as the portal's; KRAS 221/2 identical; TP53 still 325/7 vs 329/3 (the 4 hotspot rows: coadread not yet in the Genome Nexus store); no ⚙ (tracked) |
-| MUT-BF-2 | ✅ | C | With no driver source on (or offered), one badge per type, no Driver/VUS header (`AlterationGrid.tsx` TypeBadges) |
+| MUT-BF-2 | ✅ | C | With no driver source on (or offered), one badge per type, no Driver/VUS header (`AlterationGrid.tsx` TypeBadges) (#282) |
 | MUT-BF-3 | ✅ | B | Badge, row and column toggles; "only" (always visible, not on hover); everything selected removes the filter; Driver off → 2 of 223 |
 | MUT-BF-4 | 🟡 | B | Unchanged: filter reaches lollipop and table; no tracks / 3D |
 
