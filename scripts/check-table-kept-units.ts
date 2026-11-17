@@ -58,7 +58,7 @@ type Kept = { samples: number; patients: number };
 type Table = { kept?: Kept; total: number; all: number };
 const mutations = async (gene: string, extra: Record<string, unknown> = {}): Promise<Table | string> => {
   try {
-    const res = await runMutations({ kind: "mutations", gene, cohorts: ["c"], ...extra } as never, ctx()) as Record<string, unknown> & { result?: Record<string, unknown> };
+    const res = await runMutations({ kind: "mutations", gene, cohorts: ["c"], ...extra } as never, ctx()) as unknown as Record<string, unknown> & { result?: Record<string, unknown> };
     const r = (res.result ?? res) as Record<string, unknown>;
     const t = r.mutations as Table | undefined;
     return t || "refused: " + String(r.error || JSON.stringify(r).slice(0, 200));
