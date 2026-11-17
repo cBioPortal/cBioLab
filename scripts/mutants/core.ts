@@ -3,7 +3,6 @@
 import type { GuardCommands, Mutant } from "./types.ts";
 
 export const guards: GuardCommands = {
-  "mutation-search-lollipop": ["node", "--env-file=.env.local", "scripts/check-mutation-search-lollipop.ts"],
   "mutation-tab-states": ["node", "--env-file=.env.local", "scripts/check-mutation-tab-states.ts"],
   "mutation-driver-settings": ["node", "--env-file=.env.local", "scripts/check-mutation-driver-settings.ts"],
   // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
@@ -146,9 +145,10 @@ export const mutants: Mutant[] = [
     effect: "Do not filter by OQL leaves the Mutations tab filtered.",
     find: "return v.useOql === false || !oqlHasMutationOql(",
     replace: "return !oqlHasMutationOql(" },
-  { id: "lollipop-ignores-table-search", layer: "counts", guard: "mutation-search-lollipop", file: "lib/federation.ts",
-    effect: "A search in the Mutations tab's table leaves the lollipop and badges counting every mutation, where the portal's follow the table.",
-    find: "m AS (SELECT * FROM ma WHERE gene != ", replace: "m AS (SELECT * FROM ma WHERE 1 OR gene != " },
+  { id: "table-present-numbers-only", layer: "counts", guard: "density", file: "lib/table-query.ts",
+    effect: "A table's \"has a value\" filter keeps only a numeric column's plain numbers, so a case file drops \">89\".",
+    find: "  if (isPresent(f)) return col.text + \" != ''\";",
+    replace: "  if (isPresent(f)) return col.num ? col.num + \" IS NOT NULL\" : col.text + \" != ''\";" },
   { id: "corr-shown-unrounded-r", layer: "counts", guard: "unit", file: "lib/chart/format.ts",
     effect: "A plot's correlation is shown to 2 decimals from the full-precision r, where the portal rounds its 5-decimal value (0.124996 shows 0.12, the portal 0.13).",
     find: "export const portalCorr = (r: number): string => portalR5(r).toFixed(2);",
