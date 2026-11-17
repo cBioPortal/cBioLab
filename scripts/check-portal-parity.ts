@@ -30,6 +30,8 @@
  *   8. Uncalled mutations: glioma_msk_2018, the study that holds them (read support for a
  *      patient's other samples, below the caller's thresholds), against the portal's mutation
  *      profile, which leaves them out. Counted in samples, where they would differ.
+ *  21. The Comparison page's Genomic Alterations tab as one table under the portal's type tree:
+ *      every gene's altered / profiled per group, four type selections (brca Basal vs LumA).
  *  20. The mutation spectrum row: per sample (coadread) and summed per patient (msk_impact_2017).
  *  19. An oncoprint patient column's clinical value when the patient has several samples
  *      (msk_impact_2017): the portal's mean / MUTATION_COUNT max / "Mixed" of its sample data.
@@ -57,6 +59,8 @@ import { oqlCasesSql } from "../lib/oql.ts";
 import { clinicalSql, spectrumSql } from "../lib/oncoprint.ts";
 import { chQuery, DB, PRIMARY } from "../lib/ch.ts";
 import { oncokbPin } from "../lib/annotation.ts";
+import { enrichEventsAlteredSql, enrichEventsPanelProfiledSql, enrichEventsWesSql } from "../lib/federation-views.ts";
+import { ALTERATION_EVENTS, MUTATION_UNITS, type AlterationEvent } from "../lib/alteration-events.ts";
 import type { CohortDef, GeneTableRow, ClinicalFacet } from "../lib/types.ts";
 
 type CatFacet = Extract<ClinicalFacet, { kind: "cat" }>;
@@ -685,6 +689,57 @@ for (const studies of [["brca_tcga_pan_can_atlas_2018"], ["prostate_pcbm_swiss_2
     record({ study, group: "oncoprint", what: `mutation spectrum per ${unit} (six counts each, ${theirs.size.toLocaleString()} ${unit}s)`,
       ours: (theirs.size - differ.length) + " identical" + (differ.length ? ", e.g. " + differ[0][0] + " " + (ours.get(differ[0][0]) ?? "none") : ""),
       portal: theirs.size + (differ.length ? ", e.g. " + differ[0][1].join(",") : ""), agree: differ.length === 0 && ours.size === theirs.size });
+  }
+}
+
+// 21. the Comparison page's Genomic Alterations tab as ONE table under the portal's type tree
+// (CMM-AT-1…5, CMM-STM-2): every gene's altered and profiled samples per group, against the portal's
+// alteration-enrichments service, for four selections — every type; no copy number; Missense + Inframe
+// + Other (mutation_type NOT IN the rest); Missense + Inframe, deep deletion and SV (mutation_type IN).
+// brca Basal vs LumA, the spec's two-group session. Every gene the portal lists is compared.
+{
+  const st = "brca_tcga_pan_can_atlas_2018";
+  const subtypes = ["BRCA_Basal", "BRCA_LumA"];
+  const profiles = await studyProfiles(st);
+  const pin = await oncokbPin();
+  const pcd = await api<{ patientId: string; value: string }[]>(`/studies/${st}/clinical-data?clinicalDataType=PATIENT&attributeId=SUBTYPE&projection=SUMMARY&pageSize=100000`);
+  const psamples = await api<PortalSample[]>(`/studies/${st}/samples?pageSize=100000`);
+  const groupSamples = (v: string) => { const pts = new Set(pcd.filter((d) => d.value === v).map((d) => d.patientId)); return psamples.filter((x) => pts.has(x.patientId)).map((x) => x.sampleId); };
+  const mutProfiles = [st + "_mutations", st + "_gistic", st + "_structural_variants"];
+  const selections: { label: string; events: AlterationEvent[] }[] = [
+    { label: "every type", events: [...ALTERATION_EVENTS] },
+    { label: "no copy number", events: ALTERATION_EVENTS.filter((e) => e !== "amp" && e !== "homdel") },
+    { label: "Missense, Inframe, Other", events: ["missense", "inframe", "inframe_ins", "inframe_del", "other"] },
+    { label: "Missense, Inframe, Deletion, SV", events: ["missense", "inframe", "inframe_ins", "inframe_del", "homdel", "sv"] },
+  ];
+  for (const sel of selections) {
+    const mutOn = new Set(sel.events.flatMap((e) => (MUTATION_UNITS as Record<string, readonly string[]>)[e] || []));
+    const theirs = await api<{ hugoGeneSymbol: string; counts: { name: string; alteredCount: number; profiledCount: number }[] }[]>("/alteration-enrichments/fetch?enrichmentType=SAMPLE", {
+      molecularProfileCasesGroupFilter: subtypes.map((g) => ({ name: g, molecularProfileCaseIdentifiers: groupSamples(g).flatMap((caseId) => mutProfiles.map((molecularProfileId) => ({ caseId, molecularProfileId }))) })),
+      alterationEventTypes: { copyNumberAlterationEventTypes: { AMP: sel.events.includes("amp"), HOMDEL: sel.events.includes("homdel") },
+        mutationEventTypes: Object.fromEntries(Object.values(MUTATION_UNITS).flat().map((t) => [t, mutOn.has(t)])), structuralVariants: sel.events.includes("sv"),
+        includeDriver: true, includeVUS: true, includeUnknownOncogenicity: true, tiersBooleanMap: {}, includeUnknownTier: true, includeGermline: true, includeSomatic: true, includeUnknownStatus: true } });
+    const altered = new Map<string, number[]>(), profiledIn: ((gene: string) => number)[] = [];
+    for (const [i, g] of subtypes.entries()) {
+      const cohortSql = compileCohortDef({ all: [{ kind: "clinical", attribute: "SUBTYPE", values: [g] }] } as CohortDef, { study: st, db: DB, oncokbPin: pin, ...profiles });
+      const [alt, pan, wes] = await Promise.all([
+        chQuery<{ gene: string; altered: string }>(enrichEventsAlteredSql(cohortSql, st, DB, sel.events, pin, false), PRIMARY),
+        chQuery<{ gene: string; profiled: string }>(enrichEventsPanelProfiledSql(cohortSql, st, DB, sel.events), PRIMARY),
+        chQuery<{ n: string }>(enrichEventsWesSql(cohortSql, st, DB, sel.events), PRIMARY)]);
+      const w = Number(wes.data[0]?.n || 0), panel = new Map(pan.data.map((r) => [r.gene, Number(r.profiled)]));
+      profiledIn[i] = (gene) => (panel.get(gene) || 0) + w;
+      for (const r of alt.data) {
+        const cells = altered.get(r.gene) || subtypes.map(() => 0);
+        cells[i] = Number(r.altered);
+        altered.set(r.gene, cells);
+      }
+    }
+    const ours = new Map([...altered].map(([gene, a]) => [gene, a.map((n, i) => n + "/" + profiledIn[i](gene))]));
+    const portalSig = (x: (typeof theirs)[number]) => subtypes.map((g) => { const c = x.counts.find((k) => k.name === g); return c ? c.alteredCount + "/" + c.profiledCount : "0/0"; }).join(" ");
+    const differ = theirs.filter((x) => (ours.get(x.hugoGeneSymbol) || []).join(" ") !== portalSig(x));
+    record({ study: st, group: "comparison: genomic alterations (one table)", what: `${sel.label}: altered/profiled per group, Basal vs LumA, every gene (${theirs.length.toLocaleString()})`,
+      ours: (theirs.length - differ.length) + " identical, " + ours.size + " genes" + (differ.length ? ", e.g. " + differ[0].hugoGeneSymbol + " " + (ours.get(differ[0].hugoGeneSymbol) || []).join(" ") : ""),
+      portal: theirs.length + " genes" + (differ.length ? ", e.g. " + portalSig(differ[0]) : ""), agree: differ.length === 0 && ours.size === theirs.length });
   }
 }
 
