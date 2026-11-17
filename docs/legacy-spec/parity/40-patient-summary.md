@@ -22,10 +22,10 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 36 |
+| ✅ match | 37 |
 | 🟡 partial | 26 |
 | 🔶 different | 10 |
-| ❌ missing | 15 |
+| ❌ missing | 14 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
@@ -123,7 +123,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-SH-1 | ❌ | B | Title "cbio-lab" on every patient; no meta description |
+| PAT-SH-1 | ✅ | B | "Patient: P04" / "Sample: P04_Pri", description "P04 from Low-Grade Gliomas (UCSF, Science 2014)" (set while the page shows them, put back on leaving) |
 | PAT-SH-2 | 🟡 | B | "Patient:" / "Samples:" rows ✅; no user-circle icon; study is id + name text in a summary card, not a link to the study; pager right ✅ |
 | PAT-SH-3 | ✅ | B | Skeleton rows while the header loads; tabs load separately |
 | PAT-SH-4 | 🟡 | B | Unknown patient → "no patient NOPE in lgg_ucsf_2014", but tabs still render with "cohort's patient list is empty" refusals |
