@@ -5,8 +5,10 @@ import { fmtInt, portalFreq } from "./chart/format.ts";
 export type DownloadUnit = "sample" | "patient";
 
 /** a chart's download file name: its name with each space and tab replaced by "_", then the kind's suffix */
-export function chartFileName(chartName: string, kind: "summary" | "full" | "data"): string {
-  return chartName.replace(/[ \t]/g, "_") + (kind === "data" ? "" : "." + kind) + ".txt";
+export function chartFileName(chartName: string, kind: "summary" | "full" | "data" | "svg" | "pdf"): string {
+  const base = chartName.replace(/[ \t]/g, "_");
+  if (kind === "svg" || kind === "pdf") return base + "." + kind;
+  return base + (kind === "data" ? "" : "." + kind) + ".txt";
 }
 
 /** one category's count, in the order the counts arrived */

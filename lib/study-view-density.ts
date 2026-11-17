@@ -85,8 +85,12 @@ export function densityColors(counts: number[]): { color: (count: number) => str
 
 /** the legend's bar as a CSS gradient: plasma from 0 at the bottom to the chart's top colour, in the portal's 30 steps */
 export function densityGradient(): string {
-  const stops = Array.from({ length: 30 }, (_, i) => interpolatePlasma(COLOR_MAX * i / 30) + " " + Math.round(i / 30 * 100) + "%");
-  return "linear-gradient(to top, " + stops.join(", ") + ")";
+  return "linear-gradient(to top, " + densityGradientStops().map((s) => s.color + " " + s.offset).join(", ") + ")";
+}
+
+/** the legend bar's 30 stops, bottom first: each colour and its offset up the bar */
+export function densityGradientStops(): { color: string; offset: string }[] {
+  return Array.from({ length: 30 }, (_, i) => ({ color: interpolatePlasma(COLOR_MAX * i / 30), offset: Math.round(i / 30 * 100) + "%" }));
 }
 
 /** a coefficient's two-sided p-value as the portal computes it (PlotUtils.ts:462-482): Student's t on n − 2 degrees of freedom, 0 at |r| = 1 */
