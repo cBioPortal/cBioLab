@@ -678,26 +678,24 @@ const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
   return { mutatedGenes, cnaGenes, svGenes, geneTotals };
 }
 
-/**
- * One study's MutSig q-values by gene and GISTIC's by gene and call (gene-tables-cases.md QV1-QV4);
- * empty for several studies, as the portal gives none, and when the study has neither table's rows.
- * A failed lookup leaves the tables without q-values rather than failing them.
- */
 type QValues = { mutsig: Map<string, number>; gistic: Map<string, number> };
 const NO_Q: QValues = { mutsig: new Map(), gistic: new Map() };
-/** each study's q-values, read once (they do not depend on the selection); every read where studies change */
+/** each study's q-values by its import: read once per import (they do not depend on the selection) */
 const qValuesByStudy = new Map<string, Promise<QValues>>();
 
 /**
- * MutSig's and GISTIC's q-values for one study (none for several, as the portal shows them). The
- * tables are optional: an instance without them has none, read from its table list; a lookup that
- * fails is an error, never an empty answer.
+ * One study's MutSig q-values by gene and GISTIC's by gene and call (gene-tables-cases.md QV1-QV4);
+ * empty for several studies, as the portal gives none. The tables are optional: an instance
+ * without them has none, read from its table list; a lookup that fails is an error, never an empty
+ * answer. Kept per study and its import date, so a re-imported study is read again.
  */
-function significantGenes(studies: string[], db: string, conn: ChConn): Promise<QValues> {
-  if (studies.length !== 1) return Promise.resolve(NO_Q);
-  const key = conn.id + "|" + db + "|" + studies[0];
+async function significantGenes(studies: string[], db: string, conn: ChConn): Promise<QValues> {
+  if (studies.length !== 1) return NO_Q;
+  const imported = (await chQuery<ChRow>("SELECT toString(import_date) AS d FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(studies[0]), conn)).data[0]?.d;
+  const key = conn.id + "|" + db + "|" + studies[0] + "|" + String(imported ?? "");
   const held = studiesChangeWhileRunning() ? undefined : qValuesByStudy.get(key);
   if (held) return held;
+  for (const k of qValuesByStudy.keys()) if (k.startsWith(conn.id + "|" + db + "|" + studies[0] + "|")) qValuesByStudy.delete(k);
   const p = readQValues(studies[0], db, conn);
   qValuesByStudy.set(key, p);
   p.catch(() => qValuesByStudy.delete(key));

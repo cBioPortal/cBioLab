@@ -157,7 +157,7 @@ export async function saveCaseFile(file: CaseFile, fileName: string, def: Cohort
 /** a message setter that can keep what is shown (a React state setter is one) */
 export type Say = (update: (current: string | null) => string | null) => void;
 
-/** the files being prepared: a second request for one is ignored until the first ends */
+/** the downloads being prepared, by what they ask for (two can share a file name: the header's and the tab's clinical data); the same request again is ignored until it ends */
 const preparing = new Set<string>();
 
 /**
@@ -168,8 +168,9 @@ const preparing = new Set<string>();
 export async function runCaseFile(file: CaseFile, fileName: string, sel: { def: CohortDef; study: string } | null, say: Say,
   busy?: (on: boolean) => void): Promise<void> {
   if (!sel) { say(() => "select a study first"); return; }
-  if (preparing.has(fileName)) return;
-  preparing.add(fileName);
+  const asked = JSON.stringify([fileName, file, sel.def, sel.study]);
+  if (preparing.has(asked)) return;
+  preparing.add(asked);
   busy?.(true);
   const mine = "preparing " + fileName + "…";
   say(() => mine);
@@ -180,7 +181,7 @@ export async function runCaseFile(file: CaseFile, fileName: string, sel: { def: 
   } catch (e) {
     say(() => "Could not download " + fileName + ": " + String((e as Error)?.message || e));
   } finally {
-    preparing.delete(fileName);
+    preparing.delete(asked);
     busy?.(false);
   }
 }

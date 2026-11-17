@@ -5,7 +5,7 @@ import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { isDrawn, type AnalysisDoc, type TableRows, type ViewResult } from "../../../lib/types.ts";
 import { TABLE_COLUMNS_MAX } from "../../../lib/clinical-table.ts";
-import { caseFileBreaks, caseFileHeader, caseFileLine, caseFileLineBreaks, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
+import { caseFileBreaks, caseFileHeader, caseFileLine, caseFileLineBreaks, caseFileColumnsCut, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
 
 export const maxDuration = 300;
 
@@ -83,14 +83,13 @@ function portalFile(t: TableRows<unknown>, format: CaseFileFormat, page: (offset
     cut: (why) => (before || "") + "# DOWNLOAD INCOMPLETE: " + why.replace(/\s+/g, " ") + after,
   });
   const left = (t.excluded || []).map((e) => e.study + ": " + e.reason).join("; ");
-  const of = (t as TableRows<unknown> & { attributesOf?: number }).attributesOf;
-  const held = at.filter((i) => !["patient", "sample"].includes(t.columns[i].id)).length;
+  const cut = caseFileColumnsCut(t as TableRows<unknown> & { attributesOf?: number }, at.filter((i) => !["patient", "sample"].includes(t.columns[i].id)).length);
   return new Response(stream, { headers: {
     "content-type": "text/tab-separated-values; charset=utf-8",
     // what the file must hold to be whole, so the page can tell a cut one from a finished one
     "x-line-breaks": String(caseFileLineBreaks(t.total, format)),
     ...(left ? { "x-left-out": encodeURIComponent(left) } : {}),
-    ...(of ? { "x-columns-cut": encodeURIComponent(held + " of the " + of + " attributes (a table holds at most " + TABLE_COLUMNS_MAX + ")") } : {}),
+    ...(cut ? { "x-columns-cut": encodeURIComponent(cut.held + " of the " + cut.of + " attributes (a table holds at most " + TABLE_COLUMNS_MAX + ")") } : {}),
   } });
 }
 

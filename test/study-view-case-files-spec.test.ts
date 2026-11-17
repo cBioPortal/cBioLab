@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  CASE_FILE_COHORT, caseFileBreaks, caseFileLineBreaks, caseFileDoc, caseFileFormat, caseFileHeader, caseFileLine, caseFileName,
+  caseFileColumnsCut, CASE_FILE_COHORT, caseFileBreaks, caseFileLineBreaks, caseFileDoc, caseFileFormat, caseFileHeader, caseFileLine, caseFileName,
   type CaseFile,
 } from "../lib/study-view-case-files.ts";
 import type { AnalysisDoc, CohortDef } from "../lib/types.ts";
@@ -231,4 +231,11 @@ test("PC14 caseFileLineBreaks equals the line breaks in a whole file, both layou
       assert.equal(count, caseFileLineBreaks(n, format), `${label}, ${n} rows`);
     }
   }
+});
+
+test("PC15: only a file of every attribute says it left some out", () => {
+  assert.deepEqual(caseFileColumnsCut({ query: {}, attributesOf: 260 }, 200), { held: 200, of: 260 });
+  assert.equal(caseFileColumnsCut({ query: { columns: ["patient", "SEX"] }, attributesOf: 260 }, 1), null);
+  assert.equal(caseFileColumnsCut({ query: {} }, 60), null);
+  assert.equal(caseFileColumnsCut({ query: { columns: [] }, attributesOf: 60 }, 60), null);
 });

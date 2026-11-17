@@ -44,7 +44,8 @@ export async function GET(req: Request) {
     // study has none here (its database is not this instance's to read)
     const one = new URL(req.url).searchParams.get("about");
     if (one != null) {
-      const study = one.replace(/[^A-Za-z0-9._-]/g, "");
+      if (!/^[A-Za-z0-9._-]{1,120}$/.test(one)) return Response.json({ error: "a study id is letters, digits, '.', '_' and '-' (at most 120)" }, { status: 400 });
+      const study = one;
       if (await peerForStudy(study)) return Response.json({ about: null });
       const conn = (await studyRouting()).get(study);
       if (!conn) return Response.json({ error: "Study '" + study + "' not found" }, { status: 400 });

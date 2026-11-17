@@ -84,6 +84,15 @@ export function caseFileBreaks(format: CaseFileFormat): { before: string; after:
   return format.table ? { before: "", after: "\r\n" } : { before: "\n", after: "" };
 }
 
+/**
+ * How many attributes a file of every attribute leaves out of `of` (download-cases PC15): only a
+ * file that asks for no columns of its own lists every attribute, so only it is short when the
+ * table holds fewer; null when nothing is left out.
+ */
+export function caseFileColumnsCut(t: { query: { columns?: string[] }; attributesOf?: number }, held: number): { held: number; of: number } | null {
+  return !t.query.columns?.length && t.attributesOf != null && t.attributesOf > held ? { held, of: t.attributesOf } : null;
+}
+
 /** the line breaks a whole file of `rows` rows holds, header included: what the download checks it received */
 export function caseFileLineBreaks(rows: number, format: CaseFileFormat): number {
   return format.table ? rows + 1 : rows;

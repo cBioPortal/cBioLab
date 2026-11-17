@@ -29,7 +29,7 @@ export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps
   const doc = useMemo(() => selection ? clinicalTabDoc(selection.def, selection.study, columns, query) : null, [selection, columns, query]);
   const docText = doc ? JSON.stringify(doc) : "";
   /** the shown table and the document it came from; `failed`, the document whose request failed with `error` */
-  const [res, setRes] = useState<{ doc: string; table?: TableResult; error?: string; failed?: string } | null>(null);
+  const [res, setRes] = useState<{ doc: string; shown?: { query: TableQuery; columns: string[] }; table?: TableResult; error?: string; failed?: string } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -43,10 +43,10 @@ export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps
         const v = j.views?.[0];
         // a failed refetch keeps the table it had, so the search box and the page stay
         setRes((prev) => j.error || !v || v.error || !v.table
-          ? { doc: prev?.doc ?? docText, table: prev?.table, error: String(j.error || v?.error || "the table returned nothing"), failed: docText }
-          : { doc: docText, table: v.table });
+          ? { doc: prev?.doc ?? docText, shown: prev?.shown, table: prev?.table, error: String(j.error || v?.error || "the table returned nothing"), failed: docText }
+          : { doc: docText, shown: { query, columns }, table: v.table });
       })
-      .catch((e) => { if (!ac.signal.aborted) setRes((prev) => ({ doc: prev?.doc ?? docText, table: prev?.table, error: String((e as Error)?.message || e), failed: docText })); });
+      .catch((e) => { if (!ac.signal.aborted) setRes((prev) => ({ doc: prev?.doc ?? docText, shown: prev?.shown, table: prev?.table, error: String((e as Error)?.message || e), failed: docText })); });
     return () => ac.abort();
   }, [docText]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on docText, the string form of doc
 
@@ -54,7 +54,9 @@ export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps
   if (!res) return <div className="card"><p className="waiting" role="status"><span className="spinner" /> loading clinical data…</p></div>;
   if (!res.table) return <div className="card"><p className="note">Could not load the clinical data: {res.error}</p></div>;
   const updating = res.doc !== docText && res.failed !== docText;
-  const file: CaseFile = { kind: "tab", columns, query, studies: studies.length };
+  // the file lists the rows shown: after a failed update, those of the last query that answered
+  const asShown = res.failed === docText && res.shown ? res.shown : { query, columns };
+  const file: CaseFile = { kind: "tab", columns: asShown.columns, query: asShown.query, studies: studies.length };
   const fileName = caseFileName(file, "", studies);
   const download = () => { void runCaseFile(file, fileName, selection, setMessage, setSaving); };
   return (
