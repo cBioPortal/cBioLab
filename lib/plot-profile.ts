@@ -36,8 +36,13 @@ export function resolveProfileAxis(a: PlotAxis, which: string, studies: StudyCat
   if (a.entity != null) throw new Error(which + " axis: only a generic-assay profile reads an entity; '" + a.profile + "' is " + info.name + ", which reads a gene");
   const gene = String(a.gene).toUpperCase();
   const label = gene + ": " + info.name;
-  if (use === "mutation") return { source: "alteration", gene, by: a.by || "mutationType" };
-  if (use === "sv") return { source: "alteration", gene, by: "sv" };
+  // titled as the portal's Plots tab titles them (getAxisLabel, PLT-DT-19)
+  if (use === "mutation") {
+    const by = a.by || "mutationType";
+    return { source: "alteration", gene, by,
+      label: by === "mutated" ? gene + ": Mutated vs Wild Type" : by === "driver" ? gene + ": Driver vs VUS Mutations" : label };
+  }
+  if (use === "sv") return { source: "alteration", gene, by: "sv", label: gene + ": Variant vs No Variant" };
   if (use === "discrete") return { source: "molecular", profileType: a.profile, gene, discrete: true, label };
   return { source: "molecular", profileType: a.profile, gene, ...(a.log ? { log: true } : {}), label };
 }

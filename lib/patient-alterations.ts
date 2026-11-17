@@ -30,7 +30,7 @@ export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   mutations: [
     samples, text("gene", "Gene"), { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, annotation,
     text("mutationType", "Mutation Type"), text("copy", "Copy #"), freq,
-    number("vaf", "Allele Freq", "round(vaf, 2)"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"),
+    number("vaf", "Allele Freq"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"),
     text("variantType", "Variant Type"), text("chr", "Chromosome"), number("start", "Start Pos"), number("end", "End Pos"),
     text("ref", "Ref"), text("var", "Var"), text("status", "MS"),
   ],
@@ -104,6 +104,23 @@ const onlyCohort = (sampleIdExpr: string, samples: AlterationSamples, cte = "ck"
 /** The rows' labels: the part's cohort and study, the patient, and the first sample (the row's `sample`). */
 const labels = (p: TablePart, patient: string) => sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, 0 AS ord, " + sq(patient) + " AS patient, splitByString(', ', g.samples)[1] AS sid";
 
+/** An SQL array of (sample, …) tuples with one per sample, the first of each kept. */
+export const firstPerSample = (arr: string) => "arrayFilter((x, i) -> indexOf(arrayMap(y -> y.1, " + arr + "), x.1) = i, " + arr + ", arrayEnumerate(" + arr + "))";
+
+/**
+ * A mutation's allele frequency in each of the patient's samples, in their order (`order`): NULL in
+ * a sample without the mutation, without reads, or at 0 — the portal's sort value
+ * (AlleleFreqColumnFormatter getSortValue, `calcFrequency(m) || null`). `sf` is an SQL array of (sample, VAF) pairs.
+ */
+const vafVector = (order: string[], sf: string) =>
+  "CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, " + sf + ").2, " + orderArray(order) + ") AS Array(Nullable(Float64)))";
+/**
+ * The Allele Freq sort over `n` samples: the per-sample VAFs compared one by one, a missing one
+ * last in either direction (LazyMobXTable compareLists / compareValues).
+ */
+export const vafSort = (n: number) => (dir: "ASC" | "DESC") => n === 0 ? "vaf " + dir + " NULLS LAST"
+  : Array.from({ length: n }, (_, i) => "isNull(vafs[" + (i + 1) + "]) ASC, vafs[" + (i + 1) + "] " + dir).join(", ");
+
 /**
  * One patient's mutations, one row per variant however many of the patient's samples carry it (the
  * portal's patient table): the samples listed, the highest allele frequency among them with that
@@ -119,13 +136,17 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
     with: "WITH " + cohortCte(p, samples) + "m AS (\n" +
       "  SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
       "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,\n" +
-      "         if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f\n" +
+      "         if(tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f\n" +
       "  FROM " + db + ".mutation_derived\n" +
       "  WHERE " + mutationStudySql(p.study) + " AND patientId = " + sq(patient) + " AND molecularProfileId NOT LIKE '%uncalled%'" + onlyCohort("sampleId", samples) + "\n" +
       "),\n" +
       "g AS (\n" +
       "  SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, " + sampleCols(order) + ",\n" +
-      "         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount\n" +
+      "         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount,\n" +
+      // each sample's reads, in the patient's sample order: what the Allele Freq cell draws, and its sort
+      // one record per sample (a variant can repeat within a sample: two called profiles, duplicate rows), the first kept
+      "         groupArrayIf(tuple(sid, ac, rc), f IS NOT NULL) AS rs,\n" +
+      "         arraySort(x -> " + ordinalOf(order, "x.1") + ", " + firstPerSample("rs") + ") AS reads\n" +
       "  FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var\n" +
       "),\n" +
       (pin ? oncokbCte(pin, "MUTATION", "SELECT gene FROM g") : "") +
@@ -139,14 +160,16 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
       "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
-      "         g.vaf AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,\n" +
+      // the value the cell shows, filters and searches, to 4 places (the page writes it as the portal does)
+      "         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,\n" +
+      "         " + vafVector(order, "arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)") + " AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,\n" +
       "         g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos\n" +
       "  FROM g\n" +
       (pin ? "  LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange\n" : "") +
       "  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene\n" +
       "))\n",
-    columns: ALTERATION_COLUMNS.mutations,
-    select: "*",
+    columns: ALTERATION_COLUMNS.mutations.map((c) => c.id === "vaf" ? { ...c, sort: vafSort(order.length) } : c),
+    select: "* EXCEPT (vafs)",
     defaultOrder: "gdrv DESC, gene, so, pos ASC NULLS LAST",
     tiebreak: "gene, chr, start, end, ref, var, proteinChange, mutationType",
   };

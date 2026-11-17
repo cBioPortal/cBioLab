@@ -116,13 +116,15 @@ SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort,
 WITH m AS (
   SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,
-         if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
+         if(tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
   FROM snapshot_db.mutation_derived
   WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND patientId = 'P-0024249' AND molecularProfileId NOT LIKE '%uncalled%'
 ),
 g AS (
   SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
-         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount
+         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount,
+         groupArrayIf(tuple(sid, ac, rc), f IS NOT NULL) AS rs,
+         arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x.1) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x.1)), arrayFilter((x, i) -> indexOf(arrayMap(y -> y.1, rs), x.1) = i, rs, arrayEnumerate(rs))) AS reads
   FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var
 ),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
@@ -140,7 +142,8 @@ fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
-         g.vaf AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
+         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
+         CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)).2, ['P-0024249-T01-IM6', 'P-0024249-T02-IM7']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange
@@ -152,13 +155,15 @@ SELECT cohort, study, countIf((positionCaseInsensitiveUTF8(if(oncogenicity = '',
 WITH m AS (
   SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,
          referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,
-         if(tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
+         if(tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f
   FROM snapshot_db.mutation_derived
   WHERE startsWith(molecularProfileId, 'msk_chord_2024_') AND studyId = 'msk_chord_2024' AND patientId = 'P-0024249' AND molecularProfileId NOT LIKE '%uncalled%'
 ),
 g AS (
   SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, arrayStringConcat(arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], sid))) AS so,
-         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount
+         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount,
+         groupArrayIf(tuple(sid, ac, rc), f IS NOT NULL) AS rs,
+         arraySort(x -> if(indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x.1) = 0, 1000000, indexOf(['P-0024249-T01-IM6', 'P-0024249-T02-IM7'], x.1)), arrayFilter((x, i) -> indexOf(arrayMap(y -> y.1, rs), x.1) = i, rs, arrayEnumerate(rs))) AS reads
   FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var
 ),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
@@ -176,13 +181,14 @@ fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
-         g.vaf AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
+         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
+         CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)).2, ['P-0024249-T01-IM6', 'P-0024249-T02-IM7']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange
   LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene
 ))
-SELECT *, count() OVER () AS total FROM rows
+SELECT * EXCEPT (vafs), count() OVER () AS total FROM rows
 WHERE (positionCaseInsensitiveUTF8(if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level '))))), 'Oncogenic') > 0)
 ORDER BY gdrv DESC, gene, so, pos ASC NULLS LAST, gene, chr, start, end, ref, var, proteinChange, mutationType
 LIMIT 25 OFFSET 0

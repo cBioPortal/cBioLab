@@ -10,7 +10,8 @@ import { sampleMarks } from "../../lib/timeline-tracks.ts";
 import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
-import type { AlterationsResult } from "../../lib/views/alterations/types";
+import type { AlterationsResult, AlleleReads } from "../../lib/views/alterations/types";
+import { portalVaf } from "../../lib/chart/format.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
@@ -32,6 +33,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
   const allMarks = useMemo(() => sampleMarks(p?.samples || [], []), [p]);
   // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
   const marks = useMemo(() => p?.shown ? new Map([...allMarks].filter(([id]) => p.shown!.includes(id))) : allMarks, [p, allMarks]);
+  // the Allele Freq bars' slots: one per sample in view, in sample order, as the Samples column's
+  const slot = useMemo(() => new Map([...marks.keys()].map((id, i) => [id, i])), [marks]);
   const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch({ patient: to }); };
   // the mutation or copy-number row clicked: the genomic overview zooms to its gene, and its Reset view lets go
   // (the portal's onMutationTableRowClick / onCnaTableRowClick / onResetViewClick); one row at a time across the tables
@@ -67,6 +70,24 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
     );
   };
 
+  // the portal's Allele Freq cell (AlleleFreqColumnFormatter): one sample in view, its VAF as text; several, a 6-px bar per
+  // sample of the patient in sample order, VAF × 12 px high in the sample's colour; each sample's reads on hover
+  const vafCell = (row: { detail?: Record<string, unknown> }) => {
+    const reads = ((row.detail?.reads || []) as AlleleReads[]).filter((r) => marks.has(r.sample));
+    const vaf = (r: AlleleReads) => r.alt / (r.alt + r.ref);
+    const lines = reads.map((r) => (marks.get(r.sample)?.label ?? "?") + "  " + portalVaf(vaf(r)) + " (" + r.alt + " variant reads out of " + (r.alt + r.ref) + " total)");
+    const tip = lines.length ? lines.join("\n") : undefined;
+    if (marks.size === 1) return <span data-tip={tip}>{reads[0] ? portalVaf(vaf(reads[0])) : ""}</span>;
+    if (!reads.length) return <span />;
+    return (
+      <svg width={slot.size * 6 + (slot.size - 1) * 3} height={12} data-tip={tip} role="img" aria-label={"allele frequency: " + lines.join("; ")}>
+        {reads.map((r) => {
+          const h = vaf(r) * 12;
+          return <rect key={r.sample} x={(slot.get(r.sample) ?? 0) * 9} y={12 - h} width={6} height={h} fill={marks.get(r.sample)?.color} />;
+        })}
+      </svg>);
+  };
+
   return (
     // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
     <div className="tl-view" tabIndex={-1} onKeyDown={patientKeys(a.position, go)}>
@@ -99,8 +120,9 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 },
                 selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
               })}
-              num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
-              cell={(id, x) => id === "samples" ? sampleCell(x)
+              num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? x.toFixed(1) + "%" : x.toLocaleString()}
+              cell={(id, x, row) => id === "samples" ? sampleCell(x)
+                : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>

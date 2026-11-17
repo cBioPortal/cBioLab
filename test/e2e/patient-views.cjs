@@ -96,9 +96,15 @@ async function patientViews({ browser, ok, BASE }) {
       await sec("Mutations").locator(".dt-sort", { hasText: "Allele Freq" }).click();
       await page.waitForFunction(() => /TP53/.test(document.querySelector("section.alt-table[aria-label='Mutations'] tbody tr")?.textContent || ""), null, { timeout: 120000 });
       await settle();
-      const vafs = (await sec("Mutations").locator("tbody tr td:last-child").allInnerTexts()).map(Number);
-      ok("alterations: a header click sorts its own table, highest first, and no other", vafs.length === 7 && vafs.every((x, i) => i === 0 || vafs[i - 1] >= x) &&
-        JSON.stringify(await sec("Copy Number Alterations").locator("tbody tr").allInnerTexts()) === JSON.stringify(cnaBefore), vafs.join(" "));
+      // the portal's Allele Freq sort: the samples' VAFs in sample order, one by one, a sample without the mutation last —
+      // KRAS (0.0758) and POLE, in the second sample alone, after every first-sample VAF (PAT-MT-3)
+      const order = (await sec("Mutations").locator("tbody tr td:nth-child(2)").allInnerTexts()).map((x) => x.trim()).join(" ");
+      ok("alterations: a header click sorts its own table by the samples' VAFs in sample order, and no other", order === "TP53 PTEN BRCA2 ROS1 SPEN KRAS POLE" &&
+        JSON.stringify(await sec("Copy Number Alterations").locator("tbody tr").allInnerTexts()) === JSON.stringify(cnaBefore), order);
+      // two samples: a bar per sample, each sample's reads on hover, as the portal draws its Allele Freq cell
+      const bar = sec("Mutations").locator("tbody tr").first().locator("td:last-child svg");
+      ok("alterations: Allele Freq is a bar per sample with the reads in its tooltip", (await bar.locator("rect").count()) === 1 &&
+        /0\.76 \(761 variant reads out of 1000 total\)/.test(await bar.getAttribute("data-tip") || ""), await bar.getAttribute("data-tip"));
       // a filter's values come from that table
       await sec("Copy Number Alterations").getByRole("button", { name: "filter Gene" }).click();
       await page.locator(".dt-values label").first().waitFor({ timeout: 60000 });
@@ -236,6 +242,7 @@ async function patientViews({ browser, ok, BASE }) {
       await page.locator(".segigv").first().waitFor({ state: "attached", timeout: 240000 });
       await settled(); await page.waitForTimeout(1500);
       let s = await state();
+      ok("patient page: the browser title is the portal's (PAT-SH-1)", (await page.title()) === "Patient: IM-GBM-28", await page.title());
       ok("overview: compact IGV with the sample columns", !s.navbar && s.canvases > 3 && s.cells.startsWith("1|2|3|4|1|2|3|4|4|5|4|4|") && /P1\|P1\|P1\|P1/.test(s.cells), JSON.stringify(s));
       const row = page.locator("section.alt-table[aria-label='Mutations'] tbody tr", { hasText: "TP53" }).first();
       await row.click();
@@ -248,6 +255,20 @@ async function patientViews({ browser, ok, BASE }) {
       ok("overview: Reset view goes back to compact and lets the row go", !s.navbar && (await row.getAttribute("aria-selected")) === "false", JSON.stringify(s));
     } catch (e) {
       ok("overview: the genomic overview", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    // the timeline's tooltip as the portal's (PAT-TL-TT-1): hover shows it, a click pins it past the pointer leaving, Esc closes it
+    try {
+      const mark = page.locator(".tl-fig svg .tl-m").first();
+      await mark.scrollIntoViewIfNeeded();
+      await mark.hover(); await page.waitForTimeout(250);
+      const hovered = await page.locator(".tl-tip").count();
+      await mark.click(); await page.mouse.move(2, 2); await page.waitForTimeout(400);
+      const pinned = await page.locator(".tl-tip").count();
+      await page.keyboard.press("Escape"); await page.waitForTimeout(200);
+      const closed = await page.locator(".tl-tip").count();
+      ok("timeline: a hovered tooltip, pinned by a click past the pointer leaving, closed by Esc (PAT-TL-TT-1)", hovered === 1 && pinned === 1 && closed === 0, [hovered, pinned, closed].join(" "));
+    } catch (e) {
+      ok("timeline: a hovered tooltip, pinned by a click past the pointer leaving, closed by Esc (PAT-TL-TT-1)", false, String(e.message).split("\n")[0].slice(0, 200));
     }
     ok("overview: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
