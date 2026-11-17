@@ -428,7 +428,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Cohort column: the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
     - [x] "72%" and "<1%" as the portal writes them (#290)
   - [x] The header's tooltip tables write non-integers to one decimal (PAT-STM-10) (#290)
-  - [ ] Browser title "Patient: P04" (ours "cbio-lab") (PAT-SH-1)
+  - [x] Browser title "Patient: P04" (ours "cbio-lab") (PAT-SH-1) (#296)
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
   - [ ] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3)
   - [ ] Clinical Data tab as Attribute | Value and Attribute × sample, and the Timeline Data tables (ours two wide tables of raw values) (PTB-CD-1…4, PTB-STM-11)
