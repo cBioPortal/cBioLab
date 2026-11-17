@@ -96,3 +96,11 @@ test("P1 (PAT-MT-1): the Patient page lays out the alterations view with mutatio
   assert.equal(v.cna.rows, 10);
   assert.equal(v.sv?.rows, undefined);
 });
+
+test("L1 PTB-CD-4: the Clinical Data tab's Timeline Data view is the event tables", () => {
+  const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION", "CNA"] });
+  const at = l.names.indexOf("Clinical Data › Timeline Data");
+  assert.ok(at >= 0, l.names.join(", "));
+  assert.equal((l.doc.views![at] as { kind: string; tables?: boolean }).kind, "timeline");
+  assert.equal((l.doc.views![at] as { tables?: boolean }).tables, true);
+});
