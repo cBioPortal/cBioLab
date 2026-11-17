@@ -913,6 +913,8 @@ interface FacetBase {
    */
   studyCount?: number;
   attribute: string; per: "patient" | "sample"; patients: number;
+  /** a patient-level attribute: the queried samples whose patient has a value (the portal's Tracks-menu count) */
+  samples?: number;
   /** from clinical_attribute_meta — the portal's own declarations */
   displayName?: string; description?: string;
   /** the portal orders charts by this and hides priority 0 by default */
