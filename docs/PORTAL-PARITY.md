@@ -437,7 +437,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Tooltips pinned by a click, lingering 100 ms, closed by Esc, and paged "‹ i of n events ›" with the arrow keys (PAT-TL-TT-1, PAT-TL-TT-4) (#317)
     - [x] The sample row's tooltip with the sample's clinical attributes (PAT-TL-TT-3) (#319)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
-  - [ ] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15)
+  - [x] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15) (#PR)
   - [ ] Cohort column: the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
     - [x] "72%" and "<1%" as the portal writes them (#290)
   - [x] The header's tooltip tables write non-integers to one decimal (PAT-STM-10) (#290)

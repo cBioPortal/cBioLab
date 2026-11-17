@@ -1538,6 +1538,11 @@
                 "id": "status",
                 "name": "MS",
                 "numeric": false
+              },
+              {
+                "id": "inAll",
+                "name": "Profiled in all samples",
+                "numeric": true
               }
             ],
             "shown": [
@@ -1584,7 +1589,8 @@
                   76937801,
                   "T",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1618,7 +1624,8 @@
                   91298168,
                   "G",
                   "-",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1652,7 +1659,8 @@
                   153332775,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1686,7 +1694,8 @@
                   153249542,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1720,7 +1729,8 @@
                   56160630,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1754,7 +1764,8 @@
                   56174930,
                   "T",
                   "G",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1788,7 +1799,8 @@
                   8486074,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1822,7 +1834,8 @@
                   8436666,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1856,7 +1869,8 @@
                   40748610,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1890,7 +1904,8 @@
                   40739128,
                   "C",
                   "G",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1924,7 +1939,8 @@
                   11144050,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1958,7 +1974,8 @@
                   7577515,
                   "T",
                   "G",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1992,7 +2009,8 @@
                   7579487,
                   "G",
                   "-",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2026,7 +2044,8 @@
                   142178126,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2060,7 +2079,8 @@
                   63534396,
                   "G",
                   "C",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2094,7 +2114,8 @@
                   59876623,
                   "T",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2128,7 +2149,8 @@
                   30303904,
                   "C",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2162,7 +2184,8 @@
                   3778565,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2196,7 +2219,8 @@
                   2207631,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2230,7 +2254,8 @@
                   180056365,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2244,7 +2269,7 @@
               },
               {
                 "…": "5 more",
-                "sha256": "ac4099ffd7be8d40"
+                "sha256": "6e2e2d285b72672e"
               }
             ],
             "offset": 0,
@@ -2291,6 +2316,11 @@
                 "id": "freq",
                 "name": "Cohort %",
                 "numeric": true
+              },
+              {
+                "id": "inAll",
+                "name": "Profiled in all samples",
+                "numeric": true
               }
             ],
             "shown": [
@@ -2322,7 +2352,8 @@
                   "AMP",
                   "Oncogenic · Level 4",
                   "12q14.1",
-                  1.5575079872204474
+                  1.5575079872204474,
+                  1
                 ]
               },
               {
@@ -2336,7 +2367,8 @@
                   "AMP",
                   "Oncogenic",
                   "1q21.2",
-                  1.5095846645367412
+                  1.5095846645367412,
+                  1
                 ]
               },
               {
@@ -2350,7 +2382,8 @@
                   "AMP",
                   "Unknown",
                   "1q22",
-                  0.7388769071012061
+                  0.7388769071012061,
+                  1
                 ]
               }
             ],
@@ -2504,6 +2537,10 @@
             "total": 0,
             "all": 0
           }
+        },
+        "mixedPanels": {
+          "mutations": false,
+          "cna": false
         },
         "oncokbPin": "v7.5"
       },

@@ -7,6 +7,8 @@
  *
  *   M  one row per key: both genes, positions and chromosomes and the class, sorted. FX-P49's
  *      EML4-ALK fusion, in T1 and T2 alike, is one row naming both samples
+ *   G  genes profiled in all samples (PAT-MT-6, PAT-STM-15): FX-P33-T1's EGFR is off its panel
+ *      (PEERFIX_NO_EGFR), so genes "all" drops it and the table says a row is off a panel; FX-P01 has none
  *   K  the key, run on ClickHouse over literal rows: a fusion recorded A–B and B–A is one key;
  *      another position, chromosome or class is another (the fixture holds no A–B / B–A pair)
  *   F  a merged row's fields are one record's (Gene 1 and Gene 2 never both the same partner)
@@ -88,6 +90,24 @@ for (const id of ["FX-P49", "FX-P51"]) {
   }
   const sorted = await svRows("FX-P51", { sort: { column: "status" } });
   ok("S a sort by Status is refused, naming the column", typeof sorted === "string" && /status is not sortable/.test(sorted), String(sorted).slice(0, 160));
+}
+
+// ---- G: genes profiled in all samples (the portal's gene filter) --------------------------------
+{
+  // FX-P33-T1 is on PEERFIX_NO_EGFR (data_gene_panel_matrix.txt; the panel lists 14 genes, no EGFR) and carries ATM, EGFR, TP53 mutations
+  const run = async (genes?: "any" | "all") => (await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: "FX-P33" }, ...(genes ? { genes } : {}),
+    mutations: { columns: ["gene", "inAll"], rows: 100 } }, ctx) as { alterations?: AlterationsResult }).alterations;
+  const any = await run(), all = await run("all");
+  const genesOf = (a: AlterationsResult | undefined) => {
+    const t = a?.tables.mutations; if (!t) return "none";
+    const g = t.columns.findIndex((c) => c.id === "gene"), i = t.columns.findIndex((c) => c.id === "inAll");
+    return t.rows.map((r) => r.values[g] + ":" + r.values[i]).sort().join(" ");
+  };
+  ok("G FX-P33: EGFR, off its sample's panel, is not profiled in all samples; ATM and TP53 are", genesOf(any) === "ATM:1 EGFR:0 TP53:1", genesOf(any));
+  ok("G genes \"all\" keeps ATM and TP53 only", genesOf(all) === "ATM:1 TP53:1", genesOf(all));
+  ok("G the table says some row is off a panel (the menu's condition)", any?.mixedPanels?.mutations === true, JSON.stringify(any?.mixedPanels));
+  const p01 = (await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: "FX-P01" } }, ctx) as { alterations?: AlterationsResult }).alterations;
+  ok("G FX-P01, both samples on PEERFIX_FULL: no row off a panel", p01?.mixedPanels?.mutations === false && p01?.mixedPanels?.cna === false, JSON.stringify(p01?.mixedPanels));
 }
 
 // ---- K: the key on literal rows -----------------------------------------------------------------

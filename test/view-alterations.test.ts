@@ -3,7 +3,7 @@
 // Driven with hand-made participants whose tables live in memory.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { vafSort } from "../lib/patient-alterations.ts";
+import { vafSort, alterationSource } from "../lib/patient-alterations.ts";
 import { runAlterations } from "../lib/views/alterations/run.ts";
 import { ALTERATION_COLUMNS, ALTERATION_DEFAULT_COLUMNS } from "../lib/patient-alterations.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
@@ -98,6 +98,8 @@ const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?
     case "alterations:mutations": return o.mut ?? MUT;
     case "alterations:cna": return o.cna ?? CNA;
     case "alterations:sv": return o.sv ?? [];
+    // the mixed-panel counts: no mixed panel unless a test supplies rows
+    case "alterations:mixed-mutations": case "alterations:mixed-cna": return [];
     default: throw new Error("unexpected table " + table);
   }
 };
@@ -401,5 +403,50 @@ describe("vafSort", () => {
   test("S2 PAT-STM-1: no samples listed sorts by vaf, null last", () => {
     assert.equal(vafSort(0)("DESC"), "vaf DESC NULLS LAST");
     assert.equal(vafSort(0)("ASC"), "vaf ASC NULLS LAST");
+  });
+});
+
+describe("PAT-MT-6: the gene filter (legacy GeneFilterMenu, PAT-STM-15)", () => {
+  const withMixed = (mut: number, cna: number): Tables => (table, src) => {
+    if (table === "alterations:mixed-mutations") return Array.from({ length: mut }, () => ({ cohort: "A", study: "s1" }));
+    if (table === "alterations:mixed-cna") return Array.from({ length: cna }, () => ({ cohort: "A", study: "s1" }));
+    return study()(table, src);
+  };
+
+  test("PAT-MT-6 GF1: genes other than any or all is refused, naming genes", async () => {
+    const v = await run({ genes: "some" } as never, one());
+    assert.match(v.error!, /genes/);
+  });
+
+  test("PAT-MT-6 GF2: genes all and genes any are not refused", async () => {
+    for (const genes of ["all", "any"] as const) {
+      const v = await run({ genes }, one());
+      assert.equal(v.error, undefined, genes + ": " + String(v.error));
+    }
+  });
+
+  test("PAT-MT-6 GF3: the inAll column is numeric, offered by mutations and cna, and not a default", () => {
+    for (const t of ["mutations", "cna"] as const) {
+      const c = ALTERATION_COLUMNS[t].find((x) => x.id === "inAll");
+      assert.ok(c, t + " has inAll");
+      assert.equal(c!.numeric, true);
+      assert.equal(c!.name, "Profiled in all samples");
+      assert.ok(!ALTERATION_DEFAULT_COLUMNS[t].includes("inAll"), t + " does not show inAll by default");
+    }
+  });
+
+  test("PAT-MT-6 GF4: mixedPanels is read from the mixed-mutations and mixed-cna counts", async () => {
+    const v = await run({}, one(withMixed(2, 0)));
+    assert.equal(v.error, undefined, String(v.error));
+    assert.deepEqual(alt(v).mixedPanels, { mutations: true, cna: false });
+  });
+
+  test("PAT-MT-6 GF5: the all source narrows the rows on inAll = 1, the any source does not (text smoke test)", () => {
+    const part = { cohort: "A", study: "s1", cohortSql: "SELECT 1" };
+    const all = alterationSource("mutations", part, "P1", "db", null, [], "patient", "all").with;
+    const any = alterationSource("mutations", part, "P1", "db", null, [], "patient", "any").with;
+    assert.notEqual(all, any);
+    assert.ok(all.includes("inAll = 1"));
+    assert.ok(!any.includes("inAll = 1"));
   });
 });

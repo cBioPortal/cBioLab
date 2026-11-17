@@ -22,10 +22,10 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 41 |
+| ✅ match | 43 |
 | 🟡 partial | 26 |
 | 🔶 different | 6 |
-| ❌ missing | 14 |
+| ❌ missing | 12 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
@@ -230,7 +230,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 | PAT-MT-3 | 🟡 | B | One sample in view: the VAF as text ✅; several: a 6-px bar per sample, VAF × 12 px, sample colour ✅ (lgg P04 IDH1 R132C four bars); tooltip "0.38 (46 variant reads out of 121 total)" per sample ✅; sort by the samples' VAFs in sample order, null last ✅ (`check:patient-vaf`); no header VAF plot; download keeps the highest VAF, not the per-sample list |
 | PAT-MT-4 | 🟡 | B | Marker per carrying sample, "--" where not (equal-width slots) ✅; no grey not-profiled pill, no uncalled opacity |
 | PAT-MT-5 | ❌ | B | No mRNA Expr. column (P3 legacy 25 %, 29 % …) |
-| PAT-MT-6 | ❌ | C | No gene filter menu |
+| PAT-MT-6 | ✅ | B | The Gene header's menu, shown with several samples in view and a row whose gene some sample's panel leaves out: "Different gene panels were used for the samples. Filter mutations for:" ◉ Genes profiled in any sample / ○ all samples (the view's `genes`, both tables); msk_chord P-0025952 (IMPACT468 and IMPACT505): 185 → 182 rows, CTR9, NADK, SPRTN dropped (not on IMPACT468 per the portal API); the Genomic Overview and the VAF plot are not filtered |
 
 ### §6 Copy Number Alterations table
 
@@ -282,7 +282,7 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 | PAT-STM-12 | 🟡 | BC | Header/timeline: collection day, type rank, natural id ✅ (`timeline-tracks.ts:196`); tables number without days (`alterations/run.ts:101`, tracked known issue) |
 | PAT-STM-13 | ✅ | BC | Sorted panel ids → P1…Pn, W for WES (`igv.ts:100-107`) |
 | PAT-STM-14 | 🟡 | C | Mutation key adds mutationType/variantType (harmless); CNA ✅; SV tuple not sorted |
-| PAT-STM-15 | ❌ | C | No "profiled in all samples" filter |
+| PAT-STM-15 | ✅ | BC | Keep a row iff every sample in view is profiled for its gene (panel holds it, WES/WGS, or no panel), by the table's own profile (the CNA table by the CNA panel: the portal's mutation-map bug, PAT-CNA-5, not copied); check:patient-sv G (FX-P33's EGFR, off PEERFIX_NO_EGFR) |
 
 ---
 

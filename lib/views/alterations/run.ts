@@ -70,6 +70,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     if (bad) return no(t + ": " + bad);
     tq[t] = { q: tqq, size };
   }
+  if (view.genes != null && view.genes !== "any" && view.genes !== "all") return no("genes is \"any\" (every row, the default) or \"all\" (only genes profiled in every sample in view)");
+  const genes = view.genes || "any";
   if (view.samples != null && view.samples !== "patient" && view.samples !== "cohort")
     return no("samples is \"patient\" (every sample of the patient, the default) or \"cohort\" (only the cohort's samples)");
   const scope = view.samples || "patient";
@@ -108,11 +110,25 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const samples = r.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
     return { samples, order: [...sampleMarks(samples, []).keys()] };
   };
+  /**
+   * whether the Mutations and CNA tables hold a row whose gene some sample in view was not profiled
+   * for (the portal shows its "Different gene panels" menu only then, PAT-MT-6); a peer's patient is
+   * not asked (null)
+   */
+  const mixedPanelsOf = async (pt: { study: string; id: string }, order: string[]): Promise<AlterationsResult["mixedPanels"] | null> => {
+    const res = ctx.resolvers[pt.study];
+    if (peerOf(res)) return null;
+    const part = { cohort: vNames[0], study: pt.study, cohortSql: scope === "cohort" ? res.cohortSql(ctx.doc.cohorts[vNames[0]]) : "" };
+    const count = (t: "mutations" | "cna") => (res as unknown as PatientLevelCapable).rowsCounts("alterations:mixed-" + t, (db) => alterationSource(t, part, pt.id, db, pin, order, scope),
+      { filters: { inAll: { max: 0 } } }, ALTERATION_DEFAULT_COLUMNS[t]).then((c) => c.some((x) => x.n > 0));
+    const [mutations, cna] = await Promise.all([count("mutations"), count("cna")]);
+    return { mutations, cna };
+  };
   /** one of the patient's tables, for the page (or values) the request asks of it */
   const tableRows = async (t: AlterationTable, pt: { study: string; id: string }, order: string[]): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = ALTERATION_DEFAULT_COLUMNS[t];
     const r = await runRows(ctx, "alterations:" + t, [pt.study], tqq, defs, shownColumns(tqq, cols, defs), size,
-      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope),
+      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, genes),
       ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined,
       remote(("alterations:" + t) as PeerTable, { patient: pt.id, order }));
     const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, ...(c.unsorted ? { unsorted: true } : {}) }));
@@ -154,7 +170,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     // every sample of the patient numbers the markers, as the portal's sample view keeps each sample's number;
     // with samples: "cohort", the cohort's are the ones the tables read and the card shows
     const [smp, inCohort] = want ? await Promise.all([samplesOf(want, "patient"), scope === "cohort" ? samplesOf(want, "cohort") : null]) : [null, null];
-    const [position, ...tabs] = await Promise.all([
+    const [mixed, position, ...tabs] = await Promise.all([
+      want ? mixedPanelsOf(want, smp!.order) : Promise.resolve(null),
       want ? listPosition(r, !!view.patient, (first) => listRows(1, { locate: first })) : Promise.resolve(null),
       ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order) : Promise.resolve(null)),
     ]);
@@ -170,7 +187,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     };
     return {
       kind: "alterations", cohorts: vNames,
-      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.samples.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, oncokbPin: shownPin },
+      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.samples.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, ...(mixed ? { mixedPanels: mixed } : {}), oncokbPin: shownPin },
       method: alterationsMethod({ samples: scope, cohorts: vNames, oncokbPin: shownPin, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length,
         lists: r.lists, excluded, instances: r.groups, patient: want,
         tables: want ? ALTERATION_TABLES.map((t) => ({ name: ALTERATION_TABLE_NAMES[t], total: tables[t]!.total, all: tables[t]!.all, queryText: describeQuery(tables[t]!.query, tables[t]!.columns) })) : [] }),
