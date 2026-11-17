@@ -164,8 +164,8 @@ export function TracksMenu({ attrs, totals, spectrum, sequenced, autoTracks = []
                   {r && (r.pct != null || r.kind === "spectrum") ? <span style={{ fontVariantNumeric: "tabular-nums" }}
                     data-tip={r.kind === "auto" ? "drawn for every queried sample"
                       : r.kind === "spectrum" ? (sequenced != null && totals ? sequenced.toLocaleString() + " of " + totals.samples.toLocaleString() + " queried samples were profiled for mutations" : "how many queried samples were profiled for mutations is not known here")
-                      : a!.patients.toLocaleString() + " of " + (r.unit === "samples" ? totals!.samples : totals!.patients).toLocaleString() + " queried " + r.unit + " have a value" +
-                      (r.unit === "patients" ? " (a patient attribute: the portal counts these patients' samples)" : "")}>{trackFreqText(r.pct)}</span>
+                      : (a!.per !== "sample" && a!.samples != null ? a!.samples : a!.patients).toLocaleString() + " of " + (r.unit === "samples" ? totals!.samples : totals!.patients).toLocaleString() + " queried " + r.unit + " have a value" +
+                      (a!.per !== "sample" ? (a!.samples != null ? " (a patient attribute: counted in its patients' samples, as the portal)" : " (a patient attribute: the portal counts these patients' samples)") : "")}>{trackFreqText(r.pct)}</span>
                     : a && a.kind !== "spectrum" && <span style={{ fontVariantNumeric: "tabular-nums" }}>{a.patients.toLocaleString()}</span>}
                 </label>
                 {h && ga && <div className="mb-1.5 ml-6 flex flex-wrap items-center gap-1">
