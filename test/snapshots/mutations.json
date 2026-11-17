@@ -148,6 +148,8 @@
           "proteinChange",
           "annotation",
           "mutationType",
+          "copyNumber",
+          "vaf",
           "mutCount"
         ],
         "query": {

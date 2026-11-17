@@ -125,6 +125,7 @@ warehouse_checks() (
   phase "mutation table columns"   && npm run check:mutation-columns 2>&1 | summary grep -E "^FAIL|mutation column checks passed|FAILED"
   phase "mutation tab states (empty gene, germline)" && npm run check:mutation-tab-states 2>&1 | summary grep -E "^FAIL|mutation tab state checks passed|FAILED"
   phase "patient allele frequency"  && npm run check:patient-vaf 2>&1 | summary grep -E "^FAIL|patient VAF checks passed|FAILED"
+  phase "mutation table search narrows the lollipop" && npm run check:mutation-search-lollipop 2>&1 | summary grep -E "^FAIL|mutation search lollipop checks passed|FAILED"
   phase "mutation tab driver settings" && npm run check:mutation-driver-settings 2>&1 | summary grep -E "^FAIL|mutation driver settings checks passed|FAILED"
   phase "patient structural variants" && npm run check:patient-sv 2>&1 | summary grep -E "^FAIL|patient SV checks passed|FAILED"
   phase "patient tables' Mutation Type" && npm run check:patient-tables 2>&1 | summary grep -E "^FAIL|patient table checks passed|FAILED"

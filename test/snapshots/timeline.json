@@ -1435,10 +1435,14 @@
           "samples": [
             {
               "id": "P-0000012-T02-IM3",
+              "label": "1",
+              "color": "black",
               "type": "Primary"
             },
             {
               "id": "P-0000012-T03-IM3",
+              "label": "2",
+              "color": "red",
               "type": "Metastasis"
             }
           ]

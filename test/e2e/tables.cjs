@@ -94,7 +94,7 @@ async function tables({ browser, ok, BASE }) {
     page.on("pageerror", e => errors.push("pageerror: " + e.message));
     try {
       await page.goto(BASE + "/portal/results?study=msk_impact_2017&genes=ALK,ROS1,RET", { waitUntil: "domcontentloaded" });
-      const tab = page.locator("[role=tab]").filter({ hasText: /^Structural Variants$/ }).first();
+      const tab = page.locator("[role=tab]").filter({ hasText: /^Structural Variants/ }).first();
       await tab.click({ timeout: 240000 });
       const tabs = await page.locator("[aria-label='results tabs'] [role=tab]").allInnerTexts();
       const title = page.locator(".dt-title").first();
@@ -104,7 +104,7 @@ async function tables({ browser, ok, BASE }) {
         return Number(/^([\d,]+)/.exec(await title.innerText())[1].replace(/,/g, ""));
       };
       const alk = await rows("ALK");
-      ok("results: the Structural Variants tab follows Mutations and lists ALK's calls, as the portal does", tabs[tabs.indexOf("Mutations") + 1] === "Structural Variants" && alk === 52,
+      ok("results: the Structural Variants tab follows Mutations and lists ALK's calls, as the portal does", /^Structural Variants\s*Beta!$/.test(tabs[tabs.indexOf("Mutations") + 1] || "") && alk === 52,
         tabs.join(", ") + " · ALK " + alk);
       await page.getByRole("tab", { name: "ROS1", exact: true }).click();
       const ros1 = await rows("ROS1");
@@ -114,7 +114,7 @@ async function tables({ browser, ok, BASE }) {
       await page.getByText(/queried patients altered in the queried genes/).waitFor({ timeout: 240000 });
       await page.waitForTimeout(500);
       ok("results: no Structural Variants tab when the queried genes have no call",
-        !(await page.locator("[aria-label='results tabs'] [role=tab]").allInnerTexts()).includes("Structural Variants"));
+        !(await page.locator("[aria-label='results tabs'] [role=tab]").allInnerTexts()).some((t) => t.startsWith("Structural Variants")));
     } catch (e) {
       ok("results: the Structural Variants tab", false, String(e.message).split("\n")[0].slice(0, 200));
     }
@@ -141,7 +141,7 @@ async function tables({ browser, ok, BASE }) {
       const all = await count("TMPRSS2");
       const selected = await page.locator("[role=tab][aria-selected=true]").allInnerTexts();
       ok("results: ?tab=Structural Variants opens the tab on the first gene, with the portal's TMPRSS2 count",
-        selected.includes("Structural Variants") && all.all === 236, selected.join(", ") + " · " + JSON.stringify(all));
+        selected.some((t) => t.startsWith("Structural Variants")) && all.all === 236, selected.join(", ") + " · " + JSON.stringify(all));
       const heads = (await page.locator(".dt-table thead th").allInnerTexts()).map((x) => x.trim()).filter(Boolean);
       ok("results: the SV table shows the portal's default columns, in its order",
         ["Sample ID", "Cancer Type Detailed", "Gene 1", "Gene 2", "Annotation (OncoKB)", "Connection Type", "Event Info", "Variant Class"].every((c, i) => heads[i]?.startsWith(c)),

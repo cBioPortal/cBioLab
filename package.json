@@ -43,6 +43,7 @@
     "check:mutation-tab-states": "node --env-file=.env.local scripts/check-mutation-tab-states.ts",
     "check:sv-levels": "node --env-file=.env.local scripts/check-sv-levels.ts",
     "check:patient-vaf": "node --env-file=.env.local scripts/check-patient-vaf.ts",
+    "check:mutation-search-lollipop": "node --env-file=.env.local scripts/check-mutation-search-lollipop.ts",
     "check:mutation-driver-settings": "node --env-file=.env.local scripts/check-mutation-driver-settings.ts",
     "check:patient-sv": "node --env-file=.env.local scripts/check-patient-sv.ts",
     "check:patient-tables": "node --env-file=.env.local scripts/check-patient-tables.ts",

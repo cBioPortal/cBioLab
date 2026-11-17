@@ -28,6 +28,11 @@ export function resultsHref(t: ResultsTarget): string {
   return "/portal/results?" + p.toString();
 }
 
+/** a study's own page, Explore on that study */
+export function exploreHref(study: string): string {
+  return "/lab?tab=explore&study=" + encodeURIComponent(study);
+}
+
 /** a Results link read back; `error` says what is wrong with one that cannot be */
 export function readResultsTarget(q: URLSearchParams): ResultsTarget & { error?: string } {
   const ids = (q.get("studies") || q.get("study") || "").split(",").map((s) => s.trim()).filter(Boolean);

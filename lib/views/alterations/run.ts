@@ -14,7 +14,7 @@ import {
 } from "../../patient-alterations.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
-import { plural, refuse } from "../shared.ts";
+import { patientSampleEvents, plural, refuse } from "../shared.ts";
 import type { AlterationsView, AlterationsResult, AlleleReads } from "./types.ts";
 import { alterationsMethod } from "./method.ts";
 
@@ -113,8 +113,16 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const r = await runRows({ ...ctx, page: undefined, values: undefined }, "alterations:samples", [pt.study], {}, ["sid"], ["sid", "type"], TABLE_ROWS_MAX,
       (parts: TablePart[]) => (db) => patientSamplesSource(parts[0], pt.id, db, which), undefined,
       { ...remote("alterations:samples", { patient: pt.id }), samples: which });
-    const samples = r.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
-    return { samples, order: [...sampleMarks(samples, []).keys()] };
+    return r.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
+  };
+  /**
+   * every sample of the patient numbered as the header numbers them (collection day, type, id), its
+   * sample events read beside the samples; `order` (the numbered markers' order) orders a gene's rows
+   */
+  const numbered = async (pt: { study: string; id: string }) => {
+    const [samples, ev] = await Promise.all([samplesOf(pt, "patient"), patientSampleEvents(ctx, pt.study, pt.id)]);
+    const marks = sampleMarks(samples, ev.events);
+    return { samples: [...marks.values()].filter((m) => samples.some((x) => x.id === m.id)), order: [...marks.keys()], note: ev.note };
   };
   /** one of the patient's tables, for the page (or values) the request asks of it */
   const tableRows = async (t: AlterationTable, pt: { study: string; id: string }, order: string[], inView: number): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
@@ -139,8 +147,9 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
       const first = pt ? null : await listRows(1);
       const want = pt || (first?.rows[0] ? { study: String(first.rows[0].study), id: String(first.rows[0].patient) } : null);
       if (!want) return no("the cohort's patient list is empty, so there is no patient's " + only + " table to page");
-      const smp = await samplesOf(want);
-      const { rows } = await tableRows(only, want, smp.order, smp.samples.length);
+      // numbered by collection day; the columns by how many samples are in view (the cohort's, or all)
+      const [smp, inCohort] = await Promise.all([numbered(want), scope === "cohort" ? samplesOf(want, "cohort") : null]);
+      const { rows } = await tableRows(only, want, smp.order, inCohort ? inCohort.length : smp.samples.length);
       return partial({ ...listOf({ rows: [], lists: [], total: 0, all: 0, offset: 0, groups: 1 }), patient: { ...want, samples: [], ...sourceOf(want.study) }, tables: { [only]: rows },
         oncokbPin: pinOf(want.study) });
     }
@@ -162,10 +171,10 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     }
     // every sample of the patient numbers the markers, as the portal's sample view keeps each sample's number;
     // with samples: "cohort", the cohort's are the ones the tables read and the card shows
-    const [smp, inCohort] = want ? await Promise.all([samplesOf(want, "patient"), scope === "cohort" ? samplesOf(want, "cohort") : null]) : [null, null];
+    const [smp, inCohort] = want ? await Promise.all([numbered(want), scope === "cohort" ? samplesOf(want, "cohort") : null]) : [null, null];
     const [position, ...tabs] = await Promise.all([
       want ? listPosition(r, !!view.patient, (first) => listRows(1, { locate: first })) : Promise.resolve(null),
-      ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order, (inCohort || smp!).samples.length) : Promise.resolve(null)),
+      ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order, inCohort ? inCohort.length : smp!.samples.length) : Promise.resolve(null)),
     ]);
     const tables: AlterationsResult["tables"] = {};
     ALTERATION_TABLES.forEach((t, i) => { const x = tabs[i]; if (x) tables[t] = x.rows; });
@@ -179,7 +188,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     };
     return {
       kind: "alterations", cohorts: vNames,
-      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.samples.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, oncokbPin: shownPin },
+      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, oncokbPin: shownPin },
       method: alterationsMethod({ samples: scope, cohorts: vNames, oncokbPin: shownPin, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length,
         lists: r.lists, excluded, instances: r.groups, patient: want,
         tables: want ? ALTERATION_TABLES.map((t) => ({ name: ALTERATION_TABLE_NAMES[t], total: tables[t]!.total, all: tables[t]!.all, queryText: describeQuery(tables[t]!.query, tables[t]!.columns) })) : [] }),
@@ -187,9 +196,10 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
       ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
       caveat: (want ? want.id + " — " + ALTERATION_TABLES.map(tableLine).join("; ") + ". " : "No patient to list: the cohort's patient list is empty. ") +
         "Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. " +
+        (smp?.note && smp.samples.length > 1 ? smp.note + " " : "") +
         "Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them" +
         (tables.mutations?.shown.includes("copy") ? "; Copy # on a mutation is the gene's deep calls anywhere in " + (scope === "cohort" ? "the cohort's samples of the patient. " : "the patient. ") : ". ") +
-        (want && inCohort ? "Only " + plural(inCohort.samples.length, "sample") + " of " + want.id + "'s " + (smp?.samples.length ?? 0) + " " + (inCohort.samples.length === 1 ? "is" : "are") + " in the cohort, and the tables read only " + (inCohort.samples.length === 1 ? "it" : "those") + " (samples: \"cohort\"); each keeps its number among all the patient's samples. " : "") +
+        (want && inCohort ? "Only " + plural(inCohort.length, "sample") + " of " + want.id + "'s " + (smp?.samples.length ?? 0) + " " + (inCohort.length === 1 ? "is" : "are") + " in the cohort, and the tables read only " + (inCohort.length === 1 ? "it" : "those") + " (samples: \"cohort\"); each keeps its number among all the patient's samples. " : "") +
         "Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. " +
         (want && peerOf(ctx.resolvers[want.study]) ? want.id + "'s tables come from " + ctx.resolvers[want.study].instance.label + " via federation, computed in its database. " : "") +
         (shownPin ? "Annotation is OncoKB " + shownPin + " (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. " : "No OncoKB version is pinned here, so the annotation columns are empty. ") +
