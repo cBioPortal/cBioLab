@@ -103,6 +103,34 @@ export function clickCodon(selected: readonly number[], pos: number, multi: bool
 }
 
 /** The selection with only the genes given kept and empty lists dropped; undefined when nothing is left. */
+/** a gene's y-axis maximum as the portal sets it by default: the tallest stem, at least 5 (MUT-STM-17) */
+export const defaultYMax = (g: Pick<HotspotGene, "positions">): number => Math.max(5, ...g.positions.map((q) => q.n));
+
+/**
+ * The Y-Axis Max control's next setting for a typed or slid value: rounded, at least 1 (the portal clamps
+ * below 1), and undefined — no setting — when it is the default; NaN leaves it unchanged (null).
+ */
+export function nextYMax(input: number, def: number): number | undefined | null {
+  if (!Number.isFinite(input)) return null;
+  const v = Math.max(1, Math.round(input));
+  return v === def ? undefined : v;
+}
+
+/**
+ * The view's `yMax` (each gene's y-axis maximum, the portal's Y-Axis Max) refused when malformed: an
+ * object from a gene of the view to a positive number. Below 1 is clamped to 1 where it is drawn.
+ */
+export function checkYMax(yMax: unknown, genes: readonly string[]): string | null {
+  if (yMax == null) return null;
+  const shape = "yMax is an object from gene to the y axis's maximum, like {\"KRAS\": 100}";
+  if (typeof yMax !== "object" || Array.isArray(yMax)) return shape;
+  for (const [g, v] of Object.entries(yMax as Record<string, unknown>)) {
+    if (!genes.includes(g)) return "yMax." + g + ": not a gene of this view — its genes are " + genes.join(", ");
+    if (typeof v !== "number" || !Number.isFinite(v)) return "yMax." + g + ": " + shape;
+  }
+  return null;
+}
+
 export function pruneCodons(codons: CodonSelection | undefined, genes: readonly string[]): CodonSelection | undefined {
   const kept = Object.entries(codons || {}).filter(([g, ps]) => genes.includes(g) && ps.length);
   return kept.length ? Object.fromEntries(kept) : undefined;

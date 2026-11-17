@@ -116,4 +116,10 @@ export const mutants: Mutant[] = [
     effect: "The mutation table lists every mutation whatever the query's OQL.",
     find: "(filter ? \"\\n    AND \" + filter : \"\")",
     replace: "(\"\")" },
+  { id: "lollipop-ymax-not-clamped", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "A Y-Axis Max typed below 1 is kept, where the portal clamps it to 1.",
+    find: "const v = Math.max(1, Math.round(input));", replace: "const v = Math.round(input);" },
+  { id: "lollipop-ymax-cap-unmarked", layer: "counts", guard: "unit", file: "lib/lollipop-svg.ts",
+    effect: "A lollipop whose tallest stem is above the set Y-Axis Max shows a plain top tick, where the portal marks the capped axis with \"≥\".",
+    find: "(cap != null && t === cap && maxN > cap ? \"≥\" : \"\")", replace: "(\"\")" },
 ];
