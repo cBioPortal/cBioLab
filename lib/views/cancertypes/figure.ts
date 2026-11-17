@@ -26,6 +26,14 @@ export function categoryLabel(groupBy: string): string {
   return ({ study: "Cancer Study", CANCER_TYPE: "Cancer Type", CANCER_TYPE_DETAILED: "Cancer Type Detailed" } as Record<string, string>)[groupBy] || groupBy;
 }
 
+/**
+ * The portal's grey gene tab (CancerSummaryContainer, CTS-GT-4): `gene` (null: the genes together) altered in no
+ * unit of any panel's cohort, before the filters.
+ */
+export function cancertypesUnaltered(r: CtResult, gene: string | null): boolean {
+  return r.panels.every((pn) => !(gene ? pn.perGene?.find((x) => x.gene === gene)?.altered ?? pn.altered : pn.altered));
+}
+
 /** the portal's filter alert, when a threshold hides some group */
 export function filterAlert(r: CtResult, g: { groups: unknown[]; categories: number; filtered?: true }): string | null {
   return g.filtered ? g.groups.length + " of " + g.categories + " categories (" + categoryLabel(r.groupBy) + ") are shown based on filtering." : null;
@@ -85,12 +93,13 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   if (o.title !== false) {
     const head = pn.cohort, hw = Math.min(textWidth(head, FS.title, 600), W * 0.5);
     out.push(label(PAD, 18, head, { size: FS.title, weight: 600, fill: p.ink, maxW: W * 0.5 }));
-    out.push(label(PAD + hw + 8, 18, (o.gene ? o.gene + " · " : "") + fmtInt(pn.altered) + " of " + fmtInt(pn.profiled) + " profiled " + r.unit + "s altered (" +
-      fmtPct(100 * pn.altered / (pn.profiled || 1)) + ")", { size: FS.small, fill: p.muted, maxW: W - PAD - hw - 8 - PAD }));
+    const tot = src !== pn && "profiled" in src && src.profiled !== undefined ? { altered: src.altered, profiled: src.profiled } : pn;
+    out.push(label(PAD + hw + 8, 18, (o.gene ? o.gene + " · " : "") + fmtInt(tot.altered) + " of " + fmtInt(tot.profiled) + " profiled " + r.unit + "s altered (" +
+      fmtPct(100 * tot.altered / (tot.profiled || 1)) + ")", { size: FS.small, fill: p.muted, maxW: W - PAD - hw - 8 - PAD }));
   }
   if (alert) out.push(label(PAD, T - 12, alert, { size: FS.small, fill: p.ink, maxW: W - 2 * PAD }));
-  if (!groups.length) {
-    out.push(label(PAD, T + 20, "No category passes the filters.", { size: FS.body, fill: p.muted, maxW: W - 2 * PAD }));
+  if (!groups.length || src.altered === 0) {
+    out.push(label(PAD, T + 20, groups.length ? "There are no alterations in this gene." : "No category passes the filters.", { size: FS.body, fill: p.muted, maxW: W - 2 * PAD }));
     return { body: out.join(""), width: W, height: T + 36, grown };
   }
   out.push(axisLeft(ys, L - 4, p, { title: yTitle, gridTo: plotR, fmt: yFmt }));
