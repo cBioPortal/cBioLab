@@ -20,9 +20,9 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 29 |
+| ✅ match | 31 |
 | 🟡 partial | 43 |
-| 🔶 different | 17 |
+| 🔶 different | 15 |
 | ❌ missing | 33 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -98,7 +98,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 |---|---|---|---|
 | MUT-0-1 | ✅ | B | "Mutations" tab, always shown; `?tab=Mutations`; spinner/skeleton while loading |
 | MUT-0-2 | 🟡 | B | Unchanged: the Results header as audited in 01-oncoprint RV-1…RV-3 |
-| MUT-0-3 | 🔶 | C | The tab now reads the page's driver settings (#251), but has no settings menu of its own; in-tab state lives in the document (invariant 9) |
+| MUT-0-3 | 🔶 | C | The tab's Driver/VUS split and its DRIVER lines follow the page's driver settings (#251, and the sources now reach the badges and table), but it has no settings menu of its own; in-tab state lives in the document (invariant 9) |
 | MUT-0-4 | 🟡 | BC | The query's OQL filters the tab (#251) and SVs are "A-B Fusion" rows (Q2 TMPRSS2 240 rows, as legacy) (#230); Show only drivers / somatic / profiled still not applied to this tab (tracked) |
 | MUT-0-5 | 🟡 | B | The OQL status line with "Do not filter by OQL" (#251); no VUS-hidden, germline or CaseFilter banners |
 
@@ -155,7 +155,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | ID | verdict | how | note |
 |---|---|---|---|
 | MUT-BF-1 | 🟡 | B | Grid as the portal's; KRAS 221/2 identical; TP53 still 325/7 vs 329/3 (the 4 hotspot rows: coadread not yet in the Genome Nexus store); no ⚙ (tracked) |
-| MUT-BF-2 | 🔶 | C | Unchanged: no pin → every call a driver (`federation.ts:581` for fusions) |
+| MUT-BF-2 | ✅ | C | With no driver source on (or offered), one badge per type, no Driver/VUS header (`AlterationGrid.tsx` TypeBadges) (#282) |
 | MUT-BF-3 | ✅ | B | Badge, row and column toggles; "only" (always visible, not on hover); everything selected removes the filter; Driver off → 2 of 223 |
 | MUT-BF-4 | 🟡 | B | Unchanged: filter reaches lollipop and table; no tracks / 3D |
 
@@ -249,7 +249,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | ID | verdict | how | note |
 |---|---|---|---|
 | MUT-MD-1 | ✅ | B | A gene with no mutations keeps its plot, drawn empty with "No <GENE> mutations in this cohort", zero badges, no frequency (#250) |
-| MUT-MD-2 | 🔶 | C | As BF-2 |
+| MUT-MD-2 | ✅ | C | As BF-2; the legend has one line per type; stems take the type's main colour |
 | MUT-MD-3 | ❌ | C | Unchanged: Show only drivers not applied to the tab (tracked) |
 | MUT-MD-4 | ❌ | C | Unchanged: germline not filtered on the tab (tracked) |
 | MUT-MD-5 | 🟡 | C | Unchanged |

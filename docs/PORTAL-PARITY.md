@@ -108,7 +108,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The patient header's significant-signatures badge (no warehouse study has a p-value profile yet, so it would show nothing today)
   - [ ] The signature table's download (the portal's table exports; ours is client-side `PortalTable` with no CSV)
   - [ ] A browser check: the kind is still `e2ePending`
-  - [ ] The signature table unpaged (ours 25 of 65 rows), spectrum % rounded (PTB-MS-7, PTB-STM-6) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
+  - [ ] The signature table unpaged (ours 25 of 65 rows) (PTB-MS-7)
+    - [x] Spectrum % rounded to whole percents (PTB-STM-6) (#290) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
 - [x] **Comparison → mRNA, Protein and DNA methylation tabs** — `diffexpr` laid out as the portal's tab: volcano and the clicked gene's box plot per group (a `plot` by cohort), then the gene table with the "High expression/methylation in" filter and "Significant only"; profiles picked as the portal picks them, 2 groups (PR #159)
   - [x] More than 2 groups: 3 to 10 compared by one-way ANOVA (p-values checked against cbioportal.org's), the table a mean and SD per group, no volcano, as the portal's
     - [x] Where there is no volcano, the box plot's place before a gene is clicked is one line saying to click a gene (expression and generic-assay tabs alike); the portal leaves an empty 360px box there
@@ -254,7 +255,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] A gene with no mutations: chip greyed, its plot drawn empty, 0 badges, no frequency (the portal hides it) (MUT-GT-2, MUT-MD-1; see bugs)
     - [x] The plot drawn empty with "No KRAS mutations in this cohort", 0 badges, the frequency hidden (#250)
     - [ ] The greyed gene chip (needs a per-gene status on the page)
-  - [ ] Driver calls where the stores are not loaded: coadread_tcga_pan_can_atlas_2018 TP53 325 drivers / 7 VUS, the portal's 329 / 3 (R175C ×3, T125M are Cancer Hotspots; the study is not yet in the Genome Nexus store); prad_tcga_pan_can_atlas_2018 TMPRSS2 Fusion 0 / 236, the portal's 207 / 29 (prad's pair calls are stored at v7.7, the pin is v7.5; 207 / 29 at v7.7) [data: the OncoKB v7.7 sync, SV-COL-13 above]. With no pin at all every call is a driver (`lib/federation.ts`) (MUT-BF-1, MUT-BF-2, MUT-MD-2) ([05-mutations](legacy-spec/parity/05-mutations.md))
+  - [ ] Driver calls where the stores are not loaded: coadread_tcga_pan_can_atlas_2018 TP53 325 drivers / 7 VUS, the portal's 329 / 3 (R175C ×3, T125M are Cancer Hotspots; the study is not yet in the Genome Nexus store); prad_tcga_pan_can_atlas_2018 TMPRSS2 Fusion 0 / 236, the portal's 207 / 29 (prad's pair calls are stored at v7.7, the pin is v7.5; 207 / 29 at v7.7) (MUT-BF-1) ([05-mutations](legacy-spec/parity/05-mutations.md)) [data: a Genome Nexus sync of coadread and prad, and the OncoKB v7.7 sync, both awaiting the user]
+    - [x] The tab's Driver/VUS split (badges, stems, legend, the table's Alteration cell and default order) follows the page's driver settings, as the portal's putativeDriver: OncoKB, Cancer Hotspots, the study's own calls and tiers, each where it is on and offered; with no source annotating, one badge per type and a legend without the split (MUT-BF-2, MUT-MD-2, MUT-0-3) (#282)
   - [ ] The Genome Nexus columns (Functional Impact, HGVSc, Exon, gnomAD, ClinVar, dbSNP, SIGNAL) are blank on coadread_tcga_pan_can_atlas_2018: the study is not in the offline store (MUT-COL-10, MUT-COL-26, MUT-COL-31…35, MUT-VA-1…5, MUT-STM-13) ([05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] Gene tabs and layout: the gene is the document's, not `mutations_gene`, and not shared with the SV tab; switching gene clears the table's sort, search and filters and the codon selection (the portal keeps them per gene); no germline rate or Somatic / Germline badges beside the frequency (MUT-GT-3, MUT-GT-4, MUT-LY-1, MUT-HD-3) ([05-mutations](legacy-spec/parity/05-mutations.md))
   - [ ] Lollipop details: no reset panel in its bar; downloads SVG / PNG only, named `KRAS_mutation_diagram` (the portal adds PDF, `KRAS_lollipop`); a domain's tip has no description or PFAM / Mutation Aligner links; the filter does not reach tracks or 3D (none) (MUT-LP-1, MUT-LP-4, MUT-LP-12, MUT-BF-4) ([05-mutations](legacy-spec/parity/05-mutations.md))
@@ -430,9 +432,12 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] Uncalled mutations' reads toward the Genomic Evolution gate (legacy counts called or uncalled); Files & Links only with resource data (ours a placeholder on every patient) (PTB-TAB-2)
   - [ ] Timeline: drag-zoom, PDF/PNG/SVG/ZIP download, month ticks, tooltips pinned and paged, the sample row's clinical data in its tooltip (PAT-TL-ZM-1, PAT-TL-ZM-3, PAT-TL-ZM-4, PAT-TL-TT-1…4)
     - [x] Tooltips pinned by a click, lingering 100 ms, closed by Esc, and paged "‹ i of n events ›" with the arrow keys (PAT-TL-TT-1, PAT-TL-TT-4) (#317)
+    - [x] The sample row's tooltip with the sample's clinical attributes (PAT-TL-TT-3) (#319)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
   - [ ] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15)
-  - [ ] Cohort column: "72%" and "<1%" (ours "72.5%"), the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
+  - [ ] Cohort column: the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
+    - [x] "72%" and "<1%" as the portal writes them (#290)
+  - [x] The header's tooltip tables write non-integers to one decimal (PAT-STM-10) (#290)
   - [x] Browser title "Patient: P04" (ours "cbio-lab") (PAT-SH-1) (#296)
   - [ ] Cohort navigation: `#navCaseIds=` read (ours opens without the pager), ⊖ exclude, "N patients" opens the Study View (ours a list dialog) (PAT-URL-4, PAT-NAV-3, PAT-NAV-4)
   - [x] SV table: Breakpoint Type hidden by default, the Status (s/g) column, A–B and B–A merged; the Annotation is under the SV tab item (PAT-SV-1, PAT-SV-3) (#303)

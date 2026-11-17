@@ -12,7 +12,7 @@ export interface HotspotsView {
    * false` shows every one (the portal's "Do not filter by OQL")
    */
   oql?: string[]; useOql?: boolean;
-  /** how a line's DRIVER reads: the page's driver settings */
+  /** the page's driver settings: the Driver/VUS split of the grid, stems and colours, and how a line's DRIVER reads */
   drivers?: DriverSettings;
   /**
    * The cells of the Driver/VUS × alteration class grid left out of the plot ("missense.vus",
@@ -87,6 +87,8 @@ declare module "../../types.ts" {
       codons?: Record<string, number[]>;
       /** every study of the query is on GRCh38, so its transcript links go to GRCh38 Ensembl */
       grch38?: boolean;
+      /** false: no driver source annotates these mutations, so the grid counts them by type alone (the portal's annotation off) */
+      annotated?: false;
     };
   }
   interface ViewResultMain { hotspots: "hotspots" }

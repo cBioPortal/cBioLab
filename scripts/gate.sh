@@ -126,6 +126,7 @@ warehouse_checks() (
   phase "mutation tab states (empty gene, germline)" && npm run check:mutation-tab-states 2>&1 | summary grep -E "^FAIL|mutation tab state checks passed|FAILED"
   phase "patient allele frequency"  && npm run check:patient-vaf 2>&1 | summary grep -E "^FAIL|patient VAF checks passed|FAILED"
   phase "mutation table search narrows the lollipop" && npm run check:mutation-search-lollipop 2>&1 | summary grep -E "^FAIL|mutation search lollipop checks passed|FAILED"
+  phase "mutation tab driver settings" && npm run check:mutation-driver-settings 2>&1 | summary grep -E "^FAIL|mutation driver settings checks passed|FAILED"
   phase "patient structural variants" && npm run check:patient-sv 2>&1 | summary grep -E "^FAIL|patient SV checks passed|FAILED"
   phase "hotspot drivers"           && npm run check:hotspot-drivers 2>&1 | summary grep -E "^FAIL|hotspot driver checks passed|FAILED"
   phase "Results tabs' OQL"         && npm run check:results-oql 2>&1 | summary grep -E "^FAIL|results OQL checks passed|FAILED"

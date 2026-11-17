@@ -11,6 +11,7 @@ import type { HotspotsView, HotspotGene } from "./types.ts";
 import { checkQuery, describeQuery } from "../../table-query.ts";
 import { MUTATION_COLUMNS } from "../../mutation-table.ts";
 import { lollipopNarrowing } from "../../lollipop.ts";
+import { driverSourceText, resolveDrivers } from "../../driver-settings.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
@@ -31,13 +32,14 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
     if (bad) return untimed({ kind: "hotspots", error: "table: " + bad });
   }
   const narrowing = hv.table ? lollipopNarrowing(hv.table) : null;
+  if (hv.drivers !== undefined) { try { resolveDrivers(hv.drivers); } catch (e) { return untimed({ kind: "hotspots", error: (e as Error).message }); } }
   const cn = vNames[0];
   const studies = cohorts[cn].studies;
   // the table lists only patient-level studies' rows, and only those may be narrowed by its row values
   const unnarrowed = narrowing ? studies.filter((st) => !isPatientLevel(resolvers[st])) : [];
   // the sites' counts and the proteins (length, Pfam domains) are independent, so both at once
   const [reports, proteins] = await Promise.all([
-    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql, narrowing && !unnarrowed.includes(st) ? narrowing : undefined))),
+    Promise.all(studies.map((st) => resolvers[st].lollipopCounts(doc.cohorts[cn], uniq, minCount, lines.oql, hv.drivers, narrowing && !unnarrowed.includes(st) ? narrowing : undefined))),
     Promise.all(uniq.map((g) => fetchProteinInfo(g)))
   ]);
   // every queried gene, an empty one included: the portal keeps its tab and draws its plot empty
@@ -56,14 +58,16 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const annotated = reports.every((r) => r.annotated);
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
-  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
+  const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(annotated ? {} : { annotated: false }), ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}),
     participation: participationFor(studies, false),
     note: (vNames.length > 1 ? "A lollipop draws one cohort: this shows “" + cn + "” only; " +
         vNames.slice(1).map((n) => "“" + n + "”").join(", ") + (vNames.length === 2 ? " is" : " are") + " not drawn. " : "") +
       "Mutations in “" + cn + "” by protein position, as cBioPortal's mutation tab draws them: one stem per codon" +
       " (the stored protein start position), its height the number of distinct patient + protein change pairs there." +
       " Colour is the codon's dominant mutation type, putative drivers before VUS" +
-      (annotated ? " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).") +
+      (!annotated ? (hv.drivers ? " (no driver source is switched on or offered here, so mutations are counted by type alone, as the portal does with annotation off)." : " (no OncoKB pin, so every mutation is coloured as a driver, as the portal does with annotation off).")
+        : hv.drivers ? " (driver = any switched-on source of the page's driver settings: " + driverSourceText(resolveDrivers(hv.drivers), "OncoKB, pinned", "a Cancer Hotspot of its kind in the stored Genome Nexus annotation") + ")."
+        : " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
       (narrowing ? " " + narrowing.gene + "'s stems and badges count only the mutations its table keeps, " + describeQuery(narrowing, MUTATION_COLUMNS) +
           ", as the portal's lollipop follows its table's search and filters; its Somatic Mutation Frequency does not." +

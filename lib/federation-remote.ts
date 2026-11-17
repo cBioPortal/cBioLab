@@ -13,6 +13,7 @@
 // by construction, so oncoprints degrade for its studies exactly as they do for
 // a local aggregate-only instance.
 import type { CohortDef, CohortSizes, ExploreResult } from "./types.ts";
+import type { DriverSettings } from "./driver-settings.ts";
 import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, PairOql, LollipopOql, LollipopRows, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
 import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers, PlotCell } from "./plot.ts";
 import type { Moments } from "./stats.ts";
@@ -397,17 +398,20 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     this.remember(r);
     return r.variantCounts || { variants: [], totals: [], minCount };
   }
-  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, rows?: LollipopRows): Promise<LollipopReport> {
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, drivers?: DriverSettings, rows?: LollipopRows): Promise<LollipopReport> {
     this.guard(def);
     // the table's search and filters read row values (a sample id among them), which never leave for a peer
     if (rows) throw new Error(this.study + " is a federation peer's, so its lollipop cannot be narrowed by the mutation table's search or filters");
     if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: false };
     const r = await this.call("aggregates",
-      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}) });
+      { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}), ...(drivers ? { lollipopDrivers: drivers } : {}) });
     this.remember(r);
     // a peer on an older build answers without these; refuse by name rather than draw nothing
     if (!r.lollipopCounts)
       throw new Error("peer " + this.study + " does not report per-codon lollipop counts (it predates them); update that instance");
+    // a site that predates the settings answers by OncoKB and hotspots alone: refused, not drawn as if it followed them
+    if (drivers && !r.lollipopCounts.drivers)
+      throw new Error("peer " + this.study + " does not apply the page's driver settings to its Mutations tab counts (it predates them); update that instance");
     return r.lollipopCounts;
   }
   async pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]> {
