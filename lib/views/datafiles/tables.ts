@@ -107,7 +107,7 @@ function matrixValues(f: MatrixFile, study: string, db: string, genes: string[],
       "      AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", cohort) + " GROUP BY sid, gene",
     missing: "WT", type: "MUTATION" };
   if (f.kind === "sv") return {
-    values: "SELECT " + bare + " AS sid, hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(sv_event_info)), ', ') AS val\n" +
+    values: "SELECT " + bare + " AS sid, hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(sv_event_info)), ' ') AS val\n" +
       "    FROM " + db + ".genomic_event_derived WHERE " + genomicStudySql(study) + " AND variant_type = 'structural_variant'\n" +
       "      AND hugo_gene_symbol IN " + inGenes + " AND " + inCohortSamples(bare, cohort) + " GROUP BY sid, gene",
     missing: "NA", type: "SV" };

@@ -20,8 +20,8 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 5 |
-| 🟡 partial | 23 |
+| ✅ match | 6 |
+| 🟡 partial | 22 |
 | 🔶 different | 6 |
 | ❌ missing | 4 |
 | 🐞 ok | 1 |
@@ -30,12 +30,12 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 | ? | 0 |
 | **Total IDs** | **41** |
 
-**Overall: 19.5 %** (✅ 5 + 🐞ok 1 + N/A 2 = 8 of 41). Counting 🟡 as half: 47.6 %.
+**Overall: 22.0 %** (✅ 6 + 🐞ok 1 + N/A 2 = 9 of 41). Counting 🟡 as half: 48.8 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 Chrome (0.x) | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Same three sections; no hide switch |
-| §1 Data files (1.x) | 13 | 1 | 10 | 1 | 1 | 0 | 0 | Every profile offered as CSV; no transposed; no generic-assay rows; lists open as a lab cohort |
+| §1 Data files (1.x) | 13 | 2 | 9 | 1 | 1 | 0 | 0 | Every profile in the portal's Tab Delimited and Transposed formats; no generic-assay rows; lists open as a lab cohort |
 | §2 Gene frequency (2.x) | 6 | 0 | 2 | 4 | 0 | 0 | 0 | Counts identical; 1-decimal %, no bar, no sort/paging |
 | §3 Case table (3.x) | 6 | 0 | 4 | 0 | 1 | 1 | 0 | Cells match minus "(Driver)" tags; no Study ID column, no per-alteration columns |
 | §4 Modes (MD) | 6 | 1 | 1 | 1 | 1 | 0 | 2 | OQL handled as legacy |
@@ -97,15 +97,15 @@ Data version: every count identical.
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| RDL-1.1 | 🟡 | B | CNA as "Putative copy-number alterations from GISTIC" (the profile's name, not "Copy-number Alterations (OQL is not in effect)"); CSV only (tracked) |
-| RDL-1.2 | 🟡 | B | "Mutations (OQL is not in effect)" ✅; CSV only |
-| RDL-1.3 | 🟡 | BC | "Structural Variants (OQL is not in effect)" ✅; shown when the study holds an SV profile, not when any SV exists; CSV only |
+| RDL-1.1 | 🟡 | B | Tab Delimited Format → `cna.txt` and Transposed Matrix → `cna_transposed.txt` ✅ (STUDY_ID, SAMPLE_ID, genes; tabs, no trailing newline); the row is named after the profile ("Putative copy-number alterations from GISTIC"), not "Copy-number Alterations (OQL is not in effect)" |
+| RDL-1.2 | ✅ | B | "Mutations (OQL is not in effect)"; Tab Delimited → `mutations.txt`, Transposed → `mutations_transposed.txt` (coadread KRAS + TP53: 594 rows, "G12D", WT, NP) |
+| RDL-1.3 | 🟡 | BC | "Structural Variants (OQL is not in effect)" → `structural_variants.txt` / `_transposed.txt`, events space-separated ✅; shown when the study holds an SV profile, not when any SV exists |
 | RDL-1.4 | 🟡 | B | Every mRNA profile offered by name; no "selected in the query" row (the query's mRNA choice does not change the list) |
 | RDL-1.5 | 🟡 | B | Same for protein |
 | RDL-1.6 | 🟡 | B | "Altered samples" 485 rows: CSV, Copy, Open as cohort; no Download as `altered_samples.txt`, Query, Virtual Study |
 | RDL-1.7 | 🟡 | B | "Unaltered samples" 55 rows (see STM-1); same actions |
 | RDL-1.8 | 🟡 | B | "Sample matrix: … 1 = altered, 0 = unaltered, NP = not profiled": CSV only, no Copy |
-| RDL-1.9 | 🟡 | B | Each profile its own row with a description line (no ⓘ tooltip); CSV only |
+| RDL-1.9 | 🟡 | B | Each profile its own row with a description line (no ⓘ tooltip); Tab Delimited / Transposed → `<profile name>.txt` (the portal's transposed file is a one-line bug, RDL-STM-5; ours transposes) |
 | RDL-1.10 | ❌ | B | No generic-assay rows |
 | RDL-1.11 | 🟡 | B | Rows: GISTIC, Log2, mRNA, z (normal), z (all), z (diploid), CPTAC, CPTAC z, RPPA, RPPA z — same profiles; z-score order reversed vs legacy (diploid, all, normal) |
 | RDL-1.12 | ✅ | C | Mutation/SV types not in the profile list; ordered MUTATION, CNA, GENESET, MRNA, METHYLATION, …, PROTEIN (`run.ts:113`); one row per profile id (= name for one study) |

@@ -4,6 +4,7 @@ import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { isDrawn, type AnalysisDoc, type ViewResult } from "../../../lib/types.ts";
+import { portalMatrix } from "../../../lib/views/datafiles/portal-file.ts";
 
 export const maxDuration = 300;
 
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
   const v = first.views[0];
   const t = pagedTable(v, table);
   if (!t || !isDrawn(v)) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
+  if (body.format === "tsv" || body.format === "tsv-transposed") return portalFile(v, t, table, body.format === "tsv-transposed", run, doc);
   const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   const enc = new TextEncoder();
   // the header row comes first, so the file opens as a table anywhere; what the query kept and who
@@ -77,5 +79,33 @@ export async function POST(req: Request) {
   return new Response(stream, { headers: {
     "content-type": "text/csv; charset=utf-8",
     "content-disposition": "attachment; filename=\"" + name.replace(/[^A-Za-z0-9._-]/g, "_") + "\""
+  } });
+}
+
+/**
+ * A Download-tab gene-by-sample file in the portal's format (Tab Delimited Format, or its Transposed
+ * Matrix): every row read first, since the transposed file's lines run across all of them; a read cut
+ * short refuses the file rather than writing part of it.
+ */
+async function portalFile(v: ViewResult, t: NonNullable<ReturnType<typeof pagedTable>>, table: string | undefined, transposed: boolean,
+  run: <T>(fn: () => Promise<T>) => Promise<T>, doc: AnalysisDoc): Promise<Response> {
+  const file = v.kind === "datafiles" ? v.datafiles?.files.find((f) => f.id === table && f.portalFile) : undefined;
+  if (!file) return new Response("cannot download: the portal's tab-delimited formats are for the Download tab's gene-by-sample files\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
+  const genes = t.columns.slice(2).map((c) => c.name);
+  const rows: { study: string; sample: string; values: string[] }[] = [];
+  try {
+    for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
+      const r = await run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table }));
+      const p = pagedTable(r.views[0], table);
+      if (!p) throw new Error(r.views[0].error || "the page at row " + offset + " returned nothing");
+      for (const row of p.rows) rows.push({ study: row.study, sample: row.sample, values: row.values.slice(2).map(String) });
+    }
+  } catch (e) {
+    return new Response("cannot download: " + String((e as Error)?.message || e) + "\n", { status: 500, headers: { "content-type": "text/plain; charset=utf-8" } });
+  }
+  const name = transposed ? file.portalFile!.replace(/\.txt$/, "_transposed.txt") : file.portalFile!;
+  return new Response(portalMatrix(genes, rows, transposed), { headers: {
+    "content-type": "text/plain; charset=utf-8",
+    "content-disposition": "attachment; filename=\"" + name.replace(/[^A-Za-z0-9._() -]/g, "_").replace(/"/g, "_") + "\""
   } });
 }

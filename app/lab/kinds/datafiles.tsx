@@ -56,12 +56,12 @@ async function listIds(docJson: () => string, vi: number, table: string): Promis
 
 function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJson?: () => string; updating: boolean }) {
   const [state, setState] = useState<string | null>(null);
-  const download = async (e: React.FormEvent<HTMLFormElement>) => {
+  const download = (format?: "tsv" | "tsv-transposed") => async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
     const doc = docJson ? readDoc(docJson) : null;
     if (!doc) return;
-    (form.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc, view: vi, table: f.id });
+    (form.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc, view: vi, table: f.id, ...(format ? { format } : {}) });
     form.submit();
   };
   /** read the list, act on it, and say what came of it: `act`'s message, or why it failed */
@@ -91,11 +91,22 @@ function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJso
       <td className="tabular-nums text-right whitespace-nowrap">{f.rows.toLocaleString()} rows</td>
       <td className="whitespace-nowrap">
         <span className="inline-flex gap-1.5">
-          <form method="post" action="/api/table" target="_blank" onSubmit={download}>
+          {f.portalFile ? <>
+            <form method="post" action="/api/table" target="_blank" onSubmit={download("tsv")}>
+              <input type="hidden" name="payload" />
+              <Button variant="outline" size="sm" className={TB} type="submit" disabled={!!off} aria-label={"download " + f.name + " in tab-delimited format"}
+                data-tip={off || "the portal's " + f.portalFile + ": STUDY_ID, SAMPLE_ID, then a column per gene, tab-separated"}><Download />Tab Delimited Format</Button>
+            </form>
+            <form method="post" action="/api/table" target="_blank" onSubmit={download("tsv-transposed")}>
+              <input type="hidden" name="payload" />
+              <Button variant="outline" size="sm" className={TB} type="submit" disabled={!!off} aria-label={"download " + f.name + " as a transposed matrix"}
+                data-tip={off || "the same file transposed: a line for STUDY_ID, one for SAMPLE_ID, one per gene"}><Download />Transposed Matrix</Button>
+            </form>
+          </> : <form method="post" action="/api/table" target="_blank" onSubmit={download()}>
             <input type="hidden" name="payload" />
             <Button variant="outline" size="sm" className={TB} type="submit" disabled={!!off} aria-label={"download " + f.name}
               data-tip={off || "every row as comma-separated text, with the cohort and study of each"}><Download />CSV</Button>
-          </form>
+          </form>}
           {(f.id === "altered" || f.id === "unaltered") && <>
             <Button variant="outline" size="sm" className={TB} type="button" disabled={!!off} onClick={() => void copy()} aria-label={"copy the " + f.name.toLowerCase()}
               data-tip={off || "copy the sample ids, one per line, as <study>:<sample>"}><Copy />Copy</Button>
