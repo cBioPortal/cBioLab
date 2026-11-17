@@ -34,6 +34,10 @@ on:
 
 # A pull request's newer push cancels its older run; every push to master and every merge-queue run
 # runs to the end, in a group of its own (keyed by its commit), so neither is ever cancelled.
+# In the merge queue (merge_group) only the quick checks run: lint, gate-local and coverage. The
+# warehouse and e2e lanes, the planted bugs and the reports that gather them already ran on the pull
+# request and run again on the push to master; in the queue they are skipped, which a required check
+# counts as passing.
 concurrency:
   group: verify-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -42,7 +46,7 @@ jobs:
   # Its own job, so a pull request shows lint as a check of its own, and in a couple of minutes
   # rather than after the gate's build and e2e.
   lint:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 15
     permissions:
       contents: read
@@ -67,7 +71,7 @@ jobs:
         run: npm run lint
 
   gate-local:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 30
     permissions:
       contents: read
@@ -89,6 +93,7 @@ jobs:
         run: scripts/gate.sh local
 
   gate-warehouse:
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -175,6 +180,7 @@ jobs:
           if-no-files-found: warn
 
   gate-e2e:
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -217,7 +223,7 @@ jobs:
   # or not that lane passed.
   planted-bugs:
     needs: gate-warehouse
-    if: ${{ !cancelled() }}
+    if: ${{ (!cancelled()) && github.event_name != 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -269,8 +275,8 @@ jobs:
   # One verification-report artifact, as /verification describes it, from the jobs' parts.
   verification-report:
     needs: [gate-warehouse, planted-bugs]
-    if: always()
-    runs-on: ubuntu-latest
+    if: ${{ (always()) && github.event_name != 'merge_group' }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 5
     permissions:
       contents: read
@@ -285,7 +291,7 @@ jobs:
   # a pull request's changed lines in lib/ and mcp/ covered, no new file there that no unit test loads,
   # and each area's coverage at or above its floor. It needs the base branch's history for the diff.
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     permissions:
       contents: read
@@ -322,7 +328,8 @@ jobs:
   # Report-only: copy-paste (jscpd) and security patterns (Semgrep's registry rule packs). Neither
   # fails the run; the findings are kept as the quality-report artifact, Semgrep's as SARIF.
   reports:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'merge_group'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     timeout-minutes: 20
     permissions:
       contents: read
