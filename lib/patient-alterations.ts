@@ -36,12 +36,14 @@ export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   ],
   cna: [samples, text("gene", "Gene"), text("cna", "CNA"), annotation, text("cytoband", "Cytoband"), freq],
   sv: [
-    samples, text("gene1", "Gene 1"), text("gene2", "Gene 2"), text("class", "Variant Class"), text("eventInfo", "Event Info"),
-    text("breakpointType", "Breakpoint Type"), text("connectionType", "Connection Type"), text("frame", "Effect on Frame"),
-    text("site1", "Site 1 Description"), text("site2", "Site 2 Description"),
-    text("pos1", "Site 1 Position"), text("pos2", "Site 2 Position"), number("length", "Length"),
+    samples, text("gene1", "Gene 1"), text("gene2", "Gene 2"),
+    // the portal's s / g badge, not sorted (StructuralVariantTableWrapper: MutationStatus, sortBy a constant)
+    { ...text("status", "Status"), unsorted: true },
+    text("class", "Variant Class"), text("pos1", "Site 1 Position"), text("pos2", "Site 2 Position"), text("eventInfo", "Event Info"),
+    text("connectionType", "Connection Type"), text("breakpointType", "Breakpoint Type"), text("svAnnotation", "Additional Annotation"),
+    text("frame", "Effect on Frame"), text("site1", "Site 1 Description"), text("site2", "Site 2 Description"), number("length", "Length"),
     number("tumorVariantCount", "Tumor Variant Count"), number("tumorReadCount", "Tumor Read Count"),
-    text("dnaSupport", "DNA Support"), text("rnaSupport", "RNA Support"), text("status", "Status"), text("svAnnotation", "Study Annotation"), text("comments", "Comments"),
+    text("dnaSupport", "DNA Support"), text("rnaSupport", "RNA Support"), text("comments", "Comments"),
   ],
 };
 
@@ -49,7 +51,7 @@ export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
 export const ALTERATION_DEFAULT_COLUMNS: Record<AlterationTable, string[]> = {
   mutations: ["samples", "gene", "proteinChange", "annotation", "mutationType", "copy", "freq", "vaf"],
   cna: ["samples", "gene", "cna", "annotation", "cytoband", "freq"],
-  sv: ["samples", "gene1", "gene2", "class", "eventInfo", "breakpointType", "connectionType"],
+  sv: ["samples", "gene1", "gene2", "status", "class", "eventInfo", "connectionType"],
 };
 
 /** The patient list's columns: how much of each table a patient has, so a list can be sorted by it. */
@@ -216,15 +218,34 @@ const patientSamples = (db: string, study: string, patient: string) =>
   "    WHERE cs.cancer_study_identifier = " + sq(study) + " AND p.stable_id = " + sq(patient);
 
 /**
- * One patient's structural variants, one row per event (both genes, both breakpoints, its class and
- * event info) however many samples carry it, with the study's own description of each site and the
- * highest supporting read counts among those samples. With no sort, by the first gene, then by the first
- * sample carrying the event (`order`), then the second gene.
+ * A structural variant's row key in the patient's table, as the portal's (generateStructuralVariantId):
+ * both genes, positions and chromosomes and the class, sorted and joined, so a fusion recorded A–B in
+ * one sample and B–A in another is one row. Arguments are SQL expressions.
+ */
+export function svRowKey(gene1: string, gene2: string, pos1: string, pos2: string, chr1: string, chr2: string, cls: string): string {
+  const s = (x: string) => "ifNull(toString(" + x + "), '')";
+  return "arrayStringConcat(arraySort([" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(", ") + "]), '_')";
+}
+
+/** the fields a merged structural-variant row shows, all taken from one record (the group's first) */
+const SV_FIELDS = ["gene1", "gene2", "class", "eventInfo", "pos1", "pos2", "breakpointType", "connectionType", "frame", "site1", "site2", "length", "dnaSupport", "rnaSupport", "status", "svAnnotation", "comments"];
+
+/**
+ * One patient's structural variants, one row per event as the portal keys it (svRowKey: both genes,
+ * positions and chromosomes and the class, sorted, so A–B and B–A are one row) however many samples
+ * carry it; the row's fields are its first record's (the first sample's in the patient's order, then
+ * the database's own order, as the portal's API lists them), with the highest supporting read counts
+ * among its samples. With no sort, by the first gene, then by the first sample carrying the event
+ * (`order`), then the second gene.
  */
 export function patientSvSource(p: TablePart, patient: string, db: string, order: string[], samples: AlterationSamples = "patient"): RowSource {
   return {
     with: "WITH " + cohortCte(p, samples) + "s AS (\n" +
-      "  SELECT smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
+      "  SELECT smp.stable_id AS sid, " + ordinalOf(order, "smp.stable_id") + " AS o,\n" +
+      // the portal's row key (generateStructuralVariantId): both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row
+      "         " + svRowKey("g1.hugo_gene_symbol", "g2.hugo_gene_symbol", "sv.site1_position", "sv.site2_position", "sv.site1_chromosome", "sv.site2_chromosome", "sv.class") + " AS k,\n" +
+      "         tuple(o, sv.internal_id) AS r, tuple(" + SV_FIELDS.join(", ") + ") AS rec0,\n" +
+      "         ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
       "         ifNull(sv.class, '') AS class, ifNull(sv.event_info, '') AS eventInfo, sv.breakpoint_type AS breakpointType, sv.connection_type AS connectionType,\n" +
       "         sv.site2_effect_on_frame AS frame, sv.site1_description AS site1, sv.site2_description AS site2,\n" +
       "         if(sv.site1_position IS NULL, '', concat(ifNull(sv.site1_chromosome, ''), ':', toString(sv.site1_position))) AS pos1,\n" +
@@ -238,17 +259,19 @@ export function patientSvSource(p: TablePart, patient: string, db: string, order
       "  WHERE sv.sample_id IN (" + patientSamples(db, p.study, patient) + ")" + onlyCohort("smp.stable_id", samples) + "\n" +
       "),\n" +
       "g AS (\n" +
-      "  SELECT gene1, gene2, class, eventInfo, pos1, pos2, " + sampleCols(order) + ",\n" +
-      "         any(breakpointType) AS breakpointType, any(connectionType) AS connectionType, any(frame) AS frame, any(site1) AS site1, any(site2) AS site2,\n" +
-      "         any(length) AS length, max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount,\n" +
-      "         any(dnaSupport) AS dnaSupport, any(rnaSupport) AS rnaSupport, any(status) AS status, any(svAnnotation) AS svAnnotation, any(comments) AS comments\n" +
-      "  FROM s GROUP BY gene1, gene2, class, eventInfo, pos1, pos2\n" +
+      // one row per key; its fields are one record's, the first sample's in the patient's order (the portal shows the group's first)
+      "  SELECT k, " + sampleCols(order) + ",\n" +
+      // one tuple per group, so a NULL field is the record's own (argMin alone skips NULLs, mixing records)
+      "         argMin(rec0, r) AS rec, " + SV_FIELDS.map((f, i) => "tupleElement(rec, " + (i + 1) + ") AS " + f).join(", ") + ",\n" +
+      "         max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount\n" +
+      "  FROM s GROUP BY k\n" +
       "),\n" +
-      "rows AS (SELECT " + labels(p, patient) + ", g.* FROM g)\n",
+      "rows AS (SELECT " + labels(p, patient) + ", g.* EXCEPT (rec) FROM g)\n",
     columns: ALTERATION_COLUMNS.sv,
-    select: "*",
+    select: "* EXCEPT (k)",
     defaultOrder: "gene1, so, gene2",
-    tiebreak: "gene1, gene2, pos1, pos2, class, eventInfo",
+    // the key last: two rows can match on every shown field (no positions, other chromosomes)
+    tiebreak: "gene1, gene2, pos1, pos2, class, eventInfo, k",
   };
 }
 
@@ -305,8 +328,11 @@ export function alterationPatientRowSource(parts: AlterationPart[], db: string, 
       "  GROUP BY pid\n" +
       "),\n" +
       "sv" + i + " AS (\n" +
-      "  SELECT p.stable_id AS pid, uniqExact(tuple(sv.site1_entrez_gene_id, sv.site2_entrez_gene_id, sv.class, sv.event_info, sv.site1_chromosome, sv.site1_position, sv.site2_chromosome, sv.site2_position)) AS n\n" +
+      // counted as the table lists them: one per the portal's row key (svRowKey)
+      "  SELECT p.stable_id AS pid, uniqExact(" + svRowKey("g1.hugo_gene_symbol", "g2.hugo_gene_symbol", "sv.site1_position", "sv.site2_position", "sv.site1_chromosome", "sv.site2_chromosome", "sv.class") + ") AS n\n" +
       "  FROM " + db + ".structural_variant sv\n" +
+      "  LEFT JOIN " + db + ".gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id\n" +
+      "  LEFT JOIN " + db + ".gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id\n" +
       "  JOIN " + db + ".sample s ON s.internal_id = sv.sample_id\n" +
       "  JOIN " + db + ".patient p ON p.internal_id = s.patient_id\n" +
       "  JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = p.cancer_study_id\n" +
