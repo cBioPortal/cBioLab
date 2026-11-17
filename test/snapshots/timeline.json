@@ -845,6 +845,160 @@
           ],
           "source": {
             "label": "primary"
+          },
+          "sampleAttrs": {
+            "P-0000012-T02-IM3": [
+              [
+                "CANCER_TYPE",
+                "Breast Cancer"
+              ],
+              [
+                "DIAGNOSIS_DESCRIPTION",
+                "Breast"
+              ],
+              [
+                "ICD_O_HISTOLOGY_DESCRIPTION",
+                "Infiltrating Duct Carcinoma"
+              ],
+              [
+                "CANCER_TYPE_DETAILED",
+                "Breast Invasive Ductal Carcinoma"
+              ],
+              [
+                "SAMPLE_TYPE",
+                "Primary"
+              ],
+              [
+                "MSI_TYPE",
+                "Indeterminate"
+              ],
+              [
+                "GENE_PANEL",
+                "IMPACT341"
+              ],
+              [
+                "SOMATIC_STATUS",
+                "Matched"
+              ],
+              [
+                "SAMPLE_CLASS",
+                "Tumor"
+              ],
+              [
+                "MUTATION_COUNT",
+                "1"
+              ],
+              [
+                "FRACTION_GENOME_ALTERED",
+                "0.3146"
+              ],
+              [
+                "TMB_NONSYNONYMOUS",
+                "1.109155301"
+              ],
+              [
+                "MSI_COMMENT",
+                "MICROSATELLITE INSTABILITY-INDETERMINATE. See MSI note below."
+              ],
+              [
+                "MSI_SCORE",
+                "4.1"
+              ],
+              [
+                "ONCOTREE_CODE",
+                "IDC"
+              ],
+              [
+                "PRIMARY_SITE",
+                "Breast"
+              ],
+              [
+                "SAMPLE_COVERAGE",
+                "344"
+              ]
+            ],
+            "P-0000012-T03-IM3": [
+              [
+                "CANCER_TYPE",
+                "Non-Small Cell Lung Cancer"
+              ],
+              [
+                "CLINICAL_GROUP",
+                "3B"
+              ],
+              [
+                "CLINICAL_SUMMARY",
+                "Distant"
+              ],
+              [
+                "DIAGNOSIS_DESCRIPTION",
+                "Lung and Bronchus"
+              ],
+              [
+                "ICD_O_HISTOLOGY_DESCRIPTION",
+                "Adenocarcinoma, Nos"
+              ],
+              [
+                "CANCER_TYPE_DETAILED",
+                "Lung Adenocarcinoma"
+              ],
+              [
+                "SAMPLE_TYPE",
+                "Metastasis"
+              ],
+              [
+                "MSI_TYPE",
+                "Stable"
+              ],
+              [
+                "GENE_PANEL",
+                "IMPACT341"
+              ],
+              [
+                "SOMATIC_STATUS",
+                "Matched"
+              ],
+              [
+                "SAMPLE_CLASS",
+                "Tumor"
+              ],
+              [
+                "MUTATION_COUNT",
+                "30"
+              ],
+              [
+                "FRACTION_GENOME_ALTERED",
+                "0.1844"
+              ],
+              [
+                "TMB_NONSYNONYMOUS",
+                "32.16550372"
+              ],
+              [
+                "MSI_COMMENT",
+                "MICROSATELLITE STABLE (MSS). See MSI note below."
+              ],
+              [
+                "MSI_SCORE",
+                "0.47"
+              ],
+              [
+                "METASTATIC_SITE",
+                "Neck"
+              ],
+              [
+                "ONCOTREE_CODE",
+                "LUAD"
+              ],
+              [
+                "PRIMARY_SITE",
+                "Lung"
+              ],
+              [
+                "SAMPLE_COVERAGE",
+                "428"
+              ]
+            ]
           }
         },
         "position": {
