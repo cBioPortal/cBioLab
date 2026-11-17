@@ -67,7 +67,7 @@ async function pooledPairs(sites: string[], resolvers: Record<string, Resolver>,
   const closed = sites.filter((s) => !plotCasesOf(resolvers[s]));
   if (closed.length) return { pairs: null, why: closed.join(", ") + " may not show individual cases" };
   const perSite = await peerSafe(sites.map((s) => resolvers[s]),
-    () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotScatterPoints(def, spec, POOLED_VALUES_CAP))), () => [null]);
+    () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotScatterPoints(def, pairsOnly(spec), POOLED_VALUES_CAP))), () => [null]);
   const pairs = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : null;
   if (!pairs) return { pairs: null, why: "not every study handed over its pairs (one past " + fmtInt(POOLED_VALUES_CAP) + ", or a peer that cannot)" };
   if (pairs.length !== n) return { pairs: null, why: "the studies' pairs (" + fmtInt(pairs.length) + ") did not add up to the plotted " + fmtInt(n) };
@@ -189,10 +189,20 @@ async function drawAll(rc: PlotCasesCapable, def: Def, spec: PlotRequest, data: 
   colourKey(data, spec, all);
 }
 
+/** the request without its colour and ring: a statistic over the pairs needs neither */
+function pairsOnly(spec: PlotRequest): PlotRequest {
+  const rest = { ...spec };
+  delete rest.colorBy; delete rest.ringBy;
+  return rest;
+}
+
 /** the key to points coloured and ringed by a category, a box's or a scatter's, titled by the axes they come from (PLT-CL-8, PLT-SC-6) */
 function colourKey(data: PlotData, spec: PlotRequest, pts: { c?: string; r?: string }[]): void {
-  if (spec.colorBy) { data.legend = legendFor(pts.map((x) => x.c || "")); data.colorLabel = axisLabel(spec.colorBy); }
-  if (spec.ringBy) { data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)]; data.ringLabel = axisLabel(spec.ringBy); }
+  // a participant that predates coloured points answers without the categories: said, not drawn plain
+  const unanswered = [spec.colorBy && pts.every((x) => x.c === undefined) ? "colour" : "", spec.ringBy && pts.every((x) => x.r === undefined) ? "ring" : ""].filter(Boolean);
+  if (unanswered.length) data.colourNote = "The points are not coloured: the study's participant answered without their " + unanswered.join(" and ") + " categories.";
+  if (spec.colorBy && !unanswered.includes("colour")) { data.legend = legendFor(pts.map((x) => x.c || "")); data.colorLabel = axisLabel(spec.colorBy); }
+  if (spec.ringBy && !unanswered.includes("ring")) { data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)]; data.ringLabel = axisLabel(spec.ringBy); }
 }
 
 /** what the caption says when the plotted cohort is drawn as density rather than as its cases */
@@ -648,7 +658,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), data.colourNote, layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data })
       };
       return pr;
@@ -787,7 +797,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       markLogOff(data, logs);
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, data.colourNote, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data, moments }) };
       return pr;
     }

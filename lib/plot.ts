@@ -1102,6 +1102,8 @@ export interface PlotData {
   /** what the colours mean: the fill category, the ring category, and the key to draw */
   colorLabel?: string;
   ringLabel?: string;
+  /** why the points carry no colour though the view asks for one */
+  colourNote?: string;
   legend?: { label: string; color: string; ring?: boolean }[];
   violinBins?: number;
   /** the value range the violin's bins were cut over, which is not the range the box is drawn on */

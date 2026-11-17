@@ -286,6 +286,10 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
             {plot?.shape === "scatter" && !colourable && <div className="tbz">
               <span className="tbl text-muted-foreground" data-tip="each cell of a density holds many cases, so there is no one colour to give it; a scatter is coloured when its cases are drawn as points">
                 colour samples by: drawn as density, no per-case colour</span>
+              {(spec.colorBy || spec.ringBy) && <button type="button" className="tbl underline" disabled={busy}
+                data-tip="this plot still asks for a colour or ring it cannot draw while it is a density; clear it"
+                onClick={() => update((vv) => { const n = { ...vv }; delete n.colorBy; delete n.ringBy; return n; })}>
+                clear {[spec.colorBy ? "colour" : "", spec.ringBy ? "ring" : ""].filter(Boolean).join(" and ")}</button>}
             </div>}
             {colourable && <><div className="tbz">
               <span className="tbl" data-tip={plot?.shape === "box" ? "colours each group's violin and points by a category" : "colours each point by a category"}>colour samples by</span>

@@ -6,6 +6,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runPlot } from "../lib/views/plot/run.ts";
+import { pointTip } from "../lib/views/plot/point-tip.ts";
 import { legendFor } from "../lib/federation.ts";
 import { POINTS_CAP, type PlotData } from "../lib/plot.ts";
 import { viewToSvg } from "../lib/view-svg.ts";
@@ -99,6 +100,24 @@ describe("runPlot: a scatter's points coloured and ringed", () => {
     assert.equal(p.pointSet!.rule, "none");
     assert.equal(p.xyPoints, undefined);
     assert.equal(p.legend, undefined);
+  });
+});
+
+describe("runPlot: a participant that answers without the categories (review of #300)", () => {
+  test("R6 a scatter whose points come back without c or r though the view colours and rings them: no key, and the caption says why", async () => {
+    const r = fake(() => scatter(3));
+    r.plotScatterPoints = async () => [0, 1, 2].map((i) => ({ id: "p" + i, x: i * 10, y: i * 5 }));
+    const out = await run(r, { colorBy: CANCER_TYPE, ringBy: SEX });
+    assert.equal(out.plot!.legend, undefined);
+    assert.match(out.note || "", /not coloured: the study's participant answered without their colour and ring categories/);
+  });
+});
+
+describe("pointTip: a coloured scatter point names its categories (review of #300)", () => {
+  test("R7 the tip of a scatter point lists its colour and ring after x and y", () => {
+    const d: PlotData = { ...scatter(3), xyPoints: [{ id: "a", x: 1, y: 2, c: "X", r: "R" }], colorLabel: "Colour attr", ringLabel: "Ring attr" };
+    const tip = pointTip(d, "a", "base")!;
+    assert.deepEqual(tip.rows.slice(2), [["Colour attr", "X"], ["Ring attr", "R"]]);
   });
 });
 

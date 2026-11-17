@@ -83,11 +83,8 @@ for (const [id, x, y, rho] of RANKS) {
   const ySel = sel({ source: "clinical", attribute: "FRACTION_GENOME_ALTERED" }, "num");
   const kras = sel({ source: "alteration", gene: "KRAS", by: "mutated" }, "cat");
   const sex = sel({ source: "clinical", attribute: "SEX" }, "cat");
-  // colorSel and ringSel are plotScatterPointsSql's optional trailing arguments
-  const pointsSql = plotScatterPointsSql as unknown as (x: string, y: string, cohort: string, cap?: number, sparse?: undefined,
-    colorSel?: string, ringSel?: string) => unknown;
   const rowsOf = async (colorSel?: string, ringSel?: string) =>
-    (await chQuery<Record<string, unknown>>(String(pointsSql(xSel, ySel, cohortSql, undefined, undefined, colorSel, ringSel)))).data;
+    (await chQuery<Record<string, unknown>>(plotScatterPointsSql(xSel, ySel, cohortSql, undefined, undefined, colorSel, ringSel))).data;
   /** per category of `catSel`, the plotted samples (a value on both axes), "" for one without a category */
   const countsBy = async (catSel: string) => new Map((await chQuery<Record<string, unknown>>(
     "WITH cohort AS (" + cohortSql + "),\n     xs AS (" + xSel + "),\n     ys AS (" + ySel + "),\n     cs AS (" + catSel + ")\n" +
@@ -103,9 +100,11 @@ for (const [id, x, y, rho] of RANKS) {
     try { await f(); } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
   };
 
-  await caseRow("C1 no colour or ring: 581 rows", async () => {
+  // the plotted samples, counted by a separate join (581 on cbioportal.org when the scorecard read Q4)
+  const plotted = [...(await countsBy(sex)).values()].reduce((a, n) => a + n, 0);
+  await caseRow("C1 no colour or ring: every plotted sample", async () => {
     const rows = await rowsOf();
-    ok(rows.length === 581, "C1 no colour or ring: 581 rows", "rows " + rows.length + " — expected 581");
+    ok(rows.length === plotted, "C1 no colour or ring: every plotted sample", "rows " + rows.length + " — expected " + plotted);
   });
 
   await caseRow("C2 colorSel KRAS mutated", async () => {
@@ -113,9 +112,9 @@ for (const [id, x, y, rho] of RANKS) {
     const c = tally(rows, "c");
     const allowed = new Set(["Mutated", "Not mutated", "No mutation", OQL_NOT_PROFILED, "Not profiled"]);
     const want = (await countsBy(kras)).get("Mutated") || 0;
-    ok(rows.length === 581 && [...c.keys()].every((k) => allowed.has(k)) && (c.get("Mutated") || 0) === want,
+    ok(rows.length === plotted && [...c.keys()].every((k) => allowed.has(k)) && (c.get("Mutated") || 0) === want,
       "C2 colorSel KRAS mutated: every c a KRAS category, Mutated counted as a separate join counts it",
-      "rows " + rows.length + ", c: " + show(c) + " — expected 581 rows, Mutated=" + want);
+      "rows " + rows.length + ", c: " + show(c) + " — expected " + plotted + " rows, Mutated=" + want);
   });
 
   await caseRow("C3 colorSel KRAS mutated, ringSel SEX", async () => {
@@ -123,10 +122,10 @@ for (const [id, x, y, rho] of RANKS) {
     const r = tally(rows, "r");
     const want = await countsBy(sex);
     const keys = new Set([...r.keys(), ...want.keys()]);
-    ok(rows.length === 581 && [...r.keys()].every((k) => k === "Male" || k === "Female" || k === "") &&
+    ok(rows.length === plotted && [...r.keys()].every((k) => k === "Male" || k === "Female" || k === "") &&
       [...keys].every((k) => (r.get(k) || 0) === (want.get(k) || 0)),
     "C3 colorSel KRAS mutated, ringSel SEX: every r Male, Female or \"\", counted as a separate join counts them",
-    "rows " + rows.length + ", r: " + show(r) + " — expected 581 rows, " + show(want));
+    "rows " + rows.length + ", r: " + show(r) + " — expected " + plotted + " rows, " + show(want));
   });
 }
 

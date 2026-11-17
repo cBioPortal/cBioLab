@@ -119,6 +119,19 @@ describe("a scatter pooled across studies", () => {
     nearRel(st.pPearson, P_PEARSON, 1e-6, "pPearson");
   });
 
+  test("R8: the pairs for Spearman are asked for without the view's colour and ring (review of #300)", async () => {
+    const asked: unknown[] = [];
+    const a = site("study_a", "patient-level", A), b = site("study_b", "patient-level", B);
+    for (const r of [a, b]) {
+      const inner = r.plotScatterPoints as (d: unknown, spec: Record<string, unknown>, cap?: number) => Promise<unknown>;
+      r.plotScatterPoints = async (d: unknown, spec: Record<string, unknown>, cap?: number) => { asked.push(spec); return inner(d, spec, cap); };
+    }
+    const st = statsOf(await run({ study_a: a, study_b: b }, { colorBy: { source: "clinical", attribute: "SEX" }, ringBy: { source: "clinical", attribute: "SEX" } }));
+    near(st.spearman, SPEARMAN, 1e-12, "spearman");
+    assert.ok(asked.length >= 2);
+    for (const spec of asked) assert.ok(!("colorBy" in (spec as object)) && !("ringBy" in (spec as object)), "no colour or ring in the pairs' request");
+  });
+
   test("R3: with the pooled pairs, the caption does not say Spearman is not reported", async () => {
     const r = await run({ study_a: site("study_a", "patient-level", A), study_b: site("study_b", "patient-level", B) });
     assert.equal(r.error, undefined);
