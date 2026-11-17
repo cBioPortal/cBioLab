@@ -124,8 +124,24 @@ export const portalSig2 = (x: number): string => x === 0 ? "0" : String(Number(x
  */
 export function portalPct(f: number | null): string {
   if (f == null || Number.isNaN(f)) return "-";
-  const fixed = (f * 100).toFixed(1);
-  return f !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
+  return portalRound1(f * 100);
+}
+
+/** A number to one decimal as cbioportal-utils formatPercentValue writes it: "< 0.1" when it rounds to nothing but is not 0. */
+export function portalRound1(x: number): string {
+  const fixed = x.toFixed(1);
+  return x !== 0 && Number(fixed) === 0 ? "< 0.1" : fixed;
+}
+
+/**
+ * A clinical value in the Patient page's attribute tables (ClinicalInformationPatientTable
+ * getDisplayValue): a non-integer number to one decimal (portalRound1: Fraction Genome Altered
+ * 0.4881 → "0.5"), anything else as stored.
+ */
+export function portalClinicalValue(v: string): string {
+  if (v.trim() === "" || Number.isNaN(Number(v))) return v;
+  const f = parseFloat(v);
+  return f !== parseInt(v, 10) ? portalRound1(f) : v;
 }
 
 /**
@@ -224,3 +240,13 @@ export function portalPercentAltered(altered: number, sequenced: number): string
   if (p < 0.03 && fixed.endsWith("0")) fixed = percent.toFixed();
   return fixed + "%";
 }
+
+/**
+ * A value rounded to `sig` significant digits, kept a number: what a result's long per-gene columns
+ * carry when they need not hold every bit (the page writes p and q to 3 digits). Not finite → as is.
+ */
+export const roundSig = (x: number, sig: number): number => Number.isFinite(x) && x !== 0 ? Number(x.toPrecision(sig)) : x;
+/** A value rounded to `places` decimal places, kept a number (a mean the page writes to 2 places). */
+export const roundPlaces = (x: number, places: number): number => Number.isFinite(x) ? Math.round(x * 10 ** places) / 10 ** places : x;
+/** A byte count in megabytes, one decimal: "2.5 MB". */
+export const fmtMb = (bytes: number): string => (bytes / 1e6).toFixed(1) + " MB";
