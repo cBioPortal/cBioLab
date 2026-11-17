@@ -1,14 +1,15 @@
 // Timeline view: the cohort's patients, and one patient's clinical timeline (cBioPortal's patient-view
 // Timeline) — drawn by lib/timeline-svg.ts, on the track model of lib/timeline-tracks.ts.
 import type { ViewResult, TimelineResult, PatientTimeline } from "../../types.ts";
-import { hasPatientTimeline, peerRowsFor, type PatientLevelCapable, type PatientTimelineCapable, type Resolver } from "../../federation.ts";
+import { hasPatientTimeline, hasViewAggregates, peerRowsFor, type PatientLevelCapable, type PatientTimelineCapable, type Resolver } from "../../federation.ts";
 import type { TablePart } from "../../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../../table-query.ts";
 import { timelineSvg, timelineSummary } from "../../timeline-svg.ts";
 import { timelinePatientRowSource, TIMELINE_COLUMNS, TIMELINE_DEFAULT_COLUMNS, PATIENT_ID } from "../../patient-timeline.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
-import { refuse } from "../shared.ts";
+import { refuse, type ViewResolver } from "../shared.ts";
+import { clinicalRowSource, tableAttributesSql } from "../../clinical-table.ts";
 import type { TimelineView } from "./types.ts";
 import { timelineMethod } from "./method.ts";
 
@@ -79,6 +80,10 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
       }
       if (!hasPatientTimeline(res)) return refuse("timeline", ctx, want.study + " cannot disclose a patient's timeline");
       patient = await (res as Resolver & PatientTimelineCapable).patientTimeline(want.id);
+      if (patient.samples.length && !peerRowsFor(res, "timeline") && hasViewAggregates(res)) {
+        const attrs = await sampleAttributes(res as ViewResolver & PatientLevelCapable, want.study, want.id);
+        if (attrs) patient = { ...patient, sampleAttrs: attrs };
+      }
     } catch (e) { return refuse("timeline", ctx, (e as Error).message); }
   }
 
@@ -108,3 +113,24 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
   };
 }
 
+/**
+ * Each of the patient's samples with its own clinical attributes (not its patient's), by attribute
+ * id, which the timeline's sample-row tooltip lists as the portal's does (PAT-TL-TT-3). Read where the
+ * patient lives, as the clinical table reads them; null when they cannot be read (the tooltip goes
+ * without them, the timeline is still drawn).
+ */
+async function sampleAttributes(res: ViewResolver & PatientLevelCapable, study: string, patient: string): Promise<Record<string, [string, string][]> | null> {
+  try {
+    const meta = await res.viewMeta("table:attributes", tableAttributesSql);
+    const cols = meta.filter((m) => Number(m.patient) !== 1).map((m) => ({ id: String(m.id), name: String(m.name || m.id), per: "sample" as const, numeric: false }));
+    if (!cols.length) return {};
+    const parts: TablePart[] = [{ cohort: "patient", study, cohortSql: res.cohortSql({ study, all: [{ kind: "patientList", ids: [study + ":" + patient] }] }) }];
+    const page = await res.rowsPage("timeline:sample-attributes", (db) => clinicalRowSource(parts, db, "sample", cols), {}, ["patient", "sample"], TABLE_ROWS_MAX, 0);
+    const out: Record<string, [string, string][]> = {};
+    for (const r of page.rows) {
+      const m = (r.m || {}) as Record<string, string>;
+      out[String(r.sample)] = cols.map((c) => [c.id, m[c.id] ?? ""] as [string, string]).filter(([, v]) => v !== "");
+    }
+    return out;
+  } catch { return null; }
+}
