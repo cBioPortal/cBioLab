@@ -696,7 +696,7 @@ export function lollipopTotalsSql(cohortSql: string, genes: string[], study: str
   return aggregateSql(lollipopCte(cohortSql, genes, study, 1, pin, db, hotspotPins, filters, fusions?.lines, drivers) +
     "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
     "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,\n" +
-    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND " + germlineConsentedSql(db, study, "sid") + ") AS germline_samples" +
+    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND " + germlineConsentedCond(db, study, "sid") + ") AS germline_samples" +
     (drivers ? ",\n       " + annotatingSql(drivers, offeredSources(drivers, pin, hotspotPins).sure, db, study) + " AS annotating" : "") + "\n" +
     "FROM m GROUP BY gene");
 }
@@ -715,7 +715,7 @@ export function cohortSampleCountSql(cohortSql: string): AggregateSql {
  * list (`<study>_germline`), or the study has none — the portal counts only the consented samples' germline
  * mutations (MutationUtils germlineMutationRate, over germlineConsentedSamples).
  */
-export function germlineConsentedSql(db: string, study: string, sid: string): string {
+function germlineConsentedCond(db: string, study: string, sid: string): string {
   const list = sq(study + "_germline");
   return "((SELECT count() FROM " + db + ".sample_list WHERE stable_id = " + list + ") = 0 OR " + sid + " IN (SELECT smp.stable_id FROM " + db + ".sample_list sl " +
     "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id JOIN " + db + ".sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = " + list + "))";
