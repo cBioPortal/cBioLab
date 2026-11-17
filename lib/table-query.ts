@@ -45,6 +45,8 @@ export interface QueryColumn {
   order?: string;
   /** the whole sort for each direction, missing values placed by the column itself (a list of values compared one by one, say) */
   sort?: (dir: "ASC" | "DESC") => string;
+  /** a column the portal does not sort by: refused as a sort, drawn without a sort control */
+  unsorted?: boolean;
 }
 
 /** A table's rows. `with` defines `rows`, which carries `cohort` and `study` columns. */

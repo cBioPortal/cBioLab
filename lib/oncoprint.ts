@@ -37,6 +37,7 @@ import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, 
 import { normalizeGeneTracks, toGeneList } from "./gene-tracks.ts";
 import { clinicalTable, clinicalMetaTable, assertCustomDataPresent } from "./custom-data.ts";
 import { finiteSql, finiteNumber } from "./sql-number.ts";
+import { SV_EVENT_KEY } from "./sv-oncokb.ts";
 import { expressionProfileFor, type OqlPins } from "./oql.ts";
 import { ENTITY_RE, isCategoricalAssay } from "./generic-assay.ts";
 import type { OncoprintSpec, HeatmapSpec } from "./views/oncoprint/types.ts";
@@ -146,7 +147,9 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
     "       mutation_variant AS mv, cna_alteration AS cna,\n" +
     // the study's own driver call and tier, and whether the mutation is germline (lib/driver-settings.ts)
     "       driver_filter AS df, driver_tiers_filter AS dt, toUInt8(" + germlineCondSql() + ") AS germ,\n" +
-    "       CAST(NULL AS Nullable(Int64)) AS ps, CAST(NULL AS Nullable(Int64)) AS pe\n" +
+    "       CAST(NULL AS Nullable(Int64)) AS ps, CAST(NULL AS Nullable(Int64)) AS pe,\n" +
+    // a structural variant's key in the OncoKB pair calls (lib/sv-oncokb.ts svDriverKeysSql)
+    "       if(variant_type = 'structural_variant', " + SV_EVENT_KEY + ", '') AS svk\n" +
     "FROM " + db + ".genomic_event_derived\n" +
     "WHERE " + genomicStudySql(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
     "  AND mutation_status != 'UNCALLED'" + // read support, not a call (lib/oql.ts specCond)
@@ -159,7 +162,7 @@ export function genomicEventsSql(genes: string[], study: string = STUDY, db: str
     "       `GENE.hugoGeneSymbol` AS gene, 'mutation' AS vt, ifNull(mutationType, '') AS mt,\n" +
     "       ifNull(proteinChange, '') AS mv, CAST(NULL AS Nullable(Int8)) AS cna,\n" +
     "       ifNull(driverFilter, '') AS df, ifNull(driverTiersFilter, '') AS dt, toUInt8(positionCaseInsensitive(" + status + ", 'germline') > 0) AS germ,\n" +
-    "       proteinPosStart AS ps, proteinPosEnd AS pe\n" +
+    "       proteinPosStart AS ps, proteinPosEnd AS pe, '' AS svk\n" +
     "FROM " + db + ".mutation_derived\n" +
     "WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + ranged.map(sq).join(",") + ")\n" +
     "  AND " + status + " != 'UNCALLED'" +
@@ -721,7 +724,7 @@ export function checkStudyInputs(x: unknown, nGroups: number): StudyInputs {
   });
   const overlays = (Array.isArray(r.overlays) ? r.overlays : bad("overlays")).map((o: Record<string, unknown>) =>
     ({ available: o?.available === true, values: table(o?.values, 3, "overlay values") }));
-  return { genes: strings(r.genes, "genes"), groups, events: table(r.events, 11, "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
+  return { genes: strings(r.genes, "genes"), groups, events: table(r.events, [11, 12], "alterations"), coverage: table(r.coverage, 2, "panel coverage"),
     facts: table(r.facts, 3, "column facts"), clinical: table(r.clinical, 3, "clinical values"),
     ...(r.clinicalNames === undefined ? {} : { clinicalNames: table(r.clinicalNames, 3, "clinical display names and datatypes") }), heatmap, overlays,
     levels: table(r.levels, 4, "expression levels").map((x) => x[2] === "exp" || x[2] === "prot" ? x : bad("expression levels")),
@@ -917,10 +920,11 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
                  lqRows("oncoprint:profiledTypes", columnFactsSql(s, dbOf(s), unit, samplesOf(s)), s)]).then(([e, c, p]) => ({ s, e, c, p }))));
   for (const { s, e, c, p } of evFetched) {
     const pref = multi ? s + "_" : "";
-    // column order is the SELECT's: pid, gene, vt, mt, mv, cna, df, dt, germ, ps, pe
+    // column order is the SELECT's: pid, gene, vt, mt, mv, cna, df, dt, germ, ps, pe, svk; a peer's
+    // structural variants are not in this instance's database, so their key finds no pair call here
     for (const r of e.rows) events.push({ pid: pref + (r[0] as string), gene: r[1] as string, vt: r[2] as string, mt: r[3] as string, mv: r[4] as string, cna: r[5] as string,
       df: (r[6] as string) ?? null, dt: (r[7] as string) ?? null, germ: Number(r[8] ?? 0) === 1,
-      ps: r[9] == null ? null : Number(r[9]), pe: r[10] == null ? null : Number(r[10]) });
+      ps: r[9] == null ? null : Number(r[9]), pe: r[10] == null ? null : Number(r[10]), ...(r[11] && !peers.has(s) ? { svk: r[11] as string } : {}) });
     for (const r of c.rows) coverage.push({ pid: pref + (r[0] as string), mask: Number(r[1]) });
     // column order is the SELECT's: pid, samples, mask
     for (const r of p.rows) {
@@ -936,7 +940,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   // only where these alterations carry a tier (forData).
   const drivers = forData(display.drivers!, events.some((e) => e.dt));
   if (drivers !== display.drivers) Object.assign(display, { drivers, hideVUS: drivers.hideVus, annotate: drivers.annotated ? "oncokb" : "none" });
-  const annotation = await driverAnnotation(drivers, events, genes, multi ? studies : study);
+  const annotation = await driverAnnotation(drivers, events, genes, multi ? studies : study, (s) => conns.get(s) ?? PRIMARY);
 
   // ---- a row's EXP / PROT: each sample's value in the profile it reads ----
   if (levelGenes.EXP.length || levelGenes.PROT.length) {
