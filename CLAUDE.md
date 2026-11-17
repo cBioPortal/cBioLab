@@ -57,7 +57,7 @@ Other docs: [`DOMAIN.md`](docs/DOMAIN.md) (what the domain's words mean),
 [`PERFORMANCE.md`](docs/PERFORMANCE.md) (measured against cbioportal.org — read before claiming
 this project is "fast"), [`ENVIRONMENT.md`](docs/ENVIRONMENT.md) (settings),
 [`SESSIONS.md`](docs/SESSIONS.md) (several working copies on one machine),
-[`PORTAL-PARITY.md`](docs/PORTAL-PARITY.md) (what cBioLab still lacks from cBioPortal — a PR that closes a gap ticks it there),
+[`PORTAL-PARITY.md`](docs/PORTAL-PARITY.md) (what cBioLab still lacks from cBioPortal — a PR never edits it: its body lists, under `## Tracker`, the items it ticks and the sub-items it leaves, and they are ticked on master after merge),
 [`legacy-spec/`](docs/legacy-spec/) (the legacy portal's behaviour per tab — every control, mode and statistic's method, with IDs a parity check cites),
 [`LINKS.md`](docs/LINKS.md) (Copy link and stored links `?s=`, a page's address past its limit, stored id lists read by id and
 withdrawn by their owner — before changing how a page reads or writes its URL).
@@ -75,7 +75,9 @@ withdrawn by their owner — before changing how a page reads or writes its URL)
    ids. Cross-study overlap is deliberately NOT deduplicated, vocabularies NOT harmonized — and
    views and captions must say so.
 4. **Docs are generated.** Never hand-edit `docs/dsl.md`: change `lib/dsl-reference.ts` (or the
-   kind's `lib/views/<kind>/doc.ts`), run `npm run docs:gen`, commit both. The same module feeds the Examples tab, MCP `describe_dsl` and
+   kind's `lib/views/<kind>/doc.ts`) and commit that; `docs/dsl.md` itself is regenerated
+   (`npm run docs:gen`) on master after merges, never committed in a pull request, since every one
+   would conflict on it. The same module feeds the Examples tab, MCP `describe_dsl` and
    the agent grammar. Every example runs in the gate and its cohort counts are pinned
    (`npm run docs:counts` re-pins after an intentional change — [`TESTING.md`](docs/TESTING.md)).
 5. **SQL injection surface**: user values reach SQL only through `sq()`, and cohort SQL passes

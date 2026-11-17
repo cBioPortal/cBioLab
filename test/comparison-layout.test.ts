@@ -60,9 +60,9 @@ test("protein and methylation profiles are picked as the portal picks them: not 
 test("two groups: mRNA, Protein and DNA methylation tabs, each a diffexpr view without enrichment, as the portal's", () => {
   const l = layout(2, BRCA_TCGA);
   assert.deepEqual(l.tabs.map((t) => t.title).filter((t) => /mRNA|Protein|methylation/.test(t)), ["mRNA", "Protein", "DNA methylation"]);
-  assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna", geneSets: [] });
-  assert.deepEqual(tabOf(l, "Protein"), { kind: "diffexpr", profileType: "protein_quantification", geneSets: [] });
-  assert.deepEqual(tabOf(l, "DNA methylation"), { kind: "diffexpr", profileType: "methylation_hm450", geneSets: [] });
+  assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna", allRows: true, geneSets: [] });
+  assert.deepEqual(tabOf(l, "Protein"), { kind: "diffexpr", profileType: "protein_quantification", allRows: true, geneSets: [] });
+  assert.deepEqual(tabOf(l, "DNA methylation"), { kind: "diffexpr", profileType: "methylation_hm450", allRows: true, geneSets: [] });
   assert.ok(!l.left.some((x) => /mRNA|Protein|methylation/.test(x)), l.left.join("; "));
   // the portal's tab offers the data set alone
   for (const t of ["mRNA", "Protein", "DNA methylation"]) assert.deepEqual(l.tabs.find((x) => x.title === t)!.locks, ["log2", "geneSets"], t);
@@ -70,9 +70,9 @@ test("two groups: mRNA, Protein and DNA methylation tabs, each a diffexpr view w
 
 test("three groups: the same tabs, tested by ANOVA", () => {
   const l = layout(3, BRCA_TCGA);
-  assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna", geneSets: [] });
-  assert.deepEqual(tabOf(l, "Protein"), { kind: "diffexpr", profileType: "protein_quantification", geneSets: [] });
-  assert.deepEqual(tabOf(l, "DNA methylation"), { kind: "diffexpr", profileType: "methylation_hm450", geneSets: [] });
+  assert.deepEqual(tabOf(l, "mRNA"), { kind: "diffexpr", profileType: "rna_seq_v2_mrna", allRows: true, geneSets: [] });
+  assert.deepEqual(tabOf(l, "Protein"), { kind: "diffexpr", profileType: "protein_quantification", allRows: true, geneSets: [] });
+  assert.deepEqual(tabOf(l, "DNA methylation"), { kind: "diffexpr", profileType: "methylation_hm450", allRows: true, geneSets: [] });
   assert.ok(!l.left.some((x) => /mRNA|Protein|methylation/.test(x)), l.left.join("; "));
 });
 
@@ -143,4 +143,16 @@ test("the Survival tab opens on the portal's first endpoint, and is not shown wi
   assert.ok(none.left.includes("Survival (no survival data)"), none.left.join("; "));
   // before the attributes are known the tab is offered, on OS
   assert.deepEqual(tabOf(layout(2, null), "Survival"), { kind: "survival", types: true, partitions: true, testAnySize: true });
+});
+
+test("Genomic Alterations is one table over every alteration type, under the portal's type tree (CMM-AT-2, CMM-AL-5)", () => {
+  for (const known of [BRCA_TCGA, null]) {
+    const ga = layout(2, known).tabs.find((t) => t.title === "Genomic Alterations")!;
+    assert.equal(ga.views?.length, 1, "one table, not one per alteration type");
+    const view = tabOf(layout(2, known), "Genomic Alterations") as unknown as Record<string, unknown>;
+    assert.equal(view.kind, "enrichment");
+    assert.equal(view.alteration, "any");
+    assert.equal(view.events, undefined, "every type by default");
+    assert.equal(view.minAltered, 1, "every gene tested is listed, as the portal's table (CMM-AL-5)");
+  }
 });

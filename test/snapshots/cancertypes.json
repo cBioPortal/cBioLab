@@ -25,6 +25,7 @@
           "HRAS"
         ],
         "minSamples": 200,
+        "minAltered": 0,
         "show": "frequency",
         "unit": "patient",
         "panels": [
@@ -459,28 +460,9 @@
                 "sha256": "1731b700d9fb8c8a"
               }
             ],
-            "pooled": {
-              "key": "__pooled__",
-              "label": "38 smaller groups",
-              "samples": 1842,
-              "profiled": 1842,
-              "altered": 250,
-              "mutation": 231,
-              "amp": 9,
-              "homdel": 8,
-              "sv": 0,
-              "multiple": 2,
-              "mrnaHigh": 0,
-              "mrnaLow": 0,
-              "protHigh": 0,
-              "protLow": 0,
-              "profiledFor": {
-                "mutation": 1842,
-                "cna": 1842,
-                "sv": 1842
-              },
-              "count": 38
-            },
+            "categories": 66,
+            "minSamples": 200,
+            "filtered": true,
             "perGene": [
               {
                 "gene": "KRAS",
@@ -910,28 +892,9 @@
                     "sha256": "cf40ba1ad932162e"
                   }
                 ],
-                "pooled": {
-                  "key": "__pooled__",
-                  "label": "38 smaller groups",
-                  "samples": 1842,
-                  "profiled": 1842,
-                  "altered": 213,
-                  "mutation": 203,
-                  "amp": 8,
-                  "homdel": 0,
-                  "sv": 0,
-                  "multiple": 2,
-                  "mrnaHigh": 0,
-                  "mrnaLow": 0,
-                  "protHigh": 0,
-                  "protLow": 0,
-                  "profiledFor": {
-                    "mutation": 1842,
-                    "cna": 1842,
-                    "sv": 1842
-                  },
-                  "count": 38
-                }
+                "categories": 66,
+                "minSamples": 200,
+                "filtered": true
               },
               {
                 "gene": "NRAS",
@@ -1361,28 +1324,9 @@
                     "sha256": "3bf4d0d8798a115c"
                   }
                 ],
-                "pooled": {
-                  "key": "__pooled__",
-                  "label": "38 smaller groups",
-                  "samples": 1842,
-                  "profiled": 1842,
-                  "altered": 17,
-                  "mutation": 16,
-                  "amp": 0,
-                  "homdel": 1,
-                  "sv": 0,
-                  "multiple": 0,
-                  "mrnaHigh": 0,
-                  "mrnaLow": 0,
-                  "protHigh": 0,
-                  "protLow": 0,
-                  "profiledFor": {
-                    "mutation": 1842,
-                    "cna": 1842,
-                    "sv": 1842
-                  },
-                  "count": 38
-                }
+                "categories": 66,
+                "minSamples": 200,
+                "filtered": true
               },
               {
                 "gene": "HRAS",
@@ -1812,28 +1756,9 @@
                     "sha256": "84ee958d194f6b1a"
                   }
                 ],
-                "pooled": {
-                  "key": "__pooled__",
-                  "label": "38 smaller groups",
-                  "samples": 1842,
-                  "profiled": 1842,
-                  "altered": 21,
-                  "mutation": 12,
-                  "amp": 1,
-                  "homdel": 8,
-                  "sv": 0,
-                  "multiple": 0,
-                  "mrnaHigh": 0,
-                  "mrnaLow": 0,
-                  "protHigh": 0,
-                  "protLow": 0,
-                  "profiledFor": {
-                    "mutation": 1842,
-                    "cna": 1842,
-                    "sv": 1842
-                  },
-                  "count": 38
-                }
+                "categories": 66,
+                "minSamples": 200,
+                "filtered": true
               }
             ]
           }
@@ -1851,13 +1776,24 @@
         "requiresPatientLevel": false,
         "aggregateOnly": []
       },
-      "caveat": "Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under \"multiple\"; an amplification and a deep deletion are one kind (copy number), shown as the amplification. A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. CANCER_TYPE is read per sample and folded on case and whitespace; samples with no value form their own group. Groups with fewer than 200 profiled patients are pooled into one bar rather than dropped. ",
+      "caveat": "Patients altered in at least one of 3 genes per CANCER_TYPE group, over the patients profiled for at least one of them (the union of their panels, as an oncoprint's merged row counts it). Any mutation, high-level copy-number change (amplification, deep deletion) or structural variant counts; low-level gains and losses do not. A patient with more than one kind of alteration across the genes counts once, under \"multiple\"; an amplification and a deep deletion are one kind (copy number), shown as the amplification. A patient counts in every group one of their samples in the cohort falls in, profiled if any of those samples is, altered if any is. Grouped by CANCER_TYPE, the portal's default category for a cohort of several cancer types. CANCER_TYPE is read per sample and folded on case and whitespace; a sample without one takes its study's type of cancer, as the portal's. A group is drawn when it has at least 200 profiled patients; the rest are counted in \"N of M categories are shown\". ",
       "method": {
         "steps": [
           {
+            "kind": "transform",
+            "title": "Choose the category",
+            "detail": "The view names no groupBy, so the portal's default applies (CancerSummaryContainer groupAlterationsBy): the study when the cohorts span more than one study; otherwise CANCER_TYPE_DETAILED when the cohort's samples have exactly one CANCER_TYPE (a sample without one counted as its study's type of cancer), else CANCER_TYPE. One study; the cancertypes:default query above counts 66 distinct CANCER_TYPE values: grouped by CANCER_TYPE.",
+            "params": [
+              [
+                "category",
+                "CANCER_TYPE"
+              ]
+            ]
+          },
+          {
             "kind": "fetch",
             "title": "Count patients per CANCER_TYPE group",
-            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only.",
+            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only. A sample without a CANCER_TYPE takes its study's type of cancer (else \"Unknown\").",
             "scope": "all patients · msk_impact_50k_2026",
             "rowsOut": 67,
             "params": [
@@ -1873,9 +1809,9 @@
           },
           {
             "kind": "transform",
-            "title": "Pool the small groups",
+            "title": "Filter the groups",
             "scope": "all patients",
-            "detail": "38 groups with fewer than 200 profiled patients drawn as one pooled bar; 28 drawn on their own.",
+            "detail": "28 of 66 groups drawn: those with at least 200 profiled patients.",
             "params": [
               [
                 "profiled",

@@ -51,7 +51,8 @@ written this way.
 5. **What computes is run, and a planted bug proves the test.** Logic in SQL is run against the
    fixture study ([below](#the-second-database-is-a-committed-fixture-study)), never only matched
    as text, as `check:values` and `check:genefacets` run theirs. Each new rule gets planted bugs in
-   `scripts/check-mutants.ts` that some check must catch; one that survives means the tests are
+   its area's file under `scripts/mutants/` (one file per area, so pull requests don't all edit one
+   list) that some check must catch; one that survives means the tests are
    not testing the rule.
 
 ## Coverage rules — new code is tested
@@ -110,8 +111,9 @@ each one lands.
 
 ## Documented examples are executed and their counts pinned
 
-`npm run docs:check` (a stage of `scripts/gate.sh`) fails on drift between `lib/dsl-reference.ts`
-and `docs/dsl.md`, and EXECUTES every documented example against the live compiler. **Every
+`npm run docs:check` (a stage of `scripts/gate.sh`) notes drift between `lib/dsl-reference.ts`
+and `docs/dsl.md` (pull requests don't commit `docs/dsl.md`; it is regenerated on master after
+merges), and EXECUTES every documented example against the live compiler. **Every
 example's cohort counts are pinned** in `test/fixtures/example-counts.json` and asserted by the
 same gate, so "it still runs" is not mistaken for "it still gives the same answer". A renamed
 cohort, a moved number and a pin left behind by a deleted example all fail. After an intentional
@@ -213,6 +215,11 @@ checks assert rather than whatever a real warehouse happens to contain:
   KIF5B-RET's Likely Neutral against its Oncogenic tumour-type row, so a VUS row can show an Oncogenic
   cell and the reverse. The other genes of these SVs have no mutations, so each is a gene with
   fusions only.
+- **An SV with a blank `Event_Info`** (CD74-NRG1 on FX-P52-T1, with an Oncogenic `''` row in
+  `peer-oncokb-sv.tsv` and no other OncoKB row), for `check:oncokb-sv` O15: both partners are
+  drivers in `driverEventSql`, OQL `FUSION_DRIVER` and the oncoprint's SV key set. The importer
+  stores the blank as `NA`, so the fixture keys it `NA`; the `ifNull(…, '')` in the SV key is what
+  a warehouse whose `event_info` is NULL relies on. No other check queries CD74 or NRG1.
 - **Cancer Hotspots cases** on `FX-P29-T1` (`test/fixtures/peer-hotspots.tsv`, Genome Nexus's
   `hotspots` list per variant, stored in `annotation.variant` under the app's Genome Nexus pin and
   `fixture`), one mutation per case of the hotspot rule, for `check:hotspot-drivers`: a gene off the
@@ -240,6 +247,13 @@ checks assert rather than whatever a real warehouse happens to contain:
   and blank (stored `NA` by the importer, so no row has a NULL status). Each sample already had other
   mutations, so the samples with any mutation are as before. The same check runs the lollipop with
   BRCA1, a gene with no mutation, SV or panel row anywhere in the fixture: the empty-gene state.
+
+`check:enrichment-events` runs the Genomic Alterations table's any-type SQL over a scratch copy of
+the fixture's genomic tables in a database of its own (`cbiolab_check_enrichment_events_<pid>_<time>`, dropped
+after), with four samples added for shapes the study does not hold: a sample whose mutation and
+copy-number panels differ, a whole-exome mutation sample, mutation types outside the portal's tree
+and blank, and a whole-exome row on a log2 copy-number profile. The study's own files are untouched,
+so no other check's counts move. It refuses to write unless connection b is the fixture peer.
 
 `npm run peer-db` (`scripts/peer-db.ts`) starts a private ClickHouse for it (the pinned release
 `npm run local` uses, data in `CBIOLAB_PEER_DATA`, default `~/.cbiolab-peer/<port>`), imports the
@@ -289,11 +303,15 @@ named in the scripts).
 - `check:cohorts` — the cohort algebra (and/or/not, splits, line nesting, held-out halves) as set
   arithmetic over patient ids, and fast-check-generated definitions compared with a reference
   evaluator over the raw rows.
-- `check:mutants` — plants each bug in `scripts/check-mutants.ts` into a temp copy and requires a
-  check to fail. On a pull request CI sets `MUTANT_CHANGED` to the diff's file list and only the bugs
-  it could affect are planted: those in a changed file, and those whose guard's script or unit suites
-  changed. A diff touching the script itself, `verify.yml` or the dependencies plants every bug, as
-  does every push to master, so a test weakened far from the bug it guards is caught there.
+- `check:mutants` — plants each bug defined under `scripts/mutants/` (one file per area: its
+  `mutants`, and the `guards` they need beyond `unit`, `cohort-logic` and `portal-parity`) into a
+  temp copy and requires a check to fail; `node scripts/check-mutants.ts --list` loads and checks the
+  files (unique ids, each guard defined once and every bug's guard defined) without planting. On a
+  pull request CI sets `MUTANT_CHANGED` to the diff's file list and only the bugs it could affect are
+  planted: those in a changed file, those whose guard's script or unit suites changed, and those an
+  edited area file defines or guards. A diff touching `scripts/check-mutants.ts`,
+  `scripts/mutants/types.ts`, `verify.yml` or the dependencies plants every bug, as does every push to
+  master and every merge-queue run, so a test weakened far from the bug it guards is caught there.
 
 The first two are gate stages. A new statistic gets a row in `lib/verification.ts`
 (`test/verification.test.ts` fails otherwise); new cohort or count logic should get a planted bug

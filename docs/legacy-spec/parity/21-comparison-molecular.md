@@ -57,7 +57,7 @@ Legacy numbers come from `POST /api/alteration-enrichments/fetch` (mutation-only
 |---|---|---|---|
 | 1 | **No combined Genomic Alterations table.** The tab holds three views (mutation, CNA, SV), each a type-specific table. Legacy has one row per gene, altered by any selected type, under a checkbox tree with [Select]. G2: TP53 154/171 in legacy (any type) vs 153/171 in cBioLab (mutation); MYC is legacy's #2 row and only in cBioLab's CNA view | AT-1..3, AL-5, STM-2 | not tracked |
 | 2 | **Default `minAltered: 5` changes q and significance.** Genes with <5 altered samples are not tested, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested; DYNC2H1 q 0.0503 vs 0.239. SV: PUM1 q 0.0425 (significant) vs 0.533. CNA: 6,512 vs 6,156 significant. G5 mutation: 145 vs 336, because PPP1R16B (q 4.2e-7) and MARK3 are dropped. With `minAltered: 1` every q is identical | STM-7, AL-4 | not tracked |
-| 3 | **Row caps:** alterations and GA tables list ≤300 rows, expression ≤1,500 (legacy lists all 22,871 / 20,026). The frequency scatter and bar plot are built from those 300 only | AL-5, FS, BP-2, GN, EX-5 | (tracked) expression 1,500 only |
+| 3 | **Row caps:** alterations and GA tables list ≤300 rows, expression ≤1,500 (legacy lists all 22,871 / 20,026). The frequency scatter and bar plot are built from those 300 only | AL-5, FS, BP-2, GN, EX-5 | 2026-11-17: alterations (#294) and expression list every row; generic-assay tables still ≤300 |
 | 4 | **No patient-level enrichments:** no Sample/Patient select; always samples | AL-4, MD-5 | not tracked |
 | 5 | **Overlap default Include** ("Overlapping samples: include") vs legacy Exclude | MD-6, TAB-8 | not tracked |
 | 6 | **Alteration number formats:** p/q "1.1e-82" (`pDigits`) vs "< 10^-10"; altered % to 1 dp ("89.5%") vs 2 dp ("90.06%"); group headers "Basal", not "(A) Basal"; volcano y uncapped (to 82) vs capped at 10 | STM-9, STM-3, AL-5, VO-1 | not tracked |
@@ -134,11 +134,11 @@ Data version: every altered/profiled count, every expression mean and every p ma
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| CMM-AT-1 | 🔶 | B | No checkbox tree. Each view has an "alteration" select: mutation · amp or deep deletion · amplification · deep deletion · structural variant (`app/lab/kinds/enrichment.tsx:233`). No mutation subtypes |
-| CMM-AT-2 | 🔶 | B | Default is three views (mutation, CNA, SV), each with its own table and charts; no combined any-type table |
-| CMM-AT-3 | ❌ | B | No [Select]; a change re-runs at once |
-| CMM-AT-4 | 🟡 | C | Choice kept in the document (`?changes=`, invariant 9), not `selectedEnrichmentEventTypes` |
-| CMM-AT-5 | 🟡 | C | Uncalled excluded ✅, CNA ±2 ✅, SV ✅ (`federation-views.ts:272-277`). **Off-panel calls are excluded** (`NOT g.off_panel`); legacy counts them. No partial mutation-type sets |
+| CMM-AT-1 | ✅ | B | 2026-11-17: the portal's "Alteration Types" tree at the table's left (`EventTree`, `app/lab/kinds/enrichment.tsx`; units `lib/alteration-events.ts`, the legacy groups): a row ☑ when any type under it is, a click sets every type under it. Only the kinds the study has a profile for |
+| CMM-AT-2 | ✅ | B | 2026-11-17: one table, every type ☑ (`alteration: "any"`); G2 22,871 genes tested, 5,747 at q < 0.05, as the portal; TP53 154/171 · 55/499, MYC 62/171 · 36/499 |
+| CMM-AT-3 | ✅ | B | 2026-11-17: [Select] applies the staged tree, disabled until it differs (and with nothing ticked, saying why) |
+| CMM-AT-4 | 🟡 | C | Choice kept in the document as the view's `events` (invariant 9; absent = every type), not `selectedEnrichmentEventTypes` |
+| CMM-AT-5 | 🟡 | B | Uncalled excluded ✅, CNA ±2 ✅, SV ✅; partial mutation sets by the backend's rule (all → no filter, Other ☑ → NOT IN the rest, else IN) ✅; a type with nothing ☑ leaves its profile out of profiled ✅ (`enrichEventsCond`, `federation-views.ts`). Every gene identical to the portal's for every type / no CNA / Missense+Inframe+Other / Missense+Inframe+Deletion+SV (2026-11-17, `check:portal` §21). **Off-panel calls are excluded** (`NOT g.off_panel`, invariant 7); legacy counts them (msk_impact_2017 Glioma vs Melanoma: ZFHX3 27 vs 28 altered, PPP6C 10 vs 11, profiled identical) |
 | CMM-AT-6 | 🔶 | BC | Page-level "Alterations: all / OncoKB drivers only" uses OncoKB, not the DB `driver_filter`. No VUS / tier / germline (tracked: Driver-annotation settings, Custom driver annotations) |
 
 ### §1 Genomic Alterations — layout
@@ -147,9 +147,9 @@ Data version: every altered/profiled count, every expression mean and every p ma
 |---|---|---|---|
 | CMM-AL-1 | ✅ | B | Volcano · frequency scatter · "Genes with highest frequency in any group", per view |
 | CMM-AL-2 | ✅ | B | G5: bar plot only |
-| CMM-AL-3 | 🟡 | B | View headers "MUTATIONS — Basal vs LumA", "COPY-NUMBER ALTERATIONS — …", "STRUCTURAL VARIANTS — …"; no single "Genomic Alterations" header |
+| CMM-AL-3 | ✅ | B | 2026-11-17: one view, "GENOMIC ALTERATIONS — Basal vs LumA" |
 | CMM-AL-4 | 🟡 | B | Significant only ✅. No Sample/Patient select; no "Enriched in ..." select. Extra controls: "count any/drivers", "test genes altered in ≥ 5" |
-| CMM-AL-5 | 🔶 | B | Columns `Gene \| Cytoband \| Basal \| LumA \| Log2 Ratio \| p-Value \| q-Value \| Enriched in`. Differences: no Co-occurrence; cells "153 (89.5%)"; no "(A)"; p/q `pDigits`; p never bold. 25 rows a page of ≤300 ("the 300 most significant of 3,108 genes tested"). Header tip "altered / profiled in Basal" and no per-cell profiled tooltip. Initial sort q ✅; G5 "Most enriched in" ✅ |
+| CMM-AL-5 | 🔶 | B | Columns `Gene \| Cytoband \| Basal \| LumA \| Log2 Ratio \| p-Value \| q-Value \| Enriched in`. Differences: no Co-occurrence; cells "153 (89.5%)"; no "(A)"; p/q `pDigits`; p never bold. 25 rows a page; 2026-11-17: every gene tested is listed on the portal pages (`minAltered: 1`, the result's `all`): G2 22,871 rows, as the portal's. Header tip "altered / profiled in Basal" and no per-cell profiled tooltip. Initial sort q ✅; G5 "Most enriched in" ✅ |
 | CMM-AL-6 | ❌ | B | No Co-occurrence MiniOncoprint (tracked only for the Mutations tab) |
 | CMM-AL-7 | ❌ | C | Row click does nothing (no highlight) |
 
@@ -157,7 +157,7 @@ Data version: every altered/profiled count, every expression mean and every p ma
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| CMM-VO-1 | 🟡 | B | Top 300 (alterations, GA) / 1,500 (expression) drawn as points, the rest as a density grid. Null ratio drawn at the axis edge ✅. **y not capped at 10** (G2 mutation axis to 100, TP53 at 82). Corner labels "← LumA / Basal →" ✅; no "Significance →" |
+| CMM-VO-1 | 🟡 | B | Top 300 (alterations, GA) / 1,500 (expression) drawn as points, the rest as a density grid; 2026-11-17: on the page the alterations volcano draws every listed gene as a point (G2 22,871), the server figure keeps 300 + density; the expression volcano too (brca RNA-seq 20,026 points), the server figure keeps 1,500 + density. Null ratio drawn at the axis edge ✅. **y not capped at 10** (G2 mutation axis to 100, TP53 at 82). Corner labels "← LumA / Basal →" ✅; no "Significance →" |
 | CMM-VO-2 | 🟡 | B | Alterations x ±10, ticks −10, −5, 0, 5, 10 (legacy ±15, ticks −10, 0, 10). Expression ±`niceCeil(max\|x\|)` |
 | CMM-VO-3 | 🔶 | B | q<0.05 points take the enriched group's colour (blue / orange), others grey; legacy `#58ACFA` / `#D3D3D3`, selection `#FE9929` |
 | CMM-VO-4 | 🟡 | C | Alterations: SVG `<title>` "TP53: Basal 89.5% (153 / 171), LumA … · q 3.4e-79", not Gene / Log2 Ratio / p / q lines |
@@ -168,9 +168,9 @@ Data version: every altered/profiled count, every expression mean and every p ma
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| CMM-FS | 🟡 | B | X "Altered frequency in Basal (%)", Y "… LumA (%)", dashed diagonal, [0, max] ✅. Only the 300 listed genes ("the 300 most significant genes"); group colours; tooltip is an SVG title; no drag |
+| CMM-FS | 🟡 | B | X "Altered frequency in Basal (%)", Y "… LumA (%)", dashed diagonal, [0, max] ✅. 2026-11-17: every listed gene ("all 22,871 listed genes"), as the portal's; group colours; tooltip is an SVG title; no drag |
 | CMM-BP-1 | 🟡 | B | Title "Genes with highest frequency in any group" ✅; no [Select genes], no download |
-| CMM-BP-2 | 🔶 | BC | Only the default ordering, fixed 10 genes, no option select / Number input. **Ranked within the 300 most significant rows** (`enrichment/figure.ts:58`): MUC16 (12.3 % Basal) is missing |
+| CMM-BP-2 | 🔶 | BC | Only the default ordering, fixed 10 genes, no option select / Number input. Ranked over every tested gene (`topFrequency`, #228) ✅ |
 | CMM-BP-3 | 🟡 | B | One bar per group, height = %, "*" when q<0.05 ✅ (+ footnote). Y label always "Alteration frequency (%)" |
 | CMM-BP-4 | 🟡 | C | Bar `<title>` "TP53 in Basal: 89.5% (153 / 171)"; no p/q, no group table. Legacy falsy-0 bug not applicable |
 | CMM-FL-1 | ✅ | BC | "Significant only" = q < 0.05 |
@@ -198,7 +198,7 @@ Data version: every altered/profiled count, every expression mean and every p ma
 | CMM-EX-2 | ✅ | B | Volcano (2 groups) + box panel; no scatter / bar. GSEA locked off on the portal page |
 | CMM-EX-3 | ✅ | B | h3 = profile name ("mRNA Expression, RSEM (Batch normalized from Illumina HiSeq_RNASeqV2)") |
 | CMM-EX-4 | ✅ | BC | "High expression in" / "High methylation in", Significant only; no sample/patient select |
-| CMM-EX-5 | 🟡 | B | Columns and tips word for word (μ / σ "Mean log2 expression…", Log2 Ratio "(unlogged)" tip kept, "Higher expression in"). p tip "Derived from Welch's two-sided t-test", which corrects legacy's "Student's". `portalP` ✅, q bold ✅. Lists 1,500 of 20,026 (tracked) |
+| CMM-EX-5 | 🟡 | B | Columns and tips word for word (μ / σ "Mean log2 expression…", Log2 Ratio "(unlogged)" tip kept, "Higher expression in"). p tip "Derived from Welch's two-sided t-test", which corrects legacy's "Student's". `portalP` ✅, q bold ✅. 2026-11-17: lists every gene tested (brca Basal vs LumA RNA-seq 20,026, the portal's 20,026, p identical for every gene) |
 | CMM-EX-6 | ✅ | C | Row or volcano click sets `gene` → plot by cohort (`diffexpr.tsx:44,86`) |
 | CMM-EX-7 | N/A | — | Not a requirement |
 
@@ -218,7 +218,7 @@ Data version: every altered/profiled count, every expression mean and every p ma
 |---|---|---|---|
 | CMM-GA-1 | 🐞 ok | BC | "DATA SET" select; each choice re-runs that profile (no stale binary/categorical map) |
 | CMM-GA-2 | ✅ | B | "Gene / Probe"; cell bold "TBX19 (cg17095936)" |
-| CMM-GN | 🟡 | B | Layout and columns match (μ / σ, "Log Ratio", "Higher in", "High in"), Welch / ANOVA ✅; table capped at 300 of 22,601 (not tracked) |
+| CMM-GN | 🟡 | B | Layout and columns match (μ / σ, "Log Ratio", "Higher in", "High in"), Welch / ANOVA ✅; table capped at 300 of 22,601 (tracked: PORTAL-PARITY, the generic-assay tabs past 300) |
 | CMM-GB | 🔶 | C | BINARY is tested as categorical (χ² on values × cohorts, `assays/run.ts:57-61`); legacy uses Welch t on 0/1, frequency columns, volcano, scatter and bar plot |
 | CMM-GC | 🔶 | B | Table `Entity \| Basal n \| LumA n \| p \| q \| Higher in ("Basal · Loss")`, not Attribute Type / Statistical Test; the side panel shows the value mix, with no plot type / swap / horizontal / Show NA / p-q options (tracked). NA excluded (see STM-6) |
 
@@ -256,8 +256,8 @@ Data version: every altered/profiled count, every expression mean and every p ma
 | ID | verdict | how | note |
 |---|---|---|---|
 | CMM-STM-1 | ✅ | BC | Two-sided Fisher p identical (G2 mutation / CNA / SV). χ² identical where legacy is representable; legacy's underflow to 0 is not copied (G5 PIK3CA 2.43e-20). Panel p = 0 bug not reproduced (MD-7). Fisher uses a 1e-9 relative tolerance (`stats.ts:23`); no visible effect |
-| CMM-STM-2 | 🟡 | B | Altered / profiled identical for all 300 listed genes in each of mutation, CNA and SV, G2 and G5. No combined any-type count. Off-panel calls excluded. No PATIENT mode |
-| CMM-STM-3 | 🟡 | B | Log2 ratio identical; null → ">10" / "<-10" ✅; enriched-in identical on the top 20. % at 1 dp (legacy 2). A tie of equal non-zero shares goes to the first group (`indexOf(max)`), legacy to the second |
+| CMM-STM-2 | 🟡 | B | Altered / profiled identical for all 300 listed genes in each of mutation, CNA and SV, G2 and G5. 2026-11-17: the combined any-type count too — altered once per sample over every selected type, profiled by the union of a sample's panels over the selected profiles: G2 every gene identical (`check:portal` §21), G5 23,037 tested / 6,846 significant with identical p, msk_impact_2017 (IMPACT341/410/468) profiled identical. Off-panel calls excluded. No PATIENT mode |
+| CMM-STM-3 | 🟡 | B | Log2 ratio identical; null → ">10" / "<-10" ✅; enriched-in identical on the top 20. % at 1 dp (legacy 2). 2026-11-17: a tie of equal non-zero shares goes to the second group, as legacy's (`enrichmentRow`, `lib/views/enrichment/rows.ts`) ✅ |
 | CMM-STM-4 | 🟡 | B | Welch t and classic ANOVA, log2(x+1) for RNA-seq: μ, σ, p, q, tested counts identical (G2 / G5 mRNA, G2 protein). Differences: min 3 values per cohort vs 2 per group, and every cohort required (MD-8); negative RNA-seq values dropped (`diffexpr/sql.ts:216`) vs clamped to 0 |
 | CMM-STM-5 | 🔶 | C | Binary assays: χ² on categories, not Welch on 0/1; no frequency / log ratio |
 | CMM-STM-6 | 🔶 | B | χ² ✅, but NA / blank excluded (4,234 values for arm-level) where legacy counts NA strings as a category. 1q 0.211 vs 5.9e-15; 7q 0.155 vs 0; 11q 0.0669 vs 1.3e-4. q by BH in the app vs legacy backend |

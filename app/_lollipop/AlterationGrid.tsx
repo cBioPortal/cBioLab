@@ -1,8 +1,9 @@
 "use client";
 // The portal's mutation-type badge selector beside a lollipop: rows by alteration class, Driver and
 // VUS columns, each cell a count that hides or shows its mutations; a column's total or a row's name
-// toggles all of it, and "only" keeps just it. The selection is the view's `hide` (lib/lollipop.ts
-// cellOf). Drawn once per gene on the Results tab and once per group on the Comparison tab.
+// toggles all of it, and "only" keeps just it. With no driver source annotating (`annotated` false),
+// one count per class, as the portal's badges are then. The selection is the view's `hide`
+// (lib/lollipop.ts cellOf). Drawn once per gene on the Results tab and once per group on the Comparison tab.
 import React from "react";
 import { IMPACT_COLORS, IMPACT_TYPES, cellOf, type AlterationCell, type ImpactType } from "../../lib/lollipop.ts";
 import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
@@ -25,6 +26,20 @@ function toggled(hide: Set<string>, cells: AlterationCell[]): string[] {
   return [...next];
 }
 
+/** A class's row header: its name, which shows or hides the whole row, and "only", which keeps just it. */
+function RowHead({ k, shown, onToggle, onOnly, tail }: { k: ImpactType; shown: boolean; onToggle: () => void; onOnly: () => void; tail: string }) {
+  const c = IMPACT_COLORS[k];
+  return (
+    <th scope="row">
+      <span className="lp-head">
+        <button type="button" className={"lp-rowname" + (shown ? "" : " off")} style={{ color: k === "truncating" ? undefined : c.driver }}
+          onClick={onToggle} data-tip={(shown ? "hide" : "show") + " every " + c.label.toLowerCase() + " mutation" + tail}>{c.label}</button>
+        <button type="button" className="lp-only" onClick={onOnly} data-tip={"show only " + c.label.toLowerCase() + " mutations" + tail}>only</button>
+      </span>
+    </th>
+  );
+}
+
 function Badge({ n, color, shown, onClick, title, label }: { n: number; color: string; shown: boolean; onClick: () => void; title: string; label: string }) {
   return (
     <button type="button" className={"lp-badge" + (shown ? "" : " off")} onClick={onClick} data-tip={title} aria-pressed={shown} aria-label={label}
@@ -38,9 +53,10 @@ function Badge({ n, color, shown, onClick, title, label }: { n: number; color: s
  * The grid for one tally. `of` names whose mutations they are (a comparison group) in each tooltip
  * and label; `note` is added to each tooltip (e.g. that a click acts on both groups).
  */
-export function AlterationGrid({ tally, classes, hide, onHide, of, note }: {
-  tally: Tally; classes: ImpactType[]; hide: Set<string>; onHide: (next: string[]) => void; of?: string; note?: string;
+export function AlterationGrid({ tally, classes, hide, onHide, of, note, annotated = true }: {
+  tally: Tally; classes: ImpactType[]; hide: Set<string>; onHide: (next: string[]) => void; of?: string; note?: string; annotated?: boolean;
 }) {
+  if (!annotated) return <TypeBadges tally={tally} classes={classes} hide={hide} onHide={onHide} of={of} note={note} />;
   const where = of ? " in " + of : "", tail = note ? "; " + note : "";
   const total = (c: Col) => classes.reduce((n, k) => n + tally[k][c], 0);
   const colCells = (c: Col) => classes.map((k) => cell(k, c));
@@ -71,13 +87,7 @@ export function AlterationGrid({ tally, classes, hide, onHide, of, note }: {
           const rowShown = rowCells(k).some((x) => !hide.has(x));
           return (
             <tr key={k}>
-              <th scope="row">
-                <span className="lp-head">
-                  <button type="button" className={"lp-rowname" + (rowShown ? "" : " off")} style={{ color: k === "truncating" ? undefined : c.driver }}
-                    onClick={() => onHide(toggled(hide, rowCells(k)))} data-tip={(rowShown ? "hide" : "show") + " every " + c.label.toLowerCase() + " mutation" + tail}>{c.label}</button>
-                  <button type="button" className="lp-only" onClick={() => only(rowCells(k))} data-tip={"show only " + c.label.toLowerCase() + " mutations" + tail}>only</button>
-                </span>
-              </th>
+              <RowHead k={k} shown={rowShown} onToggle={() => onHide(toggled(hide, rowCells(k)))} onOnly={() => only(rowCells(k))} tail={tail} />
               {COLS.map((col) => {
                 const x = cell(k, col), on = !hide.has(x);
                 return (
@@ -87,6 +97,35 @@ export function AlterationGrid({ tally, classes, hide, onHide, of, note }: {
                       label={c.label + " " + (col === "driver" ? "driver" : "VUS") + where} />
                   </td>);
               })}
+            </tr>);
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+/** One count per class, when nothing tells drivers from VUS: a badge shows or hides the class's mutations, "only" keeps just them. */
+function TypeBadges({ tally, classes, hide, onHide, of, note }: {
+  tally: Tally; classes: ImpactType[]; hide: Set<string>; onHide: (next: string[]) => void; of?: string; note?: string;
+}) {
+  const where = of ? " in " + of : "", tail = note ? "; " + note : "";
+  const rowCells = (k: ImpactType) => COLS.map((c) => cell(k, c));
+  const every = classes.flatMap(rowCells);
+  const only = (keep: AlterationCell[]) => onHide(every.filter((c) => !keep.includes(c)));
+  return (
+    <table className="lp-grid">
+      <tbody>
+        {classes.map((k) => {
+          const c = IMPACT_COLORS[k], n = tally[k].driver + tally[k].vus;
+          const shown = rowCells(k).some((x) => !hide.has(x));
+          return (
+            <tr key={k}>
+              <RowHead k={k} shown={shown} onToggle={() => onHide(toggled(hide, rowCells(k)))} onOnly={() => only(rowCells(k))} tail={tail} />
+              <td>
+                <Badge n={n} color={c.driver} shown={shown} onClick={() => onHide(toggled(hide, rowCells(k)))}
+                  title={(shown ? "hide " : "show ") + c.label.toLowerCase() + " mutations (" + n.toLocaleString() + " mutation rows" + where + ")" + tail}
+                  label={c.label + where} />
+              </td>
             </tr>);
         })}
       </tbody>

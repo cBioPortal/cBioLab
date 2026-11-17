@@ -12,10 +12,10 @@ const grp = (key: string, label: string, profiled: number, mutation: number, amp
 
 describe("cancertypes", () => {
   const v: ViewResult = { kind: "cancertypes", cohorts: ["all"], caveat: "samples, not patients",
-    cancertypes: { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, show: "frequency", unit: "sample",
+    cancertypes: { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 10, minAltered: 0, show: "frequency", unit: "sample",
       panels: [{ cohort: "all", samples: 300, profiled: 290, altered: 120,
         groups: [grp("pancreatic", "Pancreatic <Cancer>", 100, 80, 2), grp("lung", "Lung", 150, 30, 0, 160)],
-        pooled: { ...grp("__pooled__", "3 smaller groups", 40, 8), count: 3 } }] } };
+        categories: 5, minSamples: 10, filtered: true }] } };
   test("each group shows its altered share over its profiled samples, and its unprofiled total when larger", () => {
     const svg = viewToSvg(v)!;
     assert.ok(svg.includes("82.0% (82 / 100 samples)"));
@@ -25,8 +25,8 @@ describe("cancertypes", () => {
   test("a '+' per group for a data type only some groups were profiled for, and one gene's bars on request", () => {
     const g = (k: string, label: string, n: number, m: number, sv: number) => ({ ...grp(k, label, n, m), profiledFor: { mutation: n, cna: 0, sv } });
     const two: ViewResult = { ...v, cancertypes: { ...v.cancertypes!, genes: ["KRAS", "NRAS"], panels: [{ ...v.cancertypes!.panels[0],
-      groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], pooled: undefined,
-      perGene: [{ gene: "KRAS", groups: [g("a", "A", 100, 40, 100)] }, { gene: "NRAS", groups: [g("b", "B", 100, 7, 0)] }] }] } };
+      groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], categories: 2, filtered: undefined,
+      perGene: [{ gene: "KRAS", groups: [g("a", "A", 100, 40, 100)], categories: 1, minSamples: 10 }, { gene: "NRAS", groups: [g("b", "B", 100, 7, 0)], categories: 1, minSamples: 10 }] }] } };
     const all = cancertypesPanelSvg(two.cancertypes!, 0);
     assert.ok(all.body.includes("Structural variant data") && !all.body.includes("CNA data"));
     assert.equal((all.body.match(/>\+</g) || []).length, 1, "only the SV row differs between groups: one '+', for A");
@@ -34,8 +34,10 @@ describe("cancertypes", () => {
     const nras = cancertypesPanelSvg(two.cancertypes!, 0, { gene: "NRAS" });
     assert.ok(nras.body.includes("B: 7.0% (7 / 100 samples)") && !nras.body.includes("A: "));
   });
-  test("pooled small groups are drawn and named, not dropped", () => {
-    assert.ok(viewToSvg(v)!.includes("3 smaller groups"));
+  test("groups the filters hide are counted, as the portal's alert counts them (CTS-CH-1)", () => {
+    assert.ok(viewToSvg(v)!.includes("2 of 5 categories (Cancer Type) are shown based on filtering."));
+    const two = cancertypesPanelSvg({ ...v.cancertypes!, panels: [{ ...v.cancertypes!.panels[0], filtered: undefined }] }, 0);
+    assert.ok(!two.body.includes("categories ("), "no alert when nothing is filtered");
   });
   test("labels are escaped, the caveat travels, and the title names the genes", () => {
     const svg = viewToSvg(v)!;

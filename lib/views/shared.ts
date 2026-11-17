@@ -79,12 +79,17 @@ export function viewOql(v: { oql?: unknown; useOql?: unknown; drivers?: DriverSe
 /** A view-level refusal: past a limit, or nothing that can answer. */
 export const refuse = (kind: ViewKind, ctx: ViewRun, error: string): ViewResult => plainResult(kind, { cohorts: ctx.vNames, error });
 
+/** the most genes asked for in one statement; a longer list is asked in batches of this many */
+const CYTOBAND_BATCH = 2000;
+
 /** Cytobands for the genes a table lists, from the first participant that can answer; a gene it
  *  does not know (or no answer at all) is left without one rather than failing the view. */
 export async function cytobands(ok: Record<string, ViewResolver>, genes: string[]): Promise<Map<string, string>> {
   const first = Object.values(ok)[0];
   if (!first || !genes.length) return new Map();
-  const rows = await first.viewMeta("cytobands", (s, d) => geneCytobandsSql(genes, s, d)).catch(() => []);
+  const batches: string[][] = [];
+  for (let i = 0; i < genes.length; i += CYTOBAND_BATCH) batches.push(genes.slice(i, i + CYTOBAND_BATCH));
+  const rows = (await Promise.all(batches.map((b) => first.viewMeta("cytobands", (s, d) => geneCytobandsSql(b, s, d)).catch(() => [])))).flat();
   return new Map(rows.map((r) => [String(r.gene), String(r.cytoband || "")]));
 }
 
@@ -175,4 +180,16 @@ export async function survivalLeftOutCaveat(ctx: ViewRun, months: string, status
     ? "Left out of the survival analysis (" + months + " / " + status + "), as on cBioPortal — a patient enters only with both a status and a time of at least 0, so a missing status is never read as censored: " + per.join("; ") + ". "
     : "") +
     (unknown.size ? "Not known for " + [...unknown].join(", ") + ", which send only their counts: how many of their patients lack a status or a time. " : "");
+}
+
+/**
+ * The most a result's every-row columns (a page's `all`) may hold, as JSON: past it the page lists
+ * the view's capped rows and says why, so a page's whole response (with its points, method record and
+ * other views) stays under the host's ~4.5 MB.
+ */
+export const ALL_ROWS_MAX_BYTES = 2_000_000;
+/** the columns, or why they are left out (their size, against the limit) */
+export function allRowsWithin<T>(cols: T): { all: T } | { tooBig: number } {
+  const n = JSON.stringify(cols).length;
+  return n <= ALL_ROWS_MAX_BYTES ? { all: cols } : { tooBig: n };
 }

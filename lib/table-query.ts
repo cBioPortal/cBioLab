@@ -42,6 +42,10 @@ export interface QueryColumn {
   num?: string;
   /** an order other than text/num (protein change by codon, say) */
   order?: string;
+  /** the whole sort for each direction, missing values placed by the column itself (a list of values compared one by one, say) */
+  sort?: (dir: "ASC" | "DESC") => string;
+  /** a column the portal does not sort by: refused as a sort, drawn without a sort control */
+  unsorted?: boolean;
 }
 
 /** A table's rows. `with` defines `rows`, which carries `cohort` and `study` columns. */
@@ -167,6 +171,7 @@ function orderSql(src: RowSource, q: TableQuery): string {
   const col = q.sort && src.columns.find((c) => c.id === q.sort!.column);
   if (!col) return src.defaultOrder + ", " + src.tiebreak;
   const dir = q.sort!.desc ? "DESC" : "ASC";
+  if (col.sort) return col.sort(dir) + ", " + src.tiebreak;
   const by = col.order || col.num || col.text;
   // text: blanks last either way, then the value
   return (col.order || col.num ? by + " " + dir + " NULLS LAST" : "(" + by + " = '') ASC, " + by + " " + dir) + ", " + src.tiebreak;
