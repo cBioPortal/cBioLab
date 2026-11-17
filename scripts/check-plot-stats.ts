@@ -24,6 +24,7 @@
  *       L4 KRAS gistic: Deep Deletion 1, Shallow Deletion 67, Diploid 390, Gain 128, Amplification 6
  *       L5 L2 with labels "model": {Mutated, Not mutated, Not profiled}
  *       L6 L3 with labels "model": ⊆ {Structural variant, No structural variant, Not profiled}
+ *       L7 the resolver's coxRows reads a covariate with those labels: KRAS mutated has "Not mutated", not "No mutation"
  *   T*  lib/federation.ts plotAxisKinds / plot — an axis's title as the portal writes it (PLT-DT-19;
  *       cbioportal-frontend cd8c6df PlotsTabUtils.tsx getAxisLabel): a clinical attribute by its
  *       display name, " (log2(value + 1))" after it on a log scale, and the colour axis likewise.
@@ -154,6 +155,13 @@ const LABELS: LabelCase[] = [
 
   const t10 = await r.plot(null, { x: clin("CANCER_TYPE_DETAILED"), y: FGA, unit: "sample", colorBy: clin("SEX") });
   is("T10", "plot colorLabel (" + t10.shape + ")", t10.colorLabel, "Sex");
+
+  // L7 a cox covariate is read by the resolver with the model's labels: the reference level its
+  // documents name ("Not mutated") is a value it returns, the plot's "No mutation" is not
+  const cox = await (r as unknown as { coxRows(d: null, e: string, c: PlotAxis[]): Promise<{ rows: { values: (string | number)[] }[] }> })
+    .coxRows(null, "OS", [{ source: "alteration", gene: "KRAS", by: "mutated" }]);
+  const levels = new Set(cox.rows.map((x) => String(x.values[0])));
+  ok(levels.has("Not mutated") && !levels.has("No mutation"), "L7 coxRows: KRAS mutated as a covariate keeps \"Not mutated\"", [...levels].join(", "));
 }
 
 console.log(failures ? "\n" + failures + " of " + checks + " plot statistics checks FAILED" : "\nall " + checks + " plot statistics checks passed");

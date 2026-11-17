@@ -305,7 +305,7 @@ const MUTANTS: Mutant[] = [
     effect: "A plot's mutation, SV and copy-number categories read \"Not mutated\", \"Structural variant\", \"Deep deletion\", where the portal writes \"No mutation\", \"With Structural Variants\", \"Deep Deletion\".",
     find: "const L = AXIS_LABELS[ctx.labels ?? \"portal\"];",
     replace: "const L = AXIS_LABELS.model;" },
-  { id: "cox-covariate-portal-labels", layer: "counts", guard: "unit", file: "lib/federation.ts",
+  { id: "cox-covariate-portal-labels", layer: "counts", guard: "plot-stats", file: "lib/federation.ts",
     effect: "A cox covariate's mutated-vs-not levels are renamed \"No mutation\", so a document naming its reference \"Not mutated\" no longer finds it.",
     find: "const ctx = { study: this.study, db, unit: \"patient\" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()), labels: \"model\" as const };\n    const sels = covariates.map((c, i) => ({ label: \"c\" + i, sel: axisSelect(c, ctx, kinds[i]) }));\n    // a patient",
     replace: "const ctx = { study: this.study, db, unit: \"patient\" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };\n    const sels = covariates.map((c, i) => ({ label: \"c\" + i, sel: axisSelect(c, ctx, kinds[i]) }));\n    // a patient" },
