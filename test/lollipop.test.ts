@@ -219,9 +219,9 @@ test("PR J: an empty gene", async (t) => {
   await t.test("EX2 E5: the empty gene's plot is drawn — axis, protein bar, domains — with no stem and the one-line message", () => {
     const svg = lollipopPanelsSvg([empty()], { width: 720 }, "");
     assert.match(svg, /No BRCA1 mutations in this cohort/);
-    assert.match(svg, /# BRCA1 Mutations/, "the y axis is drawn");
+    assert.match(svg, /# patients/, "the y axis is drawn");
     assert.match(svg, /BRCT \(PF00533\): 1650–1736/, "the domain is drawn");
-    assert.match(svg, /1,863aa/, "the x axis runs to the protein's length");
+    assert.match(svg, />1863aa</, "the x axis runs to the protein's length");
     assert.doesNotMatch(svg, /data-codon=/, "no stem");
   });
   await t.test("EX2: a gene with mutations gets no such message; beside an empty gene, only the empty one does", () => {
