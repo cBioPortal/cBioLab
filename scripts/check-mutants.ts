@@ -17,7 +17,8 @@
  * gives it), only the bugs that diff could affect are planted: those in a changed file, those whose
  * guard's own files changed, and those an edited area file defines or guards. A diff that touches
  * this script, scripts/mutants/types.ts, the workflow or the dependencies plants every bug, as does
- * a run without MUTANT_CHANGED (master, the merge queue, and locally).
+ * a run without MUTANT_CHANGED (the nightly run, planted-bugs-nightly.yml, and locally). A push to
+ * master is selective too, by its own diff.
  * With RECORD=1 (npm run verify) it writes docs/verification/mutants.json, which /verification reads
  * (or REPORT_DIR/mutants.json when REPORT_DIR is set, as in CI).
  */
