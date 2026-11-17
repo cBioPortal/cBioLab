@@ -2,7 +2,8 @@
 // several, narrowed by Explore's filters or not), one tab per portal tab, each drawing the queried
 // patients; Comparison/Survival alone compares those the gene query alters with the profiled rest. Pure: the page builds it, and so
 // can a script that checks the views run.
-import { PROFILED_MAX_GENES, type Clause, type CohortDef, type Leaf, type View } from "../../lib/types.ts";
+import type { Clause, CohortDef, Leaf, View } from "../../lib/types.ts";
+import type { SelectedProfile } from "../../lib/query-options.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
 import { hasOql, oqlHasMutationOql, oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
 import { ALTERATION_CELLS, cellLabel, pruneCodons } from "../../lib/lollipop.ts";
@@ -27,8 +28,8 @@ export interface ResultsQuery {
   prot?: string;
   /** several studies: exp / prot apply to each study holding that profile */
   ifHeld?: boolean;
-  /** the alteration profiles the query page selected (the portal's selectedMolecularProfiles), when its options say; every kind otherwise */
-  kinds?: ProfileType[];
+  /** the profiles the query page selected (the portal's selectedMolecularProfiles), when its options say; every alteration data type held otherwise */
+  selected?: SelectedProfile[];
 }
 
 /** What the queried studies hold, as far as the page's tabs need it. */
@@ -62,27 +63,35 @@ export interface ResultsData {
 
 type ProfileType = "MUTATION" | "CNA" | "SV";
 const ALL_KINDS: ProfileType[] = ["MUTATION", "CNA", "SV"];
+const TYPE_WORD: Record<ProfileType, string> = { MUTATION: "mutation", CNA: "copy number", SV: "structural variants" };
+/** the profiles Unaltered checks, in words */
+const selectionWords = (q: ResultsQuery, held: ResultsData["held"]): string =>
+  (q.selected ?? ALL_KINDS.filter((t) => held.every.includes(t) || held.some.includes(t)).map((type) => ({ type }))).map((s) => "profile" in s ? s.profile : TYPE_WORD[s.type]).join(", ");
 
 /**
  * The page's cohorts, as cBioPortal has them (ResultsViewPageStore filteredUnalteredAndProfiledSamples,
  * totallyUnprofiledSamples). Queried: everyone the query covers (the studies, with Explore's
  * filters) — what every tab draws but Comparison/Survival. Altered: the query matches. Unaltered: it
- * does not, and the sample is not wholly unprofiled — profiled for at least one queried gene in at
- * least one of the query's selected alteration profiles (`q.kinds`, every kind by default; a kind no
- * queried study holds is left out). A sample profiled for none of them is in neither group. Each
- * kind is one clause over the query's genes (`anyGene`), the kinds OR-ed, so a long query stays
- * within a cohort's clauses.
+ * does not, and the sample is not wholly unprofiled — in at least one of the query's selected
+ * profiles (`q.selected`: mRNA and protein too) on a panel covering at least one queried gene. With
+ * no options the selection is every alteration data type the studies hold. A sample profiled in
+ * none of them is in neither group; when nothing can be checked, Unaltered is empty.
  */
 export function resultsGroups(q: ResultsQuery, held: ResultsData["held"], drivers?: DriverSettings): { cohorts: Record<string, CohortDef>; unchecked: string[] } {
   const scope = q.studies.length === 1 ? { study: q.studies[0] } : { studies: q.studies };
-  const unchecked: string[] = [];
-  for (const entry of q.entries) for (const e of parseOql(entry)) for (const spec of e.specs) if (!OQL_PROFILE[spec.type]) unchecked.push(e.gene + ": " + spec.type);
-  const kinds = (q.kinds ?? ALL_KINDS).filter((t) => held.every.includes(t) || held.some.includes(t));
-  const chunks: string[][] = [];
-  for (let i = 0; i < q.genes.length; i += PROFILED_MAX_GENES) chunks.push(q.genes.slice(i, i + PROFILED_MAX_GENES));
-  const leaves = kinds.flatMap((type) => chunks.map((genes) => ({ kind: "profiled", type, genes, anyGene: true }) as Leaf));
-  if (leaves.length > 8) throw new Error("the Unaltered group checks profiling in at most 8 clauses; this query's " + q.genes.length + " genes over " + kinds.length + " data types need " + leaves.length);
+  const isHeld = (t: ProfileType) => held.every.includes(t) || held.some.includes(t);
+  const defaults: SelectedProfile[] = ALL_KINDS.filter(isHeld).map((type) => ({ type }));
+  // a selection naming nothing Unaltered can check (DNA methylation across studies) checks the alteration
+  // data types instead, and the page says so; a type no study holds matches nobody
+  const selected: SelectedProfile[] = q.selected?.length ? q.selected : defaults.length ? defaults : [{ type: "MUTATION" }];
+  const leaves = selected.map((s) => ({ kind: "profiled", ...s, genes: q.genes, anyGene: true }) as Leaf);
   const profiled: Clause[] = leaves.length > 1 ? [{ any: leaves }] : leaves;
+  // EXP / PROT lines whose profile the selection does not check
+  const read = (t: string) => t === "EXP" ? q.exp : t === "PROT" ? q.prot : undefined;
+  const checks = (t: string) => { const p = read(t); return !!p && selected.some((s) => "profile" in s && s.profile === p); };
+  const unchecked: string[] = [];
+  for (const entry of q.entries) for (const e of parseOql(entry)) for (const spec of e.specs)
+    if (!OQL_PROFILE[spec.type] && !checks(spec.type)) unchecked.push(e.gene + ": " + spec.type);
   // the query as one OQL clause — its ";" is "or" between entries (up to 30), where an `any` group
   // of one clause per line would stop at 8
   const text = q.entries.join("; ");
@@ -299,7 +308,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     !svHeld ? "Structural Variants (no structural-variant data)"
       : data.svs === false ? "Structural Variants (no structural variant in the queried genes)"
       : data.svs === null ? "Structural Variants (could not check for structural variants in the queried genes)" : null,
-    unchecked.length ? "Unaltered checks profiling in the mutation, copy-number and structural-variant profiles only, not for " + unchecked.join(", ") + ": a sample profiled only for those is in neither group" : null,
+    unchecked.length ? "Unaltered checks profiling in the selected profiles (" + selectionWords(q, data.held) + "), not for " + unchecked.join(", ") + ": a sample profiled only for those is in neither group" : null,
+    q.selected && !q.selected.length ? "The selected profiles name none Unaltered can check, so it checks the " + selectionWords({ ...q, selected: undefined }, data.held) + " data instead" : null,
   ].filter(Boolean) as string[];
   return arrange({ study: q.studies[0], cohorts }, [
     { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), ...pinsOf(q), cohorts: queried })] },

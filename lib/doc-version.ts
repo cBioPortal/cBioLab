@@ -217,9 +217,10 @@ const cohortsLockable = (doc: AnyDoc): AnyDoc => doc;
 const profiledGeneLists = (doc: AnyDoc): AnyDoc => doc;
 
 /**
- * 2.9 → 2.10: a `profiled` clause's gene list may ask for any one of its genes (`anyGene`). Nothing an
- * older document says changes; the version exists so a 2.9 engine refuses a document using
- * `anyGene` rather than ignoring it and reading the clause as "profiled for every gene".
+ * 2.9 → 2.10: a `profiled` clause's gene list may ask for any one of its genes (`anyGene`), and the
+ * clause may name one profile (`profile`, `ifHeld`) instead of a data type. Nothing an older document
+ * says changes; the version exists so a 2.9 engine refuses a document using either rather than
+ * misreading the clause.
  */
 const profiledAnyGene = (doc: AnyDoc): AnyDoc => doc;
 

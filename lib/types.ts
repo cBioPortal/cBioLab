@@ -111,10 +111,18 @@ export interface GeneStateFacet {
   overlap?: number;
 }
 
-/** the most genes one `profiled` clause names */
-export const PROFILED_MAX_GENES = 32;
 export interface ProfiledLeaf {
-  kind: "profiled"; type: "MUTATION" | "CNA" | "SV";
+  kind: "profiled";
+  /** the data type: a sample on a panel of any of the study's profiles of that type. Give `type` or `profile`. */
+  type?: "MUTATION" | "CNA" | "SV";
+  /**
+   * One of the study's profiles by its id without the study prefix (rna_seq_v2_mrna, rppa, gistic):
+   * a sample in that profile, as the portal's selected profiles cover a sample. Any data type,
+   * expression and protein included. A study without it is refused unless `ifHeld`.
+   */
+  profile?: string;
+  /** with `profile`: a study without that profile has no sample matching the clause, rather than refusing it (several studies) */
+  ifHeld?: boolean;
   /**
    * Narrow to samples profiled for THIS GENE — the panel they were run on
    * actually covers it. Without this, "profiled for mutations" includes samples

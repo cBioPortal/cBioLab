@@ -414,6 +414,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The Unaltered group as the portal's, unaltered among samples not wholly unprofiled (ours needs profiling in every type: 312 vs 372; OS p 0.616 vs 0.632); the Unprofiled and per-track groups (CMP-RV-3, CMM-RV-1…4)
     - [x] Unaltered: not altered and profiled for some queried gene in some selected alteration profile (`profiled` `anyGene`, DSL 2.10): coadread KRAS 372, OS 369/74, p 0.632, as the portal; msk_impact_2017 ZFHX3 399 / 7,740 samples (#304)
     - [ ] The Unprofiled group, the per-track groups, user groups and the group selector on the Results tab
+    - [ ] The Download tab's unaltered list and NP count by the same rule (`lib/views/datafiles/sql.ts` still requires every type: coadread KRAS 312; Results lane)
   - [ ] The SV, mRNA, Protein and Methylation sub-tabs (ours mutation and CNA); "Add checked genes to query"; query genes left out before q (CMM-RV-1…4, CMM-MD-9)
 - [ ] **Patient → Summary and tabs** ([40-patient-summary](legacy-spec/parity/40-patient-summary.md), [41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
   - [x] Allele Freq per sample as bars, "x variant reads out of y", 4 decimals below 0.01, sorted by the samples' VAFs in sample order (PAT-MT-3, PAT-STM-1) (#281)

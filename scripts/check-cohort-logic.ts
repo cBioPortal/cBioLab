@@ -175,6 +175,23 @@ async function profiledAnyGene(study: string, type: "MUTATION" | "CNA", genes: s
     list.size > 0 && same(list, expected) && (!strict || list.size > every.size), diff("any gene", list, expected) + " · every gene: " + n(every) + " · each gene: " + singles.map(n).join(" / "));
 }
 
+/**
+ * `profile`: a study with one profile of a data type selects the same patients by that profile as by
+ * the type; a profile the study does not hold is refused, or with `ifHeld` matches nobody.
+ */
+async function profiledProfile(study: string, type: "MUTATION" | "CNA", profile: string, genes: string[]) {
+  const [byProfile, byType] = await Promise.all([
+    leaf(study, { kind: "profiled", profile, genes, anyGene: true } as Clause),
+    leaf(study, { kind: "profiled", type, genes, anyGene: true } as Clause),
+  ]);
+  record(study, "profiled", `profiled in ${profile} for any of ${genes.join(", ")} is profiled for ${type} (the study's one ${type} profile)`,
+    byProfile.size > 0 && same(byProfile, byType), diff("profile", byProfile, byType));
+  const absent = await leaf(study, { kind: "profiled", profile: profile + "_absent", ifHeld: true, genes } as Clause);
+  const refused = await leaf(study, { kind: "profiled", profile: profile + "_absent", genes } as Clause).then(() => "", (e: Error) => String(e.message));
+  record(study, "profiled", "a profile the study does not hold: nobody with ifHeld, refused without it",
+    absent.size === 0 && /is not in/.test(refused), `ifHeld: ${n(absent)}; without: ${refused.slice(0, 120) || "not refused"}`);
+}
+
 /** A categorical attribute's values partition the patients who have one; a threshold splits a number. */
 async function clinicalPartition(study: string, attribute: string, values: string[], numeric: string, cut: number) {
   const recorded = await leaf(study, { kind: "clinical", attribute, op: "!=", value: "" } as Clause);
@@ -400,6 +417,7 @@ await profiledGeneList("brca_tcga", "CNA", ["KRAS", "TP53", "PIK3CA"]);
 // ZFHX3 is on IMPACT410/468 but not IMPACT341, KRAS on all three: the union is larger than the intersection
 await profiledAnyGene("msk_impact_2017", "MUTATION", ["KRAS", "ZFHX3"], true);
 await profiledAnyGene("brca_tcga", "CNA", ["KRAS", "TP53"], false);
+await profiledProfile("msk_impact_2017", "MUTATION", "mutations", ["KRAS", "ZFHX3"]);
 await lineNesting(CHORD);
 await heldOutHalves(CHORD);
 

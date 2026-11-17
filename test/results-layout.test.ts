@@ -4,89 +4,121 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { resultsGroups, resultsLayout, linkMutations, samplesLine, svCheckCohort } from "../app/portal/results-layout.ts";
-import { PROFILED_MAX_GENES, type View, type Clause } from "../lib/types.ts";
+import type { View, Clause } from "../lib/types.ts";
+import type { SelectedProfile } from "../lib/query-options.ts";
 
 const ALL3 = { every: ["MUTATION", "CNA", "SV"] as const, some: [] as never[] };
 const q = (studies: string[], entries: string[], filters: any[] = []) => ({ studies, filters, entries, genes: [...new Set(entries.map((e) => e.split(":")[0].trim()))] });
-const qk = (kinds: ("MUTATION" | "CNA" | "SV")[], studies: string[], entries: string[], filters: any[] = []) => ({ ...q(studies, entries, filters), kinds });
+const qs = (selected: SelectedProfile[], studies: string[], entries: string[], filters: any[] = []) => ({ ...q(studies, entries, filters), selected });
 // Unaltered's profiling requirement: its last clause, one `profiled` leaf or an `any` of them
 const profiledLeaves = (def: any): any[] => { const last = def.all[def.all.length - 1]; return last.any ? last.any : last.kind === "profiled" ? [last] : []; };
-const profiledOf = (def: any) => profiledLeaves(def).map((c: any) => c.type + " " + c.genes.join(","));
+const profiledOf = (def: any) => profiledLeaves(def).map((c: any) => (c.type ?? c.profile) + " " + c.genes.join(","));
 const leaf = (type: string, genes: string[]) => ({ kind: "profiled", type, genes, anyGene: true });
+const pleaf = (profile: string, genes: string[], ifHeld?: boolean) => ({ kind: "profiled", profile, ...(ifHeld ? { ifHeld } : {}), genes, anyGene: true });
+const all3 = () => ({ every: [...ALL3.every], some: [] as never[] });
 
 describe("Unaltered: not the query, and not wholly unprofiled (filteredUnalteredAndProfiledSamples, totallyUnprofiledSamples)", () => {
-  test("a bare gene, no options: profiled for it in mutation, copy number or structural variants — one `any` of three leaves", () => {
-    const { cohorts } = resultsGroups(q(["s"], ["KRAS"]), { every: [...ALL3.every], some: [] });
+  test("no options: profiled for a queried gene in mutation, copy number or structural variants — one `any` of three leaves (row 1)", () => {
+    const F = { kind: "clinical", attribute: "SEX", values: ["Female"] };
+    const { cohorts } = resultsGroups(q(["s"], ["KRAS"], [F]), all3());
     assert.deepEqual(cohorts.Unaltered.all, [
+      F,
       { not: { kind: "oql", q: "KRAS" } },
       { any: [leaf("MUTATION", ["KRAS"]), leaf("CNA", ["KRAS"]), leaf("SV", ["KRAS"])] }
     ]);
   });
 
   test("every leaf names every queried gene, whatever a line's own alteration type: any gene, any kind", () => {
-    const { cohorts } = resultsGroups(q(["s"], ["KRAS", "TP53: MUT", "ERBB2: AMP"]), { every: [...ALL3.every], some: [] });
+    const { cohorts } = resultsGroups(q(["s"], ["KRAS", "TP53: MUT", "ERBB2: AMP"]), all3());
     assert.deepEqual(profiledLeaves(cohorts.Unaltered), ["MUTATION", "CNA", "SV"].map((t) => leaf(t, ["KRAS", "TP53", "ERBB2"])));
     assert.deepEqual(cohorts.Unaltered.all![0], { not: { kind: "oql", q: "KRAS; TP53: MUT; ERBB2: AMP" } });
     assert.equal(cohorts.Unaltered.all!.length, 2, "not the query, then the profiled requirement");
   });
 
-  test("the query page's selected profiles decide the kinds: mutations only is one leaf, no `any` group", () => {
-    const { cohorts } = resultsGroups(qk(["MUTATION"], ["s"], ["KRAS", "TP53"]), { every: [...ALL3.every], some: [] });
-    assert.deepEqual(cohorts.Unaltered.all, [{ not: { kind: "oql", q: "KRAS; TP53" } }, leaf("MUTATION", ["KRAS", "TP53"])]);
-    const two = resultsGroups(qk(["MUTATION", "CNA"], ["s"], ["KRAS"]), { every: [...ALL3.every], some: [] }).cohorts;
+  test("no options: a kind only some studies hold still counts; a kind no study holds is left out (row 2)", () => {
+    const some = resultsGroups(q(["a", "b"], ["KRAS"]), { every: ["MUTATION", "CNA"], some: ["SV"] }).cohorts;
+    assert.deepEqual(profiledOf(some.Unaltered), ["MUTATION KRAS", "CNA KRAS", "SV KRAS"]);
+    const two = resultsGroups(q(["brca_tcga"], ["KRAS"]), { every: ["MUTATION", "CNA"], some: [] }).cohorts;
     assert.deepEqual(profiledOf(two.Unaltered), ["MUTATION KRAS", "CNA KRAS"]);
-  });
-
-  test("a kind no queried study holds is left out (brca_tcga has no structural variants)", () => {
-    const { cohorts } = resultsGroups(q(["brca_tcga"], ["KRAS"]), { every: ["MUTATION", "CNA"], some: [] });
-    assert.deepEqual(profiledOf(cohorts.Unaltered), ["MUTATION KRAS", "CNA KRAS"]);
-  });
-
-  test("a kind only some studies hold is still checked, and named in no note", () => {
-    const { cohorts } = resultsGroups(q(["a", "b"], ["KRAS"]), { every: ["MUTATION"], some: ["CNA"] });
-    assert.deepEqual(profiledOf(cohorts.Unaltered), ["MUTATION KRAS", "CNA KRAS"]);
     const l = resultsLayout(q(["a", "b"], ["KRAS", "TP53"]), data({ held: { every: ["MUTATION", "CNA"], some: ["SV"] } }));
     assert.deepEqual(profiledOf(l.doc.cohorts!.Unaltered), ["MUTATION KRAS,TP53", "CNA KRAS,TP53", "SV KRAS,TP53"]);
     assert.ok(!l.left.some((x) => /only some of the selected studies hold/.test(x)), l.left.join(" | "));
   });
 
-  test("forty genes over three kinds: at most " + PROFILED_MAX_GENES + " genes a leaf, two leaves a kind, six in the `any`", () => {
-    const forty = Array.from({ length: 40 }, (_, i) => "G" + i);
-    const { cohorts } = resultsGroups(q(["s"], forty), { every: [...ALL3.every], some: [] });
-    const leaves = profiledLeaves(cohorts.Unaltered);
-    assert.equal(leaves.length, 6);
-    for (const t of ["MUTATION", "CNA", "SV"]) {
-      const ofKind = leaves.filter((c) => c.type === t);
-      assert.equal(ofKind.length, 2, t);
-      assert.ok(ofKind.every((c) => c.genes.length <= PROFILED_MAX_GENES && c.anyGene === true), t);
-      assert.deepEqual(ofKind.flatMap((c) => c.genes), forty, t + ": every gene once, in order");
+  test("one selected profile is one leaf naming it, no `any` group (row 3)", () => {
+    const { cohorts } = resultsGroups(qs([{ profile: "mutations" }], ["s"], ["KRAS", "TP53"]), all3());
+    assert.deepEqual(cohorts.Unaltered.all, [{ not: { kind: "oql", q: "KRAS; TP53" } }, pleaf("mutations", ["KRAS", "TP53"])]);
+  });
+
+  test("mutations and mRNA selected: two leaves in an `any`, the mRNA one counting a sample with RNA but no sequencing (row 4)", () => {
+    const { cohorts } = resultsGroups(qs([{ profile: "mutations" }, { profile: "rna_seq_v2_mrna" }], ["coadread_tcga"], ["KRAS"]), all3());
+    assert.deepEqual(cohorts.Unaltered.all![1], { any: [pleaf("mutations", ["KRAS"]), pleaf("rna_seq_v2_mrna", ["KRAS"])] });
+  });
+
+  test("mRNA-only options: one mRNA leaf, never a missing profiling clause (row 5)", () => {
+    const { cohorts } = resultsGroups(qs([{ profile: "rna_seq_v2_mrna" }], ["s"], ["KRAS: EXP>=2"]), all3());
+    assert.deepEqual(cohorts.Unaltered.all, [{ not: { kind: "oql", q: "KRAS: EXP>=2" } }, pleaf("rna_seq_v2_mrna", ["KRAS"])]);
+  });
+
+  test("selected profiles naming none Unaltered can check: the held kinds' type leaves, and the page says so (row 6)", () => {
+    const { cohorts } = resultsGroups(qs([], ["a", "b"], ["KRAS"]), { every: ["MUTATION", "CNA"], some: [] });
+    assert.deepEqual(profiledLeaves(cohorts.Unaltered), [leaf("MUTATION", ["KRAS"]), leaf("CNA", ["KRAS"])]);
+    const l = resultsLayout(qs([], ["a", "b"], ["KRAS"]), data());
+    assert.deepEqual(profiledOf(l.doc.cohorts!.Unaltered), ["MUTATION KRAS", "CNA KRAS", "SV KRAS"]);
+    assert.ok(l.left.some((x) => /The selected profiles name none Unaltered can check, so it checks the .* data instead/.test(x)), l.left.join(" | "));
+    assert.ok(!resultsLayout(q(["a"], ["KRAS"]), data()).left.some((x) => /name none Unaltered can check/.test(x)), "no options: no note");
+  });
+
+  test("nothing selectable and no kind held: one MUTATION type leaf (Unaltered matches nobody), not no clause (row 7)", () => {
+    const none = { every: [] as never[], some: [] as never[] };
+    for (const Q of [qs([], ["s"], ["KRAS"]), q(["s"], ["KRAS"])]) {
+      const { cohorts } = resultsGroups(Q, none);
+      assert.deepEqual(cohorts.Unaltered.all, [{ not: { kind: "oql", q: "KRAS" } }, leaf("MUTATION", ["KRAS"])], JSON.stringify((Q as { selected?: unknown }).selected));
     }
-    for (const def of Object.values(cohorts)) assert.ok(def.all!.length <= 8, String(def.all!.length));
   });
 
-  test("a query needing more than 8 profiled leaves is refused, naming the limit", () => {
-    const hundred = Array.from({ length: 100 }, (_, i) => "G" + i);
-    assert.throws(() => resultsGroups(q(["s"], hundred), { every: [...ALL3.every], some: [] }), /8 clauses[\s\S]*100 genes over 3 data types/);
-    // two kinds of the same genes fit: 4 + 4
-    assert.equal(profiledLeaves(resultsGroups(qk(["MUTATION", "CNA"], ["s"], hundred), { every: [...ALL3.every], some: [] }).cohorts.Unaltered).length, 8);
+  test("several studies, mRNA chosen: its leaf is read in each study holding it (row 8)", () => {
+    const { cohorts } = resultsGroups(qs([{ type: "MUTATION" }, { profile: "rna_seq_v2_mrna_median_all_sample_Zscores", ifHeld: true }], ["a", "b"], ["KRAS"]), all3());
+    assert.deepEqual(cohorts.Unaltered.all![1], { any: [leaf("MUTATION", ["KRAS"]), pleaf("rna_seq_v2_mrna_median_all_sample_Zscores", ["KRAS"], true)] });
   });
 
-  test("an expression or protein line is not checked for profiling, and the page says so", () => {
-    const l = resultsLayout(q(["a"], ["KRAS", "EGFR: EXP>=2"]), data());
-    const note = l.left.find((x) => /EGFR: EXP/.test(x));
-    assert.ok(note, l.left.join(" | "));
-    assert.match(note!, /mutation, copy-number and (SV|structural-variant) profiles only/);
-    assert.match(note!, /in neither group/);
-    assert.deepEqual(profiledOf(l.doc.cohorts!.Unaltered), ["MUTATION KRAS,EGFR", "CNA KRAS,EGFR", "SV KRAS,EGFR"]);
-    assert.ok(!resultsLayout(q(["a"], ["KRAS", "TP53"]), data()).left.some((x) => /profiles only/.test(x)), "no EXP/PROT line, no note");
+  test("one leaf per selected profile with every queried gene, however many genes: no chunking", () => {
+    const twelve = Array.from({ length: 12 }, (_, i) => "G" + i);
+    const sel: SelectedProfile[] = [{ profile: "mutations" }, { profile: "gistic" }, { profile: "rna_seq_v2_mrna" }, { profile: "rppa_Zscores" }];
+    const leaves = profiledLeaves(resultsGroups(qs(sel, ["s"], twelve), all3()).cohorts.Unaltered);
+    assert.deepEqual(leaves, sel.map((p) => pleaf((p as { profile: string }).profile, twelve)));
+    const forty = Array.from({ length: 40 }, (_, i) => "G" + i);
+    const { cohorts } = resultsGroups(q(["s"], forty), all3());
+    assert.deepEqual(profiledLeaves(cohorts.Unaltered), ["MUTATION", "CNA", "SV"].map((t) => leaf(t, forty)));
+    assert.doesNotThrow(() => resultsGroups(q(["s"], Array.from({ length: 100 }, (_, i) => "G" + i)), all3()));
   });
 
-  test("Altered is the query as one OQL clause and Queried the selection, with no profiling requirement", () => {
+  test("an EXP line reading a selected profile needs no note (row 9)", () => {
+    const Q = { ...qs([{ profile: "mutations" }, { profile: "rna_seq_v2_mrna_median_Zscores" }], ["a"], ["KRAS", "EGFR: EXP>=2"]), exp: "rna_seq_v2_mrna_median_Zscores" };
+    assert.ok(!resultsLayout(Q, data()).left.some((x) => /EGFR: EXP/.test(x)), resultsLayout(Q, data()).left.join(" | "));
+    assert.ok(!resultsLayout(q(["a"], ["KRAS", "TP53"]), data()).left.some((x) => /Unaltered checks profiling/.test(x)), "no EXP/PROT line, no note");
+  });
+
+  test("an EXP line whose profile is not selected is named, with the selection in words (row 9)", () => {
+    const Q = { ...qs([{ profile: "mutations" }], ["a"], ["KRAS", "EGFR: EXP>=2"]), exp: "rna_seq_v2_mrna_median_Zscores" };
+    const l = resultsLayout(Q, data());
+    assert.ok(l.left.some((x) => /Unaltered checks profiling in the selected profiles \(mutations\), not for EGFR: EXP/.test(x)), l.left.join(" | "));
+    // the defaults the studies hold, in words
+    const d = resultsLayout(q(["a"], ["KRAS", "EGFR: EXP>=2"]), data({ held: { every: ["MUTATION", "CNA"], some: ["SV"] } }));
+    const note = d.left.find((x) => /Unaltered checks profiling in the selected profiles/.test(x));
+    assert.ok(note, d.left.join(" | "));
+    assert.match(note!, /selected profiles \([^)]*\bmutation\b[^)]*\bcopy number\b[^)]*\bstructural variants\b[^)]*\), not for EGFR: EXP/);
+    assert.deepEqual(profiledOf(d.doc.cohorts!.Unaltered), ["MUTATION KRAS,EGFR", "CNA KRAS,EGFR", "SV KRAS,EGFR"]);
+  });
+
+  test("Altered is the query as one OQL clause and Queried the selection, with no profiling requirement (row 10)", () => {
     const F = { kind: "clinical", attribute: "SEX", values: ["Female"] };
-    const { cohorts } = resultsGroups(q(["s"], ["KRAS", "TP53: MUT", "ERBB2: AMP"], [F]), { every: [...ALL3.every], some: [] });
-    assert.deepEqual(cohorts.Altered.all, [F, { kind: "oql", q: "KRAS; TP53: MUT; ERBB2: AMP" }], "the query is one OQL clause, its lines joined by ';'");
-    assert.deepEqual(cohorts.Queried.all, [F]);
-    assert.equal(cohorts.Unaltered.all![0], F);
+    for (const Q of [q(["s"], ["KRAS", "TP53: MUT", "ERBB2: AMP"], [F]), qs([{ profile: "mutations" }], ["s"], ["KRAS", "TP53: MUT", "ERBB2: AMP"], [F])]) {
+      const { cohorts } = resultsGroups(Q, all3());
+      assert.deepEqual(cohorts.Altered.all, [F, { kind: "oql", q: "KRAS; TP53: MUT; ERBB2: AMP" }], "the query is one OQL clause, its lines joined by ';'");
+      assert.deepEqual(cohorts.Queried.all, [F]);
+      assert.equal(cohorts.Unaltered.all![0], F);
+    }
   });
 });
 
@@ -101,13 +133,6 @@ const data = (over: Partial<Parameters<typeof resultsLayout>[1]> = {}) =>
   ({ expr: "rna_seq_v2_mrna", cna: "gistic", clinical: ["AGE", "OS_MONTHS", "OS_STATUS"], numeric: ["MUTATION_COUNT"], expressionAcross: true, held: { every: ["MUTATION", "CNA"], some: ["SV"] }, ...over } as Parameters<typeof resultsLayout>[1]);
 const titles = (l: ReturnType<typeof resultsLayout>) => l.tabs.map((t) => t.title);
 const plotY = (l: ReturnType<typeof resultsLayout>) => (l.doc.views!.find((v: any) => v.kind === "plot") as any)?.y;
-
-test("a twelve-gene query fits a cohort's limits: 8 clauses, and no group past 8 lines", () => {
-  const twelve = Array.from({ length: 12 }, (_, i) => "G" + i);
-  const { cohorts } = resultsGroups(q(["s"], twelve), { every: ["MUTATION", "CNA", "SV"], some: [] });
-  for (const def of Object.values(cohorts)) assert.ok(def.all!.length <= 8, String(def.all!.length));
-  assert.deepEqual(profiledOf(cohorts.Unaltered), ["MUTATION", "CNA", "SV"].map((t) => t + " " + twelve.join(",")), "one leaf a kind, every gene in it");
-});
 
 test("every tab draws the queried patients; only Comparison/Survival compares Altered with Unaltered", () => {
   const l = resultsLayout(q(["a"], ["KRAS", "TP53"]), data());

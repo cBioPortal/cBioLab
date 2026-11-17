@@ -123,6 +123,47 @@ describe("profiled leaf", () => {
     assert.throws(() => one({ kind: "profiled", type: "CNA", genes: many }), new RegExp("at most " + PROFILED_MAX_GENES + " genes; this names " + many.length));
     assert.throws(() => one({ kind: "profiled", type: "CNA", gene: "bad gene" }), /profiled clause: invalid gene symbol/);
   });
+  test("PROFILED_MAX_GENES is the compiler's own export, not lib/types.ts's (row 16)", async () => {
+    assert.equal(typeof PROFILED_MAX_GENES, "number");
+    assert.ok(!("PROFILED_MAX_GENES" in (await import("../lib/types.ts"))));
+  });
+  test("a profile by id: the study's own profile rows, any data type (row 13)", () => {
+    const c = { ...ctx, profiles: ["mutations", "rna_seq_v2_mrna"] };
+    const sql = one({ kind: "profiled", profile: "rna_seq_v2_mrna", gene: "kras" }, c);
+    assert.match(sql, /sp\.genetic_profile_id = 's1_rna_seq_v2_mrna'/);
+    assert.match(sql, /'KRAS'/);
+    assert.doesNotMatch(sql, /alteration_type = /, "the profile, not its data type");
+    assert.match(one({ kind: "profiled", profile: "mutations", genes: ["KRAS"], anyGene: true }, c), /sp\.genetic_profile_id = 's1_mutations'/);
+  });
+  test("refused: type and profile together, ifHeld without profile, a bad id (row 13)", () => {
+    assert.throws(() => one({ kind: "profiled", type: "MUTATION", profile: "mutations", gene: "KRAS" }), /profiled clause/);
+    assert.throws(() => one({ kind: "profiled", type: "MUTATION", ifHeld: true, gene: "KRAS" }), /profiled clause/);
+    assert.throws(() => one({ kind: "profiled", profile: "x y", gene: "KRAS" }), /profiled clause/);
+    assert.throws(() => one({ kind: "profiled", profile: "a'; drop", gene: "KRAS" }), /profiled clause/);
+  });
+  test("a profile the study does not hold: a check row refuses at run time, unless ifHeld (row 14)", () => {
+    const c = { ...ctx, profiles: ["mutations"] };
+    const missing = one({ kind: "profiled", profile: "rna_seq_v2_mrna", gene: "KRAS" }, c);
+    assert.match(missing, /FROM system\.one WHERE throwIf\(/);
+    assert.match(missing, /profile \\?'rna_seq_v2_mrna\\?' is not in s1/);
+    const held = one({ kind: "profiled", profile: "rna_seq_v2_mrna", ifHeld: true, gene: "KRAS" }, c);
+    assert.doesNotMatch(held, /throwIf/);
+    assert.match(held, /sp\.genetic_profile_id = 's1_rna_seq_v2_mrna'/, "still read as named, matching none of this study's rows");
+    assert.doesNotMatch(one({ kind: "profiled", profile: "mutations", gene: "KRAS" }, c), /throwIf|system\.one/);
+  });
+  test("a gene list with a profile: each gene's clause keeps profile and ifHeld (row 15)", () => {
+    const c = { ...ctx, profiles: ["mutations"] };
+    const n = (sql: string, re: RegExp) => sql.match(re)?.length ?? 0;
+    const id = /sp\.genetic_profile_id = 's1_rna_seq_v2_mrna'/g;
+    const any = one({ kind: "profiled", profile: "rna_seq_v2_mrna", ifHeld: true, genes: ["KRAS", "TP53", "EGFR"], anyGene: true }, c);
+    assert.equal(n(any, /UNION DISTINCT/g), 2);
+    assert.equal(n(any, id), 3, "every gene's clause on the profile");
+    assert.doesNotMatch(any, /throwIf|alteration_type = /, "ifHeld kept by every gene's clause");
+    const every = one({ kind: "profiled", profile: "rna_seq_v2_mrna", genes: ["KRAS", "TP53"] }, c);
+    assert.equal(n(every, /INTERSECT DISTINCT/g), 1);
+    assert.equal(n(every, id), 2);
+    assert.match(every, /profile \\?'rna_seq_v2_mrna\\?' is not in s1/, "without ifHeld, refused for each gene alike");
+  });
   test("profiledCasesSql: per sample or per patient, the same whole-exome rule", () => {
     const s = profiledCasesSql("tp53", "MUTATION", { study: "s1", db: "cbio", unit: "sample" });
     assert.match(s, /SELECT DISTINCT replaceOne\(sd\.sample_unique_id, 's1_', ''\) AS profiled_id/);
@@ -319,6 +360,7 @@ describe("readback", () => {
     assert.equal(text({ kind: "profiled", type: "MUTATION", genes: ["kras", "tp53"], anyGene: true }), "profiled for any of KRAS, TP53 MUTATION");
     assert.equal(text({ kind: "profiled", type: "CNA", gene: "egfr" }), "profiled for EGFR CNA");
     assert.equal(text({ kind: "profiled", type: "SV" }), "profiled for SV");
+    assert.equal(text({ kind: "profiled", profile: "rna_seq_v2_mrna", genes: ["kras"], anyGene: true }), "profiled for any of KRAS in rna_seq_v2_mrna");
     assert.equal(text({ kind: "derived", metric: "alteredGenes", range: { gt: 3, lte: 9 } }), "alteredGenes > 3 and ≤ 9 genes");
     assert.equal(text({ kind: "derived", metric: "lines", eventType: "Treatment", range: { gte: 2, lt: 4 } }), "lines of 'Treatment' ≥ 2 and < 4");
     assert.equal(text({ kind: "derived", metric: "followupMonths", range: { gte: 24 } }), "followupMonths ≥ 24 months");

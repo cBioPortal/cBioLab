@@ -54,7 +54,7 @@ export default function ResultsPage() {
   // starts at once; with the profiles and attributes Explore's facets give, the rest
   // whether the queried patients carry a structural variant in a queried gene: asked beside the header's count (below)
   const [svs, setSvs] = useState<boolean | null | undefined>(undefined);
-  const asked = useMemo(() => ({ studies, filters: scope, entries: chosen.entries, genes, exp: chosen.exp, prot: chosen.prot, ifHeld: chosen.ifHeld, ...(chosen.kinds ? { kinds: chosen.kinds } : {}) }), [studies, scope, chosen, genes]);
+  const asked = useMemo(() => ({ studies, filters: scope, entries: chosen.entries, genes, exp: chosen.exp, prot: chosen.prot, ifHeld: chosen.ifHeld, ...(chosen.selected ? { selected: chosen.selected } : {}) }), [studies, scope, chosen, genes]);
   const fresh = useMemo(() => basics && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError && !chosen.waiting && !chosen.error
     ? resultsLayout(asked, known ? {
         expr: expressionProfile(known.profileCatalog), cna: discreteCnaProfile(known.profileCatalog), clinical: known.clinical,
