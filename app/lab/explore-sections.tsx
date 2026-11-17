@@ -833,7 +833,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                     title: binSet?.showNa ? "show the cases with no " + label + " as a count beside the bars" : "draw the cases with no " + label + " as a bar of their own",
                     onClick: () => setChartBins(c.attribute, { ...binSet, showNa: !binSet?.showNa }, false) }] : []),
                   { label: "Download", title: "save this chart as a file", sub: [
-                    caseFileAction("Data", { kind: "full", attribute: c.attribute, per: c.per, numeric: true }, chartFileName(label, "data"), () => selectionOf(ctx), ctx.setExMsg),
+                    caseFileAction("Data", { kind: "full", attribute: c.attribute, per: c.per }, chartFileName(label, "data"), () => selectionOf(ctx), ctx.setExMsg),
                     ...figureActions(label, () => c.bins && c.bins.length > 1 ? barFigure([
                     ...c.bins.map((b: any) => ({ count: b.count, tick: String(b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start)) })),
                     ...(showNa ? [{ count: c.naCount!, tick: "NA", na: true }] : [])], c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null) : null, ctx.setExMsg)] },

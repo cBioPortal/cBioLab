@@ -1390,6 +1390,8 @@ filtered, sorted table; the page is the reader's and is not.
   \`{"op": "contains"|"notContains"|"equals"|"notEquals"|"startsWith"|"endsWith"|"regex", "value": "…"}\`
   (case-insensitive but for \`regex\`, RE2 syntax) or \`{"values": ["…", …]}\` (≤500 exact values; \`""\`
   is blank); a numeric column takes \`{"min"?: n, "max"?: n}\` (inclusive; a blank value fails it).
+  Any column takes \`{"present": true}\`: the rows with a value, whatever it is (a numeric
+  column's \`>89\` included).
 - \`sort: {"column": id, "desc"?: true}\` — numbers as numbers, missing values last either way.
 
 All four run in the database across every cohort and study together, so the order is global and

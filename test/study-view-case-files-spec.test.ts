@@ -38,9 +38,8 @@ function theView(doc: AnalysisDoc): TableView {
   return t;
 }
 const unitOf = (v: TableView) => v.unit ?? "sample";
-const HAS_VALUE = { op: "notEquals", value: "" };
-/** a numeric column takes only a range: every finite number, which leaves a missing value out */
-const HAS_NUMBER = { min: -Number.MAX_VALUE };
+/** "has a value", for a column of either kind: every recorded value, a numeric column's ">89" included */
+const HAS_VALUE = { present: true };
 
 // ---- caseFileName (PC2, SD2) ----
 
@@ -183,17 +182,17 @@ test("PC4/PC5: Full Data of a patient attribute: per patient, patient + attribut
   assert.deepEqual(v.filters, { SEX: HAS_VALUE });
 });
 
-test("PC6: a numeric attribute's Full Data (a bar's Data) keeps the rows with a number", () => {
-  const v = theView(caseFileDoc({ kind: "full", attribute: "AGE", per: "patient", numeric: true }, def, STUDY));
+test("PC6: a numeric attribute's Full Data (a bar's Data) keeps every row with a recorded value, not only plain numbers", () => {
+  const v = theView(caseFileDoc({ kind: "full", attribute: "AGE", per: "patient" }, def, STUDY));
   assert.deepEqual(v.columns, ["patient", "AGE"]);
-  assert.deepEqual(v.filters, { AGE: HAS_NUMBER });
+  assert.deepEqual(v.filters, { AGE: HAS_VALUE });
 });
 
 test("PC7: density Data: per sample, patient + sample + x + y, both values required", () => {
   const v = theView(caseFileDoc(density, def, STUDY));
   assert.equal(unitOf(v), "sample");
   assert.deepEqual(v.columns, ["patient", "sample", "FRACTION_GENOME_ALTERED", "MUTATION_COUNT"]);
-  assert.deepEqual(v.filters, { FRACTION_GENOME_ALTERED: HAS_NUMBER, MUTATION_COUNT: HAS_NUMBER });
+  assert.deepEqual(v.filters, { FRACTION_GENOME_ALTERED: HAS_VALUE, MUTATION_COUNT: HAS_VALUE });
 });
 
 test("PC7: density Data after Swap Axes swaps the columns", () => {

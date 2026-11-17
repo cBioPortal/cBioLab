@@ -11,7 +11,7 @@ import { chartFileName } from "./study-view-download.ts";
 /** which file: a chart's per-case data, or every attribute of the selection */
 export type CaseFile =
   /** a clinical pie or list chart's Full Data, or a clinical bar chart's Data */
-  | { kind: "full"; attribute: string; per: "patient" | "sample"; numeric?: boolean }
+  | { kind: "full"; attribute: string; per: "patient" | "sample" }
   /** the density chart's Data: x and y as the chart draws them */
   | { kind: "density"; x: string; y: string }
   /** the survival chart's Data: the endpoint's status and months attributes */
@@ -25,10 +25,8 @@ export const CASE_FILE_COHORT = "Selection";
 /** how /api/table writes a file: its study column's header, and attribute headers by name or by id */
 export interface CaseFileFormat { study: "Study ID" | "Cancer Study"; header: "names" | "ids" }
 
-/** a filter that keeps the rows with a value for a text column */
-const HAS_VALUE = { op: "notEquals", value: "" } as const;
-/** for a numeric column, which takes only a range: every finite number, so a missing value is left out */
-const HAS_NUMBER = { min: -Number.MAX_VALUE };
+/** the rows with a value, as the portal lists every recorded value (a numeric column's ">89" included) */
+const HAS_VALUE = { present: true } as const;
 
 /**
  * The document whose one view is the file's rows: the clinical `table` view over the selection
@@ -39,9 +37,9 @@ export function caseFileDoc(file: CaseFile, def: CohortDef, study: string): Anal
   if (file.kind === "full") {
     if (file.per === "patient") Object.assign(view, { unit: "patient", columns: ["patient", file.attribute] });
     else Object.assign(view, { unit: "sample", columns: ["patient", "sample", file.attribute] });
-    view.filters = { [file.attribute]: file.numeric ? HAS_NUMBER : HAS_VALUE };
+    view.filters = { [file.attribute]: HAS_VALUE };
   } else if (file.kind === "density") {
-    Object.assign(view, { unit: "sample", columns: ["patient", "sample", file.x, file.y], filters: { [file.x]: HAS_NUMBER, [file.y]: HAS_NUMBER } });
+    Object.assign(view, { unit: "sample", columns: ["patient", "sample", file.x, file.y], filters: { [file.x]: HAS_VALUE, [file.y]: HAS_VALUE } });
   } else if (file.kind === "survival") {
     Object.assign(view, { unit: "patient", columns: ["patient", file.status, file.months] });
   } else {
