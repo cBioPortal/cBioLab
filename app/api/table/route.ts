@@ -4,7 +4,7 @@ import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { isDrawn, type AnalysisDoc, type ViewResult } from "../../../lib/types.ts";
-import { portalMatrix } from "../../../lib/views/datafiles/portal-file.ts";
+import { portalDisposition, portalMatrix } from "../../../lib/views/datafiles/portal-file.ts";
 
 export const maxDuration = 300;
 
@@ -106,6 +106,6 @@ async function portalFile(v: ViewResult, t: NonNullable<ReturnType<typeof pagedT
   const name = transposed ? file.portalFile!.replace(/\.txt$/, "_transposed.txt") : file.portalFile!;
   return new Response(portalMatrix(genes, rows, transposed), { headers: {
     "content-type": "text/plain; charset=utf-8",
-    "content-disposition": "attachment; filename=\"" + name.replace(/[^A-Za-z0-9._() -]/g, "_").replace(/"/g, "_") + "\""
+    "content-disposition": portalDisposition(name)
   } });
 }

@@ -66,10 +66,14 @@ export function fileList(catalogs: Record<string, ProfileInfo[]>, studies: strin
   const profiles = new Map<string, ProfileInfo>();
   for (const st of studies) for (const p of catalogs[st] || []) if (inGeneticAlterationDerived(p.type) && !profiles.has(p.profile)) profiles.set(p.profile, p);
   const rank = (p: ProfileInfo) => { const i = PROFILE_ORDER.indexOf(p.type); return i < 0 ? PROFILE_ORDER.length : i; };
+  // the portal's cna.txt is its selected copy-number profile, the first discrete one; any other takes its name
+  let cna = false;
   for (const p of [...profiles.values()].sort((a, b) => rank(a) - rank(b) || a.order - b.order || a.profile.localeCompare(b.profile))) {
     const discrete = p.type === "COPY_NUMBER_ALTERATION" && p.datatype.toUpperCase() === "DISCRETE";
+    const asCna = discrete && !cna;
+    if (asCna) cna = true;
     out.push({ id: "profile:" + p.profile, name: p.name || p.profile, studies: holding((x) => x.profile === p.profile), matrix: { kind: "profile", profile: p.profile, discrete },
-      portalFile: discrete ? "cna.txt" : (p.name || p.profile) + ".txt",
+      portalFile: asCna ? "cna.txt" : (p.name || p.profile) + ".txt",
       description: "per sample and gene: its value in " + p.profile + " (" + p.type.toLowerCase().replace(/_/g, " ") + ", " + p.datatype.toLowerCase() + ")" +
         (discrete ? "; NA when none is stored; NP when its panel did not cover the gene" : "; NA when none is stored") });
   }

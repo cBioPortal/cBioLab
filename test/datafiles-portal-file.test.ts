@@ -10,13 +10,14 @@
 // | F5   | Zero rows, plain: the header line alone                                                |
 // | F6   | Zero rows, transposed: a single column STUDY_ID\nSAMPLE_ID\n<gene>…                    |
 // | F7   | fileList portalFile: mutations → mutations.txt, sv → structural_variants.txt           |
-// | F8   | fileList portalFile: discrete CNA profile → cna.txt                                    |
+// | F8   | fileList portalFile: the first discrete CNA profile in list order → cna.txt; a second → its name + ".txt" |
 // | F9   | fileList portalFile: other profiles → name + ".txt"                                    |
 // | F10  | fileList portalFile: a profile with no name → profile id + ".txt"                      |
-// | F11  | SV matrix joins a sample's events in one gene with a single space                      |
+// | F11  | SV matrix joins every record's events (duplicates kept, groupArray) with a single space |
+// | F12  | portalDisposition: attachment; filename="<ascii>"; filename*=UTF-8''<encoded>   |
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { portalMatrix } from "../lib/views/datafiles/portal-file.ts";
+import { portalMatrix, portalDisposition } from "../lib/views/datafiles/portal-file.ts";
 import { fileList } from "../lib/views/datafiles/run.ts";
 import { matrixRowSource } from "../lib/views/datafiles/tables.ts";
 import type { ProfileInfo } from "../lib/profile-catalog.ts";
@@ -62,6 +63,7 @@ const p = (profile: string, type: string, datatype: string, order: number, name 
 const catalog: ProfileInfo[] = [
   p("mutations", "MUTATION_EXTENDED", "MAF", 0),
   p("gistic", "COPY_NUMBER_ALTERATION", "DISCRETE", 1, "Putative copy-number alterations from GISTIC"),
+  p("rae", "COPY_NUMBER_ALTERATION", "DISCRETE", 5, "Putative copy-number from RAE"),
   p("rna_z", "MRNA_EXPRESSION", "Z-SCORE", 2, "mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)"),
   p("rppa", "PROTEIN_LEVEL", "LOG2-VALUE", 3, ""),
   p("structural_variants", "STRUCTURAL_VARIANT", "SV", 4),
@@ -74,8 +76,9 @@ test("F7 portalFile: mutations and structural variants", () => {
   assert.equal(portalFile("sv"), "structural_variants.txt");
 });
 
-test("F8 portalFile: a discrete copy-number profile is cna.txt", () => {
+test("F8 portalFile: only the first discrete copy-number profile is cna.txt; a second is its name", () => {
   assert.equal(portalFile("profile:gistic"), "cna.txt");
+  assert.equal(portalFile("profile:rae"), "Putative copy-number from RAE.txt");
 });
 
 test("F9 portalFile: any other profile is its name plus .txt", () => {
@@ -86,8 +89,16 @@ test("F10 portalFile: a profile with no name is its id plus .txt", () => {
   assert.equal(portalFile("profile:rppa"), "rppa.txt");
 });
 
-test("F11 sv matrix joins a sample's events in one gene with a single space", () => {
+test("F11 sv matrix joins every record's event info, duplicates kept, with a single space", () => {
   const parts = [{ cohort: "C", study: "s", cohortSql: "SELECT pid, sid FROM x" }];
   const sql = matrixRowSource({ kind: "sv" }, parts, ["TP53"], "d").with;
-  assert.ok(sql.includes("arrayStringConcat(arraySort(groupUniqArray(sv_event_info)), ' ')"), sql);
+  assert.ok(sql.includes("arrayStringConcat(arraySort(groupArray(sv_event_info)), ' ')"), sql);
+});
+
+test("F12 portalDisposition: ascii fallback and RFC 5987 filename*", () => {
+  const n = "mRNA Expression, RSEM (Batch normalized from Illumina HiSeq_RNASeqV2).txt";
+  assert.equal(portalDisposition(n),
+    `attachment; filename="${n}"; filename*=UTF-8''mRNA%20Expression%2C%20RSEM%20%28Batch%20normalized%20from%20Illumina%20HiSeq_RNASeqV2%29.txt`);
+  assert.equal(portalDisposition("Protéines.txt"), `attachment; filename="Prot_ines.txt"; filename*=UTF-8''Prot%C3%A9ines.txt`);
+  assert.equal(portalDisposition(`a"b\\c'*.txt`), `attachment; filename="a_b_c'*.txt"; filename*=UTF-8''a%22b%5Cc%27%2A.txt`);
 });

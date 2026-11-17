@@ -54,6 +54,12 @@ async function listIds(docJson: () => string, vi: number, table: string): Promis
   return lines.slice(1).map((l) => { const xs = l.split(","); return xs[st] + ":" + xs[sm]; });
 }
 
+/** a gene-by-sample file's downloads, the portal's: its format, label, what it is for a screen reader, its tip */
+const PORTAL_FORMATS: ["tsv" | "tsv-transposed", string, string, (file: string) => string][] = [
+  ["tsv", "Tab Delimited Format", "in tab-delimited format", (file) => "the portal's " + file + ": STUDY_ID, SAMPLE_ID, then a column per gene, tab-separated"],
+  ["tsv-transposed", "Transposed Matrix", "as a transposed matrix", () => "the same file transposed: a line for STUDY_ID, one for SAMPLE_ID, one per gene"],
+];
+
 function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJson?: () => string; updating: boolean }) {
   const [state, setState] = useState<string | null>(null);
   const download = (format?: "tsv" | "tsv-transposed") => async (e: React.FormEvent<HTMLFormElement>) => {
@@ -91,18 +97,13 @@ function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJso
       <td className="tabular-nums text-right whitespace-nowrap">{f.rows.toLocaleString()} rows</td>
       <td className="whitespace-nowrap">
         <span className="inline-flex gap-1.5">
-          {f.portalFile ? <>
-            <form method="post" action="/api/table" target="_blank" onSubmit={download("tsv")}>
+          {f.portalFile ? PORTAL_FORMATS.map(([format, label, aria, tip]) =>
+            <form key={format} method="post" action="/api/table" target="_blank" onSubmit={download(format)}>
               <input type="hidden" name="payload" />
-              <Button variant="outline" size="sm" className={TB} type="submit" disabled={!!off} aria-label={"download " + f.name + " in tab-delimited format"}
-                data-tip={off || "the portal's " + f.portalFile + ": STUDY_ID, SAMPLE_ID, then a column per gene, tab-separated"}><Download />Tab Delimited Format</Button>
-            </form>
-            <form method="post" action="/api/table" target="_blank" onSubmit={download("tsv-transposed")}>
-              <input type="hidden" name="payload" />
-              <Button variant="outline" size="sm" className={TB} type="submit" disabled={!!off} aria-label={"download " + f.name + " as a transposed matrix"}
-                data-tip={off || "the same file transposed: a line for STUDY_ID, one for SAMPLE_ID, one per gene"}><Download />Transposed Matrix</Button>
-            </form>
-          </> : <form method="post" action="/api/table" target="_blank" onSubmit={download()}>
+              <Button variant="outline" size="sm" className={TB} type="submit" disabled={!!off} aria-label={"download " + f.name + " " + aria}
+                data-tip={off || tip(f.portalFile!)}><Download />{label}</Button>
+            </form>)
+          : <form method="post" action="/api/table" target="_blank" onSubmit={download()}>
             <input type="hidden" name="payload" />
             <Button variant="outline" size="sm" className={TB} type="submit" disabled={!!off} aria-label={"download " + f.name}
               data-tip={off || "every row as comma-separated text, with the cohort and study of each"}><Download />CSV</Button>

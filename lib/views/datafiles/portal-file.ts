@@ -11,3 +11,13 @@ export function portalMatrix(genes: string[], rows: { study: string; sample: str
   const out = transposed ? m[0].map((_, j) => m.map((line) => line[j])) : m;
   return out.map((line) => line.join("\t")).join("\n");
 }
+
+/**
+ * The Content-Disposition of a portal file: its name as the portal saves it (`<profile name>.txt`, commas and
+ * all), in RFC 5987's filename* for browsers that read it, beside an ASCII filename for those that do not.
+ */
+export function portalDisposition(name: string): string {
+  const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  const encoded = encodeURIComponent(name).replace(/['()*]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase());
+  return "attachment; filename=\"" + ascii + "\"; filename*=UTF-8''" + encoded;
+}
