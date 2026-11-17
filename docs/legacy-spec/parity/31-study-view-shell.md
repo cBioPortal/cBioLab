@@ -33,7 +33,7 @@ Scripts and screenshots: (local scratch, not committed) (`leg-ui.js` → `out/le
 | ? | 0 |
 | **Total IDs** | **118** |
 
-**Overall: 18.6 %** (✅ 14 + 🐞ok 4 + N/A 4 = 22 of 118). Counting 🟡 as half: 29.7 %. (2026-11-11: 12.7 % / 23.7 %.)
+**Overall: 25.4 %** (✅ 22 + 🐞ok 5 + N/A 3 = 30 of 118). Counting 🟡 as half: 39.8 %. (2026-11-16: 18.6 % / 29.7 %.) (2026-11-11: 12.7 % / 23.7 %.)
 
 Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated were checked again, and 5 more verdicts changed, all for the better (#188, #189). The filters now live in the URL, Copy link carries them, and a portal `#filterJson` or `filterAttributeId` link opens with its filters. Still missing: the Clinical Data tab, the clinical-data download, the Groups manager, virtual studies, Custom Selection on the page, the study header and per-user layout.
 

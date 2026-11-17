@@ -33,7 +33,7 @@ Legacy numbers from `/api/clinical-data-counts`, `/api/clinical-data-bin-counts?
 | ? | 0 |
 | **Total IDs** | **135** |
 
-**Overall: 37.8 %** (✅ 46 + 🐞ok 3 + N/A 2 = 51 of 135). Counting 🟡 as half: 52.6 %. (2026-11-11: 17.8 % / 31.9 %.)
+**Overall: 39.3 %** (✅ 48 + 🐞ok 3 + N/A 2 = 53 of 135). Counting 🟡 as half: 54.1 %. (2026-11-16: 37.8 % / 52.6 %.) (2026-11-11: 17.8 % / 31.9 %.)
 
 Re-score of 2026-11-16: the rows PRs #203, #222, #257, #260, #261 and #266 had already updated were checked again, and 17 more verdicts changed, all for the better (#188, #190, #261). The default charts, NA slices and rows, % of every case, bins fixed for the study, two bars of a chart ORed and a second click unselecting all now match. Still open: the pie allowlist, slice labels and grey-out, list search and Select all, the missing chart kinds (violin, treatment, GA frequency, mutation-type, variant annotations) and the downloads beyond Summary Data.
 
