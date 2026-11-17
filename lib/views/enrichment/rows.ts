@@ -1,6 +1,7 @@
 // One enrichment row from its counts, and the compact columns every listed gene travels in — the one
 // rule the runner and the page both use, so a row the page rebuilds is the row the runner made.
 import type { EnrichmentGene, EnrichmentColumns } from "./types.ts";
+import { roundSig } from "../../chart/format.ts";
 
 /** a gene's row: each cohort's altered share, the log2 ratio of two cohorts' shares (null when either is
  *  zero), and the cohort it is enriched in — of two, the first when its share is higher, else the second
@@ -15,12 +16,12 @@ export function enrichmentRow(gene: string, groups: string[], altered: number[],
     p, q, enrichedIn: groups[best] };
 }
 
-/** rows as columns, in their order */
+/** rows as columns, in their order; p and q to 4 digits, one more than the page writes */
 export function toColumns(rows: EnrichmentGene[]): EnrichmentColumns {
   return {
     gene: rows.map((g) => g.gene), cytoband: rows.map((g) => g.cytoband || ""),
     altered: rows.map((g) => g.cells.map((c) => c.altered)), profiled: rows.map((g) => g.cells.map((c) => c.profiled)),
-    p: rows.map((g) => g.p), q: rows.map((g) => g.q),
+    p: rows.map((g) => roundSig(g.p, 4)), q: rows.map((g) => roundSig(g.q, 4)),
   };
 }
 
