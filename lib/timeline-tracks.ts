@@ -301,6 +301,33 @@ export function dayScale(ticks: AxisTick[], width: number): { x: (day: number) =
 }
 
 /** A year tick's label as the portal writes it: "0", "2y", "-3y". */
+/** the portal's month on the axis (cbioportal-clinical-timeline TickIntervalEnum.MONTH) */
+export const MONTH = 30.41666;
+
+/**
+ * The month ticks inside the year starting at `yearStart`, drawn when a year is wider than 150 px, as
+ * the portal's axis draws them (TickAxis): one at each of the 11 months after the year's start, every
+ * 4th labelled, every one past 700 px a year. A label counts months from the year's start — "4m" in
+ * the first year, "2y 4m" later — and, before diagnosis, back from the next year: "-8m", "-1y 8m".
+ */
+export function monthTicks(yearStart: number, pxPerYear: number): { day: number; label: string | null }[] {
+  if (!(pxPerYear > 150)) return [];
+  const count = Math.round(yearStart / YEAR);
+  const out: { day: number; label: string | null }[] = [];
+  for (let i = 1; i < 12; i++) {
+    const shown = i % 4 === 0 || pxPerYear > 700;
+    let label: string | null = null;
+    if (shown) {
+      if (count < 0) {
+        const m = 12 - i, major = count + 1 === 0 ? "" : (count + 1) + "y";
+        label = count === -1 ? "-" + m + "m" : major + " " + m + "m";
+      } else label = count === 0 ? i + "m" : count + "y " + i + "m";
+    }
+    out.push({ day: yearStart + MONTH * i, label });
+  }
+  return out;
+}
+
 export function yearLabel(startDay: number): string {
   const n = Math.round(startDay / YEAR);
   return n === 0 ? "0" : n + "y";

@@ -2,7 +2,7 @@
 // patient-view timeline — and the figure's promises about what it draws (lib/timeline-svg.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildTracks, flattenTracks, sampleMarks, numericResult, axisTicks, dayScale, formatDays, yearLabel } from "../lib/timeline-tracks.ts";
+import { buildTracks, flattenTracks, sampleMarks, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, MONTH } from "../lib/timeline-tracks.ts";
 import { timelineSvg, timelineSummary } from "../lib/timeline-svg.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
@@ -130,5 +130,49 @@ describe("timeline queries", () => {
     assert.match(rank, /row_number\(\) OVER \(ORDER BY .*\) - 1 AS idx/);
     assert.match(rank, /positionCaseInsensitive|ILIKE|like/i);
     assert.match(rank, /patient = 'P-0\\'1'/);
+  });
+});
+
+describe("monthTicks (PAT-TL-ZM-1)", () => {
+  const lab = (t: { label: string | null }[]) => t.map((x) => x.label);
+  const at = (t: { label: string | null }[], i: number) => t[i - 1].label;
+
+  test("M1 PAT-TL-ZM-1: no month ticks at 150 px/year or less", () => {
+    assert.deepEqual(monthTicks(0, 150), []);
+    assert.deepEqual(monthTicks(0, 100), []);
+  });
+
+  test("M2 PAT-TL-ZM-1: 200 px/year labels only months 4 and 8", () => {
+    const t = monthTicks(0, 200);
+    assert.equal(t.length, 11);
+    t.forEach((x, k) => assert.ok(Math.abs(x.day - MONTH * (k + 1)) < 1e-9));
+    assert.deepEqual(lab(t), [null, null, null, "4m", null, null, null, "8m", null, null, null]);
+  });
+
+  test("M3 PAT-TL-ZM-1: 800 px/year labels every month", () => {
+    assert.deepEqual(lab(monthTicks(0, 800)), Array.from({ length: 11 }, (_, k) => `${k + 1}m`));
+  });
+
+  test("M4 PAT-TL-ZM-1: year 2 prefixes the year", () => {
+    const t = monthTicks(730, 200);
+    assert.equal(at(t, 4), "2y 4m");
+    assert.equal(at(t, 8), "2y 8m");
+    t.forEach((x, k) => assert.ok(Math.abs(x.day - (730 + MONTH * (k + 1))) < 1e-9));
+  });
+
+  test("M5 PAT-TL-ZM-1: count -1 counts months back from the year", () => {
+    const t = monthTicks(-365, 200);
+    assert.equal(at(t, 4), "-8m");
+    assert.equal(at(t, 8), "-4m");
+  });
+
+  test("M6 PAT-TL-ZM-1: count -2 gives -1y labels", () => {
+    const t = monthTicks(-730, 200);
+    assert.equal(at(t, 4), "-1y 8m");
+    assert.equal(at(t, 8), "-1y 4m");
+  });
+
+  test("M7 PAT-TL-ZM-1: negative year at 800 px/year", () => {
+    assert.equal(at(monthTicks(-730, 800), 1), "-1y 11m");
   });
 });
