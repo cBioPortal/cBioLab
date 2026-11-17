@@ -6,7 +6,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
-import { evolutionSvg, lineCells, cellText, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { evolutionSvg, lineCells, cellText, heatmapOrder, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
 import { pageSql } from "../lib/table-query.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
@@ -208,7 +208,7 @@ describe("evolution: the patient drawn", () => {
     const w = await run({ chart: "heatmap", logScale: true, dataRange: true }, one(study({ muts: [MUTS[2]] })));
     assert.deepEqual(evo(w).drawn, []);
     assert.equal(evo(w).noVaf, 1);
-    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true });
+    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, transpose: false, cluster: true, mutationLabels: true });
     assert.match(w.caveat!, /The heatmap colours each sample's VAF/);
   });
 
@@ -305,5 +305,65 @@ describe("evolution: its row sources name one patient and live only with patient
     assert.match(pageSql(evolutionSamplesSource(part, "P-1", "db"), {}, [], 10, 0), /AS sid, ifNull\(pn\.panel, ''\) AS panel/);
     // a sample id reaches SQL only through sq()
     assert.match(pageSql(evolutionMutationsSource(part, "P-1", "db", ["a'b"]), {}, [], 10, 0), /'a\\'b'/);
+  });
+});
+
+describe("evolution: the heatmap's drawing order", () => {
+  const mut = (gene: string, proteinChange: string, vafs: (number | null)[]): EvolutionMutation => ({
+    key: gene + "|" + proteinChange, gene, proteinChange, mutationType: "Missense_Mutation",
+    cells: vafs.map((v) => v == null ? { status: "np" as const, vaf: null, alt: null, ref: null } : { status: v === 0 ? "absent" as const : "called" as const, vaf: v, alt: null, ref: null }),
+  });
+  const A = mut("TP53", "R273H", [0.5, 0.1, 0.9, 0.3]);
+  const B = mut("KRAS", "G12D", [0.05, 0.95, 0.05, 0.95]);
+  const C = mut("EGFR", "L858R", [0.5, 0.1, 0.9, 0.3]);
+  const perm = (a: number[], n: number) => assert.deepEqual([...a].sort((x, y) => x - y), Array.from({ length: n }, (_, i) => i));
+  const adjacent = (a: number[], i: number, j: number) => assert.equal(Math.abs(a.indexOf(i) - a.indexOf(j)), 1, a.join());
+  const combos = [false, true].flatMap((transpose) => [false, true].map((cluster) => ({ transpose, cluster })));
+
+  test("without clustering the mutations keep the table's order, or sort by name when transposed", () => {
+    const drawn = [A, B, C];
+    assert.deepEqual(heatmapOrder(drawn, 4, { transpose: false, cluster: false }), { mutations: [0, 1, 2], samples: [0, 1, 2, 3] });
+    assert.deepEqual(heatmapOrder(drawn, 4, { transpose: true, cluster: false }), { mutations: [2, 1, 0], samples: [0, 1, 2, 3] });
+  });
+
+  test("clustering puts identical mutations, and identical samples, side by side in either orientation", () => {
+    for (const transpose of [false, true]) {
+      const r = heatmapOrder([A, B, C], 4, { transpose, cluster: true });
+      adjacent(r.mutations, 0, 2);
+    }
+    const x = mut("G1", "a", [0.2, 0.8, 0.4]);
+    const y = mut("G2", "b", [0.9, 0.1, 0.9]);
+    const z = mut("G3", "c", [0.2, 0.8, 0.4]);
+    for (const transpose of [false, true]) {
+      const r = heatmapOrder([x, y, z], 3, { transpose, cluster: true });
+      adjacent(r.samples, 0, 2);
+    }
+  });
+
+  test("every option combination yields permutations, with not-profiled and absent cells too", () => {
+    const drawn = [A, B, C, mut("NP", "x", [null, null, null, null]), mut("AB", "y", [0, null, 0, 0.2])];
+    for (const o of combos) {
+      for (const d of [[A, B, C], drawn, [A]]) {
+        const r = heatmapOrder(d, 4, o);
+        perm(r.mutations, d.length);
+        perm(r.samples, 4);
+      }
+    }
+  });
+});
+
+describe("evolution: the heatmap's display settings", () => {
+  test("transpose, cluster and mutationLabels must be true or false", async () => {
+    for (const [k, v] of [["transpose", "yes"], ["cluster", 1], ["mutationLabels", "no"]] as const) {
+      const e = (await run({ [k]: v } as never, one())).error!;
+      assert.ok(e.includes(k) && e.includes("true or false"), e);
+    }
+  });
+
+  test("the display echoes them, defaulting to transpose false, cluster true, mutationLabels true", async () => {
+    const d = evo(await run({ chart: "heatmap" }, one())).display;
+    assert.deepEqual([d.transpose, d.cluster, d.mutationLabels], [false, true, true]);
+    const off = evo(await run({ chart: "heatmap", cluster: false, transpose: true, mutationLabels: false }, one())).display;
+    assert.deepEqual([off.transpose, off.cluster, off.mutationLabels], [true, false, false]);
   });
 });

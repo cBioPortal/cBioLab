@@ -22,24 +22,24 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 23 |
-| 🟡 partial | 15 |
-| 🔶 different | 10 |
-| ❌ missing | 30 |
+| ✅ match | 25 |
+| 🟡 partial | 17 |
+| 🔶 different | 8 |
+| ❌ missing | 28 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 0 |
 | **Total IDs** | **81** |
 
-**Overall: 25.9 %** (✅ 18 + 🐞ok 0 + N/A 3 = 21 of 81). Counting 🟡 as half: 35.2 %.
+**Overall: 34.6 %** (✅ 25 + 🐞ok 0 + N/A 3 = 28 of 81). Counting 🟡 as half: 45.1 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 TAB inventory | 5 | 0 | 2 | 2 | 0 | 0 | 1 | Different order and gating; placeholder tabs; `?tab=` not path |
 | §1 GE core | 4 | 2 | 1 | 0 | 1 | 0 | 0 | Same mutation set and selection model; no unprofiled alert |
 | §1 GE line chart | 7 | 1 | 4 | 0 | 2 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
-| §1 GE heatmap | 4 | 0 | 0 | 3 | 1 | 0 | 0 | Mutation × sample fixed, oncoprint ramp, no cluster/transpose/zoom/download |
+| §1 GE heatmap | 4 | 2 | 1 | 1 | 0 | 0 | 0 | Sample rows by default, Cluster/Transpose/labels; oncoprint ramp; no zoom/download |
 | §1 GE table | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Own columns (VAF by sample, Max VAF); no "only selected" |
 | §2 Pathways | 4 | 0 | 2 | 2 | 0 | 0 | 0 | Same scores; numeric score not Yes/No; tie order → other default pathway |
 | §3 Clinical Data | 4 | 0 | 0 | 3 | 1 | 0 | 0 | Wide row-per-case tables; no timeline tables |
@@ -47,7 +47,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | §5 Resources, pathology, tissue, trials, custom | 10 | 0 | 0 | 0 | 10 | 0 | 0 | None built (tracked) |
 | §6 mRNA / Plots (beta) | 11 | 0 | 0 | 0 | 10 | 0 | 1 | None built (mRNA tracked) |
 | §7 Modes | 12 | 5 | 1 | 3 | 3 | 0 | 0 | Sample mode right; GE offered on 1-sample patients |
-| §9 Statistics | 12 | 5 | 3 | 1 | 2 | 0 | 1 | VAF and signature numbers identical; no clustering, no mRNA stats |
+| §9 Statistics | 12 | 5 | 4 | 1 | 1 | 0 | 1 | VAF and signature numbers identical; heatmap clustered; no mRNA stats |
 
 ---
 
@@ -57,7 +57,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 |---|---|---|---|
 | 1 | **Clinical Data tab is two wide tables** (one row per patient / sample, every attribute a column, raw values) instead of Attribute \| Value and Attribute × sample; **no Timeline Data tables** | CD-1..4, STM-11 | not tracked |
 | 2 | **Tab order and gating**: GE after Clinical Data; GE shown (then refuses) for single-sample patients; "Clinical Trials" placeholder that legacy does not have; "Files & Links" placeholder always | TAB-2, TAB-3, MD-2, MD-3, MD-12 | Files & Links, Clinical Trials (tracked as gaps) |
-| 3 | **GE heatmap**: rows = mutations fixed (legacy default rows = samples), oncoprint blue ramp (legacy `rgb(241,242,181)`→`rgb(19,80,88)`), table order; no Cluster, Transpose, labels toggle, zoom, SVG/PNG/Data download | HM-1..4, STM-3 | not tracked |
+| 3 | **GE heatmap**: sample rows by default with Transpose, Cluster (oncoprint clustering) and a labels toggle, as legacy; still the oncoprint blue ramp (legacy `rgb(241,242,181)`→`rgb(19,80,88)`); no zoom, SVG/PNG/Data download | HM-1, HM-3, STM-3 | zoom/download not tracked |
 | 4 | **GE line chart controls**: no Group by, no Show/Hide Timeline, no "Show only selected mutations" checkbox (the table's filter decides what is drawn); y label "Variant allele frequency", x "Days from diagnosis" | LC-1..5 | not tracked |
 | 5 | **GE table**: Samples · Gene · Protein Change · Mutation Type · VAF by sample · Max VAF; no Annotation, Allele Freq bars, Cohort; 25 rows | TB-1 | not tracked |
 | 6 | **Pathways table and controls**: "score" number instead of bold Yes/No "Pathway altered"; tie order puts Cell Cycle first (legacy TP53) so the drawn pathway differs; patient view shows "rank by" and "weight by altered %" that legacy hides; nodes coloured by altered % not per-sample mini tracks | PW-2..4, STM-10 | partly: "Ranking table search and CSV" |
@@ -118,10 +118,10 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-GE-LC-5 | ❌ | B | No grouping |
 | PTB-GE-LC-6 | 🟡 | C | "VAF 0.38 (46 of 121 reads)", "called, no allele counts", "uncalled, VAF …", "not found", "not profiled" (`figure.ts:15-26`) — same states, other words |
 | PTB-GE-LC-7 | ✅ | C | No download on the tab, as legacy without the timeline |
-| PTB-GE-HM-1 | ❌ | C | No Cluster, Transpose, labels toggle, zoom, download |
-| PTB-GE-HM-2 | 🔶 | C | Always a row per mutation, column per sample (legacy default is the transpose); no-VAF mutations dropped ✅ |
+| PTB-GE-HM-1 | 🟡 | C | Cluster ✅, Transpose ✅, mutation-labels toggle ✅ (gear menu, in the document); no zoom, no SVG/PNG/Data download |
+| PTB-GE-HM-2 | ✅ | C | Default a row per sample, a column per mutation, as legacy; Transpose gives a row per mutation; no-VAF mutations dropped ✅ |
 | PTB-GE-HM-3 | 🔶 | C | Oncoprint sequential ramp, not yellow→teal; grey = profiled not found ✅, NA glyph ✅, called-no-counts glyph, uncalled dot |
-| PTB-GE-HM-4 | 🔶 | C | Table order; no clustering |
+| PTB-GE-HM-4 | ✅ | C | Clustered by default with the oncoprint heatmap clustering (both axes); Cluster off: samples in collection order, mutations in table order (by name when transposed) |
 | PTB-GE-TB-1 | 🔶 | B | Columns Samples · Gene · Protein Change · Mutation Type · VAF by sample · Max VAF (6/13); 25 rows; no "Show only selected" (filter the table instead) |
 
 ### §2 Pathways
@@ -210,7 +210,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 |---|---|---|---|
 | PTB-STM-1 | ✅ | BC | 88/88 points; lines trimmed to first/last sample with reads (README); profiled-not-found = 0; NP never 0; interpolation bug not reproduced |
 | PTB-STM-2 | 🟡 | C | Data range and log (floor 0.001) ✅; tick-label rule not compared |
-| PTB-STM-3 | ❌ | C | No heatmap clustering |
+| PTB-STM-3 | 🟡 | C | Heatmap clustered with lib/oncoprint-cluster.ts (the oncoprint's heatmap clustering); clustered order not compared cell-by-cell with the portal |
 | PTB-STM-4 | ✅ | BC | Stored fraction; "<1%" below 1 %, else whole % (`data.ts:93-96`); 36/34/27/2 % |
 | PTB-STM-5 | ✅ | C | p < 0.05 bold; p = 0 also bolds (legacy bug not copied) |
 | PTB-STM-6 | ✅ | BC | Counts and total 347 ✅; % = round(100·count/total), 0 when the total is 0 (`spectrumPct`), as legacy; the multi-sample tooltip bug not copied |

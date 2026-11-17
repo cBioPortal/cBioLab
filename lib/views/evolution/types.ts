@@ -36,6 +36,12 @@ export interface EvolutionView extends TableQuery {
   logScale?: boolean;
   /** the line chart's y axis spans the VAFs drawn rather than 0 to 1 (default false) */
   dataRange?: boolean;
+  /** the heatmap with a row per mutation and a column per sample (default false: a row per sample, as the portal's) */
+  transpose?: boolean;
+  /** the heatmap's rows and columns clustered as the portal clusters an oncoprint heatmap (default true) */
+  cluster?: boolean;
+  /** the heatmap labels each mutation "GENE pChange" (default true) */
+  mutationLabels?: boolean;
 }
 
 /**
@@ -85,7 +91,7 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   /** sequence was not asked for, but these samples have no collection day, so the samples are drawn in sequence */
   noDay?: string[];
   /** the display as drawn, from the spec */
-  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean };
+  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean };
 }
 
 declare module "../../types.ts" {

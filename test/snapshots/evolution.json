@@ -890,7 +890,10 @@
         "display": {
           "chart": "line",
           "logScale": false,
-          "dataRange": false
+          "dataRange": false,
+          "transpose": false,
+          "cluster": true,
+          "mutationLabels": true
         }
       },
       "participation": {

@@ -62,7 +62,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   if (view.patient != null && (typeof view.patient !== "object" || typeof view.patient.study !== "string" || typeof view.patient.id !== "string" || !PATIENT_ID.test(view.patient.id)))
     return no("patient is {study, id}: a study of the view's cohort and a patient id in it, e.g. {\"study\": \"glioma_msk_2018\", \"id\": \"IM-GBM-28\"}");
   if (view.chart != null && view.chart !== "line" && view.chart !== "heatmap") return no("chart is \"line\" (a line per mutation across the samples, the default) or \"heatmap\" (mutation × sample)");
-  for (const k of ["sequential", "logScale", "dataRange"] as const)
+  for (const k of ["sequential", "logScale", "dataRange", "transpose", "cluster", "mutationLabels"] as const)
     if (view[k] != null && typeof view[k] !== "boolean") return no(k + " is true or false");
   const q = viewQuery(view);
   { const bad = checkQuery(q, EVOLUTION_PATIENT_COLUMNS); if (bad) return no(bad); }
@@ -72,7 +72,8 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   const mq = viewQuery(view.mutations || {});
   { const bad = checkQuery(mq, EVOLUTION_COLUMNS); if (bad) return no("mutations: " + bad); }
   if (ctx.table != null && ctx.table !== "mutations") return no("table is mutations, or none for the patient list");
-  const display = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange } as const;
+  const display = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange,
+    transpose: !!view.transpose, cluster: view.cluster !== false, mutationLabels: view.mutationLabels !== false } as const;
 
   // who may answer: a local patient-level participant (no peer serves this view's rows)
   const { holders, excluded } = rowHolders(ctx);
