@@ -419,20 +419,23 @@
             "name": "Mutations (OQL is not in effect)",
             "description": "per sample and gene: its mutations' protein changes, space-separated ([germline] marked); WT when profiled with none; NP when its panel did not cover the gene",
             "group": "data",
+            "portalFile": "mutations.txt",
             "rows": 996
           },
           {
             "id": "sv",
             "name": "Structural Variants (OQL is not in effect)",
-            "description": "per sample and gene: its structural variants' event info; NA when it has none; NP when its panel did not cover the gene",
+            "description": "per sample and gene: its structural variants' event info, space-separated; NA when it has none; NP when its panel did not cover the gene",
             "group": "data",
+            "portalFile": "structural_variants.txt",
             "rows": 996
           },
           {
-            "id": "profile:gistic",
-            "name": "Putative copy-number alterations from GISTIC",
-            "description": "per sample and gene: its value in gistic (copy number alteration, discrete); NA when none is stored; NP when its panel did not cover the gene",
+            "id": "cna",
+            "name": "Copy-number Alterations (OQL is not in effect)",
+            "description": "per sample and gene: its value in its study's discrete copy-number profile (gistic); NA when none is stored; NP when its panel did not cover the gene",
             "group": "data",
+            "portalFile": "cna.txt",
             "rows": 996
           },
           {
@@ -440,6 +443,7 @@
             "name": "Log2 copy-number values",
             "description": "per sample and gene: its value in log2CNA (copy number alteration, log2-value); NA when none is stored",
             "group": "data",
+            "portalFile": "Log2 copy-number values.txt",
             "rows": 996
           },
           {
@@ -447,6 +451,7 @@
             "name": "mRNA Expression, RSEM (Batch normalized from Illumina HiSeq_RNASeqV2)",
             "description": "per sample and gene: its value in rna_seq_v2_mrna (mrna expression, continuous); NA when none is stored",
             "group": "data",
+            "portalFile": "mRNA Expression, RSEM (Batch normalized from Illumina HiSeq_RNASeqV2).txt",
             "rows": 996
           },
           {
@@ -454,6 +459,7 @@
             "name": "mRNA expression z-scores relative to normal samples (log RNA Seq V2 RSEM)",
             "description": "per sample and gene: its value in rna_seq_v2_mrna_median_all_sample_ref_normal_Zscores (mrna expression, z-score); NA when none is stored",
             "group": "data",
+            "portalFile": "mRNA expression z-scores relative to normal samples (log RNA Seq V2 RSEM).txt",
             "rows": 996
           },
           {
@@ -461,6 +467,7 @@
             "name": "mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM)",
             "description": "per sample and gene: its value in rna_seq_v2_mrna_median_all_sample_Zscores (mrna expression, z-score); NA when none is stored",
             "group": "data",
+            "portalFile": "mRNA expression z-scores relative to all samples (log RNA Seq V2 RSEM).txt",
             "rows": 996
           },
           {
@@ -468,6 +475,7 @@
             "name": "mRNA expression z-scores relative to diploid samples (RNA Seq V2 RSEM)",
             "description": "per sample and gene: its value in rna_seq_v2_mrna_median_Zscores (mrna expression, z-score); NA when none is stored",
             "group": "data",
+            "portalFile": "mRNA expression z-scores relative to diploid samples (RNA Seq V2 RSEM).txt",
             "rows": 996
           },
           {
@@ -475,6 +483,7 @@
             "name": "Protein levels (mass spectrometry by CPTAC)",
             "description": "per sample and gene: its value in protein_quantification (protein level, continuous); NA when none is stored",
             "group": "data",
+            "portalFile": "Protein levels (mass spectrometry by CPTAC).txt",
             "rows": 996
           },
           {
@@ -482,6 +491,7 @@
             "name": "Protein expression z-scores (mass spectrometry by CPTAC)",
             "description": "per sample and gene: its value in protein_quantification_zscores (protein level, z-score); NA when none is stored",
             "group": "data",
+            "portalFile": "Protein expression z-scores (mass spectrometry by CPTAC).txt",
             "rows": 996
           },
           {
@@ -489,6 +499,7 @@
             "name": "Protein expression (RPPA)",
             "description": "per sample and gene: its value in rppa (protein level, log2-value); NA when none is stored",
             "group": "data",
+            "portalFile": "Protein expression (RPPA).txt",
             "rows": 996
           },
           {
@@ -496,6 +507,7 @@
             "name": "Protein expression z-scores (RPPA)",
             "description": "per sample and gene: its value in rppa_Zscores (protein level, z-score); NA when none is stored",
             "group": "data",
+            "portalFile": "Protein expression z-scores (RPPA).txt",
             "rows": 996
           },
           {
