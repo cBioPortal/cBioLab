@@ -22,28 +22,28 @@ Legacy per-group numbers read from the chart component's React props (`countsByG
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 14 |
+| ✅ match | 12 |
 | 🟡 partial | 15 |
 | 🔶 different | 14 |
-| ❌ missing | 12 |
+| ❌ missing | 14 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 0 |
 | **Total IDs** | **59** |
 
-**Overall: 30.5 %** (✅ 14 + 🐞ok 1 + N/A 3 = 18 of 59). Counting 🟡 as half: 43.2 %.
+**Overall: 27.1 %** (✅ 12 + 🐞ok 1 + N/A 3 = 16 of 59). Counting 🟡 as half: 39.8 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 Shared chrome | 4 | 1 | 2 | 1 | 0 | 0 | 0 | Tab and link ✅; no OQL banner or filter warnings |
-| §1 Gene tabs (GT) | 6 | 4 | 1 | 0 | 0 | 0 | 1 | Same pill tabs; grey label for a gene with no alterations |
+| §1 Gene tabs (GT) | 6 | 3 | 1 | 0 | 1 | 0 | 1 | Same pill tabs; no grey label for unaltered genes |
 | §2 Category (CT) | 10 | 0 | 1 | 4 | 4 | 0 | 1 | Same 3 categories (+ any attribute); default always Cancer Type; small groups pooled, not filtered; no altered threshold, no sort select |
 | §2 Occurrence (OC) | 5 | 3 | 0 | 0 | 1 | 0 | 1 | Count By (Patients default) and Y-axis ✅; no "Show Genomic Alteration Types" |
 | §3 Chart (CH) | 9 | 0 | 4 | 4 | 1 | 0 | 0 | Stacked bars with same colours but reversed stack; "+" rows only where groups differ; SVG titles, not popovers; study ids as labels |
 | §4 Sorting (SO) | 4 | 1 | 0 | 2 | 1 | 0 | 0 | Frequency order identical; count mode still sorted by frequency; no Alphabetical |
 | §5 Downloads (DL) | 3 | 0 | 0 | 0 | 3 | 0 | 0 | No download at all |
-| §6 Modes (MD) | 12 | 3 | 3 | 2 | 3 | 1 | 0 | Patients/samples ✅; OQL not applied; no filters/Show-only-profiled; default category per mode differs |
+| §6 Modes (MD) | 12 | 2 | 3 | 2 | 4 | 1 | 0 | Patients/samples ✅; OQL not applied; no filters/Show-only-profiled; default category per mode differs |
 | §8 Statistics (STM) | 6 | 1 | 4 | 1 | 0 | 0 | 0 | Every denominator identical; altered counts identical in all 65 groups compared; amp + homdel across genes → Multiple (legacy picks one) in 3 groups |
 
 ---
@@ -121,7 +121,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-GT-1 | ✅ | B | "All Queried Genes · TP53 · KRAS · PIK3CA" pills |
 | CTS-GT-2 | ✅ | C | Shown only when > 1 gene (`cancertypes.tsx:37`) |
 | CTS-GT-3 | ✅ | C | First active; component state, no URL |
-| CTS-GT-4 | ✅ | C | A gene tab's label is grey (#bbb) when the gene is altered in no unit of any cohort, before the filters (coadread TP53 + DAZ1: DAZ1 grey) |
+| CTS-GT-4 | ❌ | C | No grey label for a gene with 0 alterations |
 | CTS-GT-5 | N/A | C | Invariant 9: the view's settings live in the document and are shared by every gene pill, so nothing resets on switch |
 | CTS-GT-6 | ✅ | C | One tab per distinct gene; two lines of one gene counted together under it |
 
@@ -194,7 +194,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-MD-7 | ❌ | C | No Show only profiled |
 | CTS-MD-8 | 🟡 | BC | Denominator excludes cases whose panels lack the genes ✅ (all denominators identical); profiled strip lacks "−" |
 | CTS-MD-9 | 🐞 ok | C | Groups are pooled, never all filtered away; controls never disappear |
-| CTS-MD-10 | ✅ | C | Grey tab label; "There are no alterations in this gene." in place of the bars; "No category passes the filters." first when every group is filtered away |
+| CTS-MD-10 | ❌ | C | No grey label, no message |
 | CTS-MD-11 | 🟡 | B | > 37 groups: figure widens and scrolls; no top scrollbar |
 | CTS-MD-12 | ❌ | C | No hide-download switch (no downloads either) (tracked: Data-governance switches) |
 
