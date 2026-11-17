@@ -24,6 +24,8 @@ export interface DiffexprView {
    * change re-runs nothing.
    */
   gene?: string;
+  /** carry every tested gene in the result (`all`), for a page whose table and volcano draw them all, as the portal's (default only the 1,500 most significant) */
+  allRows?: boolean;
 }
 export interface DiffexprGene {
   gene: string;
@@ -35,6 +37,17 @@ export interface DiffexprGene {
   f?: number;
   p: number; q: number;
   cytoband?: string;
+}
+/** every tested gene as columns, row i across them (lib/views/diffexpr/rows.ts rebuilds the genes) */
+export interface DiffexprColumns {
+  gene: string[];
+  /** "" when not known */
+  cytoband: string[];
+  /** per gene, per cohort in `groups` order */
+  n: number[][]; mean: number[][]; sd: number[][];
+  /** two cohorts: the first's mean minus the second's */
+  effect?: number[];
+  p: number[]; q: number[];
 }
 export interface DiffexprResult {
   profileType: string; log2: boolean;
@@ -58,6 +71,8 @@ export interface DiffexprResult {
   up?: number; down?: number;
   /** the most significant genes by p (≤1,500) and the labelled ones: the volcano's points and the table's rows */
   points: DiffexprGene[];
+  /** every tested gene, most significant first, when more were tested than `points` holds: the page's table and volcano draw them all, as the portal's */
+  all?: DiffexprColumns;
   /** two cohorts: every other tested gene, binned on the volcano's axes: [x bin, y bin, count, 0 not significant | 1 higher in the first cohort | 2 in the second] */
   grid?: { xMax: number; yMax: number; nx: number; ny: number; cells: [number, number, number, 0 | 1 | 2][] };
   /** genes q < 0.05 not drawn individually because of the cap */
