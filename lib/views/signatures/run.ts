@@ -11,7 +11,7 @@ import { patientSamplesSource } from "../../patient-alterations.ts";
 import { sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
-import { plural, refuse } from "../shared.ts";
+import { patientSampleEvents, plural, refuse } from "../shared.ts";
 import { SIGNATURE_PATIENT_COLUMNS, SIGNATURE_PATIENT_DEFAULT_COLUMNS, signaturePatientsSource, signatureValuesSource, type SignaturePart } from "./sql.ts";
 import { SIGNIFICANT_P, defaultVersion, pairsOf, signatureFamilies, signatureRows, spectrumOf, spectrumUnit, versionLabel, YMAX_MAX, YMAX_MIN, type SignatureFamily } from "./data.ts";
 import type { SignaturesView, SignaturesResult } from "./types.ts";
@@ -108,16 +108,17 @@ export async function runSignatures(view: SignaturesView, ctx: ViewRun): Promise
     }
 
     // the patient's samples in order (the numbered markers), and their values in every signature profile of the study
-    const [smp, vals] = await Promise.all([
+    const [smp, vals, ev] = await Promise.all([
       runRows({ ...ctx, page: undefined, values: undefined }, "signatures:samples", [want.study], {}, ["sid"], ["sid", "type"], TABLE_ROWS_MAX,
         (parts: TablePart[]) => (db) => patientSamplesSource(parts[0], want.id, db, scope)),
       runRows({ ...ctx, page: undefined, values: undefined }, "signatures:values", [want.study], {}, ["profile", "entity"], ["profile", "entity"], TABLE_ROWS_MAX,
         (parts: TablePart[]) => (db) => signatureValuesSource(parts[0], want.id, db, fam.flatMap((f) => [f.contribution, f.pvalue, f.counts].filter((x): x is string => !!x)), scope)),
+      patientSampleEvents(ctx, want.study, want.id),
     ]);
     if (vals.total > vals.rows.length) return no(want.id + "'s signature profiles hold " + vals.total.toLocaleString("en-US") + " entities; this view reads at most " + TABLE_ROWS_MAX.toLocaleString("en-US"));
     const samples0 = smp.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
-    const marks = sampleMarks(samples0, []);
-    const samples = [...marks.values()].map((m) => ({ id: m.id, type: samples0.find((s) => s.id === m.id)?.type || "", label: m.label }));
+    const marks = sampleMarks(samples0, ev.events);
+    const samples = [...marks.values()].filter((m) => samples0.some((s) => s.id === m.id)).map((m) => ({ id: m.id, type: samples0.find((s) => s.id === m.id)?.type || "", label: m.label }));
     const order = samples.map((s) => s.id);
     const byProfile = new Map<string, { entity: string; name: string; description: string; url: string; vals: Map<string, number | null> }[]>();
     for (const x of vals.rows) {
@@ -175,6 +176,7 @@ export async function runSignatures(view: SignaturesView, ctx: ViewRun): Promise
       caveat: want.id + ": " + versionLabel(version) + " from " + f.contribution + ", " + plural(profiled.length, "sample") + " profiled" +
         (notProfiled.length ? " (" + notProfiled.join(", ") + (notProfiled.length === 1 ? " is" : " are") + " not profiled for mutational signatures)" : "") + ". " +
         (versions.length > 1 ? "The patient also has " + versions.filter((x) => x !== version).join(", ") + " signatures. " : "") +
+        (ev.note && samples.length > 1 ? ev.note + " " : "") +
         "A contribution is the share of the sample's mutations the study's signature fitting assigned to the signature, as stored; a missing value is NA, not 0. " +
         (f.pvalue ? "Significant (p < " + SIGNIFICANT_P + " in " + f.pvalue + "): " + plural(significant, "signature–sample value") + ". "
           : "This study records no p-value profile for " + version + " (mutational_signatures_pvalue_" + version + "), so no signature is marked significant. ") +
