@@ -241,6 +241,7 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
   const lab = (a as { label?: unknown }).label;
   if (lab != null) {
     if (typeof lab !== "string" || lab.length > 200) throw new Error(which + " axis: a label is a title of at most 200 characters");
+    if (a.source === "profile") throw new Error(which + " axis: a profile axis takes its title from the study's profile; drop label");
     if (a.source === "alteration" && ("genes" in a || isOqlAxis(a)))
       throw new Error(which + " axis: a label is only for a one-gene alteration axis; a gene set's or an OQL query's title is its own");
   }

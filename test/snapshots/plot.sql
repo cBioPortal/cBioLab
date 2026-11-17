@@ -115,11 +115,10 @@ SELECT g, least(39, toUInt32(floor((x - x0) / if(x1 > x0, x1 - x0, 1) * 40))) AS
 FROM j, e GROUP BY g, b
 
 -- view 1 plot: clinical:names · brca_tcga_pan_can_atlas_2018
-SELECT cam.attr_id AS a, any(cam.display_name) AS name
+SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name
 FROM snapshot_db.clinical_attribute_meta cam
 JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id
 WHERE cs.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018' AND cam.attr_id IN ('FRACTION_GENOME_ALTERED')
-GROUP BY a
 
 -- view 1 plot: plot:box · brca_tcga_pan_can_atlas_2018
 WITH cohort AS (SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived

@@ -19,7 +19,7 @@
       "logistic": {
         "coefficients": [
           {
-            "label": "APC: Mutated vs Wild Type: Mutated",
+            "label": "APC mutation status: Mutated",
             "reference": "Not mutated",
             "level": "Mutated",
             "axisIndex": 0,
@@ -73,7 +73,7 @@
             "detail": "Each numeric covariate is one term. Each categorical covariate becomes one 0/1 term per level, measured against a reference level that gets no term.",
             "params": [
               [
-                "APC: Mutated vs Wild Type: Mutated",
+                "APC mutation status: Mutated",
                 "1 if c0 = “Mutated”, else 0 · 325 of 470 patients · reference “Not mutated”: the fixed default for a mutated-vs-not axis"
               ]
             ]
@@ -123,13 +123,13 @@
         },
         "verification": "Matches statsmodels 0.15.0 Logit to a relative 1e-6 on coefficients, SEs, p-values and intervals (test/regression-golden.test.ts).",
         "check": {
-          "logistic:APC: Mutated vs Wild Type: Mutated:beta": {
+          "logistic:APC mutation status: Mutated:beta": {
             "v": -1.264274030987992
           },
-          "logistic:APC: Mutated vs Wild Type: Mutated:se": {
+          "logistic:APC mutation status: Mutated:se": {
             "v": 0.4053957847207888
           },
-          "logistic:APC: Mutated vs Wild Type: Mutated:p": {
+          "logistic:APC mutation status: Mutated:p": {
             "v": 0.001817022203426293,
             "rel": 0.00001,
             "abs": 1e-14

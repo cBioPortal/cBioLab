@@ -320,7 +320,7 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
   async plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData> {
     return this.plotOp<PlotData>("plot", def, spec);
   }
-  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
+  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis; colorBy?: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string; colorLabel?: string }> {
     return this.plotOp("axisKinds", null, spec);
   }
   async plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }> {

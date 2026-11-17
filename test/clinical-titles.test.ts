@@ -14,6 +14,7 @@ import { Untimed, type ViewRun, type EvaluatedCohort } from "../lib/views/run.ts
 import type { ViewResult, ViewResultOf, ViewParticipation } from "../lib/types.ts";
 import type { ForestResult } from "../lib/views/forest/types.ts";
 import { PRIMARY } from "../lib/ch.ts";
+import { covariateLabel } from "../lib/views/covariates.ts";
 
 type NameRow = { a: string; name: string };
 type Calls = string[];
@@ -214,5 +215,61 @@ describe("runners: the display name reaches the result", () => {
       ctx({ A: cohort({ s1: 8 }) }, { s1: local(names, { logisticRows: async () => answer }) })));
     assert.equal(lg.error, undefined);
     assert.equal((lg as unknown as { logistic: { coefficients: { label: string }[] } }).logistic.coefficients[0].label, "Diagnosis Age");
+  });
+
+  test("R5 (review of #315) a pooled colour key takes a participant's own title where no study answers the names query (a remote peer)", async () => {
+    const kinds = { xk: "cat", yk: "num", shape: "box" };
+    const rows: BoxRow[] = [{ g: "A", n: 2, lo: 0, hi: 9, q1: 2, median: 4, q3: 6 }];
+    const peer = (st: string) => {
+      const f: Record<string, unknown> = fed(st, [], { kinds, boxRows: rows });
+      delete f.viewMeta;
+      f.plotAxisKinds = async (spec: { x: PlotAxis; y: PlotAxis; colorBy?: PlotAxis }) =>
+        ({ ...kinds, xLabel: axisLabel(spec.x), yLabel: axisLabel(spec.y), ...(spec.colorBy ? { colorLabel: "Sex" } : {}) });
+      return f;
+    };
+    const r = await plotRun({ s1: peer("s1"), s2: peer("s2") }, { colorBy: { source: "clinical", attribute: "SEX" } });
+    assert.equal(r.error, undefined);
+    assert.equal(r.plot!.colorLabel, "Sex");
+  });
+
+  test("R6 (review of #315) the strata of a forest are named by their display name", async () => {
+    const rows = Array.from({ length: 40 }, (_, i) => {
+      const exposed = i % 2 === 1;
+      return { t: 1 + ((i * 7) % 23) / (exposed ? 2 : 1), event: i % 3 === 0 ? 0 : 1, values: [exposed ? 12 : 3, "A"] };
+    });
+    const s1 = local([{ a: "TMB", name: "TMB (nonsynonymous)" }, { a: "CANCER_TYPE", name: "Cancer Type" }],
+      { coxRows: async () => ({ rows, kinds: ["num", "cat"], notProfiled: 0 }) });
+    const r = await runForest({ kind: "forest", exposure: { source: "clinical", attribute: "TMB" }, threshold: 10 } as never, ctx({ A: cohort({ s1: 40 }) }, { s1 }));
+    assert.equal(r.error, undefined);
+    assert.equal((r as unknown as { forest: ForestResult }).forest.strata, "Cancer Type");
+  });
+
+  test("R7 (review of #315) a logistic view refused for its covariates asks no study for names", async () => {
+    const calls: Calls = [];
+    const s1 = { instance: { id: "local", mode: "patient-level", label: "local", conn: PRIMARY }, ...meta("s1", [{ a: "AGE", name: "Diagnosis Age" }], calls) };
+    const lg = unwrap(await runLogistic({ kind: "logistic", outcome: { source: "clinical", attribute: "RESPONSE" }, covariates: [] } as never,
+      ctx({ A: cohort({ s1: 8 }) }, { s1 })));
+    assert.match(String(lg.error), /at least one covariate/);
+    assert.deepEqual(calls, []);
+  });
+});
+
+describe("review of #315: long names, labels, model coefficients", () => {
+  test("R8 a display name past 200 characters is cut to 200 and the view still validates", async () => {
+    const long = "X".repeat(250);
+    const out = await titledAxes({ x: AGE }, { a: meta("a", [{ a: "AGE", name: long }]) }, ["a"]);
+    const label = (out.x as { label?: string }).label!;
+    assert.equal(label.length, 200);
+    assert.ok(label.endsWith("…"));
+    assert.doesNotThrow(() => validateAxis(out.x!, "x"));
+  });
+
+  test("R9 a label on a profile axis is refused: its title is the profile's", () => {
+    assert.throws(() => validateAxis({ source: "profile", profile: "mutations", gene: "KRAS", label: "x" } as never, "x"), /profile axis takes its title from the study's profile/);
+  });
+
+  test("R10 a one-gene alteration covariate keeps its plain name in a model, so \"<name>: <level>\" stays unambiguous", () => {
+    assert.equal(covariateLabel({ source: "alteration", gene: "tp53", by: "mutated", label: "TP53: Mutated vs Wild Type" } as never), "TP53 mutation status");
+    assert.equal(covariateLabel({ source: "clinical", attribute: "AGE", label: "Diagnosis Age" }), "Diagnosis Age");
   });
 });

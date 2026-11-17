@@ -660,7 +660,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           missing.join(", ") + " does not yet (a remote federation peer, most likely)." });
       }
       const fr = resolvers as Record<string, Resolver & FederatedPlotCapable>;
-      const { xk, yk, shape, xLabel, yLabel } = await fr[sites[0]].plotAxisKinds(spec);
+      const { xk, yk, shape, xLabel, yLabel, colorLabel: siteColorLabel } = await fr[sites[0]].plotAxisKinds(spec);
       if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
       const lr = axisLogs(spec);
       const label = { x: { label: xLabel, kind: xk, ...(lr.x ? { log: lr.x } : {}) }, y: { label: yLabel, kind: yk, ...(lr.y ? { log: lr.y } : {}) } };
@@ -765,7 +765,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           await peerSafe(sites.map((s) => resolvers[s]), async () => {
             const violin = poolViolin(await Promise.all(sites.map((s) => fr[s].plotViolinCounts(doc.cohorts[cn], spec, xk, yk, vBins, range))));
             box.violin = violin; box.violinBins = vBins; box.violinExtent = range; box.overlay = "violin";
-            if (spec.colorBy) { box.colorLabel = axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || "")); }
+            if (spec.colorBy) { box.colorLabel = spec.colorBy.source === "clinical" && !spec.colorBy.label && siteColorLabel ? siteColorLabel : axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || "")); }
             box.note += " The density behind each box is binned by every site over one shared range, the pooled whiskers and up to" +
               " one whisker span beyond them, so its counts add exactly; a value past that range is off the figure and not in it.";
           }, (why) => { box.note += " No density is drawn behind the boxes: " + why + "."; });

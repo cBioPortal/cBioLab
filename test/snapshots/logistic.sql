@@ -4,11 +4,10 @@ SELECT replaceOne(patient_unique_id, 'crc_apc_impact_2020_', '') AS pid, replace
   WHERE cancer_study_identifier = 'crc_apc_impact_2020'
 
 -- view 0 logistic: clinical:names · crc_apc_impact_2020
-SELECT cam.attr_id AS a, any(cam.display_name) AS name
+SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name
 FROM snapshot_db.clinical_attribute_meta cam
 JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id
 WHERE cs.cancer_study_identifier = 'crc_apc_impact_2020' AND cam.attr_id IN ('MSI_TYPE')
-GROUP BY a
 
 -- view 0 logistic: logisticNotProfiled · crc_apc_impact_2020
 SELECT countIf(c0 = 'Not profiled') AS n FROM (

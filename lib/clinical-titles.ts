@@ -1,47 +1,38 @@
 // A clinical axis titled by its attribute's display name, as the portal titles it (getAxisLabel,
-// PLT-DT-19), resolved onto the axis once so every view that names it — a plot's axes and colour
-// key, a forest's exposure, a model's covariates — says the same thing.
-import { sq } from "./compiler.ts";
-import { clinicalMetaTable } from "./custom-data.ts";
-import { aggregateSql, type AggregateSql } from "./sql-kinds.ts";
+// PLT-DT-19), for the views that name an axis outside a participant's plot answer: a pooled plot's
+// colour key, a forest's exposure and strata, a model's covariates. A participant's own plot answer
+// titles its axes itself (lib/federation.ts clinicalMeta), so a remote peer's plot is named too.
+import { clinicalMetaSql, displayTitle } from "./federation.ts";
+import type { AggregateSql } from "./sql-kinds.ts";
 import type { PlotAxis } from "./plot.ts";
-
-/** the display names a study declares for these attributes: one row per attribute, columns `a` and `name` */
-export function clinicalNamesSql(attrs: string[]): (study: string, db: string) => AggregateSql {
-  return (study, db) => aggregateSql(
-    "SELECT cam.attr_id AS a, any(cam.display_name) AS name\n" +
-    "FROM " + clinicalMetaTable(db) + " cam\n" +
-    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(", ") + ")\n" +
-    "GROUP BY a");
-}
 
 /** what a participant needs to answer the names query */
 type Meta = { viewMeta(label: string, build: (study: string, db: string) => AggregateSql): Promise<Record<string, unknown>[]> };
 
 /**
  * The axes with each clinical one, not already labelled, titled by the first non-empty display name
- * any of `studies` declares for its attribute, in that order: a study that does not declare it, or
- * whose participant cannot answer, leaves it to the next. With no name anywhere the axis keeps none,
- * and is titled by its id.
+ * any of `studies` declares for its attribute, in that order: the studies are asked one at a time
+ * until every attribute has a name, and one that does not declare it, or whose participant cannot
+ * answer, leaves it to the next. With no name anywhere the axis keeps none, and is titled by its id.
  */
 export async function titledAxes<T extends Record<string, PlotAxis | undefined>>(axes: T, resolvers: Record<string, unknown>, studies: string[]): Promise<T> {
   const attrs = [...new Set(Object.values(axes).flatMap((a) => a && a.source === "clinical" && !a.label ? [a.attribute] : []))];
   if (!attrs.length) return axes;
-  const build = clinicalNamesSql(attrs);
-  const perStudy = await Promise.all(studies.map(async (st) => {
+  const names = new Map<string, string>();
+  for (const st of studies) {
+    const want = attrs.filter((a) => !names.has(a));
+    if (!want.length) break;
     const r = resolvers[st] as Partial<Meta> | undefined;
-    if (!r || typeof r.viewMeta !== "function") return new Map<string, string>();
+    if (!r || typeof r.viewMeta !== "function") continue;
     try {
-      const rows = await r.viewMeta("clinical:names", build);
-      return new Map(rows.filter((x) => x.name != null && String(x.name).trim() !== "").map((x) => [String(x.a), String(x.name)]));
-    } catch { return new Map<string, string>(); }
-  }));
-  const nameOf = (attr: string) => perStudy.map((m) => m.get(attr)).find((n) => n != null);
-  const out: Record<string, PlotAxis | undefined> = {};
-  for (const [k, a] of Object.entries(axes)) {
-    const name = a && a.source === "clinical" && !a.label ? nameOf(a.attribute) : undefined;
-    out[k] = name ? { ...(a as PlotAxis & { source: "clinical" }), label: name } : a;
+      for (const row of await r.viewMeta("clinical:names", (s, db) => clinicalMetaSql(want, s, db))) {
+        const n = displayTitle(row.name);
+        if (n && !names.has(String(row.a))) names.set(String(row.a), n);
+      }
+    } catch { /* this participant cannot answer; the next study may */ }
   }
+  const out: Record<string, PlotAxis | undefined> = {};
+  for (const [k, a] of Object.entries(axes))
+    out[k] = a && a.source === "clinical" && !a.label && names.has(a.attribute) ? { ...a, label: names.get(a.attribute)! } : a;
   return out as T;
 }

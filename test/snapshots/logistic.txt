@@ -4,13 +4,13 @@ Cohorts:
 - all patients: 471 patients — all samples in the study
 
 Logistic regression (n=470, 27 with the outcome):
-  APC: Mutated vs Wild Type: Mutated vs Not mutated: OR 0.28 (95% CI 0.13–0.63) p=0.0018
+  APC mutation status: Mutated vs Not mutated: OR 0.28 (95% CI 0.13–0.63) p=0.0018
   CAVEAT (tell the user): Logistic regression on 470 patients, 27 with MSI Type = Instable (1 term). Every other observed value of MSI Type (Do not report, Indeterminate, Stable) was treated as “not event.” 1 patient from patient-level participants lacked the outcome or a covariate and were excluded. Computed from real per-patient rows within each local study — not pooled aggregate counts across untrusted remote peers.
   METHOD:
     - Fetch one row per patient [crc_apc_impact_2020] (471 → 470 rows): The logisticRows query above. Patients with a value for MSI Type and for every covariate are kept. 1 cohort patient had no row.
     - Code the outcome: 1 if MSI Type = “Instable”, else 0 — every other observed value (Do not report, Indeterminate, Stable) counts as not the event.
     - Code the covariates: Each numeric covariate is one term. Each categorical covariate becomes one 0/1 term per level, measured against a reference level that gets no term.
-        APC: Mutated vs Wild Type: Mutated: 1 if c0 = “Mutated”, else 0 · 325 of 470 patients · reference “Not mutated”: the fixed default for a mutated-vs-not axis
+        APC mutation status: Mutated: 1 if c0 = “Mutated”, else 0 · 325 of 470 patients · reference “Not mutated”: the fixed default for a mutated-vs-not axis
     - Fit a logistic regression: Maximum likelihood for a binomial GLM with a logit link and an intercept, by Newton–Raphson with step-halving.
         patients / events: 470 / 27
         terms: 1 plus an intercept (not drawn)
