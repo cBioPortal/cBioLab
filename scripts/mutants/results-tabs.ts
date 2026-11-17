@@ -101,6 +101,10 @@ export const mutants: Mutant[] = [
     replace: "return { plus: true, tip:" },
   { id: "cts-strip-rows-from-drawn", layer: "counts", guard: "unit", file: "lib/views/cancertypes/figure.ts",
     effect: "A gene tab where no group was profiled for a data type drops that row, where the portal keeps it with \"−\" marks.",
-    find: "PROFILES.filter(([k]) => all.some((g) => n(g, k) > 0))",
-    replace: "PROFILES.filter(([k]) => groups.some((g) => n(g, k) > 0))" },
+    find: "PROFILES.filter(([k]) => types.includes(k))",
+    replace: "PROFILES.filter(([k]) => types.includes(k) && groups.some((g) => n(g, k) > 0))" },
+  { id: "cts-strip-rows-every-type", layer: "counts", guard: "unit", file: "lib/views/cancertypes/run.ts",
+    effect: "A \"KRAS: MUT\" query draws CNA and structural variant rows too, where the portal lists only the selected profiles.",
+    find: "lines ? lines.flatMap((l) => parseOql(l).flatMap((e) => e.specs.flatMap((x) => SPEC_TYPES[x.type] || []))) : [\"mutation\", \"cna\", \"sv\"]",
+    replace: "[\"mutation\", \"cna\", \"sv\"]" },
 ];

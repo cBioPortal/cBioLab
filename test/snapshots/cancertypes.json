@@ -34,6 +34,11 @@
             "samples": 48179,
             "profiled": 48179,
             "altered": 10796,
+            "profiledTypes": [
+              "sv",
+              "mutation",
+              "cna"
+            ],
             "groups": [
               {
                 "key": "pancreatic cancer",

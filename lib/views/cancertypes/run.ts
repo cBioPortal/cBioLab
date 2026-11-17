@@ -16,6 +16,21 @@ export function shortStudyName(name: string): string {
   return paren > 50 ? name.substring(0, 49) + "..." + name.substring(paren) : name;
 }
 
+type StripType = keyof NonNullable<CancertypesGroup["profiledFor"]>;
+/** each data type and the cancertypes query's column counting the units profiled for it */
+const STRIP_COLUMNS: [StripType, string][] = [["mutation", "pmut"], ["cna", "pcna"], ["sv", "psv"], ["mrna", "pmrna"], ["prot", "pprot"]];
+const SPEC_TYPES: Record<string, StripType[]> = { MUT: ["mutation"], CNA: ["cna"], SV: ["sv"], ANY: ["mutation", "cna", "sv"], EXP: ["mrna"], PROT: ["prot"] };
+
+/** the data types the query reads, in the strip's order: its OQL lines' alteration types, or without OQL mutation, copy number and structural variant */
+export function readTypes(lines: string[] | null): StripType[] {
+  const types = new Set<StripType>(lines ? lines.flatMap((l) => parseOql(l).flatMap((e) => e.specs.flatMap((x) => SPEC_TYPES[x.type] || []))) : ["mutation", "cna", "sv"]);
+  return (["sv", "mutation", "cna", "mrna", "prot"] as StripType[]).filter((k) => types.has(k));
+}
+/** a group's profiled counts, zero for each type the query reads */
+function zeroProfiled(read: StripType[]): NonNullable<CancertypesGroup["profiledFor"]> {
+  return { mutation: 0, cna: 0, sv: 0, ...(read.includes("mrna") ? { mrna: 0 } : {}), ...(read.includes("prot") ? { prot: 0 } : {}) };
+}
+
 const zeroGroup = (key: string, label: string): CancertypesGroup =>
   ({ key, label, samples: 0, profiled: 0, altered: 0, mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0, mrnaHigh: 0, mrnaLow: 0, protHigh: 0, protLow: 0 });
 
@@ -72,6 +87,8 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
   const panels: CancertypesPanel[] = [];
   const ALL_KEY = "\x01all";
   const cohortTotal = new Map<string, { profiled: number; altered: number; samples: number }>();
+  const cohortTypes = new Map<string, Set<StripType>>();
+  const read = readTypes(lines);
   // the portal's filters (CancerSummaryContent chartData): a group is drawn when it has profiled units, at
   // least the Min. # Total of them (unset: 10 when its largest group has more than 10, else 0) and at least
   // the Min. % / # Altered; drawn highest first by the y-axis value, or by name
@@ -112,17 +129,19 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
       let profiled = 0;
       for (const r of rows) {
         if (r.grp === ALL_KEY) {
-          if (r.gene === "*") { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.profiled += Number(r.profiled); t.altered += Number(r.altered); cohortTotal.set(n, t); }
+          if (r.gene === "*") {
+            const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.profiled += Number(r.profiled); t.altered += Number(r.altered); cohortTotal.set(n, t);
+            const held = cohortTypes.get(n) || new Set<StripType>(); cohortTypes.set(n, held);
+            for (const [k, col] of STRIP_COLUMNS) if (Number(r[col] ?? 0) > 0) held.add(k);
+          }
           continue;
         }
         const g = get(String(r.gene), String(r.grp), attribute ? String(r.label || r.grp) : shortStudyName(String(r.label || r.grp)));
         g.profiled += Number(r.profiled); g.altered += Number(r.altered); if (r.gene === "*") profiled += Number(r.profiled);
         g.mutation += Number(r.mutation); g.amp += Number(r.amp); g.homdel += Number(r.homdel); g.sv += Number(r.sv); g.multiple += Number(r.multiple);
         for (const k of ["mrnaHigh", "mrnaLow", "protHigh", "protLow"] as const) g[k] = (g[k] || 0) + Number(r[k] ?? 0);
-        const pf = g.profiledFor ??= { mutation: 0, cna: 0, sv: 0 };
-        pf.mutation += Number(r.pmut ?? 0); pf.cna += Number(r.pcna ?? 0); pf.sv += Number(r.psv ?? 0);
-        if (Number(r.pmrna ?? 0)) pf.mrna = (pf.mrna || 0) + Number(r.pmrna);
-        if (Number(r.pprot ?? 0)) pf.prot = (pf.prot || 0) + Number(r.pprot);
+        const pf = g.profiledFor ??= zeroProfiled(read);
+        for (const [k, col] of STRIP_COLUMNS) if (pf[k] !== undefined) pf[k] = pf[k]! + Number(r[col] ?? 0);
       }
       for (const r of tot) {
         if (r.grp === ALL_KEY) { const t = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 }; t.samples += Number(r.samples); cohortTotal.set(n, t); continue; }
@@ -137,12 +156,13 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
     for (const [k, t] of totals) for (const gene of ["*", ...genes]) get(gene, k, t.label);
     for (const m of byGene.values()) for (const g of m.values()) {
       const t = totals.get(g.key);
-      if (t) { g.samples = t.samples; g.profiledFor ??= { mutation: 0, cna: 0, sv: 0 }; }
+      if (t) { g.samples = t.samples; g.profiledFor ??= zeroProfiled(read); }
     }
     const all = [...(byGene.get("*") || new Map()).values()];
     // the cohort's own totals count each unit once, though a patient can sit in two groups
     const ct = cohortTotal.get(n) || { profiled: 0, altered: 0, samples: 0 };
-    panels.push({ cohort: n, samples: ct.samples, profiled: ct.profiled, altered: ct.altered, ...arrange(all),
+    const held = cohortTypes.get(n) || new Set<StripType>();
+    panels.push({ cohort: n, samples: ct.samples, profiled: ct.profiled, altered: ct.altered, profiledTypes: [...read].filter((k) => held.has(k)), ...arrange(all),
       ...(genes.length > 1 ? { perGene: genes.map((gene) => ({ gene, ...arrange([...(byGene.get(gene) || new Map()).values()]) })) } : {}) });
   }
   if (!panels.some((p) => p.profiled)) return refuse("cancertypes", ctx, "no " + unit + " in " + (vNames.length === 1 ? "this cohort" : "these cohorts") +

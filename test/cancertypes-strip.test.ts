@@ -1,5 +1,6 @@
-// The Cancer Types Summary's profiled-data strip (figure.ts profiledStrip): which data-type rows it
-// draws, and a "+" / "−" mark per group with its tooltip. Written from the case table before the code.
+// The Cancer Types Summary's profiled-data strip (figure.ts profiledStrip): a row per data type the query
+// reads (run.ts readTypes, the panel's profiledTypes), and a "+" / "−" mark per group with its tooltip.
+// Written from the case table before the code.
 // Legacy (cbioportal-frontend at cd8c6df):
 //   CSCt = src/pages/resultsView/cancerSummary/CancerSummaryContent.tsx (alterationTypeDataCounts)
 //   CSCh = src/pages/resultsView/cancerSummary/CancerSummaryChart.tsx (the scatter under the bars)
@@ -8,23 +9,30 @@
 // (a gene off some panels: "minus" where a group has no profiled case).
 //
 // Case table:
-//   S1  rows top to bottom: Structural variant data, Mutation data, CNA data, mRNA data, Protein data   (CTS-CH-5)
-//   S2  a row appears only when some group of `all` has its count > 0; a type no group has is left out  (CTS-CH-5)
-//   S3  one mark per group of `groups`, in their order; plus = that group's count > 0                   (CTS-CH-5)
-//   S4  a group with count 0 in a drawn row: a minus mark, tip "Not profiled"                          (CTS-CH-6, CTS-MD-8)
-//   S5  tip "<n> patients profiled", "1 patient profiled" for n === 1                                  (CTS-CH-6)
+//   S1  rows top to bottom: Structural variant data, Mutation data, CNA data, mRNA data, Protein data,
+//       whatever the order of `types`                                                                 (CTS-CH-5)
+//   S2  a row per type in `types` only: a type not in it has no row, even when groups count it > 0     (CTS-CH-5)
+//   S3  one mark per group, in their order; plus = that group's count > 0                             (CTS-CH-5)
+//   S4  a group with count 0: a minus mark, tip "Not profiled"                                        (CTS-CH-6, CTS-MD-8)
+//   S5  tip "<n> patients profiled", "1 patient profiled"; the raw count, no thousands separator       (CTS-CH-6)
 //   S6  sample mode: "<n> samples profiled", "1 sample profiled"                                       (CTS-CH-6)
-//   S7  mrna / prot are optional: absent is 0; their rows appear only when some group has them > 0    (CTS-CH-5)
-//   S8  rows are decided by `all`, marks by `groups`: a subset (a gene tab, filtered groups) still
-//       draws a row some other group has, with minus marks for its own groups                        (CTS-CH-5)
-//   S9  a group without profiledFor counts as all 0                                                   (CTS-CH-5)
-//   S10 no row anywhere (every count 0, or no profiledFor, or no group): []                            (CTS-CH-5)
+//   S7  a group without profiledFor, or without the key, counts 0                                     (CTS-CH-5)
+//   S8  a row of `types` every group counts 0 is still drawn, all minus                               (CTS-CH-5)
+//   S9  empty `types`: []                                                                             (CTS-CH-5)
+//   R1  readTypes(null): sv, mutation, cna
+//   R2  a bare gene: sv, mutation, cna
+//   R3  MUT, MUT_DRIVER, MUT=G12D: mutation; AMP, HOMDEL, CNA: cna; FUSION: sv
+//   R4  EXP>2: mrna; PROT<-1: prot
+//   R5  the union over lines, in strip order
+//   F1  a gene tab with the genes-together groups all filtered out: the panel's profiledTypes still
+//       draw every row for the gene's own groups, each mark's tip in its <title>                       (reviewer)
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { profiledStrip } from "../lib/views/cancertypes/figure.ts";
-import type { CancertypesGroup } from "../lib/views/cancertypes/types.ts";
+import { profiledStrip, cancertypesPanelSvg } from "../lib/views/cancertypes/figure.ts";
+import { readTypes } from "../lib/views/cancertypes/run.ts";
+import type { CancertypesGroup, CancertypesResult } from "../lib/views/cancertypes/types.ts";
 
-type Profiled = { mutation: number; cna: number; sv: number; mrna?: number; prot?: number };
+type Profiled = { mutation?: number; cna?: number; sv?: number; mrna?: number; prot?: number };
 const group = (key: string, profiledFor?: Profiled): CancertypesGroup => ({
   key, label: key, samples: 10, profiled: 10, altered: 0,
   mutation: 0, amp: 0, homdel: 0, sv: 0, multiple: 0,
@@ -38,129 +46,144 @@ const row = (rows: Strip, label: string) => {
   assert.ok(r, "no row " + label + " in " + JSON.stringify(labels(rows)));
   return r;
 };
+const ALL5 = ["sv", "mutation", "cna", "mrna", "prot"];
+const FIVE = ["Structural variant data", "Mutation data", "CNA data", "mRNA data", "Protein data"];
 
 describe("profiledStrip rows", () => {
-  test("S1/S2 the three genomic rows in their fixed order, mRNA and protein absent", () => {
-    const gs = [group("a", { mutation: 5, cna: 4, sv: 3 })];
-    assert.deepEqual(labels(profiledStrip(gs, gs, "patient")), ["Structural variant data", "Mutation data", "CNA data"]);
-  });
-  test("S1/S7 all five rows in their fixed order", () => {
+  test("S1 all five rows in their fixed order", () => {
     const gs = [group("a", { mutation: 1, cna: 1, sv: 1, mrna: 1, prot: 1 })];
-    assert.deepEqual(labels(profiledStrip(gs, gs, "sample")),
-      ["Structural variant data", "Mutation data", "CNA data", "mRNA data", "Protein data"]);
+    assert.deepEqual(labels(profiledStrip(gs, ALL5, "sample")), FIVE);
   });
-  test("S2 a type no group is profiled for has no row", () => {
-    const gs = [group("a", { mutation: 5, cna: 0, sv: 0 }), group("b", { mutation: 2, cna: 0, sv: 0 })];
-    assert.deepEqual(labels(profiledStrip(gs, gs, "patient")), ["Mutation data"]);
+  test("S1 the order of `types` doesn't matter", () => {
+    const gs = [group("a", { mutation: 1, cna: 1, sv: 1, mrna: 1, prot: 1 })];
+    assert.deepEqual(labels(profiledStrip(gs, ["prot", "cna", "sv", "mrna", "mutation"], "sample")), FIVE);
+    assert.deepEqual(labels(profiledStrip(gs, ["cna", "mutation", "sv"], "patient")), ["Structural variant data", "Mutation data", "CNA data"]);
   });
-  test("S2 one group's count is enough for the row", () => {
-    const gs = [group("a", { mutation: 5, cna: 0, sv: 0 }), group("b", { mutation: 5, cna: 0, sv: 2 })];
-    assert.deepEqual(labels(profiledStrip(gs, gs, "patient")), ["Structural variant data", "Mutation data"]);
-  });
-  test("S7 mRNA only: its row after CNA, no protein row", () => {
-    const gs = [group("a", { mutation: 3, cna: 3, sv: 0, mrna: 2 }), group("b", { mutation: 3, cna: 3, sv: 0, prot: 0 })];
-    assert.deepEqual(labels(profiledStrip(gs, gs, "patient")), ["Mutation data", "CNA data", "mRNA data"]);
-  });
-  test("S7 protein only, on a group other than the first", () => {
-    const gs = [group("a", { mutation: 3, cna: 0, sv: 0 }), group("b", { mutation: 3, cna: 0, sv: 0, prot: 4 })];
-    const rows = profiledStrip(gs, gs, "patient");
-    assert.deepEqual(labels(rows), ["Mutation data", "Protein data"]);
-    assert.deepEqual(row(rows, "Protein data").marks.map((m: { plus: boolean }) => m.plus), [false, true]);
-  });
-  test("S7 mrna: 0 and prot: 0 given explicitly draw no row", () => {
-    const gs = [group("a", { mutation: 1, cna: 1, sv: 1, mrna: 0, prot: 0 })];
-    assert.deepEqual(labels(profiledStrip(gs, gs, "patient")), ["Structural variant data", "Mutation data", "CNA data"]);
+  test("S2 a type not in `types` has no row, even when groups were profiled for it", () => {
+    const gs = [group("a", { mutation: 5, cna: 4, sv: 3, mrna: 2, prot: 1 })];
+    assert.deepEqual(labels(profiledStrip(gs, ["mutation"], "patient")), ["Mutation data"]);
+    assert.deepEqual(labels(profiledStrip(gs, ["mrna", "sv"], "patient")), ["Structural variant data", "mRNA data"]);
   });
 });
 
 describe("profiledStrip marks", () => {
   test("S3 one mark per group, in the groups' order", () => {
-    const gs = [group("a", { mutation: 1, cna: 0, sv: 0 }), group("b", { mutation: 2, cna: 0, sv: 0 }), group("c", { mutation: 3, cna: 0, sv: 0 })];
-    const m = row(profiledStrip(gs, gs, "patient"), "Mutation data").marks;
-    assert.deepEqual(m, [
+    const gs = [group("a", { mutation: 1 }), group("b", { mutation: 2 }), group("c", { mutation: 3 })];
+    assert.deepEqual(row(profiledStrip(gs, ["mutation"], "patient"), "Mutation data").marks, [
       { plus: true, tip: "1 patient profiled" },
       { plus: true, tip: "2 patients profiled" },
       { plus: true, tip: "3 patients profiled" },
     ]);
+    const rev = row(profiledStrip([gs[2], gs[0]], ["mutation"], "patient"), "Mutation data").marks;
+    assert.deepEqual(rev.map((m) => m.tip), ["3 patients profiled", "1 patient profiled"]);
   });
-  test("S3 every drawn row has one mark per group", () => {
+  test("S3 every row has one mark per group", () => {
     const gs = [group("a", { mutation: 1, cna: 2, sv: 3, mrna: 4, prot: 5 }), group("b", { mutation: 0, cna: 0, sv: 0 })];
-    for (const r of profiledStrip(gs, gs, "sample")) assert.equal(r.marks.length, 2, r.label);
+    for (const r of profiledStrip(gs, ALL5, "sample")) assert.equal(r.marks.length, 2, r.label);
   });
-  test("S4 a group not profiled for a drawn row's type: minus, Not profiled (CTS-MD-8)", () => {
+  test("S4 count 0: minus, Not profiled (CTS-MD-8)", () => {
     const gs = [group("a", { mutation: 10, cna: 10, sv: 10 }), group("b", { mutation: 0, cna: 7, sv: 10 })];
-    const rows = profiledStrip(gs, gs, "patient");
+    const rows = profiledStrip(gs, ["mutation", "cna", "sv"], "patient");
     assert.deepEqual(row(rows, "Mutation data").marks, [{ plus: true, tip: "10 patients profiled" }, { plus: false, tip: "Not profiled" }]);
     assert.deepEqual(row(rows, "CNA data").marks, [{ plus: true, tip: "10 patients profiled" }, { plus: true, tip: "7 patients profiled" }]);
-    assert.deepEqual(row(rows, "Structural variant data").marks.map((m: { plus: boolean }) => m.plus), [true, true]);
+    assert.deepEqual(row(rows, "Structural variant data").marks.map((m) => m.plus), [true, true]);
   });
-  test("S5 singular and plural, patients", () => {
-    const gs = [group("a", { mutation: 1, cna: 2, sv: 592 })];
-    const rows = profiledStrip(gs, gs, "patient");
+  test("S5 singular and plural, patients; the raw count", () => {
+    const gs = [group("a", { mutation: 1, cna: 2, sv: 592, mrna: 12345 })];
+    const rows = profiledStrip(gs, ALL5.slice(0, 4), "patient");
     assert.equal(row(rows, "Mutation data").marks[0].tip, "1 patient profiled");
     assert.equal(row(rows, "CNA data").marks[0].tip, "2 patients profiled");
     assert.equal(row(rows, "Structural variant data").marks[0].tip, "592 patients profiled");
+    assert.equal(row(rows, "mRNA data").marks[0].tip, "12345 patients profiled");
   });
   test("S6 sample mode: singular and plural, samples", () => {
     const gs = [group("a", { mutation: 1, cna: 2, sv: 0, mrna: 1, prot: 13 }), group("b", { mutation: 0, cna: 1, sv: 0 })];
-    const rows = profiledStrip(gs, gs, "sample");
+    const rows = profiledStrip(gs, ["mutation", "cna", "mrna", "prot"], "sample");
     assert.deepEqual(row(rows, "Mutation data").marks, [{ plus: true, tip: "1 sample profiled" }, { plus: false, tip: "Not profiled" }]);
     assert.deepEqual(row(rows, "CNA data").marks, [{ plus: true, tip: "2 samples profiled" }, { plus: true, tip: "1 sample profiled" }]);
     assert.deepEqual(row(rows, "mRNA data").marks, [{ plus: true, tip: "1 sample profiled" }, { plus: false, tip: "Not profiled" }]);
     assert.deepEqual(row(rows, "Protein data").marks, [{ plus: true, tip: "13 samples profiled" }, { plus: false, tip: "Not profiled" }]);
-  });
-  test("S7 an absent mrna on one group is a minus in the mRNA row another group draws", () => {
-    const gs = [group("a", { mutation: 1, cna: 0, sv: 0 }), group("b", { mutation: 1, cna: 0, sv: 0, mrna: 3 })];
-    assert.deepEqual(row(profiledStrip(gs, gs, "patient"), "mRNA data").marks,
-      [{ plus: false, tip: "Not profiled" }, { plus: true, tip: "3 patients profiled" }]);
+    assert.equal(profiledStrip([group("c", { mutation: 12345 })], ["mutation"], "sample")[0].marks[0].tip, "12345 samples profiled");
   });
 });
 
-describe("profiledStrip: rows by `all`, marks by `groups`", () => {
-  const a = group("a", { mutation: 4, cna: 4, sv: 0 });
-  const b = group("b", { mutation: 4, cna: 0, sv: 2, prot: 1 });
-  const c = group("c", { mutation: 0, cna: 0, sv: 0 });
-  test("S8 a subset draws every row `all` has, its marks its own groups'", () => {
-    const rows = profiledStrip([a, c], [a, b, c], "patient");
-    assert.deepEqual(labels(rows), ["Structural variant data", "Mutation data", "CNA data", "Protein data"]);
-    assert.deepEqual(row(rows, "Structural variant data").marks, [{ plus: false, tip: "Not profiled" }, { plus: false, tip: "Not profiled" }]);
-    assert.deepEqual(row(rows, "Mutation data").marks, [{ plus: true, tip: "4 patients profiled" }, { plus: false, tip: "Not profiled" }]);
-    assert.deepEqual(row(rows, "CNA data").marks, [{ plus: true, tip: "4 patients profiled" }, { plus: false, tip: "Not profiled" }]);
-    assert.deepEqual(row(rows, "Protein data").marks, [{ plus: false, tip: "Not profiled" }, { plus: false, tip: "Not profiled" }]);
-  });
-  test("S8 a type only `groups` would have, but `all` lacks, is not decided by `groups`", () => {
-    // `all` decides: a group in `groups` and not in `all` adds no row
-    const extra = group("x", { mutation: 1, cna: 0, sv: 0, mrna: 9 });
-    assert.deepEqual(labels(profiledStrip([extra], [a], "patient")), ["Mutation data", "CNA data"]);
-  });
-  test("S8 an empty subset of a non-empty `all`: rows with no marks", () => {
-    const rows = profiledStrip([], [a, b], "sample");
-    assert.deepEqual(labels(rows), ["Structural variant data", "Mutation data", "CNA data", "Protein data"]);
-    for (const r of rows) assert.deepEqual(r.marks, [], r.label);
-  });
-  test("S8 the groups' order, not `all`'s", () => {
-    const rows = profiledStrip([b, a], [a, b], "patient");
-    assert.deepEqual(row(rows, "Structural variant data").marks.map((m: { plus: boolean }) => m.plus), [true, false]);
-    assert.deepEqual(row(rows, "CNA data").marks.map((m: { plus: boolean }) => m.plus), [false, true]);
-  });
-});
-
-describe("profiledStrip with no data", () => {
-  test("S9 a group without profiledFor is all minus where another group draws the row", () => {
-    const bare = group("bare");
-    const gs = [bare, group("a", { mutation: 2, cna: 0, sv: 0 })];
-    assert.deepEqual(profiledStrip(gs, gs, "patient"),
+describe("profiledStrip with missing data", () => {
+  test("S7 a group without profiledFor counts 0", () => {
+    const gs = [group("bare"), group("a", { mutation: 2 })];
+    assert.deepEqual(profiledStrip(gs, ["mutation"], "patient"),
       [{ label: "Mutation data", marks: [{ plus: false, tip: "Not profiled" }, { plus: true, tip: "2 patients profiled" }] }]);
   });
-  test("S10 no group has profiledFor: []", () => {
-    const gs = [group("a"), group("b")];
-    assert.deepEqual(profiledStrip(gs, gs, "patient"), []);
+  test("S7 a group without the key counts 0", () => {
+    const gs = [group("a", { mutation: 1, cna: 0, sv: 0 }), group("b", { mutation: 1, cna: 0, sv: 0, mrna: 3 })];
+    assert.deepEqual(row(profiledStrip(gs, ["mrna"], "patient"), "mRNA data").marks,
+      [{ plus: false, tip: "Not profiled" }, { plus: true, tip: "3 patients profiled" }]);
   });
-  test("S10 every count 0: []", () => {
-    const gs = [group("a", { mutation: 0, cna: 0, sv: 0, mrna: 0, prot: 0 })];
-    assert.deepEqual(profiledStrip(gs, gs, "sample"), []);
+  test("S8 a row every group counts 0 is still drawn, all minus", () => {
+    const gs = [group("a", { mutation: 4, cna: 0, sv: 0 }), group("b")];
+    const rows = profiledStrip(gs, ["mutation", "cna", "prot"], "patient");
+    assert.deepEqual(labels(rows), ["Mutation data", "CNA data", "Protein data"]);
+    for (const l of ["CNA data", "Protein data"])
+      assert.deepEqual(row(rows, l).marks, [{ plus: false, tip: "Not profiled" }, { plus: false, tip: "Not profiled" }]);
   });
-  test("S10 no groups at all: []", () => {
+  test("S8 no group profiled for anything: every row of `types`, all minus", () => {
+    const rows = profiledStrip([group("a"), group("b")], ["sv", "mutation", "cna"], "sample");
+    assert.deepEqual(labels(rows), FIVE.slice(0, 3));
+    for (const r of rows) assert.deepEqual(r.marks.map((m) => m.plus), [false, false], r.label);
+  });
+  test("S8 no groups: rows with no marks", () => {
+    const rows = profiledStrip([], ["mutation", "cna"], "patient");
+    assert.deepEqual(rows, [{ label: "Mutation data", marks: [] }, { label: "CNA data", marks: [] }]);
+  });
+  test("S9 empty `types`: []", () => {
+    assert.deepEqual(profiledStrip([group("a", { mutation: 5, cna: 5, sv: 5, mrna: 5, prot: 5 })], [], "patient"), []);
     assert.deepEqual(profiledStrip([], [], "patient"), []);
+  });
+});
+
+describe("readTypes", () => {
+  test("R1 without OQL: sv, mutation, cna", () => {
+    assert.deepEqual(readTypes(null), ["sv", "mutation", "cna"]);
+  });
+  test("R2 a bare gene: sv, mutation, cna", () => {
+    assert.deepEqual(readTypes(["KRAS"]), ["sv", "mutation", "cna"]);
+  });
+  test("R3 MUT in its forms: mutation", () => {
+    for (const l of ["KRAS: MUT", "KRAS: MUT_DRIVER", "KRAS: MUT=G12D"]) assert.deepEqual(readTypes([l]), ["mutation"], l);
+  });
+  test("R3 AMP, HOMDEL, CNA: cna", () => {
+    for (const l of ["KRAS: AMP", "CDKN2A: HOMDEL", "KRAS: AMP HOMDEL", "KRAS: CNA"]) assert.deepEqual(readTypes([l]), ["cna"], l);
+  });
+  test("R3 FUSION: sv", () => {
+    for (const l of ["ERG: FUSION", "ALK: FUSION_DRIVER"]) assert.deepEqual(readTypes([l]), ["sv"], l);
+  });
+  test("R4 EXP: mrna; PROT: prot", () => {
+    assert.deepEqual(readTypes(["KRAS: EXP>2"]), ["mrna"]);
+    assert.deepEqual(readTypes(["KRAS: PROT<-1"]), ["prot"]);
+  });
+  test("R5 one line's specs, in strip order", () => {
+    assert.deepEqual(readTypes(["KRAS: MUT FUSION AMP HOMDEL EXP>=2 EXP<=-2"]), ["sv", "mutation", "cna", "mrna"]);
+    assert.deepEqual(readTypes(["KRAS: MUT=G12D EXP>=2 EXP<=-2 PROT>=2 PROT<=-2"]), ["mutation", "mrna", "prot"]);
+  });
+  test("R5 the union over lines, in strip order", () => {
+    assert.deepEqual(readTypes(["KRAS: MUT", "EGFR: AMP EXP>2"]), ["mutation", "cna", "mrna"]);
+    assert.deepEqual(readTypes(["EGFR: PROT<-1", "ERG: FUSION", "KRAS: MUT"]), ["sv", "mutation", "prot"]);
+    assert.deepEqual(readTypes(["KRAS: EXP>2", "NRAS"]), ["sv", "mutation", "cna", "mrna"]);
+  });
+});
+
+describe("the strip in the figure", () => {
+  test("F1 a gene tab draws every profiled type although every genes-together group is filtered out", () => {
+    const egfr = { ...group("lung", { mutation: 5, cna: 5, sv: 0 }), samples: 5, profiled: 5, altered: 2, mutation: 2 } as CancertypesGroup;
+    const r: CancertypesResult = { groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS", "EGFR"], minSamples: 10, minAltered: 0,
+      show: "frequency", unit: "sample",
+      panels: [{ cohort: "all", samples: 5, profiled: 5, altered: 2, groups: [], categories: 1, minSamples: 10, filtered: true,
+        profiledTypes: ["mutation", "cna", "sv"],
+        perGene: [{ gene: "EGFR", groups: [egfr], categories: 1, minSamples: 10 }] }] };
+    const svg = cancertypesPanelSvg(r, 0, { gene: "EGFR" }).body;
+    for (const l of ["Structural variant data", "Mutation data", "CNA data"]) assert.ok(svg.includes(l), l);
+    assert.equal((svg.match(/>\+</g) || []).length, 2, "mutation and CNA");
+    assert.equal((svg.match(/>−</g) || []).length, 1, "structural variant");
+    assert.equal((svg.match(/<title>5 samples profiled<\/title>/g) || []).length, 2);
+    assert.equal((svg.match(/<title>Not profiled<\/title>/g) || []).length, 1);
   });
 });

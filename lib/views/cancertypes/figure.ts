@@ -25,13 +25,13 @@ const PROFILES: [keyof NonNullable<CancertypesGroup["profiledFor"]>, string][] =
 
 /**
  * The portal's profiled-data strip under the bars (CancerSummaryContent alterationTypeDataCounts, CancerSummaryChart
- * scatter): a row per data type the query reads (here: one some group of `all` was profiled for), and in it a mark
- * per group of `groups` — "plus" when any of its units was profiled for that type, else "minus" — whose tip is
- * "N patients profiled", or "Not profiled".
+ * scatter): a row per data type of `types` (the panel's profiledTypes, the portal's selected profiles) in the
+ * portal's order, and in it a mark per group — "plus" when any of its units was profiled for that type, else
+ * "minus" — whose tip is the portal's "N patients profiled" (the count as it prints it), or "Not profiled".
  */
-export function profiledStrip(groups: CancertypesGroup[], all: CancertypesGroup[], unit: "patient" | "sample"): { label: string; marks: { plus: boolean; tip: string }[] }[] {
+export function profiledStrip(groups: CancertypesGroup[], types: readonly string[], unit: "patient" | "sample"): { label: string; marks: { plus: boolean; tip: string }[] }[] {
   const n = (g: CancertypesGroup, k: keyof NonNullable<CancertypesGroup["profiledFor"]>) => Number(g.profiledFor?.[k] ?? 0);
-  return PROFILES.filter(([k]) => all.some((g) => n(g, k) > 0)).map(([k, name]) => ({
+  return PROFILES.filter(([k]) => types.includes(k)).map(([k, name]) => ({
     label: name,
     marks: groups.map((g) => {
       const c = n(g, k);
@@ -74,7 +74,7 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
   const top = Math.max(1, ...groups.map((g) => value(g, "altered")));
   const yTitle = freq ? "Alteration Frequency" : "Absolute Counts";
 
-  const strip = profiledStrip(groups, pn.groups, r.unit);
+  const strip = profiledStrip(groups, pn.profiledTypes ?? [], r.unit);
 
   let W = Math.max(360, o.width || 860);
   const T = (o.title === false ? 10 : 34) + (alert ? 18 : 0);

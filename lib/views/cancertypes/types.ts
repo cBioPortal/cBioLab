@@ -71,6 +71,12 @@ export interface CancertypesGroups {
 }
 export interface CancertypesPanel extends CancertypesGroups {
   cohort: string; samples: number; profiled: number; altered: number;
+  /**
+   * the profiled-data strip's rows: the data types the query reads (its OQL lines' alteration types — a bare
+   * gene mutation, copy number and structural variant — and mRNA / protein for an EXP / PROT line) that some
+   * unit of the cohort was profiled for, as the portal's rows are its selected profiles
+   */
+  profiledTypes?: (keyof NonNullable<CancertypesGroup["profiledFor"]>)[];
   /** the same, one gene at a time (the portal's per-gene tabs) */
   perGene?: ({ gene: string } & CancertypesGroups)[];
 }
