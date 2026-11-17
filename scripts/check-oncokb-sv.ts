@@ -33,6 +33,7 @@ import { chQuery, connById } from "../lib/ch.ts";
 import { svKeySpace } from "../packages/annotation-sync/src/sources/oncokb-sv.ts";
 import { SV_COLUMNS, svRowSource } from "../lib/sv-table.ts";
 import { driverEventSql, oqlCasesSql } from "../lib/oql.ts";
+import { SV_EVENT_KEY, svDriverKeySetSql } from "../lib/sv-oncokb.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 /** peer-db.ts stores the SV and gene-level OncoKB rows under this version (and the app's pin) */
@@ -77,6 +78,7 @@ const KEYS: [string, string][] = [
   [`7170|4914|FUSION|${LUAD}`, "S6 TPM3-NTRK1 on FX-P53-T1"],
   [`23184|7113|FUSION|${LUAD}`, "P10 MESD-TMPRSS2 on FX-P52-T1 (the file's MESDC2, by its Entrez id)"],
   [`57670|673|FUSION|${LUAD}`, "KIAA1549-BRAF on FX-P53-T1"],
+  [`972|3084|FUSION|${LUAD}`, "O15 CD74-NRG1 on FX-P52-T1, Event_Info blank"],
   // X1 (PR E): every (site1, site2, SV type) is also a key with no tumour type, the portal's
   // driver query (cancerTypeForOncoKb(key, {}) is null: ResultsViewPageStore.ts 5467-5490); EML4-ALK's
   // is already one by FX-P48-T1's own tumour type, and stays one row (Y10)
@@ -92,7 +94,8 @@ const KEYS: [string, string][] = [
   [`7113|2078|FUSION|`, "X1 TMPRSS2-ERG with no tumour type"],
   [`7170|4914|FUSION|`, "X1 TPM3-NTRK1 with no tumour type"],
   [`23184|7113|FUSION|`, "X1 MESD-TMPRSS2 with no tumour type"],
-  [`57670|673|FUSION|`, "X1 KIAA1549-BRAF with no tumour type"]
+  [`57670|673|FUSION|`, "X1 KIAA1549-BRAF with no tumour type"],
+  [`972|3084|FUSION|`, "X1 O15 CD74-NRG1 with no tumour type"]
 ];
 
 const keys = await keysOf(STUDY);
@@ -209,7 +212,9 @@ const SV_CALLS: [string, string, 0 | 1, string][] = [
   ["FX-P50-T1", "RB1", 0, "O12 RB1 one-gene UNKNOWN (class Intergenic)"],
   ["FX-P51-T1", "SMAD4", 0, "O12 SMAD4 one-gene UNKNOWN (class Deletion)"],
   ["FX-P50-T1", "SMAD4", 0, "O12 SMAD4 one-gene UNKNOWN (class NA)"],
-  ["FX-P51-T1", "NOTCH1", 0, "O12 NOTCH1 one-gene UNKNOWN (class NA)"]
+  ["FX-P51-T1", "NOTCH1", 0, "O12 NOTCH1 one-gene UNKNOWN (class NA)"],
+  ["FX-P52-T1", "CD74", 1, "O15 CD74-NRG1 with Event_Info blank: its no-tumour-type row is Oncogenic, the CD74 row"],
+  ["FX-P52-T1", "NRG1", 1, "O15 CD74-NRG1 with Event_Info blank, the NRG1 row"]
 ];
 
 const compareCalls = (got: Call[], want: [string, string, 0 | 1, string][], tag: string) => {
@@ -256,11 +261,32 @@ for (const [tag, q, want] of [
   ["Q1 O1 O2", "ALK: FUSION_DRIVER", ["FX-P45-T1", "FX-P46-T1", "FX-P47-T1", "FX-P48-T1", "FX-P49-T1", "FX-P49-T2"]],
   ["Q2 O3", "RET: FUSION_DRIVER", []],
   ["Q3 O8", "NTRK1: DRIVER", ["FX-P53-T1"]],
-  ["Q4 no driver filter", "RET: FUSION", ["FX-P52-T1"]]
+  ["Q4 no driver filter", "RET: FUSION", ["FX-P52-T1"]],
+  ["O15 (b) Event_Info blank", "CD74: FUSION_DRIVER", ["FX-P52-T1"]],
+  ["O15 (b) Event_Info blank", "NRG1: FUSION_DRIVER", ["FX-P52-T1"]]
 ] as [string, string, string[]][]) {
   const got = await samplesOf(q);
   ok(`${tag} '${q}': ${want.join(", ") || "no one"}`, Array.isArray(got) && got.join(",") === [...want].sort().join(","),
     Array.isArray(got) ? "got " + (got.join(", ") || "no one") : got);
+}
+
+// O15: an SV whose Event_Info is blank. The importer stores a blank SV text column as 'NA' (legacy
+// importer rule), so the key is 'NA' here; a warehouse whose structural_variant.event_info is NULL
+// takes the ifNull(…, '') on both sides of the key. (a) is SV_CALLS above, (b) the Q rows.
+const o15 = (await chQuery<{ e: string | null; n: number | string }>("SELECT event_info AS e, isNull(event_info) AS n FROM " + db +
+  ".structural_variant WHERE comments LIKE 'O15:%'", conn)).data;
+ok("O15 premise: the CD74-NRG1 SV is stored once, its blank Event_Info as 'NA' or NULL", o15.length === 1 && (Number(o15[0].n) === 1 || o15[0].e === "NA"),
+  JSON.stringify(o15));
+// (c) the oncoprint's in-memory path: each event's svk (SV_EVENT_KEY of its genomic_event_derived row) is
+// looked up in the driver key set (svDriverKeySetSql), which buildAnnotationIndex reads
+const keySet = new Set((await chQuery<{ k: string }>(svDriverKeySetSql(db, PIN, [STUDY], ["CD74", "NRG1"]), conn)).data.map((r) => r.k));
+const svks = (await chQuery<{ g: string; k: string | null }>("SELECT hugo_gene_symbol AS g, " + SV_EVENT_KEY + " AS k FROM " + db +
+  ".genomic_event_derived WHERE variant_type = 'structural_variant' AND cancer_study_identifier = '" + STUDY +
+  "' AND sample_unique_id = '" + STUDY + "_FX-P52-T1' AND hugo_gene_symbol IN ('CD74', 'NRG1')", conn)).data;
+for (const g of ["CD74", "NRG1"]) {
+  const r = svks.filter((x) => x.g === g);
+  ok(`O15 (c) FX-P52-T1 ${g}: the event's svk is in the oncoprint's driver key set`, r.length === 1 && r[0].k != null && keySet.has(r[0].k),
+    "svk " + JSON.stringify(r.map((x) => x.k)) + ", key set " + JSON.stringify([...keySet]));
 }
 
 console.log(`\n${checks - failures}/${checks} OncoKB SV checks passed`);

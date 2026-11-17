@@ -70,11 +70,11 @@ export const svDriverSql = (pr: string, a1 = "a1", a2 = "a2") =>
   "toUInt8(if(" + pr + ".found = 1, " + pr + ".driver, greatest(" + a1 + ".driver, " + a2 + ".driver)))";
 
 /** a genomic_event_derived structural-variant row's key, as svDriverKeySetSql lists the drivers' */
-export const SV_EVENT_KEY = "concat(sample_unique_id, '\\t', hugo_gene_symbol, '\\t', sv_event_info)";
+export const SV_EVENT_KEY = "concat(sample_unique_id, '\\t', hugo_gene_symbol, '\\t', ifNull(sv_event_info, ''))";
 
 /** The keys (SV_EVENT_KEY) of `studies`' structural variants of `genes` that are drivers at the pin. */
 export const svDriverKeySetSql = (db: string, pin: string, studies: string[], genes: string[]): string =>
-  "SELECT DISTINCT " + SV_EVENT_KEY + " AS k FROM (" + svDriverKeysSql(db, pin, studies) + ") WHERE hugo_gene_symbol IN (" + genes.map(sq).join(", ") + ")";
+  "SELECT DISTINCT " + SV_EVENT_KEY + " AS k FROM (" + svDriverKeysSql(db, pin, studies, genes) + ") WHERE hugo_gene_symbol IN (" + genes.map(sq).join(", ") + ")";
 
 /**
  * The structural variants that are drivers at the pin, as genomic_event_derived keys their rows
@@ -83,15 +83,16 @@ export const svDriverKeySetSql = (db: string, pin: string, studies: string[], ge
  * tumour types), or, where the store holds no row for the pair (a study not synced), either partner's
  * gene-level Fusion call. `studies` narrows it to those studies' variants.
  */
-export function svDriverKeysSql(db: string, pin: string, studies?: string[]): string {
-  const only = studies?.length ? " AND cs.cancer_study_identifier IN (" + studies.map(sq).join(", ") + ")" : "";
+export function svDriverKeysSql(db: string, pin: string, studies?: string[], genes?: string[]): string {
+  const only = (studies?.length ? " AND cs.cancer_study_identifier IN (" + studies.map(sq).join(", ") + ")" : "") +
+    (genes?.length ? " AND (g1.hugo_gene_symbol IN (" + genes.map(sq).join(", ") + ") OR g2.hugo_gene_symbol IN (" + genes.map(sq).join(", ") + "))" : "");
   const geneCall = (alias: string) =>
     "LEFT JOIN (SELECT hugo_gene_symbol AS gene, toUInt8(max(is_driver)) AS driver FROM " + ONCOKB_TABLE +
     " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = 'SV' AND alteration = 'Fusion' GROUP BY gene) " + alias;
   return "SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (\n" +
     "  SELECT v.sample_unique_id AS sample_unique_id, v.event_info AS sv_event_info, [v.gene1, v.gene2] AS genes,\n" +
-    "         if(pr.found = 1, pr.driver, greatest(a1.driver, a2.driver)) AS driver\n" +
-    "  FROM (SELECT concat(cs.cancer_study_identifier, '_', smp.stable_id) AS sample_unique_id, sv.event_info AS event_info,\n" +
+    "         " + svDriverSql("pr") + " AS driver\n" +
+    "  FROM (SELECT concat(cs.cancer_study_identifier, '_', smp.stable_id) AS sample_unique_id, ifNull(sv.event_info, '') AS event_info,\n" +
     "               ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2, sv.class AS class,\n" +
     "               " + siteKey("sv.site1_entrez_gene_id") + " AS k1, " + siteKey("sv.site2_entrez_gene_id") + " AS k2\n" +
     "        FROM " + db + ".structural_variant sv\n" +

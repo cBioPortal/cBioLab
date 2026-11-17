@@ -920,7 +920,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   // only where these alterations carry a tier (forData).
   const drivers = forData(display.drivers!, events.some((e) => e.dt));
   if (drivers !== display.drivers) Object.assign(display, { drivers, hideVUS: drivers.hideVus, annotate: drivers.annotated ? "oncokb" : "none" });
-  const annotation = await driverAnnotation(drivers, events, genes, multi ? studies : study);
+  const annotation = await driverAnnotation(drivers, events, genes, multi ? studies : study, (s) => conns.get(s) ?? PRIMARY);
 
   // ---- a row's EXP / PROT: each sample's value in the profile it reads ----
   if (levelGenes.EXP.length || levelGenes.PROT.length) {

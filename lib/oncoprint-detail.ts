@@ -83,7 +83,7 @@ export async function columnDetail(spec: OncoprintSpec, column: string): Promise
   const settings = forData(normalizeDisplay(spec.display, spec.drivers).drivers!, rows.some((r) => r.dt));
   // a germline mutation the settings hide is not in the figure, so not in its tooltip
   const shown = rows.filter((r) => !(settings.hideGermline && r.vt === "mutation" && r.germ));
-  const annotation = await driverAnnotation(settings, shown, genes, study);
+  const annotation = await driverAnnotation(settings, shown, genes, study, () => conn);
 
   const label = (r: typeof rows[number]): { kind: string; alteration: string } => {
     if (r.vt === "mutation") return { kind: r.mt || "Mutation", alteration: r.mv || "" };

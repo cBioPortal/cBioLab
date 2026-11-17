@@ -1,4 +1,4 @@
-// A structural variant's driver call in the oncoprint's in-memory index (spec rows K1-K5) and the
+// A structural variant's driver call in the oncoprint's in-memory index (spec rows K1-K7) and the
 // SQL condition's database and studies (O14). The portal calls an SV a driver by its pair's OncoKB
 // answer with no tumour type (ResultsViewPageStore.ts 5468-5562, StoreUtils.ts 2014-2031,
 // cbioportal-frontend cd8c6df); the index reads that call as a set of driver SV keys and falls back
@@ -14,7 +14,8 @@ process.env.CLICKHOUSE_PASSWORD = "p";
 for (const k of ["CLICKHOUSE2_URL", "FEDERATION_PEERS", "CH_RUN_CACHE"]) delete process.env[k];
 process.env.ONCOKB_PIN = "v7.5";
 
-const { setChTransport } = await import("../lib/ch.ts");
+const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
+type ChConn = import("../lib/ch.ts").ChConn;
 const { buildAnnotationIndex, MOCK_SOURCE } = await import("../lib/annotation.ts");
 const { driverEventSql } = await import("../lib/oql.ts");
 
@@ -32,9 +33,16 @@ const GENE_LEVEL = [
 const DRIVER_KEYS = [{ k: "SV-KEY-DRIVER" }];
 
 let sent: string[] = [];
+/** each statement with the id of the connection it was sent on */
+let sentOn: { query: string; conn: string }[] = [];
+/** a test's own answer for a statement, ahead of the defaults; undefined falls through to them */
+let answer: ((query: string, conn: ChConn) => Record<string, unknown>[] | undefined) | null = null;
 const keyReads = () => sent.filter((q) => /annotation\.oncokb_sv/.test(q));
-setChTransport(async ({ query }) => {
+setChTransport(async ({ query, conn }) => {
   sent.push(query);
+  sentOn.push({ query, conn: conn.id });
+  const own = answer?.(query, conn);
+  if (own) return JSON.stringify({ meta: [], data: own, rows: own.length });
   const data: Record<string, unknown>[] = /annotation\.oncokb_sv/.test(query) ? DRIVER_KEYS
     : /annotation\.oncokb\b/.test(query) && /alteration_type AS t/.test(query) ? GENE_LEVEL
       : /sync_run/.test(query) ? [{ study: STUDY }]
@@ -42,7 +50,7 @@ setChTransport(async ({ query }) => {
   return JSON.stringify({ meta: [], data, rows: data.length });
 });
 after(() => setChTransport(null));
-beforeEach(() => { sent = []; });
+beforeEach(() => { sent = []; sentOn = []; answer = null; });
 
 const GENES = ["ALK", "EML4", "ERG", "TMPRSS2", "TTN", "KRAS", "TP53", "CDKN2A", "EGFR"];
 
@@ -109,6 +117,42 @@ describe("the oncoprint's driver index on structural variants", () => {
       assert.equal(ix.isDriver(evs.egfrAmp), true, "EGFR amplification" + tag);
       assert.equal(ix.isDriver(evs.cdkn2aAmp), false, "CDKN2A amplification, no store row" + tag);
     }
+  });
+});
+
+describe("the pair-call lookup per connection (K6) and when it fails (K7)", () => {
+  const OTHER: ChConn = { id: "peer-k6", url: "http://other.invalid", user: "u", password: "p", db: "cbio_b", label: "other" };
+  const connOf = (s: string) => (s === "s2" ? OTHER : PRIMARY);
+  test("K6 each study's pair lookup is sent on its own connection, in that connection's database, naming only that study", async () => {
+    answer = (q, c) => (/annotation\.oncokb_sv/.test(q) && c.id === OTHER.id ? [{ k: "SV-KEY-S2" }] : undefined);
+    const s1 = { vt: "structural_variant", gene: "EML4", svk: "SV-KEY-S1" };
+    const s2 = { vt: "structural_variant", gene: "ALK", svk: "SV-KEY-S2" };
+    const ix = await buildAnnotationIndex([s1, s2], GENES, ["s1", "s2"], connOf);
+    assert.notEqual(ix.source, MOCK_SOURCE);
+    const reads = sentOn.filter((x) => /annotation\.oncokb_sv/.test(x.query));
+    const onPrimary = reads.filter((x) => x.conn === PRIMARY.id), onOther = reads.filter((x) => x.conn === OTHER.id);
+    assert.equal(onPrimary.length, 1, "one lookup on the primary: " + JSON.stringify(reads.map((x) => x.conn)));
+    assert.equal(onOther.length, 1, "one lookup on the other connection: " + JSON.stringify(reads.map((x) => x.conn)));
+    assert.match(onPrimary[0].query, new RegExp("\\b" + PRIMARY.db + "\\.structural_variant\\b"));
+    assert.ok(onPrimary[0].query.includes("'s1'") && !onPrimary[0].query.includes("'s2'"), onPrimary[0].query);
+    assert.match(onOther[0].query, /\bcbio_b\.structural_variant\b/);
+    assert.doesNotMatch(onOther[0].query, new RegExp("\\b" + PRIMARY.db + "\\.structural_variant\\b"));
+    assert.ok(onOther[0].query.includes("'s2'") && !onOther[0].query.includes("'s1'"), onOther[0].query);
+    assert.equal(ix.isDriver(s2), true, "s2's key, returned by its own connection's lookup, is a driver");
+    assert.equal(ix.isDriver(s1), false, "s1's key is not returned by the primary");
+  });
+  test("K7 a failed pair lookup leaves the index on OncoKB: mutations keep their calls, keyed SVs take their gene-level Fusion row", async () => {
+    answer = (q) => { if (/annotation\.oncokb_sv/.test(q)) throw new Error("ClickHouse error [a]: HTTP 500"); return undefined; };
+    const kras = { vt: "mutation", gene: "KRAS", mv: "G12C", mt: "Missense_Mutation" };
+    const alk = { vt: "structural_variant", gene: "ALK", svk: "SV-KEY-DRIVER" };
+    const ttn = { vt: "structural_variant", gene: "TTN", svk: "SV-KEY-TTN" };
+    const ix = await buildAnnotationIndex([kras, alk, ttn], GENES, STUDY);
+    assert.ok(keyReads().length >= 1, "the pair lookup was asked");
+    assert.notEqual(ix.source, MOCK_SOURCE);
+    assert.ok(ix.source.startsWith("OncoKB"), ix.source);
+    assert.equal(ix.isDriver(kras), true, "KRAS G12C keeps its gene-level driver row");
+    assert.equal(ix.isDriver(alk), true, "ALK's gene-level Fusion row is a driver");
+    assert.equal(ix.isDriver(ttn), false, "TTN's gene-level Fusion row is not a driver");
   });
 });
 

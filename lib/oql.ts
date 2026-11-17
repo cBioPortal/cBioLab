@@ -124,7 +124,7 @@ export const driverEventSql = (pin: string, g = "", { db = DB, studies }: { db?:
   return "((" + c + "variant_type != 'structural_variant' AND (" + c + "hugo_gene_symbol, " + storeAlterationType(c) + ", " + storeAlteration(c) + ") IN (\n" +
     "    SELECT hugo_gene_symbol, alteration_type, alteration FROM " + ONCOKB_TABLE + "\n" +
     "    WHERE oncokb_version = " + sq(pin) + " AND is_driver))\n" +
-    "  OR (" + c + "variant_type = 'structural_variant' AND (" + c + "sample_unique_id, " + c + "hugo_gene_symbol, " + c + "sv_event_info) IN (\n" +
+    "  OR (" + c + "variant_type = 'structural_variant' AND (" + c + "sample_unique_id, " + c + "hugo_gene_symbol, ifNull(" + c + "sv_event_info, '')) IN (\n" +
     svDriverKeysSql(db, pin, studies) + ")))";
 };
 

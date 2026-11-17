@@ -46,7 +46,7 @@ describe("the OncoKB driver condition", () => {
   });
   test("matches a structural variant event on its pair's call, in the database and studies named", () => {
     const sql = driverEventSql("v7.5", "g", { db: "cbio_b", studies: ["s1"] });
-    assert.match(sql, /OR \(g\.variant_type = 'structural_variant' AND \(g\.sample_unique_id, g\.hugo_gene_symbol, g\.sv_event_info\) IN \(/);
+    assert.match(sql, /OR \(g\.variant_type = 'structural_variant' AND \(g\.sample_unique_id, g\.hugo_gene_symbol, ifNull\(g\.sv_event_info, ''\)\) IN \(/);
     assert.match(sql, /FROM annotation\.oncokb_sv WHERE oncokb_version = 'v7\.5' AND tumor_type = ''/);
     assert.match(sql, /FROM cbio_b\.structural_variant sv/);
     assert.match(sql, /cs\.cancer_study_identifier IN \('s1'\)/);

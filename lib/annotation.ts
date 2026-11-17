@@ -8,7 +8,7 @@
 // grant is revoked (or the store is empty) this degrades to the rule-based MOCK below,
 // clearly labeled as such. Pin a specific release with ONCOKB_PIN; default is the
 // most recently synced version in the store.
-import { chQuery, isAbortError, DB } from "./ch.ts";
+import { chQuery, isAbortError, DB, PRIMARY, type ChConn } from "./ch.ts";
 import type { ChRow } from "./types.ts";
 import { isDriverEvent, driverSourceText, type DriverFields, type ResolvedDrivers } from "./driver-settings.ts";
 import { sq } from "./compiler.ts";
@@ -97,7 +97,11 @@ export async function studiesWithoutDrivers(studies: string[]): Promise<string[]
   return studies.filter((s) => !synced.has(s));
 }
 
-export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
+/**
+ * `connOf`: the instance each study's events were read from (the oncoprint's patientLevelConn); a
+ * structural variant's pair call is looked up there, in that instance's database. Default the primary.
+ */
+export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], study?: string | string[], connOf?: (study: string) => ChConn): Promise<AnnotationIndex> {
   try {
     const pin = await oncokbPin();
     if (!pin) throw new Error("annotation store is empty");
@@ -126,12 +130,26 @@ export async function buildAnnotationIndex(eventRows: EvRow[], genes: string[], 
     // oncoprint asks OncoKB about it; one without (a peer's) by its gene's gene-level Fusion row
     const list = Array.isArray(study) ? study : (study ? [study] : []);
     const svDrivers = new Set<string>();
+    let svLookupFailed = false;
     if (list.length && eventRows.some((r) => r.svk)) {
-      const keys = await chQuery<{ k: string }>(svDriverKeySetSql(DB, pin, list, genes));
-      for (const r of keys.data) svDrivers.add(r.k);
+      const byConn = new Map<ChConn, string[]>();
+      for (const s of list) {
+        const c = connOf ? connOf(s) : PRIMARY;
+        byConn.set(c, [...(byConn.get(c) || []), s]);
+      }
+      await Promise.all([...byConn].map(async ([c, studies]) => {
+        try {
+          const keys = await chQuery<{ k: string }>(svDriverKeySetSql(connOf ? c.db : DB, pin, studies, genes), c);
+          for (const r of keys.data) svDrivers.add(r.k);
+        } catch (e) {
+          // the pair store unreadable here: its SVs are called by their genes' gene-level rows, the rest stands
+          if (isAbortError(e)) throw e;
+          svLookupFailed = true;
+        }
+      }));
     }
     const isDriver = (r: EvRow): boolean => {
-      if (r.vt === "structural_variant" && r.svk) return svDrivers.has(r.svk);
+      if (r.vt === "structural_variant" && r.svk && !svLookupFailed) return svDrivers.has(r.svk);
       const e = byGene.get(r.gene as string);
       if (!e) return false;
       if (r.vt === "mutation") return e.mut.has(r.mv as string);
@@ -195,9 +213,9 @@ export async function hotspotIndex(genes: string[], study?: string | string[]): 
  * are on, the study's own calls and tiers from the event's columns. `source` says what the calls
  * came from.
  */
-export async function driverAnnotation(s: ResolvedDrivers, eventRows: (EvRow & DriverFields)[], genes: string[], study?: string | string[]): Promise<AnnotationIndex> {
+export async function driverAnnotation(s: ResolvedDrivers, eventRows: (EvRow & DriverFields)[], genes: string[], study?: string | string[], connOf?: (study: string) => ChConn): Promise<AnnotationIndex> {
   const [oncokb, hotspots] = await Promise.all([
-    s.oncokb ? buildAnnotationIndex(eventRows, genes, study) : null,
+    s.oncokb ? buildAnnotationIndex(eventRows, genes, study, connOf) : null,
     s.hotspots ? hotspotIndex(genes, study) : null
   ]);
   return {
