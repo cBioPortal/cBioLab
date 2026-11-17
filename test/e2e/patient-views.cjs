@@ -96,9 +96,15 @@ async function patientViews({ browser, ok, BASE }) {
       await sec("Mutations").locator(".dt-sort", { hasText: "Allele Freq" }).click();
       await page.waitForFunction(() => /TP53/.test(document.querySelector("section.alt-table[aria-label='Mutations'] tbody tr")?.textContent || ""), null, { timeout: 120000 });
       await settle();
-      const vafs = (await sec("Mutations").locator("tbody tr td:last-child").allInnerTexts()).map(Number);
-      ok("alterations: a header click sorts its own table, highest first, and no other", vafs.length === 7 && vafs.every((x, i) => i === 0 || vafs[i - 1] >= x) &&
-        JSON.stringify(await sec("Copy Number Alterations").locator("tbody tr").allInnerTexts()) === JSON.stringify(cnaBefore), vafs.join(" "));
+      // the portal's Allele Freq sort: the samples' VAFs in sample order, one by one, a sample without the mutation last —
+      // KRAS (0.0758) and POLE, in the second sample alone, after every first-sample VAF (PAT-MT-3)
+      const order = (await sec("Mutations").locator("tbody tr td:nth-child(2)").allInnerTexts()).map((x) => x.trim()).join(" ");
+      ok("alterations: a header click sorts its own table by the samples' VAFs in sample order, and no other", order === "TP53 PTEN BRCA2 ROS1 SPEN KRAS POLE" &&
+        JSON.stringify(await sec("Copy Number Alterations").locator("tbody tr").allInnerTexts()) === JSON.stringify(cnaBefore), order);
+      // two samples: a bar per sample, each sample's reads on hover, as the portal draws its Allele Freq cell
+      const bar = sec("Mutations").locator("tbody tr").first().locator("td:last-child svg");
+      ok("alterations: Allele Freq is a bar per sample with the reads in its tooltip", (await bar.locator("rect").count()) === 1 &&
+        /0\.76 \(761 variant reads out of 1000 total\)/.test(await bar.getAttribute("data-tip") || ""), await bar.getAttribute("data-tip"));
       // a filter's values come from that table
       await sec("Copy Number Alterations").getByRole("button", { name: "filter Gene" }).click();
       await page.locator(".dt-values label").first().waitFor({ timeout: 60000 });
