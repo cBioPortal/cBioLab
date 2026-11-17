@@ -26,9 +26,10 @@ export interface ClinicalTrace {
 export function clinicalMethod(t: ClinicalTrace): MethodRecord {
   const k = t.cohorts.length;
   const listing: MethodStep[] = t.listed ? [{ kind: "fetch", title: "List the studies' clinical attributes",
-    detail: "Every attribute the studies declare in their clinical attribute metadata: " + t.listed.declared + ". Left out, as cBioPortal's Comparison page leaves them out: each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR" +
-      (t.listed.leftOut.length ? " (" + t.listed.leftOut.join(", ") + ")" : "") + ". The rest are each described and tested below.",
-    rowsIn: t.listed.declared, rowsOut: t.listed.declared - t.listed.leftOut.length }] : [];
+    detail: "Every attribute the studies declare in their clinical attribute metadata: " + t.listed.declared + ", each described and tested below. " +
+      "Not listed in the result, as cBioPortal's Comparison page does not list them, though tested and counted in the q-values as it counts them: each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR" +
+      (t.listed.leftOut.length ? " (" + t.listed.leftOut.join(", ") + ")" : "") + ".",
+    rowsIn: t.listed.declared, rowsOut: t.listed.declared }] : [];
   const steps: MethodStep[] = [...listing, ...t.perSite.map((s) => ({
     kind: "fetch" as const, title: "Describe each attribute",
     detail: "The attributeStats query above. A categorical attribute comes back as a count per value; a numeric one as n, Σx and Σx² (from which the mean and variance are exact, and which add across studies)" +
