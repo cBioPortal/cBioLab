@@ -8,6 +8,13 @@ import { SEG_TAB, SEG_TABS } from "../../_ui/toolbar.ts";
 import { Tabs, TabsList, TabsTrigger } from "../../_ui/tabs";
 import { cancertypesPanelSvg, categoryLabel } from "../../../lib/views/cancertypes/figure.ts";
 import { frame, palette } from "../../../lib/svg-kit";
+import { cancertypesTsv } from "../../../lib/views/cancertypes/tsv.ts";
+import { savePdf, savePng, standaloneSvg } from "../chart-files.ts";
+import { saveText } from "../../../lib/study-view-download.ts";
+import { Button } from "../../_ui/button";
+import { TB } from "../../_ui/toolbar.ts";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../../_ui/dropdown-menu";
+import { CloudDownload } from "lucide-react";
 import { useState } from "react";
 import { DraftInput } from "./parts.tsx";
 
@@ -30,6 +37,44 @@ function Pills({ items, on, set }: { items: string[]; on: string; set: (x: strin
 
 // ---- Cancer Types Summary: "All Queried Genes" and one tab per gene, a bar chart per cohort ----
 
+/**
+ * One chart's download menu, the portal's: SVG, PNG, PDF and its Data file, all named cancer_types_summary
+ * (with the cohort's name beside it when the view draws several), as the chart is drawn: its gene tab,
+ * filters and order.
+ */
+function Downloads({ r, panel, gene }: { r: DrawnResultOf<"cancertypes">["cancertypes"]; panel: number; gene: string | null }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const base = "cancer_types_summary" + (r.panels.length > 1 ? "_" + r.panels[panel].cohort.replace(/[^\w.-]+/g, "_") : "");
+  const svg = () => {
+    const c = cancertypesPanelSvg(r, panel, { width: 860, gene, title: r.panels.length > 1 || gene !== null, theme: "light" });
+    return standaloneSvg(frame(c.width, c.height, c.body, palette("light").bg, false, "Cancer types summary"));
+  };
+  const image = (fmt: "svg" | "png" | "pdf") => {
+    setFailed(null);
+    const s = svg(), file = base + "." + fmt;
+    if (fmt === "svg") saveText(file, s);
+    else (fmt === "png" ? savePng(file, s) : savePdf(file, s)).catch((e) => setFailed("Could not make the " + fmt.toUpperCase() + ": " + String((e as Error)?.message || e)));
+  };
+  return (
+    <div className="flex items-center justify-end gap-2">
+      {failed && <span className="meta" role="alert">{failed}</span>}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="outline" size="sm" className={TB} aria-label="download the cancer types summary" data-tip="download this chart as drawn, or its numbers (Data)">
+            <CloudDownload />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={() => image("svg")}>SVG</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => image("png")}>PNG</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => image("pdf")}>PDF</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => saveText(base + ".tsv", cancertypesTsv(r, panel, gene))}>Data</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   const r = v.cancertypes;
   const ALL = "All Queried Genes";
@@ -42,7 +87,10 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   return (
     <div className="pb">
       {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} />}
-      {r.panels.map((_, i) => <DrawAtWidth key={i} draw={draw(i)} deps={[r, gene]} />)}
+      {r.panels.map((_, i) => <div key={i}>
+        <Downloads r={r} panel={i} gene={gene === ALL ? null : gene} />
+        <DrawAtWidth draw={draw(i)} deps={[r, gene]} />
+      </div>)}
     </div>
   );
 }
