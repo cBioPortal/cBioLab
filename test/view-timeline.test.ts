@@ -296,4 +296,12 @@ describe("timeline: PAT-TL-TT-3 sample attributes", () => {
     assert.equal(v.timeline.patient!.patient, "P2");
     assert.equal(v.timeline.patient!.sampleAttrs, undefined);
   });
+  test("RA3 PAT-TL-TT-3: an abandoned sample-attributes read is not served as a patient without sampleAttrs", async () => {
+    const r = withAttrs(async () => { throw Object.assign(new Error("aborted"), { name: "AbortError" }); });
+    let out: Awaited<ReturnType<typeof run>> | undefined;
+    let thrown: unknown;
+    try { out = await run({}, ctx({ A: { s1: 3 } }, { s1: r })); } catch (e) { thrown = e; }
+    if (thrown === undefined) assert.ok(out!.error, "an abandoned read must be refused, not drawn without sampleAttrs");
+    else assert.equal((thrown as Error).name, "AbortError");
+  });
 });
