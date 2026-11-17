@@ -438,6 +438,20 @@ export default function AnalysisPage() {
     return !!own;
   };
   const hasSegments = cnSegmentsTab(studies.filter((s) => exStudies.includes(s.id)));
+  // the Clinical Data and CN Segments tabs need a selected sample; a new selection or set of
+  // studies opens on Summary again
+  const hasSamples = !!explore && (explore.totals?.samples ?? 0) > 0;
+  const studyKey = exStudies.join(",");
+  useEffect(() => { if (!hasSamples) setSvTab("summary"); }, [hasSamples]);
+  useEffect(() => { setSvTab("summary"); }, [studyKey]);
+  const shownTab = !hasSamples || (svTab === "cn" && !hasSegments) ? "summary" : svTab;
+  // the tabs' props, kept while the selection and the charts stay the same
+  const tabSelection = useMemo(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; },
+    [explore, studyKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- barDef reads the applied draft, which changes with explore
+  const chartList = explore ? (visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number }[])
+    .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0 })) : [];
+  const chartListKey = JSON.stringify(chartList);
+  const tabCharts = useMemo(() => chartList, [chartListKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on its own JSON
   useSavedActions({ openDoc: openDocument, openShared, showClauseData, onDataChanged: () => fetchExplore(), editCohort: editSavedCohort, studies: () => exStudies });
   // links into it: ?tab=cohorts (the lab's Saved tab, before the manager) opens it; ?shared=<id> opens
   // that shared analysis, and ?editCohort=<id> that saved cohort in Explore, once the list holding it has arrived
@@ -538,27 +552,24 @@ export default function AnalysisPage() {
           <ExploreBar ctx={exploreCtx} />
           {/* the portal's study view tabs: Clinical Data and CN Segments only while the selection holds a
               sample, CN Segments only when a selected study holds segments */}
-          {!addMode && explore && exStudies.length > 0 && <Tabs value={explore.draftCount === 0 || (svTab === "cn" && !hasSegments) ? "summary" : svTab} className="mb-3"
+          {!addMode && explore && exStudies.length > 0 && <Tabs value={shownTab} className="mb-3"
             onValueChange={(v) => setSvTab(v as "summary" | "clinical" | "cn")}>
             <TabsList variant="line" aria-label="study view sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
               <TabsTrigger value="summary" className={PAGE_TAB}>Summary</TabsTrigger>
-              {explore.draftCount !== 0 && <TabsTrigger value="clinical" className={PAGE_TAB}>Clinical Data</TabsTrigger>}
-              {explore.draftCount !== 0 && hasSegments && <TabsTrigger value="cn" className={PAGE_TAB}>CN Segments</TabsTrigger>}
+              {hasSamples && <TabsTrigger value="clinical" className={PAGE_TAB}>Clinical Data</TabsTrigger>}
+              {hasSamples && hasSegments && <TabsTrigger value="cn" className={PAGE_TAB}>CN Segments</TabsTrigger>}
             </TabsList>
           </Tabs>}
-          {!addMode && explore && exStudies.length > 0 && explore.draftCount !== 0 && svTab === "clinical" &&
-            <ClinicalDataTab selection={(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; })()} studies={exStudies}
-              charts={(visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number }[])
-                .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0 }))} />}
-          {!addMode && explore && exStudies.length > 0 && explore.draftCount !== 0 && svTab === "cn" && hasSegments &&
-            <CnSegmentsTab selection={(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; })()}
-              selected={explore.totals?.samples ?? 0} />}
+          {!addMode && explore && exStudies.length > 0 && shownTab === "clinical" &&
+            <ClinicalDataTab selection={tabSelection} studies={exStudies} charts={tabCharts} />}
+          {!addMode && explore && exStudies.length > 0 && shownTab === "cn" &&
+            <CnSegmentsTab selection={tabSelection} selected={explore.totals?.samples ?? 0} />}
           {/* A facet click starts a recount, and a second click before it lands
               would race it — so the facets themselves greyscale until it does.
               The study picker above stays live: choosing studies is a staged,
               separately-submitted action, not an immediate filter. */}
           <div className={exploreBusy ? "busy" : undefined} aria-busy={exploreBusy}
-            hidden={!addMode && !!explore && explore.draftCount !== 0 && (svTab === "clinical" || (svTab === "cn" && hasSegments))}>
+            hidden={!addMode && !!explore && exStudies.length > 0 && shownTab !== "summary"}>
           {exStudies.length === 0 && <div className="card"><p className="note t-md flush">
             Choose one or more studies above to explore.</p></div>}
           {/* first load: placeholders shaped like the facet grid, so it does not jump when it lands */}
@@ -602,7 +613,7 @@ export default function AnalysisPage() {
           )}
           {explore && explore.draftCount !== 0 && <>
             <div className="facetgrid">
-              <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} draft={parseDraft()}
+              <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} selection={() => tabSelection} draft={parseDraft()}
                 attrs={explore.clinical || []}
                 endpoints={(() => {
                   // an endpoint is a <X>_MONTHS with its <X>_STATUS, the survival view's own convention

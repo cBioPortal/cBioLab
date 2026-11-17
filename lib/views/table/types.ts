@@ -22,6 +22,8 @@ export interface TableView extends TableQuery {
 }
 export interface TableResult extends TableRows<string> {
   unit: "sample" | "patient";
+  /** the attributes the studies hold, when the table holds fewer (at most TABLE_COLUMNS_MAX) */
+  attributesOf?: number;
   /**
    * Where the named patient falls in the list's order (its search, filters and sort), with the
    * patients either side; null when the list leaves it out. Only when the view names a patient.

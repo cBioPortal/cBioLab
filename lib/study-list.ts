@@ -2,6 +2,7 @@
 // Read from a ClickHouse connection; /api/studies merges every connection's rows with those of
 // the peers in FEDERATION_PEERS, which serve theirs through the federation API's `studies` op.
 import { chQuery, type ChConn } from "./ch.ts";
+import { sq } from "./compiler.ts";
 import { isRestrictedStudy } from "./federation.ts";
 import { syncedStudiesSql } from "./annotation-store.ts";
 
@@ -17,11 +18,12 @@ export type StudyRow = {
 export async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
   const db = conn.db;
   const q = <T = Record<string, string>>(sql: string) => chQuery<T>(sql, conn);
-  // the studies holding copy-number segments (the study view's CN Segments tab); none where the
-  // instance has no segment table
+  // the studies holding copy-number segments (the study view's CN Segments tab), from the importer's
+  // one row per study's segment file rather than the segments themselves; none where the instance
+  // has no such table
   const segP = q<{ id: string }>(
     "SELECT cancer_study_identifier AS id FROM " + db + ".cancer_study\n" +
-    "WHERE cancer_study_id IN (SELECT DISTINCT cancer_study_id FROM " + db + ".copy_number_seg)")
+    "WHERE cancer_study_id IN (SELECT cancer_study_id FROM " + db + ".copy_number_seg_file)")
     .then((x) => new Set(x.data.map((r) => r.id)), () => new Set<string>());
 
   const r = await q(
@@ -73,4 +75,12 @@ export async function studiesFor(conn: ChConn): Promise<StudyRow[]> {
       instance: conn.id, instanceLabel: conn.label
     };
   });
+}
+
+/** A study's own words for the Explore header (study-header-cases.md): its name, description and PubMed id; null when this connection does not hold it. */
+export async function studyAbout(study: string, conn: ChConn): Promise<{ name: string; description: string; pmid: string | null } | null> {
+  const r = await chQuery<Record<string, string | null>>(
+    "SELECT name, description, pmid FROM " + conn.db + ".cancer_study WHERE cancer_study_identifier = " + sq(study), conn);
+  const a = r.data[0];
+  return a ? { name: String(a.name ?? ""), description: String(a.description ?? ""), pmid: a.pmid ? String(a.pmid) : null } : null;
 }

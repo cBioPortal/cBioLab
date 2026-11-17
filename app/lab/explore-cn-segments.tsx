@@ -60,9 +60,10 @@ export function CnSegmentsTab({ selection, selected }: CnSegmentsTabProps) {
       </p>
       {c && <KindCardControls c={c} />}
       {c && v && !busy && segmented !== 0 && <p className="meta flush mb-1">{segmentsUi.sub?.(c.spec, v)}</p>}
+      {doc && v && !busy && v.note && <p className="note flush mb-1">{v.note}</p>}
       {busy && !v && <p className="waiting" role="status"><span className="spinner" /> Loading copy number segments data…</p>}
       {busy && v && <Updating />}
-      {!busy && res?.error && <p className="note">{res.error}</p>}
+      {doc && !busy && res?.error && <p className="note">{res.error}</p>}
       {c && v && segmented !== 0 && KindCardBody({ c: { ...c, v } })}
       {v && !busy && segmented !== 0 && v.caveat && <p className="note vfoot">{v.caveat}</p>}
     </section>

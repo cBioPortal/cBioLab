@@ -25,7 +25,7 @@
 import { readFileSync } from "node:fs";
 import { connById } from "../lib/ch.ts";
 import { buildExplore } from "../lib/explore.ts";
-import { studiesFor } from "../lib/study-list.ts";
+import { studiesFor, studyAbout } from "../lib/study-list.ts";
 import { panelGenes } from "../lib/genes.ts";
 
 const STUDY = "cbiolab_peer_fixture";
@@ -153,6 +153,17 @@ try {
   ok("GU3 under KRAS: TP53 counts only the samples mutated in both", row(own, "TP53")?.altered === both && (row(own, "TP53")?.profiled ?? 0) <= kras.size,
     `TP53 ${row(own, "TP53")?.altered} of ${row(own, "TP53")?.profiled}, want ${both} of at most ${kras.size}`);
 } catch (e) { ok("GU3", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+
+// SH1–SH3 (study-header-cases.md): the header's name, description and PubMed id are the study's own, as meta_study.txt gives them
+try {
+  const meta = Object.fromEntries(readFileSync(new URL("../test/fixtures/peer-study/meta_study.txt", import.meta.url), "utf8")
+    .split("\n").filter((l) => l.includes(":")).map((l) => [l.slice(0, l.indexOf(":")).trim(), l.slice(l.indexOf(":") + 1).trim()]));
+  const a = await studyAbout(STUDY, conn);
+  ok("SH1-SH3 the fixture study's name, description and PubMed id, as meta_study.txt gives them",
+    !!a && a.name === meta.name && a.description === meta.description && a.pmid === (meta.pmid || null),
+    a ? `name ${JSON.stringify(a.name)}, pmid ${a.pmid}` : "no row");
+  ok("SH1 a study this connection does not hold has none", (await studyAbout("no_such_study", conn)) === null);
+} catch (e) { ok("SH1-SH3", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
 
 // CS2 (study-cn-segments-cases.md): a study holding no copy-number segment offers no CN Segments tab
 // (the fixture holds none, so the study list's seg flag reads false for it)

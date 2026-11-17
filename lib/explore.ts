@@ -1,7 +1,7 @@
 // Faceted study explorer: what exists, in what numbers — optionally conditioned on a
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
-import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, type ChConn } from "./ch.ts";
+import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
@@ -683,17 +683,39 @@ const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
  * empty for several studies, as the portal gives none, and when the study has neither table's rows.
  * A failed lookup leaves the tables without q-values rather than failing them.
  */
-async function significantGenes(studies: string[], db: string, conn: ChConn): Promise<{ mutsig: Map<string, number>; gistic: Map<string, number> }> {
-  if (studies.length !== 1) return { mutsig: new Map(), gistic: new Map() };
-  const study = "cs.cancer_study_identifier = " + sq(studies[0]);
+type QValues = { mutsig: Map<string, number>; gistic: Map<string, number> };
+const NO_Q: QValues = { mutsig: new Map(), gistic: new Map() };
+/** each study's q-values, read once (they do not depend on the selection); every read where studies change */
+const qValuesByStudy = new Map<string, Promise<QValues>>();
+
+/**
+ * MutSig's and GISTIC's q-values for one study (none for several, as the portal shows them). The
+ * tables are optional: an instance without them has none, read from its table list; a lookup that
+ * fails is an error, never an empty answer.
+ */
+function significantGenes(studies: string[], db: string, conn: ChConn): Promise<QValues> {
+  if (studies.length !== 1) return Promise.resolve(NO_Q);
+  const key = conn.id + "|" + db + "|" + studies[0];
+  const held = studiesChangeWhileRunning() ? undefined : qValuesByStudy.get(key);
+  if (held) return held;
+  const p = readQValues(studies[0], db, conn);
+  qValuesByStudy.set(key, p);
+  p.catch(() => qValuesByStudy.delete(key));
+  return p;
+}
+
+async function readQValues(studyId: string, db: string, conn: ChConn): Promise<QValues> {
+  const tables = new Set((await chQuery<ChRow>("SELECT name FROM system.tables WHERE database = " + sq(db) +
+    " AND name IN ('mut_sig', 'gistic', 'gistic_to_gene')", conn)).data.map((r) => String(r.name)));
+  const study = "cs.cancer_study_identifier = " + sq(studyId);
   const [m, g] = await Promise.all([
-    chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, m.q_value AS q FROM " + db + ".mut_sig m\n" +
+    tables.has("mut_sig") ? chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, m.q_value AS q FROM " + db + ".mut_sig m\n" +
       "JOIN " + db + ".gene g ON g.entrez_gene_id = m.entrez_gene_id\n" +
-      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id WHERE " + study, conn).catch(() => ({ data: [] as ChRow[] })),
-    chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, gi.amp AS amp, gi.q_value AS q FROM " + db + ".gistic gi\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id WHERE " + study, conn) : { data: [] as ChRow[] },
+    tables.has("gistic") && tables.has("gistic_to_gene") ? chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, gi.amp AS amp, gi.q_value AS q FROM " + db + ".gistic gi\n" +
       "JOIN " + db + ".gistic_to_gene gg ON gg.gistic_roi_id = gi.gistic_roi_id\n" +
       "JOIN " + db + ".gene g ON g.entrez_gene_id = gg.entrez_gene_id\n" +
-      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gi.cancer_study_id WHERE " + study, conn).catch(() => ({ data: [] as ChRow[] })),
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gi.cancer_study_id WHERE " + study, conn) : { data: [] as ChRow[] },
   ]);
   return {
     mutsig: new Map(m.data.map((r) => [String(r.g), Number(r.q)])),
@@ -1599,8 +1621,8 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     const nums = same.filter((i): i is Extract<ClinicalFacet, { kind: "num" }> => i.kind === "num");
     const cats = same.filter((i): i is Extract<ClinicalFacet, { kind: "cat" }> => i.kind === "cat");
     const patients = same.reduce((s: number, i) => s + i.patients, 0);
-    // a patient attribute's samples, summed over the studies, when every study counted them
-    const samples = same.every((i) => i.samples != null) ? same.reduce((s: number, i) => s + i.samples!, 0) : undefined;
+    // the selected samples with a value, summed over every study (whatever kind each drew it as), when every study counted them
+    const samples = items.every((i) => i.samples != null) ? items.reduce((s: number, i) => s + i.samples!, 0) : undefined;
     const withMeta = same.find((i) => i.displayName || i.priority != null) || same[0];
     const base = {
       attribute: same[0].attribute, per: same[0].per, patients, ...(samples != null ? { samples } : {}),

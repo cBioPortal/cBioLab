@@ -92,4 +92,5 @@ Further source: CC as above; DCN = `packages/cbioportal-frontend-commons/src/com
 | PC11 | Several studies | One file; each row names its own study | SPS:10511-10527 |
 | PC12 | ⚠ Studies that may not list patients | They contribute no rows, as on the Clinical Data tab; the page says which were left out and why. The portal has no such studies | cBioLab (docs/DATA-BOUNDARY.md) |
 | PC13 | No case selected | The header alone (the portal saves nothing for an empty clinical-data download) | SPS:11340-11342 |
-| PC14 | A download cut short | The page says it failed and saves nothing, rather than a file that reads as whole | cBioLab (`/api/table`'s `# DOWNLOAD INCOMPLETE` line) |
+| PC14 | A download cut short | The page says it failed and saves nothing, rather than a file that reads as whole: the route ends a file it could not finish with a `# DOWNLOAD INCOMPLETE` line, and says how many line breaks a whole file holds (`caseFileLineBreaks`: the rows in the chart layout, whose lines each start with one; the rows plus the header's in the table layout, where every line ends with one), so a file cut off in transit is caught too | cBioLab (`/api/table`) |
+| PC15 | Attributes past the table's limit | A clinical-data file holds at most 200 attributes (the table's limit); the page says how many of how many it holds | cBioLab (TABLE_COLUMNS_MAX) |

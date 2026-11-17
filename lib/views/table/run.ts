@@ -68,6 +68,7 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
   });
   const table = { unit, columns, shown, defaults, query: q, rows, offset: r.offset, pageSize: show, lists: r.lists, total: r.total, all: r.all,
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}),
+    ...(held.length < usable.length ? { attributesOf: usable.length } : {}),
     ...(locate ? { position: await listPosition(r, true, () => Promise.resolve(r)) } : {}) };
   if (ctx.page || ctx.values) return { kind: "table", cohorts: vNames, table, participation: ctx.participationFor(ctx.vStudies, true) };
   const one = unit === "sample" ? "sample" : "patient";

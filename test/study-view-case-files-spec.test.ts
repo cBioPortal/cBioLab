@@ -5,11 +5,11 @@
 //   PC1  which charts offer Full Data / Data, and the header's "Download clinical data" button
 //   PC6  a bar chart's Data name is the caller's chartFileName(name, "data"); its rows are PC4/PC5's
 //   PC9  attribute order and the 200-attribute cap; PC10 row order; PC11 several studies in one file
-//   PC12 studies that may not list patients; PC13 the header alone; PC14 a download cut short
+//   PC12 studies that may not list patients; PC13 the header alone; PC14 the route's incomplete line and the page's check
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  CASE_FILE_COHORT, caseFileDoc, caseFileFormat, caseFileHeader, caseFileLine, caseFileName,
+  CASE_FILE_COHORT, caseFileBreaks, caseFileLineBreaks, caseFileDoc, caseFileFormat, caseFileHeader, caseFileLine, caseFileName,
   type CaseFile,
 } from "../lib/study-view-case-files.ts";
 import type { AnalysisDoc, CohortDef } from "../lib/types.ts";
@@ -213,4 +213,22 @@ test("PC9: clinical data: per sample, every attribute (no columns), no filters",
   assert.equal(v.columns, undefined);
   assert.equal(v.attributes, undefined);
   assert.ok(v.filters == null || Object.keys(v.filters).length === 0, JSON.stringify(v.filters));
+});
+
+// ---- PC14 (rewritten): caseFileLineBreaks matches what the route writes ----
+
+test("PC14 caseFileLineBreaks equals the line breaks in a whole file, both layouts, 0/1/3 rows", () => {
+  const tab = (studies: number): CaseFile => ({ kind: "tab", columns: ["patient", "sample", "AGE"], query: {} as never, studies });
+  const files: [string, CaseFile][] = [["full (chart layout)", fullSample], ["tab 1 study", tab(1)], ["tab 2 studies (table layout)", tab(2)]];
+  const cols = [{ id: "patient", name: "Patient ID" }, { id: "sample", name: "Sample ID" }, { id: "AGE", name: "Age" }];
+  for (const [label, file] of files) {
+    const format = caseFileFormat(file);
+    const { before, after } = caseFileBreaks(format);
+    for (const n of [0, 1, 3]) {
+      let text = caseFileHeader(cols, format) + after;
+      for (let i = 0; i < n; i++) text += before + caseFileLine("s1", ["P" + i, "S" + i, i === 1 ? "" : String(40 + i)], format) + after;
+      const count = (text.match(/\n/g) || []).length;
+      assert.equal(count, caseFileLineBreaks(n, format), `${label}, ${n} rows`);
+    }
+  }
 });

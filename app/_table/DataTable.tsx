@@ -93,6 +93,8 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
 
 /** The pager under a table: previous, a window of page numbers, next; the rows shown; the page size. */
 export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
+  // the table's own size stays on offer after the reader picks another
+  const own = useRef(p.size).current;
   const nums: (number | null)[] = [];
   const lo = Math.max(0, p.page - 2), hi = Math.min(p.pages - 1, p.page + 2);
   if (lo > 0) nums.push(0, ...(lo > 1 ? [null] : []));
@@ -107,7 +109,7 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
       <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page"><ChevronRight /></Button>
       <span>Showing {from.toLocaleString()}–{to.toLocaleString()} of {p.total.toLocaleString()} {unit}</span>
       <label className="tbfield">per page <OptionSelect value={String(p.size)} onValueChange={(v) => p.setSize(Number(v))}>
-        {[...new Set([p.size, 25, 50, 100, 250])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
+        {[...new Set([own, p.size, 25, 50, 100, 250])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
       </OptionSelect></label>
       {p.error && <span className="mark">{p.error}</span>}
     </div></div>

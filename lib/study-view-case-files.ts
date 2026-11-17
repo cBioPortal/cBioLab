@@ -84,6 +84,11 @@ export function caseFileBreaks(format: CaseFileFormat): { before: string; after:
   return format.table ? { before: "", after: "\r\n" } : { before: "\n", after: "" };
 }
 
+/** the line breaks a whole file of `rows` rows holds, header included: what the download checks it received */
+export function caseFileLineBreaks(rows: number, format: CaseFileFormat): number {
+  return format.table ? rows + 1 : rows;
+}
+
 /** the table layout's fields: the study, when it has a column, third, after Patient ID and Sample ID */
 const inTable = (fields: string[], study: string, studyColumn: boolean) => studyColumn ? [...fields.slice(0, 2), study, ...fields.slice(2)] : fields;
 
