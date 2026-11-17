@@ -94,7 +94,7 @@ function run(dir: string, guard: string, file?: string): { ok: boolean; failures
   // the warehouse anew, and one that changes only what is done with the answer gets the same answer.
   // Never the unit guard's: its tests answer statements with stubs, which would be kept as the warehouse's.
   const { RECORD, REPORT_DIR, CH_RUN_CACHE, ...rest } = process.env;
-  const env = { ...rest, PORTAL_CACHE: join(dir, ".portal-cache"),
+  const env = { ...rest, PORTAL_CACHE: process.env.PORTAL_CACHE || join(dir, ".portal-cache"),
     ...(guard === "unit" ? {} : { CH_RUN_CACHE: CH_RUN_CACHE || join(dir, ".ch-cache") }) };
   const r = spawnSync(cmd, args, { cwd: dir, env, encoding: "utf8", maxBuffer: 64 << 20, timeout: 600_000 });
   const out = (r.stdout || "") + (r.stderr || "");
