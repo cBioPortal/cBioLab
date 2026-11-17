@@ -525,7 +525,7 @@
                   "Missense_Mutation",
                   "",
                   28.5,
-                  0.08,
+                  0.0758,
                   42,
                   512,
                   "SNP",
@@ -535,7 +535,16 @@
                   "C",
                   "A",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "reads": [
+                    {
+                      "sample": "P-0024249-T02-IM7",
+                      "alt": 42,
+                      "ref": 512
+                    }
+                  ]
+                }
               },
               {
                 "cohort": "Prostate",
@@ -550,7 +559,7 @@
                   "Missense_Mutation",
                   "",
                   4.8,
-                  0.62,
+                  0.6194,
                   262,
                   161,
                   "SNP",
@@ -560,7 +569,16 @@
                   "G",
                   "T",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "reads": [
+                    {
+                      "sample": "P-0024249-T01-IM6",
+                      "alt": 262,
+                      "ref": 161
+                    }
+                  ]
+                }
               },
               {
                 "cohort": "Prostate",
@@ -575,7 +593,7 @@
                   "Missense_Mutation",
                   "",
                   52.4,
-                  0.76,
+                  0.761,
                   761,
                   239,
                   "SNP",
@@ -585,7 +603,16 @@
                   "G",
                   "C",
                   "SOMATIC"
-                ]
+                ],
+                "detail": {
+                  "reads": [
+                    {
+                      "sample": "P-0024249-T01-IM6",
+                      "alt": 761,
+                      "ref": 239
+                    }
+                  ]
+                }
               }
             ],
             "offset": 0,
@@ -945,7 +972,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
@@ -967,7 +994,7 @@
           {
             "kind": "fetch",
             "title": "Read P-0024249's three tables",
-            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, the highest allele frequency among them (variant / (variant + reference) reads) with that sample's reads, and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
             "params": [
               [
                 "Mutations",

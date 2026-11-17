@@ -112,7 +112,7 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "),\n" +
     "sg2 AS (SELECT suid, gene, types FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types FROM sg GROUP BY suid),\n" +
     "u AS (\n" +
-    "  SELECT " + (unit === "patient" ? "samp.puid" : "sg2.suid") + " AS k, ifNull(grp.g, '') AS g, any(ifNull(grp.label, '')) AS label, sg2.gene AS gene,\n" +
+    "  SELECT " + (unit === "patient" ? "samp.puid" : "sg2.suid") + " AS k, ifNull(grp.g, '') AS g, min(ifNull(grp.label, '')) AS label, sg2.gene AS gene,\n" +
     "         arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types\n" +
     "  FROM sg2 JOIN samp ON samp.suid = sg2.suid LEFT JOIN grp ON grp.suid = sg2.suid\n" +
     "  GROUP BY k, g, gene\n" +
@@ -124,7 +124,7 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     // amplification and a deep deletion are one copy-number kind, shown as the amplification
     "uk AS (SELECT grp_, gene, label, types, arrayDistinct(arrayMap((t) -> multiIf(t IN ('amp', 'homdel'), 'cna', t IN ('mrnaHigh', 'mrnaLow'), 'mrna',\n" +
     "         t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds FROM (SELECT g AS grp_, gene, label, types FROM uu))\n" +
-    "SELECT grp_ AS grp, gene, any(label) AS label, count() AS profiled,\n" +
+    "SELECT grp_ AS grp, gene, min(label) AS label, count() AS profiled,\n" +
     "       countIf(length(types) > 0) AS altered,\n" +
     "       countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND has(types, 'amp')) AS amp,\n" +
     "       countIf(kinds = ['cna'] AND NOT has(types, 'amp')) AS homdel, countIf(kinds = ['sv']) AS sv,\n" +
@@ -150,7 +150,7 @@ export function cancerTypeSamplesSql(cohortSql: string, study: string, db: strin
     "  WHERE cancer_study_identifier = " + sq(study) + " AND sample_unique_id IN (SELECT suid FROM samp) GROUP BY suid\n" +
     ")\n" +
     "SELECT " + (attribute ? "ifNull(grp.g, '')" : sq(study)) + " AS grp, " +
-    (attribute ? "any(ifNull(grp.label, ''))" : "(SELECT any(name) FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")") + " AS label, uniqExact(" + k + ") AS samples,\n" +
+    (attribute ? "min(ifNull(grp.label, ''))" : "(SELECT any(name) FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(study) + ")") + " AS label, uniqExact(" + k + ") AS samples,\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'MUTATION_EXTENDED')) AS mut,\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'COPY_NUMBER_ALTERATION')) AS cna,\n" +
     "       uniqExactIf(" + k + ", has(prof.types, 'STRUCTURAL_VARIANT')) AS sv\n" +
