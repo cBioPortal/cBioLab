@@ -14,6 +14,14 @@
  * (src/pages/patientView/structuralVariant/column/AnnotationColumnFormatter.tsx 161-188). Row ids
  * are the case table's (Y*, T*, D*, S*).
  *
+ * The oncoprint's and OQL DRIVER's call on a structural variant (spec rows O*, Q*): driverEventSql
+ * over every SV row of genomic_event_derived, and oqlCasesSql's DRIVER over SVs. The portal asks
+ * OncoKB about every SV of the oncoprint with no tumour type and reads each one's answer by its
+ * (site1, site2, null tumour type, SV type) id (ResultsViewPageStore.ts 5468-5562, cbioportal-frontend
+ * cd8c6df); the call is a driver when OncoKB says Oncogenic, Likely Oncogenic or Resistance
+ * (StoreUtils.ts 2014-2031), and both partners' rows take it. A pair with no row at the pin falls back
+ * to either partner's gene-level Fusion row.
+ *
  * The SV type is decided by how many sites name a gene (the API's Hugo symbols): two → FUSION
  * whatever the class; one → the class when it is exactly one of DELETION, TRANSLOCATION,
  * DUPLICATION, INSERTION, INVERSION, FUSION, else UNKNOWN.
@@ -24,6 +32,8 @@
 import { chQuery, connById } from "../lib/ch.ts";
 import { svKeySpace } from "../packages/annotation-sync/src/sources/oncokb-sv.ts";
 import { SV_COLUMNS, svRowSource } from "../lib/sv-table.ts";
+import { driverEventSql, oqlCasesSql } from "../lib/oql.ts";
+import { SV_EVENT_KEY, svDriverKeySetSql } from "../lib/sv-oncokb.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 /** peer-db.ts stores the SV and gene-level OncoKB rows under this version (and the app's pin) */
@@ -68,6 +78,7 @@ const KEYS: [string, string][] = [
   [`7170|4914|FUSION|${LUAD}`, "S6 TPM3-NTRK1 on FX-P53-T1"],
   [`23184|7113|FUSION|${LUAD}`, "P10 MESD-TMPRSS2 on FX-P52-T1 (the file's MESDC2, by its Entrez id)"],
   [`57670|673|FUSION|${LUAD}`, "KIAA1549-BRAF on FX-P53-T1"],
+  [`972|3084|FUSION|${LUAD}`, "O15 CD74-NRG1 on FX-P52-T1, Event_Info blank"],
   // X1 (PR E): every (site1, site2, SV type) is also a key with no tumour type, the portal's
   // driver query (cancerTypeForOncoKb(key, {}) is null: ResultsViewPageStore.ts 5467-5490); EML4-ALK's
   // is already one by FX-P48-T1's own tumour type, and stays one row (Y10)
@@ -83,7 +94,8 @@ const KEYS: [string, string][] = [
   [`7113|2078|FUSION|`, "X1 TMPRSS2-ERG with no tumour type"],
   [`7170|4914|FUSION|`, "X1 TPM3-NTRK1 with no tumour type"],
   [`23184|7113|FUSION|`, "X1 MESD-TMPRSS2 with no tumour type"],
-  [`57670|673|FUSION|`, "X1 KIAA1549-BRAF with no tumour type"]
+  [`57670|673|FUSION|`, "X1 KIAA1549-BRAF with no tumour type"],
+  [`972|3084|FUSION|`, "X1 O15 CD74-NRG1 with no tumour type"]
 ];
 
 const keys = await keysOf(STUDY);
@@ -164,6 +176,118 @@ compare(await tableRows(OTHER), [
 const none = await tableRows(null);
 ok("with no pin no row has an OncoKB call", none.length === rows.length && none.every((r) => r.oncogenicity === "" && r.level === "" && Number(r.drv) === 0),
   none.filter((r) => r.oncogenicity !== "").map((r) => r.sid + " " + r.gene1 + "/" + r.gene2).join("; "));
+
+// ---- the oncoprint's and OQL DRIVER's call on a structural variant (spec rows O*, Q*) ----------
+
+type Call = { sample_unique_id: string; hugo_gene_symbol: string; d: number | string };
+const bare = (sid: string) => sid.slice(STUDY.length + 1);
+const callsAt = async (pin: string, studies: string[] = [STUDY]) => (await chQuery<Call>(
+  "SELECT sample_unique_id, hugo_gene_symbol, toUInt8(" + driverEventSql(pin, "", { db, studies }) + ") AS d FROM " + db +
+  ".genomic_event_derived WHERE variant_type = 'structural_variant' AND cancer_study_identifier = '" + STUDY + "'", conn)).data;
+
+/** [sample, gene of the row, driver at pin `fixture`, spec row and why]: every SV row of the fixture */
+const SV_CALLS: [string, string, 0 | 1, string][] = [
+  ...["FX-P45-T1", "FX-P46-T1", "FX-P47-T1", "FX-P48-T1", "FX-P49-T1", "FX-P49-T2"].flatMap((s): [string, string, 0 | 1, string][] => [
+    [s, "EML4", 1, "O1 EML4-ALK's no-tumour-type row is Oncogenic: the EML4 row" + (s === "FX-P49-T2" ? " (O2 its LUSC row Likely Neutral is not read)" : "")],
+    [s, "ALK", 1, "O1 EML4-ALK's no-tumour-type row is Oncogenic: the ALK row" + (s === "FX-P49-T2" ? " (O2 its LUSC row Likely Neutral is not read)" : "")]
+  ]),
+  ["FX-P52-T1", "KIF5B", 0, "O3 KIF5B-RET's no-tumour-type row is Likely Neutral, its LUAD row Oncogenic is not read"],
+  ["FX-P52-T1", "RET", 0, "O3 KIF5B-RET, the RET row"],
+  ["FX-P53-T1", "KIAA1549", 1, "O4 KIAA1549-BRAF's no-tumour-type row is Oncogenic"],
+  ["FX-P53-T1", "BRAF", 1, "O4 KIAA1549-BRAF, the BRAF row"],
+  ["FX-P46-T1", "FGFR2", 1, "O5 FGFR2-FGFR2's no-tumour-type row is Resistance"],
+  ["FX-P50-T1", "BRCA2", 1, "O6 BRCA2 one-gene DELETION, no-tumour-type row Likely Oncogenic (somatic)"],
+  ["FX-P51-T1", "BRCA2", 1, "O6 BRCA2 one-gene DELETION (germline)"],
+  ["FX-P50-T1", "MET", 0, "O7 MET one-gene DUPLICATION: only a LUAD row, no gene-level Fusion row"],
+  ["FX-P53-T1", "TPM3", 1, "O8 TPM3-NTRK1 has no no-tumour-type row: NTRK1's gene-level Fusion is Oncogenic, the TPM3 row"],
+  ["FX-P53-T1", "NTRK1", 1, "O8 TPM3-NTRK1, the NTRK1 row"],
+  ["FX-P52-T1", "TTN", 0, "O9 TTN-MUC16 has no no-tumour-type row; TTN's gene-level Fusion is Unknown"],
+  ["FX-P52-T1", "MUC16", 0, "O9 TTN-MUC16, the MUC16 row"],
+  ["FX-P52-T1", "MESD", 0, "O10 MESDC2-TMPRSS2: no pair row, no gene-level row"],
+  ["FX-P52-T1", "TMPRSS2", 0, "O10 MESDC2-TMPRSS2, the TMPRSS2 row"],
+  ["FX-P53-T1", "TMPRSS2", 1, "O11 TMPRSS2-ERG has no pair row at the pin: ERG's gene-level Fusion is Oncogenic, the TMPRSS2 row"],
+  ["FX-P53-T1", "ERG", 1, "O11 TMPRSS2-ERG, the ERG row"],
+  ["FX-P50-T1", "ROS1", 0, "O12 ROS1 one-gene FUSION: only a LUAD row"],
+  ["FX-P51-T1", "RB1", 0, "O12 RB1 one-gene UNKNOWN (class DEL): only a LUAD row"],
+  ["FX-P50-T1", "RB1", 0, "O12 RB1 one-gene UNKNOWN (class Intergenic)"],
+  ["FX-P51-T1", "SMAD4", 0, "O12 SMAD4 one-gene UNKNOWN (class Deletion)"],
+  ["FX-P50-T1", "SMAD4", 0, "O12 SMAD4 one-gene UNKNOWN (class NA)"],
+  ["FX-P51-T1", "NOTCH1", 0, "O12 NOTCH1 one-gene UNKNOWN (class NA)"],
+  ["FX-P52-T1", "CD74", 1, "O15 CD74-NRG1 with Event_Info blank: its no-tumour-type row is Oncogenic, the CD74 row"],
+  ["FX-P52-T1", "NRG1", 1, "O15 CD74-NRG1 with Event_Info blank, the NRG1 row"]
+];
+
+const compareCalls = (got: Call[], want: [string, string, 0 | 1, string][], tag: string) => {
+  ok(`${tag}one call per SV row of the fixture`, got.length === want.length, got.length + " rows, " + want.length + " expected");
+  for (const [sid, gene, d, why] of want) {
+    const found = got.filter((r) => bare(r.sample_unique_id) === sid && r.hugo_gene_symbol === gene);
+    ok(`${tag}${sid} ${gene}: ${d ? "driver" : "not a driver"} — ${why}`, found.length === 1 && Number(found[0].d) === d,
+      found.length === 1 ? "ours " + Number(found[0].d) : found.length + " rows");
+  }
+  const extra = got.filter((r) => !want.some(([sid, gene]) => bare(r.sample_unique_id) === sid && r.hugo_gene_symbol === gene));
+  ok(`${tag}no SV row beyond the expected ones`, extra.length === 0, extra.map((r) => r.sample_unique_id + " " + r.hugo_gene_symbol).join("; "));
+};
+
+compareCalls(await callsAt(PIN), SV_CALLS, `driverEventSql pin ${PIN}: `);
+compareCalls(await callsAt(OTHER), SV_CALLS.map(([s, g, , why]): [string, string, 0 | 1, string] =>
+  [s, g, 0, "O11 at fixture-older: no no-tumour-type row and no gene-level row at that release (was: " + why + ")"]), `driverEventSql pin ${OTHER}: `);
+compareCalls(await callsAt(PIN, ["no_such_study"]), SV_CALLS.map(([s, g]): [string, string, 0 | 1, string] =>
+  [s, g, 0, "O14 the lookup reads only the named studies' SVs, and another study is named"]), `driverEventSql pin ${PIN}, studies [no_such_study]: `);
+
+// O13: a mutation and a copy-number row keep their gene-level calls (peer-oncokb.tsv: KRAS G12C
+// Oncogenic, CDKN2A DELETION Oncogenic; KRAS G12C on FX-P01-T1, CDKN2A deep deletion on FX-P05-T1)
+const nonSv = async (where: string) => (await chQuery<{ d: number | string }>(
+  "SELECT toUInt8(" + driverEventSql(PIN, "", { db, studies: [STUDY] }) + ") AS d FROM " + db + ".genomic_event_derived WHERE cancer_study_identifier = '" +
+  STUDY + "' AND " + where, conn)).data.map((r) => Number(r.d));
+const kras = await nonSv(`sample_unique_id = '${STUDY}_FX-P01-T1' AND variant_type = 'mutation' AND hugo_gene_symbol = 'KRAS' AND mutation_variant = 'G12C'`);
+ok("O13 a mutation (KRAS G12C on FX-P01-T1, Oncogenic) is still a driver", kras.length > 0 && kras.every((d) => d === 1), JSON.stringify(kras));
+const cdkn2a = await nonSv(`sample_unique_id = '${STUDY}_FX-P05-T1' AND variant_type = 'cna' AND hugo_gene_symbol = 'CDKN2A' AND cna_alteration <= -2`);
+ok("O13 a copy-number row (CDKN2A deep deletion on FX-P05-T1, Oncogenic) is still a driver", cdkn2a.length > 0 && cdkn2a.every((d) => d === 1), JSON.stringify(cdkn2a));
+const notStored = await nonSv(`variant_type = 'mutation' AND (hugo_gene_symbol, mutation_variant) NOT IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb WHERE oncokb_version = '${PIN}' AND alteration_type = 'MUTATION')`);
+ok("O13 a mutation with no store row at the pin is not a driver", notStored.length > 0 && notStored.every((d) => d === 0), notStored.filter((d) => d !== 0).length + " of " + notStored.length + " called drivers");
+
+// Q: the samples an OQL query returns. The fixture holds no NTRK1 mutation or copy-number event
+// (asked of genomic_event_derived), so NTRK1: DRIVER is TPM3-NTRK1's sample alone.
+const samplesOf = async (q: string): Promise<string[] | string> => {
+  try {
+    const rows = (await chQuery<{ pid: string }>(oqlCasesSql(q, { oncokbPin: PIN, study: STUDY, db, unit: "sample" }), conn)).data;
+    return [...new Set(rows.map((r) => r.pid))].sort();
+  } catch (e) { return "error: " + String((e as Error).message).slice(0, 200); }
+};
+const ntrk1Other = (await chQuery<{ n: number | string }>("SELECT count() AS n FROM " + db + ".genomic_event_derived WHERE cancer_study_identifier = '" +
+  STUDY + "' AND hugo_gene_symbol = 'NTRK1' AND variant_type != 'structural_variant'", conn)).data;
+ok("Q3 premise: the fixture holds no NTRK1 mutation or copy-number event", Number(ntrk1Other[0]?.n) === 0, String(ntrk1Other[0]?.n));
+for (const [tag, q, want] of [
+  ["Q1 O1 O2", "ALK: FUSION_DRIVER", ["FX-P45-T1", "FX-P46-T1", "FX-P47-T1", "FX-P48-T1", "FX-P49-T1", "FX-P49-T2"]],
+  ["Q2 O3", "RET: FUSION_DRIVER", []],
+  ["Q3 O8", "NTRK1: DRIVER", ["FX-P53-T1"]],
+  ["Q4 no driver filter", "RET: FUSION", ["FX-P52-T1"]],
+  ["O15 (b) Event_Info blank", "CD74: FUSION_DRIVER", ["FX-P52-T1"]],
+  ["O15 (b) Event_Info blank", "NRG1: FUSION_DRIVER", ["FX-P52-T1"]]
+] as [string, string, string[]][]) {
+  const got = await samplesOf(q);
+  ok(`${tag} '${q}': ${want.join(", ") || "no one"}`, Array.isArray(got) && got.join(",") === [...want].sort().join(","),
+    Array.isArray(got) ? "got " + (got.join(", ") || "no one") : got);
+}
+
+// O15: an SV whose Event_Info is blank. The importer stores a blank SV text column as 'NA' (legacy
+// importer rule), so the key is 'NA' here; a warehouse whose structural_variant.event_info is NULL
+// takes the ifNull(…, '') on both sides of the key. (a) is SV_CALLS above, (b) the Q rows.
+const o15 = (await chQuery<{ e: string | null; n: number | string }>("SELECT event_info AS e, isNull(event_info) AS n FROM " + db +
+  ".structural_variant WHERE comments LIKE 'O15:%'", conn)).data;
+ok("O15 premise: the CD74-NRG1 SV is stored once, its blank Event_Info as 'NA' or NULL", o15.length === 1 && (Number(o15[0].n) === 1 || o15[0].e === "NA"),
+  JSON.stringify(o15));
+// (c) the oncoprint's in-memory path: each event's svk (SV_EVENT_KEY of its genomic_event_derived row) is
+// looked up in the driver key set (svDriverKeySetSql), which buildAnnotationIndex reads
+const keySet = new Set((await chQuery<{ k: string }>(svDriverKeySetSql(db, PIN, [STUDY], ["CD74", "NRG1"]), conn)).data.map((r) => r.k));
+const svks = (await chQuery<{ g: string; k: string | null }>("SELECT hugo_gene_symbol AS g, " + SV_EVENT_KEY + " AS k FROM " + db +
+  ".genomic_event_derived WHERE variant_type = 'structural_variant' AND cancer_study_identifier = '" + STUDY +
+  "' AND sample_unique_id = '" + STUDY + "_FX-P52-T1' AND hugo_gene_symbol IN ('CD74', 'NRG1')", conn)).data;
+for (const g of ["CD74", "NRG1"]) {
+  const r = svks.filter((x) => x.g === g);
+  ok(`O15 (c) FX-P52-T1 ${g}: the event's svk is in the oncoprint's driver key set`, r.length === 1 && r[0].k != null && keySet.has(r[0].k),
+    "svk " + JSON.stringify(r.map((x) => x.k)) + ", key set " + JSON.stringify([...keySet]));
+}
 
 console.log(`\n${checks - failures}/${checks} OncoKB SV checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
