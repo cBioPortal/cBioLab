@@ -25,7 +25,13 @@ export interface HotspotsView {
    * filters the mutation table to those protein positions. Applied where the figure is drawn, so a
    * change re-runs nothing.
    */
-  codons?: Record<string, number[]> }
+  codons?: Record<string, number[]>;
+  /**
+   * Each gene's y-axis maximum (the portal's Y-Axis Max: a slider up to the default, a number box beyond it;
+   * below 1 is drawn as 1); a stem taller than it is drawn capped at the top. Applied where the figure is
+   * drawn, so a change re-runs nothing. Omitted: the tallest stem, at least 5.
+   */
+  yMax?: Record<string, number> }
 /** Recurrent protein changes in one gene, with the cohort's mutated total. */
 /** One drawn stem: a codon, its height (distinct patient + change pairs), and how it is coloured. */
 export interface LollipopPosition {
@@ -77,6 +83,8 @@ declare module "../../types.ts" {
       hide?: string[];
       /** the codons selected on each gene's lollipop, as the figure draws them */
       codons?: Record<string, number[]>;
+      /** each gene's y-axis maximum the reader set, as the figure draws it */
+      yMax?: Record<string, number>;
       /** every study of the query is on GRCh38, so its transcript links go to GRCh38 Ensembl */
       grch38?: boolean;
       /** false: no driver source annotates these mutations, so the grid counts them by type alone (the portal's annotation off) */
