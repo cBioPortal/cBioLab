@@ -210,3 +210,26 @@ export function portalKeptUnits(samples: number, patients: number): string {
   if (samples !== patients) return samples + (samples === 1 ? " sample" : " samples") + " / " + patients + (patients === 1 ? " patient" : " patients");
   return samples + (samples === 1 ? " sample/patient" : " samples/patients");
 }
+
+/**
+ * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",
+ * "<1%" below one percent, else the whole percent, Math.round's (2.5 → "3%").
+ */
+export function portalPercentage(proportion: number): string {
+  const perc = 100 * proportion;
+  if (perc === 0) return "0%";
+  return perc < 1 ? "<1%" : Math.round(perc) + "%";
+}
+
+/**
+ * altered ÷ sequenced as the portal's percentAltered writes it (OncoprintUtils 857-876), the value of
+ * the Download tab's frequency file: "N/P" when nothing was sequenced; below 3% one decimal, dropped
+ * when it is 0 ("2.5%", "2%"); else a whole percent.
+ */
+export function portalPercentAltered(altered: number, sequenced: number): string {
+  if (sequenced === 0) return "N/P";
+  const p = altered / sequenced, percent = 100 * p;
+  let fixed = p < 0.03 ? percent.toFixed(1) : percent.toFixed();
+  if (p < 0.03 && fixed.endsWith("0")) fixed = percent.toFixed();
+  return fixed + "%";
+}
