@@ -93,6 +93,7 @@ The pure rules are in `lib/study-view-gene-tables.ts`, and the rows come from `g
 |---|---|---|---|
 | GU1 | Union | The checked genes filter as one clause: the samples altered in any of them (one OQL query of a line per gene) | STS-GT-9; MST |
 | GU2 | Intersection | The checked genes filter as a clause per gene: the samples altered in every one | STS-GT-9 |
+| GU3 | The table's own selection | A gene table is narrowed by its own checked genes as by any other filter: under KRAS the Mutated Genes table counts only the KRAS-mutated samples (KRAS 100%, every other gene its co-occurrence). Unlike the clinical charts, whose own filter is left out (STS-MD-6). Checked on cbioportal.org: brca under TP53 gives 347 profiled samples, TTN 83, PIK3CA 81 (unfiltered: 1,066; 187; 347) | StudyViewPageStore.ts:10022 (`studyViewFilter: this.filters`); 30-study-summary.md:653, STS-MD-6 |
 | GU3 | The choice | Offered with two or more rows checked. Union by default for the gene tables. The choice is kept by the browser and shared by the three gene tables | STS-GT-9 (localStorage by table type) |
 | GU4 | Applied rows | A gene the selection already filters on in this table (a line of one of the draft's OQL clauses) is pinned to the top, checked and disabled, in the filter's order | STS-GT-9 |
 | GU5 | Appended | A new filter is added to the selection's other filters (AND), never replacing them | STS-GT-9 |

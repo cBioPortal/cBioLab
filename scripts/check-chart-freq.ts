@@ -16,6 +16,8 @@
  * GP7, each fixture panel's genes by Hugo symbol, A to Z, as its data_gene_panel_*.txt lists them;
  * GP9, WES lists no genes; GP10, a panel the database does not hold is refused, naming it.
  *
+ * It also checks GU3 (gene-tables-cases.md): a gene table is narrowed by its own checked genes.
+ *
  * Run: node --env-file=.env.local scripts/check-chart-freq.ts
  * (connection b is `npm run peer-db`: export the CLICKHOUSE2_* lines it prints)
  */
@@ -129,6 +131,26 @@ try {
   const m = String((e as Error).message ?? e);
   ok("GP10 an unknown panel is refused, naming it", m.includes("NO_SUCH_PANEL"), m.split("\n")[0].slice(0, 300));
 }
+
+// GU3: a gene table is narrowed by its own checked genes (the portal sends its whole filter, the
+// table's own gene filter included, to fetchMutatedGenes)
+try {
+  const muts = readFileSync(new URL("../test/fixtures/peer-study/data_mutations.txt", import.meta.url), "utf8")
+    .split("\n").filter((l) => l && !l.startsWith("#"));
+  const mh = muts[0].split("\t"), gi = mh.indexOf("Hugo_Symbol"), si = mh.indexOf("Tumor_Sample_Barcode");
+  const mutated = (gene: string) => new Set(muts.slice(1).map((l) => l.split("\t")).filter((r) => r[gi] === gene).map((r) => r[si]));
+  const kras = mutated("KRAS"), tp53 = mutated("TP53");
+  const both = [...tp53].filter((x) => kras.has(x)).length;
+  const row = (r: Awaited<ReturnType<typeof buildExplore>>, g: string) => r.mutatedGenes?.find((x) => x.gene === g);
+  const plain = await buildExplore({ study: STUDY, conn, skipBins: true });
+  const own = await buildExplore({ study: STUDY, conn, skipBins: true, draft: { all: [{ kind: "oql", q: "KRAS" }] } as never });
+  ok("GU3 unfiltered: KRAS and TP53 count their mutated samples", row(plain, "KRAS")?.altered === kras.size && row(plain, "TP53")?.altered === tp53.size,
+    `KRAS ${row(plain, "KRAS")?.altered} want ${kras.size}, TP53 ${row(plain, "TP53")?.altered} want ${tp53.size}`);
+  ok("GU3 under KRAS: the table is narrowed by its own gene — KRAS reads every selected sample", row(own, "KRAS")?.altered === kras.size && row(own, "KRAS")?.profiled === kras.size,
+    `KRAS ${row(own, "KRAS")?.altered} of ${row(own, "KRAS")?.profiled}, want ${kras.size} of ${kras.size}`);
+  ok("GU3 under KRAS: TP53 counts only the samples mutated in both", row(own, "TP53")?.altered === both && (row(own, "TP53")?.profiled ?? 0) <= kras.size,
+    `TP53 ${row(own, "TP53")?.altered} of ${row(own, "TP53")?.profiled}, want ${both} of at most ${kras.size}`);
+} catch (e) { ok("GU3", false, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
 
 console.log(failures ? `\n${failures} failure(s)` : "\nall passed");
 process.exit(failures ? 1 : 0);
