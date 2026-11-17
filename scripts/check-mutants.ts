@@ -27,7 +27,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 /** the report's folder: docs/verification/ (what the page shows), or REPORT_DIR (what CI uploads) */
 const OUT = join(process.env.REPORT_DIR || join(ROOT, "docs/verification"), "mutants.json");
 
-type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "mutation-search-lollipop" | "sv-levels" | "enrichment-events";
+type Guard = "unit" | "cohort-logic" | "portal-parity" | "oncoprint-values" | "oncoprint-spectrum" | "oncokb-tumor-type" | "oncokb-sv" | "hotspot-drivers" | "results-oql" | "density" | "case-lists" | "gene-panels" | "plot-stats" | "mutation-fusions" | "mutation-columns" | "mutation-tab-states" | "patient-vaf" | "mutation-search-lollipop" | "sv-levels" | "enrichment-events" | "patient-sv";
 const GUARD_CMD: Record<Guard, string[]> = {
   "unit": ["npm", "test"],
   "cohort-logic": ["node", "--env-file=.env.local", "scripts/check-cohort-logic.ts"],
@@ -54,6 +54,7 @@ const GUARD_CMD: Record<Guard, string[]> = {
   "mutation-search-lollipop": ["node", "--env-file=.env.local", "scripts/check-mutation-search-lollipop.ts"],
   // the Genomic Alterations table's any-type counts, run on the fixture study's connection b
   "enrichment-events": ["node", "--env-file=.env.local", "scripts/check-enrichment-events.ts"],
+  "patient-sv": ["node", "--env-file=.env.local", "scripts/check-patient-sv.ts"],
 };
 
 interface Mutant {
@@ -530,6 +531,12 @@ const MUTANTS: Mutant[] = [
     effect: "A partner gene's gene-level fusion call makes a structural variant a driver even where OncoKB's call for the pair says it is not.",
     find: "\"toUInt8(if(\" + pr + \".found = 1, \" + pr + \".driver, greatest(\" + a1 + \".driver, \" + a2 + \".driver)))\"",
     replace: "\"toUInt8(greatest(\" + pr + \".driver, \" + a1 + \".driver, \" + a2 + \".driver))\"" },
+  { id: "oncokb-sv-oncoprint-tumour-type-rows", layer: "counts", guard: "oncokb-sv", file: "lib/sv-oncokb.ts",
+    effect: "The oncoprint and OQL DRIVER call a fusion a driver when OncoKB calls the pair oncogenic in any one sample's cancer, where the portal's oncoprint asks with no tumour type.",
+    find: " AND tumor_type = ''\\n\"", replace: "\\n\"" },
+  { id: "oncokb-sv-oncoprint-site1-only", layer: "counts", guard: "oncokb-sv", file: "lib/sv-oncokb.ts",
+    effect: "Only a fusion's first gene takes the pair's driver call, so the partner's oncoprint row and OQL query show the same fusion as a VUS.",
+    find: "[v.gene1, v.gene2] AS genes", replace: "[v.gene1] AS genes" },
   { id: "fusion-driver-tumour-type", layer: "counts", guard: "mutation-fusions", file: "lib/mutation-table.ts",
     effect: "A fusion row's driver status comes from OncoKB's call for the sample's tumour type, where the portal's driver call (badges, Show only drivers) asks with none, so a fusion can be a driver in the table and a VUS on the portal.",
     find: "\" AND vn.tumor_type = ''\\n\" : \"\")", replace: "\" AND vn.tumor_type = vk.tumorType\\n\" : \"\")" },
@@ -584,6 +591,9 @@ const MUTANTS: Mutant[] = [
   { id: "lollipop-badge-filter-narrows-badges", layer: "counts", guard: "mutation-search-lollipop", file: "lib/lollipop.ts",
     effect: "Hiding a badge narrows the badges' own counts, where the portal's badge counts ignore the badge filter.",
     find: "new Set([\"alteration\", \"proteinPos\"])", replace: "new Set([\"proteinPos\"])" },
+  { id: "oncokb-sv-oncoprint-primary-only", layer: "counts", guard: "unit", file: "lib/annotation.ts",
+    effect: "A study on a second instance has its fusions' pair calls looked up on the primary, finds none, and draws every fusion as a VUS.",
+    find: "const c = connOf ? connOf(s) : PRIMARY;", replace: "const c = PRIMARY;" },
   { id: "oncokb-sort-3a-3b-swapped", layer: "counts", guard: "sv-levels", file: "lib/sv-oncokb.ts",
     effect: "A level 3B call sorts above a level 3A one in the Annotation sort, where the portal scores 3A 3 and 3B 2.",
     find: "['1', '2', '3A', '3B', '4'], [6, 5, 3, 2, 1]", replace: "['1', '2', '3A', '3B', '4'], [6, 5, 2, 3, 1]" },
@@ -777,6 +787,22 @@ const MUTANTS: Mutant[] = [
     effect: "The Patient page offers Genomic Evolution to a patient with several samples but no mutation with a VAF, where the portal hides the tab (PTB-MD-3).",
     find: " || data.vaf !== true ? [] :",
     replace: " ? [] :" },
+  { id: "patient-sv-key-unsorted", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table keys a row by its fields in order, so a fusion recorded A–B in one sample and B–A in another is two rows, where the portal shows one.",
+    find: "return \"arrayStringConcat(arraySort([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"]), '_')\";",
+    replace: "return \"arrayStringConcat([\" + [gene1, gene2, pos1, pos2, chr1, chr2, cls].map(s).join(\", \") + \"], '_')\";" },
+  { id: "patient-sv-row-per-sample", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table lists an event once per sample carrying it, where the portal lists it once naming the samples.",
+    find: "  FROM s GROUP BY k\\n",
+    replace: "  FROM s GROUP BY k, sid\\n" },
+  { id: "patient-sv-list-counts-records", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient list counts a patient's structural-variant records, not the rows the table lists, so a fusion in two samples counts twice.",
+    find: "\"  SELECT p.stable_id AS pid, uniqExact(\" + svRowKey(",
+    replace: "\"  SELECT p.stable_id AS pid, count(\" + svRowKey(" },
+  { id: "patient-sv-status-sortable", layer: "counts", guard: "patient-sv", file: "lib/patient-alterations.ts",
+    effect: "The Patient SV table offers a sort by Status, which the portal does not sort.",
+    find: "{ ...text(\"status\", \"Status\"), unsorted: true },",
+    replace: "text(\"status\", \"Status\")," },
   { id: "patient-vaf-sample-repeated", layer: "counts", guard: "patient-vaf", file: "lib/patient-alterations.ts",
     effect: "A mutation recorded twice in one sample draws two bars in that sample's slot and two tooltip lines.",
     find: "indexOf(arrayMap(y -> y.1, \" + arr + \"), x.1) = i",
@@ -1311,8 +1337,8 @@ const MUTANTS: Mutant[] = [
     replace: "\"\" +" },
   { id: "oncoprint-ranged-positions-swapped", layer: "counts", guard: "oncoprint-values", file: "lib/oncoprint.ts",
     effect: "A ranged mutation's start and end are swapped, so a range wants E746_A750del by its wrong ends.",
-    find: "\"       proteinPosStart AS ps, proteinPosEnd AS pe\\n\"",
-    replace: "\"       proteinPosEnd AS ps, proteinPosStart AS pe\\n\"" },
+    find: "\"       proteinPosStart AS ps, proteinPosEnd AS pe, '' AS svk\\n\"",
+    replace: "\"       proteinPosEnd AS ps, proteinPosStart AS pe, '' AS svk\\n\"" },
   { id: "oql-sql-pchange-case-sensitive", layer: "counts", guard: "oncoprint-values", file: "lib/oql.ts",
     effect: "The cohort's KRAS: MUT=g12c picks no patient, where the portal compares protein changes ignoring case.",
     find: "conds.push(\"lower(g.mutation_variant) = \" + sq(spec.pchange.toLowerCase()));",

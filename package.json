@@ -44,6 +44,7 @@
     "check:sv-levels": "node --env-file=.env.local scripts/check-sv-levels.ts",
     "check:patient-vaf": "node --env-file=.env.local scripts/check-patient-vaf.ts",
     "check:mutation-search-lollipop": "node --env-file=.env.local scripts/check-mutation-search-lollipop.ts",
+    "check:patient-sv": "node --env-file=.env.local scripts/check-patient-sv.ts",
     "check:hotspot-drivers": "node --env-file=.env.local scripts/check-hotspot-drivers.ts",
     "check:results-oql": "node --env-file=.env.local scripts/check-results-oql.ts",
     "check:density": "node --env-file=.env.local scripts/check-density.ts",
