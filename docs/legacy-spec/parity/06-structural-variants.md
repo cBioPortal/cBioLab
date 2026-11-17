@@ -40,8 +40,8 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 | §2 Table (TB) | 6 | 1 | 3 | 2 | 0 | 0 | 0 | Unchanged: numbered pager, header filters, CSV; default sort differs |
 | §2 Columns (COL) | 23 | 16 | 4 | 0 | 2 | 1 | 0 | Annotation reads the pair now, blank here; no Exon/Intron, no Center |
 | §3 Annotation (AN) | 5 | 1 | 1 | 3 | 0 | 0 | 0 | The portal's query; no header icons, card or empty-call icon |
-| §4 Modes (MD) | 7 | 4 | 1 | 0 | 1 | 1 | 0 | Settings leave the tab alone, as legacy; no duplicate suffix |
-| §6 Statistics (STM) | 5 | 2 | 0 | 1 | 2 | 0 | 0 | Fusions on the Mutations tab; duplicates and exon rank not shown |
+| §4 Modes (MD) | 7 | 5 | 1 | 0 | 0 | 1 | 0 | Settings leave the tab alone, as legacy; the duplicate suffix as legacy |
+| §6 Statistics (STM) | 5 | 3 | 0 | 1 | 1 | 0 | 0 | Fusions on the Mutations tab and duplicates as legacy; exon rank not shown |
 
 ---
 
@@ -51,7 +51,7 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 |---|---|---|---|
 | 1 | **Annotation column blank** on all 236 TMPRSS2 rows: the pair lookup is the portal's (#219) but prad's pairs are not in the store; plain header, no icon, no card | SV-COL-13, AN-1, AN-2, AN-4, AN-5 | SV tab: the Annotation column |
 | 2 | **Default sort** "drivers, then gene 1, gene 2" (AFF3-TMPRSS2 first) vs Annotation ↓ (TMPRSS2-BRAF first) | SV-TB-4, STM-3 | SV tab (added in this re-score) |
-| 3 | **No duplicate suffix** ("includes 2 duplicate structural variants…") | SV-TB-1, MD-7, STM-1 | SV tab (added in this re-score) |
+| 3 | ~~**No duplicate suffix**~~ ("includes 2 duplicate structural variants…"): in (#302) | SV-TB-1, MD-7, STM-1 | SV tab (added in this re-score) |
 | 4 | **No experimental-feature alert, no "Beta!"** | SV-1, SV-5 | SV tab (added in this re-score) |
 | 5 | **No Site1/Site2 Exon/Intron columns** | SV-COL-6, COL-10, STM-2 | SV tab: Exon and Intron columns |
 
@@ -150,7 +150,7 @@ Re-score of 2026-11-16: 4 verdicts changed. The OncoKB lookup is now the portal'
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| SV-STM-1 | ✅ | BC | Grouped by patient + both sites' chromosome and position, Σ(group − 1) over every row (`svRowSource` duplicateKey); TMPRSS2 2 |
+| SV-STM-1 | ✅ | BC | Grouped by patient + both sites' chromosome and position, Σ(group − 1) over every row (`svRowSource` duplicateKey); TMPRSS2 2; keyed within a study, where legacy keys on the patient id alone |
 | SV-STM-2 | ❌ | C | Unchanged: no exon rank |
 | SV-STM-3 | 🔶 | C | Unchanged: driver bit, then gene 1, gene 2 |
 | SV-STM-4 | ✅ | B | 236 / 220 / 11 identical |

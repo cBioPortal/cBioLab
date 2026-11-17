@@ -4,7 +4,7 @@ import { geneSymbols } from "../../gene-tracks.ts";
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterationOf } from "../../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
-import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
+import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows, keyOnFirstRun } from "../rows.ts";
 import { overLimit, refuse, viewOql } from "../shared.ts";
 import type { MutationsView } from "./types.ts";
 import { mutationsMethod } from "./method.ts";
@@ -83,7 +83,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   let r: Rows;
   try {
-    r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS), size, (parts) => (db) => mutationRowSource(parts, db, gene, pin, pins, lines.oql),
+    r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS), size, (parts) => (db) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql)),
       ctx.values ? { column: ctx.values, numeric: !!MUTATION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   const rows = r.rows.map((x) => {
@@ -101,7 +101,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
     kind: "mutations", cohorts: vNames, mutations,
     method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, variantPins: gn, queryText: describeQuery(q, MUTATION_COLUMNS),
       sortName: q.sort ? MUTATION_COLUMNS.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
-      shown: rows.length, lists: r.lists, excluded, instances: r.groups }),
+      shown: rows.length, lists: r.lists, excluded, instances: r.groups, ...(r.duplicates !== undefined ? { duplicates: r.duplicates } : {}) }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every " + gene + " mutation call in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples, one row per call; uncalled mutations are left out, as the portal leaves them out. " +

@@ -1,7 +1,8 @@
 "use client";
 // The sv view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
 import { AnnotationBadge } from "../portal-bodies.tsx";
-import { DataTable, duplicatesNote, specQuery } from "../../_table/DataTable.tsx";
+import { DataTable, specQuery } from "../../_table/DataTable.tsx";
+import { portalDuplicatesNote } from "../../../lib/chart/format.ts";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindUi } from "./kind-ui.ts";
@@ -13,7 +14,7 @@ function SvBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnResultOf<
   const t = v.sv;
   return (
     <div className="pb">
-      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.genes.join(", ") + " structural variants"} countNote={duplicatesNote(t.duplicates, "structural variant", "structural variants")} onQuery={onQuery}
+      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.genes.join(", ") + " structural variants"} countNote={portalDuplicatesNote(t.duplicates, "structural variant", "structural variants")} onQuery={onQuery}
         num={(_id, x) => x.toLocaleString()}
         cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
           // as on the portal's table, a sample id opens that sample's page, in a new tab so the table keeps its place

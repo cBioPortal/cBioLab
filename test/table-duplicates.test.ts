@@ -29,10 +29,11 @@ const { countsSql } = await import("../lib/table-query.ts");
 const { mutationRowSource } = await import("../lib/mutation-table.ts");
 const { svRowSource } = await import("../lib/sv-table.ts");
 const { PatientLevelResolver } = await import("../lib/federation.ts");
-const { runRows } = await import("../lib/views/rows.ts");
+// read off the modules, so this file loads before portalDuplicatesNote and keyOnFirstRun exist and each test fails on its own
+const rowsLib = await import("../lib/views/rows.ts") as Record<string, unknown> & typeof import("../lib/views/rows.ts");
+const format = await import("../lib/chart/format.ts") as Record<string, unknown>;
 const { runSv } = await import("../lib/views/sv/run.ts");
 const { runMutations } = await import("../lib/views/mutations/run.ts");
-// read off the module, so this file loads before duplicatesNote exists and each test fails on its own
 const dataTable = await import("../app/_table/DataTable.tsx") as Record<string, unknown>;
 type RowSource = import("../lib/table-query.ts").RowSource;
 type TableQuery = import("../lib/table-query.ts").TableQuery;
@@ -96,11 +97,11 @@ describe("D1 countsSql over a source with a duplicate key", () => {
 
 // ---------------------------------------------------------------- D5: the note's words
 const note = (n: number | undefined, one: string, many: string): string | undefined => {
-  const f = dataTable.duplicatesNote;
-  assert.equal(typeof f, "function", "app/_table/DataTable.tsx exports duplicatesNote");
+  const f = format.portalDuplicatesNote;
+  assert.equal(typeof f, "function", "lib/chart/format.ts exports portalDuplicatesNote");
   return (f as (n: number | undefined, one: string, many: string) => string | undefined)(n, one, many);
 };
-describe("D5 duplicatesNote", () => {
+describe("D5 portalDuplicatesNote", () => {
   test("D5 none (0 or undefined): no note", () => {
     assert.equal(note(0, "mutation", "mutations"), undefined);
     assert.equal(note(undefined, "mutation", "mutations"), undefined);
@@ -113,19 +114,22 @@ describe("D5 duplicatesNote", () => {
     assert.equal(note(38, "mutation", "mutations"), "includes 38 duplicate mutations in patients with multiple samples");
     assert.equal(note(38, "structural variant", "structural variants"), "includes 38 duplicate structural variants in patients with multiple samples");
   });
+  test("D5 1234: the bare number, as the portal writes it (String(n), no thousands separator)", () => {
+    assert.equal(note(1234, "mutation", "mutations"), "includes 1234 duplicate mutations in patients with multiple samples");
+  });
 });
 
 // ---------------------------------------------------------------- D6: the table's title
 const COLS = [{ id: "sample", name: "Sample ID", numeric: false }];
-const table = (total: number, all: number, search?: string) => ({
+const table = (total: number, all: number, search?: string, lists = [{ cohort: "A", study: "s1", total, all }]) => ({
   columns: COLS, shown: ["sample"], defaults: ["sample"], query: search ? { search } : {},
   rows: [{ cohort: "A", study: "s1", patient: "P1", sample: "S1", values: ["S1"] }], offset: 0, pageSize: 25,
-  lists: [{ cohort: "A", study: "s1", total, all }], total, all,
+  lists, total, all,
 });
-/** the title's text: the dt-title span, with React's text separators and any markup dropped */
+/** the title's text: the dt-title span up to the bar's spacer, with React's text separators and any markup dropped */
 const titleOf = (props: Record<string, unknown>): string => {
   const html = renderToStaticMarkup(createElement(dataTable.DataTable as never, { vi: 0, onQuery: () => {}, ...props } as never));
-  const m = /<span class="dt-title[^"]*">([\s\S]*?)<\/span>/.exec(html);
+  const m = /<span class="dt-title[^"]*">([\s\S]*?)<span class="spacer"/.exec(html);
   assert.ok(m, "the table has a title");
   return m[1].replace(/<!-- -->/g, "").replace(/<[^>]*>/g, "");
 };
@@ -137,6 +141,10 @@ describe("D6 DataTable with countNote", () => {
   test("D6 searched: \"<total> of <all> <unit>: <note>\"", () => {
     const t = table(1, 24, "FX-P01-T1");
     assert.equal(titleOf({ t, query: t.query, unit: "KRAS mutations", countNote: NOTE }), "1 of 24 KRAS mutations: " + NOTE);
+  });
+  test("D6 several cohorts and studies: \"<total> <unit> across N cohorts and studies: <note>\"", () => {
+    const t = table(24, 24, undefined, [{ cohort: "A", study: "s1", total: 20, all: 20 }, { cohort: "B", study: "s2", total: 4, all: 4 }]);
+    assert.equal(titleOf({ t, unit: "KRAS mutations", countNote: NOTE }), "24 KRAS mutations across 2 cohorts and studies: " + NOTE);
   });
   test("D6 no countNote: the title is the count alone", () => {
     assert.equal(titleOf({ t: table(24, 24), unit: "KRAS mutations" }), "24 KRAS mutations");
@@ -188,7 +196,7 @@ const mutations = async (resolvers: Record<string, unknown>, studies: string[]) 
   return (r as unknown as { mutations: { duplicates?: number; total: number; all: number } }).mutations;
 };
 const viaRows = (resolvers: Record<string, unknown>, studies: string[], remote?: Record<string, unknown>) =>
-  runRows(ctx(resolvers, studies), "t", studies, {} as TableQuery, ["name"], ["name"], 25, () => () => keyed, undefined, remote as never);
+  rowsLib.runRows(ctx(resolvers, studies), "t", studies, {} as TableQuery, ["name"], ["name"], 25, () => () => keyed, undefined, remote as never);
 
 describe("D7 a counts answer's dup carried through to runRows", () => {
   test("D7 PatientLevelResolver.rowsCounts (what federation-api answers for mode \"counts\") keeps the dup the database answers", async () => {
@@ -215,6 +223,38 @@ describe("D7 a counts answer's dup carried through to runRows", () => {
   test("D7 counts without a dup: no duplicates", async () => {
     const got = await viaRows({ s1: local("db1", [{ cohort: "A", study: "s1", n: 2, all: 5 }]) }, ["s1"]);
     assert.equal((got as { duplicates?: number }).duplicates, undefined);
+  });
+  test("D7 (a) one group reports dup 3, another's counts carry no dup: no duplicates (the sum is unknown, not smaller)", async () => {
+    const got = await viaRows({ s1: local("db1", [{ cohort: "A", study: "s1", n: 2, all: 5, dup: 3 }]), s2: local("db2", [{ cohort: "A", study: "s2", n: 3, all: 4 }]) }, ["s1", "s2"]);
+    assert.equal(got.groups, 2);
+    assert.equal((got as { duplicates?: number }).duplicates, undefined);
+  });
+  test("D7 (b) a part with no counts row (no rows at all) counts as 0: with a part's dup 2, duplicates 2", async () => {
+    const got = await viaRows({ s1: local("db1", []), s2: local("db2", [{ cohort: "A", study: "s2", n: 3, all: 4, dup: 2 }]) }, ["s1", "s2"]);
+    assert.equal((got as { duplicates?: number }).duplicates, 2);
+    assert.equal(got.all, 4);
+  });
+  test("D7 (c) a dup given as the string \"3\": not a valid dup, so no duplicates", async () => {
+    const asText = await viaRows({ s1: local("db1", [{ cohort: "A", study: "s1", n: 2, all: 5, dup: "3" as unknown as number }]) }, ["s1"]);
+    assert.equal((asText as { duplicates?: number }).duplicates, undefined, "a string dup");
+  });
+  test("D7 (c) a dup that is not an integer from 0 to all (more than all, negative, fractional): no duplicates", async () => {
+    const over = await viaRows({ s1: local("db1", [{ cohort: "A", study: "s1", n: 2, all: 5, dup: 6 }]) }, ["s1"]);
+    assert.equal((over as { duplicates?: number }).duplicates, undefined, "dup > all");
+    for (const bad of [-1, 1.5]) {
+      const got = await viaRows({ s1: local("db1", [{ cohort: "A", study: "s1", n: 2, all: 5, dup: bad }]) }, ["s1"]);
+      assert.equal((got as { duplicates?: number }).duplicates, undefined, "dup " + bad);
+    }
+  });
+  test("D7 keyOnFirstRun: a page or a column's values drop the duplicate key (no dup in the counts SQL); the first run keeps it", () => {
+    const f = rowsLib.keyOnFirstRun as unknown;
+    assert.equal(typeof f, "function", "lib/views/rows.ts exports keyOnFirstRun");
+    const k = f as (ctx: Record<string, unknown>, s: RowSource) => RowSource;
+    assert.equal(k({ page: { offset: 25, limit: 25 } }, keyed).duplicateKey, undefined);
+    assert.equal(k({ values: "proteinChange" }, keyed).duplicateKey, undefined);
+    assert.doesNotMatch(countsSql(k({ page: { offset: 25, limit: 25 } }, keyed), {}, ["name"]), /AS dup/);
+    assert.deepEqual(k({}, keyed), keyed);
+    assert.equal(k({}, keyed).duplicateKey, "(study, patient, x)");
   });
   test("D7 the sv view's result carries duplicates (summed across databases), with total and all as before", async () => {
     const r = await sv({ s1: local("db1", [{ cohort: "A", study: "s1", n: 2, all: 5, dup: 1 }]), s2: local("db2", [{ cohort: "A", study: "s2", n: 3, all: 4, dup: 2 }]) }, ["s1", "s2"]);

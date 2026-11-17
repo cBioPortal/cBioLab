@@ -416,9 +416,13 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * only this instance knows what its panels cover. That is also why a federated
  * co-occurrence is more correct than one computed from pooled exports.
  */
-/** the query's lines a Mutations tab follows, and how their DRIVER reads */
-/** a table's rows per cohort and study: kept by the query (`n`), every one (`all`), and duplicates among every one (`dup`, RowSource.duplicateKey) */
+/**
+ * A table's rows per cohort and study: kept by the query (`n`), every one (`all`), and duplicates among
+ * every one (`dup`, RowSource.duplicateKey). The Mutations and SV tables page only their own instances'
+ * rows (no `remote`), so today a peer's counts never carry `dup`.
+ */
 export interface RowCounts { cohort: string; study: string; n: number; all: number; dup?: number }
+/** the query's lines a Mutations tab follows, and how their DRIVER reads */
 export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
 /** each gene's mutation filter under the query's lines, where one applies */
 export function mutationFilters(oql: LollipopOql, genes: string[], o: { study: string; db: string; oncokbPin: string | null; hotspotPins: VariantPins | null }): MutationFilters {

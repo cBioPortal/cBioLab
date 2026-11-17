@@ -90,10 +90,6 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
 }
 
 /** The pager under a table: previous, a window of page numbers, next; the rows shown; the page size. */
-/** the portal's note on a table's count for one patient's rows repeated across samples (MutationMapper multipleMutationInfo); undefined when none */
-export const duplicatesNote = (n: number | undefined, one: string, many: string): string | undefined =>
-  n ? "includes " + n.toLocaleString("en-US") + " duplicate " + (n === 1 ? one : many) + " in patients with multiple samples" : undefined;
-
 export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
   const nums: (number | null)[] = [];
   const lo = Math.max(0, p.page - 2), hi = Math.min(p.pages - 1, p.page + 2);
@@ -414,8 +410,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   return (
     <div className="dt">
       <div className="dt-bar">
-        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}{countNote ? ": " + countNote : null}
-          {multi ? <span className="meta"> across {t.lists.length} cohorts and studies</span> : null}</span>
+        <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}</> : <>{t.total.toLocaleString()} {unit}</>}
+          {multi ? <span className="meta"> across {t.lists.length} cohorts and studies</span> : null}{countNote ? ": " + countNote : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>

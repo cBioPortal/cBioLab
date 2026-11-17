@@ -201,3 +201,10 @@ export const portalLocale = (x: number): string => x.toLocaleString("en-US");
  */
 export const portalRange = (min: number, max: number): string =>
   min === max ? portalLocale(min) : "(" + portalLocale(min) + ", " + portalLocale(max) + "]";
+
+/**
+ * The portal's note on a table's count for one patient's rows repeated across samples, as MutationMapper
+ * multipleMutationInfo writes it (the bare number); undefined when there are none.
+ */
+export const portalDuplicatesNote = (n: number | undefined, one: string, many: string): string | undefined =>
+  n ? "includes " + String(n) + " duplicate " + (n === 1 ? one : many) + " in patients with multiple samples" : undefined;

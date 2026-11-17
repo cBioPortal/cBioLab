@@ -96,14 +96,18 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
     return { rows: [], lists: [], total: 0, all: 0, offset: 0, groups: groups.length, values: mergeValues(values.column, values.numeric, got as Record<string, unknown>[][]) };
   }
   const lists: Rows["lists"] = [];
-  let all = 0, duplicates: number | undefined;
+  let all = 0, duplicates = 0, dupParts = 0, parts = 0;
   await Promise.all(groups.map(async (g) => {
     const counts = await g.backend.counts(g.parts, reads);
     for (const p of g.parts) {
       const c = counts.find((x) => x.cohort === p.cohort && x.study === p.study);
       lists.push({ cohort: p.cohort, study: p.study, total: c?.n || 0, all: c?.all || 0 });
       g.total += c?.n || 0; all += c?.all || 0;
-      if (c?.dup != null) duplicates = (duplicates || 0) + c.dup;
+      parts++;
+      // a part that reports no duplicates (a source without a key, a site on older code) leaves the sum unknown, not smaller
+      const dup = c?.dup;
+      if (!c) dupParts++;
+      else if (typeof dup === "number" && Number.isInteger(dup) && dup >= 0 && dup <= c.all) { duplicates += dup; dupParts++; }
     }
   }));
   const total = groups.reduce((n, g) => n + g.total, 0);
@@ -135,7 +139,7 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
   })() : Promise.resolve(undefined)]);
   const order = (l: { cohort: string; study: string }) => ctx.vNames.indexOf(l.cohort) * 1000 + ctx.vStudies.indexOf(l.study);
   lists.sort((a, b) => order(a) - order(b));
-  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}), ...(duplicates !== undefined ? { duplicates } : {}) };
+  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}), ...(parts && dupParts === parts ? { duplicates } : {}) };
 }
 
 /** A view's query as the document gives it, with an older `sort.attribute` read as `sort.column`. */
@@ -199,3 +203,10 @@ export function pagedTable(v: ViewResult, table?: string): TableRows<unknown> | 
     default: return undefined;
   }
 }
+
+/**
+ * The source as a view's first run asks for it; a later page or a column's values drop its duplicate key,
+ * since the duplicates count every row whatever the query and the first run already reported them.
+ */
+export const keyOnFirstRun = (ctx: Pick<ViewRun, "page" | "values">, src: RowSource): RowSource =>
+  ctx.page || ctx.values ? { ...src, duplicateKey: undefined } : src;

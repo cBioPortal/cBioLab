@@ -4,13 +4,14 @@ import { BUILD_COMMIT } from "../../build-info.ts";
 import type { SvProfiled } from "./types.ts";
 
 export function svMethod(t: { genes: string[]; oncokbPin: string | null; queryText: string; sortName: string | null; desc: boolean; shown: number;
-  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; profiled: SvProfiled[] }): MethodRecord {
+  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; profiled: SvProfiled[]; duplicates?: number }): MethodRecord {
   const genes = t.genes.join(", ");
   const steps = [
     ...tableSteps({ label: "sv", what: "structural variants of " + genes, queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
       source: "every call in the study's structural-variant profile, in each cohort's samples, whose gene 1 or gene 2 is " + (t.genes.length > 1 ? "one of " : "") + genes +
         " (matched by Entrez id, as the portal asks), once however many of them it involves, with the sample's CANCER_TYPE_DETAILED where recorded" +
-        (t.oncokbPin ? " and OncoKB " + t.oncokbPin + "'s call for the pair in the sample's tumour type (CANCER_TYPE_DETAILED; the study's cancer type for a sample with no cancer type), or, for a study whose structural variants are not synced, the stronger of the two partners' gene-level fusion calls" : "") + ".",
+        (t.oncokbPin ? " and OncoKB " + t.oncokbPin + "'s call for the pair in the sample's tumour type (CANCER_TYPE_DETAILED; the study's cancer type for a sample with no cancer type), or, for a study whose structural variants are not synced, the stronger of the two partners' gene-level fusion calls" : "") + "." +
+        (t.duplicates !== undefined ? " Duplicates (" + t.duplicates + "): the rows grouped by study, patient and both sites' chromosome and position, the count of rows beyond the first in each group, over every row whatever the search and filters (the portal's ResultsViewStructuralVariantMapperDataStore, which keys on the patient id alone)." : ""),
       order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : (t.oncokbPin ? "drivers first, then " : "") + "by gene 1, then gene 2") + ", then sample" }),
     {
       kind: "fetch" as const, title: "Count the samples profiled for each gene's structural variants",

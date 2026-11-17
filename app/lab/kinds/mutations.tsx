@@ -1,7 +1,8 @@
 "use client";
 // The mutations view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
 import { AnnotationBadge } from "../portal-bodies.tsx";
-import { DataTable, duplicatesNote, specQuery } from "../../_table/DataTable.tsx";
+import { DataTable, specQuery } from "../../_table/DataTable.tsx";
+import { portalDuplicatesNote } from "../../../lib/chart/format.ts";
 import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
@@ -19,7 +20,7 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
   return (
     <div className="pb">
       {tips.node}
-      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} countNote={duplicatesNote(t.duplicates, "mutation", "mutations")} onQuery={onQuery}
+      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} countNote={portalDuplicatesNote(t.duplicates, "mutation", "mutations")} onQuery={onQuery}
         num={(id, x) => id === "vaf" ? x.toFixed(2) : id === "vafNormal" ? String(x) : x.toLocaleString()}
         colHead={(id) => id === "functionalImpact" ? <FunctionalImpactHead show={tips.show} /> : null}
         cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
