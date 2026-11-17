@@ -22,8 +22,8 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 42 |
-| 🟡 partial | 25 |
+| ✅ match | 41 |
+| 🟡 partial | 26 |
 | 🔶 different | 6 |
 | ❌ missing | 14 |
 | 🐞 ok | 4 |
@@ -201,7 +201,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-TL-ZM-1 | ✅ | B | Year ticks "0, 1y … 5y" ✅; past 150 px a year, a short tick each month, every 4th labelled ("4m", "1y 8m"; before 0 "-8m", "-1y 8m"), every one past 700 px (monthTicks), as the portal's TickAxis (lgg P04: 0 · 4m · 8m · 1y · 1y 4m …) |
+| PAT-TL-ZM-1 | 🟡 | B | Year ticks "0, 1y … 5y" ✅; no month minor ticks |
 | PAT-TL-ZM-2 | 🟡 | B | ≥4 empty years cut to a dashed mark ✅; restored by an "every year" checkbox (in the document), not by clicking it |
 | PAT-TL-ZM-3 | ❌ | C | No drag-to-zoom, no cursor line |
 | PAT-TL-ZM-4 | ❌ | C | No download (PDF/PNG/SVG/ZIP) |

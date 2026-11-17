@@ -17,6 +17,8 @@ export interface TimelineView extends TableQuery {
   collapsed?: string[];
   /** draw every year rather than cutting runs of four or more empty years to one mark (default false) */
   expandGaps?: boolean;
+  /** list the patient's events as tables, one per event type, as the portal's Clinical Data tab does (lib/timeline-tables.ts), in place of the drawing */
+  tables?: boolean;
   /** patients per page of the list (default 25, at most 1000) */
   rows?: number;
 }
