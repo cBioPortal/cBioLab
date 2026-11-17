@@ -39,7 +39,7 @@ const { AlterationGrid, classesOf } = await import("../app/_lollipop/AlterationG
 const { ColorLegend } = await import("../app/_lollipop/ColorLegend.tsx");
 
 // a stand-in warehouse: every statement answers no rows (routing answers the one study, a size one patient)
-let sent: string[] = [];
+const sent: string[] = [];
 setChTransport(async ({ query }) => {
   sent.push(query);
   const data = /SELECT cancer_study_identifier AS id, name FROM fed_a\.cancer_study/.test(query) ? [{ id: "s1", name: "Study one" }]
@@ -186,7 +186,6 @@ describe("R the report says whether drivers are told apart", () => {
 
   test("R7 the federation API carries lollipopDrivers to the peer's lollipopCounts as its 5th argument", async () => {
     const seen: unknown[][] = [];
-    const saved = [PatientLevelResolver.prototype.lollipopCounts, AggregateResolver.prototype.lollipopCounts];
     const fake = async function (this: unknown, ...args: unknown[]) {
       seen.push(args);
       return { changes: [], types: [], totals: [], cohortSamples: 0, minCount: 1, annotated: false };
@@ -199,8 +198,9 @@ describe("R the report says whether drivers are told apart", () => {
       const without = await answerFederation("aggregates", { study: "s1", cohort: { all: [] }, lollipopGenes: ["KRAS"] });
       assert.equal(without.status, 200, JSON.stringify(without.body));
     } finally {
-      (PatientLevelResolver.prototype as { lollipopCounts: unknown }).lollipopCounts = saved[0];
-      (AggregateResolver.prototype as { lollipopCounts: unknown }).lollipopCounts = saved[1];
+      // both inherit lollipopCounts from their base: removing the stand-in restores it
+      delete (PatientLevelResolver.prototype as { lollipopCounts?: unknown }).lollipopCounts;
+      delete (AggregateResolver.prototype as { lollipopCounts?: unknown }).lollipopCounts;
     }
     assert.equal(seen.length, 2);
     assert.deepEqual(seen[0][4], { oncokb: false });
@@ -217,7 +217,7 @@ describe("R the report says whether drivers are told apart", () => {
     }) as typeof fetch;
     try {
       const r = new RemoteAggregateResolver("s1", "http://peer.invalid/api/federation/v1", { id: "peer", mode: "aggregate-only", label: "test peer", conn: PRIMARY });
-      const call = r.lollipopCounts as unknown as Lollipop;
+      const call = Object.getOwnPropertyDescriptor(RemoteAggregateResolver.prototype, "lollipopCounts")?.value as Lollipop;
       await call.call(r, { all: [] }, ["KRAS"], 1, undefined, { hotspots: false });
       await call.call(r, { all: [] }, ["KRAS"], 1);
     } finally { globalThis.fetch = original; }
