@@ -912,7 +912,8 @@
         "display": {
           "chart": "line",
           "logScale": false,
-          "dataRange": false
+          "dataRange": false,
+          "expandGaps": false
         }
       },
       "participation": {
@@ -927,7 +928,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "IM-GBM-28: 4 samples in collection order, placed by the day each was collected (days from diagnosis, from the study's timeline) on the patient's timeline axis — a tick a year across all the patient's events, empty stretches of four or more years cut, as the portal's. 8 mutations; 8 are drawn. VAF is variant reads ÷ (variant + reference reads) in each sample. A mutation called in one sample is followed into the others: there it is an uncalled mutation where the study's uncalled-mutations profile found variant reads (drawn with that VAF), not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene — never 0. A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment. Fusions recorded as mutations are left out, as the portal leaves them out. The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: 36 patients. Sorted with the most samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "IM-GBM-28: 4 samples in collection order, placed by the day each was collected (days from diagnosis, from the study's timeline) on the patient's timeline axis — a tick a year across all the patient's events, as the portal's. 8 mutations; 8 are drawn. VAF is variant reads ÷ (variant + reference reads) in each sample. A mutation called in one sample is followed into the others: there it is an uncalled mutation where the study's uncalled-mutations profile found variant reads (drawn with that VAF), not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene — never 0. A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment. Fusions recorded as mutations are left out, as the portal leaves them out. The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: 36 patients. Sorted with the most samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {

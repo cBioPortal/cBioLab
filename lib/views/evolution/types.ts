@@ -90,7 +90,7 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   /** placed by day: the patient's timeline axis, a tick a year from the first to the last of all the patient's events, empty stretches of four or more years cut, as the portal's line chart shares the timeline's axis */
   axis?: AxisTick[];
   /** the display as drawn, from the spec */
-  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean };
+  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean };
 }
 
 declare module "../../types.ts" {

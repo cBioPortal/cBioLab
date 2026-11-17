@@ -5,7 +5,7 @@
 import type { DrawnResultOf } from "../../types.ts";
 import { palette, frame, caption, label, textWidth, legend, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, fmtInt, esc, FS, SW, r1, type SvgOpts, type Scale } from "../../svg-kit.ts";
 import { STYLE, numericColor, encodeNumeric } from "../../oncoprint-style.ts";
-import { YEAR, dayScale, monthTicks, yearLabel, type AxisTick } from "../../timeline-tracks.ts";
+import { axisMarks, dayScale, type AxisTick } from "../../timeline-tracks.ts";
 import type { EvolutionCell, EvolutionMutation, EvolutionSample } from "./types.ts";
 
 /** the table columns that identify a mutation: one key names its line or heatmap row and its table row alike */
@@ -59,44 +59,35 @@ export function lineCells(m: EvolutionMutation): { i: number; c: EvolutionCell }
 }
 
 /**
- * The line chart's x axis as the portal's, which is the patient timeline's (TickAxis): a line and a
- * label at each year ("0", "1y", "-2y"), month ticks inside a year wide enough for them, a squiggle
- * where empty years are cut; a faint guide up through the plot at each year. Labels that would touch
- * the one before them or a cut are left out.
+ * The line chart's x axis as the portal's, which is the patient timeline's (TickAxis), laid out by the
+ * timeline's own axisMarks: a line and a label at each year ("0", "1y", "-2y"), month ticks inside a
+ * year wide enough for them, a squiggle where empty years are cut with a dashed guide up through the
+ * plot, and a faint guide up through the plot at each year; the day-0 line in the muted ink, as the
+ * timeline draws it. Labels share one row under the axis.
  */
 function timeAxis(ticks: AxisTick[], X: (day: number) => number, left: number, right: number, axY: number, top: number, p: ReturnType<typeof palette>): string[] {
   const out = [`<line x1="${r1(left)}" y1="${r1(axY)}" x2="${r1(right)}" y2="${r1(axY)}" stroke="${p.muted}" stroke-width="${SW.line}"/>`];
-  const pxPerYear = (right - left) / Math.max(1, ticks.filter((t) => !t.trim).length);
-  const cuts = ticks.filter((t) => t.trim).map((t) => X(t.start));
-  // each label row (years, months) keeps its own right edge so far
-  const lastRight = new Map<number, number>();
-  const put = (x: number, text: string, y: number, fill: string) => {
-    const w = textWidth(text, FS.small), cx = Math.min(Math.max(x, left + w / 2), right - w / 2);
-    if (cx - w / 2 <= (lastRight.get(y) ?? -Infinity) + 4 || cuts.some((c) => Math.abs(c - cx) <= w / 2 + 8)) return;
-    out.push(label(cx, y, text, { size: FS.small, fill, anchor: "middle" }));
-    lastRight.set(y, cx + w / 2);
-  };
-  for (const t of ticks) {
-    if (t.trim) {
-      const cx = X(t.start);
-      out.push(`<g transform="translate(${r1(cx)} ${r1(axY)})"><title>${t.trim.years} years with no events, cut</title><path d="M-6 0 q3 -6 6 0 t6 0" fill="none" stroke="${p.muted}" stroke-width="1.2"/></g>`);
-      continue;
-    }
-    for (let d = Math.ceil(t.start / YEAR) * YEAR; d <= t.end; d += YEAR) {
-      const x = X(d);
-      out.push(`<line x1="${r1(x)}" x2="${r1(x)}" y1="${r1(top)}" y2="${r1(axY)}" stroke="${p.line}" stroke-width="${SW.hair}"/>`,
-        `<line x1="${r1(x)}" x2="${r1(x)}" y1="${r1(axY)}" y2="${r1(axY + 6)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
-      put(x, yearLabel(d), axY + 17, p.ink);
-      for (const m of monthTicks(d, pxPerYear)) {
-        if (m.day > t.end) break;
-        const mx = X(m.day);
-        out.push(`<line x1="${r1(mx)}" x2="${r1(mx)}" y1="${r1(axY)}" y2="${r1(axY + 3)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
-        if (m.label) put(mx, m.label, axY + 29, p.muted);
-      }
+  const ly = axY + 17;
+  for (const m of axisMarks(ticks, X, left, right, (t) => textWidth(t, FS.small))) {
+    if (m.kind === "cut")
+      out.push(`<g transform="translate(${r1(m.x)} 0)"><title>${m.years} years with no events, cut</title>` +
+        `<path d="M-6 ${r1(axY)} q3 -6 6 0 t6 0" fill="none" stroke="${p.muted}" stroke-width="1.2"/>` +
+        `<line x1="0" x2="0" y1="${r1(top)}" y2="${r1(axY)}" stroke="${p.muted}" stroke-width="${SW.hair}" stroke-dasharray="2 3"/></g>`);
+    else if (m.kind === "year") {
+      out.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(top)}" y2="${r1(axY)}" stroke="${m.day === 0 ? p.muted : p.line}" stroke-width="${SW.hair}"/>`,
+        `<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(axY)}" y2="${r1(axY + 6)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) out.push(label(m.label.x, ly, m.label.text, { size: FS.small, fill: p.muted, anchor: "middle" }));
+    } else {
+      out.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(axY)}" y2="${r1(axY + 3)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) out.push(label(m.x, ly, m.label, { size: FS.small, fill: p.muted, anchor: "middle" }));
     }
   }
+  out.push(label((left + right) / 2, ly + 15, TIME_TITLE, { size: FS.small, fill: p.muted, anchor: "middle" }));
   return out;
 }
+
+/** the time axis's title */
+const TIME_TITLE = "Time from diagnosis, when each sample was collected";
 
 function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
@@ -129,7 +120,7 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
     const axY = markTop + (Math.max(...rows) + 1) * (2 * MARK_R + 2) + 4;
     if (e.axis?.length) {
       out.push(...timeAxis(e.axis, X, left, right, axY, top, p));
-      bottom = axY + 34;
+      bottom = axY + 38;
     } else {
       out.push(axisBottom(X as Scale, axY, p, { title: "Days from diagnosis, when each sample was collected", fmt: (t) => fmtInt(t), minX: 0, maxX: W, line: true }));
       bottom = axY + bottomAxisHeight("x");

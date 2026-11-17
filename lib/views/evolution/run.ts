@@ -2,12 +2,12 @@
 // patient's mutations followed across their samples (cBioPortal's Genomic Evolution tab) — a table
 // view of the mutations (lib/table-query.ts, row sources in ./sql.ts) and the figure drawn from
 // every mutation its query keeps (./figure.ts).
-import type { ViewResult, TableRows } from "../../types.ts";
+import type { ViewResult, TableRows, PatientEvent } from "../../types.ts";
 import { hasPatientTimeline, type PatientLevelCapable, type Resolver } from "../../federation.ts";
 import type { TablePart } from "../../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../../table-query.ts";
 import { PATIENT_ID } from "../../patient-timeline.ts";
-import { axisTicks, eventItems, sampleDays, sampleMarks, type AxisTick } from "../../timeline-tracks.ts";
+import { axisTicks, timelineAxisItems, sampleDays, sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { plural, refuse } from "../shared.ts";
@@ -72,7 +72,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   const mq = viewQuery(view.mutations || {});
   { const bad = checkQuery(mq, EVOLUTION_COLUMNS); if (bad) return no("mutations: " + bad); }
   if (ctx.table != null && ctx.table !== "mutations") return no("table is mutations, or none for the patient list");
-  const display = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange } as const;
+  const display = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange, expandGaps: !!view.expandGaps } as const;
 
   // who may answer: a local patient-level participant (no peer serves this view's rows)
   const { holders, excluded } = rowHolders(ctx);
@@ -88,7 +88,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     runRows(opts.whole ? { ...ctx, page: undefined, values: undefined } : ctx, "evolution", holders, q, defaults, shown, size, (parts) => (db) => evolutionPatientsSource(parts, db),
       opts.values && ctx.values && !ctx.table ? { column: ctx.values, numeric: !!EVOLUTION_PATIENT_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined, undefined, opts.locate);
   /** the patient's samples in order — numbered markers, collection days, mutation panels — read whole */
-  const samplesOf = async (pt: { study: string; id: string }): Promise<{ samples: EvolutionSample[]; axis: AxisTick[] }> => {
+  const samplesOf = async (pt: { study: string; id: string }): Promise<{ samples: EvolutionSample[]; events: PatientEvent[] }> => {
     const res = ctx.resolvers[pt.study];
     if (!hasPatientTimeline(res)) throw new Error(pt.study + " cannot disclose a patient's samples and timeline");
     const [tl, panels] = await Promise.all([res.patientTimeline(pt.id),
@@ -100,7 +100,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     const samples = [...sampleMarks(tl.samples, tl.events).values()].filter((m) => own.has(m.id)).map((m) => ({
       id: m.id, type: tl.samples.find((s) => s.id === m.id)?.type || "", label: m.label, color: m.color,
       day: days.has(m.id) ? days.get(m.id)! : null, panel: panel.get(m.id) || null }));
-    return { samples, axis: axisTicks(eventItems(tl.events), !view.expandGaps).ticks };
+    return { samples, events: tl.events };
   };
   const mutationRows = (pt: { study: string; id: string }, order: string[], size: number) =>
     runRows(ctx, "evolution:mutations", [pt.study], mq, EVOLUTION_DEFAULT_COLUMNS, shownColumns(mq, EVOLUTION_COLUMNS, EVOLUTION_DEFAULT_COLUMNS), size,
@@ -160,7 +160,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
         return no(row ? whyNot(want, row) : want.id + " is not a patient of this cohort in " + want.study);
       }
     }
-    const { samples, axis } = await samplesOf(want);
+    const { samples, events } = await samplesOf(want);
     const order = samples.map((s) => s.id);
     const [position, m] = await Promise.all([
       listPosition(r, !!view.patient, (first) => listRows(1, { locate: first })),
@@ -174,6 +174,9 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     const noVaf = over ? 0 : kept.length - drawn!.length;
     const noDay = samples.filter((s) => s.day == null).map((s) => s.id);
     const x: EvolutionResult["x"] = view.sequential || noDay.length ? "sequence" : "time";
+    // the line chart placed by day is drawn on the patient timeline's axis, built from the same items
+    const axis = x === "time" && display.chart === "line" ? axisTicks(timelineAxisItems(events), !view.expandGaps).ticks : null;
+    const cut = !!axis?.some((t) => t.trim);
     const undrawn = over ? "the mutation table's query keeps " + m.total.toLocaleString("en-US") + " mutations; one figure draws at most " + EVOLUTION_DRAW_MAX.toLocaleString("en-US") + " — narrow the table's search or filters" : undefined;
     const notSeq = samples.filter((s) => !s.panel).map((s) => s.id);
     const npCells = drawn ? drawn.reduce((a, d) => a + d.cells.filter((c) => c.status === "np").length, 0) : 0;
@@ -183,12 +186,13 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     return {
       kind: "evolution", cohorts: vNames,
       evolution: { ...list, patient: { ...want, samples }, position, mutations: table, drawn, ...(undrawn ? { undrawn } : {}), noVaf, x,
-        ...(!view.sequential && noDay.length ? { noDay } : {}), ...(x === "time" ? { axis } : {}), display },
+        ...(!view.sequential && noDay.length ? { noDay } : {}), ...(axis ? { axis } : {}), display },
       method: evolutionMethod({ cohorts: vNames, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length, lists: r.lists, excluded, instances: r.groups,
         patient: want, samples: samples.length, table: { total: m.total, all: m.all, queryText: tq }, drawn: drawn?.length ?? null, noVaf }),
       participation: ctx.participationFor(ctx.vStudies, true),
       ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
-      caveat: want.id + ": " + plural(samples.length, "sample") + " in " + (x === "time" ? "collection order, placed by the day each was collected (days from diagnosis, from the study's timeline) on the patient's timeline axis — a tick a year across all the patient's events, empty stretches of four or more years cut, as the portal's" : "order (the numbered markers: by collection day where the timeline records it, then primary before metastasis, then by id), evenly spaced") + ". " +
+      caveat: want.id + ": " + plural(samples.length, "sample") + " in " + (x === "time" ? "collection order, placed by the day each was collected (days from diagnosis, from the study's timeline)" +
+          (axis ? " on the patient's timeline axis — a tick a year across all the patient's events, as the portal's" + (cut ? ", empty stretches of four or more years cut" : view.expandGaps ? ", every year shown" : "") : "") : "order (the numbered markers: by collection day where the timeline records it, then primary before metastasis, then by id), evenly spaced") + ". " +
         (!view.sequential && noDay.length ? "The samples are drawn in sequence because " + (noDay.length === samples.length ? "no sample's" : plural(noDay.length, "sample") + "'s") + " collection day is recorded (" + noDay.join(", ") + "). " : "") +
         (over ? "Not drawn: " + undrawn + ". " : (tq ? m.total.toLocaleString("en-US") + " of " + plural(m.all, "mutation") + " kept by the table's query (" + tq + "); " : plural(m.all, "mutation") + "; ") +
           drawn!.length.toLocaleString("en-US") + (drawn!.length === 1 ? " is" : " are") + " drawn" + (noVaf ? " — " + plural(noVaf, "mutation") + " with no allele counts in any sample " + (noVaf === 1 ? "is" : "are") + " listed but not drawn" : "") + ". ") +

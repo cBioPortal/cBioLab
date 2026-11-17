@@ -70,6 +70,6 @@ export const mutants: Mutant[] = [
     replace: "const shown = true;" },
   { id: "evolution-axis-samples-only", layer: "counts", guard: "unit", file: "lib/views/evolution/run.ts",
     effect: "The Genomic Evolution line chart's time axis ends at the last sample, not the patient's last clinical event, so it is shorter than the portal's (the timeline's axis).",
-    find: "axisTicks(eventItems(tl.events), !view.expandGaps)",
-    replace: "axisTicks(eventItems(tl.events.filter((ev) => sampleDays([ev]).size > 0)), !view.expandGaps)" },
+    find: "axisTicks(timelineAxisItems(events), !view.expandGaps)",
+    replace: "axisTicks(timelineAxisItems(events.filter((ev) => sampleDays([ev]).size > 0)), !view.expandGaps)" },
 ];
