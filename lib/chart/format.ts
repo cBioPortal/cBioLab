@@ -225,6 +225,16 @@ export const portalLocale = (x: number): string => x.toLocaleString("en-US");
 export const portalRange = (min: number, max: number): string =>
   min === max ? portalLocale(min) : "(" + portalLocale(min) + ", " + portalLocale(max) + "]";
 
+/** a MutSig / GISTIC q-value as the portal's gene-table download writes it (getQValue, StudyViewUtils.tsx:2431): 0 as "0", else 3-digit exponential */
+export function portalQValue(q: number): string {
+  return q === 0 ? "0" : q.toExponential(3);
+}
+
+/** a q-value as the portal's MutSig and GISTIC icon tooltips write it: `(q || 0).toExponential(3)` (MutSig.tsx, Gistic.tsx) */
+export function portalQTip(q: number): string {
+  return (q || 0).toExponential(3);
+}
+
 /**
  * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",
  * "<1%" below one percent, else the whole percent, Math.round's (2.5 → "3%").

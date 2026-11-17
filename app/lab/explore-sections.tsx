@@ -22,7 +22,7 @@ import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
-import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, freqTipLines, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
+import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, freqTipLines, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
@@ -1302,6 +1302,11 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
               applied={appliedSet.has(meta.oql(g))}>
               <span className="gname">
                 {g.gene}
+                {(() => {
+                  const icon = qValueIcon(kind, g.qValue);
+                  return icon && <span className="qicon ml-1 inline-flex size-3.5 items-center justify-center rounded-sm border border-border text-[10px] font-semibold leading-none text-muted-foreground"
+                    data-tip={icon.tip.join("\n\n")} aria-label={(icon.text === "M" ? "MutSig" : "GISTIC") + " " + icon.tip[icon.tip.length - 1]}>{icon.text}</span>;
+                })()}
                 <button type="button" className={cn("gqueue", queuedGenes.includes(g.gene) && "on")} aria-label={"Select gene " + g.gene}
                   aria-pressed={queuedGenes.includes(g.gene)}
                   data-tip={queuedGenes.includes(g.gene) ? "remove " + g.gene + " from the query queue" : "queue " + g.gene + " for a query (Query genes…)"}

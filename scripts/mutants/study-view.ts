@@ -274,4 +274,12 @@ export const mutants: Mutant[] = [
     effect: "Turning a chart off also drops an any-of filter that names another attribute too.",
     find: "leaves.every((l) => isClinicalLeaf(l) && l.attribute === attribute)",
     replace: "leaves.some((l) => isClinicalLeaf(l) && l.attribute === attribute)" },
+  { id: "gistic-highest-q", layer: "counts", guard: "unit", file: "lib/study-view-gene-tables.ts",
+    effect: "A CNA gene listed by several GISTIC regions shows the last region's q-value, where the portal shows the lowest.",
+    find: "if (cur == null || r.q < cur) out.set(k, r.q);",
+    replace: "out.set(k, r.q);" },
+  { id: "gistic-any-call", layer: "counts", guard: "unit", file: "lib/study-view-gene-tables.ts",
+    effect: "A CNA row takes GISTIC's q-value for the gene whatever its call, so an amplification shows a deletion peak's q-value.",
+    find: "gistic.get(r.gene + \"|\" + r.cna)",
+    replace: "(gistic.get(r.gene + \"|2\") ?? gistic.get(r.gene + \"|-2\"))" },
 ];
