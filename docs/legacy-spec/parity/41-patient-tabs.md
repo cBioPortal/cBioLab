@@ -23,9 +23,9 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | Verdict | Count |
 |---|---|
 | ✅ match | 23 |
-| 🟡 partial | 15 |
+| 🟡 partial | 16 |
 | 🔶 different | 10 |
-| ❌ missing | 30 |
+| ❌ missing | 29 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
 | N/A | 3 |
@@ -140,7 +140,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-CD-1 | 🔶 | B | Two cards "Patient", "Samples"; no Timeline Data section |
 | PTB-CD-2 | 🔶 | B | One row, attributes as columns (P04 · 4 · 1:DECEASED · 22 …); per-column filter + CSV ✅; no Attribute \| Value, no priority order, no 1-decimal format, no panel links |
 | PTB-CD-3 | 🔶 | B | One row per sample, patient attributes repeated; legacy one column per sample |
-| PTB-CD-4 | ❌ | B | No per-event-type timeline tables |
+| PTB-CD-4 | 🟡 | B | Timeline Data: a table per event type, START_DATE · STOP_DATE · EVENT_TYPE · each attribute key in first-seen order, PATIENT_ID and STYLE_* left out, days as recorded, each sortable (as text) and filterable ✅ (lgg P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows — the portal API's counts); laid out as its own card under the two tables |
 
 ### §4 Mutational Signatures
 
@@ -152,7 +152,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-MS-4 | ✅ | B | "Sample: SP1003 \| Single Base Substitution (SBS) count: 347" + ⓘ |
 | PTB-MS-5 | 🟡 | B | Category strip, contexts, "Single Base Substitution (%)" ✅; no SVG/PNG/PDF button |
 | PTB-MS-6 | ✅ | C | Row click → COSMIC v3.3 reference below (`reference.ts`) |
-| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; paged 25 of 65 (legacy all); extra "Signature contributions" bar chart; Copy / Download as the portal's table.tsv ✅ (every row in the table's sort, the search not narrowing it, "<1%"/whole percents, CRLF; pancan_pcawg_2020 DO1000: 65 rows, SBS40 65%, SBS5 22%, SBS1 13% as the API's 0.654/0.2208/0.1252) |
+| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; paged 25 of 65 (legacy all); extra "Signature contributions" bar chart; no download (tracked) |
 
 ### §5 Files & Links, resources, pathology, tissue, trials, custom tabs
 

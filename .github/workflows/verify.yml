@@ -94,7 +94,7 @@ jobs:
 
   gate-warehouse:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
@@ -181,7 +181,7 @@ jobs:
 
   gate-e2e:
     if: github.event_name != 'merge_group'
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
@@ -224,7 +224,7 @@ jobs:
   planted-bugs:
     needs: gate-warehouse
     if: ${{ (!cancelled()) && github.event_name != 'merge_group' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read

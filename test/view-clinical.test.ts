@@ -10,6 +10,7 @@ import type { AttrStats } from "../lib/federation.ts";
 import type { ClinicalRow } from "../lib/views/clinical/types.ts";
 import { kindText } from "./support/kind-text.ts";
 import { clinicalKind } from "../lib/views/clinical/kind.ts";
+import { benjaminiHochberg } from "../lib/stats.ts";
 
 /** a numeric attribute's description from its values, with the complete histogram */
 function num(attribute: string, xs: number[], per: "patient" | "sample" = "patient"): AttrStats {
@@ -291,7 +292,8 @@ describe("clinical: every attribute the study declares (allAttributes, CMP-CL-2)
     const rows = rowsOf(v);
     assert.deepEqual(rows.map((r) => r.attribute).sort(), ["PFS_STATUS", "SEX", "WEIGHT"]);
     assert.deepEqual(rows.map((r) => r.label).sort(), ["Patient Weight", "Progression Status", "Sex"]);
-    assert.match(v.note!, /Every clinical attribute the study declares is compared \(3\), but each survival endpoint's _MONTHS \/ _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR, as on cBioPortal\./);
+    assert.match(v.note!, /Every clinical attribute the study declares is compared \(3\), but each survival endpoint's _MONTHS \/ _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR are not listed, as on cBioPortal\./);
+    assert.match(v.note!, /across the 7 tested attributes, 4 of them tested but not listed/);
   });
   test("45 attributes are asked for in batches of at most 20, and all tested", async () => {
     const { c, batches } = listing(Object.fromEntries(Array.from({ length: 45 }, (_, i) => ["ATTR_" + String(i).padStart(2, "0"), "Attr " + i])));
@@ -354,5 +356,128 @@ describe("clinical: numeric attributes by rank, as the portal (rankTests, CMP-ST
     assert.ok(v.method!.steps.some((s) => /^Kruskal–Wallis for each numeric attribute/.test(s.title)));
     assert.match(v.method!.python!, /ranked = \["W"\]/);
     assert.match(v.method!.python!, /p_values\[attr\] = kruskal\(\*values\)\.pvalue/);
+  });
+});
+
+describe("clinical: q-values over every tested attribute, listed or not (allAttributes, CMP-STM-8, CMP-CL-2)", () => {
+  // The portal's ComparisonStore takes BH over every enrichment the backend returns; its table then hides the
+  // survival pairs, AGE_LAST_FU_YEARS and BIRTH_YEAR. So those are tested and counted in n, though not listed.
+  type Pair = [AttrStats, AttrStats];
+  const two = (a: string, x: Record<string, number>, y: Record<string, number>): Pair => [cat(a, x), cat(a, y)];
+  const constant = (a: string): Pair => [cat(a, { only: 4 }), cat(a, { only: 4 })];
+  const sep = (a: string): Pair => [num(a, [1, 2, 3]), num(a, [4, 5, 6])];
+  /** one study declaring every key of `spec` in order; spec[attr] = [cohort A's description, cohort B's] */
+  function site(spec: Record<string, Pair>) {
+    const { c } = ctx({ A: ["s1"], B: ["s1"] }, { s1: {} });
+    const r = (c.resolvers as Record<string, any>).s1;
+    r.attributeStats = async (def: { name: string }, attrs: string[]) =>
+      attrs.filter((a) => spec[a]).map((a) => spec[a][def.name === "A" ? 0 : 1]);
+    r.viewAggregate = async () => [];
+    r.viewMeta = async () => Object.keys(spec).map((a) => ({ a, label: a + " label" }));
+    return c;
+  }
+  const runView = async (view: object, c: ViewRun) => { const r = await runClinical({ kind: "clinical", ...view } as never, c); return r instanceof Untimed ? r.result : r; };
+  const all = (c: ViewRun) => runView({ allAttributes: true }, c);
+  /** p-values for the five attributes, all distinct, from the cases worked above and Pearson χ² on 2×2 tables */
+  const five = (): Record<string, Pair> => ({
+    A: two("A", { x: 3, y: 1 }, { x: 1, y: 3 }),                       // χ² 2, p 0.1573
+    B: two("B", { x: 4, y: 0 }, { x: 1, y: 3 }),                       // χ² 4.8, p 0.0285
+    OS_MONTHS: sep("OS_MONTHS"),                                       // Welch t, p 0.0213
+    OS_STATUS: two("OS_STATUS", { x: 2, y: 2 }, { x: 1, y: 3 }),       // χ² 0.5333, p 0.4652
+    AGE_LAST_FU_YEARS: two("AGE_LAST_FU_YEARS", { x: 5, y: 1 }, { x: 1, y: 5 }), // χ² 5.3333, p 0.0209
+  });
+  /** the p each attribute gets when it is the only one asked for, so q = p */
+  const soloP = async (pair: Pair) => rowsOf(await runView({ attributes: [pair[0].attribute] }, ctx({ A: ["s1"], B: ["s1"] }, { s1: { A: [pair[0]], B: [pair[1]] } }).c))[0].p!;
+  async function expectedQ(spec: Record<string, Pair>, tested: string[]) {
+    const ps = await Promise.all(tested.map((a) => soloP(spec[a])));
+    const qs = benjaminiHochberg(ps);
+    return Object.fromEntries(tested.map((a, i) => [a, qs[i]]));
+  }
+
+  test("row 1: only the listed attributes are rows — the survival pair and AGE_LAST_FU_YEARS are not", async () => {
+    const rows = rowsOf(await all(site(five())));
+    assert.deepEqual(rows.map((r) => r.attribute).sort(), ["A", "B"]);
+  });
+
+  test("row 2: each listed row's q is Benjamini–Hochberg over all five p-values, not over the two listed", async () => {
+    const spec = five();
+    const q = await expectedQ(spec, Object.keys(spec));
+    const rows = rowsOf(await all(site(spec)));
+    for (const r of rows) near(r.q, q[r.attribute], 1e-9);
+    // over the two listed alone, q(B) would be 2·0.0285 = 0.0569 and q(A) = 0.1573; over five, 0.0474 and 0.1966
+    const b = rows.find((r) => r.attribute === "B")!;
+    const a = rows.find((r) => r.attribute === "A")!;
+    near(b.q, 0.047433, 1e-5);
+    near(a.q, 0.196624, 1e-5);
+    assert.notEqual(a.q, a.p, "BH over two would leave the larger p unchanged");
+  });
+
+  test("row 3: an untestable hidden attribute is not in n and not listed", async () => {
+    const spec = { ...five(), AGE_LAST_FU_YEARS: constant("AGE_LAST_FU_YEARS") };
+    const q = await expectedQ(spec, ["A", "B", "OS_MONTHS", "OS_STATUS"]);
+    const v = await all(site(spec));
+    const rows = rowsOf(v);
+    assert.deepEqual(rows.map((r) => r.attribute).sort(), ["A", "B"]);
+    for (const r of rows) near(r.q, q[r.attribute], 1e-9);
+    assert.match(v.note!, /across the 4 tested attributes, 2 of them tested but not listed/);
+    assert.doesNotMatch(v.note!, /listed as not tested/);
+  });
+
+  test("row 4: a _MONTHS without its _STATUS is not a survival pair — listed and tested as any attribute", async () => {
+    const spec = { A: five().A, B: five().B, PFS_MONTHS: sep("PFS_MONTHS") };
+    const q = await expectedQ(spec, ["A", "B", "PFS_MONTHS"]);
+    const v = await all(site(spec));
+    const rows = rowsOf(v);
+    assert.deepEqual(rows.map((r) => r.attribute).sort(), ["A", "B", "PFS_MONTHS"]);
+    for (const r of rows) near(r.q, q[r.attribute], 1e-9);
+    assert.match(v.note!, /across the 3 tested attributes/);
+    assert.doesNotMatch(v.note!, /tested but not listed/);
+  });
+
+  test("row 5: named attributes — nothing hidden is added, q over the named tested ones", async () => {
+    const spec = five();
+    const q = await expectedQ(spec, ["A", "B"]);
+    const v = await runView({ attributes: ["A", "B"] }, site(spec));
+    const rows = rowsOf(v);
+    assert.deepEqual(rows.map((r) => r.attribute).sort(), ["A", "B"]);
+    for (const r of rows) near(r.q, q[r.attribute], 1e-9);
+    near(rows.find((r) => r.attribute === "B")!.q, 2 * 0.0284597, 1e-5);
+    assert.match(v.note!, /across the 2 tested attributes/);
+    assert.doesNotMatch(v.note!, /tested but not listed/);
+  });
+
+  test("row 6: the note gives N tested and M of them not listed", async () => {
+    const v = await all(site(five()));
+    assert.match(v.note!, /Benjamini–Hochberg across the 5 tested attributes, 3 of them tested but not listed/);
+  });
+
+  test("row 7: the method record lists every tested attribute, hidden ones included, so its script reproduces each q", async () => {
+    const spec = five();
+    const q = await expectedQ(spec, Object.keys(spec));
+    const m = (await all(site(spec))).method!;
+    assert.ok(m.check, "a check record");
+    for (const a of Object.keys(spec)) {
+      assert.ok(m.check!["clinical:" + a + ":p"], "p of " + a + " in the check record");
+      near(m.check!["clinical:" + a + ":q"]?.v, q[a], 1e-9);
+    }
+    const listed = m.steps.find((s) => s.title === "List the studies' clinical attributes")!;
+    assert.equal(listed.rowsOut, 5);
+    assert.match(listed.detail!, /AGE_LAST_FU_YEARS, OS_MONTHS, OS_STATUS/);
+    assert.match(m.steps.find((s) => /^Benjamini–Hochberg/.test(s.title))!.detail!, /over the 5 tested attributes/);
+    const statParams = m.steps.flatMap((s) => (s.kind === "statistic" ? s.params || [] : []).map(([name]) => name));
+    for (const a of Object.keys(spec)) assert.ok(statParams.includes(a), a + " among the tested in the method steps");
+    assert.ok(m.python, "a script");
+    for (const a of Object.keys(spec)) for (const co of ["A", "B"]) assert.ok(m.python!.includes('"' + co + ",s1," + a + ","), a + " of cohort " + co + " in the script's data");
+    assert.match(m.python!, /multipletests\(list\(p_values\.values\(\)\), method="fdr_bh"\)/, "BH over every attribute the script tests");
+  });
+
+  test("row 8: the note's untested count counts listed rows only", async () => {
+    const spec = { ...five(), C: constant("C"), BIRTH_YEAR: constant("BIRTH_YEAR") };
+    const v = await all(site(spec));
+    const rows = rowsOf(v);
+    assert.deepEqual(rows.map((r) => r.attribute).sort(), ["A", "B", "C"]);
+    assert.ok(rows.find((r) => r.attribute === "C")!.skipped);
+    assert.match(v.note!, /across the 5 tested attributes, 3 of them tested but not listed/);
+    assert.match(v.note!, /1 attribute is listed as not tested/);
   });
 });
