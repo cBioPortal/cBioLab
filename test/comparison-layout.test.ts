@@ -153,5 +153,6 @@ test("Genomic Alterations is one table over every alteration type, under the por
     assert.equal(view.kind, "enrichment");
     assert.equal(view.alteration, "any");
     assert.equal(view.events, undefined, "every type by default");
+    assert.equal(view.minAltered, 1, "every gene tested is listed, as the portal's table (CMM-AL-5)");
   }
 });

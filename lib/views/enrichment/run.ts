@@ -8,6 +8,7 @@ import type { ViewRun } from "../run.ts";
 import { overLimit, cytobands, answering, refuse, niceCeil, askEachSite } from "../shared.ts";
 import type { EnrichmentView, EnrichmentGene } from "./types.ts";
 import { enrichmentMethod } from "./method.ts";
+import { enrichmentRow, toColumns } from "./rows.ts";
 
 const ENRICH_ROWS = 300;
 /** the genes "Genes with highest frequency in any group" draws */
@@ -77,10 +78,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     const p = two
       ? fisherExact(cells[0].altered, cells[0].profiled - cells[0].altered, cells[1].altered, cells[1].profiled - cells[1].altered)
       : chiSquareTest(cells.map((c) => [c.altered, c.profiled - c.altered])).p;
-    const shares = cells.map((c) => c.altered / c.profiled);
-    const best = shares.indexOf(Math.max(...shares));
-    tested.push({ gene: g, cells, ...(two ? { log2Ratio: shares[0] > 0 && shares[1] > 0 ? Math.log2(shares[0] / shares[1]) : null } : {}),
-      p, q: 1, enrichedIn: vNames[best] });
+    tested.push(enrichmentRow(g, vNames, cells.map((c) => c.altered), cells.map((c) => c.profiled), p, 1));
   }
   if (!tested.length) return refuse("enrichment", ctx, "no gene had a " + word + " in these cohorts, profiled in each of them");
   benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
@@ -93,8 +91,8 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   // share, the order before it (by p) kept among ties (EnrichmentsUtil compareByAlterationPercentage)
   const highest = (g: EnrichmentGene) => Math.max(...g.cells.map((c) => c.altered / c.profiled));
   const topFrequency = [...tested].sort((a, b) => highest(b) - highest(a)).slice(0, TOP_FREQUENCY);
-  const bands = await cytobands(ok, rows.map((g) => g.gene));
-  for (const g of rows) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
+  const bands = await cytobands(ok, listed.map((g) => g.gene));
+  for (const g of listed) { const b = bands.get(g.gene); if (b) g.cytoband = b; }
   const labels = rows.slice(0, label).map((g) => g.gene);
   let grid: NonNullable<ViewResultOf<"enrichment">["enrichment"]>["grid"];
   if (two) {
@@ -119,7 +117,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   return {
     kind: "enrichment", cohorts: vNames,
     enrichment: { alteration: word, ...(events ? { events } : {}), measure, groups: vNames, tested: tested.length, untested, hidden, significant, minAltered, test,
-      rows, topFrequency, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
+      rows, ...(listed.length > rows.length ? { all: toColumns(listed) } : {}), topFrequency, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
     method: enrichmentMethod({ alteration: word, union: !!events, measure, oncokbPin: pin, cohorts: vNames, minAltered, test, two, perSite,
       tested: tested.length, untested, hidden, results: rows.map((g) => ({ gene: g.gene, p: g.p, q: g.q })) }),
     participation: ctx.participationFor(ctx.vStudies, false),
@@ -132,7 +130,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
       tested.length.toLocaleString("en-US") + " genes tested with a " + test + "; q is Benjamini–Hochberg across all of them. " +
       (untested ? untested.toLocaleString("en-US") + " altered gene" + (untested === 1 ? " was" : "s were") + " not tested: not profiled in one of the cohorts. " : "") +
       (hidden ? hidden.toLocaleString("en-US") + " tested gene" + (hidden === 1 ? " has" : "s have") + " fewer than " + minAltered + " altered samples across the cohorts and " + (hidden === 1 ? "is" : "are") + " not listed, though counted in q. " : "") +
-      (listed.length > rows.length ? "The " + rows.length + " most significant of the " + listed.length.toLocaleString("en-US") + " listed genes are in the table; the rest are drawn as density on the volcano. " : "") +
+      (listed.length > rows.length ? "The table and charts hold all " + listed.length.toLocaleString("en-US") + " listed genes; a drawing of this view made outside the page names the " + rows.length + " most significant and draws the rest as density. " : "") +
       (two ? "The log ratio is log2 of the first cohort's altered share over the second's, undefined (drawn at the edge) when either is zero. " : "") +
       "A gene enriched here is more often altered, not necessarily more important: a cohort holding hypermutated tumours (MSI-high, POLE) is enriched for mutations in almost every gene at once — exclude them in the cohort definition to see past that. " +
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; overlap is not deduplicated. " : "") +

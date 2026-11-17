@@ -32,6 +32,15 @@ export interface EnrichmentGene {
   /** the cohort with the highest altered share */
   enrichedIn: string;
 }
+/** every listed gene as columns, row i across them (lib/views/enrichment/rows.ts rebuilds the rows) */
+export interface EnrichmentColumns {
+  gene: string[];
+  /** "" when not known */
+  cytoband: string[];
+  /** per gene, per cohort in `groups` order */
+  altered: number[][]; profiled: number[][];
+  p: number[]; q: number[];
+}
 export interface EnrichmentResult {
   alteration: string;
   /** with alteration "any": the event types counted */
@@ -42,6 +51,8 @@ export interface EnrichmentResult {
   test: string;
   /** the most significant genes with at least minAltered altered samples (≤300), the rest summarised in `grid` */
   rows: EnrichmentGene[];
+  /** every listed gene, most significant first, when there are more than `rows` holds: the page's table and charts draw them all, as the portal's */
+  all?: EnrichmentColumns;
   /** "Genes with highest frequency in any group": the tested genes with the highest altered share in any cohort, highest first */
   topFrequency?: EnrichmentGene[];
   /** two cohorts: every other tested gene binned on the volcano's axes, [x bin, y bin, count] */

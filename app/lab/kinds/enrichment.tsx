@@ -1,6 +1,6 @@
 "use client";
 // The enrichment view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge, type Col, PortalTable } from "../portal-bodies.tsx";
 import { DrawAtWidth, ViewFigure } from "../figure.tsx";
 import { Checkbox } from "../../_ui/checkbox";
@@ -10,7 +10,7 @@ import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import type { DrawnResultOf, ViewResultOf } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
-import { enrichmentChartsSvg } from "../../../lib/views/enrichment/figure.ts";
+import { enrichmentChartsSvg, withEveryRow } from "../../../lib/views/enrichment/figure.ts";
 import { portalAlteredPct, portalPMin } from "../../../lib/chart/format.ts";
 import { seriesStyle } from "../../../lib/chart/style";
 
@@ -19,7 +19,8 @@ import { seriesStyle } from "../../../lib/chart/style";
 type EnRow = NonNullable<ViewResultOf<"enrichment">["enrichment"]>["rows"][number];
 
 function EnrichmentBody({ v }: { v: DrawnResultOf<"enrichment"> }) {
-  const r = v.enrichment;
+  // every listed gene, as the portal's table and charts hold them
+  const r = useMemo(() => withEveryRow(v.enrichment), [v.enrichment]);
   const two = r.groups.length === 2;
   const color = (g: string) => seriesStyle(Math.max(0, r.groups.indexOf(g))).color;
   const sig = (g: EnRow) => g.q < 0.05;
@@ -43,8 +44,8 @@ function EnrichmentBody({ v }: { v: DrawnResultOf<"enrichment"> }) {
       <DrawAtWidth draw={(width) => enrichmentChartsSvg(r, { width })} deps={[r]} />
       <PortalTable rows={r.rows} cols={cols} initialSort={{ key: "q" }} search={(g) => g.gene + " " + (g.cytoband || "")}
         filters={[{ label: "Significant only", test: (g) => g.q < 0.05 }]}
-        note={r.tested > r.rows.length ? "the " + r.rows.length + " most significant of " + r.tested.toLocaleString() + " genes tested" +
-          (r.hidden ? " (" + r.hidden.toLocaleString() + " under " + r.minAltered + " altered samples not listed)" : "") : undefined} />
+        note={r.hidden ? r.hidden.toLocaleString() + " of " + r.tested.toLocaleString() + " genes tested have under " + r.minAltered + " altered samples and are not listed"
+          : r.tested > r.rows.length ? "the " + r.rows.length + " most significant of " + r.tested.toLocaleString() + " genes tested" : undefined} />
     </div>
   );
 }

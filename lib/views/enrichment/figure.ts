@@ -2,6 +2,7 @@
 // three charts (volcano, frequency scatter, most-altered genes) and its table.
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
 import { volcano, volcanoPlotH } from "../../figures/volcano.ts";
+import { fromColumns } from "./rows.ts";
 import {
 
   palette, frame, caption, label, textWidth, wrapWidth, linear, axisLeft, axisBottom, leftAxisWidth,
@@ -44,7 +45,8 @@ function enrichmentScatter(r: EnResult, p: Pal, x0: number, y0: number, w: numbe
   const S = Math.max(120, Math.min(plotH, x0 + w - 8 - L));
   const ys = linear(0, top, T + S, T), xs = linear(0, top, L, L + S);
   const out: string[] = [];
-  out.push(label(L, y0 + FS.small, "the " + fmtInt(r.rows.length) + " most significant genes", { size: FS.small, fill: p.muted, maxW: x0 + w - L }));
+  const every = r.rows.length >= r.tested - (r.hidden || 0);
+  out.push(label(L, y0 + FS.small, every ? "all " + fmtInt(r.rows.length) + " listed genes" : "the " + fmtInt(r.rows.length) + " most significant genes", { size: FS.small, fill: p.muted, maxW: x0 + w - L }));
   out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: L + S }));
   out.push(axisBottom(xs, T + S, p, { title: xTitle, gridTo: T, minX: x0, maxX: x0 + w }));
   out.push(`<line x1="${L}" y1="${T + S}" x2="${L + S}" y2="${T}" stroke="${p.muted}" stroke-width="${SW.line}" stroke-dasharray="4 3"/>`);
@@ -124,7 +126,13 @@ export function enrichmentCharts(r: EnResult, p: Pal, W: number, y0: number): { 
 }
 const plotHFor = (w: number) => Math.round(Math.max(180, Math.min(260, w * 0.6)));
 
-/** the charts alone, framed, at `o.width` — what the page draws above its own table */
+/** the result with every listed gene as its rows, the volcano drawing each as a point: what the page draws */
+export function withEveryRow(r: EnResult): EnResult {
+  if (!r.all) return r;
+  return { ...r, rows: fromColumns(r.all, r.groups), all: undefined, ...(r.grid ? { grid: { ...r.grid, cells: [] } } : {}) };
+}
+
+/** the charts alone, framed, at `o.width` — what the page draws above its own table, over every listed gene */
 export function enrichmentChartsSvg(r: EnResult, o: SvgOpts = {}): string {
   const p = palette(o.theme), want = o.width || 960, W = Math.max(MIN_PANEL, want);
   const c = enrichmentCharts(r, p, W, 4);

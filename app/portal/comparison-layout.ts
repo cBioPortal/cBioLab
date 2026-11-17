@@ -57,8 +57,8 @@ export function comparisonLayout(linked: AnalysisDoc, study: string, known: Stud
       ...(endpoint && endpoint !== "OS" ? { endpoint } : {}) })] }] : []),
     // every attribute, as the portal's tab tests them
     ...(clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true })] }] : []),
-    // one table over every alteration type, under the portal's type tree
-    { title: "Genomic Alterations", views: [v("Genomic Alterations", { kind: "enrichment", alteration: "any", measure })] },
+    // one table over every alteration type, under the portal's type tree, listing every gene tested
+    { title: "Genomic Alterations", views: [v("Genomic Alterations", { kind: "enrichment", alteration: "any", minAltered: 1, measure })] },
     ...(mutationsOk ? [{ title: "Mutations", views: [v("Mutations", { kind: "mutcompare" })] }] : []),
     ...(groupsOk ? expression.filter((e) => e.profile).map((e) => ({ title: e.title, views: [v(e.title, { kind: "diffexpr", profileType: e.profile, ...e.extra })],
       // the portal's tab offers the data set alone
