@@ -1,5 +1,5 @@
 // The enrichment view's spec and result, added to lib/types.ts's maps by the declaration at the end.
-import type {  } from "../../types.ts";
+import type { AlterationEvent } from "../../alteration-events.ts";
 
 /**
  * Genomic-alteration enrichment (cBioPortal's group-comparison Genomic Alterations tab): every gene's
@@ -9,8 +9,11 @@ import type {  } from "../../types.ts";
 export interface EnrichmentView {
   note?: string;
   kind: "enrichment"; cohorts?: string[];
-  /** which alteration (default mutation); "cna" is amplification or deep deletion */
-  alteration?: "mutation" | "cna" | "amp" | "homdel" | "sv";
+  /** which alteration (default mutation); "cna" is amplification or deep deletion; "any" is every type in
+   *  `events`, a sample altered by any of them and profiled by any of their profiles' panels (the portal's tab) */
+  alteration?: "mutation" | "cna" | "amp" | "homdel" | "sv" | "any";
+  /** with alteration "any": the portal's alteration types that count (default all of them) */
+  events?: AlterationEvent[];
   /** count OncoKB drivers only, or any alteration (default) */
   measure?: "driver" | "any";
   /** genes altered in fewer samples than this, across all cohorts, are tested (q counts them) but not listed (default 5) */
@@ -30,7 +33,9 @@ export interface EnrichmentGene {
   enrichedIn: string;
 }
 export interface EnrichmentResult {
-  alteration: string; measure: "driver" | "any"; groups: string[];
+  alteration: string;
+  /** with alteration "any": the event types counted */
+  events?: AlterationEvent[]; measure: "driver" | "any"; groups: string[];
   tested: number; untested: number; significant: number; minAltered: number;
   /** tested genes under minAltered, not listed */
   hidden?: number;

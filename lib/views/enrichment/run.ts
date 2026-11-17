@@ -1,6 +1,8 @@
 // Enrichment view: every gene's alteration frequency, compared between cohorts
 import type { ViewResult, ViewResultOf } from "../../types.ts";
-import { type EnrichAlteration, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql } from "../../federation-views.ts";
+import { type EnrichAlteration, enrichAlteredSql, enrichPanelProfiledSql, enrichWesSql,
+  enrichEventsAlteredSql, enrichEventsPanelProfiledSql, enrichEventsWesSql } from "../../federation-views.ts";
+import { ALTERATION_EVENTS, type AlterationEvent, normalizeEvents, eventsWord, mutationTypeFilter, mutationUnitsWord } from "../../alteration-events.ts";
 import { fisherExact, chiSquareTest, benjaminiHochberg } from "../../stats.ts";
 import type { ViewRun } from "../run.ts";
 import { overLimit, cytobands, answering, refuse, niceCeil, askEachSite } from "../shared.ts";
@@ -20,8 +22,17 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   const { doc, cohorts, vNames, pin } = ctx;
   if (vNames.length < 2) return refuse("enrichment", ctx, "an enrichment view compares two or more cohorts; this one draws " + vNames.length);
   { const e = overLimit("an enrichment view", 6, vNames.length); if (e) return refuse("enrichment", ctx, e.replace("at most 6", "at most 6 cohorts")); }
-  const alteration = (view.alteration || "mutation") as EnrichAlteration;
-  if (!(alteration in ALTERATION_WORD)) return refuse("enrichment", ctx, "alteration is mutation, cna, amp, homdel or sv; got " + JSON.stringify(view.alteration).slice(0, 30));
+  const any = view.alteration === "any";
+  const alteration = (any ? "mutation" : view.alteration || "mutation") as EnrichAlteration;
+  if (!any && !(alteration in ALTERATION_WORD)) return refuse("enrichment", ctx, "alteration is mutation, cna, amp, homdel, sv or any; got " + JSON.stringify(view.alteration).slice(0, 30));
+  if (view.events != null && !any) return refuse("enrichment", ctx, "events chooses among the types of alteration \"any\"; this view's alteration is " + JSON.stringify(view.alteration || "mutation"));
+  let events: AlterationEvent[] | null = null;
+  if (any) {
+    events = Array.isArray(view.events) || view.events == null ? normalizeEvents(view.events ?? ALTERATION_EVENTS) : null;
+    if (!events) return refuse("enrichment", ctx, "events are " + ALTERATION_EVENTS.join(", ") + "; got " + JSON.stringify(view.events).slice(0, 60));
+    if (!events.length) return refuse("enrichment", ctx, "no alteration type is selected: choose at least one of " + ALTERATION_EVENTS.join(", "));
+  }
+  const word = events ? eventsWord(events) : ALTERATION_WORD[alteration];
   const measure: "driver" | "any" = view.measure === "driver" ? "driver" : "any";
   if (measure === "driver" && !pin) return refuse("enrichment", ctx, "no OncoKB annotation pin is available here, so drivers cannot be called — use measure: \"any\"");
   const minAltered = view.minAltered == null ? 5 : Math.floor(Number(view.minAltered));
@@ -38,9 +49,10 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   const genes = new Set<string>();
   const perSite: { cohort: string; study: string; genes: number; wes: number }[] = [];
   const answers = await askEachSite(ctx, ok, (n, st, r) => Promise.all([
-    r.viewAggregate("enrichment:altered:" + n, doc.cohorts[n], (c, s, d) => enrichAlteredSql(c, s, d, alteration, pin, measure === "driver")),
-    r.viewAggregate("enrichment:panels:" + n, doc.cohorts[n], (c, s, d) => enrichPanelProfiledSql(c, s, d, alteration)),
-    r.viewAggregate("enrichment:wes:" + n, doc.cohorts[n], (c, s, d) => enrichWesSql(c, s, d, alteration))
+    r.viewAggregate("enrichment:altered:" + n, doc.cohorts[n], (c, s, d) => events
+      ? enrichEventsAlteredSql(c, s, d, events, pin, measure === "driver") : enrichAlteredSql(c, s, d, alteration, pin, measure === "driver")),
+    r.viewAggregate("enrichment:panels:" + n, doc.cohorts[n], (c, s, d) => events ? enrichEventsPanelProfiledSql(c, s, d, events) : enrichPanelProfiledSql(c, s, d, alteration)),
+    r.viewAggregate("enrichment:wes:" + n, doc.cohorts[n], (c, s, d) => events ? enrichEventsWesSql(c, s, d, events) : enrichWesSql(c, s, d, alteration))
   ]));
   for (const { cohort: n, study: st, answer: [a, pr, w] } of answers) {
     for (const r of a) { const k = n + "\t" + r.gene; altered.set(k, (altered.get(k) || 0) + Number(r.altered)); genes.add(String(r.gene)); }
@@ -70,7 +82,7 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
     tested.push({ gene: g, cells, ...(two ? { log2Ratio: shares[0] > 0 && shares[1] > 0 ? Math.log2(shares[0] / shares[1]) : null } : {}),
       p, q: 1, enrichedIn: vNames[best] });
   }
-  if (!tested.length) return refuse("enrichment", ctx, "no gene had a " + ALTERATION_WORD[alteration] + " in these cohorts, profiled in each of them");
+  if (!tested.length) return refuse("enrichment", ctx, "no gene had a " + word + " in these cohorts, profiled in each of them");
   benjaminiHochberg(tested.map((g) => g.p)).forEach((q, i) => { tested[i].q = q; });
   tested.sort((a, b) => a.p - b.p || a.gene.localeCompare(b.gene));
   const alteredIn = (g: EnrichmentGene) => g.cells.reduce((a, c) => a + c.altered, 0);
@@ -106,15 +118,16 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
   const multi = ctx.vStudies.length > 1;
   return {
     kind: "enrichment", cohorts: vNames,
-    enrichment: { alteration: ALTERATION_WORD[alteration], measure, groups: vNames, tested: tested.length, untested, hidden, significant, minAltered, test,
+    enrichment: { alteration: word, ...(events ? { events } : {}), measure, groups: vNames, tested: tested.length, untested, hidden, significant, minAltered, test,
       rows, topFrequency, ...(grid ? { grid } : {}), labels, ...(excluded.length ? { excluded } : {}) },
-    method: enrichmentMethod({ alteration: ALTERATION_WORD[alteration], measure, oncokbPin: pin, cohorts: vNames, minAltered, test, two, perSite,
+    method: enrichmentMethod({ alteration: word, union: !!events, measure, oncokbPin: pin, cohorts: vNames, minAltered, test, two, perSite,
       tested: tested.length, untested, hidden, results: rows.map((g) => ({ gene: g.gene, p: g.p, q: g.q })) }),
     participation: ctx.participationFor(ctx.vStudies, false),
     ...(multi ? { studies: ctx.vStudies } : {}),
-    caveat: "Every gene's " + ALTERATION_WORD[alteration] + " frequency in each cohort, counted in SAMPLES over the samples profiled for that gene " +
+    caveat: (events ? eventsCaveat(events)
+      : "Every gene's " + word + " frequency in each cohort, counted in SAMPLES over the samples profiled for that gene " +
       "(a panel that lists it, or whole-exome; an off-panel call is left out)" +
-      (alteration === "mutation" ? ", uncalled mutations excluded as the portal excludes them" : alteration === "sv" ? "" : ", high-level copy number only") + ". " +
+      (alteration === "mutation" ? ", uncalled mutations excluded as the portal excludes them" : alteration === "sv" ? "" : ", high-level copy number only") + ". ") +
       (measure === "driver" ? "Only OncoKB drivers (" + pin + ") count. " : "") +
       tested.length.toLocaleString("en-US") + " genes tested with a " + test + "; q is Benjamini–Hochberg across all of them. " +
       (untested ? untested.toLocaleString("en-US") + " altered gene" + (untested === 1 ? " was" : "s were") + " not tested: not profiled in one of the cohorts. " : "") +
@@ -125,4 +138,16 @@ export async function runEnrichment(view: EnrichmentView, ctx: ViewRun): Promise
       (multi ? "Counts are summed across " + ctx.vStudies.length + " studies; overlap is not deduplicated. " : "") +
       (excluded.length ? "Left out: " + excluded.map((e) => e.study + " (" + e.reason + ")").join(", ") + "." : "")
   };
+}
+
+/** what alteration "any" counts, in words: only the rules of the types selected */
+function eventsCaveat(events: AlterationEvent[]): string {
+  const mut = mutationTypeFilter(events), units = mutationUnitsWord(events);
+  const rules = [mut && "uncalled mutations excluded", (events.includes("amp") || events.includes("homdel")) && "high-level copy number only (the discrete profile)", "an off-panel call left out"]
+    .filter(Boolean).join(", ");
+  return "Every gene's alteration frequency in each cohort, counting " + eventsWord(events) + (units ? " (" + units + ")" : "") +
+    ": a sample is altered when it has any of these in the gene (" + rules + "), and profiled when any of its panels for these types lists the gene, " +
+    "or one of them is whole-exome — the portal's union of a sample's panels. " +
+    (mut?.op === "all" ? "Every mutation type counts, those outside the portal's type list (5'Flank, Intron) too, as the portal's do when every mutation type is ticked. "
+      : mut?.op === "not in" ? "Mutation types outside the portal's type list, and blank ones, count, as Other is ticked. " : "");
 }

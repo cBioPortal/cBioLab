@@ -335,8 +335,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       ...(data.partial || survivalDefault(data.clinical) ? [{ title: "Survival", views: [v("Survival", { kind: "survival", types: true, partitions: true, testAnySize: true, cohorts: both,
         ...(!data.partial && survivalDefault(data.clinical) !== "OS" ? { endpoint: survivalDefault(data.clinical) } : {}) })] }] : []),
       ...(data.clinical.length ? [{ title: "Clinical", views: [v("Clinical", { kind: "clinical", allAttributes: true, rankTests: true, cohorts: both })] }] : []),
-      { title: "Genomic Alterations", views: [v("Mutations", { kind: "enrichment", alteration: "mutation", cohorts: both }),
-        v("Copy-number alterations", { kind: "enrichment", alteration: "cna", cohorts: both })] },
+      { title: "Genomic Alterations", views: [v("Genomic Alterations", { kind: "enrichment", alteration: "any", cohorts: both })] },
       ...(data.assays || []).map((a) => ({ title: a.label, views: [v(a.label, { kind: "assays", profileType: a.profile, cohorts: both })] }))
     ] },
     cnSegmentsTab(genes, queried),

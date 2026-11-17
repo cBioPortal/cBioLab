@@ -1,7 +1,12 @@
 "use client";
 // The enrichment view on the analysis page: its entry in the add menu, the view a new one starts from, and its card.
+import { useState } from "react";
 import { Badge, type Col, PortalTable } from "../portal-bodies.tsx";
-import { DrawAtWidth } from "../figure.tsx";
+import { DrawAtWidth, ViewFigure } from "../figure.tsx";
+import { Checkbox } from "../../_ui/checkbox";
+import { Button } from "../../_ui/button";
+import { ALTERATION_EVENTS, EVENT_TREE, normalizeEvents, type AlterationEvent, type EventNode } from "../../../lib/alteration-events.ts";
+import type { ProfileInfo } from "../../../lib/profile-catalog.ts";
 import type { DrawnResultOf, ViewResultOf } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
@@ -44,6 +49,75 @@ function EnrichmentBody({ v }: { v: DrawnResultOf<"enrichment"> }) {
   );
 }
 
+
+// ---- the portal's alteration-type tree (CMM-AT-1…3) ---------------------------------------------
+
+/** the tree's top rows the study has a profile for (CMM-TAB-2); all three before the catalog is known */
+function treeRoots(catalog: ProfileInfo[] | undefined): EventNode[] {
+  if (!catalog?.length) return [EVENT_TREE.mutation, EVENT_TREE.sv, EVENT_TREE.cna];
+  return [
+    catalog.some((p) => p.type === "MUTATION_EXTENDED") && EVENT_TREE.mutation,
+    catalog.some((p) => p.type === "STRUCTURAL_VARIANT") && EVENT_TREE.sv,
+    catalog.some((p) => p.type === "COPY_NUMBER_ALTERATION" && p.datatype === "DISCRETE") && EVENT_TREE.cna,
+  ].filter((x): x is EventNode => !!x);
+}
+
+/** "Alteration Types": a row is ticked when any type under it is, and a click sets every type under it
+ *  to the opposite; the choice applies on [Select], which waits until it differs from the view's. */
+function EventTree({ c }: { c: KindCardCtx }) {
+  const applied = normalizeEvents(c.spec.events ?? ALTERATION_EVENTS) || [...ALTERATION_EVENTS];
+  const roots = treeRoots(c.catalog);
+  const offered = new Set(roots.flatMap((r) => r.units));
+  const [staged, setStaged] = useState<AlterationEvent[] | null>(null);
+  // a change made elsewhere (undo, a link, an agent) replaces what was staged against the old selection
+  const appliedKey = applied.join(",");
+  const [stagedFor, setStagedFor] = useState(appliedKey);
+  if (stagedFor !== appliedKey) { setStagedFor(appliedKey); setStaged(null); }
+  const cur = staged ?? applied;
+  const on = (n: EventNode) => n.units.some((u) => cur.includes(u));
+  const toggle = (n: EventNode) => {
+    const next = on(n) ? cur.filter((u) => !n.units.includes(u)) : [...cur, ...n.units];
+    setStaged(normalizeEvents(next));
+  };
+  const key = (xs: AlterationEvent[]) => xs.filter((u) => offered.has(u)).join(",");
+  const changed = staged != null && key(staged) !== key(applied);
+  const none = !cur.some((u) => offered.has(u));
+  const row = (n: EventNode, depth: number): React.ReactNode => (
+    <li key={n.label} className="mt-1">
+      <label className="flex items-center gap-1.5 cursor-pointer" style={{ paddingLeft: depth * 14 }}>
+        <Checkbox checked={on(n)} disabled={c.busy} onCheckedChange={() => toggle(n)} aria-label={n.label}
+          data-tip={c.busy ? "waiting for the table to update" : undefined} />
+        <span className={depth ? "" : "font-semibold"}>{n.label}</span>
+      </label>
+      {n.children && <ul className="list-none m-0 p-0">{n.children.map((k) => row(k, depth + 1))}</ul>}
+    </li>);
+  const apply = () => {
+    const sel = cur.filter((u) => offered.has(u));
+    // every offered type is the default, so the document leaves events out
+    c.patch({ events: sel.length === offered.size ? undefined : sel });
+    setStaged(null);
+  };
+  return (
+    <div className="enrich-types text-sm" style={{ minWidth: 190 }}>
+      <div className="font-semibold mb-1">Alteration Types</div>
+      <ul className="list-none m-0 p-0 flex flex-col gap-1">{roots.map((r) => row(r, 0))}</ul>
+      <span data-tip={c.busy ? "waiting for the table to update" : none ? "select at least one alteration type" : !changed ? "the table shows this selection" : "apply the selection"}>
+        <Button size="sm" className="mt-2" disabled={c.busy || !changed || none} onClick={apply}>Select</Button>
+      </span>
+    </div>
+  );
+}
+
+/** alteration "any": the tree at the left, the charts and table (or why there are none) beside it, as the portal lays the tab out */
+function AnyBody({ c }: { c: KindCardCtx }) {
+  return (
+    <div className="pb-row">
+      <EventTree c={c} />
+      <div className="min-w-0 flex-1">{c.v.enrichment ? <EnrichmentBody v={c.v} /> : <ViewFigure v={c.v} error={c.v.error} />}</div>
+    </div>
+  );
+}
+
 /** the enrichment view's settings row */
 function Controls({ c }: { c: KindCardCtx }) {
   const { spec, busy, patch } = c;
@@ -51,8 +125,8 @@ function Controls({ c }: { c: KindCardCtx }) {
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
         <label className="tbfield" data-tip="which alteration to compare across every gene">
-          alteration <OptionSelect value={spec.alteration || "mutation"} disabled={busy} onValueChange={(v) => patch({ alteration: v === "mutation" ? undefined : v })}>
-            <option value="mutation">mutation</option><option value="cna">amp or deep deletion</option><option value="amp">amplification</option>
+          alteration <OptionSelect value={spec.alteration || "mutation"} disabled={busy} onValueChange={(v) => patch({ alteration: v === "mutation" ? undefined : v, events: undefined })}>
+            <option value="any">any type</option><option value="mutation">mutation</option><option value="cna">amp or deep deletion</option><option value="amp">amplification</option>
             <option value="homdel">deep deletion</option><option value="sv">structural variant</option>
           </OptionSelect>
         </label>
@@ -78,8 +152,8 @@ export const enrichmentUi: KindUi<"enrichment"> = {
   title: "Alteration enrichment",
   maxCohorts: 6,
   minCohorts: 2,
-  sub: (spec) => ({ mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
+  sub: (spec) => ({ any: "alterations", mutation: "mutations", cna: "copy-number alterations", amp: "amplifications", homdel: "deep deletions", sv: "structural variants" } as Record<string, string>)[spec.alteration || "mutation"] +
     (spec.measure === "driver" ? " (drivers)" : "") + " in every gene, per sample",
   Controls,
-  body: (c) => c.v.enrichment ? <EnrichmentBody v={c.v} /> : null,
+  body: (c) => c.spec.alteration === "any" ? <AnyBody c={c} /> : c.v.enrichment ? <EnrichmentBody v={c.v} /> : null,
 };

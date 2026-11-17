@@ -144,3 +144,14 @@ test("the Survival tab opens on the portal's first endpoint, and is not shown wi
   // before the attributes are known the tab is offered, on OS
   assert.deepEqual(tabOf(layout(2, null), "Survival"), { kind: "survival", types: true, partitions: true, testAnySize: true });
 });
+
+test("Genomic Alterations is one table over every alteration type, under the portal's type tree (CMM-AT-2, CMM-AL-5)", () => {
+  for (const known of [BRCA_TCGA, null]) {
+    const ga = layout(2, known).tabs.find((t) => t.title === "Genomic Alterations")!;
+    assert.equal(ga.views?.length, 1, "one table, not one per alteration type");
+    const view = tabOf(layout(2, known), "Genomic Alterations") as unknown as Record<string, unknown>;
+    assert.equal(view.kind, "enrichment");
+    assert.equal(view.alteration, "any");
+    assert.equal(view.events, undefined, "every type by default");
+  }
+});
