@@ -92,6 +92,30 @@ test("a new database gets cBioPortal's schema and seeds, the app's columns and s
   assert.equal(logs.at(-1), "Database ready");
 });
 
+test("a panel datahub lists but serves no content for is named in the log and the rest still load", async () => {
+  const files = upstream();
+  files[PANEL_LIST] = JSON.stringify([{ name: "data_gene_panel_impact.txt" }, { name: "data_gene_panel_gone.txt" }]);
+  serve(files);
+  ch = database();
+  const logs: string[] = [];
+  await setupDatabase(ch.conn, dataDir(), (m) => logs.push(m));
+  assert.deepEqual(ch.rows("gene_panel").map((r) => r.stable_id), ["IMPACT2"]);
+  assert.ok(logs.some((l) => l.startsWith("data_gene_panel_gone.txt: not loaded") && l.includes("HTTP 404")), logs.join("\n"));
+  assert.equal(logs.at(-1), "Database ready");
+});
+
+test("a panel that fails to download for any other reason stops setup", async () => {
+  const files = upstream();
+  serve(files);
+  const served = globalThis.fetch;
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    return url.endsWith("data_gene_panel_impact.txt") ? new Response("busy", { status: 503 }) : served(input);
+  }) as typeof fetch;
+  ch = database();
+  await assert.rejects(setupDatabase(ch.conn, dataDir(), () => undefined), /data_gene_panel_impact\.txt \(HTTP 503\)/);
+});
+
 test("a database already set up is left as it is", async () => {
   const asked = serve(upstream());
   ch = database({ setUp: true });
