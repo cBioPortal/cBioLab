@@ -913,7 +913,10 @@
           "chart": "line",
           "logScale": false,
           "dataRange": false,
-          "expandGaps": false
+          "expandGaps": false,
+          "transpose": false,
+          "cluster": true,
+          "mutationLabels": true
         }
       },
       "participation": {
