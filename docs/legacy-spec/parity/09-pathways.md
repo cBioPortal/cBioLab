@@ -1,6 +1,6 @@
 # Parity audit — Results › Pathways (spec `09-pathways.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`): Q5 reloaded and RTK-RAS picked (KRAS node 10.6 %, the caveat naming KRAS's OQL), code re-read; no verdict changed
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright, same day; node %s from the spec's capture of 2026-11-10)
 - **Code paths (cBioLab):** `lib/views/pathwaymap/{run,rank,library,figure,types}.ts`, `lib/views/pathwaymap/README.md`, `app/lab/kinds/pathwaymap.tsx` (toolbar, ranking table), `lib/oncoprint-style.ts:94,166` (`frequencyColor`), `lib/chart/format.ts:21` (`fmtPct`), `app/portal/results-layout.ts` (tab)
@@ -34,11 +34,11 @@ Scripts and output: (local scratch, not committed) (`legother.js pwy` → `out/l
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | 🐞copied | N/A | One line |
 |---|---|---|---|---|---|---|---|---|---|
-| §0 Visibility, sub-tabs (0.x) | 5 | 0 | 1 | 1 | 2 | 0 | 0 | 1 | No source pills, no NDEx; OQL not applied |
+| §0 Visibility, sub-tabs (0.x) | 5 | 0 | 1 | 1 | 2 | 0 | 0 | 1 | No source pills, no NDEx; OQL applied, no banner on the tab |
 | §1 Layout (1.x) | 7 | 1 | 2 | 0 | 3 | 0 | 0 | 1 | Own SVG diagram; no PathwayMapper toolbar (export, layout, add genes, edit, help) |
 | §2 Ranking (2.x) | 7 | 2 | 3 | 1 | 0 | 0 | 0 | 1 | Scores and default pathway match; tie order differs; no table sort/paging/download |
 | §3 Overlay (3.x) | 4 | 1 | 3 | 0 | 0 | 0 | 0 | 0 | Q1 %s identical; sample level, every alteration |
-| §4 Modes (MD) | 6 | 0 | 1 | 2 | 1 | 1 | 0 | 1 | OQL ignored; always sample level |
+| §4 Modes (MD) | 6 | 0 | 1 | 2 | 1 | 1 | 0 | 1 | OQL on query genes, merged groups refused; always sample level |
 | §6 Statistics (STM) | 4 | 1 | 0 | 1 | 0 | 1 | 1 | 0 | Weighted scores identical (54.54, 66.67); percent formula's legacy bug copied on purpose |
 
 ---
@@ -119,7 +119,7 @@ Data version: counts identical to the oncoprint's and Download's (same warehouse
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PWY-3.1 | 🟡 | B | One box per GENE node, coloured ✅; sample-level % of every alteration (not patient-level, not OQL) |
+| PWY-3.1 | 🟡 | B | One box per GENE node, coloured ✅; sample-level % (not patient-level); a query gene's OQL applied |
 | PWY-3.2 | 🟡 | BC | "37.4%" ✅, N/P grey ✅; 0 → "0%" (legacy "0.0%"), 0 < p < 0.1 → "<0.1%" (legacy "<0.5%" below 0.5) |
 | PWY-3.3 | ✅ | B | KRAS 37.4, BRAF 10.8, NRAS 6.4, EGFR 3.0, HRAS 1.2 — identical |
 | PWY-3.4 | 🟡 | C | Non-query genes from the same cohort in one pass ✅; every alteration, no driver/germline settings (none exist) |
@@ -141,7 +141,7 @@ Data version: counts identical to the oncoprint's and Download's (same warehouse
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PWY-STM-1 | 🔶 | BC | altered ÷ samples profiled for that gene (panel-aware, invariant 7) ✅ denominator; sample level and no OQL (legacy patient level, OQL); stored `round2`, shown 1 decimal ✅; Q1 values identical |
+| PWY-STM-1 | 🔶 | BC | altered ÷ samples profiled for that gene (panel-aware, invariant 7) ✅ denominator; sample level (legacy patient level); the query's OQL applied to query-gene nodes ✅ (Q5 KRAS 10.6 %, 2026-11-18); stored `round2`, shown 1 decimal ✅; Q1 values identical |
 | PWY-STM-2 | ✅ | C | All library genes counted at once; non-genes (`NOT_GENES`) get no box, as the portal's invalid symbols |
 | PWY-STM-3 | 🐞 ok | C | ratio = 0.8 × ln(1+p)/ln(101) ✅ (`oncoprint-style.ts:94,169`); p = 100 stays at 0.8 (no pure-red jump); p > 100 clamped |
 | PWY-STM-4 | 🐞 copied | C | Four scores ✅ (54.54, 66.67 match); "match % weighted" = \|m\| × S / G, the legacy formula the spec flags as a bug (copied deliberately, README); N/P −101 not copied |
