@@ -76,7 +76,8 @@ export function useQueryKnown(studies: string[], filters: Clause[] = []): { basi
       if (live) setBasics(b);
       return b;
     });
-    Promise.all([api.explore({ ...scope, draft: filters.length ? { ...scope, all: filters } : null }).then((r) => r.json()), listed])
+    // only what describes the selection: a study's facets (value lists, gene tables) would hold the page's tabs for seconds
+    Promise.all([api.explore({ ...scope, draft: filters.length ? { ...scope, all: filters } : null, attributesOnly: true }).then((r) => r.json()), listed])
       .then(([j, b]) => {
         if (j.error) { fail(j.error); return; }
         if (!b || !live) return;
