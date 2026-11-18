@@ -27,8 +27,8 @@ Legacy values read from `window.resultsViewPlotsTab` (`scatterPlotData`, `boxPlo
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 34 |
-| 🟡 partial | 43 |
+| ✅ match | 33 |
+| 🟡 partial | 44 |
 | 🔶 different | 17 |
 | ❌ missing | 69 |
 | 🐞 ok | 2 |
@@ -37,9 +37,9 @@ Legacy values read from `window.resultsViewPlotsTab` (`scatterPlotData`, `boxPlo
 | ? | 0 |
 | **Total IDs** | **170** |
 
-**Overall: 24.1 %** (✅ 34 + 🐞ok 2 + N/A 5 = 41 of 170). Counting 🟡 as half: 36.8 %. (2026-11-11: 13.5 % / 25.9 %.)
+**Overall: 23.5 %** (✅ 33 + 🐞ok 2 + N/A 5 = 40 of 170). Counting 🟡 as half: 36.5 %. (2026-11-11: 13.5 % / 25.9 %.)
 
-Re-measurement of 2026-11-18 (master `bc53b944`): every ID judged again from the spec text against the code, the page and the `/api/analysis` results, not from the PRs' Tracker lines; the PRs since the first audit (#226, #232, #234, #238, #240, #241, #254, #280, #283, #285, #289, #298, #300, #305, #315, #318) had updated only three rows. 33 verdicts went up, none down. The statistics now agree with legacy wherever they were compared: every box's quartiles, median and whiskers (Q1, Q5), Spearman with average ranks (Q2 0.33036, Q3 −0.34872, Q4 −0.05509), both p-values, the regression's rounded slope / intercept / R², the table's 15 cells, Q8's counts. What is still missing is the portal's surface: quick-plot pills, waterfall, bar charts, downloads, search and selection, the first gene's colouring by default, limit values, VAF / CCF / clonality.
+Re-measurement of 2026-11-18 (master `bc53b944`): every ID judged again from the spec text against the code, the page and the `/api/analysis` results, not from the PRs' Tracker lines; the PRs since the first audit (#226, #232, #234, #238, #240, #241, #254, #280, #283, #285, #289, #298, #300, #305, #315, #318) had updated only three rows. 32 verdicts went up, none down. The statistics now agree with legacy wherever they were compared: every box's quartiles, median and whiskers (Q1, Q5), Spearman with average ranks (Q2 0.33036, Q3 −0.34872, Q4 −0.05509), both p-values, the regression's rounded slope / intercept / R², the table's 15 cells, Q8's counts. Sort by Median orders by the raw values' median only where the points are drawn; otherwise by each box's own median, said to be approximate. What is still missing is the portal's surface: quick-plot pills, waterfall, bar charts, downloads, search and selection, the first gene's colouring by default, limit values, VAF / CCF / clonality.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
@@ -62,7 +62,7 @@ Re-measurement of 2026-11-18 (master `bc53b944`): every ID judged again from the
 | §11 Messages (MS) | 7 | 0 | 4 | 0 | 1 | 0 | 2 | "Showing N of M samples with data on both axes" (numbers match); refusals in own words |
 | §11 Limit values (LV) | 4 | 0 | 0 | 1 | 3 | 0 | 0 | ">8"-style values dropped as non-numeric |
 | §13 Modes (MD) | 14 | 2 | 9 | 1 | 2 | 0 | 0 | Sample default + patient mode; multi-study pooled; no waterfall / limit-value modes |
-| §15 Statistics (STM) | 22 | 11 | 6 | 0 | 5 | 0 | 0 | Pearson, Spearman, p, regression, box statistics, sort by median, log, table counts as legacy |
+| §15 Statistics (STM) | 22 | 10 | 7 | 0 | 5 | 0 | 0 | Pearson, Spearman, p, regression, box statistics, log, table counts as legacy; sort by median approximate without points |
 
 ---
 
@@ -159,7 +159,7 @@ Data version: every n, every point set and every value compared is identical (Q2
 | PLT-AX-7 | ❌ | C | No gene sets (tracked: GSVA gene sets) |
 | PLT-AX-8 | 🟡 | C | `EntityField` search per generic-assay profile; no "Same <type>", no gene-related ordering, no 100-option header |
 | PLT-AX-9 | 🟡 | BC | "Filter categories" on a box plot: a checkbox list of every category, empty = all, cleared when the category axis's data changes, swapped with the axes (`plot-controls.tsx:249-275`) ✅; not searchable; kept in the document (invariant 9) |
-| PLT-AX-10 | ✅ | BC | ☐ "Sort Categories by Median" on a box plot with > 1 category: ascending median of the raw values (`plot-controls.tsx:276-282`, STM-9) |
+| PLT-AX-10 | ✅ | BC | ☐ "Sort Categories by Median" on a box plot with > 1 category, ascending (`plot-controls.tsx:276-282`); the median it uses: STM-9 |
 | PLT-AX-11 | 🐞 ok | BC | Swap exchanges the whole axis definitions (log, by and SV mode included), so the `structuralVariantCountBy` bug is not reproduced; Filter categories and Sort by Median stay with the categorical axis (`axis-edit.ts:35-37`, #318) |
 
 ### §3 Axis data
@@ -381,7 +381,7 @@ Data version: every n, every point set and every value compared is identical (Q2
 | PLT-STM-6 | ✅ | BC | Same t-test on r rounded to 5 dp (#285): p Q2 1.72e-16, Q3 2.12e-16, Q4 0.185 (Spearman), 4.86e-40 / 6.80e-15 / 0.359 (Pearson) = legacy; shown `toConditionalPrecision(p, 3, 0.01)` (`portalP`) |
 | PLT-STM-7 | ✅ | BC | OLS in plotted space, slope and intercept rounded to 2 dp from the rounded slope, R² from them (Q3: slope 0, intercept 0.24, R² 0); a negative intercept prints "− 1.2", not the portal's "+ -1.2" |
 | PLT-STM-8 | ✅ | BC | Nearest-rank quartiles, mean-of-middles median, fence whiskers as legacy: Q1 Shallow 774.00 · 1017.73 · 1169.69 · 180.48–1763.21, Diploid 978.62 · 1217.02 · 1487.07 · 215.95–2249.74, Gain, Amplification 2668.88; Q5 0.2268 / 0.1140 / Rectal q3 0.4110 — all = legacy |
-| PLT-STM-9 | ✅ | C | Median of the raw values, ascending (`plot-controls.tsx:276`, `run.ts`) |
+| PLT-STM-9 | 🟡 | C | Median of the raw values (a log axis's converted back) from the drawn points; without points, each box's own median, the order then said to be approximate (`lib/views/plot/run.ts:300-318`) (#318) |
 | PLT-STM-10 | 🟡 | C | Deterministic per sample (FNV-1a hash → sin, `plot-draw.ts:14`) ✅; different hash, ±0.9 × half-width |
 | PLT-STM-11 | ✅ | BC | log2(max(v,0)+1), generic assay log10(v) with 0 → 0, before Pearson/box/regression; Q1-log Diploid quartiles = portal (#254) |
 | PLT-STM-12 | ❌ | C | No bar counts |
