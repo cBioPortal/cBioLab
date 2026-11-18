@@ -1,8 +1,8 @@
 # Parity audit — Results › OncoPrint (spec `01-oncoprint.md`)
 
-- **Date:** 2026-11-10; re-scored 2026-11-16
-- **cBioLab:** master @ `7ef627ba`, `next dev` on `http://127.0.0.1:3000` (first audit: `session/spec` @ `73a4af6f`)
-- **Legacy:** cbioportal.org (Playwright, 2026-11-16; first audit 2026-11-10)
+- **Date:** 2026-11-10; re-scored 2026-11-16; re-measured 2026-11-18
+- **cBioLab:** master @ `cc9004b7`, `next dev` on `http://127.0.0.1:3109` (2026-11-16: master @ `7ef627ba`; first audit: `session/spec` @ `73a4af6f`)
+- **Legacy:** cbioportal.org (Playwright, 2026-11-18 for the statistics; 2026-11-16; first audit 2026-11-10)
 - **Code paths (cBioLab):** `app/_oncoprint/OncoprintFigure.tsx` (figure, toolbar, track menu, tooltips), `app/_oncoprint/OncoprintCard.tsx` (data controls, Tracks menu), `app/_oncoprint/canvas.ts`, `lib/oncoprint.ts` (engine), `lib/oncoprint-assemble.ts` (cells, sort, %), `lib/oncoprint-style.ts`, `lib/oncoprint-cluster.ts`, `lib/annotation.ts`, `app/portal/results/page.tsx`, `app/portal/results-layout.ts`
 
 **Queries used** (legacy ⇄ cBioLab)
@@ -23,9 +23,9 @@ Legacy values read from `window.frontendOnc.model` (track info, id order) and `r
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 51 |
-| 🟡 partial | 38 |
-| 🔶 different | 2 |
+| ✅ match | 53 |
+| 🟡 partial | 37 |
+| 🔶 different | 1 |
 | ❌ missing | 10 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
@@ -33,7 +33,9 @@ Legacy values read from `window.frontendOnc.model` (track info, id order) and `r
 | ? | 0 |
 | **Total IDs** | **104** |
 
-**Overall: 51.9 %** (✅ 51 + 🐞ok 1 + N/A 2 = 54 of 104). Counting 🟡 as half: 70.2 %. (2026-11-10: 23.1 % / 43.3 %.)
+**Overall: 53.8 %** (✅ 53 + 🐞ok 1 + N/A 2 = 56 of 104). Counting 🟡 as half: 71.6 %. (2026-11-16: 51.9 % / 70.2 %; 2026-11-10: 23.1 % / 43.3 %.)
+
+Re-measurement of 2026-11-18 (master `cc9004b7`), each ID against the spec text in cBioLab's UI or code, the statistics against cbioportal.org: 4 verdicts changed. Up: ONC-SO-4, ONC-TM-5 (#278), ONC-TT-8 (#267). Down: ONC-VI-6. The Q1–Q5 numbers all match again; ONC-STM-4 stays 🟡 for a new reason (the spectrum's Freq).
 
 Re-score of 2026-11-16: 36 verdicts changed, all for the better; no regression in the ✅ rows spot-checked (SO-2, VI-1…3, VI-7, DL-3, GL-1, GL-3, TM-1, TM-4, MI-2, MD-5).
 
@@ -41,15 +43,15 @@ Re-score of 2026-11-16: 36 verdicts changed, all for the better; no regression i
 |---|---|---|---|---|---|---|---|---|
 | §0 Results chrome (RV) | 4 | 0 | 4 | 0 | 0 | 0 | 0 | Samples line added; driver menu on the toolbar, not a page ⚙; no Show only profiled, no CaseFilterWarning |
 | §1 Tracks (TR) | 4 | 0 | 4 | 0 | 0 | 0 | 0 | Clinical tab now the portal's (names, Freq %, Select all, Update); Heatmap tab still raw profile ids, GA heatmap only |
-| §1 Sort (SO) | 5 | 3 | 0 | 1 | 1 | 0 | 0 | Type / Driver / Ignore VUS toggles added; no case-list order; cluster is a choice, not an indicator |
+| §1 Sort (SO) | 5 | 4 | 0 | 0 | 1 | 0 | 0 | Type / Driver / Ignore VUS toggles; clustering a disabled indicator; no case-list order |
 | §1 Mutations (MU) | 3 | 2 | 1 | 0 | 0 | 0 | 0 | Germline stripe and Show only somatic added; colour-by-type and germline sit in Display |
-| §1 View (VI) | 7 | 5 | 1 | 0 | 1 | 0 | 0 | No clinical-legend toggles in the UI |
+| §1 View (VI) | 7 | 4 | 2 | 0 | 1 | 0 | 0 | No clinical-legend toggles in the UI; Show OQL filters only offered with OQL |
 | §1 Download (DL) | 6 | 1 | 2 | 1 | 2 | 0 | 0 | PNG/SVG/PDF, portal-shaped TSV and order file; no Oncoprinter, no hide switch |
 | §1 Zoom/Minimap (ZM, MM) | 4 | 1 | 3 | 0 | 0 | 0 | 0 | Fit now the altered span; no % box; minimap is a strip |
 | §2 Layout (LY) | 6 | 2 | 4 | 0 | 0 | 0 | 0 | Gutter % as the portal's; Profiled rows named by type; merged `[A B]` refused |
 | §3 Glyphs (GL) | 6 | 4 | 2 | 0 | 0 | 0 | 0 | Hotspots and custom drivers added; Nonstart → Other; no "No alterations" legend entry |
-| §4 Other tracks (TT) | 12 | 8 | 1 | 0 | 3 | 0 | 0 | Spectrum, clinical colours/aggregation and heatmap ramps added; no GA bar/stacked/categorical, no GSVA |
-| §5 Track menu (TM) | 5 | 2 | 3 | 0 | 0 | 0 | 0 | Remove/cluster bugs fixed; cluster still from the sort select |
+| §4 Other tracks (TT) | 12 | 9 | 0 | 0 | 3 | 0 | 0 | Spectrum, clinical colours/aggregation, heatmap ramps and GA thresholds; no GA bar/stacked/categorical, no GSVA |
+| §5 Track menu (TM) | 5 | 3 | 2 | 0 | 0 | 0 | 0 | Remove/cluster bugs fixed; Cluster / Don't cluster in a heatmap row's menu |
 | §6 Sorting (ST) | 5 | 5 | 0 | 0 | 0 | 0 | 0 | Staircase, Ignore VUS and natural sort as the portal's |
 | §7 Mouse (MI) | 6 | 2 | 3 | 0 | 1 | 0 | 0 | Unchanged: no label drag, no cell highlight |
 | §8 Tooltips (TP) | 5 | 1 | 3 | 0 | 1 | 0 | 0 | Exact values now; no OncoKB/hotspot icons, no "View these N" |
@@ -88,6 +90,20 @@ Re-score of 2026-11-16: 36 verdicts changed, all for the better; no regression i
 | Q1 Tracks › Clinical count | TR-1, STM-4 | 64 | Clinical (64) | ✅ (#196) |
 | Q1 SV legend | MD-7 | "Structural Variant (putative driver)" | "Structural Variant (unknown significance)" | 🟡 |
 
+**Re-measured 2026-11-18** (cBioLab master `cc9004b7`; legacy values from `resultsViewOncoprint.geneticTracks`):
+
+| Statistic | ID | Legacy | cBioLab | Verdict |
+|---|---|---|---|---|
+| Q1 KRAS / NRAS / BRAF / TP53 / APC labels; header | STM-1, STM-2 | 37 / 6 / 11 / 53 / 67 %; 485 (82%) | same; 485 (82%) | ✅ |
+| Q2 TP53 / KRAS / TERT altered of 10,336 | STM-1 | 4,437 / 1,768 / 1,600 (43 / 17 / 15 %) | 4,437 / 1,768 / 1,600 (43 / 17 / 15 %) | ✅ |
+| Q3 ZFHX3 / RAC1 / AXIN2 | STM-1, LY-4 | 391 of 7,773 "5%*", 128 "1%", 224 "2%" (2 more ZFHX3 mutations drawn in unprofiled columns, not counted) | 391 / 7,773 "5%*", 128 "1%", 224 "2%" | ✅ |
+| Q3 header patients / samples | STM-2 | 682 (7%) / 690 (6%) | 682 (7%) / 690 (6%) | ✅ |
+| Q4 KRAS / TP53; header | STM-1, STM-2 | 245 / 669 (15 / 40 %); 775 (46%) | 245 / 669; 775 (46%) | ✅ |
+| Q5 KRAS `AMP MUT=G12D` / TP53; header | STM-1, STM-2 | 63 / 315; 344 (58%) | 63 / 315; 344 (58%) | ✅ |
+| Q1 Tracks › Clinical Freq, every row but the spectrum | STM-4 | e.g. Overall Survival Status 99.5 %, Mutation Count 89.9 %, Disease Free Status 37.5 % | the same for every row | ✅ |
+| Q1 Tracks › Clinical, Mutation spectrum | STM-4 | 99.7 % | 89.9 % | 🟡 |
+| Q1 SV legend | MD-7 | "Structural Variant (putative driver)" | "Structural Variant (unknown significance)" | 🟡 |
+
 Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3 partial panels, Q1 column order) were not re-run, their IDs being ✅ on the PRs' own audits (#192, #193).
 
 ---
@@ -107,7 +123,7 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| ONC-TR-1 | 🟡 | B | Display names, Freq %, Select all (64) / Deselect all, applied by Update tracks, no cap; 64 attributes as legacy (#196); automatic rows (Profiled for, Mutation spectrum) listed first (#258). Left: a patient-level attribute's Freq is over patients, the portal's over samples |
+| ONC-TR-1 | 🟡 | B | Display names, Freq %, Select all (64) / Deselect all, applied by Update tracks, no cap; 64 attributes as legacy (#196); automatic rows (Profiled for, Mutation spectrum) listed first (#258); a patient-level attribute's Freq over samples (#264): every other Q1 row's Freq as the portal's (2026-11-18). Left: numeric names carry " (numeric)" ("Diagnosis Age (numeric)"); the spectrum's Freq (STM-4); no Save tracks (MD-12) |
 | ONC-TR-2 | 🟡 | BC | Unchanged: Heatmap tab lists raw profile ids (`rna_seq_v2_mrna_median_Zscores`, `gistic`) + VAF + generic assays; not hidden for multi-study; free-text genes per profile; no NG-CHM (tracked: gated features) |
 | ONC-TR-3 | 🟡 | BC | Unchanged: generic assay as heatmap rows with entity search; no Select/Clear all, no bar/stacked chart types |
 | ONC-TR-4 | 🟡 | B | Unchanged: "Cohort rows" (≤3) ≈ Groups; "Custom" tab = uploads ≈ Custom Charts |
@@ -119,7 +135,7 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 | ONC-SO-1 | ✅ | BC | Staircase menu: mutation type, driver, ignore VUS, each enabled only where the portal's is (#195) |
 | ONC-SO-2 | ✅ | B | "patient id" / "sample id" option |
 | ONC-SO-3 | ❌ | C | No case-list order; the portal offers it only for a query naming sample ids, which no Results query here can yet (tracked) |
-| ONC-SO-4 | 🔶 | C | Clustering now the portal's method (#201), but "cluster by <profile>" is still a selectable option of the sort select, not a disabled indicator |
+| ONC-SO-4 | ✅ | BC | Was 🔶: the sort select shows "sorted by heatmap clustering order" as a disabled entry, only with a heatmap row, selected while clustered (`OncoprintFigure.tsx:858-861`) (#278); Q1 + mRNA-z, Cluster on TP53 mRNA-z: select reads it |
 | ONC-SO-5 | ✅ | C | Choosing another primary key replaces the cluster key |
 
 ### §1 Toolbar — Mutations
@@ -139,7 +155,7 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 | ONC-VI-3 | ✅ | BC | "whitespace between cells"; pad drawn only once a column is ≥6 px (legacy auto-off <2 px) |
 | ONC-VI-4 | 🟡 | C | Unchanged: engine has `display.clinicalLegends: all|none` (`oncoprint-assemble.ts:112`); no UI toggle in Display |
 | ONC-VI-5 | ❌ | C | Unchanged: no "only altered" legend option |
-| ONC-VI-6 | ✅ | C | A row's OQL line in grey after its gene (rgb(166,166,166), cut at 15 + "..."), Display › show OQL filters, on by default; none for a row without OQL (the portal writes the default line there) |
+| ONC-VI-6 | 🟡 | BC | Was ✅: a row's OQL line in grey after its gene, Display › show OQL filters, on by default with OQL. But the toggle is offered only when a row has OQL (`OncoprintFigure.tsx:817`): Q1's Display has no "show OQL filters", Q5's has. The spec's option is always there (default off without OQL) and writes the default OQL line on rows without one |
 | ONC-VI-7 | ✅ | BC | "white background (for print)" + legend caution |
 
 ### §1 Toolbar — Download
@@ -197,7 +213,7 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 | ONC-TT-5 | ✅ | C | Expression blue→black→red, z −3…3 (#200) |
 | ONC-TT-6 | ✅ | C | Methylation fixed [0, 1], white at 0.35 (`oncoprint-style.ts:117`) (#200) |
 | ONC-TT-7 | ✅ | C | VAF yellow→teal `rgb(241,242,181)`→`rgb(19,80,88)` (#200); a profiled column with no VAF drawn #e0e0e0, legend "Not mutated/no VAF data" (`oncoprint-style.ts` heatNull) (#263) |
-| ONC-TT-8 | 🟡 | C | Range, pivot threshold and sort order as the portal's (#200); threshold values (">8") not read (tracked) |
+| ONC-TT-8 | ✅ | C | Was 🟡: range, pivot threshold and sort order as the portal's (#200); threshold values (">90", "<1") read and drawn as categories (`lib/oncoprint.ts:417` parseThresholdValue, `oncoprint-style.ts:652` thresholdColor) (#267), the intended behaviour rather than the legacy NaN drop |
 | ONC-TT-9 | ❌ | C | Unchanged: no GA bar / stacked (the only stacked row is the mutation spectrum) |
 | ONC-TT-10 | ❌ | C | Unchanged: categorical GA refused |
 | ONC-TT-11 | ❌ | C | Unchanged: no GSVA (tracked) |
@@ -210,8 +226,8 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 | ONC-TM-1 | ✅ | B | Current sort bold + ✓; one menu at a time. Item lists differ: genetic rows lack "Sort by genes"; # Samples per Patient lacks "Show one column per…"; no group-header menu |
 | ONC-TM-2 | 🟡 | BC | "Remove track" no longer offered on the last gene, a `cluster:` key survives track edits (#187); remove gene still edits the view's genes, not `gene_list` |
 | ONC-TM-3 | 🟡 | B | Unchanged: Show gaps / w/% right / w/% left only when the track is already the primary sort key |
-| ONC-TM-4 | ✅ | C | Edit colours inline (colour inputs), Reset; stored in the document, not localStorage (invariant 9) |
-| ONC-TM-5 | 🟡 | C | Average linkage on 1 − Spearman, rows and columns (#201); still started from the sort select, not the heatmap group header's menu (tracked) |
+| ONC-TM-4 | ✅ | BC | Edit colours inline (colour inputs), Reset; stored in the document, not localStorage (invariant 9); the spectrum row too (#265) |
+| ONC-TM-5 | ✅ | BC | Was 🟡: average linkage on 1 − Spearman, rows and columns (#201); Cluster / Don't cluster in each heatmap row's menu, one profile at a time (`OncoprintFigure.tsx:950-951`) (#278). Q1 + mRNA-z: Cluster reorders columns and the five rows. No group-header row (LY-1) |
 
 ### §6 Sorting
 
@@ -254,7 +270,7 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 | ONC-MD-4 | ✅ | C | "Show only drivers" disabled with no source on (`DriverSettingsMenu.tsx:88`) (#168) |
 | ONC-MD-5 | ✅ | BC | drivers only drops VUS, re-runs, legend mark counts them |
 | ONC-MD-6 | ✅ | BC | Germline stripe and Show only somatic (#168) |
-| ONC-MD-7 | 🟡 | B | Inset glyph + split ✅; Q1's one SV (TRIM24-BRAF) is "Structural Variant (unknown significance)", legacy "(putative driver)"; our SV tab leaves its OncoKB cell blank (v7.5 store has no pair call). The oncoprint reads only the gene-level OncoKB "Fusion" row (`lib/annotation.ts:121,128`), not the pair calls of `lib/sv-oncokb.ts` (#219) |
+| ONC-MD-7 | 🟡 | B | Inset glyph + split ✅; the oncoprint now reads OncoKB's pair calls (`lib/sv-oncokb.ts:95` svDriverKeysSql) (#271), but the pinned v7.5 store has none, so Q1's TRIM24-BRAF is still "Structural Variant (unknown significance)" (2026-11-18), legacy "(putative driver)" |
 | ONC-MD-8 | ✅ | C | "Remove track" not offered on a single gene (#187) |
 | ONC-MD-9 | 🟡 | B | Each row draws its gene's line (Q5 KRAS "11% / 11%", header 344 (58%), as legacy) (#225, #229); `[ ]` still refused (tracked) |
 | ONC-MD-10 | ✅ | C | No special empty state; 0 % / N/P |
@@ -271,7 +287,7 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 | ONC-STM-1 | ✅ | BC | Counts as before; labels as the portal's (KRAS 222/594 "37%", Q2 header 6,208 (60%)) (#192). Ours alone: the driver % beside it |
 | ONC-STM-2 | ✅ | B | 485 (82%), 6,208 (60%) + 6,494 (59%) samples, 775 (46%), 344 (58%), as legacy (#192) |
 | ONC-STM-3 | 🐞 ok | C | Per-segment altered ÷ profiled; no profiled → "N/P", not "NaN%" (`canvas.ts:88-92`). Note: counts any cell code > 0, so mRNA/protein overlay bits would count as altered |
-| ONC-STM-4 | 🟡 | B | Freq % of the queried cases with data (#196); a patient-level attribute's over patients, legacy over samples (tracked) |
+| ONC-STM-4 | 🟡 | B | Q1, 2026-11-18: every attribute's Freq as the portal's, patient-level ones now over samples (#264). Mutation spectrum: ours 89.9 %, the portal's 99.7 %: ours counts the samples in the mutation profile's `sample_profile` rows (534 of 594; `app/portal/study-known.ts:92`, `lib/explore.ts:1474-1481`), the portal its sequenced case list |
 | ONC-STM-5 | ✅ | C | Patient NUMBER mean, MUTATION_COUNT max, ranges as the portal's (#198) |
 | ONC-STM-6 | ✅ | C | Spectrum shares per substitution (#199) |
 | ONC-STM-7 | ✅ | C | z clamp ±3, methylation [0, 1], VAF max, patient max |x|, GA pivot (#200) |
