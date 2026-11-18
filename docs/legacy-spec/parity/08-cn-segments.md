@@ -1,6 +1,6 @@
 # Parity audit — Results › CN Segments (spec `08-cn-segments.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`): Q1 tab reloaded (KRAS · TP53 · Whole genome chips, "300 of 583 samples with segments are drawn; 283 are left out", internal-id order, the tab laid out as before), code re-read; one verdict changed (CNS-MD-6)
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright + `/api/copy-number-segments/fetch` from the page, same day)
 - **Code paths (cBioLab):** `lib/views/segments/{run,sql,igv,types}.ts`, `lib/views/segments/README.md`, `app/lab/segments-igv.tsx` (igv.js **3.8.10**; legacy 2.11.2), `app/lab/kinds/segments.tsx`, `app/portal/results-layout.ts:165-181` (`cnSegmentsTab`, locus chooser), `lib/views/genome/` (extra view under the tab)
@@ -20,16 +20,16 @@ Scripts and output: (local scratch, not committed) (`legother.js seg`, `labui.js
 | Verdict | Count |
 |---|---|
 | ✅ match | 6 |
-| 🟡 partial | 9 |
+| 🟡 partial | 8 |
 | 🔶 different | 4 |
 | ❌ missing | 5 |
-| 🐞 ok | 3 |
+| 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
 | ? | 1 |
 | **Total IDs** | **29** |
 
-**Overall: 34.5 %** (✅ 6 + 🐞ok 3 + N/A 1 = 10 of 29). Counting 🟡 as half: 50.0 %.
+**Overall: 37.9 %** (✅ 6 + 🐞ok 4 + N/A 1 = 11 of 29). Counting 🟡 as half: 51.7 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | ? | One line |
 |---|---|---|---|---|---|---|---|---|---|
@@ -37,7 +37,7 @@ Scripts and output: (local scratch, not committed) (`legother.js seg`, `labui.js
 | §1 Controls (1.x) | 7 | 1 | 4 | 1 | 1 | 0 | 0 | 0 | Pills ✅ (Whole genome last); igv 3.8 navbar; no .seg download; row cap instead of the 20,000 rule |
 | §2 Data (2.x) | 4 | 2 | 1 | 0 | 0 | 1 | 0 | 0 | Same samples (583 with segments), identical segment means |
 | §3 Rendering (3.x) | 5 | 1 | 0 | 2 | 0 | 1 | 0 | 1 | 300 of 583 rows drawn by default; fixed 600 px; sample order differs |
-| §4 Modes (MD) | 8 | 1 | 2 | 1 | 2 | 1 | 1 | 0 | Mixed builds refused (loud); multi-study id collision still merges rows in IGV |
+| §4 Modes (MD) | 8 | 1 | 1 | 1 | 2 | 2 | 1 | 0 | Mixed builds refused (loud); multi-study rows keyed by study, no id collision |
 | §6 Statistics (STM) | 2 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Values identical; no segment file |
 
 ---
@@ -128,7 +128,7 @@ Data version: identical segment starts, ends and means for every sample compared
 | CNS-MD-3 | 🔶 | C | No 20,000 refusal; row cap applies to every locus (see 1.7) |
 | CNS-MD-4 | ❌ | C | Tab not hidden; the view refuses "no sample of this cohort has copy-number segments … the portal hides its CN Segments tab" (tracked) |
 | CNS-MD-5 | N/A | C | No Show-only-profiled setting (RV-2) |
-| CNS-MD-6 | 🟡 | C | One track; per-study build, mixed builds refused; rows keyed by study + id server-side, but igv features use the bare sample id (`igv.ts:18`), so same-id samples of two studies still merge into one IGV row (legacy bug copied in the drawing) |
+| CNS-MD-6 | 🐞 ok | C | Re-measured 2026-11-18 (was 🟡): one track ✅; per-study build, mixed builds refused (2.4); with several studies each IGV row is named `study:sample` (`igvSegFeatures`, `lib/views/segments/igv.ts:16-26`), so same-id samples of two studies stay two rows — the portal's collision merge not copied |
 | CNS-MD-7 | 🐞 ok | C | Gene with no refGene span → refusal naming it (`run.ts:168`), no endless spinner |
 | CNS-MD-8 | ❌ | C | No download, so no switch (tracked: Data-governance switches) |
 
@@ -145,5 +145,5 @@ Data version: identical segment starts, ends and means for every sample compared
 
 ## 5. cBioLab bugs
 
-- `lib/views/segments/README.md` and the caption say rows are in "the order `/api/copy-number-segments/fetch` returns them" / "as the portal lists them"; the portal's API order differs (CNS-3.5).
-- Multi-study: igv rows keyed by bare sample id (`igv.ts:18`) merge two studies' samples with the same id, though the server keeps them apart.
+- ~~`lib/views/segments/README.md` and the caption say rows are in "the order `/api/copy-number-segments/fetch` returns them" / "as the portal lists them"; the portal's API order differs (CNS-3.5).~~ Fixed (#183): both now say "each study's own sample order (internal sample id)"; the order itself still differs (CNS-3.5).
+- ~~Multi-study: igv rows keyed by bare sample id (`igv.ts:18`) merge two studies' samples with the same id, though the server keeps them apart.~~ Fixed (#183): rows named `study:sample` with several studies.
