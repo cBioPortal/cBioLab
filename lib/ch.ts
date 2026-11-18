@@ -271,6 +271,18 @@ export function directConnections(): ChConn[] {
   return connections().filter((c) => c.id !== peer?.id);
 }
 
+const MATERIALIZED = " AS MATERIALIZED (";
+/**
+ * One subquery of a WITH clause, `name AS (sql)`. ClickHouse inlines a CTE at every place it is
+ * referenced, so one a statement reads several times is computed several times; with
+ * CLICKHOUSE_MATERIALIZED_CTE=1 it is `name AS MATERIALIZED (sql)` instead, computed once per
+ * statement. A statement holding one is sent with `enable_materialized_cte=1` (postToDatabase),
+ * a setting ClickHouse marks experimental, hence off unless asked for.
+ */
+export function cte(name: string, sql: string): string {
+  return name + (setting("CLICKHOUSE_MATERIALIZED_CTE") === "1" ? MATERIALIZED : " AS (") + sql + ")";
+}
+
 /** One statement as the database would receive it: its text, and the tables that ride along with it. */
 export interface ChStatement { conn: ChConn; format: string; query: string; externals: { name: string; structure: string; blob: Blob }[] }
 /**
@@ -326,7 +338,8 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
   // request keeps its share of the database until it finishes, which is most of what an
   // abandoned request costs.
   const scope = studyScope(conn);
-  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "") + (scope ? "&" + scope : "");
+  const materialized = query.includes(MATERIALIZED) ? "&enable_materialized_cte=1" : "";
+  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "") + materialized + (scope ? "&" + scope : "");
   const send = async (): Promise<string> => {
     const auth = "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64");
     let init: RequestInit;

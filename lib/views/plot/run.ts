@@ -364,6 +364,11 @@ async function peerSafe<T>(rs: Resolver[], run: () => Promise<T>, fallback: (why
 /** a layer's points, each with the key that says whether an earlier layer already drew the case */
 type Picked = { layer: PlotLayer; keys?: string[] };
 
+/** a promise's outcome as a value, so one started ahead of need and never awaited cannot go unhandled */
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
+const settle = <T>(p: Promise<T>): Promise<Settled<T>> => p.then((value) => ({ ok: true as const, value }), (error) => ({ ok: false as const, error }));
+function unsettle<T>(s: Settled<T>): T { if (s.ok) return s.value; throw s.error; }
+
 /**
  * The view's point layers, in order, each drawn in its own colour over the plotted cohort. Every
  * layer shares one POINTS_CAP budget; a case two layers share is drawn by the first. A layer that
@@ -382,16 +387,24 @@ async function pointLayers(pv: PlotView, data: PlotData, c: ViewRun, cn: string,
   const seen = new Map<string, number>();
   let budget = POINTS_CAP;
   const out: PlotLayer[] = [];
-  for (const [i, l] of specs.entries()) {
+  // a cohort layer's count in the plot, which no budget changes, asked once however often the layer is
+  const counts = new Map<string, Promise<number>>();
+  const pick = (i: number, l: PointLayerSpec, budget: number): Promise<Picked> => {
     const base = { label: layerLabel(l, (side) => data[side].label), color: LAYER_COLORS[i] };
     const kind = "cohort" in l ? "cohort" as const : l.rule;
-    let picked: Picked;
-    if ("cohort" in l) picked = await cohortLayer(l.cohort, base, data, c, def, sites, spec, budget);
-    else if (data.shape === "table" || !data.n)
-      picked = { layer: { kind, ...base, n: 0, shown: "none", why: data.n ? TABLE_WHY : undefined } };
-    else if (closed.length) picked = { layer: { kind, ...base, n: 0, shown: "none", why: closed.join(", ") + " may not show individual cases" } };
-    else picked = await peerSafe(sites.map((s) => c.resolvers[s]), () => ruleLayer(l, base, data, fr, def, sites, spec, xk, yk, budget),
+    if ("cohort" in l) return cohortLayer(l.cohort, base, data, c, def, sites, spec, budget, counts);
+    if (data.shape === "table" || !data.n)
+      return Promise.resolve({ layer: { kind, ...base, n: 0, shown: "none", why: data.n ? TABLE_WHY : undefined } });
+    if (closed.length) return Promise.resolve({ layer: { kind, ...base, n: 0, shown: "none", why: closed.join(", ") + " may not show individual cases" } });
+    return peerSafe(sites.map((s) => c.resolvers[s]), () => ruleLayer(l, base, data, fr, def, sites, spec, xk, yk, budget),
       (why) => ({ layer: { kind, ...base, n: 0, shown: "none", why } }));
+  };
+  // Every layer starts at once, on the full budget, as if no earlier layer drew points. A layer
+  // depends on the earlier ones only through the budget they leave, so its early answer is kept
+  // when that budget is still the full one and asked again with the smaller budget otherwise.
+  const early = specs.map((l, i) => settle(pick(i, l, POINTS_CAP)));
+  for (const [i, l] of specs.entries()) {
+    const picked = budget === POINTS_CAP ? unsettle(await early[i]) : await pick(i, l, budget);
     const { layer, keys } = picked;
     if (layer.shown === "points" && layer.points && keys) {
       const kept = layer.points.filter((_, j) => !seen.has(keys[j]));
@@ -417,7 +430,7 @@ function gather<T extends { id: string }>(parts: T[][], sites: string[]): { poin
 
 /** a cohort layer: the plotted cohort's cases that are also in `name` */
 async function cohortLayer(name: string, base: { label: string; color: string }, data: PlotData, c: ViewRun, def: Def,
-  sites: string[], spec: PlotRequest, budget: number): Promise<Picked> {
+  sites: string[], spec: PlotRequest, budget: number, counts: Map<string, Promise<number>>): Promise<Picked> {
   const fr = c.resolvers as Record<string, Resolver & FederatedPlotCapable>;
   const hDef = c.doc.cohorts[name], hc = c.cohorts[name];
   const xk = data.x.kind, yk = data.y.kind;
@@ -426,12 +439,26 @@ async function cohortLayer(name: string, base: { label: string; color: string },
   const head = { kind: "cohort" as const, ...base, name, patients: hc.count };
   const unable = hSites.filter((s) => !hasFederatedPlot(c.resolvers[s]));
   if (unable.length) return { layer: { ...head, inPlot: 0, n: 0, shown: "none", why: unable.join(", ") + " cannot answer a cohort layer (a remote federation peer, most likely)" } };
-  const inPlot = (await Promise.all(hSites.map((s) => fr[s].plotHighlightCount(def, hDef)))).reduce((a, n) => a + n, 0);
+  if (!counts.has(name)) counts.set(name, Promise.all(hSites.map((s) => fr[s].plotHighlightCount(def, hDef))).then((ns) => ns.reduce((a, n) => a + n, 0)));
+  const inPlot = await counts.get(name)!;
   if (data.shape === "table") return { layer: { ...head, inPlot, n: 0, shown: "none", why: TABLE_WHY } };
   if (!inPlot || !data.n) return { layer: { ...head, inPlot, n: 0, shown: "none" } };
   let why: string;
   let closedWhy = "";
   const closed = hSites.filter((s) => !plotCasesOf(c.resolvers[s]));
+  // the layer as density cells or boxes, which is what it becomes when its points do not fit
+  const aggregate = async (): Promise<{ bins: { bx: number; by: number; n: number }[] } | { groups: ReturnType<typeof poolBoxRows> }> => {
+    if (data.shape === "scatter" && data.extent && data.grid) {
+      const parts = await Promise.all(hSites.map((s) => fr[s].plotHighlightBins(def, hDef, spec, xk, yk, data.grid!, data.extent!)));
+      const cells = new Map<string, number>();
+      for (const part of parts) for (const b of part) cells.set(b.bx + "," + b.by, (cells.get(b.bx + "," + b.by) || 0) + b.n);
+      return { bins: [...cells.entries()].map(([k, n]) => { const [bx, by] = k.split(",").map(Number); return { bx, by, n }; }) };
+    }
+    return { groups: poolBoxRows(await Promise.all(hSites.map((s) => fr[s].plotHighlightBoxRows(def, hDef, spec, xk, yk)))) };
+  };
+  // more cases in the plot than the budget almost always means more points than it too, so the
+  // aggregate form is asked for beside the points rather than after them
+  const early = !closed.length && budget > 0 && inPlot > budget ? settle(aggregate()) : null;
   if (!closed.length && budget > 0) {
     // a peer that refuses its cases leaves this layer to its aggregate form, saying why
     const parts = await peerSafe(hSites.map((s) => c.resolvers[s]),
@@ -446,15 +473,9 @@ async function cohortLayer(name: string, base: { label: string; color: string },
   } else {
     why = closed.length ? closed.join(", ") + " may not show individual cases" : "the earlier layers used every point the figure draws";
   }
-  if (data.shape === "scatter" && data.extent && data.grid) {
-    const parts = await Promise.all(hSites.map((s) => fr[s].plotHighlightBins(def, hDef, spec, xk, yk, data.grid!, data.extent!)));
-    const cells = new Map<string, number>();
-    for (const part of parts) for (const b of part) cells.set(b.bx + "," + b.by, (cells.get(b.bx + "," + b.by) || 0) + b.n);
-    const bins = [...cells.entries()].map(([k, n]) => { const [bx, by] = k.split(",").map(Number); return { bx, by, n }; });
-    return { layer: { ...head, inPlot, n: bins.reduce((a, b) => a + b.n, 0), shown: "density", bins, why } };
-  }
-  const groups = poolBoxRows(await Promise.all(hSites.map((s) => fr[s].plotHighlightBoxRows(def, hDef, spec, xk, yk))));
-  return { layer: { ...head, inPlot, n: groups.reduce((a, g) => a + g.n, 0), shown: "boxes", groups, why } };
+  const agg = early ? unsettle(await early) : await aggregate();
+  if ("bins" in agg) return { layer: { ...head, inPlot, n: agg.bins.reduce((a, b) => a + b.n, 0), shown: "density", bins: agg.bins, why } };
+  return { layer: { ...head, inPlot, n: agg.groups.reduce((a, g) => a + g.n, 0), shown: "boxes", groups: agg.groups, why } };
 }
 
 /**
