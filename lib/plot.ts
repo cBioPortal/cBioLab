@@ -192,6 +192,8 @@ export interface AxisCtx {
   variantPins?: VariantPins;
   /** the cox and logistic views' labels ("Not mutated"); a plot's are the portal's (AXIS_LABELS) */
   labels?: "model";
+  /** whether the connection computes a WITH subquery once (lib/ch.ts materializedCteSupported) */
+  materialized?: boolean;
 }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
@@ -654,26 +656,34 @@ export function keptCategoriesSql(sel: string, categories: string[]): string {
   return "SELECT id, v FROM (" + sel + ") WHERE toString(v) IN (" + categories.map((c) => sq(String(c))).join(", ") + ")";
 }
 
-const pairCte = (x: string, y: string, cohortSql: string) =>
-  "WITH " + cte("cohort", cohortSql) + ",\n" +
-  "     " + cte("xs", x) + ",\n" +
-  "     " + cte("ys", y) + ",\n" +
+/**
+ * A plot query's cohort: its SQL alone (plain WITH subqueries), or a plot context, whose
+ * `materialized` says whether its connection computes a WITH subquery once (lib/ch.ts cte).
+ */
+export type PlotCohort = string | { cohortSql: string; materialized?: boolean };
+const cohortOf = (c: PlotCohort): string => typeof c === "string" ? c : c.cohortSql;
+const materializedOf = (c: PlotCohort): boolean => typeof c !== "string" && !!c.materialized;
+
+const pairCte = (x: string, y: string, cohort: PlotCohort) =>
+  "WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n" +
+  "     " + cte("xs", x, materializedOf(cohort)) + ",\n" +
+  "     " + cte("ys", y, materializedOf(cohort)) + ",\n" +
   "     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)\n";
 
 /**
  * How many cases have BOTH axes, and the extremes — one cheap query, run before any binning so
  * a plot can report its size and refuse a scan nobody meant to ask for.
  */
-export function plotCountSql(xSel: string, ySel: string, cohortSql: string, numeric: boolean): AggregateSql {
-  return aggregateSql(pairCte(xSel, ySel, cohortSql) +
+export function plotCountSql(xSel: string, ySel: string, cohort: PlotCohort, numeric: boolean): AggregateSql {
+  return aggregateSql(pairCte(xSel, ySel, cohort) +
     (numeric
       ? "SELECT count() AS n, min(x) AS x0, max(x) AS x1, min(y) AS y0, max(y) AS y1 FROM pair"
       : "SELECT count() AS n, uniqExact(x) AS kx, uniqExact(y) AS ky FROM pair"));
 }
 
 /** One numeric axis over the cohort: how many cases have it, its lowest value, and how many are below 0. Counts only. */
-export function plotNegativesSql(sel: string, cohortSql: string): AggregateSql {
-  return aggregateSql("WITH " + cte("cohort", cohortSql) + ",\n     " + cte("xs", sel) + "\n" +
+export function plotNegativesSql(sel: string, cohort: PlotCohort): AggregateSql {
+  return aggregateSql("WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n     " + cte("xs", sel, materializedOf(cohort)) + "\n" +
     "SELECT count() AS n, min(v) AS lo, countIf(v < 0) AS neg FROM xs WHERE v IS NOT NULL");
 }
 
@@ -685,8 +695,8 @@ export function plotNegativesSql(sel: string, cohortSql: string): AggregateSql {
 export function plotCoverageSql(xSel: string, ySel: string, ctx: AxisCtx): AggregateSql {
   // the cohort's samples, or (patient mode) their owners
   const universe = ctx.unit === "sample" ? "SELECT DISTINCT sid AS id FROM cohort" : "SELECT DISTINCT pid AS id FROM cohort";
-  return aggregateSql("WITH " + cte("cohort", ctx.cohortSql) + ",\n     " + cte("cases", universe) + ",\n" +
-    "     " + cte("xs", xSel) + ",\n     " + cte("ys", ySel) + "\n" +
+  return aggregateSql("WITH " + cte("cohort", ctx.cohortSql, !!ctx.materialized) + ",\n     " + cte("cases", universe, !!ctx.materialized) + ",\n" +
+    "     " + cte("xs", xSel, !!ctx.materialized) + ",\n     " + cte("ys", ySel, !!ctx.materialized) + "\n" +
     "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny" +
     // patients with more than one sample IN THE COHORT: the ones whose samples a point combines
     (ctx.unit === "sample" ? "" : ",\n  (SELECT count() FROM (SELECT pid FROM cohort GROUP BY pid HAVING uniqExact(sid) > 1)) AS multi") +
@@ -726,10 +736,10 @@ export function coverageNote(d: PlotData, unit: "patient" | "sample"): string {
  * portal compute it), so it does not depend on row order. A coefficient is NULL when either axis
  * has no spread, and the line when x has none.
  */
-export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
+export function plotStatsSql(xSel: string, ySel: string, cohort: PlotCohort): AggregateSql {
   const spread = "min(x) < max(x) AND min(y) < max(y)";
   const avgRank = (v: string) => "rank() OVER (ORDER BY " + v + ") + (count() OVER (PARTITION BY " + v + ") - 1) / 2";
-  return aggregateSql(pairCte(xSel, ySel, cohortSql) +
+  return aggregateSql(pairCte(xSel, ySel, cohort) +
     "SELECT count() AS n, if(" + spread + ", corr(x, y), NULL) AS pearson, if(" + spread + ", corr(rx, ry), NULL) AS spearman,\n" +
     "       if(min(x) < max(x), simpleLinearRegression(x, y).1, NULL) AS slope, if(min(x) < max(x), simpleLinearRegression(x, y).2, NULL) AS intercept,\n" +
     "       sum(x) AS sx, sum(y) AS sy, sum(x * y) AS sxy, sum(x * x) AS sxx, sum(y * y) AS syy\n" +
@@ -744,8 +754,8 @@ export function plotStatsSql(xSel: string, ySel: string, cohortSql: string): Agg
  * correlation needs the pooled GLOBAL ranking, which no per-site aggregate can reconstruct
  * (spearmanRho ranks the pairs of the sites that may show them).
  */
-export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
-  return aggregateSql(pairCte(xSel, ySel, cohortSql) +
+export function plotMomentsSql(xSel: string, ySel: string, cohort: PlotCohort): AggregateSql {
+  return aggregateSql(pairCte(xSel, ySel, cohort) +
     "SELECT count() AS n, sum(x) AS sx, sum(y) AS sy, sum(x * y) AS sxy, sum(x * x) AS sxx, sum(y * y) AS syy\n" +
     "FROM pair");
 }
@@ -759,14 +769,14 @@ export function plotMomentsSql(xSel: string, ySel: string, cohortSql: string): A
  * each site, and summing them draws a picture of neither. Omitted for a single-study plot, which
  * still bins over its own range exactly as before.
  */
-export function plotBinsSql(xSel: string, ySel: string, cohortSql: string, bins: [number, number] = DEFAULT_BINS,
+export function plotBinsSql(xSel: string, ySel: string, cohort: PlotCohort, bins: [number, number] = DEFAULT_BINS,
   extent?: { x0?: number; x1?: number; y0?: number; y1?: number }): AggregateSql {
   const [bx, by] = clampGrid(bins);
   // one row whichever ends are fixed: an end the request leaves open is the data's own
   const end = (k: "x0" | "x1" | "y0" | "y1", agg: string) => (extent && extent[k] != null ? "any(" + num(extent[k]!) + ")" : agg) + " " + k;
   const eCte = ",    e AS (SELECT " + end("x0", "min(x)") + ", " + end("x1", "max(x)") + ", " +
     end("y0", "min(y)") + ", " + end("y1", "max(y)") + " FROM pair)\n";
-  return aggregateSql(pairCte(xSel, ySel, cohortSql) + eCte +
+  return aggregateSql(pairCte(xSel, ySel, cohort) + eCte +
     "SELECT " + binIndex("x", bx) + " AS bx,\n" +
     "       " + binIndex("y", by) + " AS by,\n" +
     "       count() AS n, min(x) AS minX, max(x) AS maxX, min(y) AS minY, max(y) AS maxY\n" +
@@ -819,10 +829,10 @@ function num(x: number): string {
  * never interpolating; the median is the middle value, or the mean of the two middle values for an
  * even n. A group of one has no quartiles there (no box); here q1 = q3 = its value.
  */
-export function plotBoxSql(numSel: string, catSel: string, cohortSql: string): AggregateSql {
-  return aggregateSql("WITH " + cte("cohort", cohortSql) + ",\n" +
-    "     " + cte("vs", numSel) + ",\n" +
-    "     " + cte("gs", catSel) + "\n" +
+export function plotBoxSql(numSel: string, catSel: string, cohort: PlotCohort): AggregateSql {
+  return aggregateSql("WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n" +
+    "     " + cte("vs", numSel, materializedOf(cohort)) + ",\n" +
+    "     " + cte("gs", catSel, materializedOf(cohort)) + "\n" +
     "SELECT g, n, s[1] AS lo, s[n] AS hi,\n" +
     "       [s[greatest(1, intDiv(n + 2, 4))],\n" +
     "        if(n % 2 = 1, s[intDiv(n + 1, 2)], (s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2),\n" +
@@ -840,7 +850,7 @@ export function plotBoxSql(numSel: string, catSel: string, cohortSql: string): A
  * then means the same values at every site, so the sites' counts add. A value outside it is not
  * counted. Omitted for a single-study plot, which cuts its bins over its own middle 99%.
  */
-export function plotViolinSql(numSel: string, catSel: string, cohortSql: string, bins = VIOLIN_BINS, colorSel?: string,
+export function plotViolinSql(numSel: string, catSel: string, cohort: PlotCohort, bins = VIOLIN_BINS, colorSel?: string,
   range?: [number, number]): AggregateSql {
   const b = Math.max(4, Math.min(200, Math.round(bins)));
   const eCte = range
@@ -851,9 +861,9 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
   // is drawn between its whiskers, and the renderer clips whatever falls outside.
   // With a colour, the density splits by class: the key gains one dimension and the payload
   // stays bounded by groups x bins x classes rather than by the cohort.
-  return aggregateSql("WITH " + cte("cohort", cohortSql) + ",\n" +
-    "     " + cte("vs", numSel) + ",\n" +
-    "     " + cte("gs", catSel) + (colorSel ? ",\n     " + cte("cs", colorSel) : "") + ",\n" +
+  return aggregateSql("WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n" +
+    "     " + cte("vs", numSel, materializedOf(cohort)) + ",\n" +
+    "     " + cte("gs", catSel, materializedOf(cohort)) + (colorSel ? ",\n     " + cte("cs", colorSel, materializedOf(cohort)) : "") + ",\n" +
     "     j AS (SELECT gs.v AS g, vs.v AS x" + (colorSel ? ", cs.v AS c" : "") + " FROM vs INNER JOIN gs ON gs.id = vs.id" +
       (colorSel ? "\n            LEFT JOIN cs ON cs.id = vs.id" : "") + "),\n" +
     eCte +
@@ -872,9 +882,9 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
  * `PatientLevelResolver`, the participant whose entitlement is to see cases. An aggregate-only
  * site has no method that could call it — see docs/DATA-BOUNDARY.md.
  */
-export function plotPointsSql(numSel: string, catSel: string, cohortSql: string, cap = POINTS_CAP,
+export function plotPointsSql(numSel: string, catSel: string, cohort: PlotCohort, cap = POINTS_CAP,
   colorSel?: string, ringSel?: string): PatientSql {
-  return patientSql(boxCasesHead(numSel, catSel, cohortSql, colorSel, ringSel) +
+  return patientSql(boxCasesHead(numSel, catSel, cohort, colorSel, ringSel) +
     "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1));
 }
 
@@ -884,12 +894,12 @@ export function plotPointsSql(numSel: string, catSel: string, cohortSql: string,
  * the most extreme and says how many it left out. Returns ids, so like plotPointsSql it is
  * reachable only from `PatientLevelResolver`. The order is outlierExtremity's, in SQL.
  */
-export function plotOutlierPointsSql(numSel: string, catSel: string, cohortSql: string, whiskers: Whiskers[], cap = POINTS_CAP): PatientSql {
+export function plotOutlierPointsSql(numSel: string, catSel: string, cohort: PlotCohort, whiskers: Whiskers[], cap = POINTS_CAP): PatientSql {
   const at = "indexOf([" + whiskers.map((w) => sq(w.g)).join(", ") + "], gs.v)";
   const arr = (f: (w: Whiskers) => number) => "arrayElement([" + whiskers.map((w) => num(f(w))).join(", ") + "], " + at + ")";
   const lo = arr((w) => w.loWhisker), hi = arr((w) => w.hiWhisker);
   const ext = "if(vs.v > " + hi + ", vs.v - " + hi + ", " + lo + " - vs.v) / if(" + hi + " > " + lo + ", " + hi + " - " + lo + ", 1)";
-  return patientSql(boxCasesHead(numSel, catSel, cohortSql, undefined, undefined, ", count() OVER () AS total") +
+  return patientSql(boxCasesHead(numSel, catSel, cohort, undefined, undefined, ", count() OVER () AS total") +
     outsideWhiskers(whiskers) + "\n" +
     "ORDER BY " + ext + " DESC, id\n" +
     "LIMIT " + Math.max(1, Math.min(50000, Math.round(cap))));
@@ -906,12 +916,12 @@ export function outlierExtremity(v: number, w: Whiskers): number {
 }
 
 /** a box's cases and their values, the start of both points queries */
-function boxCasesHead(numSel: string, catSel: string, cohortSql: string, colorSel?: string, ringSel?: string, extra = ""): string {
-  return "WITH " + cte("cohort", cohortSql) + ",\n" +
-    "     " + cte("vs", numSel) + ",\n" +
-    "     " + cte("gs", catSel) +
-    (colorSel ? ",\n     " + cte("cs", colorSel) : "") +
-    (ringSel ? ",\n     " + cte("rs", ringSel) : "") + "\n" +
+function boxCasesHead(numSel: string, catSel: string, cohort: PlotCohort, colorSel?: string, ringSel?: string, extra = ""): string {
+  return "WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n" +
+    "     " + cte("vs", numSel, materializedOf(cohort)) + ",\n" +
+    "     " + cte("gs", catSel, materializedOf(cohort)) +
+    (colorSel ? ",\n     " + cte("cs", colorSel, materializedOf(cohort)) : "") +
+    (ringSel ? ",\n     " + cte("rs", ringSel, materializedOf(cohort)) : "") + "\n" +
     "SELECT vs.id AS id, gs.v AS g, vs.v AS v" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + extra + "\n" +
     "FROM vs INNER JOIN gs ON gs.id = vs.id" +
     (colorSel ? "\n  LEFT JOIN cs ON cs.id = vs.id" : "") +
@@ -924,10 +934,10 @@ function boxCasesHead(numSel: string, catSel: string, cohortSql: string, colorSe
  * so like plotPointsSql it stays out of lib/federation.ts's aggregate builders and is reachable
  * only from `PatientLevelResolver`. Bounded by `n`, so no cap is needed.
  */
-export function plotRankedPointsSql(xSel: string, ySel: string, cohortSql: string, shape: "scatter" | "box",
+export function plotRankedPointsSql(xSel: string, ySel: string, cohort: PlotCohort, shape: "scatter" | "box",
   numFirst: boolean, rank: PointRank): PatientSql {
   const n = Math.max(1, Math.min(POINT_RULE_N_MAX, Math.round(rank.n)));
-  const head = pairIdCte(xSel, ySel, cohortSql);
+  const head = pairIdCte(xSel, ySel, cohort);
   if (shape === "box") {
     // the numeric axis is the value, the categorical one the group, whichever the document put first
     const cols = numFirst ? "id, y AS g, x AS v" : "id, x AS g, y AS v";
@@ -944,10 +954,10 @@ export function plotRankedPointsSql(xSel: string, ySel: string, cohortSql: strin
 }
 
 /** the pair of axes per case, keeping the case id: the start of every id-returning plot query */
-const pairIdCte = (x: string, y: string, cohortSql: string) =>
-  "WITH " + cte("cohort", cohortSql) + ",\n" +
-  "     " + cte("xs", x) + ",\n" +
-  "     " + cte("ys", y) + ",\n" +
+const pairIdCte = (x: string, y: string, cohort: PlotCohort) =>
+  "WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n" +
+  "     " + cte("xs", x, materializedOf(cohort)) + ",\n" +
+  "     " + cte("ys", y, materializedOf(cohort)) + ",\n" +
   "     pair AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)\n";
 
 /** one group's whiskers, which is all a box's outlier query needs to know about it */
@@ -989,14 +999,14 @@ export function plotHighlightCountSql(cohortSql: string, highlightSql: string): 
  * Like plotPointsSql it returns identifiers, so it stays out of lib/federation.ts's aggregate
  * builders and is reachable only from `PatientLevelResolver`.
  */
-export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP,
+export function plotScatterPointsSql(xSel: string, ySel: string, cohort: PlotCohort, cap = POINTS_CAP,
   sparse?: SparseCells, colorSel?: string, ringSel?: string): PatientSql {
   const limit = "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
   // each case's fill and ring category, as a box's points carry them; "" where it has none
-  if (!sparse) return patientSql("WITH " + cte("cohort", cohortSql) + ",\n" +
-    "     " + cte("xs", xSel) + ",\n" +
-    "     " + cte("ys", ySel) +
-    (colorSel ? ",\n     " + cte("cs", colorSel) : "") + (ringSel ? ",\n     " + cte("rs", ringSel) : "") + "\n" +
+  if (!sparse) return patientSql("WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n" +
+    "     " + cte("xs", xSel, materializedOf(cohort)) + ",\n" +
+    "     " + cte("ys", ySel, materializedOf(cohort)) +
+    (colorSel ? ",\n     " + cte("cs", colorSel, materializedOf(cohort)) : "") + (ringSel ? ",\n     " + cte("rs", ringSel, materializedOf(cohort)) : "") + "\n" +
     "SELECT xs.id AS id, xs.v AS x, ys.v AS y" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + "\n" +
     "FROM xs INNER JOIN ys ON ys.id = xs.id" +
     (colorSel ? "\nLEFT JOIN cs ON cs.id = xs.id" : "") + (ringSel ? "\nLEFT JOIN rs ON rs.id = xs.id" : "") + "\n" + limit);
@@ -1004,9 +1014,9 @@ export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: stri
   // bins the density over the same extent and grid
   const [bx, by] = clampGrid(sparse.grid), e = sparse.extent;
   if (!(sparse.cellMax >= 1)) throw new Error("plotScatterPointsSql: cellMax must be at least 1");
-  return patientSql("WITH " + cte("cohort", cohortSql) + ",\n" +
-    "     " + cte("xs", xSel) + ",\n" +
-    "     " + cte("ys", ySel) + ",\n" +
+  return patientSql("WITH " + cte("cohort", cohortOf(cohort), materializedOf(cohort)) + ",\n" +
+    "     " + cte("xs", xSel, materializedOf(cohort)) + ",\n" +
+    "     " + cte("ys", ySel, materializedOf(cohort)) + ",\n" +
     "     e AS (SELECT " + num(e.x0) + " AS x0, " + num(e.x1) + " AS x1, " + num(e.y0) + " AS y0, " + num(e.y1) + " AS y1),\n" +
     "     c AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y, " + binIndex("x", bx) + " AS bx, " + binIndex("y", by) + " AS by\n" +
     "           FROM xs INNER JOIN ys ON ys.id = xs.id, e),\n" +
@@ -1018,8 +1028,8 @@ export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: stri
 export interface SparseCells { grid: [number, number]; extent: { x0: number; x1: number; y0: number; y1: number }; cellMax: number }
 
 /** the contingency table, one row per occupied cell */
-export function plotTableSql(xSel: string, ySel: string, cohortSql: string): AggregateSql {
-  return aggregateSql(pairCte(xSel, ySel, cohortSql) +
+export function plotTableSql(xSel: string, ySel: string, cohort: PlotCohort): AggregateSql {
+  return aggregateSql(pairCte(xSel, ySel, cohort) +
     // no row cap below the whole table: callers refuse a pair past CATEGORY_CAP per axis first,
     // so CATEGORY_CAP² bounds it, and a table missing its smallest cells would be a wrong one
     "SELECT x AS cx, y AS cy, count() AS n FROM pair GROUP BY cx, cy ORDER BY n DESC LIMIT " + CATEGORY_CAP * CATEGORY_CAP);

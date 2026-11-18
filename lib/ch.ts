@@ -273,14 +273,14 @@ export function directConnections(): ChConn[] {
 
 const MATERIALIZED = " AS MATERIALIZED (";
 /**
- * One subquery of a WITH clause, `name AS (sql)`. ClickHouse inlines a CTE at every place it is
- * referenced, so one a statement reads several times is computed several times; with
- * CLICKHOUSE_MATERIALIZED_CTE=1 it is `name AS MATERIALIZED (sql)` instead, computed once per
- * statement. A statement holding one is sent with `enable_materialized_cte=1` (postToDatabase),
- * a setting ClickHouse marks experimental, hence off unless asked for.
+ * One subquery of a WITH clause, `name AS (sql)`, or `name AS MATERIALIZED (sql)` when
+ * `materialized`. ClickHouse inlines a CTE at every place it is referenced, so one a statement
+ * reads several times is computed several times; materialized, it is computed once per statement.
+ * A statement holding one is sent with `enable_materialized_cte=1` (postToDatabase). Whether a
+ * connection's server can is materializedCteSupported's answer.
  */
-export function cte(name: string, sql: string): string {
-  return name + (setting("CLICKHOUSE_MATERIALIZED_CTE") === "1" ? MATERIALIZED : " AS (") + sql + ")";
+export function cte(name: string, sql: string, materialized: boolean): string {
+  return name + (materialized ? MATERIALIZED : " AS (") + sql + ")";
 }
 
 /** One statement as the database would receive it: its text, and the tables that ride along with it. */
@@ -294,6 +294,33 @@ export interface ChStatement { conn: ChConn; format: string; query: string; exte
 export type ChTransport = (st: ChStatement, send: (settings?: string) => Promise<string>) => Promise<string>;
 let transport: ChTransport | null = null;
 export function setChTransport(t: ChTransport | null): void { transport = t; }
+
+const cteSupport = new Map<string, Promise<boolean>>();
+/**
+ * Whether this connection's server computes a materialized CTE once (the `enable_materialized_cte`
+ * setting, which ClickHouse added recently and marks experimental): asked of its system.settings
+ * once per server process and connection, and remembered. CLICKHOUSE_MATERIALIZED_CTE=0 turns it
+ * off and =1 on without asking. A server too old to know the setting, or a check that fails, means
+ * no: its statements are written as before. With a transport set (recorded answers) nothing is
+ * asked and the statements are the plain ones, whatever CLICKHOUSE_MATERIALIZED_CTE says.
+ */
+export function materializedCteSupported(conn: ChConn): Promise<boolean> {
+  // recorded answers are keyed by statement, so a run with them gets the plain statements whatever is set
+  if (transport) return Promise.resolve(false);
+  const forced = setting("CLICKHOUSE_MATERIALIZED_CTE");
+  if (forced === "0") return Promise.resolve(false);
+  if (forced === "1") return Promise.resolve(true);
+  const key = conn.id + "\u0000" + conn.url + "\u0000" + conn.db;
+  let known = cteSupport.get(key);
+  if (!known) {
+    known = chQuery<{ n: string }>("SELECT count() AS n FROM system.settings WHERE name = 'enable_materialized_cte'", conn)
+      .then((r) => Number(r.data[0]?.n) > 0)
+      // asked again next time: a check that failed says nothing about the server
+      .catch(() => { cteSupport.delete(key); return false; });
+    cteSupport.set(key, known);
+  }
+  return known;
+}
 
 async function post(sql: string, conn: ChConn, format: string): Promise<string> {
   assertNotLoopbackDirect(sql, conn);
