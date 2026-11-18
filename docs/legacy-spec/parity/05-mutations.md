@@ -1,8 +1,8 @@
 # Parity audit — Results › Mutations (spec `05-mutations.md`)
 
-- **Date:** 2026-11-11; re-scored 2026-11-16
-- **cBioLab:** master @ `7ef627ba`, `next dev` on `http://127.0.0.1:3000` (first audit: `session/spec` @ `f3197d75`)
-- **Legacy:** cbioportal.org (Playwright, 2026-11-16; first audit 2026-11-11)
+- **Date:** 2026-11-11; re-scored 2026-11-16; re-measured 2026-11-18
+- **cBioLab:** master @ `bc53b944`, `next dev` on `http://127.0.0.1:3109` (2026-11-16: master @ `7ef627ba`; first audit: `session/spec` @ `f3197d75`)
+- **Legacy:** cbioportal.org (Playwright, 2026-11-18 for the statistics; 2026-11-16; first audit 2026-11-11)
 - **Code paths (cBioLab):** `app/portal/results-layout.ts` (Mutations tab: `hotspots` + `mutations` views, gene chooser, `linkMutations`), `lib/views/hotspots/*`, `lib/lollipop.ts` (types, colours, label, Genome Nexus), `lib/lollipop-svg.ts` (figure), `lib/federation.ts:519-570` (lollipop SQL), `app/_lollipop/*` (HotspotsBody, AlterationGrid, TranscriptSummary, ColorLegend, LollipopTools, use-stem-clicks), `lib/views/mutations/*`, `lib/mutation-table.ts`, `app/lab/kinds/mutations.tsx`, `app/_table/DataTable.tsx`, `lib/table-query.ts`
 
 **Queries used** (legacy ⇄ cBioLab)
@@ -20,9 +20,9 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 38 |
+| ✅ match | 40 |
 | 🟡 partial | 41 |
-| 🔶 different | 13 |
+| 🔶 different | 11 |
 | ❌ missing | 30 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -30,7 +30,9 @@ Legacy: lollipop stems read from `.lollipop-svgnode` circle geometry (heights fi
 | ? | 6 |
 | **Total IDs** | **139** |
 
-**Overall: 35.3 %** (✅ 38 + 🐞ok 4 + N/A 7 = 49 of 139). Counting 🟡 as half: 50.0 %. (2026-11-11: 18.0 % / 30.2 %.)
+**Overall: 36.7 %** (✅ 40 + 🐞ok 4 + N/A 7 = 51 of 139). Counting 🟡 as half: 51.4 %. (2026-11-16: 35.3 % / 50.0 %; 2026-11-11: 18.0 % / 30.2 %.)
+
+Re-measurement of 2026-11-18 (master `bc53b944`), each ID against the spec text in cBioLab's UI or code, the statistics against cbioportal.org: 2 verdicts changed, both up (MUT-STM-10, MUT-TB-9: the Annotation sort is the portal's array, the table's default, #309). None went down. The numbers in §3 were re-run in both apps and agree as before; TP53's and TMPRSS2's driver splits still differ for the stores' reasons.
 
 Re-score of 2026-11-16: 30 verdicts changed, from #230 (fusions), #245 (the portal's columns and Mutation Type labels), #250 (empty gene, germline, GRCh38, legend) and #251 (OQL). Six IDs are now `?`: their Genome Nexus columns exist but Q1's study is not in the offline store, so the cells are blank and their format could not be compared. ✅ rows spot-checked, none regressed: GT-1, LP-7…9, COL-3, COL-30, MD-12, STM-7.
 
@@ -44,9 +46,9 @@ Re-score of 2026-11-16: 30 verdicts changed, from #230 (fusions), #245 (the port
 | §5 Badge filter (BF) | 4 | 2 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | Grid as the portal's; driver split depends on the loaded stores |
 | §6 Table columns (COL) | 44 | 14 | 15 | 1 | 10 | 1 | 0 | 3 | 0 | 35 columns now, labels coloured; default set lacks Copy # and Allele Freq (T); no ASCN / clinical / namespace columns |
 | §7 Annotation (AN, VA) | 12 | 0 | 0 | 3 | 3 | 0 | 0 | 1 | 5 | OncoKB text badge, gene-level level; variant columns exist but blank on Q1 |
-| §8 Table controls, filters (TB, FM) | 14 | 2 | 6 | 4 | 2 | 0 | 0 | 0 | 0 | Unchanged: search does not reach the lollipop; drivers-first sort |
+| §8 Table controls, filters (TB, FM) | 14 | 3 | 6 | 3 | 2 | 0 | 0 | 0 | 0 | Search reaches the lollipop; default sort Annotation ↓; pager, one-list Columns menu, CSV of kept rows |
 | §9 Modes (MD) | 15 | 5 | 1 | 1 | 5 | 1 | 0 | 2 | 0 | Fusions and the empty gene fixed; drivers-only, germline, profiled missing |
-| §11 Statistics (STM) | 17 | 6 | 5 | 1 | 2 | 1 | 0 | 1 | 1 | Frequency with fusions and Copy # as legacy; driver split, duplicates, Freq absent |
+| §11 Statistics (STM) | 17 | 7 | 5 | 0 | 2 | 1 | 0 | 1 | 1 | Frequency, Copy #, duplicates and the Annotation sort as legacy; driver split differs with the stores; no ASCN, no Columns Freq |
 
 ---
 
@@ -54,7 +56,7 @@ Re-score of 2026-11-16: 30 verdicts changed, from #230 (fusions), #245 (the port
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **Table defaults**: 6 default columns (no Copy #, no Allele Freq (T)); default sort "drivers, then codon" (KRAS first row A11_G12dup) vs Annotation ↓ (G12C first) | COL-38, COL-18, COL-27, TB-9, STM-10 | Mutations tab: table defaults |
+| 1 | **Table defaults**: the portal's 8 columns and Annotation ↓ now (#245, #309); Copy # and Cancer Type Detailed shown whatever the query and data (lgg_ucsf_2014 shows Copy #, prad Cancer Type Detailed; the portal hides each) | COL-5, COL-18 | Mutations tab: table defaults |
 | 2 | **Annotation column** is one text badge "Oncogenic · Level 1": no icons/cards/header; level is the gene's highest (KRAS G12D "Level 1" vs legacy level_3b); no hotspot icon, CIViC, reVUE | COL-7, AN-1…AN-6 | Mutations tab: Annotation column; annotation breadth |
 | 3 | **Driver split depends on the loaded stores**: TP53 4 hotspot rows VUS (coadread not in the Genome Nexus store); prad fusions all VUS (no OncoKB pair calls in the pinned v7.5 store) | BF-1, STM-4 | Mutations tab (added in this re-score) |
 | 4 | **Genome Nexus columns blank on Q1**: Functional Impact, HGVSc, Exon, gnomAD, ClinVar, dbSNP, SIGNAL exist (#245) but coadread is not in the offline store | COL-10, COL-26, COL-31…35, VA-1…5, STM-13 | Mutations tab (added in this re-score) |
@@ -83,6 +85,16 @@ Re-score of 2026-11-16: 30 verdicts changed, from #230 (fusions), #245 (the port
 | KRAS table defaults | COL-38 | Sample ID, Cancer Type Detailed, Protein Change, Annotation, Mutation Type, Copy #, Allele Freq (T), # Mut in Sample | the same without Copy # and Allele Freq (T) | 🔶 |
 | KRAS G12C Copy # (A6-A567, AA-3696, AA-A02W) | STM-11 | ShallowDel, Gain, Diploid | ShallowDel, Gain, Diploid | ✅ (#245) |
 | Search "G12D" | TB-3 | lollipop follows | table 59 of 223, badges 59, stems G12D and A11_G12dup ("G12dup" contains "g12d") | ✅ |
+
+**Re-measured 2026-11-18** (cBioLab master `bc53b944`):
+
+| Statistic | ID | Legacy | cBioLab | Verdict |
+|---|---|---|---|---|
+| Q1 KRAS: frequency, badges, rows, y-max | STM-1, STM-4, TB-1, STM-17 | 36.7 %, Driver 221 / VUS 2, 223, 142 | 36.7 %, 221 / 2, 223, 142 | ✅ |
+| Q1 TP53: frequency, badges, rows, y-max | STM-1, STM-4, STM-17 | 52.9 %, 329 / 3 (Missense 233 / 2), 332, 35 | 52.9 %, 325 / 7 (Missense 229 / 6), 332, 35 | 🟡 as before |
+| Q2 TMPRSS2: frequency, badges, rows | STM-1, STM-4, MD-11 | 41.5 %, 207 / 33 (Fusion 207 / 29), 240 | 41.5 %, 0 / 240 (Fusion 0 / 236), 240 | 🟡 as before |
+| lgg_ucsf_2014 IDH1: rows, duplicates, frequency, y-max | TB-1, STM-14, STM-1 | 61, "includes 38 duplicate mutations in patients with multiple samples", 100.0 %, 23 | 61, the same suffix with 38, "100%", 23 | ✅ / format 🟡 |
+| Q1 KRAS G12C rows: Copy #, VAF, # Mut | STM-11, STM-5, STM-7 | ShallowDel 0.42 52, Gain 0.52 81 | the same | ✅ |
 
 Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11-11 and not re-run; the stem labels ("G12D/V/C and 3 more", "R175H/C") and counts above agree.
 
@@ -237,7 +249,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-TB-6 | 🟡 | BC | Unchanged |
 | MUT-TB-7 | ❌ | B | Unchanged: no annotation filter |
 | MUT-TB-8 | 🔶 | BC | Unchanged: CSV `cohort-lab_<study>_KRAS_mutations.csv`, every column, rows kept by filters |
-| MUT-TB-9 | 🔶 | B | Unchanged: "drivers first, then by codon": first row A11_G12dup; legacy G12C |
+| MUT-TB-9 | ✅ | BC | Was 🔶: default order is the Annotation column descending, then codon (`lib/mutation-table.ts:398`) (#309). KRAS's first row is still A11_G12dup where the portal's is G12C, because every KRAS row carries the gene's "Level 1" (MUT-AN-3), so they tie |
 | MUT-FM-1 | 🟡 | B | Search and header filters now reach the lollipop and badges; no mutation-status filter (FM-2) or tracks |
 | MUT-FM-2 | ❌ | C | Unchanged: no mutation-status filter |
 | MUT-FM-3 | ✅ | B | A stem selection narrows only the table; badge counts ignore the badge filter; Somatic Mutation Frequency ignores every in-tab filter |
@@ -270,7 +282,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-STM-1 | 🟡 | BC | KRAS 36.7 %, TP53 52.9 %, TMPRSS2 41.5 % (#230), ERG 2.8 % as legacy; germline test /germline/i (#250); format still `fmtShare` |
+| MUT-STM-1 | 🟡 | BC | KRAS 36.7 %, TP53 52.9 %, TMPRSS2 41.5 % (#230), ERG 2.8 % as legacy; germline test /germline/i (#250); format still `fmtShare`: lgg_ucsf_2014 IDH1 "100%", the portal "100.0%" (2026-11-18) |
 | MUT-STM-2 | ✅ | B | Distinct patient + change per codon; 125/125 stems identical |
 | MUT-STM-3 | 🐞 ok | BC | No mislabelled "profiled" denominator; but no denominator at all |
 | MUT-STM-4 | 🟡 | B | Totals as legacy; driver split differs where the stores are not loaded: TP53 325/7 vs 329/3 (hotspots), TMPRSS2 Fusion 0/236 vs 207/29 (no OncoKB pair calls in the pinned v7.5 store; #230 matched at v7.7); tally follows the table's search and filters |
@@ -279,7 +291,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-7 | ✅ | BC | `MUTATION_COUNT`, identical 555/555 |
 | MUT-STM-8 | N/A | C | Cohort column not on the Results tab |
 | MUT-STM-9 | 🟡 | C | Unchanged |
-| MUT-STM-10 | 🔶 | C | Unchanged: annotation sort `order: "drv"` (`mutation-table.ts:101`) |
+| MUT-STM-10 | ✅ | C | Was 🔶: [OncoKB bio 5/0, TxS 1=6…4=1, TxR R1=3…, Dx, Px], then CIViC 0, hotspot 1, reVUE 0, element-wise descending (`lib/mutation-table.ts:85`, `lib/sv-oncokb.ts:130-136`) (#309); the cancer-gene element is left out, the same for every row of one gene's table |
 | MUT-STM-11 | ✅ | C | Copy # is the sample's discrete call for the gene; Q1 KRAS G12C rows ShallowDel / Gain / Diploid as legacy (#245) |
 | MUT-STM-12 | ❌ | C | Unchanged: no ASCN |
 | MUT-STM-13 | ? | C | gnomAD and SIGNAL columns exist (#245); blank on Q1, not comparable |
