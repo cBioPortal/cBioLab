@@ -77,6 +77,10 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] Study View: the CNA chart's overlap note says "patients" (`app/lab/explore-sections.tsx:1104-1108`); the overlap is counted in samples (`lib/explore.ts:887`) (STS-GS-3) ([30-study-summary](legacy-spec/parity/30-study-summary.md))
 - [ ] Study View: a generic-assay chart's bar and value tooltips say "patients" for a sample-level profile (`app/lab/explore-sections.tsx:1054, 1066`; counted in samples, `lib/explore.ts:1838`) (STS-GS-5, STS-GS-6) ([30-study-summary](legacy-spec/parity/30-study-summary.md))
 - [ ] Study View: gene-table Freq is rounded to one decimal on the server and shown with `fmtPct` (`lib/explore.ts:661`, `app/lab/explore-sections.tsx:1321`): under 0.05 % reads "0%" (the portal "<0.1%"), 100 % reads "100%" (the portal "100.0%") (STS-GT-5) ([30-study-summary](legacy-spec/parity/30-study-summary.md))
+- [ ] Study View: the CN Segments tab disappears at 0 selected samples (`app/lab/page.tsx:445, 560`), though the study holds segments; the portal keeps it (STV-STM-13) ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
+- [ ] Study View: the Explore tab (Summary / Clinical Data / CN Segments) is not in the URL, and the Clinical Data and CN Segments tabs unmount when left (`app/lab/page.tsx:563-566`), so a reload opens Summary and a tab's search, sort, page and locus reset on every switch (STV-URL-1, STV-TAB-1) ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
+- [ ] Study View: View patients stays enabled at 0 matching patients and opens "No patients in this cohort." (`app/lab/explore-sections.tsx:184`) (STV-AB-2) ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
+- [ ] Study View: a generic-assay chart drops Compare / Analyze groups when more than one study is selected (`app/lab/explore-sections.tsx:1038`) (STV-GR-10) ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
 - [x] Patient: Allele Freq is rounded twice, to 3 decimals (`lib/views/alterations/run.ts:32`), then `toFixed(2)` (`app/lab/alterations-body.tsx:102`): 10/57 = 0.1754 shows "0.17". 5 of 64 rows wrong on TCGA-A6-2671 ([40-patient-summary](legacy-spec/parity/40-patient-summary.md)) (#183)
 - [x] Patient: an unknown patient (`?caseId=NOPE`) prints "no patient NOPE in lgg_ucsf_2014", then lays out every tab, each refusing on an empty cohort ([40-patient-summary](legacy-spec/parity/40-patient-summary.md)) (#183)
 - [x] Patient: Genomic Evolution is offered to single-sample patients, then refuses (TCGA-A6-2671, msk P-0000004); `app/portal/patient-layout.ts:57` does not check for two samples with allele counts ([40-patient-summary](legacy-spec/parity/40-patient-summary.md), [41-patient-tabs](legacy-spec/parity/41-patient-tabs.md)) (#183)
@@ -429,6 +433,11 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] CN Segments' `.seg` download (STV-CN-2), with Per-sample CN segments' download
     - [ ] Plots (STV-PL-1)
   - [ ] Per-user layout: Save settings, the restore banner, reset charts (STV-LP-1…6, STV-AC-1, STV-MD-9, STS-MD-13)
+  - [ ] Found by the re-measurement of 2026-11-18 (master `bc53b944`):
+    - [ ] The Clinical Data tab's Columns menu (Add chart is hidden there), "Show more" and the 100vh − 220px table height (STV-CD-5, STV-CD-9, STV-MD-13)
+    - [ ] The selection as the portal writes it: "Selected: N patients | M samples" (STV-AB-1)
+    - [ ] Gene, case-list and other generic pills with the portal's lower-case "or", parentheses and outer "and" (STV-FB-2); a density drag shown on its chart only, not as two range pills (STV-FB-3b)
+    - [ ] The guided tour after load (STV-LD-7)
 - [ ] **Comparison → page, Overlap, Survival and Clinical tabs** ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
   - [ ] The Clinical tab tests every attribute (coadread 45; ours the 8 best covered, so a Sex comparison does not test SEX), as a table with p, q, type and test, sort, filter, download and a click-through plot (ours a −log₁₀ q bar chart of raw ids) (CMP-CL-2…4, CMP-STM-8; see bugs)
     - [x] Every attribute, by display name, in the portal's table (Clinical Attribute, Attribute Type, Statistical Test, p, q; sorted by q, bold below 0.05, 20 a page, search, "Significant only"); untested ones listed with their reason and left out of q; the Results page's Clinical sub-tab too (CMP-CL-2, CMP-STM-6, CMP-STM-8) (#224)
