@@ -23,8 +23,9 @@ for a change that computes nothing. -->
 
 ## Tracker
 
-<!-- PORTAL-PARITY.md items this PR closes (quoted) and unticked sub-items to add. Don't edit
-     PORTAL-PARITY.md or docs/dsl.md here: both are updated on master after merge. -->
+<!-- PORTAL-PARITY.md items this PR closes (quoted) and unticked sub-items to add, and each changed
+     scorecard row (docs/legacy-spec/parity/NN-*.md) in full as it should read, with no tallies.
+     Don't edit PORTAL-PARITY.md, the scorecards or docs/dsl.md here: all are updated on master after merge. -->
 
 ## Verified
 
