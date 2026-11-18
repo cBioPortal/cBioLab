@@ -1,6 +1,6 @@
 # Parity audit — Patient View › shell + Summary (spec `40-patient-summary.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`), P1–P4 reloaded and the pager, exclude and tab bar scripted
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright, same day: page DOM + REST API)
 - **Code paths (cBioLab):** `app/portal/patient/page.tsx` (page), `app/portal/patient-header.tsx` + `app/portal/patient-attrs.ts` (header, clinical spans), `app/portal/cohort-nav.tsx` + `cohort-navigation.ts` (pager), `app/portal/patient-layout.ts` (tabs → views), `app/portal/PortalTabs.tsx`; timeline `lib/timeline-tracks.ts`, `lib/timeline-svg.ts`, `app/lab/timeline-body.tsx`; genomic overview `app/lab/genomic-overview.tsx`, `lib/views/segments/{igv,run,sql}.ts`; tables `lib/views/alterations/run.ts`, `lib/patient-alterations.ts`, `app/lab/alterations-body.tsx`
@@ -22,9 +22,9 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 51 |
-| 🟡 partial | 25 |
-| 🔶 different | 2 |
+| ✅ match | 53 |
+| 🟡 partial | 24 |
+| 🔶 different | 1 |
 | ❌ missing | 9 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
@@ -32,15 +32,15 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 | ? | 0 |
 | **Total IDs** | **92** |
 
-**Overall: 60.9 %** (✅ 51 + 🐞ok 4 + N/A 1 = 56 of 92). Counting 🟡 as half: 74.5 %.
+**Overall: 63.0 %** (✅ 53 + 🐞ok 4 + N/A 1 = 58 of 92). Counting 🟡 as half: 76.1 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | URL | 6 | 2 | 2 | 1 | 0 | 1 | 0 | Portal params accepted; tab in `?tab=`; navCaseIds hash ignored |
-| SH header | 7 | 3 | 4 | 0 | 0 | 0 | 0 | Header text identical; no page title, no TMB-H/MSI-H badges, no PDX icon |
+| SH header | 7 | 4 | 3 | 0 | 0 | 0 | 0 | Header text and browser title identical; no TMB-H/MSI-H badges, no PDX icon |
 | CS clinical spans | 5 | 5 | 0 | 0 | 0 | 0 | 0 | Verbatim port of clean/derive/whitelist/punctuation |
-| NAV | 5 | 5 | 0 | 0 | 0 | 0 | 0 | Pager works; "N patients" opens a list, not study view; no exclude |
-| TAB | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Different order and gating; placeholder tabs |
+| NAV | 5 | 5 | 0 | 0 | 0 | 0 | 0 | Pager, ⊖ exclude, "N patients" → Study View |
+| TAB | 1 | 0 | 1 | 0 | 0 | 0 | 0 | Portal order and GE gating; Files & Links always; no Pathology/Tissue/custom tabs |
 | SUM | 2 | 2 | 0 | 0 | 0 | 0 | 0 | No actionability cards; sample mode scopes data, timeline whole patient |
 | TL tracks | 6 | 1 | 3 | 0 | 0 | 1 | 1 | Order/nesting right; labels not upper-cased; tie order differs |
 | TL events | 6 | 5 | 1 | 0 | 0 | 0 | 0 | Glyphs, stacks, sample markers, diamond, line charts |
@@ -51,11 +51,13 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 | CNA table | 5 | 2 | 2 | 0 | 0 | 1 | 0 | Same 74 rows; empty table instead of "not profiled" alert |
 | SV table | 5 | 2 | 1 | 0 | 1 | 1 | 0 | Different default columns; no Status/Annotation |
 | NP / GP panels | 5 | 2 | 1 | 0 | 2 | 0 | 0 | GO panel icons only; no alerts, pills, modal |
-| STM | 15 | 7 | 4 | 0 | 4 | 0 | 0 | Counts match; display rounding; no mRNA %, VAF plot, badges |
+| STM | 15 | 8 | 3 | 0 | 4 | 0 | 0 | Counts and formats match; no mRNA %, VAF plot, badges |
 
 ---
 
 ## 2. Top gaps (ranked by how often a portal user hits them)
+
+Re-measured 2026-11-18: 2 fixed; 6 down to Files & Links on every patient and the missing resource tabs; 4 down to the sort (10 rows done); 5 down to the pills, Gene panel column and modal (alerts done); 7 down to drag-zoom; 9, 11, 12, 15 closed; 10 down to the keyword bar, tooltip and badges (format done); 13 down to the Annotation. 8 (TMB-H/MSI-H), 1's VAF plot, 3's mRNA Expr. and shallow Copy #, 14 still open.
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
@@ -126,7 +128,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 | PAT-SH-1 | ✅ | B | "Patient: P04" / "Sample: P04_Pri", description "P04 from Low-Grade Gliomas (UCSF, Science 2014)" (set while the page shows them, put back on leaving) |
 | PAT-SH-2 | 🟡 | B | "Patient:" / "Samples:" rows ✅; no user-circle icon; study is id + name text in a summary card, not a link to the study; pager right ✅ |
 | PAT-SH-3 | ✅ | B | Skeleton rows while the header loads; tabs load separately |
-| PAT-SH-4 | 🟡 | B | Unknown patient → "no patient NOPE in lgg_ucsf_2014", but tabs still render with "cohort's patient list is empty" refusals |
+| PAT-SH-4 | ✅ | B | Unknown patient → "no patient NOPE in lgg_ucsf_2014" in place of the page, no tab bar (re-measured 2026-11-18; was 🟡: tabs rendered and refused) |
 | PAT-SH-5 | ✅ | BC | Id link → patient view; spans + lifted CANCER_TYPE(_DETAILED) (`patient-attrs.ts:390`); hover table of all attributes (display names, raw values) |
 | PAT-SH-6 | 🟡 | B | Marker, id link (in place; modifier → new tab), DISPLAY_SAMPLE_NAME, spans, sample mode + "Show all 4 samples" ✅; no TMB-H/MSI-H badges, signature bar (tracked), PDX/organoid icon, gene-panel links in tooltip |
 | PAT-SH-7 | 🟡 | C | 14 px circle, number ✅; colour from raw SAMPLE_TYPE regex (`timeline-tracks.ts:36`), not the derived type; total DNA/Tissue → #333 not black; no custom colour config; no not-profiled pill / uncalled opacity |
@@ -155,7 +157,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-TAB | 🔶 | B | P1: Summary · Pathways · Clinical Data · Genomic Evolution · Files & Links · Clinical Trials (legacy Summary · Genomic Evolution · Pathways · Clinical Data); GE also on 1-sample P3/P4; Pathways hidden only with no genomic data; Files & Links, Clinical Trials are "not built yet" cards; no Pathology Report, Tissue Image, mRNA, Plots, resource or custom tabs (detail in 41-patient-tabs) |
+| PAT-TAB | 🟡 | B | Re-measured 2026-11-18 (was 🔶): P1 Summary · Genomic Evolution · Pathways · Clinical Data · Files & Links, the portal's order; GE only with >1 sample and a VAF (gone on P3/P4); no Clinical Trials. Still: Files & Links a "not built yet" card on every patient (portal: only with resource data); Pathways hidden with no genomic data; no Pathology Report, Tissue Image, mRNA, Plots, resource or custom tabs (detail in 41-patient-tabs) |
 
 ### §2 Summary layout
 
@@ -164,7 +166,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 | PAT-SUM-1 | ✅ | B | No actionability cards; OncoKB only in Annotation columns |
 | PAT-SUM-2 | ✅ | B | P2: GO, tables show P04_Rec1 only; timeline still 15 events · 4 samples |
 
-Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutations, CNA, SV in that order; legacy Mutations, SV, CNA). Timeline card shown even with no events (P4: "has no timeline events recorded"); legacy hides it.
+Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutations, CNA, SV in that order; legacy Mutations, SV, CNA). Timeline card shown even with no events (P4 on 2026-11-18: "0 events · 1 sample"); legacy hides it. Both now in PORTAL-PARITY.md.
 
 ### §3 Timeline — tracks
 
@@ -281,14 +283,14 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 | PAT-STM-11 | 🟡 | C | `formatDays` identical (`timeline-tracks.ts:215`); 365-day ticks, trims ✅; line-chart y rule not checked |
 | PAT-STM-12 | ✅ | BC | Collection day, type rank, natural id, in the header, timeline, alteration tables and signatures alike (`withSampleDays`, `lib/views/shared.ts`): msk_chord_2024 P-0004121's T02 (day −56) is 1 and T01 (day −40) is 2, as the portal API's sample-acquisition events order them |
 | PAT-STM-13 | ✅ | BC | Sorted panel ids → P1…Pn, W for WES (`igv.ts:100-107`) |
-| PAT-STM-14 | 🟡 | C | Mutation key adds mutationType/variantType (harmless); CNA ✅; SV tuple not sorted |
+| PAT-STM-14 | ✅ | C | Re-measured 2026-11-18 (was 🟡): SV key now the portal's sorted tuple (`svRowKey`, `lib/patient-alterations.ts:268`); CNA ✅; the mutation key's extra mutationType/variantType never splits a row the portal merges on the checked patients |
 | PAT-STM-15 | ✅ | BC | Keep a row iff every sample in view is profiled for its gene (a panel it was profiled on holds it, or WES/WGS; a sample with no panel row is not profiled), by the table's own profile (the CNA table by the CNA panel: the portal's mutation-map bug, PAT-CNA-5, not copied); check:patient-sv G (FX-P33's EGFR, off PEERFIX_NO_EGFR) |
 
 ---
 
 ## 5. cBioLab bugs
 
-- **Allele Freq double rounding.** `cellOf` rounds VAF to 3 decimals (`lib/views/alterations/run.ts:32`), then the card prints `x.toFixed(2)` (`app/lab/alterations-body.tsx:102`). A VAF like 10/57 = 0.1754 becomes 0.175 → "0.17". P3 shows 5 of 64 wrong: APC S943Qfs*12 0.17 (0.18), PC V944M 0.77 (0.76), EZHIP G373A 0.39 (0.38), HRNR S2028G 0.10 (0.11), SCN1A H553Q 0.42 (0.43).
-- **Unknown patient still lays out every tab.** `?caseId=NOPE` prints "no patient NOPE in lgg_ucsf_2014", then renders the tab bar with views refusing "the cohort's patient list is empty".
-- **Genomic Evolution tab offered where it can only refuse** (single-sample P3, P4: "TCGA-A6-2671 has 1 sample; following mutations across samples needs at least two"): `patient-layout.ts:57` gates on "not sample mode and holds mutations", not on ≥2 samples with counts.
-- (tracked) Table sample numbering ignores collection days (`alterations/run.ts:101`).
+- ~~**Allele Freq double rounding.** `cellOf` rounds VAF to 3 decimals (`lib/views/alterations/run.ts:32`), then the card prints `x.toFixed(2)` (`app/lab/alterations-body.tsx:102`). A VAF like 10/57 = 0.1754 becomes 0.175 → "0.17". P3 shows 5 of 64 wrong: APC S943Qfs*12 0.17 (0.18), PC V944M 0.77 (0.76), EZHIP G373A 0.39 (0.38), HRNR S2028G 0.10 (0.11), SCN1A H553Q 0.42 (0.43).~~ Fixed: APC S943Qfs*12 shows 0.18 on 2026-11-18.
+- ~~**Unknown patient still lays out every tab.** `?caseId=NOPE` prints "no patient NOPE in lgg_ucsf_2014", then renders the tab bar with views refusing "the cohort's patient list is empty".~~ Fixed (2026-11-18: the message alone).
+- ~~**Genomic Evolution tab offered where it can only refuse** (single-sample P3, P4: "TCGA-A6-2671 has 1 sample; following mutations across samples needs at least two"): `patient-layout.ts:57` gates on "not sample mode and holds mutations", not on ≥2 samples with counts.~~ Fixed (2026-11-18: no GE tab on P3, P4).
+- ~~(tracked) Table sample numbering ignores collection days.~~ Fixed (#284; msk_chord_2024 P-0004121: T02 is 1, T01 is 2).

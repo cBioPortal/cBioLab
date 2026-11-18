@@ -521,6 +521,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Attribute | Value and Attribute × sample, a sample's own attributes (PTB-CD-1…3) (#314)
     - [ ] The patient table's 1-decimal values (PTB-STM-11)
   - [x] The alteration tables and the signatures number the samples by collection day, as the header and timeline do (PAT-STM-12) (#284)
+  - [ ] Summary layout: no Timeline card when the patient has no clinical events (ours a "0 events" card: msk_impact_2017 P-0000004), and the tables in the portal's order Mutations, Structural Variants, Copy Number Alterations (ours Mutations, CNA, SV) (PAT-SUM layout, §2 of the spec) ([40-patient-summary](legacy-spec/parity/40-patient-summary.md))
 
 ## Medium — annotation depth and per-sample viewers
 

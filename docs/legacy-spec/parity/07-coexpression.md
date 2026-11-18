@@ -1,6 +1,6 @@
 # Parity audit — Results › Co-expression (spec `07-coexpression.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`): Q1 reloaded (19,892 tested, 11,809 at q < 0.05, FGD4 0.662 / 5.1e-76 / 1e-71, "Showing 1–25 of 200", the same toolbar and plot) and the portal's Q1 API re-read (20,337 rows, 17,292 with ρ, FGD4 0.6623 / 5.094e-76); no commit has touched the view since the audit, no verdict changed
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright + its REST API from the page, same day)
 - **Code paths (cBioLab):** `lib/views/correlates/{run,sql,method,figure,types}.ts`, `app/lab/kinds/correlates.tsx` (table, toolbar, side plot), `app/lab/portal-bodies.tsx` (`PortalTable`), `app/portal/results-layout.ts:209` (tab), `app/portal/study-known.ts:100` (`expressionProfile`), `lib/stats.ts`
