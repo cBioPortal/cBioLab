@@ -77,9 +77,9 @@ describe("plot: an axis is refused before anything runs", () => {
 
 describe("plot: one study", () => {
   test("a box grouped by a discrete copy-number profile runs from deep deletion to amplification, anything else after", async () => {
-    const data = () => boxData(["Amplification", "Other", "Diploid", "Deep deletion", "Gain"]);
+    const data = () => boxData(["Amplification", "Other", "Diploid", "Deep Deletion", "Gain"]);
     const r = await run({ s1: local(data, []) }, { x: { source: "molecular", profileType: "cna", gene: "TP53", discrete: true, label: "TP53: CNA" } });
-    assert.deepEqual(r.plot!.groups!.map((g) => g.g), ["Deep deletion", "Diploid", "Gain", "Amplification", "Other"]);
+    assert.deepEqual(r.plot!.groups!.map((g) => g.g), ["Deep Deletion", "Diploid", "Gain", "Amplification", "Other"]);
   });
 
   test("a clinical category's boxes are alphabetical, as the portal's (Q5: Colon, Mucinous, Rectal), whatever order the counts came in", async () => {
@@ -88,18 +88,18 @@ describe("plot: one study", () => {
   });
 
   test("a mutation-type axis's boxes are in the portal's class order, no mutation and not profiled last; an OQL axis keeps its order", async () => {
-    const t = await run({ s1: local(() => boxData(["Not mutated", "Truncating", "Missense", "Not profiled", "Splice"]), []) },
+    const t = await run({ s1: local(() => boxData(["No mutation", "Truncating", "Missense", "Not profiled", "Splice"]), []) },
       { x: { source: "alteration", gene: "KRAS", by: "mutationType" } });
-    assert.deepEqual(t.plot!.groups!.map((g) => g.g), ["Missense", "Truncating", "Splice", "Not mutated", "Not profiled"]);
+    assert.deepEqual(t.plot!.groups!.map((g) => g.g), ["Missense", "Truncating", "Splice", "No mutation", "Not profiled"]);
     const oql = await run({ s1: local(() => boxData(["Unaltered", "Altered", "Not profiled"]), []) }, { x: { source: "alteration", oql: "KRAS: MUT" } });
     assert.deepEqual(oql.plot!.groups!.map((g) => g.g), ["Unaltered", "Altered", "Not profiled"]);
   });
 
   test("a contingency table's columns and rows come in their axes' orders (PLT-TB-3); an OQL axis leaves its own to the figure", async () => {
     const table = (): PlotData => ({ shape: "table", n: 6, x: { label: "KRAS", kind: "cat" }, y: { label: "STAGE", kind: "cat" },
-      cells: [{ cx: "Not mutated", cy: "T10", n: 3 }, { cx: "Missense", cy: "T2", n: 2 }, { cx: "Truncating", cy: "T1", n: 1 }] });
+      cells: [{ cx: "No mutation", cy: "T10", n: 3 }, { cx: "Missense", cy: "T2", n: 2 }, { cx: "Truncating", cy: "T1", n: 1 }] });
     const r = await run({ s1: local(table, []) }, { x: { source: "alteration", gene: "KRAS", by: "mutationType" }, y: { source: "clinical", attribute: "STAGE" } });
-    assert.deepEqual(r.plot!.order, { x: ["Missense", "Truncating", "Not mutated"], y: ["T1", "T2", "T10"] });
+    assert.deepEqual(r.plot!.order, { x: ["Missense", "Truncating", "No mutation"], y: ["T1", "T2", "T10"] });
     const oql = await run({ s1: local(table, []) }, { x: { source: "alteration", oql: "KRAS: MUT" }, y: { source: "clinical", attribute: "STAGE" } });
     assert.deepEqual(oql.plot!.order, { y: ["T1", "T2", "T10"] });
   });

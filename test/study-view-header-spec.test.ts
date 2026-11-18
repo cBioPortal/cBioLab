@@ -113,3 +113,78 @@ test("SH8 HTML in a description: the first line goes through the same rules", ()
   assert.equal(joined(first), "Data from the site & more.");
   assert.deepEqual(links(first), [{ text: "the site", href: "https://x.org/a" }]);
 });
+
+// ---- SH8 (rewritten) ----
+
+test("SH8 <br>, <p>, </p>, <div>, <li> keep the words they separate apart", () => {
+  for (const tag of ["<br>", "<br/>", "<p>", "</p>", "<div>", "<li>"]) {
+    const t = joined(descriptionParts(`one${tag}two`));
+    assert.match(t, /one\s+two/, tag);
+  }
+});
+
+test("SH8 <script> and <style> are removed with their contents", () => {
+  const t = joined(descriptionParts("a <script>alert('x')</script>b <style>.c{color:red}</style>c"));
+  assert.ok(!/alert|color|script|style/.test(t), t);
+  assert.match(t, /a\s+b\s+c/);
+});
+
+test("SH8 comments are removed", () => {
+  const t = joined(descriptionParts("a <!-- hidden --> b"));
+  assert.ok(!t.includes("hidden") && !t.includes("<!--"), t);
+  assert.match(t, /a\s+b/);
+});
+
+test("SH8 a bare < in text stays: p < 0.05 and q > 1", () => {
+  assert.equal(joined(descriptionParts("p < 0.05 and q > 1")), "p < 0.05 and q > 1");
+});
+
+test("SH8 each listed named entity is decoded", () => {
+  const ents: [string, string][] = [
+    ["&amp;", "&"], ["&lt;", "<"], ["&gt;", ">"], ["&quot;", "\""], ["&apos;", "'"], ["&nbsp;", " "],
+    ["&ndash;", "–"], ["&mdash;", "—"], ["&hellip;", "…"], ["&lsquo;", "‘"], ["&rsquo;", "’"],
+    ["&ldquo;", "“"], ["&rdquo;", "”"], ["&deg;", "°"], ["&times;", "×"], ["&plusmn;", "±"],
+    ["&micro;", "µ"], ["&middot;", "·"], ["&alpha;", "α"], ["&beta;", "β"], ["&gamma;", "γ"],
+    ["&delta;", "δ"], ["&kappa;", "κ"],
+  ];
+  for (const [e, ch] of ents) {
+    const t = joined(descriptionParts(`x${e}y`));
+    // &nbsp; may be normalised to a plain space; either is a decoded entity
+    if (e === "&nbsp;") assert.ok(t === "x y" || t === "x y", `${e} → ${JSON.stringify(t)}`);
+    else assert.equal(t, `x${ch}y`, e);
+  }
+});
+
+test("SH8 numeric entities, decimal and hex, are decoded", () => {
+  assert.equal(joined(descriptionParts("it&#8217;s")), "it’s");
+  assert.equal(joined(descriptionParts("1&#x2013;2")), "1–2");
+});
+
+test("SH8 an unknown or invalid entity stays as written", () => {
+  for (const e of ["&foo;", "&#xD800;", "&#1114112;"]) assert.equal(joined(descriptionParts(`a${e}b`)), `a${e}b`, e);
+});
+
+test("SH8 a link is an <a> whose own href is http(s), not data-href", () => {
+  assert.equal(links(descriptionParts('<a data-href="https://x">t</a>')).length, 0);
+  assert.equal(joined(descriptionParts('<a data-href="https://x">t</a>')), "t");
+  const l = links(descriptionParts('<a class="c" href="https://x">t</a>'));
+  assert.deepEqual(l, [{ text: "t", href: "https://x" }]);
+});
+
+test("SH8 a link's text has its whitespace collapsed", () => {
+  const l = links(descriptionParts('<a href="https://x">  two\n   words  </a>'));
+  assert.equal(l.length, 1);
+  assert.equal(l[0].text.trim(), "two words");
+  assert.ok(!/\s{2}|\n/.test(l[0].text), JSON.stringify(l[0].text));
+});
+
+test("SH8 a javascript: href is not a link", () => {
+  const p = descriptionParts('<a href="javascript:alert(1)">t</a>');
+  assert.equal(links(p).length, 0);
+  assert.equal(joined(p), "t");
+});
+
+test("SH8 studyHeaderText carries the decoded, tag-free text", () => {
+  const h = studyHeaderText([study("a", { description: "A &amp; B<br>C" })]);
+  assert.match(joined(h.first), /A & B\s+C/);
+});

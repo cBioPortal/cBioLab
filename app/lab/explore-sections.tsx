@@ -17,12 +17,12 @@ import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
-import { caseFileAction, figureActions, saveCaseFile } from "./chart-files.ts";
+import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
-import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, freqTipLines, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
+import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
@@ -40,6 +40,7 @@ import { Choice } from "../_ui/choice.tsx";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "../_ui/tabs";
 import { StudyChooser } from "../_studies/study-chooser.tsx";
+import { usePanelTips } from "./explore-panel-genes.tsx";
 import { StudyRowActions } from "../_studies/study-actions.tsx";
 import { QueryGenesDialog, studiesProblem } from "../portal/query-editor.tsx";
 import { resultsMaxStudies } from "../../lib/results-settings.ts";
@@ -322,7 +323,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           const selected = explore.totals?.samples ?? 0;
           const lines = (list: typeof explore.clinical) => {
             const byKey = new Map(list.map((c) => [attrKey(c), c] as const));
-            return addChartLines(list.map((c) => ({ key: attrKey(c), name: c.displayName || c.attribute, samples: c.samples ?? 0, checked: chartChecked(attrKey(c)) })), selected)
+            return addChartLines(list.map((c) => ({ key: attrKey(c), name: c.displayName || c.attribute, samples: c.samples, checked: chartChecked(attrKey(c)) })), selected)
               .map((l) => ({ ...l, c: byKey.get(l.key)! }));
           };
           /** check or uncheck charts; an unchecked chart takes its filter with it */
@@ -333,7 +334,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           /** Select all (N) and Deselect all over the rows the search keeps, as the portal's list has them */
           const bulk = (shown: typeof explore.clinical, all: typeof explore.clinical) => {
             const b = bulkButtons(lines(shown), lines(all));
-            const pick = (keys: string[]) => all.filter((c) => keys.includes(attrKey(c)));
+            const pick = (keys: string[]) => { const want = new Set(keys); return all.filter((c) => want.has(attrKey(c))); };
             return <>
               {b.selectAll && <Button variant="link" size="inline" disabled={!b.selectAll.keys.length} onClick={() => check(pick(b.selectAll!.keys), true)}>Select all ({b.selectAll.n})</Button>}
               {b.deselectAll && <Button variant="link" size="inline" onClick={() => check(pick(b.deselectAll!), false)}>Deselect all</Button>}
@@ -353,7 +354,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                     // attribute only SOME of the selected studies actually carry
                     // reads as universal without this, so mark it rather than
                     // leave the reader to discover the gap study by study.
-                    const partial = exStudies.length > 1 && (c.studyCount ?? 1) < exStudies.length;
+                    // a declared attribute with no data has no count of the studies that carry it, so no mark
+                    const partial = exStudies.length > 1 && !(c as { absent?: boolean }).absent && (c.studyCount ?? 1) < exStudies.length;
                     return (
                       <tr key={attrKey(c)} className={disabled ? "text-muted-foreground" : undefined} aria-disabled={disabled || undefined}
                         onClick={(e) => { if (!(e.target as HTMLElement).closest("[role=checkbox]")) toggle(); }}>
@@ -365,7 +367,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                             <span className="meta" data-tip={"carried by " + (c.studyCount ?? 1) + " of " + exStudies.length + " selected studies, not all of them"}> *</span>
                           )}
                         </td>
-                        <td className="num meta">{portalFreq(freq)}</td>
+                        <td className="num meta" data-tip={Number.isNaN(freq) ? "not counted for this selection" : undefined}>{Number.isNaN(freq) ? "—" : portalFreq(freq)}</td>
                         {showDataset && <td className="meta" data-tip={c.description}>{(c.attribute || "").replace(/^custom:/, "").split("/")[0]}</td>}
                         <td className="meta">{(c as { absent?: boolean }).absent ? "—" : c.kind === "num" ? "numeric" : "categorical"}</td>
                         <td className="meta">{c.per === "sample" ? "sample" : "patient"}</td>
@@ -687,16 +689,7 @@ function summaryDownload(name: string, unit: DownloadUnit, values: CategoryCount
 function ClinicalDataButton({ ctx, ready }: { ctx: ExploreCtx; ready: boolean }) {
   const [busy, setBusy] = useState(false);
   const file = caseFileName({ kind: "clinical" }, "", ctx.exStudies);
-  const save = () => {
-    const sel = selectionOf(ctx);
-    if (!sel) { ctx.setExMsg("select a study first"); return; }
-    setBusy(true);
-    ctx.setExMsg(null);
-    saveCaseFile({ kind: "clinical" }, file, sel.def, sel.study)
-      .then((left) => ctx.setExMsg(left ? file + " leaves out the studies that may not list their patients: " + left : null))
-      .catch((e) => ctx.setExMsg("Could not download the clinical data: " + String((e as Error)?.message || e)))
-      .finally(() => setBusy(false));
-  };
+  const save = () => { void runCaseFile({ kind: "clinical" }, file, selectionOf(ctx), ctx.setExMsg, setBusy); };
   return (
     <Button variant="outline" className="clinicaldata" disabled={!ready || busy} onClick={save}
       data-tip={!ready ? "select a study first" : busy ? "preparing " + file + "…" : "download clinical data for the selected cases, as " + file}>
@@ -1213,8 +1206,9 @@ const GENE_OP_KEY = "cbiolab.explore.geneTableOp";
 type GeneOp = "union" | "intersection";
 
 function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: ExploreCtx }) {
-  const { addClauses, addMode, geneFilter, setGeneFilter, compareItems, callOql, parseDraft, queuedGenes, toggleQueuedGene } = ctx;
+  const { addClauses, addMode, geneFilter, setGeneFilter, compareItems, callOql, parseDraft, queuedGenes, toggleQueuedGene, exStudies } = ctx;
   const [op, setOp] = useState<GeneOp>("union");
+  const freqTips = usePanelTips(kind, exStudies);
   useEffect(() => {
     try { if (localStorage.getItem(GENE_OP_KEY) === "intersection") setOp("intersection"); } catch { /* the default stands */ }
   }, []);
@@ -1324,9 +1318,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
                 " of them by a call their panel does not cover (off-panel): counted here, as cBioPortal's \"#\" does, but not in the frequency" : "")}>
                 {g.altered.toLocaleString()}
               </span>
-              <span className="gnum" data-tip={freqTipLines(kind, g).join("\n")}>
-                {g.freqPct != null ? fmtPct(g.freqPct) : "—"}
-              </span>
+              {freqTips.cell(g, g.freqPct != null ? fmtPct(g.freqPct) : "—")}
             </PickRow>
           );
         }}
@@ -1347,6 +1339,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
           </PickBar>
         );
       })()}
+      {freqTips.node}
       {needle && !rows.length && (
         <p className="note flush mt-1.5">
           No match among the {all.length.toLocaleString()} genes in this table.

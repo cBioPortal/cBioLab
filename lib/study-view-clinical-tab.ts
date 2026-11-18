@@ -16,7 +16,8 @@ export const CLINICAL_TAB_ROWS = 20;
 /** the table's columns: Patient ID, Sample ID, then each chart's attribute by priority (highest first), then name */
 export function clinicalTabColumns(charts: TabChart[]): string[] {
   const sorted = [...charts].sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name));
-  return ["patient", "sample", ...sorted.map((c) => c.attribute)];
+  // one column per attribute: several studies may chart it at both levels
+  return ["patient", "sample", ...new Set(sorted.map((c) => c.attribute))];
 }
 
 /**

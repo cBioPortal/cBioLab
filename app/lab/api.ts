@@ -73,6 +73,8 @@ export const api = {
 
   /** Every study this deployment can reach, with its counts and capabilities. */
   studies: (opts: Opts = {}) => fetch("/api/studies", { signal: opts.signal }),
+  /** one study's name, description and PubMed id (the Explore header) */
+  studyAbout: (study: string, opts: Opts = {}) => fetch("/api/studies?about=" + encodeURIComponent(study), { signal: opts.signal }),
 
   /** The gene catalog: symbols checked, genes and gene sets searched, a gene set's members. */
   genes: (body: GenesBody, opts: Opts = {}) => post("/api/genes", body, opts.signal),

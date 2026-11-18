@@ -496,6 +496,11 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .generow.ghead .gsort:hover, .generow.ghead .gsort.on { color: var(--ink); }
 .generow.ghead .gsort:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .generow .gnum { text-align: right; font-variant-numeric: tabular-nums; }
+/* the Freq cell opens a tooltip whose panel names are links (app/lab/explore-panel-genes.tsx) */
+.generow button.gfreq { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: default; }
+.freq-tip { font-size: var(--t-sm); white-space: normal; }
+.freq-tip button { border: 0; background: transparent; padding: 0; font: inherit; color: var(--accent); cursor: pointer; }
+.freq-tip button:hover { text-decoration: underline; }
 .generow .gname { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .generow .cnatag { font-size: var(--t-xs); padding: 0.05rem 0.2rem; border-radius: 3px; text-align: center; }
 .generow .cnatag.amp { background: #e41a1c22; color: #b3131a; }
@@ -1245,7 +1250,7 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .onco-mini { display: block; margin-top: var(--s1); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: col-resize; background: #fff; }
 
 .onco-trackmenu {
-  position: absolute; z-index: 4; min-width: 190px; padding: var(--s1);
+  position: fixed; z-index: 50; min-width: 190px; max-width: 320px; overflow-y: auto; padding: var(--s1);
   display: flex; flex-direction: column; gap: 0.1rem;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-sm);
   box-shadow: 0 6px 18px rgba(0, 0, 0, .16);

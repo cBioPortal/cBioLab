@@ -36,7 +36,7 @@ export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
         : t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ")" : "any mutation, amplification, deep deletion or structural variant") +
       ", split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each " + t.unit + " once." +
       (t.unit === "patient" ? " A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is." : "") +
-      " Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only." + (FALLBACK[t.groupBy] || ""),
+      " Per group and gene too, the " + t.unit + "s profiled for each alteration type (mutation, copy number, structural variant, and mRNA / protein for an EXP / PROT line): the gene on a sample's panel for a profile of that type; for the genes together, any of them. Counts only." + (FALLBACK[t.groupBy] || ""),
     scope: s.cohort + " · " + s.study, rowsOut: s.groups,
     params: [["genes", t.genes.join(", ")], ["profiled " + t.unit + "s", s.profiled.toLocaleString("en-US")]],
   }))];

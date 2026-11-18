@@ -728,7 +728,9 @@ export function useExploreState(page: ExplorePage) {
       d.all = all;
       setCDefText(JSON.stringify(d, null, 2));
       fetchExplore(d.all.length ? d : null);
-    } catch {}
+    } catch (e) {
+      setExMsg("Could not remove the filters on " + attributes.join(", ") + ": " + String((e as Error)?.message || e));
+    }
   };
   const removeDraftClause = (i: number) => {
     try {

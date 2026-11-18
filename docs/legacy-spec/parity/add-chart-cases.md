@@ -15,7 +15,8 @@ Sources: ACB = `src/pages/studyView/addChartButton/AddChartButton.tsx`, ACBT =
 | AC2 | Freq text | As `portalFreq` (the portal's `getFrequencyStr`): 0 → `0%`, from 99.9 up to but not including 100 → `99.9%`, from 0.1 → one decimal, below → `<0.1%`, not a number → `NA`. Not capped at 100 | ACBT:211-212; SVU:1982-1997 |
 | AC3 | Header | A "Freq" column after the name, its tooltip "% samples with data" | ACB:340-345; ACBT:187-195 |
 | AC4 | Order | Freq, highest first; ties by name (`localeCompare`) | ACBT:85-87 |
-| AC5 | Disabled | A row whose Freq is 0 is greyed and cannot be checked | ACBT:66-76, 142-152 |
+| AC5 | Disabled | A row whose Freq is 0 is greyed and cannot be checked. ⚠ A checked one stays enabled so it can be unchecked: the portal takes a chart off from the chart itself, which Explore's fixed layout has not, so the dialog is the only way | ACBT:66-76, 142-152 |
+| AC10 | Not counted | An attribute whose count is unknown (a study that did not count it, a peer on an older build) has no Freq ("—"), is not 0%, and is not disabled; it sorts after every counted row | invariant 1; review of #276 |
 | AC6 | Select all | "Select all (N)", N the rows the search keeps (disabled ones too); it checks the rows the search keeps that are not disabled. Hidden when the number checked equals the number of rows in the whole list | FHT:264-266, 369-380; ACBT:315-320 |
 | AC7 | Deselect all | Unchecks every row the search keeps; hidden when none is checked | FHT:270-273, 369-380 |
 | AC8 | Unchecking clears the filter | Unchecking a chart removes it and its filter: every top-level clause of the selection whose clinical clauses all name that attribute (a value pick, a range, its NA filter) is removed | STV-AC-3 ("unchecked → chart removed and its filter reset") |

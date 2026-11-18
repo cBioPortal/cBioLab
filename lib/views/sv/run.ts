@@ -3,7 +3,7 @@ import type { ViewResult } from "../../types.ts";
 import { SV_COLUMNS, SV_DEFAULT_COLUMNS, svRowSource } from "../../sv-table.ts";
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
-import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
+import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows, keyOnFirstRun } from "../rows.ts";
 import { answering, askEachSite, overLimit, plural, refuse } from "../shared.ts";
 import type { SvView, SvProfiled } from "./types.ts";
 import { svMethod } from "./method.ts";
@@ -75,7 +75,7 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
     const { ok } = answering(ctx);
     const own = Object.fromEntries(holders.map((st) => [st, ok[st]]));
     [r, profiled] = await Promise.all([
-      runRows(ctx, "sv", holders, q, SV_DEFAULT_COLUMNS, shown, size, (parts) => (db) => svRowSource(parts, db, genes, pin),
+      runRows(ctx, "sv", holders, q, SV_DEFAULT_COLUMNS, shown, size, (parts) => (db) => keyOnFirstRun(ctx, svRowSource(parts, db, genes, pin)),
         ctx.values ? { column: ctx.values, numeric: !!SV_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined),
       sub ? Promise.resolve([]) : askEachSite(ctx, own, (n, _st, res) => res.viewAggregate("sv:profiled:" + n, ctx.doc.cohorts[n], (c, s, d) => svProfiledSql(c, s, d, genes)))
         .then((xs) => xs.flatMap(({ cohort, study, answer }) => genes.map((gene) => {
@@ -88,14 +88,14 @@ export async function runSv(view: SvView, ctx: ViewRun): Promise<ViewResult> {
   const rows = r.rows.map((x) => ({ cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
     values: SV_COLUMNS.map((c) => svValue(x, c)) }));
   const columns = SV_COLUMNS.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }));
-  const sv = { genes, columns, shown, defaults: SV_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
+  const sv = { genes, ...(r.duplicates ? { duplicates: r.duplicates } : {}), columns, shown, defaults: SV_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin,
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (sub) return { kind: "sv", cohorts: vNames, sv, participation: ctx.participationFor(ctx.vStudies, true) };
   return {
     kind: "sv", cohorts: vNames, sv: { ...sv, profiled },
     method: svMethod({ genes, oncokbPin: pin, queryText: describeQuery(q, columns),
       sortName: q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
-      shown: rows.length, lists: r.lists, excluded, instances: r.groups, profiled }),
+      shown: rows.length, lists: r.lists, excluded, instances: r.groups, profiled, ...(r.duplicates !== undefined ? { duplicates: r.duplicates } : {}) }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every structural variant in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples whose gene 1 or gene 2 is " + (genes.length > 1 ? "one of " : "") + genes.join(", ") +

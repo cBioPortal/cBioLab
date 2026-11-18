@@ -169,3 +169,15 @@ test("PC3 (regression): the chart files' lines are joined by \\n, none after the
 test("PC3 (regression): with no format a line starts with its study and a missing value is NA", () => {
   assert.equal(caseFileLine("s", ["", "x"]), "s\tNA\tx");
 });
+
+// ---- CT13 ----
+
+test("CT13: an attribute charted at both levels is one column, where its first chart in the CT2 order puts it", () => {
+  const charts: TabChart[] = [
+    { attribute: "AGE", name: "Age", priority: 1 },     // e.g. the per-sample chart
+    { attribute: "SEX", name: "Sex", priority: 50 },
+    { attribute: "AGE", name: "Age", priority: 100 },   // the per-patient chart, higher
+    { attribute: "LOW", name: "Low", priority: 0 },
+  ];
+  assert.deepEqual(clinicalTabColumns(charts), ["patient", "sample", "AGE", "SEX", "LOW"]);
+});

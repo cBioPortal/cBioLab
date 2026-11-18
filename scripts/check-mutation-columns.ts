@@ -24,12 +24,16 @@
  *      value filters (T22) and the sort (T20) run on the portal's label.
  *   O  the column order (O2, for the ids PR G adds, at the places its interface names); Y9 every new column hidden by default but copyNumber, which the portal shows (MUT-COL-38).
  *   Y10 missing values sort last both ways.
+ *   N1-N5 Allele Freq (T) and the read counts as the portal writes them (MUT-STM-5/6): the vaf text is ''
+ *      for none, 4 decimals below 0.01, else 2 with trailing zeros; the vaf value is that same text
+ *      (null for none); altCount / refCount null when 0 or less.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
-import { connById } from "../lib/ch.ts";
+import { chQueryRows, connById } from "../lib/ch.ts";
 import { PatientLevelResolver } from "../lib/federation.ts";
+import * as mutationTable from "../lib/mutation-table.ts";
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS } from "../lib/mutation-table.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
 import type { ViewRun } from "../lib/views/run.ts";
@@ -332,6 +336,52 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
     typeof got !== "string" && got.slice(0, 3).join(",") === head.join(",") && got.length > 3 && got.slice(3).every((x) => x == null),
     typeof got === "string" ? got : JSON.stringify(got));
 }
+
+// ---- N1-N5: Allele Freq (T) and the read counts as the portal writes them -------------------------
+
+{
+  // N1 the vaf text rule (lib/mutation-table.ts VAF_TEXT, which the rows select as vafText) over constant values
+  const vafText = (mutationTable as Record<string, unknown>).VAF_TEXT as string | undefined;
+  // a 0 frequency never reaches the rule: the row SQL makes vaf NULL when the alt count is 0 or less (N3)
+  const N1: [number | null, string][] = [[0.31, "0.31"], [0.5, "0.50"], [0.0098, "0.0098"], [0.00004, "0.0000"], [0.999, "1.00"],
+    [0.005, "0.0050"], [0.125, "0.13"], [null, ""]];
+  if (!vafText) ok("N1 lib/mutation-table.ts exports VAF_TEXT, the vaf text rule", false, "not exported");
+  else {
+    let got: string;
+    try {
+      const sql = "SELECT i, toString(" + vafText + ") AS t FROM (SELECT arrayJoin(arrayEnumerate(xs)) AS i, xs[i] AS vaf FROM (SELECT CAST([" +
+        N1.map(([x]) => x === null ? "NULL" : String(x)).join(", ") + "] AS Array(Nullable(Float64))) AS xs)) ORDER BY i";
+      const res = await chQueryRows(sql, conn);
+      got = JSON.stringify(res.rows.map((r) => r[1] == null ? "" : String(r[1])));
+    } catch (e) { got = "threw: " + String((e as Error).message).slice(0, 200); }
+    ok("N1 the vaf text over " + JSON.stringify(N1.map((n) => n[0])) + " is " + JSON.stringify(N1.map((n) => n[1])), got === JSON.stringify(N1.map((n) => n[1])), got);
+  }
+}
+{
+  // N2 the value is the portal's text of t_alt_count / (t_alt_count + t_ref_count), worked out by hand;
+  // the fixture has no tumor ratio below 0.01
+  const N2: [string, string, string, string, string][] = [
+    ["TP53", "FX-P01-T1", "R273H", "0.13", "79/601 = 0.1314"],
+    ["TP53", "FX-P09-T1", "R175H", "0.30", "175/580 = 0.3017, trailing zero kept"],
+    ["TP53", "FX-P13-T1", "R273H", "0.10", "68/671 = 0.1013, trailing zero kept"],
+    ["KRAS", "FX-P01-T1", "G12C", "0.37", "88/239 = 0.3682"],
+  ];
+  for (const [gene, sample, change, want, why] of N2) {
+    const rows = await tab(gene);
+    const name = `N2 ${gene} ${sample} ${change}: vaf is the text ${JSON.stringify(want)} (${why})`;
+    if (typeof rows === "string") { ok(name, false, rows); continue; }
+    const r = rows.find((x) => x.sample === sample && v(x, "proteinChange") === change);
+    const got = r ? v(r, "vaf") : "no such row";
+    ok(name, got === want, show(got));
+  }
+  // its text as N1: TP53's only rows written "0.30" (FX-P09, 0.3017) and "0.10" (FX-P13, 0.1013), trailing zero kept
+  for (const [q, n] of [["0.30", 1], ["0.10", 1]] as [string, number][]) {
+    const got = await count("TP53", { columns: ["sample", "vaf"], search: q });
+    ok(`N2 TP53 search "${q}" over Sample ID and Allele Freq: ${n} row (2 decimals with the trailing zero)`, got === n, String(got));
+  }
+}
+// N3-N5: every tumor row of the fixture has both counts > 0 (t_alt_count 19..317, t_ref_count 96..639); zero,
+// negative and missing counts are checked in test/mutation-number-format.test.ts
 
 console.log(`\n${checks - failures}/${checks} mutation column checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

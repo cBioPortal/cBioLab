@@ -124,7 +124,8 @@ rows AS (
          toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
          toUInt8((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS hot,
          m.mutationType AS mutationType, upper(m.variantType) AS variantType,
-         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
+         if(m.altCount > 0 AND m.refCount >= 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, if(vaf IS NULL, '', if(vaf < 0.01, toDecimalString(vaf, 4), toDecimalString(vaf, 2))) AS vafText,
+         if(m.altCount > 0, m.altCount, NULL) AS altCount, if(m.refCount > 0, m.refCount, NULL) AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
          if((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) > 0 AND ifNull(m.end, 0) > 0 AND ifNull(m.ref, '') NOT IN ('', 'NA') AND ifNull(m.var, '') NOT IN ('', 'NA') AND NOT (ifNull(m.ref, '') = '-' AND ifNull(m.var, '') = '-')), concat(ifNull(m.chr, ''), ':g.', multiIf(ifNull(m.ref, '') = '-', concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'ins', ifNull(m.var, '')), ifNull(m.var, '') = '-', if(ifNull(m.start, 0) = ifNull(m.end, 0), concat(toString(ifNull(m.start, 0)), 'del'), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'del')), length(ifNull(m.ref, '')) = 1 AND length(ifNull(m.var, '')) = 1, concat(toString(ifNull(m.start, 0)), ifNull(m.ref, ''), '>', ifNull(m.var, '')), length(ifNull(m.ref, '')) = 1, concat(toString(ifNull(m.start, 0)), 'delins', ifNull(m.var, '')), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'delins', ifNull(m.var, '')))), '') AS hgvsg,
          JSONExtractBool(ifNull(g.gd, ''), 'ok') AS gnOk,
@@ -162,7 +163,7 @@ rows AS (
          toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
          toUInt8(0) AS hot,
          'Fusion' AS mutationType, upper(v.class) AS variantType,
-         NULL AS vaf, NULL AS altCount, NULL AS refCount,
+         NULL AS vaf, '' AS vafText, NULL AS altCount, NULL AS refCount,
          toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,
          '' AS hgvsg,
          JSONExtractBool('', 'ok') AS gnOk,
@@ -192,7 +193,7 @@ rows AS (
   LEFT JOIN ct0 AS ct ON ct.sid = v.sid LEFT JOIN mc0 AS mc ON mc.sid = v.sid
   LEFT JOIN cta0 AS cta ON cta.sid = v.sid LEFT JOIN cn0 AS cn ON cn.sid = v.sid AND cn.g = v.gene1
 )
-SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS n, count() AS all, uniqExactIf(sid, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS ns, uniqExactIf(patient, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS np FROM rows GROUP BY cohort, study
+SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS n, count() AS all, count() - uniqExact((study, patient, ifNull(proteinChange, ''))) AS dup, uniqExactIf(sid, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS ns, uniqExactIf(patient, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS np FROM rows GROUP BY cohort, study
 
 -- view 0 mutations: mutations:rows · msk_chord_2024
 WITH ann AS (SELECT alteration, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level,
@@ -306,7 +307,8 @@ rows AS (
          toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
          toUInt8((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS hot,
          m.mutationType AS mutationType, upper(m.variantType) AS variantType,
-         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,
+         if(m.altCount > 0 AND m.refCount >= 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, if(vaf IS NULL, '', if(vaf < 0.01, toDecimalString(vaf, 4), toDecimalString(vaf, 2))) AS vafText,
+         if(m.altCount > 0, m.altCount, NULL) AS altCount, if(m.refCount > 0, m.refCount, NULL) AS refCount,
          toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,
          if((ifNull(m.chr, '') != '' AND ifNull(m.start, 0) > 0 AND ifNull(m.end, 0) > 0 AND ifNull(m.ref, '') NOT IN ('', 'NA') AND ifNull(m.var, '') NOT IN ('', 'NA') AND NOT (ifNull(m.ref, '') = '-' AND ifNull(m.var, '') = '-')), concat(ifNull(m.chr, ''), ':g.', multiIf(ifNull(m.ref, '') = '-', concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'ins', ifNull(m.var, '')), ifNull(m.var, '') = '-', if(ifNull(m.start, 0) = ifNull(m.end, 0), concat(toString(ifNull(m.start, 0)), 'del'), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'del')), length(ifNull(m.ref, '')) = 1 AND length(ifNull(m.var, '')) = 1, concat(toString(ifNull(m.start, 0)), ifNull(m.ref, ''), '>', ifNull(m.var, '')), length(ifNull(m.ref, '')) = 1, concat(toString(ifNull(m.start, 0)), 'delins', ifNull(m.var, '')), concat(toString(ifNull(m.start, 0)), '_', toString(ifNull(m.end, 0)), 'delins', ifNull(m.var, '')))), '') AS hgvsg,
          JSONExtractBool(ifNull(g.gd, ''), 'ok') AS gnOk,
@@ -344,7 +346,7 @@ rows AS (
          toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
          toUInt8(0) AS hot,
          'Fusion' AS mutationType, upper(v.class) AS variantType,
-         NULL AS vaf, NULL AS altCount, NULL AS refCount,
+         NULL AS vaf, '' AS vafText, NULL AS altCount, NULL AS refCount,
          toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,
          '' AS hgvsg,
          JSONExtractBool('', 'ok') AS gnOk,

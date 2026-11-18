@@ -76,7 +76,7 @@ test("a gene-set axis compiles to hugo_gene_symbol IN (...), not a single =", ()
 test("an axis names itself the way the figure labels it", () => {
   assert.equal(axisLabel(num), "MUTATION_COUNT");
   assert.equal(axisLabel(mol), "TP53 rna_seq_mrna");
-  assert.equal(axisLabel(alt), "TP53 mutation type");
+  assert.equal(axisLabel(alt), "TP53: Mutations");
   assert.equal(axisLabel({ source: "alteration", gene: "MDM2", by: "cna" }), "MDM2 copy number");
 });
 
@@ -171,8 +171,8 @@ test("patient mode's coverage counts the patients with several samples, and the 
 
 test("an alteration axis answers for every case in the cohort, not only the altered ones", () => {
   const sql = axisSelect(alt, ctx, "cat");
-  assert.match(sql, /LEFT JOIN/, "a case with no mutation still has an answer: 'Not mutated'");
-  assert.match(sql, /Not mutated/);
+  assert.match(sql, /LEFT JOIN/, "a case with no mutation still has an answer: 'No mutation'");
+  assert.match(sql, /No mutation/);
   assert.match(sql, /Multiple/, "a case with two classes is its own category rather than being picked between");
   assert.match(axisSelect({ source: "alteration", gene: "MDM2", by: "cna" }, ctx, "cat"), /Amplification|Deep deletion/);
 });
