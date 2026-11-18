@@ -1,6 +1,6 @@
 # Parity audit — Group Comparison › molecular tabs (spec `21-comparison-molecular.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`; G2 and G5 rebuilt as `?doc=` documents) and cbioportal.org (G2 Genomic Alterations and G5 Protein tabs of the same sessions): 7 verdicts changed, none down
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright + its REST API from a cbioportal.org page, same day)
 - **Code paths (cBioLab):** `app/portal/comparison/page.tsx`, `app/portal/comparison-layout.ts`, `app/portal/study-known.ts` (profile picks), `app/portal/results-layout.ts` (Results › Comparison/Survival); views `lib/views/enrichment/{run,figure,types}.ts` + `app/lab/kinds/enrichment.tsx`; `lib/views/diffexpr/{run,sql,types}.ts` + `app/lab/kinds/diffexpr.tsx`; `lib/views/assays/*` + `app/lab/kinds/assays.tsx`; `lib/views/mutcompare/*` + `app/lab/kinds/mutcompare.tsx`; SQL `lib/federation-views.ts:265-325`; tests `lib/stats.ts` (`fisherExact`, `chiSquareTest`, `welchT`, `oneWayAnova`, `benjaminiHochberg`); formats `lib/chart/format.ts` (`pDigits`, `portalP`, `fmtPct`); `lib/legacy-comparison.ts`
@@ -20,9 +20,9 @@ Legacy numbers come from `POST /api/alteration-enrichments/fetch` (mutation-only
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 18 |
-| 🟡 partial | 35 |
-| 🔶 different | 22 |
+| ✅ match | 22 |
+| 🟡 partial | 37 |
+| 🔶 different | 16 |
 | ❌ missing | 7 |
 | 🐞 ok | 2 |
 | 🐞 copied | 0 |
@@ -30,13 +30,13 @@ Legacy numbers come from `POST /api/alteration-enrichments/fetch` (mutation-only
 | ? | 1 |
 | **Total IDs** | **88** |
 
-**Overall: 26.1 %** (✅ 18 + 🐞ok 2 + N/A 3 = 23 of 88). Counting 🟡 as half: 46.0 %.
+**Overall: 30.7 %** (✅ 22 + 🐞ok 2 + N/A 3 = 27 of 88). Counting 🟡 as half: 51.7 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | ? | One line |
 |---|---|---|---|---|---|---|---|---|---|
-| §0 Tabs (TAB) | 8 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | Tab order right; labels differ; Mutations tab hidden for ≠2 groups; no Pathways; overlap default Include |
-| §1 Alteration types (AT) | 6 | 3 | 2 | 1 | 0 | 0 | 0 | 0 | No checkbox tree: three separate views (mutation / CNA / SV), no combined table, no [Select] |
-| §1 Layout (AL) | 7 | 3 | 1 | 1 | 2 | 0 | 0 | 0 | Three charts + table per view; no Co-occurrence, no sample/patient or Enriched-in select; ≤300 rows |
+| §0 Tabs (TAB) | 8 | 0 | 4 | 3 | 1 | 0 | 0 | 0 | Tab order right; labels differ; Mutations tab hidden for ≠2 groups; no Pathways; overlap default Exclude |
+| §1 Alteration types (AT) | 6 | 3 | 2 | 1 | 0 | 0 | 0 | 0 | The portal's type tree and [Select], one table over every type; off-panel calls and drivers differ |
+| §1 Layout (AL) | 7 | 3 | 2 | 0 | 2 | 0 | 0 | 0 | Three charts + one table, every gene, the portal's cells and formats; no Co-occurrence, no sample/patient or Enriched-in select |
 | §1 Volcano (VO) | 6 | 0 | 4 | 1 | 1 | 0 | 0 | 0 | Present; y not capped at 10; group colours; drag-select only on expression/GA |
 | §1 Frequency scatter (FS) | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | Present, top 300 genes only |
 | §1 Bar plot (BP) | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | Default ordering only, fixed 10, from top-300 rows |
@@ -46,8 +46,8 @@ Legacy numbers come from `POST /api/alteration-enrichments/fetch` (mutation-only
 | §3 Box plot (BX) | 5 | 1 | 2 | 0 | 1 | 0 | 0 | 1 | Plot view per group; no download |
 | §4 Generic assay (GA, GN, GB, GC) | 5 | 1 | 1 | 2 | 0 | 1 | 0 | 0 | Numeric matches; binary/categorical tested differently |
 | §5 Results › Comparison (RV) | 6 | 0 | 1 | 3 | 1 | 0 | 1 | 0 | Altered/Unaltered only; mutation + CNA; no expression sub-tabs, no add-to-query |
-| §6 Modes (MD) | 11 | 0 | 3 | 5 | 1 | 1 | 1 | 0 | No patient level; a group without data refuses the expression tab |
-| §8 Statistics (STM) | 11 | 2 | 5 | 4 | 0 | 0 | 0 | 0 | Counts, Fisher/χ², Welch/ANOVA identical; minAltered 5 changes q; NA handling differs |
+| §6 Modes (MD) | 11 | 1 | 4 | 3 | 1 | 1 | 1 | 0 | No patient level; Exclude default; a group without data left out |
+| §8 Statistics (STM) | 11 | 5 | 4 | 2 | 0 | 0 | 0 | 0 | Counts, Fisher/χ², Welch/ANOVA, q and formats identical; binary assays and NA handling differ |
 
 ---
 
@@ -55,17 +55,17 @@ Legacy numbers come from `POST /api/alteration-enrichments/fetch` (mutation-only
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **No combined Genomic Alterations table.** The tab holds three views (mutation, CNA, SV), each a type-specific table. Legacy has one row per gene, altered by any selected type, under a checkbox tree with [Select]. G2: TP53 154/171 in legacy (any type) vs 153/171 in cBioLab (mutation); MYC is legacy's #2 row and only in cBioLab's CNA view | AT-1..3, AL-5, STM-2 | not tracked |
-| 2 | **Default `minAltered: 5` changes q and significance.** Genes with <5 altered samples are not tested, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested; DYNC2H1 q 0.0503 vs 0.239. SV: PUM1 q 0.0425 (significant) vs 0.533. CNA: 6,512 vs 6,156 significant. G5 mutation: 145 vs 336, because PPP1R16B (q 4.2e-7) and MARK3 are dropped. With `minAltered: 1` every q is identical | STM-7, AL-4 | not tracked |
+| 1 | ~~**No combined Genomic Alterations table.** The tab holds three views (mutation, CNA, SV), each a type-specific table. Legacy has one row per gene, altered by any selected type, under a checkbox tree with [Select]. G2: TP53 154/171 in legacy (any type) vs 153/171 in cBioLab (mutation); MYC is legacy's #2 row and only in cBioLab's CNA view~~ Fixed (#288): one table under the portal's type tree with [Select]; G2 TP53 154/171, 22,871 rows, as the portal. | AT-1..3, AL-5, STM-2 | not tracked |
+| 2 | ~~**Default `minAltered: 5` changes q and significance.** Genes with <5 altered samples are not tested, so BH divides by fewer genes: G2 mutation 3,108 vs 14,780 tested; DYNC2H1 q 0.0503 vs 0.239. SV: PUM1 q 0.0425 (significant) vs 0.533. CNA: 6,512 vs 6,156 significant. G5 mutation: 145 vs 336, because PPP1R16B (q 4.2e-7) and MARK3 are dropped. With `minAltered: 1` every q is identical~~ Fixed (#228): every altered gene tested on the portal pages; q identical. | STM-7, AL-4 | not tracked |
 | 3 | **Row caps:** alterations and GA tables list ≤300 rows, expression ≤1,500 (legacy lists all 22,871 / 20,026). The frequency scatter and bar plot are built from those 300 only | AL-5, FS, BP-2, GN, EX-5 | 2026-11-17: alterations (#294) and expression list every row; generic-assay tables still ≤300 |
 | 4 | **No patient-level enrichments:** no Sample/Patient select; always samples | AL-4, MD-5 | not tracked |
-| 5 | **Overlap default Include** ("Overlapping samples: include") vs legacy Exclude | MD-6, TAB-8 | not tracked |
-| 6 | **Alteration number formats:** p/q "1.1e-82" (`pDigits`) vs "< 10^-10"; altered % to 1 dp ("89.5%") vs 2 dp ("90.06%"); group headers "Basal", not "(A) Basal"; volcano y uncapped (to 82) vs capped at 10 | STM-9, STM-3, AL-5, VO-1 | not tracked |
+| 5 | ~~**Overlap default Include** ("Overlapping samples: include") vs legacy Exclude~~ Fixed (#223): Exclude by default on every tab. | MD-6, TAB-8 | not tracked |
+| 6 | **Alteration number formats:** ~~p/q "1.1e-82", 1-dp %, volcano y uncapped~~ fixed (#236): "< 10^-10", "154 (90.06%)", y capped at 10. Still: group headers "Basal", not "(A) Basal" | STM-9, STM-3, AL-5, VO-1 | (tracked) the ordinals, with the group selector |
 | 7 | **No Co-occurrence Pattern column** (mini oncoprint) on Genomic Alterations or Mutations | AL-6, MU-5 | (tracked) Mutations tab only |
 | 8 | **Tabs follow the groups:** Mutations is hidden for ≠2 groups (legacy shows the tab with "We can't show mutations for more than 2 groups…"); expression tabs are hidden for >10 groups; no `tabHasBeenShown` | TAB-3, TAB-4, MD-2 | not tracked |
-| 9 | **A group with no data refuses the whole expression tab.** G5 Protein: "no gene had at least 3 samples with a protein_quantification value in every cohort". Legacy drops Normal (no CPTAC data) and tests 4 groups over 9,719 genes | MD-8, STM-4 | not tracked |
+| 9 | ~~**A group with no data refuses the whole expression tab.** G5 Protein: "no gene had at least 3 samples with a protein_quantification value in every cohort". Legacy drops Normal (no CPTAC data) and tests 4 groups over 9,719 genes~~ Fixed: Normal left out, four groups compared (G5 Protein FOXA1, AGR3 as the portal); ≥3 values per group vs the portal's 2 (9,718 vs 9,719 genes). | MD-8, STM-4 | not tracked |
 | 10 | **Categorical GA:** NA is excluded (legacy counts it as a category), so p differs widely (1q 0.211 vs 5.9e-15; 7q 0.155 vs 0). The table and plot also differ | GC, STM-6 | (tracked) layout; NA not tracked |
-| 11 | **Bar plot:** no options, no Select genes, fixed 10, and ranked within the 300 most significant rows | BP-1, BP-2 | not tracked |
+| 11 | **Bar plot:** no options, no Select genes, fixed 10; ~~ranked within the 300 most significant rows~~ ranked over every tested gene (#228) | BP-1, BP-2 | (tracked) |
 | 12 | **Results › Comparison/Survival:** Altered vs Unaltered only (no per-track or Unprofiled groups); mutation + CNA views only (no SV, mRNA, Protein, Methylation); no "Add checked genes to query"; query genes not removed before q | RV-1..4, MD-9 | not tracked |
 | 13 | **Driver filter is OncoKB**, not the custom `driver_filter`; no VUS / tier / germline switches | AT-6 | (tracked) Driver-annotation settings, custom drivers |
 | 14 | **Alteration volcano is static:** no drag-select or click (expression/GA volcanoes have both); significant points coloured by group, not `#58ACFA` | VO-3, VO-5, FL-3 | not tracked |
@@ -109,6 +109,8 @@ G2 = Basal vs LumA; G5 = five subtypes. "Top 20" = legacy's 20 lowest p, compare
 | G2 Mutations tab: badges | MU-5 | Basal Driver 159 / VUS 0; LumA 51 / 2 | 158 / 1; 50 / 3 | 🟡 hotspot drivers (tracked) |
 | G2 Highest Frequency genes | MU-1 | TP53 PIK3CA TTN CDH1 GATA3 MAP3K1 MUC16 KMT2C USH2A SPTA1 | identical | ✅ |
 | G2 mutation bar plot genes | BP-2 | (mutation-only ranking) …MAP3K1, MUC16 (12.3 %), KMT2C, USH2A, SPTA1 | …MAP3K1, KMT2C, USH2A, SPTA1, SYNE1 (9.4 %): MUC16 absent | 🔶 cBioLab bug |
+| G2 any-type table (2026-11-18) | AL-5, STM-2/3/7/9 | TP53 154 (90.06%) / 55 (11.02%), 3.03, < 10-10; MYC 62 (36.26%) / 36 (7.21%); 22,871 rows | identical | ✅ |
+| G5 Protein (2026-11-18) | MD-8, STM-4 | 4 groups (Normal NA); FOXA1 8.44e-15 / 8.20e-11, AGR3 1.94e-14 / 9.44e-11, GRB7 μ Basal −0.73, p 8.03e-13; 9,719 genes | Normal left out; FOXA1, AGR3 identical; GRB7 −0.72, 8.02e-13; 9,718 genes | 🟡 |
 | Patient-level (G2, mutation) | MD-5 | TP53 153/171 vs 53/499 (1 sample/patient here) | no patient mode | ❌ |
 
 Data version: every altered/profiled count, every expression mean and every p matches, so the warehouse and cbioportal.org hold the same data for this study. The only drift is the methylation GA values (≤6.6e-6), consistent with lower-precision storage.
@@ -128,7 +130,7 @@ Data version: every altered/profiled count, every expression mean and every p ma
 | CMM-TAB-5 | 🔶 | C | Own refusal texts: "an enrichment view compares two or more cohorts…", the `left` list "Mutations (compares exactly 2 groups…)". No legacy wording; no OverlapExclusionIndicator (the page has an "Overlapping samples" choice) |
 | CMM-TAB-6 | 🟡 | C | Empty → refusal "no gene had at least 5 altered samples (…) across these cohorts" (`enrichment/run.ts:67`), not "No data/result available" |
 | CMM-TAB-7 | ❌ | C | No Pathways tab (tracked) |
-| CMM-TAB-8 | 🔶 | B | Overlap default Include (legacy Exclude). Group order = document order. Tables use bare names ("Basal"); only the Mutations tab uses "(A) Basal". Colours from the series palette |
+| CMM-TAB-8 | 🟡 | B | Re-measured 2026-11-18 (was 🔶): overlap default Exclude ✅ (#223); group order = document order; tables use bare names ("Basal", portal "(A) Basal"); colours from the series palette |
 
 ### §1 Genomic Alterations — alteration types
 
@@ -149,7 +151,7 @@ Data version: every altered/profiled count, every expression mean and every p ma
 | CMM-AL-2 | ✅ | B | G5: bar plot only |
 | CMM-AL-3 | ✅ | B | 2026-11-17: one view, "GENOMIC ALTERATIONS — Basal vs LumA" |
 | CMM-AL-4 | 🟡 | B | Significant only ✅. No Sample/Patient select; no "Enriched in ..." select. Extra controls: "count any/drivers", "test genes altered in ≥ 5" |
-| CMM-AL-5 | 🔶 | B | Columns `Gene \| Cytoband \| Basal \| LumA \| Log2 Ratio \| p-Value \| q-Value \| Enriched in`. Differences: no Co-occurrence; cells "153 (89.5%)"; no "(A)"; p/q `pDigits`; p never bold. 25 rows a page; 2026-11-17: every gene tested is listed on the portal pages (`minAltered: 1`, the result's `all`): G2 22,871 rows, as the portal's. Header tip "altered / profiled in Basal" and no per-cell profiled tooltip. Initial sort q ✅; G5 "Most enriched in" ✅ |
+| CMM-AL-5 | 🟡 | B | Re-measured 2026-11-18 (was 🔶): G2 `Gene | Cytoband | Basal | LumA | Log2 Ratio | p-Value | q-Value | Enriched in`: TP53 "154 (90.06%)", "55 (11.02%)", 3.03, "< 10-10", "< 10-10", as the portal's first row; every gene listed (22,871 both); p/q bold below q 0.05 (#236). Still: no Co-occurrence column (AL-6), no "(A)", 25 rows a page (portal 20), header tip instead of the per-cell profiled tooltip |
 | CMM-AL-6 | ❌ | B | No Co-occurrence MiniOncoprint (tracked only for the Mutations tab) |
 | CMM-AL-7 | ❌ | C | Row click does nothing (no highlight) |
 
@@ -242,9 +244,9 @@ Data version: every altered/profiled count, every expression mean and every p ma
 | CMM-MD-3 | 🔶 | C | Page needs ≥2 cohorts; fewer active → views refuse in their own words |
 | CMM-MD-4 | 🔶 | C | The page compares one study's groups (`doc.study`); the enrichment engine sums across studies, but the Comparison page cannot hold multi-study groups |
 | CMM-MD-5 | ❌ | BC | No patient-level enrichments; caveat "counted in SAMPLES" |
-| CMM-MD-6 | 🔶 | B | Exclude available ✅; default Include (legacy Exclude) |
+| CMM-MD-6 | ✅ | B | Re-measured 2026-11-18 (was 🔶): Exclude by default on every tab, the enrichment tabs too (`?overlap=include` for Include, #223) |
 | CMM-MD-7 | 🐞 ok | C | A gene unprofiled in any cohort is "not tested" (`enrichment/run.ts:58`), not p = 0. Off-panel calls excluded (AT-5) |
-| CMM-MD-8 | 🔶 | B | Needs ≥3 values in **every** cohort (`diffexpr/run.ts:79`; legacy ≥2 per group, dropping the group). G5 Protein: whole tab refused |
+| CMM-MD-8 | 🟡 | B | Re-measured 2026-11-18 (was 🔶): a group without data is left out and the rest compared, as legacy: G5 Protein "Normal has no … data, so it is left out", FOXA1 8.44e-15 / 8.20e-11, AGR3 1.94e-14 / 9.44e-11 as the portal; still ≥3 values per cohort (legacy ≥2), so 9,718 genes tested vs the portal's 9,719 |
 | CMM-MD-9 | 🔶 | C | See RV-1..4 |
 | CMM-MD-10 | N/A | C | No settings-menu deployment switch |
 | CMM-MD-11 | 🟡 | B | Data Set dropdown on mRNA / Protein / GA ✅; alterations read all profiles of a kind (tracked) |
@@ -257,13 +259,13 @@ Data version: every altered/profiled count, every expression mean and every p ma
 |---|---|---|---|
 | CMM-STM-1 | ✅ | BC | Two-sided Fisher p identical (G2 mutation / CNA / SV). χ² identical where legacy is representable; legacy's underflow to 0 is not copied (G5 PIK3CA 2.43e-20). Panel p = 0 bug not reproduced (MD-7). Fisher uses a 1e-9 relative tolerance (`stats.ts:23`); no visible effect |
 | CMM-STM-2 | 🟡 | B | Altered / profiled identical for all 300 listed genes in each of mutation, CNA and SV, G2 and G5. 2026-11-17: the combined any-type count too — altered once per sample over every selected type, profiled by the union of a sample's panels over the selected profiles: G2 every gene identical (`check:portal` §21), G5 23,037 tested / 6,846 significant with identical p, msk_impact_2017 (IMPACT341/410/468) profiled identical. Off-panel calls excluded. No PATIENT mode |
-| CMM-STM-3 | 🟡 | B | Log2 ratio identical; null → ">10" / "<-10" ✅; enriched-in identical on the top 20. % at 1 dp (legacy 2). 2026-11-17: a tie of equal non-zero shares goes to the second group, as legacy's (`enrichmentRow`, `lib/views/enrichment/rows.ts`) ✅ |
+| CMM-STM-3 | ✅ | B | Re-measured 2026-11-18 (was 🟡): log2 ratio, ">10" / "<-10", enriched-in and the tie rule as legacy; % to 2 decimals ("154 (90.06%)", #236), G2 first rows identical to the portal's |
 | CMM-STM-4 | 🟡 | B | Welch t and classic ANOVA, log2(x+1) for RNA-seq: μ, σ, p, q, tested counts identical (G2 / G5 mRNA, G2 protein). Differences: min 3 values per cohort vs 2 per group, and every cohort required (MD-8); negative RNA-seq values dropped (`diffexpr/sql.ts:216`) vs clamped to 0 |
 | CMM-STM-5 | 🔶 | C | Binary assays: χ² on categories, not Welch on 0/1; no frequency / log ratio |
 | CMM-STM-6 | 🔶 | B | χ² ✅, but NA / blank excluded (4,234 values for arm-level) where legacy counts NA strings as a category. 1q 0.211 vs 5.9e-15; 7q 0.155 vs 0; 11q 0.0669 vs 1.3e-4. q by BH in the app vs legacy backend |
-| CMM-STM-7 | 🔶 | B | Same BH (q identical at `minAltered: 1`). Default `minAltered: 5` shrinks n: q 2–5× smaller and significance counts differ (Number check). Expression / GA: BH over all tested ✅ |
+| CMM-STM-7 | ✅ | B | Re-measured 2026-11-18 (was 🔶): the portal pages test every altered gene (`minAltered: 1`, "list genes altered in ≥ 1", #228): BH over the same genes, G2 any type 22,871 tested / 5,747 significant as the portal; expression / GA over all tested ✅ |
 | CMM-STM-8 | ✅ | B | Per protein change: patients, %, log2, Fisher p, BH q identical (TP53 G2) |
-| CMM-STM-9 | 🔶 | B | Alterations: `pDigits` ("1.1e-82", "0.0014"; "<1e-300") vs `toConditionalPrecisionWithMinimum` ("< 10-10", "1.036e-3"). Volcano y not capped at 10. Expression / GA / Mutations tables use `portalP` ✅. Log ratio 2 dp ✅ |
+| CMM-STM-9 | ✅ | B | Re-measured 2026-11-18 (was 🔶): alteration p and q as `toConditionalPrecisionWithMinimum(x, 3, 0.01, −10)` (`portalPMin`, #236): "< 10-10" on G2's top rows as the portal; volcano y capped at 10 ✅; expression / GA / Mutations `portalP` ✅; log ratio 2 dp ✅ |
 | CMM-STM-10 | 🟡 | B | q < 0.05 drives bold q, coloured enriched-in, "*", Significant only ✅. Alterations p not bold; points take group colours |
 | CMM-STM-11 | 🟡 | C | Plot view values per sample per cohort, log for log2 profiles; negatives per the plot view |
 
@@ -271,9 +273,9 @@ Data version: every altered/profiled count, every expression mean and every p ma
 
 ## 5. cBioLab bugs (broken on its own terms)
 
-- **Bar plot misses frequent genes.** "Genes with highest frequency in any group" ranks only the ≤300 most significant rows (`lib/views/enrichment/figure.ts:58`). In G2 mutation, MUC16 (21/171 = 12.3 % in Basal) is left out and SYNE1 (9.4 %) is drawn. Any frequent gene that does not differ between the groups can drop out the same way.
-- **Protein tab refuses five groups** when one group has no data: "no gene had at least 3 samples with a protein_quantification value in every cohort". The tab is offered, then shows only a refusal, though four groups hold 9,719 genes' values (`diffexpr/run.ts:79,97`).
-- **SV view tests 41 genes by default** (`minAltered: 5`) and calls PUM1 significant (q 0.0425); with every altered gene tested it is not (q 0.533). The default threshold makes the q-value depend on a display setting (STM-7).
+- ~~**Bar plot misses frequent genes.** "Genes with highest frequency in any group" ranks only the ≤300 most significant rows (`lib/views/enrichment/figure.ts:58`). In G2 mutation, MUC16 (21/171 = 12.3 % in Basal) is left out and SYNE1 (9.4 %) is drawn. Any frequent gene that does not differ between the groups can drop out the same way.~~ Fixed (#228): ranked over every tested gene.
+- ~~**Protein tab refuses five groups** when one group has no data: "no gene had at least 3 samples with a protein_quantification value in every cohort". The tab is offered, then shows only a refusal, though four groups hold 9,719 genes' values (`diffexpr/run.ts:79,97`).~~ Fixed: Normal left out, four groups compared (2026-11-18).
+- ~~**SV view tests 41 genes by default** (`minAltered: 5`) and calls PUM1 significant (q 0.0425); with every altered gene tested it is not (q 0.533). The default threshold makes the q-value depend on a display setting (STM-7).~~ Fixed (#228): every altered gene tested.
 
 **Not verified:**
 - Volcano / box-plot point tooltips (headless hover).

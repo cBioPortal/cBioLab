@@ -1,6 +1,6 @@
 # Parity audit — Group Comparison core: shell, Overlap, Survival/KM, Clinical; Results › Comparison/Survival (spec `20-comparison-core.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`; G1 and G2 rebuilt as `?doc=` documents) and cbioportal.org (the G1 and G2 sessions' Survival and Clinical tabs, the portal API's clinical data): 16 verdicts changed, 2 of them down (CMP-SV-6, CMP-STM-6)
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright, same day)
 - **Code paths (cBioLab):** `app/portal/comparison/page.tsx` (page, groups, overlap choice), `app/portal/comparison-layout.ts` (tabs), `app/portal/results-layout.ts` (RV groups, Comparison/Survival sub-tabs), `app/portal/portal-chrome.tsx` (group chips), `app/portal/PortalTabs.tsx` (tab rendering: figure only for survival/clinical), `lib/partition-arms.ts` (`exclusiveCohorts`, limits), `lib/views/overlap/{run,sql,figure}.ts`, `lib/views/survival/{run,figure}.ts`, `lib/survival-sql.ts`, `lib/stats.ts` (`kaplanMeier`, `logRank`, `logRankK`, `survivalAxis`), `lib/views/clinical/{run,figure}.ts`, `lib/legacy-comparison.ts` + `app/api/legacy-comparison/route.ts` (session hand-off)
@@ -22,29 +22,29 @@ cBioLab numbers for PFS/DFS/DSS and the chosen clinical attributes read from `/a
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 6 |
-| 🟡 partial | 24 |
-| 🔶 different | 17 |
-| ❌ missing | 22 |
+| ✅ match | 11 |
+| 🟡 partial | 30 |
+| 🔶 different | 8 |
+| ❌ missing | 20 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
 | N/A | 4 |
 | ? | 0 |
 | **Total IDs** | **73** |
 
-**Overall: 13.7 %** (✅ 6 + 🐞ok 0 + N/A 4 = 10 of 73). Counting 🟡 as half: 30.1 %.
+**Overall: 20.5 %** (✅ 11 + 🐞ok 0 + N/A 4 = 15 of 73). Counting 🟡 as half: 41.1 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
-| §0 Page shell (PG) | 4 | 0 | 2 | 2 | 0 | 0 | 0 | `?doc=` link, single study only; overlap choice always shown, default **Include**; Survival tab shown even without survival data |
+| §0 Page shell (PG) | 4 | 0 | 4 | 0 | 0 | 0 | 0 | `?doc=` link, single study only; overlap choice always shown, default Exclude; Survival only with survival data |
 | §1 Group selector (GS) | 9 | 0 | 3 | 2 | 3 | 0 | 1 | Chips with swatch + one count; toggle on/off (2–6 on); no ordinals, drag, popover, Select/Deselect all |
 | §2 Overlap (OV, OX) | 7 | 0 | 3 | 1 | 3 | 0 | 0 | Area-proportional circles ≤3 groups, patient UpSet >3; counts right; no region selection, create-group, download or banner |
-| §3 Survival tab (SV) | 8 | 1 | 2 | 3 | 2 | 0 | 0 | OS only, no survival-type table; Include mode draws overlapping groups, not partitions |
-| §4 KM chart (KM) | 11 | 1 | 3 | 2 | 5 | 0 | 0 | Curves, at-risk, median/n/events present; no HR, landmarks, slider, tooltips, censor marks, download; x-axis stops at last event |
-| §5 Clinical (CL) | 4 | 0 | 1 | 1 | 2 | 0 | 0 | 8 most-covered attributes as a −log₁₀ q bar figure; no p column, no per-attribute plot |
+| §3 Survival tab (SV) | 8 | 1 | 5 | 1 | 1 | 0 | 0 | Survival-type table and Include partitions as the portal's; no alerts; a plot even when Min. # hides every row |
+| §4 KM chart (KM) | 11 | 1 | 4 | 1 | 5 | 0 | 0 | Curves to the last follow-up, at-risk, median (CI)/n/events; no HR, landmarks, slider, tooltips, censor marks, download |
+| §5 Clinical (CL) | 4 | 0 | 2 | 0 | 2 | 0 | 0 | Every attribute in the portal's table; no download, column menu or per-attribute plot |
 | §6 RV tab (RV) | 6 | 0 | 3 | 1 | 2 | 0 | 0 | Altered/Unaltered only, Unaltered 312 vs legacy 372; no mRNA/Protein sub-tabs |
-| §7 Modes (MD) | 13 | 2 | 2 | 3 | 3 | 0 | 3 | Exclude counts identical; log-rank refused under 10 patients; no multi-study page |
-| §9 Statistics (STM) | 11 | 2 | 5 | 2 | 2 | 0 | 0 | KM n/events/median and log-rank p identical; chi² identical; numeric test Welch t (legacy Wilcoxon/KW); no HR, no survival q, no median CI |
+| §7 Modes (MD) | 13 | 3 | 3 | 1 | 3 | 0 | 3 | Exclude counts identical; Include partitions; log-rank at any size; no multi-study page |
+| §9 Statistics (STM) | 11 | 6 | 3 | 1 | 1 | 0 | 0 | KM n/events/median (CI), log-rank p, survival q, Wilcoxon p identical; 2 × 2 chi² without the portal's Yates correction; no HR |
 
 ---
 
@@ -52,21 +52,23 @@ cBioLab numbers for PFS/DFS/DSS and the chosen clinical attributes read from `/a
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **Clinical tab tests the 8 most-covered attributes only** (coadread: IN_PANCANPATHWAYS_FREEZE, CANCER_TYPE_DETAILED, ONCOTREE_CODE, CANCER_TYPE_ACRONYM, SAMPLE_TYPE, CANCER_TYPE, SAMPLE_COUNT, SOMATIC_STATUS — mostly constant); legacy tests all 45. Sex is not even tested in a Sex comparison. Shown as a −log₁₀ q bar chart: no p column, no type/test columns, raw ids, no sort/filter/download, no click-through plot | CL-2, CL-3, CL-4, STM-8 | not tracked |
+| 1 | **Clinical tab:** ~~tests the 8 most-covered attributes only, as a −log₁₀ q bar chart~~ fixed (#224, #233): every attribute, Wilcoxon / Kruskal-Wallis, in the portal's table. Still: Yates' correction on 2 × 2 tables (new, see 16), no download or column menu, no click-through plot | CL-2, CL-3, CL-4, STM-8 | partly (Clinical tab items) |
 | 2 | **No hazard ratios** (checkbox, control group, legend HR, HR matrix) | KM-1, KM-8, STM-5 | not tracked |
-| 3 | **Survival tab is OS only**: no survival-type table (PFS/DFS/DSS with p/q, Min. # patients slider), no way to pick another endpoint on the portal tab | SV-1, SV-5, SV-6, STM-4 | not tracked |
-| 4 | **Overlap default and Include semantics**: default Include (legacy Exclude); Include survival puts a shared patient in several curves and runs log-rank on non-independent groups (G2: k-group p = 0.910), where legacy partitions patients into "Only …" curves | PG-3, SV-4, MD-2 | not tracked |
-| 5 | **KM chart controls missing**: X-Axis Max slider, landmarks, point tooltips, censor "+" marks, download (SVG/PNG/PDF/Data) | KM-1, KM-3, KM-4, KM-7, KM-10 | not tracked |
-| 6 | **KM x-axis ends at the last event**, not the last follow-up (`survivalAxis`, `lib/stats.ts:160-165`): G1 OS drawn to ~77 mo, legacy 149; the censored tail and its at-risk counts are cut | KM-3, KM-6 | not tracked |
-| 7 | **Results › Unaltered group** requires profiling in every data type: 312 vs legacy 372 (legacy: unaltered among samples not totally unprofiled) → OS Unaltered 309/64, p 0.616 vs legacy 369/74, p 0.632; no Unprofiled or per-gene groups | RV-3 | not tracked |
-| 8 | **Numeric clinical test**: Welch t / Welch ANOVA as the reported p and the q basis; legacy Wilcoxon / Kruskal-Wallis (G1 Weight 2.80e-7 vs 3.86e-8; MSI MANTIS 0.0745 vs 0.798). cBioLab's rank p (computed, matches legacy) is not shown on the portal | STM-7 | not tracked |
-| 9 | **No median 95 % CI**, median shown to 1 decimal ("62.8 mo" vs "62.79 (56.25 - NA)"); p to 2 digits ("0.68" vs "0.684") | KM-9, STM-2, STM-10 | not tracked |
-| 10 | **Log-rank refused when any curve has < 10 patients**; legacy computes it at any size | MD-10, STM-3 | not tracked |
+| 3 | ~~**Survival tab is OS only**: no survival-type table (PFS/DFS/DSS with p/q, Min. # patients slider), no way to pick another endpoint on the portal tab~~ Fixed (#227): the survival-type table picks the endpoint, with p, q and Min. #; still a number field, not a slider, no hidden columns or download, and a plot drawn when Min. # hides every row (see 17). | SV-1, SV-5, SV-6, STM-4 | not tracked |
+| 4 | ~~**Overlap default and Include semantics**: default Include (legacy Exclude); Include survival puts a shared patient in several curves and runs log-rank on non-independent groups (G2: k-group p = 0.910), where legacy partitions patients into "Only …" curves~~ Fixed (#223, #255): Exclude by default, Include as the portal's "Only …" partitions. Still: the select shown without overlap, partition colours not blended. | PG-3, SV-4, MD-2 | not tracked |
+| 5 | **KM chart controls missing**: X-Axis Max slider, landmarks, point tooltips, censor "+" marks, download (SVG/PNG/PDF/Data); the axis to the last follow-up is done (#223) | KM-1, KM-3, KM-4, KM-7, KM-10 | (tracked) KM controls |
+| 6 | ~~**KM x-axis ends at the last event**, not the last follow-up (`survivalAxis`, `lib/stats.ts:160-165`): G1 OS drawn to ~77 mo, legacy 149; the censored tail and its at-risk counts are cut~~ Fixed (#223): G1 OS to 148 mo, as the portal's. | KM-3, KM-6 | not tracked |
+| 7 | ~~**Results › Unaltered group** requires profiling in every data type: 312 vs legacy 372 (legacy: unaltered among samples not totally unprofiled) → OS Unaltered 309/64, p 0.616 vs legacy 369/74, p 0.632; no Unprofiled or per-gene groups~~ Fixed (#304): Unaltered 372, OS 369/74, p 0.632, as the portal; no Unprofiled or per-gene groups yet. | RV-3 | not tracked |
+| 8 | ~~**Numeric clinical test**: Welch t / Welch ANOVA as the reported p and the q basis; legacy Wilcoxon / Kruskal-Wallis (G1 Weight 2.80e-7 vs 3.86e-8; MSI MANTIS 0.0745 vs 0.798). cBioLab's rank p (computed, matches legacy) is not shown on the portal~~ Fixed (#233): G1 Weight 3.86e-8, MSIsensor 0.0130, as the portal. | STM-7 | not tracked |
+| 9 | ~~**No median 95 % CI**, median shown to 1 decimal ("62.8 mo" vs "62.79 (56.25 - NA)"); p to 2 digits ("0.68" vs "0.684")~~ Fixed (#235): "62.79 (56.25 - NA)", p 0.684. | KM-9, STM-2, STM-10 | not tracked |
+| 10 | ~~**Log-rank refused when any curve has < 10 patients**; legacy computes it at any size~~ Fixed (#255): `testAnySize` on the portal pages. | MD-10, STM-3 | not tracked |
 | 11 | **No overlap/exclusion banner** ("Samples (221) that overlap … are excluded …") on any tab | OX, CL-1, SV-3 | (tracked) for the Mutations tab only |
 | 12 | **Group selector**: no ordinals "(A)", no drag reorder, no hover popover / Open in study view, no Select all / Deselect all, no S/P counts, no excluded strike-through | GS-1…GS-7 | not tracked |
 | 13 | **Overlap tab not interactive**: no region selection, no "Create Group From Selected Diagram Areas", no download; UpSet for patients only; in Exclude mode it draws the overlap-removed groups (legacy draws the originals) | OV-1, OV-4, OV-5, OV-6 | not tracked |
 | 14 | **Exclude is refused** for groups that differ in more than one condition, or a group wholly inside another (`lib/partition-arms.ts:139-140`), instead of legacy's iterative exclusion of emptied groups | STM-9, MD-1 | not tracked |
 | 15 | **Comparison page is single-study** (doc `study`); no "Multiple studies" header or multi-description warning | PG-2, MD-8 | not tracked |
+| 16 | **2 × 2 chi-squared without Yates' correction** (new 2026-11-18): the portal's Clinical tab corrects 2 × 2 tables (Datumbox `Chisquare.java:86`), ours does not: G1 "In PanCan Pathway Analysis" 0.101 vs 0.0824, "New Neoplasm Event" 0.289 vs 0.241 | STM-6 | yes (new) |
+| 17 | **A plot when Min. # hides every survival type** (new 2026-11-18): the portal shows only the warning; ours draws Overall too (G2) | SV-6 | yes (new) |
 
 ---
 
@@ -104,6 +106,12 @@ cBioLab numbers for PFS/DFS/DSS and the chosen clinical attributes read from `/a
 | R1 OS n/events | RV-3 | 221/46, 369/74 | 221/46, 369/74 | ✅ |
 | R1 OS p | STM-3 | 0.632 | 0.632 | ✅ |
 | R1 PFS p (type table) | SV-5 | 0.0191 | 0.0191 (2026-11-17, the page; was 0.0339) | ✅ |
+| G1 survival-type table (2026-11-18) | SV-5, STM-4 | DFS 223 0.0221 0.0884; PFS 590 0.119 0.238; DSS 569 0.464 0.618; OS 590 0.684 0.684 | identical | ✅ |
+| G1 OS median (95 % CI) (2026-11-18) | STM-2 | Male 62.79 (56.25 - NA), Female NA | Male 62.79 (56.25 - NA), Female not reached | ✅ |
+| G1 Clinical, numeric (2026-11-18) | STM-7 | Weight 3.86e-8, MSIsensor 0.0130, Ragnum 0.0465, Buffa 0.145, Aneuploidy 0.268 (Wilcoxon) | identical (Wilcoxon) | ✅ |
+| G1 Clinical, 2 × 2 categorical (2026-11-18) | STM-6 | In PanCan Pathway Analysis 0.101, New Neoplasm Event 0.289 | 0.0824, 0.241 (the portal API's counts give 0.101 / 0.289 with Yates' correction, 0.0824 / 0.241 without) | 🔶 |
+| G1 Clinical q (2026-11-18) | STM-8 | Weight 1.022e-6, MSIsensor 0.230 (over 53) | 1.003e-6, 0.225 (over 52) | 🟡 |
+| G2 Exclude / Include survival (2026-11-18) | SV-6 | every row under Min. # 3: the warning, no plot | the warning, and the Overall plot drawn | 🔶 |
 
 Data version: every n, event count and median agrees exactly on identical groups, so the warehouse and cbioportal.org hold the same clinical data. All survival mismatches trace to group definitions (Unaltered, Include partitions), not arithmetic.
 
@@ -117,8 +125,8 @@ Data version: every n, event count and median agrees exactly on identical groups
 |---|---|---|---|
 | CMP-PG-1 | 🟡 | BC | Groups travel in `?doc=` (or `?s=`), tab `?tab=`; no session service. Tabs Overlap, Survival, Clinical, Genomic Alterations, Mutations (2 groups), mRNA, Protein, DNA methylation / per-probe Methylation, generic assays, + "Clinical Data"; no Pathways (tracked) (`comparison-layout.ts:37-49`) |
 | CMP-PG-2 | 🟡 | B | Eyebrow "Group comparison", study name, id, "594 samples · 594 patients"; no study-view link; no "Groups from <attr>"; one study only (`page.tsx:25`) |
-| CMP-PG-3 | 🔶 | BC | "Overlapping samples: include/exclude" always shown, default **include** (`page.tsx:31`); URL `overlap=exclude`; legacy shows it only with overlap, default Exclude |
-| CMP-PG-4 | 🔶 | BC | Survival tab always present (no survival-data check; a study without OS errors inside the tab); Clinical hidden when no attributes, never greyed; <2 groups refused page-wide |
+| CMP-PG-3 | 🟡 | BC | Re-measured 2026-11-18 (was 🔶): default **Exclude** ✅ (`page.tsx:31`, `?overlap=include` for Include, #223); the select still shown when the groups share nobody (G1 Female/Male: "Overlapping samples: exclude"), where the portal hides it |
+| CMP-PG-4 | 🟡 | BC | Re-measured 2026-11-18 (was 🔶): Survival only when the study has a `<X>_MONTHS`/`<X>_STATUS` pair (`survivalDefault`, `comparison-layout.ts:16`) ✅; Clinical hidden when the study has no attributes (portal: never hidden, greyed below 2 groups); <2 groups refused page-wide |
 
 ### §1 Group selector
 
@@ -150,12 +158,12 @@ Data version: every n, event count and median agrees exactly on identical groups
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| CMP-SV-1 | 🔶 | C | Portal view is `{kind:"survival"}` → OS only (`comparison-layout.ts:39`); no prefix detection or priority; the view supports PFS/DFS/DSS via `endpoint` but the tab has no control (figure-only, `PortalTabs.tsx`) |
+| CMP-SV-1 | ✅ | BC | Re-measured 2026-11-18 (was 🔶): every `<X>_MONTHS`/`<X>_STATUS` pair, ordered OS, DFS, PFS, DSS then the rest (`SURVIVAL_PRIORITY`), each a row of the survival-type table that draws it (#227); G1 rows Disease Free, Progression Free, Disease-specific, Overall as the portal |
 | CMP-SV-2 | 🟡 | C | 0 groups impossible; >10 unreachable (6 active max) |
 | CMP-SV-3 | 🔶 | B | No caution / log-rank explanation alerts; a caveat paragraph under the figure instead |
-| CMP-SV-4 | 🔶 | B | Exclude: one curve per group, counts = legacy (191/178) ✅; Include: groups as-is, shared patients in several curves, not "Only …" partitions |
-| CMP-SV-5 | ❌ | B | No survival-type table (no p/q per type, no Min. # Patients slider) |
-| CMP-SV-6 | ✅ | B | OS drawn first, as legacy's observed default |
+| CMP-SV-4 | 🟡 | B | Re-measured 2026-11-18 (was 🔶): Exclude: one curve per group (G2 Male 191/37, Female 178/37) ✅; Include: the portal's partitions "Only Male", "Only Female, KRAS" …, every patient in one curve, the test over them ✅ (#255); no "(A)" ordinals in the names, colours not blended |
+| CMP-SV-5 | 🟡 | B | Re-measured 2026-11-18 (was ❌): Survival Type · Number of Patients · p-Value · q-Value, sorted by p, "Min. # Patients per Group" (default 3, rows below it hidden with the portal's warning), a row picks the plot ✅ (#227; G1 DFS 223 0.0221 0.0884 … OS 590 0.684 0.684, as the portal); a number field, not a slider; no hidden `# in`/median columns, column menu, filter or download |
+| CMP-SV-6 | 🟡 | B | Re-measured 2026-11-18 (was ✅): Overall drawn first ✅ (G1). When the Min. # threshold hides every row the portal shows only the warning and no plot (G2 Exclude and Include, cbioportal.org 2026-11-18); cBioLab shows the same warning and still draws Overall (G2 Exclude: Male 191, Female 178, KRAS "no patients with data", p = 0.987) |
 | CMP-SV-7 | 🟡 | B | Header "SURVIVAL — A vs B"; no attribute description; no multi-study warning (single study) |
 | CMP-SV-8 | ❌ | C | No GENIE BPC left-truncation checkbox (delayed entry only with an `anchor`) |
 
@@ -165,7 +173,7 @@ Data version: every n, event count and median agrees exactly on identical groups
 |---|---|---|---|
 | CMP-KM-1 | ❌ | B | No HR checkbox, control select, landmarks, X-Axis Max slider, download |
 | CMP-KM-2 | 🔶 | B | Y "Survival probability", ticks 0/25/50/75/100 %; X "Months", 24-month ticks; legacy "Probability of Overall Survival", 11 y ticks, x label from attribute, 18 ticks |
-| CMP-KM-3 | 🔶 | BC | Step curves ✅; axis and curves stop at the last event (`stats.ts:160-162`, points only at events) — G1 ~77 mo vs legacy 149; no censor "+" marks (legacy first-point bug not copied, by absence), no hover points |
+| CMP-KM-3 | 🟡 | BC | Re-measured 2026-11-18 (was 🔶): Step curves ✅; the axis to the last follow-up, each curve to its own (G1 to 148 mo, as the portal's, #223) ✅; no censor "+" marks, no hover points |
 | CMP-KM-4 | ❌ | C | No point tooltip |
 | CMP-KM-5 | 🟡 | B | Legend under the plot with median · n · events; "log-rank χ² = 0.166 (1 df) · p = 0.68" (legacy "Logrank Test P-Value: 0.684") |
 | CMP-KM-6 | 🟡 | B | Number-at-risk table at 0/24/48/72 ✅ (0: 280/310 = legacy); fewer columns, nothing past last event |
@@ -180,7 +188,7 @@ Data version: every n, event count and median agrees exactly on identical groups
 | ID | verdict | how | note |
 |---|---|---|---|
 | CMP-CL-1 | 🟡 | BC | <2 cohorts refused ("at least 2 cohorts"); no caution alert, no overlap banner |
-| CMP-CL-2 | 🔶 | B | 8 most-covered attributes (`CLINICAL_SHOWN`, `comparison-layout.ts:7,40`); −log₁₀ q bars with "test · q"; no p, type, test columns as a table; raw ids; no sort/filter/download/row click |
+| CMP-CL-2 | 🟡 | B | Re-measured 2026-11-18 (was 🔶): Every attribute by display name in the portal's table: Clinical Attribute · Attribute Type · Statistical Test · p · q, sorted by q, 20 a page, search, "Significant only" (#224); G1 52 attributes, 44 tested; no column menu, download or row click |
 | CMP-CL-3 | ❌ | B | No plot controls |
 | CMP-CL-4 | ❌ | B | No per-attribute plot or table |
 
@@ -200,7 +208,7 @@ Data version: every n, event count and median agrees exactly on identical groups
 | ID | verdict | how | note |
 |---|---|---|---|
 | CMP-MD-1 | 🟡 | BC | Exclude removes shared samples, sizes = legacy (G2 193/178/1); not default; a group wholly inside another is refused, not struck through (`partition-arms.ts:139-140`) |
-| CMP-MD-2 | 🔶 | B | Include: no partitions on survival, no warning banner |
+| CMP-MD-2 | 🟡 | B | Re-measured 2026-11-18 (was 🔶): Include: survival as the portal's exclusive partitions ✅ with "Overlapping patients (221) are plotted as distinct groups"; no CMP-OX banner on the other tabs |
 | CMP-MD-3 | 🟡 | B | No banner ✅; strategy select still shown |
 | CMP-MD-4 | 🔶 | C | A second group cannot be turned off (lock "a comparison needs at least 2 groups") |
 | CMP-MD-5 | ✅ | C | >3 groups → UpSet |
@@ -208,7 +216,7 @@ Data version: every n, event count and median agrees exactly on identical groups
 | CMP-MD-7 | ✅ | B | One plot shown directly (OS) |
 | CMP-MD-8 | ❌ | C | Comparison page single-study |
 | CMP-MD-9 | N/A | C | Groups are cohort definitions evaluated live (document model, CLAUDE.md "What this is"), not stored sample lists |
-| CMP-MD-10 | 🔶 | BC | Log-rank refused if any curve < 10 patients (`survival/run.ts:128`); legacy computes p at any size, gates only HR |
+| CMP-MD-10 | ✅ | BC | Re-measured 2026-11-18 (was 🔶): the portal pages test at any group size (`testAnySize`, #255); a curve with no patients left out of the test, as `logRankTest` drops it (G2 Include: 4-group p 0.858) |
 | CMP-MD-11 | N/A | C | Groups live in the document / Saved work (invariant 9) |
 | CMP-MD-12 | ❌ | C | As SV-8 |
 | CMP-MD-13 | ❌ | C | No deployment switch for p/q display (tracked: "Instance defaults … survival display") |
@@ -218,24 +226,24 @@ Data version: every n, event count and median agrees exactly on identical groups
 | ID | verdict | how | note |
 |---|---|---|---|
 | CMP-STM-1 | ✅ | BC | Same entry rule (both values, null markers, months ≥ 0; `lib/survival-sql.ts`), event code 1 (also bare "1"); n/events identical on 4 endpoints × 2 groups; tied-event product limit |
-| CMP-STM-2 | 🟡 | BC | Median = first S ≤ 0.5 ✅ (62.79, 63.12, 65.85); no CI on this view (`kmMedianCi` exists, used by txendpoints only); 1 decimal |
-| CMP-STM-3 | 🟡 | BC | 2-group and k-group log-rank, hypergeometric variance; p identical (0.6838, 0.1188, 0.0221, 0.4636); refused <10; 2-digit display |
-| CMP-STM-4 | ❌ | C | No survival-type q |
+| CMP-STM-2 | ✅ | BC | Re-measured 2026-11-18 (was 🟡): Median = first S ≤ 0.5 with its 95 % CI, 2 decimals: G1 Male "62.79 (56.25 - NA)", Female not reached, as the portal's summary table |
+| CMP-STM-3 | ✅ | BC | Re-measured 2026-11-18 (was 🟡): 2-group and k-group log-rank, hypergeometric variance, at any size; p to 3 digits: G1 OS 0.684, PFS 0.119, DFS 0.0221, DSS 0.464 on both sides |
+| CMP-STM-4 | ✅ | BC | Re-measured 2026-11-18 (was ❌): BH over the survival-type rows: G1 DFS 0.0884, PFS 0.238, DSS 0.618, OS 0.684, identical to the portal |
 | CMP-STM-5 | ❌ | C | No HR |
-| CMP-STM-6 | ✅ | C | Pearson χ², no Yates, patient attrs per patient; p identical (Race, Subtype, Stage, Sex) |
-| CMP-STM-7 | 🔶 | C | Reported p = Welch t (2) / Welch ANOVA (3+) from moments (`clinical/run.ts:96-115`); Mann-Whitney / Kruskal-Wallis computed (matches legacy) but not on portal and not in q |
+| CMP-STM-6 | 🔶 | BC | Re-measured 2026-11-18 (was ✅): Pearson χ² without a continuity correction. The portal applies Yates' correction to 2 × 2 tables (Datumbox `Chisquare.java:86`, which the backend's `ClinicalDataEnrichmentUtil` calls; the spec said it does not, corrected 2026-11-18): G1 "In PanCan Pathway Analysis" (No/Yes 55/225 vs 80/232, the portal API's counts) portal 0.101 = Yates, ours 0.0824 = uncorrected; "New Neoplasm Event Post Initial Therapy Indicator" 0.289 vs 0.241. Larger tables identical (Race 0.245, Subtype 0.446, Stage 0.351); the q-values shift with them (MSIsensor Score q 0.230 vs 0.225) |
+| CMP-STM-7 | ✅ | BC | Re-measured 2026-11-18 (was 🔶): Kruskal-Wallis, "Wilcoxon Test" for 2 groups (#233): G1 Patient Weight 3.86e-8, MSIsensor 0.0130, Ragnum Hypoxia 0.0465, Aneuploidy 0.268 on both sides |
 | CMP-STM-8 | 🟡 | BC | BH same formula; 2026-11-17: n counts the attributes the portal tests but does not list (each survival endpoint's pair, AGE_LAST_FU_YEARS, BIRTH_YEAR): coadread G1 n 52 (was 44), Patient Weight q 1.003e-6 against the portal's 1.022e-6 over 53 — the one left is OTHER_PATIENT_ID, refused past 200 values (QUESTIONS.md: its values are patient identifiers) |
 | CMP-STM-9 | 🟡 | BC | Overlap counts and Exclude sizes identical on G2; no iterative exclusion; refused when groups differ in >1 condition or nest |
-| CMP-STM-10 | 🔶 | B | p `pDigits` (2 sig ≥ 0.001, `lib/chart/format.ts:47-53`) vs `toConditionalPrecision(3)`; median 1 decimal vs 2; no HR / landmark formats |
+| CMP-STM-10 | ✅ | B | Re-measured 2026-11-18 (was 🔶): p and q to 3 significant digits ("0.684", "3.86e-8", "< 10^-10"), median to 2 decimals ("62.79"), as the portal; HR and landmark formats belong to the missing features (KM-7, KM-8) |
 | CMP-STM-11 | 🟡 | B | Group chip = patients only; per-curve n and at-risk counts ✅ |
 
 ---
 
 ## 5. cBioLab bugs (on its own terms)
 
-- **Include-mode log-rank on overlapping groups**: with the default "include", a patient in two groups enters two curves and the log-rank/k-group test is run as if the groups were independent (G2: Male, Female, KRAS → p 0.910 with 221 patients counted twice). The caveat says nothing about it.
-- **Clinical tab picks attributes by coverage**, so near-constant attributes (SAMPLE_TYPE, CANCER_TYPE, SOMATIC_STATUS, SAMPLE_COUNT) fill the 8 slots and the q-correction, and the attribute the groups were built from (SEX) is not tested.
-- **KM axis ends at the last event**: censored follow-up after it (and its at-risk counts) is never drawn, so a curve looks shorter than the data.
-- **Survival tab on a study without OS** shows only an error naming other endpoints ("pick one of those") while the portal tab has no control to pick one.
+- ~~**Include-mode log-rank on overlapping groups**: with the default "include", a patient in two groups enters two curves and the log-rank/k-group test is run as if the groups were independent (G2: Male, Female, KRAS → p 0.910 with 221 patients counted twice). The caveat says nothing about it.~~ Fixed (#255): Include draws the portal's partitions.
+- ~~**Clinical tab picks attributes by coverage**, so near-constant attributes (SAMPLE_TYPE, CANCER_TYPE, SOMATIC_STATUS, SAMPLE_COUNT) fill the 8 slots and the q-correction, and the attribute the groups were built from (SEX) is not tested.~~ Fixed (#224): every attribute.
+- ~~**KM axis ends at the last event**: censored follow-up after it (and its at-risk counts) is never drawn, so a curve looks shorter than the data.~~ Fixed (#223).
+- ~~**Survival tab on a study without OS** shows only an error naming other endpoints ("pick one of those") while the portal tab has no control to pick one.~~ Fixed (#227): the tab only with survival data, endpoints picked in its table.
 
 **Not verified:** legacy KM point tooltips and Venn hover (do not render headless; taken from the spec's `[C]`); legacy Include-mode partition p (hidden by its Min. # 3 threshold — cBioLab's partition numbers recorded above for later); clinical p on G2 Exclude groups in cBioLab (exclusive cohorts not rerun through the API).
