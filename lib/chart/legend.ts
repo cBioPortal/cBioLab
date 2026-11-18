@@ -11,6 +11,8 @@ export interface LegendItem {
   kind?: "rect" | "line" | "dot";
   dash?: string;
   opacity?: number;
+  /** a dot's outline, for a fill that would not show on the page (white) */
+  stroke?: string;
   /** muted text after the label, e.g. "median 37.2 mo · n = 6,322" */
   detail?: string;
 }
@@ -49,7 +51,7 @@ export function legend(items: LegendItem[], x: number, y: number, maxW: number, 
     if (kind === "line")
       out.push(`<line x1="${cx}" y1="${mid}" x2="${cx + sw}" y2="${mid}" stroke="${it.color}" stroke-width="${SW.series}"${it.dash ? ` stroke-dasharray="${it.dash}"` : ""}${op}/>`);
     else if (kind === "dot")
-      out.push(`<circle cx="${cx + sw / 2}" cy="${mid}" r="${sw / 2 - 1}" fill="${it.color}"${op}/>`);
+      out.push(`<circle cx="${cx + sw / 2}" cy="${mid}" r="${sw / 2 - 1}" fill="${it.color}"${op}${it.stroke ? ` stroke="${it.stroke}"` : ""}/>`);
     else
       out.push(`<rect x="${cx}" y="${mid - sw / 2}" width="${sw}" height="${sw}" rx="2" fill="${it.color}"${op}/>`);
     const tx = cx + sw + GAP, avail = (cols ? cx + cellW : x0 + room) - tx;

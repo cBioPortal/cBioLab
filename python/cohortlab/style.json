@@ -335,6 +335,22 @@
     },
     "unalteredLabel": "No alterations"
   },
+  "plotGene": {
+    "fill": {
+      "not mutated": "#c4e5f5",
+      "not profiled for mutations": "#ffffff"
+    },
+    "outline": "#d3d3d3",
+    "ring": {
+      "amplification": "#ff0000",
+      "gain": "#ff8c9f",
+      "diploid": "#bebebe",
+      "shallow deletion": "#2aced4",
+      "deep deletion": "#0000ff",
+      "structural variant": "#8b00c9",
+      "not profiled": "#000000"
+    }
+  },
   "ramps": {
     "sequential": {
       "from": [

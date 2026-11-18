@@ -4,7 +4,7 @@ import type { ViewResult } from "../../types.ts";
 import { pearsonR, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
 import { logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
-import { fitOf, portalBox, spearmanRho, corrPValue, AXIS_LABELS, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
+import { fitOf, portalBox, ringsAbsence, spearmanRho, corrPValue, AXIS_LABELS, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
@@ -127,6 +127,11 @@ export function categoryOrder(cat: PlotRequest["x"], rest: (a: string, b: string
   if (cat.source === "alteration" && "gene" in cat) {
     if (cat.by === "mutationType") return listed([...MUT_TYPES.flatMap((t) => [t, t + " (Driver)", t + " (VUS)"]), ...NO_MUTATION]);
     if (cat.by === "driver") return listed(["Driver", "VUS", ...NO_MUTATION]);
+    // the portal's legend order (PlotsTabUtils.tsx mutationLegendOrder): each class's Driver before its VUS, then none
+    if (cat.by === "topMutationType") return listed([...["Promoter", "Splice", "Truncating", "Inframe", "Missense", "Other"]
+      .flatMap((t) => t === "Promoter" || t === "Other" ? [t + " (VUS)", t] : [t + " (Driver)", t + " (VUS)", t]),
+      "Not mutated", "Not profiled for mutations"]);
+    if (cat.by === "copyNumberSv") return listed(["Amplification", "Gain", "Diploid", "Shallow Deletion", "Deep Deletion", "Structural Variant", OQL_NOT_PROFILED]);
     if (cat.by === "cna") return listed(["Deep deletion", "Neutral", "Amplification", OQL_NOT_PROFILED]);
     if (cat.by === "sv") return listed([AXIS_LABELS.portal.sv, AXIS_LABELS.portal.noSv, AXIS_LABELS.portal.svNotProfiled]);
     return listed(["Mutated", ...NO_MUTATION]);
@@ -202,8 +207,10 @@ function colourKey(data: PlotData, spec: PlotRequest, pts: { c?: string; r?: str
   // a participant that predates coloured points answers without the categories: said, not drawn plain
   const unanswered = [spec.colorBy && pts.every((x) => x.c === undefined) ? "colour" : "", spec.ringBy && pts.every((x) => x.r === undefined) ? "ring" : ""].filter(Boolean);
   if (pts.length && unanswered.length) data.colourNote = "The points are not coloured: the study's participant answered without their " + unanswered.join(" and ") + " categories.";
-  if (spec.colorBy && !unanswered.includes("colour")) { data.legend = legendFor(pts.map((x) => x.c || "")); data.colorLabel = axisLabel(spec.colorBy); }
-  if (spec.ringBy && !unanswered.includes("ring")) { data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true)]; data.ringLabel = axisLabel(spec.ringBy); }
+  if (spec.colorBy && !unanswered.includes("colour")) { data.legend = legendFor(pts.map((x) => x.c || ""), false, spec.colorBy); data.colorLabel = axisLabel(spec.colorBy); }
+  if (spec.ringBy && !unanswered.includes("ring")) { data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true, spec.ringBy)]; data.ringLabel = axisLabel(spec.ringBy);
+    if (ringsAbsence(spec.ringBy)) data.ringAbsent = true;
+  }
 }
 
 /** what the caption says when the plotted cohort is drawn as density rather than as its cases */
@@ -780,7 +787,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           await peerSafe(sites.map((s) => resolvers[s]), async () => {
             const violin = poolViolin(await Promise.all(sites.map((s) => fr[s].plotViolinCounts(doc.cohorts[cn], spec, xk, yk, vBins, range))));
             box.violin = violin; box.violinBins = vBins; box.violinExtent = range; box.overlay = "violin";
-            if (spec.colorBy) { box.colorLabel = spec.colorBy.source === "clinical" && !spec.colorBy.label && siteColorLabel ? siteColorLabel : axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || "")); }
+            if (spec.colorBy) { box.colorLabel = spec.colorBy.source === "clinical" && !spec.colorBy.label && siteColorLabel ? siteColorLabel : axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || ""), false, spec.colorBy); }
             box.note += " The density behind each box is binned by every site over one shared range, the pooled whiskers and up to" +
               " one whisker span beyond them, so its counts add exactly; a value past that range is off the figure and not in it.";
           }, (why) => { box.note += " No density is drawn behind the boxes: " + why + "."; });

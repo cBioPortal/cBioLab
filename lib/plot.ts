@@ -21,6 +21,7 @@ import { hotspotKeysSql } from "./hotspots.ts";
 import type { VariantPins } from "./variant-annotation.ts";
 import { clinicalTable, ATTR_NAME_RE } from "./custom-data.ts";
 import { parseOql, oqlCasesSql } from "./oql.ts";
+import { PORTAL_TYPE_CLASS } from "./oql-match.ts";
 import { OQL_ALTERED, OQL_UNALTERED, OQL_NOT_PROFILED, OQL_SEVERAL, OQL_STATEMENT_CAP, ALTERATION_GENE_SET_CAP } from "./plot-oql.ts";
 import { portalR5 } from "./chart/format.ts";
 import { oqlStatements } from "./oql-parse.ts";
@@ -89,7 +90,7 @@ export type PlotAxis =
    */
   | { source: "cohort"; label?: string }
   | { source: "none" };
-export type AlterationBy = "mutated" | "mutationType" | "driver" | "cna" | "sv";
+export type AlterationBy = "mutated" | "mutationType" | "driver" | "cna" | "sv" | "topMutationType" | "copyNumberSv";
 const AXIS_SOURCES: readonly string[] = ["clinical", "profile", "molecular", "assay", "alteration", "cohort", "none"] satisfies PlotAxis["source"][];
 /** an alteration axis given as an OQL query, rather than as genes */
 function isOqlAxis(a: PlotAxis): a is { source: "alteration"; oql: string; by?: "any" | "statement" } {
@@ -167,6 +168,21 @@ export function categoryColor(label: string, i = 0): string {
   return pal[i % pal.length];
 }
 
+/**
+ * A category's colour on a plot coloured by `axis`: a gene's mutation fill and copy-number / SV
+ * ring take the portal's Plots-tab colours (STYLE.plotGene, PLT-CL-8), everything else categoryColor's.
+ */
+export function axisCategoryColor(axis: PlotAxis | undefined, label: string, i = 0): string {
+  const by = axis && axis.source === "alteration" ? axis.by : undefined;
+  const l = String(label).toLowerCase();
+  if (by === "topMutationType" && STYLE.plotGene.fill[l]) return STYLE.plotGene.fill[l];
+  if (by === "copyNumberSv" && STYLE.plotGene.ring[l]) return STYLE.plotGene.ring[l];
+  return categoryColor(label, i);
+}
+
+/** does a ring by this axis draw its absent categories (a gene's copy-number ring, PLT-STM-15) */
+export const ringsAbsence = (axis: PlotAxis | undefined): boolean => !!axis && axis.source === "alteration" && axis.by === "copyNumberSv";
+
 export interface AxisCtx {
   /** `cohortSql` yields the cohort's (pid, sid): a sample plot draws its samples, a patient plot their owners */
   study: string; db?: string; unit: "patient" | "sample"; cohortSql: string;
@@ -241,7 +257,7 @@ export function axisKind(a: PlotAxis, clinicalKind?: (attr: string) => "num" | "
 }
 
 /** `cohort`: the axis may be the cohort, which only a plot's x axis is (runPlot decides that) */
-export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean } = {}): void {
+export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean; colour?: boolean } = {}): void {
   if (!a || typeof a !== "object" || !("source" in a)) throw new Error(which + " axis needs a source");
   if (!AXIS_SOURCES.includes(a.source))
     throw new Error(which + " axis: unknown source '" + String(a.source).slice(0, 40) + "' — use one of " + AXIS_SOURCES.filter((x) => o.cohort || x !== "cohort").join(", "));
@@ -303,8 +319,12 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean }
       throw new Error(which + " axis: a gene-set alteration axis takes at most " + ALTERATION_GENE_SET_CAP + " genes; this asks for " + genes.length);
     if ("genes" in a && genes.length > 1 && a.by && a.by !== "mutated")
       throw new Error(which + " axis: a gene SET only supports by:\"mutated\" (any gene altered) — combining several genes' mutation types or copy-number states into one category has no single honest reading");
-    if (a.by != null && !(["mutated", "mutationType", "driver", "cna", "sv"] as string[]).includes(a.by))
-      throw new Error(which + " axis: an alteration axis groups by \"mutated\", \"mutationType\", \"driver\", \"cna\" or \"sv\"; not " + JSON.stringify(a.by));
+    if (a.by != null && !(["mutated", "mutationType", "driver", "cna", "sv", "topMutationType", "copyNumberSv"] as string[]).includes(a.by))
+      throw new Error(which + " axis: an alteration axis groups by \"mutated\", \"mutationType\", \"driver\", \"cna\", \"sv\", \"topMutationType\" or \"copyNumberSv\"; not " + JSON.stringify(a.by));
+    // a gene's colouring readings label a case for its colour, and a not-profiled case is a colour
+    // of its own; as an axis, a covariate or an exposure that label would read as a category
+    if ((a.by === "topMutationType" || a.by === "copyNumberSv") && !o.colour)
+      throw new Error(which + " axis: by:" + JSON.stringify(a.by) + " colours a plot's points by a gene; give it as a plot's colorBy or ringBy, not as an axis");
     if ("drivers" in a && a.drivers != null) {
       try { resolveDrivers(a.drivers); } catch (e) { throw new Error(which + " axis: " + (e as Error).message, { cause: e }); }
     }
@@ -444,19 +464,20 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       "SELECT " + idCol + " AS oql_case, " + [...matched, ...profCols].join(",\n  ") + "\nFROM " + db + ".sample_derived sd\n" +
       "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + sampleIn("sd.sample_unique_id") + "\nGROUP BY oql_case))";
   }
+  if (a.source === "alteration" && a.by === "copyNumberSv") return copyNumberSvSelect(alterationGenes(a)[0], ctx);
   if (a.source === "alteration") {
     const genes = alterationGenes(a), by = a.by || "mutated";
     const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
     // each mutation's driver call under the view's settings: needed to tell Driver from VUS, and
     // to split a mutation type by it when the view gave settings
-    const drivers = by === "driver" || (by === "mutationType" && "drivers" in a && a.drivers) ? resolveDrivers("drivers" in a ? a.drivers : undefined) : null;
+    const drivers = by === "driver" || ((by === "mutationType" || by === "topMutationType") && "drivers" in a && a.drivers) ? resolveDrivers("drivers" in a ? a.drivers : undefined) : null;
     if (drivers && drivers.oncokb && !ctx.oncokbPin)
       throw new Error("calling drivers from OncoKB needs the version-pinned OncoKB store, which this instance cannot read; " +
         "switch drivers.oncokb off to use the study's own driver calls (cbp_driver, cbp_driver_tiers)");
     const hotspotKeys = drivers && drivers.hotspots && ctx.variantPins ? hotspotKeysSql(db, [study], genes, ctx.variantPins) : null;
     const drv = drivers ? ", toUInt8(" + driverCondSql(drivers, ctx.oncokbPin, "", hotspotKeys, { db, studies: [study] }) + ") AS drv" : "";
     // every case in the cohort appears, because "no alteration" is an answer and not a missing value
-    const events = "SELECT sample_unique_id, mutation_type, variant_type, cna_alteration" + drv + "\n" +
+    const events = "SELECT sample_unique_id, mutation_type, " + (by === "topMutationType" ? "mutation_variant, " : "") + "variant_type, cna_alteration" + drv + "\n" +
       "     FROM " + db + ".genomic_event_derived\n" +
       "     WHERE " + genomicStudySql(study) + " AND hugo_gene_symbol IN (" + genes.map(sq).join(",") + ")\n" +
       "       AND mutation_status != 'UNCALLED'"; // read support, not a call (lib/oql.ts specCond)
@@ -468,6 +489,8 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
       : by === "driver"
         // the portal's "Driver vs VUS": Driver when any of the case's mutations is a putative driver
         ? "multiIf(countIf(g.variant_type = 'mutation') = 0, " + sq(L.noMutation) + ", countIf(g.variant_type = 'mutation' AND g.drv = 1) > 0, 'Driver', 'VUS')"
+      : by === "topMutationType"
+        ? topMutationTypeSql(!!(drivers && drivers.annotated))
       : by === "mutationType" && drivers && drivers.annotated
         // the class of the case's driver mutations when it has any, else of its VUS, and which
         ? "multiIf(countIf(g.variant_type = 'mutation') = 0, " + sq(L.noMutation) + "," +
@@ -489,7 +512,7 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     const sid = strip("sd.sample_unique_id", study);
     const profCols = genes.map((g, i) => "max(" + sid + " IN (SELECT profiled_id FROM (" + profiledCasesSql(g, type, { study, db, unit: "sample" }) + "))) AS p" + i);
     const profiled = genes.map((_, i) => "p" + i + " = 1").join(" AND ");
-    return "SELECT alt_case AS id, if(hits = 0 AND NOT (" + profiled + "), " + sq(by === "sv" ? L.svNotProfiled : OQL_NOT_PROFILED) + ", v0) AS v FROM (\n" +
+    return "SELECT alt_case AS id, if(hits = 0 AND NOT (" + profiled + "), " + sq(by === "topMutationType" ? GENE_NOT_PROFILED_MUT : by === "sv" ? L.svNotProfiled : OQL_NOT_PROFILED) + ", v0) AS v FROM (\n" +
       "SELECT " + idCol + " AS alt_case, " + value + " AS v0, countIf(" + hit + ") AS hits,\n  " + profCols.join(",\n  ") + "\n" +
       "FROM " + db + ".sample_derived sd\n" +
       "LEFT JOIN (\n     " + events + "\n) g ON g.sample_unique_id = sd.sample_unique_id\n" +
@@ -510,13 +533,94 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
 const oneClass = (cond: string): string =>
   "if(length(groupUniqArrayIf(" + MUT_CLASS + ", " + cond + ")) > 1, 'Multiple', arrayElement(groupUniqArrayIf(" + MUT_CLASS + ", " + cond + "), 1))";
 
-/** mutation classes, spelled the way the oncoprint's legend spells them */
+/** a portal class (lib/oql-match.ts PORTAL_TYPE_CLASS) as the plot names it; the rest (frameshift, nonsense, nonstart, nonstop) are Truncating */
+const PLOT_CLASS: Record<string, string> = { missense: "Missense", splice: "Splice", inframe: "Inframe" };
+/**
+ * A mutation's class as the portal's plots and oncoprint read it (cbioportal-frontend DataUtils.ts
+ * getOncoprintMutationType, its types from AccessorsForOqlFilter.ts getSimplifiedMutationType, the
+ * table lib/oql-match.ts PORTAL_TYPE_CLASS holds): a protein change "promoter" is Promoter; a type
+ * the portal calls missense, splice or inframe is that; frameshift, nonsense, nonstart, nonstop and
+ * fusion are Truncating; any other type is Other.
+ */
+export function oncoprintClassSql(mutationType: string, proteinChange: string): string {
+  const t = "lower(" + mutationType + ")";
+  const arms = PORTAL_TYPE_CLASS.map(([cls, types]) => " " + t + " IN (" + types.map(sq).join(", ") + "), " + sq(PLOT_CLASS[cls] || "Truncating") + ",");
+  return "multiIf(lower(" + proteinChange + ") = 'promoter', 'Promoter'," + arms.join("") + " " + t + " = 'fusion', 'Truncating', 'Other')";
+}
+
+/** mutation classes, spelled the way the oncoprint's legend spells them, as the oncoprint classes them (lib/oncoprint-assemble.ts) */
 const MUT_CLASS =
   "multiIf(lower(g.mutation_type) LIKE 'missense%', 'Missense'," +
   " lower(g.mutation_type) LIKE 'nonsense%' OR lower(g.mutation_type) LIKE 'frame_shift%' OR lower(g.mutation_type) LIKE 'nonstop%', 'Truncating'," +
   " lower(g.mutation_type) LIKE 'splice%', 'Splice'," +
   " lower(g.mutation_type) LIKE 'in_frame%', 'Inframe'," +
   " lower(g.mutation_type) LIKE '5''flank%' OR lower(g.mutation_type) LIKE 'promoter%', 'Promoter', 'Other')";
+/** the class a gene's colouring reads, by the portal's own rule (oncoprintClassSql) */
+const COLOUR_CLASS = oncoprintClassSql("g.mutation_type", "g.mutation_variant");
+
+/** what a gene-coloured point says when its case is not profiled for the gene's mutations (PlotsTabUtils.tsx notProfiledMutationsAppearance) */
+const GENE_NOT_PROFILED_MUT = "Not profiled for mutations";
+/**
+ * The classes' render priority, best first (PlotsTabUtils.tsx mutationRenderPriority). The portal's
+ * list opens with "promoter.driver" and holds "other.driver", but no key ever takes them: a
+ * promoter or other mutation is never keyed ".driver" (:2985-2989), so a putative-driver promoter
+ * mutation reads "Promoter (VUS)" there as here.
+ */
+const MUT_RENDER_PRIORITY = ["Splice.driver", "Truncating.driver", "Inframe.driver", "Missense.driver",
+  "Promoter", "Splice", "Truncating", "Inframe", "Missense", "Other"];
+
+/**
+ * A case's one mutation colour, as the portal's Plots tab picks it (PlotsTabUtils.tsx:2975-2996,
+ * PLT-STM-14): each mutation's class, with ".driver" when it is a putative driver and not Promoter
+ * or Other; the best of them by render priority. Labelled "Missense (Driver)" / "Missense (VUS)"
+ * when drivers are annotated, else "Missense"; "Not mutated" when it has none.
+ */
+function topMutationTypeSql(annotated: boolean): string {
+  const key = "concat((" + COLOUR_CLASS + ") AS gcls, if(" + (annotated ? "g.drv = 1" : "0") + " AND gcls NOT IN ('Promoter', 'Other'), '.driver', ''))";
+  const top = "(arrayElement(arraySort(k -> indexOf([" + MUT_RENDER_PRIORITY.map(sq).join(", ") + "], k), groupArrayIf(" + key + ", g.variant_type = 'mutation')), 1) AS gtop)";
+  const label = annotated
+    ? "if(endsWith(" + top + ", '.driver'), concat(replaceOne(gtop, '.driver', ''), ' (Driver)'), concat(gtop, ' (VUS)'))"
+    : top;
+  return "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated', " + label + ")";
+}
+
+/**
+ * A case's copy-number and structural-variant ring, as the portal's Plots tab draws it
+ * (PlotsTabUtils.tsx getCnaAndSvAppearance, :2963-2974, PLT-STM-15/16): any SV of the gene is
+ * "Structural Variant", over copy number; else the call of largest |value| in the study's discrete
+ * copy-number profiles ("Deep Deletion" … "Amplification"), "Diploid" when profiled with no call,
+ * and "Not profiled" when the case is not profiled for the gene's copy number. A patient takes its
+ * samples' strongest.
+ */
+function copyNumberSvSelect(gene: string, ctx: AxisCtx): string {
+  const { study, unit } = ctx, db = ctx.db || DB;
+  const sample = unit === "sample";
+  const g = String(gene).toUpperCase();
+  const idCol = strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study);
+  const sid = strip("sd.sample_unique_id", study);
+  const discrete = "SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') FROM " + db + ".genetic_profile gp\n" +
+    "       JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+    "       WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE'";
+  const prof = (type: "CNA") => "max(" + sid + " IN (SELECT profiled_id FROM (" + profiledCasesSql(g, type, { study, db, unit: "sample" }) + ")))";
+  const level = "multiIf(cv = -2, 'Deep Deletion', cv = -1, 'Shallow Deletion', cv = 1, 'Gain', cv = 2, 'Amplification', 'Diploid')";
+  // a copy-number level only where the case is profiled for copy number (invariant 7): the portal
+  // calls a case profiled for SVs alone "Diploid", a call nothing made. A patient's samples that
+  // disagree in sign at the same strength take the amplification, so the answer does not depend
+  // on row order.
+  return "SELECT id, multiIf(svs > 0, 'Structural Variant', pc = 0, 'Not profiled', " + level + ") AS v FROM (\n" +
+    "SELECT " + idCol + " AS id, argMax(cn.v, (abs(cn.v), cn.v)) AS cv, countIf(sv.sample_unique_id != '') AS svs,\n" +
+    "  " + prof("CNA") + " AS pc\n" +
+    "FROM " + db + ".sample_derived sd\n" +
+    "LEFT JOIN (SELECT sample_unique_id, argMax(" + finiteSql("alteration_value") + ", abs(" + finiteSql("alteration_value") + ")) AS v\n" +
+    "     FROM " + db + ".genetic_alteration_derived\n" +
+    "     WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol = " + sq(g) + " AND profile_type IN (" + discrete + ")\n" +
+    "       AND " + finiteSql("alteration_value") + " IS NOT NULL\n" +
+    "     GROUP BY sample_unique_id) cn ON cn.sample_unique_id = sd.sample_unique_id\n" +
+    "LEFT JOIN (SELECT DISTINCT sample_unique_id FROM " + db + ".genomic_event_derived\n" +
+    "     WHERE " + genomicStudySql(study) + " AND hugo_gene_symbol = " + sq(g) + " AND variant_type = 'structural_variant') sv ON sv.sample_unique_id = sd.sample_unique_id\n" +
+    "WHERE sd.cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(sid) + "\n" +
+    "GROUP BY id)";
+}
 
 // ---- the pair, and the four contracts -------------------------------------
 
@@ -1136,6 +1240,8 @@ export interface PlotData {
   /** what the colours mean: the fill category, the ring category, and the key to draw */
   colorLabel?: string;
   ringLabel?: string;
+  /** a gene's copy-number ring draws Diploid and Not profiled too (the portal's grey and black strokes), where another ring leaves absence unringed */
+  ringAbsent?: boolean;
   /** why the points carry no colour though the view asks for one */
   colourNote?: string;
   legend?: { label: string; color: string; ring?: boolean }[];

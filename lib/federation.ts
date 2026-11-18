@@ -26,8 +26,8 @@ import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
-import { axisKind, axisLabel, axisSelect, corrPValue, fitOf, logRuleOf, plotShape, tukey, validateAxis,
-  categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
+import { axisKind, axisLabel, axisSelect, axisCategoryColor, corrPValue, fitOf, logRuleOf, plotShape, tukey, validateAxis,
+  CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotNegativesSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
@@ -65,11 +65,11 @@ export function named(a: PlotAxis, names: ReadonlyMap<string, string>): PlotAxis
   return a.source === "clinical" && !a.label && names.has(a.attribute) ? { ...a, label: names.get(a.attribute)! } : a;
 }
 
-export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
+export function legendFor(values: string[], ring = false, axis?: PlotAxis): { label: string; color: string; ring?: boolean }[] {
   const counts = new Map<string, number>();
   for (const v of values) if (v) counts.set(v, (counts.get(v) || 0) + 1);
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, COLOR_CAP)
-    .map(([label], i) => ({ label, color: categoryColor(label, i), ...(ring ? { ring: true } : {}) }));
+    .map(([label], i) => ({ label, color: axisCategoryColor(axis, label, i), ...(ring ? { ring: true } : {}) }));
 }
 
 const num = (v: unknown): number | null => { if (v == null || v === "") return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
@@ -1982,7 +1982,7 @@ abstract class BaseResolver implements AggregateCapable {
     return done({ shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups,
       violin, violinBins: VIOLIN_BINS, overlay: "violin",
       ...(vx0 != null && vx1 != null ? { violinExtent: [vx0, vx1] as [number, number] } : {}),
-      ...(spec.colorBy ? { colorLabel: title(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) });
+      ...(spec.colorBy ? { colorLabel: title(spec.colorBy), legend: legendFor(violin.map((v) => v.c || ""), false, spec.colorBy) } : {}) });
   }
 
   // ---- a federated plot: one pass per site, pooled by lib/views/plot/run.ts -------
