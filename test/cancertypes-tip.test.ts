@@ -96,7 +96,7 @@ describe("cancertypesTip", () => {
   test("T6: a gene tab reads that tab's counts", async () => {
     const kras = grp("Colorectal Cancer", 982, 400, { mutation: 400 });
     const tip = cancertypesTip(
-      result([panel([crc], [{ gene: "KRAS", groups: [kras], categories: 1, minSamples: 0 }])]), 0, "KRAS", "Colorectal Cancer");
+      result([panel([crc], [{ gene: "KRAS", altered: 400, profiled: 982, groups: [kras], categories: 1, minSamples: 0 }])]), 0, "KRAS", "Colorectal Cancer");
     assert.deepEqual(tip, {
       header: "Summary for Colorectal Cancer",
       study: null,

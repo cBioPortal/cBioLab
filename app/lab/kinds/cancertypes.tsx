@@ -6,7 +6,7 @@ import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { OptionSelect } from "../../_ui/choice.tsx";
 import { SEG_TAB, SEG_TABS } from "../../_ui/toolbar.ts";
 import { Tabs, TabsList, TabsTrigger } from "../../_ui/tabs";
-import { cancertypesPanelSvg, categoryLabel } from "../../../lib/views/cancertypes/figure.ts";
+import { cancertypesPanelSvg, cancertypesUnaltered, cancertypesUnprofiled, categoryLabel } from "../../../lib/views/cancertypes/figure.ts";
 import { frame, palette } from "../../../lib/svg-kit";
 import { cancertypesTsv } from "../../../lib/views/cancertypes/tsv.ts";
 import { savePdf, savePng, standaloneSvg } from "../chart-files.ts";
@@ -18,6 +18,7 @@ import { CloudDownload } from "lucide-react";
 import { useState } from "react";
 import { DraftInput } from "./parts.tsx";
 import { Checkbox } from "../../_ui/checkbox";
+import { cn } from "../../../lib/cn.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../../_ui/tooltip.tsx";
 import { cancertypesTip } from "../../../lib/views/cancertypes/tip.ts";
 import { exploreHref } from "../../portal/query-editor.tsx";
@@ -49,12 +50,13 @@ function thresholdOf(text: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** Tabs over a body, the portal's gene / group selectors. */
-function Pills({ items, on, set }: { items: string[]; on: string; set: (x: string) => void }) {
+/** Tabs over a body, the portal's gene / group selectors; a `muted` one's label is grey, as the portal's tab for a gene with no alterations */
+function Pills({ items, on, set, muted, unprofiled }: { items: string[]; on: string; set: (x: string) => void; muted?: (x: string) => boolean; unprofiled?: (x: string) => boolean }) {
   return (
     <Tabs value={on} onValueChange={set} className="my-2">
       <TabsList className={SEG_TABS}>
-        {items.map((x) => <TabsTrigger key={x} value={x} className={SEG_TAB}>{x}</TabsTrigger>)}
+        {items.map((x) => <TabsTrigger key={x} value={x} className={cn(SEG_TAB, muted?.(x) && "opacity-60")}
+          {...(muted?.(x) ? { "data-tip": (unprofiled?.(x) ? "not profiled for " : "no alterations in ") + x } : {})}>{x}</TabsTrigger>)}
       </TabsList>
     </Tabs>
   );
@@ -119,7 +121,8 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
   };
   return (
     <div className="pb">
-      {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} />}
+      {r.genes.length > 1 && <Pills items={[ALL, ...r.genes]} on={gene} set={setGene} muted={(x) => x !== ALL && cancertypesUnaltered(r, x)}
+        unprofiled={(x) => cancertypesUnprofiled(r, x)} />}
       {r.panels.map((_, i) => <div key={i}>
         <Downloads r={r} panel={i} gene={gene === ALL ? null : gene} />
         <div onPointerMove={onMove(i)} onPointerDown={onMove(i)} onPointerLeave={(e) => hover.move(null, e.clientX, e.clientY)}>
