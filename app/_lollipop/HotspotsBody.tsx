@@ -21,7 +21,7 @@ import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
 import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
 
-/** The transcript and its ids, and the somatic mutation frequency — the portal's GeneSummary. */
+/** The transcript and its ids, and the somatic (and, when any, germline) mutation frequency — the portal's GeneSummary. */
 function GeneSummary({ g, grch38 }: { g: HotspotGene; grch38: boolean }) {
   const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
   return (
@@ -32,6 +32,12 @@ function GeneSummary({ g, grch38 }: { g: HotspotGene; grch38: boolean }) {
         <div className="lp-freq" data-tip={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
           <span>Somatic Mutation Frequency</span> <b>{freq}</b>
         </div>
+        {/* the portal adds the germline rate only when some sample has a germline mutation (MutationRateSummary), over the germline-consented samples where a study lists them */}
+        {(g.germlineSamples ?? 0) > 0 && (g.germlineCohortSamples ?? 0) > 0 && (
+          <div className="lp-freq" data-tip={(g.germlineSamples ?? 0).toLocaleString() + " of " + (g.germlineCohortSamples ?? 0).toLocaleString() + " samples carry a germline mutation in " + g.gene}>
+            <span>Germline Mutation Frequency</span> <b>{fmtShare((g.germlineSamples ?? 0) / (g.germlineCohortSamples ?? 1))}</b>
+          </div>
+        )}
       </div>}
     </>
   );

@@ -74,6 +74,12 @@ export interface HotspotGene {
   /** samples with a somatic mutation in the gene, and samples in the cohort */
   somaticSamples: number; cohortSamples: number;
   /**
+   * samples with a germline mutation in the gene (status matching /germline/i), and the rate's denominator: the
+   * cohort's germline-consented samples where a study lists them, else every one. The portal shows the rate only
+   * when above 0. Absent when a site on older code did not report them.
+   */
+  germlineSamples?: number; germlineCohortSamples?: number;
+  /**
    * Mutation rows by protein impact type, putative driver vs VUS — the portal's badge tally
    * beside the lollipop. Every row counts, drawn or not; `other` covers silent and unknown types.
    */

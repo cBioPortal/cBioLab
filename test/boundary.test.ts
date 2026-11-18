@@ -381,6 +381,7 @@ describe("federation SQL returns aggregates, never identifiers", () => {
     "lollipopTotalsSql": () => lollipopTotalsSql(cohortSql, ["KRAS"], "x", "db"),
     "cohortSampleCountSql": () => cohortSampleCountSql(cohortSql),
     "cohortSizesSql": () => cohortSizesSql(cohortSql),
+    "germlineConsentedCountSql": () => federation.germlineConsentedCountSql(cohortSql, "x", "db"),
     "profileMomentsSql": () => profileMomentsSql(cohortSql, ["ERBB2"], "rna_seq_v2_mrna_median_Zscores", "x", "db"),
     "timelineSpanSql": () => timelineSpanSql(cohortSql, "x", "db"),
     // A course aligned on an event, and one aligned on the study's own day 0 —

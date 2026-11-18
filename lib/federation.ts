@@ -158,7 +158,8 @@ export interface VariantReport { variants: VariantCount[]; totals: GeneMutationT
 export interface LollipopChange { gene: string; pos: number | null; change: string; n: number; rows: number; driver: boolean; impact?: string }
 /** Raw mutation rows of one type at one codon — what a lollipop's colour is decided from. */
 export interface LollipopType { gene: string; pos: number | null; mtype: string; driver: boolean; rows: number }
-export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number }
+/** `germlineSamples`: samples with a germline mutation of the gene (status matching /germline/i), the portal's germline rate's numerator */
+export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number; germlineSamples?: number }
 /**
  * A site's per-codon lollipop counts. `annotated` is false when no OncoKB pin was available, in
  * which case every change reads as a driver — cBioPortal's own rule when driver annotation is off.
@@ -166,6 +167,8 @@ export interface LollipopTotal { gene: string; patients: number; pairs: number; 
 export interface LollipopReport {
   changes: LollipopChange[]; types: LollipopType[]; totals: LollipopTotal[];
   cohortSamples: number; minCount: number; annotated: boolean;
+  /** the germline rate's denominator: the cohort's samples on the study's germline-consented list, or every one with no list (absent from a site on older code) */
+  germlineCohortSamples?: number;
   /** the page's driver settings the split followed, when the caller gave them (lollipopCounts' `drivers`) */
   drivers?: DriverSettings;
 }
@@ -737,7 +740,8 @@ export function lollipopTotalsSql(cohortSql: string, genes: string[], study: str
   const pin = drivers && pins ? pins.pin : fusions?.pin ?? null, hotspotPins = drivers && pins ? pins.hotspotPins : null;
   return aggregateSql(lollipopCte(cohortSql, genes, study, 1, pin, db, hotspotPins, filters, fusions?.lines, drivers) +
     "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
-    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples" +
+    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,\n" +
+    "       uniqExactIf(sid, (rgene = gene OR sv = 0) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND " + germlineConsentedCond(db, study, "sid") + ") AS germline_samples" +
     (drivers ? ",\n       " + annotatingSql(drivers, offeredSources(drivers, pin, hotspotPins).sure, db, study) + " AS annotating" : "") + "\n" +
     "FROM m GROUP BY gene");
 }
@@ -749,6 +753,34 @@ export function cohortSizesSql(cohortSql: string): AggregateSql {
 /** Samples in the cohort — the somatic mutation frequency's denominator. */
 export function cohortSampleCountSql(cohortSql: string): AggregateSql {
   return aggregateSql("WITH cohort AS (" + cohortSql + ")\nSELECT uniqExact(sid) AS n FROM cohort");
+}
+
+/**
+ * A sample (`sid`, its bare id) may count toward the germline rate: it is on the study's germline-consented
+ * list (`<study>_germline`), or the study has none — the portal counts only the consented samples' germline
+ * mutations (MutationUtils germlineMutationRate, over germlineConsentedSamples).
+ */
+function germlineConsentedCond(db: string, study: string, sid: string): string {
+  const list = sq(study + "_germline");
+  return "((SELECT count() FROM " + db + ".sample_list WHERE stable_id = " + list + ") = 0 OR " + sid + " IN (SELECT smp.stable_id FROM " + db + ".sample_list sl " +
+    "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id JOIN " + db + ".sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = " + list + "))";
+}
+
+/**
+ * The germline rate's denominator: the cohort's samples on the study's germline-consented list
+ * (`<study>_germline`) when the study has one (`lists` > 0), else none is said and every cohort sample
+ * counts — the portal's germlineConsentedSamples, which only a listed study has (ResultsViewPageStore
+ * 3995-4015).
+ */
+export function germlineConsentedCountSql(cohortSql: string, study: string, db: string = DB): AggregateSql {
+  const list = sq(study + "_germline");
+  return aggregateSql("WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT (SELECT count() FROM " + db + ".sample_list WHERE stable_id = " + list + ") AS lists,\n" +
+    "       uniqExactIf(smp.stable_id, " + inCohortSamples("smp.stable_id") + ") AS n\n" +
+    "FROM " + db + ".sample_list sl\n" +
+    "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
+    "JOIN " + db + ".sample smp ON smp.internal_id = sll.sample_id\n" +
+    "WHERE sl.stable_id = " + list);
 }
 
 /** Patients carrying ANY mutation in each gene in one of the cohort's samples — the lollipop's denominator. */
@@ -1734,18 +1766,21 @@ abstract class BaseResolver implements AggregateCapable {
     }
     const rowKeys = rows
       ? { gene: rows.gene, keys: mutationRowKeysSql({ cohort: "", study: this.study, cohortSql: cohort }, db, rows.gene, pin, hotspotPins, oql, rows) } : undefined;
-    const [c, t, tot, cs] = await Promise.all([
+    const [c, t, tot, cs, gc] = await Promise.all([
       this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),
       this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),
       this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters, fusionLines ? { lines: fusionLines, pin } : undefined, d, { pin, hotspotPins }), conn),
-      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
+      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn),
+      this.runLogged<ChRow>("lollipop:germline-consented", germlineConsentedCountSql(cohort, this.study, db), conn)
     ]);
     return {
+      germlineCohortSamples: Number(gc.data[0]?.lists) > 0 ? Number(gc.data[0]?.n || 0) : Number(cs.data[0]?.n || 0),
       minCount, annotated: src ? src.sure || tot.data.some((x) => Number(x.annotating) === 1) : !!pin, cohortSamples: Number(cs.data[0]?.n || 0), ...echo,
       changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1,
         ...(x.impact ? { impact: String(x.impact) } : {}) })),
       types: t.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), mtype: String(x.mtype), driver: Number(x.driver) === 1, rows: Number(x.rows) })),
-      totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples) }))
+      totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples),
+        ...(x.germline_samples != null ? { germlineSamples: Number(x.germline_samples) } : {}) }))
     };
   }
 

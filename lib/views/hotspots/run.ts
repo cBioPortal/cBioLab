@@ -58,6 +58,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   const withheld = hotspots.reduce((n, h) => n + h.withheld, 0);
   const observed = hotspots.filter((h) => h.lengthSource === "observed").map((h) => h.gene);
   const annotated = reports.every((r) => r.annotated);
+  const noGermline = studies.filter((_, i) => reports[i].germlineCohortSamples === undefined);
   // the figure and the text apply the selection (lib/view-svg.ts lollipopSummaryText says what it hides);
   // `hotspots` stays whole, so the app re-filters it without a re-run
   const hr: ViewResult = { kind: "hotspots", cohorts: [cn], hotspots, studies, ...(annotated ? {} : { annotated: false }), ...(grch38 ? { grch38 } : {}), ...(hide.length ? { hide } : {}), ...(codons ? { codons } : {}), ...(yMax ? { yMax } : {}),
@@ -71,6 +72,7 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
         : hv.drivers ? " (driver = any switched-on source of the page's driver settings: " + driverSourceText(resolveDrivers(hv.drivers), "OncoKB, pinned", "a Cancer Hotspot of its kind in the stored Genome Nexus annotation") + ")."
         : " (driver = OncoKB oncogenic, pinned, or a Cancer Hotspot of its kind in the stored Genome Nexus annotation; the portal also counts custom annotations).") +
       " VUS and germline mutations are included, as they are by default on the portal." +
+      (noGermline.length ? " " + noGermline.join(", ") + (noGermline.length === 1 ? " reports" : " report") + " no germline counts (older code), so no Germline Mutation Frequency is shown." : "") +
       (narrowing ? " " + narrowing.gene + "'s stems and badges count only the mutations its table keeps, " + describeQuery(narrowing, MUTATION_COLUMNS) +
           ", as the portal's lollipop follows its table's search and filters; its Somatic Mutation Frequency does not." +
           (unnarrowed.length ? " " + unnarrowed.join(", ") + (unnarrowed.length === 1 ? " is" : " are") + " not patient-level here, so " +

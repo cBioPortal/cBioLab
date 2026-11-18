@@ -92,6 +92,25 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, c.1 AS oncogenic
 SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(multiIf(lowerUTF8(mtype) IN ('missense_mutation', 'missense', 'missense_variant'), 'missense', lowerUTF8(mtype) IN ('frame_shift_ins', 'frame_shift_del', 'frameshift', 'frameshift_deletion', 'frameshift_insertion', 'de_novo_start_outofframe', 'frameshift_variant', 'nonsense_mutation', 'nonsense', 'stopgain_snv', 'stop_gained', 'translation_start_site', 'initiator_codon_variant', 'start_codon_snp', 'start_codon_del', 'nonstop_mutation', 'stop_lost', 'truncating', 'feature_truncation'), 'truncating', lowerUTF8(mtype) IN ('inframe_del', 'inframe_deletion', 'in_frame_del', 'in_frame_deletion', 'inframe_ins', 'inframe_insertion', 'in_frame_ins', 'in_frame_insertion', 'indel', 'nonframeshift_deletion', 'nonframeshift', 'nonframeshift insertion', 'nonframeshift_insertion', 'inframe'), 'inframe', lowerUTF8(mtype) IN ('splice_site', 'splice', 'splice site', 'splicing', 'splice_site_snp', 'splice_site_del', 'splice_site_indel', 'splice_region_variant', 'splice_region'), 'splice', lowerUTF8(mtype) IN ('fusion'), 'fusion', 'other'))[1] AS impact
 FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= 3
 
+-- view 0 hotspots: lollipop:germline-consented · msk_chord_2024
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))))))
+SELECT (SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'msk_chord_2024_germline') AS lists,
+       uniqExactIf(smp.stable_id, smp.stable_id IN (SELECT sid FROM cohort)) AS n
+FROM snapshot_db.sample_list sl
+JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id
+JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id
+WHERE sl.stable_id = 'msk_chord_2024_germline'
+
 -- view 0 hotspots: lollipop:samples · msk_chord_2024
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'msk_chord_2024'
@@ -145,7 +164,8 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
            FROM v),
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,
-       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples
+       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,
+       uniqExactIf(sid, (rgene = gene OR sv = 0) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND ((SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'msk_chord_2024_germline') = 0 OR sid IN (SELECT smp.stable_id FROM snapshot_db.sample_list sl JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = 'msk_chord_2024_germline'))) AS germline_samples
 FROM m GROUP BY gene
 
 -- view 0 hotspots: lollipop:types · msk_chord_2024
