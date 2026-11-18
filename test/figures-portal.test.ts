@@ -26,7 +26,7 @@ describe("cancertypes", () => {
     const g = (k: string, label: string, n: number, m: number, sv: number) => ({ ...grp(k, label, n, m), profiledFor: { mutation: n, cna: 0, sv } });
     const two: ViewResult = { ...v, cancertypes: { ...v.cancertypes!, genes: ["KRAS", "NRAS"], panels: [{ ...v.cancertypes!.panels[0],
       profiledTypes: ["sv", "mutation"], groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], categories: 2, filtered: undefined,
-      perGene: [{ gene: "KRAS", groups: [g("a", "A", 100, 40, 100)], categories: 1, minSamples: 10 }, { gene: "NRAS", groups: [g("b", "B", 100, 7, 0)], categories: 1, minSamples: 10 }] }] } };
+      perGene: [{ gene: "KRAS", altered: 40, profiled: 100, groups: [g("a", "A", 100, 40, 100)], categories: 1, minSamples: 10 }, { gene: "NRAS", altered: 7, profiled: 100, groups: [g("b", "B", 100, 7, 0)], categories: 1, minSamples: 10 }] }] } };
     const all = cancertypesPanelSvg(two.cancertypes!, 0);
     assert.ok(all.body.includes("Structural variant data") && !all.body.includes("CNA data"));
     assert.equal((all.body.match(/>\+</g) || []).length, 3, "mutation: A and B; structural variant: A");

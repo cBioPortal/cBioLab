@@ -178,7 +178,7 @@ describe("the strip in the figure", () => {
       show: "frequency", unit: "sample",
       panels: [{ cohort: "all", samples: 5, profiled: 5, altered: 2, groups: [], categories: 1, minSamples: 10, filtered: true,
         profiledTypes: ["mutation", "cna", "sv"],
-        perGene: [{ gene: "EGFR", groups: [egfr], categories: 1, minSamples: 10 }] }] };
+        perGene: [{ gene: "EGFR", altered: 2, profiled: 5, groups: [egfr], categories: 1, minSamples: 10 }] }] };
     const svg = cancertypesPanelSvg(r, 0, { gene: "EGFR" }).body;
     for (const l of ["Structural variant data", "Mutation data", "CNA data"]) assert.ok(svg.includes(l), l);
     assert.equal((svg.match(/>\+</g) || []).length, 2, "mutation and CNA");

@@ -7,6 +7,8 @@ import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
 import { evolutionSvg, lineCells, cellText, portalCellTip, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { heatmapOrder } from "../lib/views/evolution/order.ts";
+import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
 import { pageSql } from "../lib/table-query.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
@@ -22,7 +24,6 @@ import { kindText } from "./support/kind-text.ts";
 import { groupOptions, sampleGroups, patientPatch } from "../lib/views/evolution/groups.ts";
 import { clinicalColor } from "../lib/oncoprint-style.ts";
 import type { EvolutionSample } from "../lib/views/evolution/types.ts";
-import { FS } from "../lib/svg-kit.ts";
 
 type Row = Record<string, unknown>;
 type Tables = (table: string, src: RowSource) => Row[];
@@ -215,8 +216,8 @@ describe("evolution: the patient drawn", () => {
     const w = await run({ chart: "heatmap", logScale: true, dataRange: true }, one(study({ muts: [MUTS[2]] })));
     assert.deepEqual(evo(w).drawn, []);
     assert.equal(evo(w).noVaf, 1);
-    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false, groupBy: null });
-    assert.match(w.caveat!, /The heatmap colours each sample's VAF/);
+    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false, transpose: false, cluster: true, mutationLabels: true, groupBy: null });
+    assert.match(w.caveat!, /The heatmap has .*; it colours each sample's VAF/);
   });
 
   test("past the figure's limit nothing is drawn and the limit is named; the table is still listed", async () => {
@@ -820,6 +821,202 @@ describe("evolution: Group by, by the rule table (R1–R8)", () => {
     const clean = Object.fromEntries(Object.entries(merged).filter(([, v]) => v !== undefined));
     assert.ok(!("groupBy" in clean), JSON.stringify(clean));
     assert.deepEqual(clean.patient, { study: "s1", id: "P2" });
+  });
+});
+
+describe("evolution: the heatmap's drawing order", () => {
+  const mut = (gene: string, proteinChange: string, vafs: (number | null)[]): EvolutionMutation => ({
+    key: gene + "|" + proteinChange, gene, proteinChange, mutationType: "Missense_Mutation",
+    cells: vafs.map((v) => v == null ? { status: "np" as const, vaf: null, alt: null, ref: null } : { status: v === 0 ? "absent" as const : "called" as const, vaf: v, alt: null, ref: null }),
+  });
+  const A = mut("TP53", "R273H", [0.5, 0.1, 0.9, 0.3]);
+  const B = mut("KRAS", "G12D", [0.05, 0.95, 0.05, 0.95]);
+  const C = mut("EGFR", "L858R", [0.5, 0.1, 0.9, 0.3]);
+  const perm = (a: number[], n: number) => assert.deepEqual([...a].sort((x, y) => x - y), Array.from({ length: n }, (_, i) => i));
+  const adjacent = (a: number[], i: number, j: number) => assert.equal(Math.abs(a.indexOf(i) - a.indexOf(j)), 1, a.join());
+  const combos = [false, true].flatMap((transpose) => [false, true].map((cluster) => ({ transpose, cluster })));
+
+  test("HM9 (R1; replaces the earlier table-order expectation for transpose false): without clustering the mutations sort by \"GENE pChange\" in both orientations, the samples stay in order", () => {
+    const drawn = [A, B, C];
+    for (const transpose of [false, true]) {
+      assert.deepEqual(heatmapOrder(drawn, 4, { transpose, cluster: false }), { mutations: [2, 1, 0], samples: [0, 1, 2, 3] }, "transpose " + transpose);
+      // the same gene: the protein change decides, by localeCompare
+      const d = [mut("TP53", "R273H", [0.1]), mut("TP53", "R175H", [0.2]), mut("BRAF", "V600E", [0.3]), mut("tp53", "A1B", [0.4])];
+      const names = d.map((m) => m.gene + " " + m.proteinChange);
+      const want = names.map((_, i) => i).sort((a, b) => names[a].localeCompare(names[b]));
+      const r = heatmapOrder(d, 1, { transpose, cluster: false });
+      assert.deepEqual(r.mutations, want, "transpose " + transpose);
+      assert.deepEqual(r.mutations.map((i) => names[i]), [...names].sort((a, b) => a.localeCompare(b)));
+      assert.deepEqual(r.samples, [0]);
+      assert.deepEqual(heatmapOrder(drawn, 6, { transpose, cluster: false }).samples, [0, 1, 2, 3, 4, 5]);
+    }
+  });
+
+  test("clustering puts identical mutations, and identical samples, side by side in either orientation", () => {
+    for (const transpose of [false, true]) {
+      const r = heatmapOrder([A, B, C], 4, { transpose, cluster: true });
+      adjacent(r.mutations, 0, 2);
+    }
+    const x = mut("G1", "a", [0.2, 0.8, 0.4]);
+    const y = mut("G2", "b", [0.9, 0.1, 0.9]);
+    const z = mut("G3", "c", [0.2, 0.8, 0.4]);
+    for (const transpose of [false, true]) {
+      const r = heatmapOrder([x, y, z], 3, { transpose, cluster: true });
+      adjacent(r.samples, 0, 2);
+    }
+  });
+
+  test("every option combination yields permutations, with not-profiled and absent cells too", () => {
+    const drawn = [A, B, C, mut("NP", "x", [null, null, null, null]), mut("AB", "y", [0, null, 0, 0.2])];
+    for (const o of combos) {
+      for (const d of [[A, B, C], drawn, [A]]) {
+        const r = heatmapOrder(d, 4, o);
+        perm(r.mutations, d.length);
+        perm(r.samples, 4);
+      }
+    }
+  });
+});
+
+describe("evolution: the heatmap's display settings", () => {
+  test("transpose, cluster and mutationLabels must be true or false", async () => {
+    for (const [k, v] of [["transpose", "yes"], ["cluster", 1], ["mutationLabels", "no"]] as const) {
+      const e = (await run({ [k]: v } as never, one())).error!;
+      assert.ok(e.includes(k) && e.includes("true or false"), e);
+    }
+  });
+
+  test("the display echoes them, defaulting to transpose false, cluster true, mutationLabels true", async () => {
+    const d = evo(await run({ chart: "heatmap" }, one())).display;
+    assert.deepEqual([d.transpose, d.cluster, d.mutationLabels], [false, true, true]);
+    const off = evo(await run({ chart: "heatmap", cluster: false, transpose: true, mutationLabels: false }, one())).display;
+    assert.deepEqual([off.transpose, off.cluster, off.mutationLabels], [true, false, false]);
+  });
+});
+
+describe("evolution: the heatmap's order, layout and labels (HM10–HM17)", () => {
+  /** a mutation row for P1's three samples, every cell called */
+  const mrow = (gene: string, proteinChange: string, vafs: number[] = [0.5, 0.25, 0.1]): Row => ({
+    cohort: "A", study: "s1", patient: "P1", sid: "T1", gene, proteinChange, mutationType: "Missense_Mutation", samples: "T1", vafs: "", maxVaf: 0.5, called: 3,
+    cells: vafs.map((f, j) => cell(j + 1, "T" + (j + 1), "called", f, Math.round(f * 100), 100 - Math.round(f * 100))),
+  });
+  const manyRows = (n: number) => Array.from({ length: n }, (_, i) => mrow("G" + String(i).padStart(3, "0"), "X" + i, [((i * 37) % 100) / 100, ((i * 53) % 100) / 100, ((i * 71) % 100) / 100]));
+  const heat = async (view: Partial<EvolutionView>, muts?: Row[]) => {
+    const v = await run({ chart: "heatmap", ...view }, one(muts ? study({ muts }) : study()));
+    assert.equal(v.error, undefined, String(v.error));
+    return v;
+  };
+  const svgOf = (v: ViewResult, width = 760) => evolutionSvg(v as never, { width, theme: "light" })!;
+  const svgWidth = (svg: string) => Number(/viewBox="0 0 ([\d.]+) /.exec(svg)![1]);
+  /** the default layout's columns, left to right: the mutation each draws and its first cell rect */
+  const columns = (svg: string) => svg.split('<g class="evo-row"').slice(1).map((chunk) => {
+    const m = /<g data-s="\d+"><title>([^<]*?) in [^<]*<\/title><rect x="([^"]+)" y="[^"]+" width="([^"]+)"/.exec(chunk)!;
+    return { name: m[1], x: Number(m[2]), w: Number(m[3]) };
+  });
+  /** the rotated mutation labels, in drawing order */
+  const rotated = (svg: string) => [...svg.matchAll(/<text x="([^"]+)" y="[^"]+"[^>]*transform="rotate\(90 [^"]*"[^>]*>(?:<title>([^<]*)<\/title>)?([^<]*)<\/text>/g)]
+    .map((m) => ({ x: Number(m[1]), title: m[2] ?? null, shown: m[3] }));
+  const unesc = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
+  const ariaLabel = (svg: string) => unesc(/aria-label="([^"]*)"/.exec(svg)![1]);
+  const SORTED = ["EGFR L858R", "KRAS G12D", "TP53 R273H"];
+  const fixture = [mrow("TP53", "R273H"), mrow("KRAS", "G12D", [0.9, 0.05, 0.9]), mrow("EGFR", "L858R")];
+
+  test("HM10 (R1): unclustered, the SVG draws the mutations by name in both orientations", async () => {
+    const v = await heat({ cluster: false }, fixture);
+    assert.deepEqual(columns(svgOf(v)).map((c) => c.name), SORTED);
+    const t = svgOf(await heat({ cluster: false, transpose: true }, fixture));
+    const rows = t.split('<g class="evo-row"').slice(1).map((ch) => /<title>([^<]*?) in /.exec(ch)![1]);
+    assert.deepEqual(rows, SORTED);
+  });
+
+  test("HM11 (R2): the result carries heatmapOrder only for the heatmap, equal to heatmapOrder(drawn, samples, display)", async () => {
+    for (const transpose of [false, true]) for (const cluster of [false, true]) {
+      const e = evo(await heat({ transpose, cluster }, fixture));
+      assert.ok(e.heatmapOrder, "transpose " + transpose + " cluster " + cluster);
+      assert.deepEqual(e.heatmapOrder, heatmapOrder(e.drawn!, e.patient!.samples.length, e.display));
+    }
+    assert.equal(evo(await run({}, one(study({ muts: fixture })))).heatmapOrder, undefined);
+    assert.equal(evo(await run({ chart: "line" }, one(study({ muts: fixture })))).heatmapOrder, undefined);
+  });
+
+  test("HM12 (R2): the SVG draws in the result's heatmapOrder, a supplied order included", async () => {
+    const v = await heat({ cluster: false }, fixture);
+    const e = evo(v);
+    const names = e.drawn!.map((m) => m.gene + " " + m.proteinChange);
+    assert.deepEqual(columns(svgOf(v)).map((c) => c.name), e.heatmapOrder!.mutations.map((i) => names[i]));
+    const reversed = { ...v, evolution: { ...e, heatmapOrder: { mutations: [...e.heatmapOrder!.mutations].reverse(), samples: e.heatmapOrder!.samples } } } as ViewResult;
+    const cols = columns(svgOf(reversed)).map((c) => c.name);
+    assert.deepEqual(cols, [...SORTED].reverse());
+    assert.notEqual(cols[0], columns(svgOf(v))[0].name, "a reversed order changes which mutation comes first");
+  });
+
+  test("HM13 (R3): the default layout keeps every column inside the SVG, widening past the requested width when it must", async () => {
+    const v = await heat({}, manyRows(300));
+    const svg = svgOf(v, 760);
+    const W = svgWidth(svg);
+    assert.ok(W > 760, "width " + W);
+    const cols = columns(svg);
+    assert.equal(cols.length, 300);
+    const last = cols[cols.length - 1];
+    assert.ok(last.x + last.w <= W, "last column ends at " + (last.x + last.w) + ", svg width " + W);
+    for (const c of cols) assert.ok(c.x >= 0 && c.x + c.w <= W, c.name);
+    assert.equal(svgWidth(svgOf(await heat({}, fixture), 760)), 760, "few mutations keep the requested width");
+  });
+
+  test("HM14 (R4): a column is at least a label's height with labels on, 6 px with them off", async () => {
+    for (const rows of [manyRows(300), fixture]) {
+      for (const cols of [columns(svgOf(await heat({}, rows))), columns(svgOf(await heat({ cluster: false }, rows)))])
+        for (const c of cols) assert.ok(c.w + 1 >= FS.small + 2, "labels on: column " + (c.w + 1));
+      for (const c of columns(svgOf(await heat({ mutationLabels: false }, rows)))) assert.ok(c.w + 1 >= 6, "labels off: column " + (c.w + 1));
+    }
+  });
+
+  test("HM15 (R5): each rotated label's baseline sits FS.small*0.35 left of its column's centre, inside the column", async () => {
+    for (const rows of [fixture, manyRows(300)]) {
+      const svg = svgOf(await heat({}, rows));
+      const cols = columns(svg), labels = rotated(svg);
+      assert.equal(labels.length, cols.length);
+      cols.forEach((c, k) => {
+        const colW = c.w + 1, centre = c.x + colW / 2, x = labels[k].x;
+        assert.ok(Math.abs(x - (centre - FS.small * 0.35)) <= 0.11, `column ${k}: label x ${x}, centre ${centre}`);
+        assert.ok(x >= c.x && x < centre, `column ${k}: label x ${x} outside [${c.x}, ${centre})`);
+        assert.equal(unesc(labels[k].title ?? labels[k].shown), c.name, "the label names its column's mutation");
+      });
+    }
+    assert.equal(rotated(svgOf(await heat({ mutationLabels: false }, fixture))).length, 0);
+  });
+
+  test("HM16 (R6): a name wider than ~134 px is ellipsized with its full name in a <title>; no label's text is wider than 134 px", async () => {
+    const long = "p.Lys123_Ala456delinsGlnSerThrTrpTyrValProGluAspArg";
+    const name = "ABCDEFGHIJ " + long;
+    assert.ok(textWidth(name, FS.small) > 134);
+    const svg = svgOf(await heat({}, [...fixture, mrow("ABCDEFGHIJ", long)]));
+    const labels = rotated(svg);
+    const cut = labels.find((l) => l.title != null);
+    assert.ok(cut, "the long name's label carries a <title>");
+    assert.equal(unesc(cut!.title!), name);
+    assert.match(cut!.shown, /…$/);
+    assert.ok(name.startsWith(unesc(cut!.shown).slice(0, -1)));
+    for (const l of labels) assert.ok(textWidth(unesc(l.shown), FS.small) <= 134, l.shown + " is " + textWidth(unesc(l.shown), FS.small));
+    for (const l of labels.filter((x) => x.title == null)) assert.ok(SORTED.includes(unesc(l.shown)), "a short name is drawn whole");
+  });
+
+  test("HM17 (R7): the SVG's title and the caveat name the orientation and the order", async () => {
+    const cases = [
+      { view: {}, title: "heatmap, a row per sample, clustered", orient: "a row per sample and a column per mutation", clustered: true },
+      { view: { transpose: true }, title: "heatmap, a row per mutation, clustered", orient: "a row per mutation and a column per sample", clustered: true },
+      { view: { cluster: false }, title: "heatmap, a row per sample", orient: "a row per sample and a column per mutation", clustered: false },
+      { view: { transpose: true, cluster: false }, title: "heatmap, a row per mutation", orient: "a row per mutation and a column per sample", clustered: false },
+    ];
+    for (const c of cases) {
+      const v = await heat(c.view, fixture);
+      const t = ariaLabel(svgOf(v));
+      assert.ok(t.includes(c.title), JSON.stringify(c.view) + ": " + t);
+      if (!c.clustered) assert.doesNotMatch(t, /clustered/, t);
+      assert.ok(v.caveat!.includes(c.orient), JSON.stringify(c.view));
+      if (c.clustered) assert.match(v.caveat!, /clustered/);
+      else { assert.match(v.caveat!, /the mutations by name/); assert.doesNotMatch(v.caveat!, /clustered/); }
+    }
   });
 });
 

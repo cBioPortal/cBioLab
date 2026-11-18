@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "../_ui/radio-group";
 import { Settings } from "lucide-react";
 import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
+import { MutationTypeCell } from "./mutation-cells.tsx";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult, AlleleReads } from "../../lib/views/alterations/types";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
@@ -108,7 +109,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
               <span className="mono">{m.id}</span>
             </span>))}
-          <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not. A gene's rows sit together, shaded alike, in sample order.</span>
+          {marks.size > 1 && <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not. A gene's rows sit together, shaded alike, in sample order.</span>}
         </div>
       ) : <p className="meta">No patient to list: the cohort's patient list is empty.</p>}
       {p && TABLES.map(({ key, name }) => {
@@ -144,6 +145,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               cell={(id, x, row) => id === "samples" ? sampleCell(x)
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
+                : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "status" && key === "sv" ? <SvStatus value={String(x || "")} />
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>

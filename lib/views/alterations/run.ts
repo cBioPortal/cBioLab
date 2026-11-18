@@ -7,9 +7,10 @@ import type { TablePart } from "../../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../../table-query.ts";
 import { PATIENT_ID } from "../../patient-timeline.ts";
 import { sampleMarks } from "../../timeline-tracks.ts";
+import { mutationTypeLabel } from "../../mutation-type.ts";
 import {
-  ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_DEFAULT_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
-  alterationSource, alterationPatientRowSource, patientProfiledSource, patientSamplesSource, type AlterationPart, type AlterationTable,
+  ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
+  alterationDefaults, alterationSource, alterationPatientRowSource, patientProfiledSource, patientSamplesSource, type AlterationPart, type AlterationTable,
 } from "../../patient-alterations.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
@@ -26,6 +27,8 @@ function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean })
     return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
   }
   const x = r[c.id];
+  // the portal's label, which the column searches, filters and sorts by; the stored type rides in the row's detail
+  if (c.id === "mutationType") return mutationTypeLabel(x == null ? "" : String(x));
   if (!c.numeric) return x == null ? "" : String(x);
   if (x == null || x === "") return null;
   const n = Number(x);
@@ -38,11 +41,16 @@ function readsOf(x: unknown): AlleleReads[] | undefined {
   return x.map((t) => ({ sample: String(t[0]), alt: Number(t[1]), ref: Number(t[2]) }));
 }
 
-/** A page of rows as the result carries them, aligned with `cols`; a mutation row's per-sample reads in its `detail`. */
+/**
+ * A page of rows as the result carries them, aligned with `cols`; a mutation row's detail holds its
+ * per-sample reads and its stored type (the cell shows the portal's label).
+ */
 const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map((x) => {
   const reads = readsOf(x.reads);
+  const typed = cols.some((c) => c.id === "mutationType");
+  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}) };
   return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
-    values: cols.map((c) => cellOf(x, c)), ...(reads ? { detail: { reads } } : {}) };
+    values: cols.map((c) => cellOf(x, c)), ...(Object.keys(detail).length ? { detail } : {}) };
 });
 
 /** The table's page size from its spec: 1 to TABLE_ROWS_MAX, 25 when unset; NaN when out of range. */
@@ -147,7 +155,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     if (inView < 2) return { mutations: false, cna: false };
     const part = { cohort: vNames[0], study: pt.study, cohortSql: scope === "cohort" ? res.cohortSql(ctx.doc.cohorts[vNames[0]]) : "" };
     const count = (t: "mutations" | "cna") => (res as unknown as PatientLevelCapable).rowsCounts("alterations:mixed-" + t, (db) => alterationSource(t, part, pt.id, db, null, order, scope, { genes: "any", inAll: true }),
-      { filters: { inAll: { max: 0 } } }, ALTERATION_DEFAULT_COLUMNS[t]).then((c) => c.some((x) => x.n > 0));
+      { filters: { inAll: { max: 0 } } }, alterationDefaults(t, inView)).then((c) => c.some((x) => x.n > 0));
     const [mutations, cna] = await Promise.all([count("mutations"), count("cna")]);
     return { mutations, cna };
   };
@@ -157,8 +165,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
   /** whether a table's query reads the inAll column (shows, filters, sorts or lists its values), so each row's panel coverage must be worked out */
   const asksInAll = (tq: TableQuery) => !!(tq.columns?.includes("inAll") || tq.filters?.inAll || tq.sort?.column === "inAll" || ctx.values === "inAll");
   /** one of the patient's tables, for the page (or values) the request asks of it */
-  const tableRows = async (t: AlterationTable, pt: { study: string; id: string }, order: string[]): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
-    const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = ALTERATION_DEFAULT_COLUMNS[t];
+  const tableRows = async (t: AlterationTable, pt: { study: string; id: string }, order: string[], inView: number): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
+    const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = alterationDefaults(t, inView);
     const r = await runRows(ctx, "alterations:" + t, [pt.study], tqq, defs, shownColumns(tqq, cols, defs), size,
       (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, { genes, inAll: asksInAll(tqq) }),
       ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined,
@@ -180,7 +188,9 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
       const want = pt || (first?.rows[0] ? { study: String(first.rows[0].study), id: String(first.rows[0].patient) } : null);
       if (!want) return no("the cohort's patient list is empty, so there is no patient's " + only + " table to page");
       { const refused = peerRefusal(want); if (refused) return refused; }
-      const { rows } = await tableRows(only, want, (await numbered(want)).order);
+      // numbered by collection day; the columns by how many samples are in view (the cohort's, or all)
+      const [smp, inCohort] = await Promise.all([numbered(want), scope === "cohort" ? samplesOf(want, "cohort") : null]);
+      const { rows } = await tableRows(only, want, smp.order, inCohort ? inCohort.length : smp.samples.length);
       return partial({ ...listOf({ rows: [], lists: [], total: 0, all: 0, offset: 0, groups: 1 }), patient: { ...want, samples: [], ...sourceOf(want.study) }, tables: { [only]: rows },
         oncokbPin: pinOf(want.study) });
     }
@@ -207,7 +217,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const [mixed, position, ...tabs] = await Promise.all([
       want ? mixedPanelsOf(want, smp!.order, inCohort ? inCohort.length : smp!.samples.length) : Promise.resolve(null),
       want ? listPosition(r, !!view.patient, (first) => listRows(1, { locate: first })) : Promise.resolve(null),
-      ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order) : Promise.resolve(null)),
+      ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order, inCohort ? inCohort.length : smp!.samples.length) : Promise.resolve(null)),
     ]);
     const tables: AlterationsResult["tables"] = {};
     ALTERATION_TABLES.forEach((t, i) => { const x = tabs[i]; if (x) tables[t] = x.rows; });
@@ -231,7 +241,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
         "Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. " +
         (smp?.note && smp.samples.length > 1 ? smp.note + " " : "") +
         (genes === "all" ? "Mutations and Copy Number Alterations keep only genes profiled in every sample in view (genesProfiled \"all\"); rows whose gene a sample's panel leaves out are not listed. " : "") +
-        "Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in " + (scope === "cohort" ? "the cohort's samples of the patient. " : "the patient. ") +
+        "Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them" +
+        (tables.mutations?.shown.includes("copy") ? "; Copy # on a mutation is the gene's deep calls anywhere in " + (scope === "cohort" ? "the cohort's samples of the patient. " : "the patient. ") : ". ") +
         (want && inCohort ? "Only " + plural(inCohort.length, "sample") + " of " + want.id + "'s " + (smp?.samples.length ?? 0) + " " + (inCohort.length === 1 ? "is" : "are") + " in the cohort, and the tables read only " + (inCohort.length === 1 ? "it" : "those") + " (samples: \"cohort\"); each keeps its number among all the patient's samples. " : "") +
         "Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. " +
         (want && peerOf(ctx.resolvers[want.study]) ? want.id + "'s tables come from " + ctx.resolvers[want.study].instance.label + " via federation, computed in its database. " : "") +

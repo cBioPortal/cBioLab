@@ -404,6 +404,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   const known = (id: string) => t.columns.some((c) => c.id === id);
   const shownIds = q.columns && q.columns.some(known) ? q.columns.filter(known) : !q.columns && t.query.columns ? (t.defaults || t.shown) : t.shown;
   const shownIdx = shownIds.map((id) => t.columns.findIndex((c) => c.id === id)).filter((i) => i >= 0);
+  // several studies' rows name their study, unless the table shows a study column of its own
+  const studyCol = multi && !shownIds.includes("study");
   const filters = Object.entries(q.filters || {});
   const filtered = t.total < t.all || filters.length > 0 || !!(q.search || "").trim();
   const waiting = updating ? "updating…" : p.loading ? "loading page " + (p.page + 1).toLocaleString() + "…" : null;
@@ -466,7 +468,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
           <table className="pb-table dt-table">
             <thead ref={head}><tr>
               {multi && !oneCohort && <th>cohort</th>}
-              {multi && <th>study</th>}
+              {studyCol && <th>study</th>}
               {shownIdx.map((i) => {
                 const c = t.columns[i];
                 const sorted = q.sort && q.sort.column === c.id;
@@ -501,12 +503,12 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                 <tr key={k} className={cls || undefined}
                   onClick={onRow ? () => onRow(r) : undefined} onMouseEnter={onHover ? () => onHover(r) : undefined} aria-selected={onRow ? !!(selected && selected(r)) : undefined}>
                   {multi && !oneCohort && <td className="meta">{r.cohort}</td>}
-                  {multi && <td className="meta">{r.study}</td>}
+                  {studyCol && <td className="meta">{r.study}</td>}
                   {shownIdx.map((i) => <td key={i} className={t.columns[i].numeric ? "num" : undefined}>
                     {g?.cont && t.columns[i].id === groupBy ? null : show(t.columns[i], r.values[i], r)}</td>)}
                 </tr>);
               })}
-              {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi ? (oneCohort ? 1 : 2) : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
+              {!p.rows.length && !waiting && <tr><td className="meta" colSpan={shownIdx.length + (multi && !oneCohort ? 1 : 0) + (studyCol ? 1 : 0)}>{filtered ? "no rows match — loosen the search or a filter" : "no rows"}</td></tr>}
             </tbody>
           </table>
         </div>

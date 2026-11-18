@@ -23,7 +23,7 @@ export interface DatafilesView extends TableQuery {
   ifHeld?: boolean;
   /** how a line's DRIVER reads: the page's driver settings (OncoKB, hotspots, the study's calls); OncoKB alone without */
   drivers?: DriverSettings;
-  /** rows per page of the case table (default 25, at most 1000) */
+  /** rows per page of the case table (default 20, the portal's; at most 1000) */
   rows?: number;
 }
 

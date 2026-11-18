@@ -88,6 +88,15 @@ test("PTB-TAB-3, PTB-MD-12: no Clinical Trials tab, whatever the patient holds",
   for (const l of cases) assert.ok(!titlesOf(l).includes("Clinical Trials"), titlesOf(l).join(", "));
 });
 
+test("P1 (PAT-MT-1): the Patient page lays out the alterations view with mutations.rows 10 and cna.rows 10, and no sv.rows", () => {
+  const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION"] });
+  const v = l.doc.views![l.names.indexOf("Summary › Genomic alterations")] as any;
+  assert.equal(v.kind, "alterations");
+  assert.equal(v.mutations.rows, 10);
+  assert.equal(v.cna.rows, 10);
+  assert.equal(v.sv?.rows, undefined);
+});
+
 test("L1 PTB-CD-2: the Clinical Data tab's patient and sample tables are transposed", () => {
   const l = patientLayout(q, { profileCatalog: [], held: [] });
   const at = (n: string) => l.doc.views![l.names.indexOf(n)] as any;

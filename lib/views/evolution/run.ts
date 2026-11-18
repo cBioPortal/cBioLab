@@ -21,6 +21,7 @@ import {
 import type { EvolutionView, EvolutionResult, EvolutionSample, EvolutionMutation, EvolutionCell, EvolutionStatus } from "./types.ts";
 import { evolutionMethod } from "./method.ts";
 import { EVOLUTION_KEY_COLUMNS, evolutionKey } from "./figure.ts";
+import { heatmapOrder } from "./order.ts";
 
 type Cell = string | number | null;
 
@@ -64,8 +65,8 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return no("rows (the page size of the patient list) is 1 to " + TABLE_ROWS_MAX);
   if (view.patient != null && (typeof view.patient !== "object" || typeof view.patient.study !== "string" || typeof view.patient.id !== "string" || !PATIENT_ID.test(view.patient.id)))
     return no("patient is {study, id}: a study of the view's cohort and a patient id in it, e.g. {\"study\": \"glioma_msk_2018\", \"id\": \"IM-GBM-28\"}");
-  if (view.chart != null && view.chart !== "line" && view.chart !== "heatmap") return no("chart is \"line\" (a line per mutation across the samples, the default) or \"heatmap\" (mutation × sample)");
-  for (const k of ["sequential", "logScale", "dataRange", "expandGaps"] as const)
+  if (view.chart != null && view.chart !== "line" && view.chart !== "heatmap") return no("chart is \"line\" (a line per mutation across the samples, the default) or \"heatmap\" (a row per sample, a column per mutation)");
+  for (const k of ["sequential", "logScale", "dataRange", "transpose", "cluster", "mutationLabels", "expandGaps"] as const)
     if (view[k] != null && typeof view[k] !== "boolean") return no(k + " is true or false");
   const q = viewQuery(view);
   { const bad = checkQuery(q, EVOLUTION_PATIENT_COLUMNS); if (bad) return no(bad); }
@@ -76,7 +77,8 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   { const bad = checkQuery(mq, EVOLUTION_COLUMNS); if (bad) return no("mutations: " + bad); }
   if (ctx.table != null && ctx.table !== "mutations") return no("table is mutations, or none for the patient list");
   if (view.groupBy != null && (typeof view.groupBy !== "string" || !view.groupBy)) return no("groupBy is the id of a sample clinical attribute (one of the result's groupOptions), e.g. \"SAMPLE_TYPE\"");
-  const display: EvolutionResult["display"] = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange, expandGaps: !!view.expandGaps, groupBy: null };
+  const display: EvolutionResult["display"] = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange, expandGaps: !!view.expandGaps,
+    transpose: !!view.transpose, cluster: view.cluster !== false, mutationLabels: view.mutationLabels !== false, groupBy: null };
 
   // who may answer: a local patient-level participant (no peer serves this view's rows)
   const { holders, excluded } = rowHolders(ctx);
@@ -212,7 +214,8 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
       kind: "evolution", cohorts: vNames,
       evolution: { ...list, patient: { ...want, samples }, position, mutations: table, drawn, ...(undrawn ? { undrawn } : {}), noVaf, x,
         ...(!view.sequential && noDay.length ? { noDay } : {}), ...(axis ? { axis } : {}),
-        ...(options ? { groupOptions: options } : {}), ...(grouping ? { groupBy: grouping } : {}), ...(ungrouped ? { ungrouped } : {}), display },
+        ...(options ? { groupOptions: options } : {}), ...(grouping ? { groupBy: grouping } : {}), ...(ungrouped ? { ungrouped } : {}),
+        ...(drawn && display.chart === "heatmap" ? { heatmapOrder: heatmapOrder(drawn, samples.length, display) } : {}), display },
       method: evolutionMethod({ cohorts: vNames, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length, lists: r.lists, excluded, instances: r.groups,
         patient: want, samples: samples.length, table: { total: m.total, all: m.all, queryText: tq }, drawn: drawn?.length ?? null, noVaf }),
       participation: ctx.participationFor(ctx.vStudies, true),
@@ -229,7 +232,9 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
           (grouping ? "; grouped by " + grouping.name + " as the portal's Group by: a line per mutation and group, through that group's samples alone, each group in its colour (" +
             grouping.groups.map((g) => (g.value || "no value") + ": " + g.samples.map((i) => samples[i].label).join(", ")).join("; ") + ")" : "") +
           (display.logScale ? "; the y axis is log-scaled, a VAF of 0 sitting at its floor of 0.001" : "") + (display.dataRange ? "; the y axis spans the VAFs drawn rather than 0 to 1" : "") + ". "
-          : "The heatmap colours each sample's VAF from 0 to 1; grey is not found, white with a bar is not profiled. ") +
+          : "The heatmap has " + (display.transpose ? "a row per mutation and a column per sample" : "a row per sample and a column per mutation") + ", " +
+            (display.cluster ? "both clustered by VAF as the portal clusters an oncoprint heatmap" : "the samples in order and the mutations by name") +
+            (display.mutationLabels ? "" : ", mutation labels hidden") + "; it colours each sample's VAF from 0 to 1 on the portal's VAF ramp; grey is not found, white with a bar is not profiled. ") +
         (ungrouped ? "Group by: " + ungrouped + ". " : "") +
         "Fusions recorded as mutations are left out, as the portal leaves them out. " +
         "The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: " + tableTail(r, q, listColumns, "patient", "with the most samples first, then by patient id", excluded, false),

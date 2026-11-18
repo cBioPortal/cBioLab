@@ -7,9 +7,9 @@ import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
-import { mutationTypeLabel, mutationTypeColor, mutationTypeTip, variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
+import { variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
   validationStatusCell, exonCell, VALIDATION_STATUS_STYLE } from "../../../lib/mutation-type.ts";
-import { ClinvarCell, DbsnpCell, FunctionalImpactCell, FunctionalImpactHead, GnomadCell, HgvscCell, HgvsgCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
+import { ClinvarCell, DbsnpCell, FunctionalImpactCell, MutationTypeCell, FunctionalImpactHead, GnomadCell, HgvscCell, HgvsgCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
 
 // ---- Mutations: one gene's mutation table, on the shared table (app/_table/DataTable.tsx) ---------
 
@@ -41,13 +41,6 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
             data-tip={"open sample " + x + "'s page"}>{x}</a> : <span className="mono">{x}</span>) : undefined} />
     </div>
   );
-}
-
-/** Mutation Type as the portal draws it: the label in its colour, the stored text as tooltip where it differs */
-function MutationTypeCell({ raw }: { raw: string }) {
-  const label = mutationTypeLabel(raw);
-  const bold = ["Missense", "Nonsense", "Splice", "IF del", "Fusion", "Silent"].includes(label) || label === raw;
-  return <span className={bold ? "font-semibold" : undefined} style={{ color: mutationTypeColor(raw) }} data-tip={mutationTypeTip(raw) ?? undefined}>{label}</span>;
 }
 
 const CN_VALUE: Record<string, number> = { Amp: 2, Gain: 1, Diploid: 0, ShallowDel: -1, DeepDel: -2 };

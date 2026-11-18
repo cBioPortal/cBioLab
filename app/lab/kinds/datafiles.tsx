@@ -204,7 +204,8 @@ function DatafilesBody({ d, spec, vi, updating, docJson, onQuery }: { d: Result;
       <section aria-label="type of genetic alterations across all samples">
         <h4 className="mb-2 font-semibold">Type of genetic alterations across all samples</h4>
         <DataTable t={d} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit="samples" onQuery={onQuery}
-          cell={(id, x) => id !== "sample" && id !== "patient" && (x === "no alteration" || x === "not profiled" || x === "unaltered") ? <span className="text-muted-foreground">{x}</span> : undefined} />
+          cell={(id, x) => id === "altered" ? <span className={x === "1" ? undefined : "text-muted-foreground"} data-tip={x === "NP" ? "not profiled for every queried gene and data type (the portal writes 0)" : "1 = Sample harbors alteration in one of the input genes"}>{x}</span>
+            : id !== "sample" && id !== "patient" && id !== "study" && (x === "no alteration" || x === "not profiled") ? <span className="text-muted-foreground">{x}</span> : undefined} />
       </section>
     </div>
   );

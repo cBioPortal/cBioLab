@@ -178,7 +178,7 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.ok(v.method);
     assert.match(v.caveat!, /^P1 — Mutations: 1 row; Copy Number Alterations: 1 row; Structural Variants: 0 rows\. /);
     assert.match(v.caveat!, /No OncoKB version is pinned here, so the annotation columns are empty\./);
-    assert.match(v.caveat!, /Copy # on a mutation is the gene's deep calls anywhere in the patient\./);
+    assert.doesNotMatch(v.caveat!, /Copy # on a mutation/, "P1 has two samples, so Copy # is not shown and the caveat does not explain it");
     assert.match(v.caveat!, /The patient list: 2 patients\. Sorted with patients who have any alteration first, then by patient id across the cohort;/);
   });
 
@@ -193,7 +193,8 @@ describe("alterations: the list and the first patient's tables", () => {
     assert.equal(row.refCount, null);
     assert.equal(row.copy, "", "missing text is blank");
     assert.equal(row.start, 25398284);
-    assert.equal(row.mutationType, "Missense_Mutation");
+    assert.equal(row.mutationType, "Missense", "the portal's label, which the column filters and searches");
+    assert.equal(t.mutations!.rows[0].detail?.mutationType, "Missense_Mutation", "the stored type rides in the detail");
     assert.equal(t.mutations!.rows[0].sample, "S1a");
     assert.deepEqual(t.mutations!.shown, ["gene", "annotation", "vaf", "freq", "altCount", "refCount", "copy", "start"]);
     const cna = Object.fromEntries(t.cna!.columns.map((c, i) => [c.id, t.cna!.rows[0].values[i]]));
@@ -346,6 +347,16 @@ describe("alterations: a federation peer that serves patient alterations", () =>
     const a = alt(await run({}, ctx({ A: cohort({ p: 2 }) }, { p }, { pin: "local-v1" })));
     assert.equal(a.oncokbPin, null);
   });
+
+  test("V1 (PAT-MT-2, PAT-CNA-4): the mutations table has no Samples column and has Copy # for a one-sample patient, the reverse for two", async () => {
+    const shown = async (view: Partial<AlterationsView>, t: Tables) => alt(await run(view, one(t))).tables.mutations!.shown!;
+    const one1 = await shown({ patient: { study: "s1", id: "P2" } }, study({ samples: [{ cohort: "A", study: "s1", patient: "P2", sid: "S2", type: "Primary" }] }));
+    assert.ok(!one1.includes("samples") && one1.includes("copy"), one1.join());
+    const two = await shown({}, study());
+    assert.ok(two.includes("samples") && !two.includes("copy"), two.join());
+    const coh = await shown({ samples: "cohort" }, study());
+    assert.ok(!coh.includes("samples"), "1 of 2 samples in the cohort: " + coh.join());
+  });
 });
 
 describe("alterations: PAT-STM-12 sample order", () => {
@@ -415,11 +426,11 @@ describe("allele frequency and per-sample reads", () => {
   });
   test("D1 PAT-MT-3: a row's reads become detail.reads in sample order", async () => {
     const { t } = await cell([{ ...MUT[0], reads: [["S1", 38, 157], ["S2", 190, 90]] }], "gene");
-    assert.deepEqual(t.rows[0].detail, { reads: [{ sample: "S1", alt: 38, ref: 157 }, { sample: "S2", alt: 190, ref: 90 }] });
+    assert.deepEqual(t.rows[0].detail?.reads, [{ sample: "S1", alt: 38, ref: 157 }, { sample: "S2", alt: 190, ref: 90 }]);
   });
-  test("D2 PAT-MT-3: a row with no reads has no detail", async () => {
+  test("D2 PAT-MT-3: a row with no reads has no reads in its detail", async () => {
     const { t } = await cell(MUT, "gene");
-    assert.equal("detail" in t.rows[0] && t.rows[0].detail !== undefined, false);
+    assert.equal(t.rows[0].detail?.reads, undefined);
   });
 });
 

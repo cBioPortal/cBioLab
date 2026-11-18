@@ -9,6 +9,7 @@ import type { TablePart } from "./mutation-table.ts";
 import { patientSamplesSql } from "./patient-timeline.ts";
 import { inCohortPatients, inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
+import { mutationTypeColumn } from "./mutation-type.ts";
 
 /** The view's three tables, in the portal's order. */
 export const ALTERATION_TABLES = ["mutations", "cna", "sv"] as const;
@@ -29,8 +30,8 @@ const freq = number("freq", "Cohort %");
 export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   mutations: [
     samples, text("gene", "Gene"), { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, annotation,
-    text("mutationType", "Mutation Type"), text("copy", "Copy #"), freq,
-    number("vaf", "Allele Freq"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"),
+    { id: "mutationType", name: "Mutation Type", numeric: false, ...mutationTypeColumn("mutationType") },
+    number("vaf", "Allele Freq"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"), text("copy", "Copy #"), freq,
     text("variantType", "Variant Type"), text("chr", "Chromosome"), number("start", "Start Pos"), number("end", "End Pos"),
     text("ref", "Ref"), text("var", "Var"), text("status", "MS"), number("inAll", "Profiled in all samples"),
   ],
@@ -47,12 +48,21 @@ export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   ],
 };
 
-/** Shown unless the view names its columns: the portal's own default set for each table. */
+/** Shown unless the view names its columns: the portal's own default set for each table, in its order (PAT-MT-2). */
 export const ALTERATION_DEFAULT_COLUMNS: Record<AlterationTable, string[]> = {
-  mutations: ["samples", "gene", "proteinChange", "annotation", "mutationType", "copy", "freq", "vaf"],
+  mutations: ["samples", "gene", "proteinChange", "annotation", "mutationType", "vaf", "copy", "freq"],
   cna: ["samples", "gene", "cna", "annotation", "cytoband", "freq"],
   sv: ["samples", "gene1", "gene2", "status", "class", "eventInfo", "connectionType"],
 };
+
+/**
+ * A table's default columns with `inView` of the patient's samples in view, as the portal's patient
+ * view decides them: Samples only with two or more (PAT-MT-2, PAT-CNA-4, PAT-SV-3); a mutation's
+ * Copy # only with one (PAT-MT-2: one sample's call, where several would disagree).
+ */
+export function alterationDefaults(t: AlterationTable, inView: number): string[] {
+  return ALTERATION_DEFAULT_COLUMNS[t].filter((c) => !(c === "samples" && inView < 2) && !(t === "mutations" && c === "copy" && inView > 1));
+}
 
 /** The patient list's columns: how much of each table a patient has, so a list can be sorted by it. */
 export const ALTERATION_PATIENT_COLUMNS: QueryColumn[] = [
