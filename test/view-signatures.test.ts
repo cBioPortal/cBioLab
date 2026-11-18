@@ -12,7 +12,7 @@ import { COUNT_TIP, ROW_CLICK_HINT, channelColor, channelTick, countAxisMax, cou
 import { REFERENCE_SOURCE, referenceChannel, referenceKey, referenceProfile, referenced } from "../lib/views/signatures/reference.ts";
 import { COSMIC_REFERENCE } from "../lib/views/signatures/cosmic-reference.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
-import { signaturesSvg, FIGURE_SIGNATURES } from "../lib/views/signatures/figure.ts";
+import { signaturesSvg, signaturesSpectrumSvg, FIGURE_SIGNATURES } from "../lib/views/signatures/figure.ts";
 import { signaturesKind } from "../lib/views/signatures/kind.ts";
 import { signaturesMethod } from "../lib/views/signatures/method.ts";
 import { pageSql } from "../lib/table-query.ts";
@@ -468,6 +468,41 @@ test("S1 (PTB-STM-6): the figure's channel tooltips state whole percents", async
   const tips = [...svg.matchAll(/<title>[^<]* of 40 single base substitutions \(([^)]*)\)/g)].map((m) => m[1]);
   assert.ok(tips.length > 0);
   for (const t of tips) assert.match(t, /^\d+%/, t);
+});
+
+describe("PTB-MS-5: the spectrum download", () => {
+  const exp = (v: unknown, o: Record<string, unknown> = {}) => signaturesSpectrumSvg(v as never, { width: 900, theme: "light", ...o });
+  test("D1: no spectrum or no patient is null", async () => {
+    const v = await run({});
+    const s = sig(v);
+    assert.equal(exp({ ...v, signatures: { ...s, spectrum: null } }), null);
+    assert.equal(exp({ ...v, signatures: { ...s, patient: null } }), null);
+  });
+  test("D2: the spectrum alone, with its head", async () => {
+    const v = await run({});
+    const s = sig(v), out = exp(v)!;
+    assert.ok(out.startsWith("<svg"));
+    assert.ok(out.includes(`Sample: ${s.spectrum!.sample} |`));
+    assert.ok(out.includes(`count: ${s.spectrum!.total}`));
+  });
+  test("D3: a chosen reference is drawn, otherwise not", async () => {
+    const v = await run({ signature: "SBS1", ymax: 40 });
+    assert.ok(sig(v).reference);
+    const out = exp(v)!;
+    assert.match(out, />COSMIC Reference</);
+    assert.match(out, />SBS1 \(%\)</);
+    assert.match(signaturesSvg(v as never, { theme: "light" })!, />SBS1 \(%\)</);
+    assert.doesNotMatch(exp(await run({}))!, /COSMIC Reference|SBS1 \(%\)/);
+  });
+  test("D4: the contributions part of the full figure is left out", async () => {
+    const v = await run({ signature: "SBS1" });
+    assert.match(signaturesSvg(v as never, { theme: "light" })!, /Signature contributions/);
+    assert.doesNotMatch(exp(v)!, /Signature contributions/);
+  });
+  test("D5: the light theme uses literal colours", async () => {
+    const v = await run({ signature: "SBS1" });
+    assert.doesNotMatch(exp(v, { theme: "light" })!, /var\(--/);
+  });
 });
 
 describe("signatureTableTsv: the Mutational Signatures table's Copy/Download", () => {

@@ -35,7 +35,12 @@ export function summaryCut(shown: number, distinct: number | undefined): string 
 
 /** saves text as a file the browser downloads */
 export function saveText(fileName: string, text: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/octet-stream" }));
+  saveBlob(fileName, new Blob([text], { type: "application/octet-stream" }));
+}
+
+/** saves a blob the page already holds, without another copy */
+export function saveBlob(fileName: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;

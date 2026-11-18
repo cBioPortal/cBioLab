@@ -4,7 +4,8 @@ import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { isDrawn, type AnalysisDoc, type TableRows, type ViewResult } from "../../../lib/types.ts";
-import { caseFileBreaks, caseFileHeader, caseFileLine, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
+import { TABLE_COLUMNS_MAX } from "../../../lib/clinical-table.ts";
+import { caseFileBreaks, caseFileHeader, caseFileLine, caseFileLineBreaks, caseFileColumnsCut, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
 import { portalDisposition, portalMatrix } from "../../../lib/views/datafiles/portal-file.ts";
 
 export const maxDuration = 300;
@@ -42,7 +43,6 @@ export async function POST(req: Request) {
   const t = pagedTable(v, table);
   if (!t || !isDrawn(v)) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   if (body.format === "tsv" || body.format === "tsv-transposed") return portalFile(v, t, table, body.format === "tsv-transposed", run, doc);
-  const enc = new TextEncoder();
   if (body.caseFile) return caseFileResponse(t, body.caseFile as CaseFileFormat, (offset) => run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table })), table);
   const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   // the header row comes first, so the file opens as a table anywhere; what the query kept and who
@@ -58,25 +58,11 @@ export async function POST(req: Request) {
       : v.kind === "datafiles" ? (table && table !== "cases" ? table.replace(/^profile:/, "") : "alterations_by_sample") : v.kind) + (filtered ? "_filtered" : "") + ".csv";
   // every line leads with the row's cohort and study, so a table's own column of the same name is not repeated
   const keep = t.columns.map((c, i) => (c.id === "cohort" || c.id === "study" ? -1 : i)).filter((i) => i >= 0);
-  const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        controller.enqueue(enc.encode(line(["cohort", "study", ...keep.map((i) => t.columns[i].id)])));
-        // one order across every cohort and study: page through it whole, as the page view does
-        for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
-          const r = await run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table }));
-          const page = r.views[0];
-          const p = pagedTable(page, table);
-          if (!p) throw new Error(page.error || "the page at row " + offset + " returned nothing");
-          controller.enqueue(enc.encode(p.rows.map((row) => line([row.cohort, row.study, ...keep.map((i) => row.values[i])])).join("")));
-        }
-        controller.close();
-      } catch (e) {
-        // a download cut short must say so in the file, not end as if it were whole
-        controller.enqueue(enc.encode(line(["# DOWNLOAD INCOMPLETE: " + String((e as Error)?.message || e)])));
-        controller.close();
-      }
-    }
+  const stream = pageStream(t.total, (offset) => run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table })), table, {
+    head: () => line(["cohort", "study", ...keep.map((i) => t.columns[i].id)]),
+    rows: (p) => p.rows.map((row) => line([row.cohort, row.study, ...keep.map((i) => row.values[i])])).join(""),
+    // a download cut short must say so in the file, not end as if it were whole
+    cut: (why) => line(["# DOWNLOAD INCOMPLETE: " + why]),
   });
   return new Response(stream, { headers: {
     "content-type": "text/csv; charset=utf-8",
@@ -91,30 +77,48 @@ export async function POST(req: Request) {
  */
 function caseFileResponse(t: TableRows<unknown>, format: CaseFileFormat, page: (offset: number) => Promise<{ views: ViewResult[] }>, table: string | undefined): Response {
   const shown = t.shown.filter((id) => id !== "cohort" && id !== "study" && id !== "samples");
-  const at = shown.map((id) => t.columns.findIndex((c) => c.id === id));
-  const enc = new TextEncoder();
+  const at = shown.map((id) => t.columns.findIndex((c) => c.id === id)).filter((i) => i >= 0);
   const { before, after } = caseFileBreaks(format);
-  const stream = new ReadableStream<Uint8Array>({
+  const stream = pageStream(t.total, page, table, {
+    head: () => caseFileHeader(at.map((i) => t.columns[i]), format) + after,
+    rows: (p) => p.rows.map((row) => before + caseFileLine(row.study, at.map((i) => String(row.values[i] ?? "")), format) + after).join(""),
+    cut: (why) => (before || "") + "# DOWNLOAD INCOMPLETE: " + why.replace(/\s+/g, " ") + after,
+  });
+  const left = (t.excluded || []).map((e) => e.study + ": " + e.reason).join("; ");
+  const cut = caseFileColumnsCut(t as TableRows<unknown> & { attributesOf?: number }, at.filter((i) => !["patient", "sample"].includes(t.columns[i].id)).length);
+  return new Response(stream, { headers: {
+    "content-type": "text/tab-separated-values; charset=utf-8",
+    // what the file must hold to be whole, so the page can tell a cut one from a finished one
+    "x-line-breaks": String(caseFileLineBreaks(t.total, format)),
+    ...(left ? { "x-left-out": encodeURIComponent(left) } : {}),
+    ...(cut ? { "x-columns-cut": encodeURIComponent(cut.held + " of the " + cut.of + " attributes (a table holds at most " + TABLE_COLUMNS_MAX + ")") } : {}),
+  } });
+}
+
+/**
+ * A table's rows streamed whole, a page of TABLE_CHUNK at a time in one order across every cohort and
+ * study: the header, each page's lines, and on any failure (the header's included) a last line saying
+ * the file was cut short.
+ */
+function pageStream(total: number, page: (offset: number) => Promise<{ views: ViewResult[] }>, table: string | undefined,
+  write: { head: () => string; rows: (p: TableRows<unknown>) => string; cut: (why: string) => string }): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
     async start(controller) {
-      controller.enqueue(enc.encode(caseFileHeader(at.map((i) => t.columns[i]), format) + after));
       try {
-        for (let offset = 0; offset < t.total; offset += TABLE_CHUNK) {
+        controller.enqueue(enc.encode(write.head()));
+        for (let offset = 0; offset < total; offset += TABLE_CHUNK) {
           const r = await page(offset);
           const p = pagedTable(r.views[0], table);
           if (!p) throw new Error(r.views[0].error || "the page at row " + offset + " returned nothing");
-          controller.enqueue(enc.encode(p.rows.map((row) => before + caseFileLine(row.study, at.map((i) => String(row.values[i] ?? "")), format) + after).join("")));
+          controller.enqueue(enc.encode(write.rows(p)));
         }
       } catch (e) {
-        controller.enqueue(enc.encode("\n# DOWNLOAD INCOMPLETE: " + String((e as Error)?.message || e).replace(/\s+/g, " ")));
+        controller.enqueue(enc.encode(write.cut(String((e as Error)?.message || e))));
       }
       controller.close();
     }
   });
-  const left = (t.excluded || []).map((e) => e.study + ": " + e.reason).join("; ");
-  return new Response(stream, { headers: {
-    "content-type": "text/tab-separated-values; charset=utf-8",
-    ...(left ? { "x-left-out": encodeURIComponent(left) } : {}),
-  } });
 }
 
 /**

@@ -26,6 +26,8 @@ export interface MutationsView extends TableQuery {
 }
 export interface MutationsResult extends TableRows<string | number | null> {
   gene: string;
+  /** rows beyond the first of one change in one patient (several samples), over every row: the portal's "includes N duplicate mutations" (MUT-STM-14); absent when none */
+  duplicates?: number;
   /** when the query keeps fewer rows than there are: the distinct samples and patients of those it keeps (the portal's reset panel, MUT-FM-5) */
   kept?: { samples: number; patients: number };
   /** the OncoKB version the annotation column reads, or null when none is pinned */

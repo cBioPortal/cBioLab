@@ -4,9 +4,11 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
 import { timelineSvg, timelineSummary } from "../lib/timeline-svg.ts";
+import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
 import type { PatientEvent, PatientTimeline } from "../lib/types.ts";
+import { timelineDataFiles, TIMELINE_ZIP, eventTables } from "../lib/timeline-tables.ts";
 
 const ev = (type: string, start: number, attrs: Record<string, string> = {}, end: number | null = null): PatientEvent =>
   ({ type, start, end, attrs: Object.entries(attrs) });
@@ -191,6 +193,115 @@ describe("PAT-TL-TT-3: a sample event's tooltip rows", () => {
   });
   test("ST4 PAT-TL-TT-3: a lower-case key becomes upper-case", () => {
     assert.deepEqual(tip([], [["grade", "II"]]), [["GRADE", "II"]]);
+  });
+});
+
+describe("timeline download PAT-TL-ZM-4: the portal's timeline download", () => {
+  const t: PatientTimeline = { study: "s", patient: "P-1", events: EVENTS, samples: [{ id: "P-1-T02", type: "Primary" }], source: { label: "peer", remote: true } };
+  const file = (o: Parameters<typeof timelineSvg>[1]) => standaloneSvg(timelineSvg(t, { width: 900, theme: "light", ...o }).svg);
+  test("D1: not interactive unless asked", () => {
+    const off = timelineSvg(t, { theme: "light" }).svg;
+    assert.doesNotMatch(off, /data-ev=|data-uid=|class="tl-m"|class="tl-h"/);
+    const on = timelineSvg(t, { theme: "light", interactive: true }).svg;
+    assert.match(on, /data-ev=/);
+    assert.match(on, /data-uid=/);
+    assert.match(on, /class="tl-m"/);
+    assert.match(on, /class="tl-h"/);
+  });
+  test("D2: the light theme leaves no colour variables", () => {
+    assert.doesNotMatch(timelineSvg(t, { theme: "light" }).svg, /var\(--/);
+  });
+  test("D3: the file's root svg has numeric width and height and an xmlns", () => {
+    const root = /<svg\b[^>]*>/.exec(file({}))![0];
+    assert.match(root, /\swidth="\d+"/);
+    assert.match(root, /\sheight="\d+"/);
+    assert.match(root, /\sxmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  });
+  test("D4: collapsed tracks and expanded gaps change the saved figure", () => {
+    assert.notEqual(file({ collapsed: ["treatment"] }), file({}), "collapsed");
+    assert.notEqual(file({ expandGaps: false }), file({ expandGaps: true }), "expandGaps");
+  });
+});
+
+
+describe("timeline data zip (legacy downloadZippedTracks)", () => {
+  const evs: PatientEvent[] = [
+    ev("Specimen", 0, { SAMPLE_ID: "S1", STYLE_COLOR: "red" }, 5),
+    ev("LAB_TEST", -56, { TEST: "CEA" }),
+    ev("Specimen", 1854, { SAMPLE_ID: "S2", SITE: "Liver", STYLE_SHAPE: "circle", PATIENT_ID: "X" }),
+  ];
+  const files = timelineDataFiles("P-1", evs);
+  const lines = (t: string) => t.split("\n").slice(0, -1).map(l => l.split("\t"));
+
+  test("DZ1 one file per type, first-appearance order, lower-cased name", () => {
+    assert.deepEqual(files.map(f => f.name), ["data_timeline_specimen.txt", "data_timeline_lab_test.txt"]);
+  });
+  test("DZ2 header: fixed columns then the type's own keys in first-seen order", () => {
+    assert.deepEqual(lines(files[0].text)[0],
+      ["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "SAMPLE_ID", "STYLE_COLOR", "SITE", "STYLE_SHAPE"]);
+    assert.deepEqual(lines(files[1].text)[0], ["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "TEST"]);
+  });
+  test("DZ3 one row per event: patient, start, end or empty, type as given, values or empty", () => {
+    const s = lines(files[0].text);
+    assert.equal(s.length, 3);
+    assert.deepEqual(s[1], ["P-1", "0", "5", "Specimen", "S1", "red", "", ""]);
+    assert.deepEqual(s[2], ["P-1", "1854", "", "Specimen", "S2", "", "Liver", "circle"]);
+    assert.deepEqual(lines(files[1].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "TEST"], ["P-1", "-56", "", "LAB_TEST", "CEA"]]);
+  });
+  test("DZ4 STYLE_* kept; PATIENT_ID attribute adds no second column", () => {
+    const h = lines(files[0].text)[0];
+    assert.ok(h.includes("STYLE_COLOR") && h.includes("STYLE_SHAPE"));
+    assert.equal(h.filter(c => c === "PATIENT_ID").length, 1);
+  });
+  test("DZ5 tab/newline joined, exactly one trailing newline, no CR", () => {
+    for (const f of files) {
+      assert.ok(f.text.endsWith("\n") && !f.text.endsWith("\n\n"));
+      assert.ok(!f.text.includes("\r"));
+    }
+    assert.equal(files[1].text, "PATIENT_ID\tSTART_DATE\tSTOP_DATE\tEVENT_TYPE\tTEST\nP-1\t-56\t\tLAB_TEST\tCEA\n");
+  });
+  test("DZ6 no events gives no files", () => {
+    assert.deepEqual(timelineDataFiles("P-1", []), []);
+  });
+  test("DZ7 archive name", () => {
+    assert.equal(TIMELINE_ZIP, "timeline.zip");
+  });
+  const raw = (type: string, attrs: [string, string][], start = 0, end: number | null = null): PatientEvent => ({ type, start, end, attrs });
+  const NAME = /^data_timeline_[a-z0-9_-]+\.txt$/;
+  test("DZ8 safe names: lower case, characters outside a-z0-9_- become _", () => {
+    const n = (t: string) => timelineDataFiles("P", [raw(t, [])])[0].name;
+    assert.equal(n("Treatment/Surgery"), "data_timeline_treatment_surgery.txt");
+    assert.equal(n("/../../x"), "data_timeline_" + "/../../x".replace(/[^a-z0-9_-]/g, "_") + ".txt");
+    assert.equal(n("/../../x"), "data_timeline________x.txt");
+    assert.equal(n("Lab Test"), "data_timeline_lab_test.txt");
+    assert.equal(n("LAB-TEST_2"), "data_timeline_lab-test_2.txt");
+    const evil = n("..\\evil");
+    assert.ok(!evil.includes("\\") && !evil.includes(".."));
+  });
+  test("DZ9 every name is one plain file name", () => {
+    const types = ["Treatment/Surgery", "/../../x", "..\\evil", "Lab Test", "LAB-TEST_2", ".hidden", "a\\b/c"];
+    for (const f of timelineDataFiles("P", types.map(t => raw(t, [])))) {
+      assert.match(f.name, NAME);
+      const rest = f.name.slice("data_timeline_".length);
+      assert.ok(!rest.startsWith(".") && !f.name.includes("/") && !f.name.includes("\\") && !f.name.includes(".."), f.name);
+    }
+  });
+  test("DZ10 no file lost: case-only and same-name types get _2, _3", () => {
+    const fs = timelineDataFiles("P", [raw("Lab Test", [["A", "1"]]), raw("lab_test", [["B", "2"]]), raw("LAB TEST", [["C", "3"]])]);
+    assert.deepEqual(fs.map(f => f.name), ["data_timeline_lab_test.txt", "data_timeline_lab_test_2.txt", "data_timeline_lab_test_3.txt"]);
+    assert.deepEqual(lines(fs[0].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "A"], ["P", "0", "", "Lab Test", "1"]]);
+    assert.deepEqual(lines(fs[1].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "B"], ["P", "0", "", "lab_test", "2"]]);
+    assert.deepEqual(lines(fs[2].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "C"], ["P", "0", "", "LAB TEST", "3"]]);
+  });
+  test("DZ11 duplicate key: header once, row holds the first value", () => {
+    const fs = timelineDataFiles("P", [raw("Lab", [["K", "first"], ["K", "second"], ["J", "j"]])]);
+    assert.deepEqual(lines(fs[0].text), [["PATIENT_ID", "START_DATE", "STOP_DATE", "EVENT_TYPE", "K", "J"], ["P", "0", "", "Lab", "first", "j"]]);
+  });
+  test("DZ-ET eventTables: PATIENT_ID and STYLE_* dropped, fixed columns, first value", () => {
+    const t = eventTables([raw("Lab", [["PATIENT_ID", "X"], ["STYLE_COLOR", "red"], ["K", "first"], ["K", "second"], ["style_shape", "c"]], 3, 7)]);
+    assert.equal(t.length, 1);
+    assert.deepEqual(t[0].columns, ["START_DATE", "STOP_DATE", "EVENT_TYPE", "K"]);
+    assert.deepEqual(t[0].rows, [["3", "7", "Lab", "first"]]);
   });
 });
 

@@ -6,7 +6,8 @@
 // steps through the cohort's patients (app/lab/patient-nav.tsx).
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { signaturesSvg } from "../../lib/views/signatures/figure.ts";
+import { signaturesSpectrumSvg, signaturesSvg } from "../../lib/views/signatures/figure.ts";
+import { ImageDownload } from "./image-download.tsx";
 import { COUNT_TIP, ROW_CLICK_HINT, SIGNIFICANT_P, TABLE_TSV, YMAX_MAX, YMAX_MIN, countLabel, pctText, signatureTableTsv, typeOption } from "../../lib/views/signatures/data.ts";
 import type { SignaturesResult, SignatureRow } from "../../lib/views/signatures/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
@@ -119,13 +120,16 @@ export function SignaturesBody({ v, spec, vi, updating, docJson, patch, fixed }:
           <InfoLine><span><strong>Sample:</strong> {sp.sample} | <strong>{countLabel(s.version)} count:</strong> {sp.total}</span>
             <InfoButton aria-label="about this count" data-tip={COUNT_TIP} /></InfoLine></p>)}
       {p && s.notProfiled.length > 0 && <p className="note">{s.notProfiled.join(", ")} {s.notProfiled.length === 1 ? "is" : "are"} not profiled for mutational signatures.</p>}
+      {p && sp && <div className="flex items-center justify-end gap-2">
+        <ImageDownload name="mutationalBarChart" formats={["svg", "png", "pdf"]} label="download the spectrum" tip="download the spectrum as drawn"
+          svg={() => signaturesSpectrumSvg(v as never, { width, theme: "light" })} /></div>}
       <div ref={box} className={"tl-fig" + (updating ? " stale" : "")}>
         {p && svg && <div dangerouslySetInnerHTML={{ __html: svg }} />}
       </div>
       {p && s.signatures.length > 0 && (
         <section className="alt-table" aria-label="Mutational signatures">
           {sp && <p className="meta">{ROW_CLICK_HINT}</p>}
-          <PortalTable wide rows={s.signatures} cols={cols} download={{ file: TABLE_TSV, tsv: (rows) => signatureTableTsv(rows, s.profiled) }} selected={chosen} onSelect={(r) => { if (!updating && canPick(r) && r !== chosen) patch({ signature: r.name }); }} initialSort={s.profiled.length ? { key: "s0", desc: true } : { key: "name" }} search={(r) => r.name + " " + r.description}
+          <PortalTable wide rows={s.signatures} cols={cols} pageSize={Math.max(1, s.signatures.length)} download={{ file: TABLE_TSV, tsv: (rows) => signatureTableTsv(rows, s.profiled) }} selected={chosen} onSelect={(r) => { if (!updating && canPick(r) && r !== chosen) patch({ signature: r.name }); }} initialSort={s.profiled.length ? { key: "s0", desc: true } : { key: "name" }} search={(r) => r.name + " " + r.description}
             filters={[{ label: "above 0 in some sample", test: (r) => r.values.some((x) => (x.value ?? 0) > 0) },
               ...(s.profiles?.pvalue ? [{ label: "significant only (p < " + SIGNIFICANT_P + ")", test: (r: SignatureRow) => r.values.some((x) => x.p != null && x.p < SIGNIFICANT_P) }] : [])]}
             note={s.profiles?.contribution + (s.profiles?.pvalue ? "; bold: p < " + SIGNIFICANT_P + " in " + s.profiles.pvalue : "; no p-values recorded")} />

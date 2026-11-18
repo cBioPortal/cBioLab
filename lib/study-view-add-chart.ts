@@ -4,21 +4,22 @@
 // Browser-safe; no I/O.
 import { isClinicalLeaf, type Clause } from "./types.ts";
 
-/** a row of the list: its key, its name, the selected samples with data, and whether it is checked */
-export interface AddChartRow { key: string; name: string; samples: number; checked: boolean }
+/** a row of the list: its key, its name, the selected samples with data (unknown when not counted), and whether it is checked */
+export interface AddChartRow { key: string; name: string; samples: number | undefined; checked: boolean }
 
 /** a row as the list draws it */
 export interface AddChartLine extends AddChartRow { freq: number; disabled: boolean }
 
-/** the share of the selected samples with data, in percent; NaN with no selected sample */
-export function chartFreq(samples: number, selected: number): number {
-  return selected > 0 ? samples * 100 / selected : NaN;
+/** the share of the selected samples with data, in percent; NaN with no selected sample or an uncounted attribute */
+export function chartFreq(samples: number | undefined, selected: number): number {
+  return selected > 0 && samples != null ? samples * 100 / selected : NaN;
 }
 
 /** the rows with their Freq and disabled flag, ordered by Freq (highest first), then name */
 export function addChartLines(rows: AddChartRow[], selected: number): AddChartLine[] {
   const rank = (f: number) => Number.isNaN(f) ? -Infinity : f;
-  return rows.map((r) => { const freq = chartFreq(r.samples, selected); return { ...r, freq, disabled: freq === 0 }; })
+  // a checked chart stays uncheckable-proof: the dialog is the only way to take a chart off
+  return rows.map((r) => { const freq = chartFreq(r.samples, selected); return { ...r, freq, disabled: freq === 0 && !r.checked }; })
     .sort((a, b) => rank(b.freq) - rank(a.freq) || a.name.localeCompare(b.name));
 }
 
