@@ -440,7 +440,7 @@ Cases: "active groups" = selected, non-empty, overlap-removed in Exclude mode (`
   - Values matching `comparison.categorical_na_values` (default "NA") are removed.
   - Value matching is exact (case-sensitive), unlike the plot.
 - Test needs ≥2 categories over all groups. Groups whose counts are all 0 are dropped. Then ≥2 groups and a valid table.
-- Pearson χ² test of independence on groups × categories (Datumbox `Chisquare`, df = (r−1)(c−1), no Yates correction). Score = χ² (not shown).
+- Pearson χ² test of independence on groups × categories (Datumbox `Chisquare`, df = (r−1)(c−1)). On a 2 × 2 table (two groups, two categories) Datumbox applies Yates' continuity correction, Σ(|O − E| − 0.5)² / E (`Chisquare.java:86`, `if(k==2 && n==2)`); larger tables are uncorrected. Checked 2026-11-18: coadread Female vs Male "In PanCan Pathway Analysis" 0.101 and "New Neoplasm Event Post Initial Therapy Indicator" 0.289 on cbioportal.org, the corrected values from the API's counts. Score = χ² (not shown).
 
 **CMP-STM-7 Clinical tab — numeric** (`ClinicalDataEnrichmentUtil.java:15-90`)
 - NUMBER attributes. Values: sample attributes per sample; patient attributes per distinct patient; attributes that are patient-level in some studies and sample-level in others are expanded to one value per sample. Non-numeric strings are dropped (`NumberUtils.isCreatable`).
