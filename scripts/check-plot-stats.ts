@@ -19,7 +19,28 @@
  *       (src/shared/components/plots/PlotsTabUtils.tsx:2963-2996, 2072-2088, 2210-2258), against
  *       cbioportal.org's counts and, for the structural-variant and not-profiled counts, this
  *       script's own reading of the warehouse.
- *   T*  lib/federation.ts plotAxisKinds / plot — an axis's title as the portal writes it (PLT-DT-19;
+ *   L*  lib/plot.ts axisSelect — a categorical axis's labels as the portal writes them, counted
+ *       over every sample of coadread_tcga_pan_can_atlas_2018 (docs/legacy-spec/04-plots.md §3:
+ *       PLT-DT-3 Mutation Type, DT-4 Mutated vs Wild-type, DT-9 Variant vs No Variant, DT-11
+ *       discrete copy number; cbioportal-frontend cd8c6df PlotsTabUtils.tsx; counts from
+ *       docs/legacy-spec/parity/04-plots.md §3 Q6). L5/L6 are the cox and logistic covariates'
+ *       labels (`labels: "model"`), which keep cBioLab's own ("Not mutated", "Structural variant").
+ *       L1 KRAS mutation type: ⊆ {Missense, Inframe, Truncating, Splice, Promoter, Other,
+ *          Multiple, No mutation, Not profiled}, has "No mutation", no "Not mutated"
+ *       L2 KRAS mutated: {Mutated, No mutation, Not profiled}
+ *       L3 TCF7L2 SV: ⊆ {With Structural Variants, No Structural Variants, Not profiled for
+ *          structural variants}; With Structural Variants = 4
+ *       L4 KRAS gistic: Deep Deletion 1, Shallow Deletion 67, Diploid 390, Gain 128, Amplification 6
+ *       L5 L2 with labels "model": {Mutated, Not mutated, Not profiled}
+ *       L6 L3 with labels "model": ⊆ {Structural variant, No structural variant, Not profiled}
+ *       L7 the resolver's coxRows reads a covariate with those labels: KRAS mutated has "Not mutated", not "No mutation"
+ *   C*  lib/plot.ts plotScatterPointsSql — a scatter's points coloured and ringed (PLT-CL-8,
+ *       PLT-SC-6; cbioportal-frontend cd8c6df PlotsTabUtils.tsx:1877-2397), rows C1–C3 of the case
+ *       table for colouring a scatter's points: over coadread_tcga_pan_can_atlas_2018, every sample,
+ *       x AGE, y FRACTION_GENOME_ALTERED, each row carries `c` / `r`, the case's category from the
+ *       colorSel / ringSel given ("" where it has none), counted against a separate query joining the
+ *       axis selects.
+ *   T*  lib/federation.ts plotAxisKinds / plot (its clinicalMetaSql) and, T11, lib/clinical-titles.ts titledAxes — an axis's title as the portal writes it (PLT-DT-19;
  *       cbioportal-frontend cd8c6df PlotsTabUtils.tsx getAxisLabel): a clinical attribute by its
  *       display name, " (log2(value + 1))" after it on a log scale, and the colour axis likewise.
  *       Read against the warehouse's coadread_tcga_pan_can_atlas_2018, all samples; the names are
@@ -28,11 +49,13 @@
  * Run: node --env-file=.env.local scripts/check-plot-stats.ts
  */
 import { chQuery, DB } from "../lib/ch.ts";
-import { plotBoxSql, plotStatsSql, axisSelect, oncoprintClassSql, type PlotAxis } from "../lib/plot.ts";
+import { axisSelect, oncoprintClassSql, plotBoxSql, plotScatterPointsSql, plotStatsSql, type AxisCtx, type PlotAxis } from "../lib/plot.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { sq } from "../lib/compiler.ts";
+import { OQL_NOT_PROFILED } from "../lib/plot-oql.ts";
 import { resolverFor, hasFederatedPlot } from "../lib/federation.ts";
 import { studyProfiles } from "../lib/analysis.ts";
+import { titledAxes } from "../lib/clinical-titles.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 
 /** [row id, values, expected q1, median, q3, lo, hi] */
@@ -204,6 +227,103 @@ await guarded("N2 TCF7L2 copyNumberSv, coadread", async () => {
   ok(got.get("Structural Variant") === 4 && f.sv === 4, "N2 TCF7L2 copyNumberSv, coadread",
     "got Structural Variant " + (got.get("Structural Variant") ?? 0) + " (all: " + show(got) + "); warehouse " + f.sv + " samples with a TCF7L2 SV — expected 4 (cbioportal.org API)");
 });
+
+/** [row id, axis, model labels, labels allowed, labels required, exact counts] */
+type LabelCase = [string, PlotAxis, boolean, string[], string[], Record<string, number>];
+const COADREAD = "coadread_tcga_pan_can_atlas_2018";
+const KRAS_MUT: PlotAxis = { source: "alteration", gene: "KRAS", by: "mutated" };
+const TCF7L2_SV: PlotAxis = { source: "alteration", gene: "TCF7L2", by: "sv" };
+const SV_LABELS = ["With Structural Variants", "No Structural Variants", "Not profiled for structural variants"];
+const LABELS: LabelCase[] = [
+  ["L1 KRAS Mutation Type: the portal's classes and \"No mutation\" (PLT-DT-3)", { source: "alteration", gene: "KRAS", by: "mutationType" }, false,
+    ["Missense", "Inframe", "Truncating", "Splice", "Promoter", "Other", "Multiple", "No mutation", "Not profiled"], ["No mutation"], {}],
+  ["L2 KRAS Mutated vs Wild-type: Mutated / No mutation / Not profiled (PLT-DT-4)", KRAS_MUT, false,
+    ["Mutated", "No mutation", "Not profiled"], ["Mutated", "No mutation", "Not profiled"], {}],
+  ["L3 TCF7L2 Variant vs No Variant: the portal's SV labels, 4 with one (PLT-DT-9)", TCF7L2_SV, false,
+    SV_LABELS, ["With Structural Variants"], { "With Structural Variants": 4 }],
+  ["L4 KRAS gistic: the portal's copy-number levels and Q6's row totals (PLT-DT-11)", { source: "molecular", profileType: "gistic", gene: "KRAS", discrete: true }, false,
+    ["Deep Deletion", "Shallow Deletion", "Diploid", "Gain", "Amplification"], ["Deep Deletion", "Shallow Deletion", "Diploid", "Gain", "Amplification"],
+    { "Deep Deletion": 1, "Shallow Deletion": 67, "Diploid": 390, "Gain": 128, "Amplification": 6 }],
+  ["L5 KRAS mutated as a model covariate keeps \"Not mutated\"", KRAS_MUT, true,
+    ["Mutated", "Not mutated", "Not profiled"], ["Mutated", "Not mutated", "Not profiled"], {}],
+  ["L6 TCF7L2 SV as a model covariate keeps cBioLab's labels", TCF7L2_SV, true,
+    ["Structural variant", "No structural variant", "Not profiled"], [], {}],
+];
+
+{
+  const cohortSql = compileCohortDef(null, { study: COADREAD });
+  for (const [id, axis, model, allowed, required, counts] of LABELS) {
+    try {
+      // `labels` is the covariates' switch on AxisCtx (lib/federation.ts coxRows / logisticRows)
+      const ctx = { study: COADREAD, unit: "sample", cohortSql, ...(model ? { labels: "model" } : {}) } as AxisCtx;
+      const sql = "WITH cohort AS (" + cohortSql + "),\n     xs AS (" + axisSelect(axis, ctx, "cat") + ")\nSELECT v, count() AS n FROM xs GROUP BY v ORDER BY v";
+      const got = new Map((await chQuery<{ v: string; n: string }>(sql)).data.map((r) => [String(r.v), Number(r.n)]));
+      const stray = [...got.keys()].filter((l) => !allowed.includes(l));
+      const lacking = required.filter((l) => !got.has(l));
+      const off = Object.entries(counts).filter(([l, n]) => got.get(l) !== n);
+      ok(!stray.length && !lacking.length && !off.length, id,
+        [...got].map(([l, n]) => l + " " + n).join(", ") +
+        (stray.length ? " — unexpected " + stray.join(", ") : "") + (lacking.length ? " — missing " + lacking.join(", ") : "") +
+        (off.length ? " — expected " + off.map(([l, n]) => l + " " + n).join(", ") : ""));
+    } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+  }
+}
+
+{
+  const study = "coadread_tcga_pan_can_atlas_2018";
+  const cohortSql = compileCohortDef(null, { study });
+  const ctx = { study, unit: "sample" as const, cohortSql };
+  const sel = (a: PlotAxis, kind: "num" | "cat") => axisSelect(a, ctx, kind);
+  const xSel = sel({ source: "clinical", attribute: "AGE" }, "num");
+  const ySel = sel({ source: "clinical", attribute: "FRACTION_GENOME_ALTERED" }, "num");
+  const kras = sel({ source: "alteration", gene: "KRAS", by: "mutated" }, "cat");
+  const sex = sel({ source: "clinical", attribute: "SEX" }, "cat");
+  const rowsOf = async (colorSel?: string, ringSel?: string) =>
+    (await chQuery<Record<string, unknown>>(plotScatterPointsSql(xSel, ySel, cohortSql, undefined, undefined, colorSel, ringSel))).data;
+  /** per category of `catSel`, the plotted samples (a value on both axes), "" for one without a category */
+  const countsBy = async (catSel: string) => new Map((await chQuery<Record<string, unknown>>(
+    "WITH cohort AS (" + cohortSql + "),\n     xs AS (" + xSel + "),\n     ys AS (" + ySel + "),\n     cs AS (" + catSel + ")\n" +
+    "SELECT ifNull(cs.v, '') AS k, count() AS n FROM xs INNER JOIN ys ON ys.id = xs.id LEFT JOIN cs ON cs.id = xs.id GROUP BY k")).data
+    .map((r) => [String(r.k), Number(r.n)]));
+  const tally = (rows: Record<string, unknown>[], col: string) => {
+    const m = new Map<string, number>();
+    for (const r of rows) { const k = r[col] == null ? "(missing)" : String(r[col]); m.set(k, (m.get(k) || 0) + 1); }
+    return m;
+  };
+  const show = (m: Map<string, number>) => [...m].sort().map(([k, n]) => (k || "\"\"") + "=" + n).join(" ");
+  const caseRow = async (id: string, f: () => Promise<void>) => {
+    try { await f(); } catch (e) { ok(false, id, String((e as Error).message ?? e).split("\n")[0].slice(0, 300)); }
+  };
+
+  // the plotted samples, counted by a separate join (581 on cbioportal.org when the scorecard read Q4)
+  const plotted = [...(await countsBy(sex)).values()].reduce((a, n) => a + n, 0);
+  await caseRow("C1 no colour or ring: every plotted sample", async () => {
+    const rows = await rowsOf();
+    ok(rows.length === plotted, "C1 no colour or ring: every plotted sample", "rows " + rows.length + " — expected " + plotted);
+  });
+
+  await caseRow("C2 colorSel KRAS mutated", async () => {
+    const rows = await rowsOf(kras);
+    const c = tally(rows, "c");
+    const allowed = new Set(["Mutated", "Not mutated", "No mutation", OQL_NOT_PROFILED, "Not profiled"]);
+    const want = (await countsBy(kras)).get("Mutated") || 0;
+    ok(rows.length === plotted && [...c.keys()].every((k) => allowed.has(k)) && (c.get("Mutated") || 0) === want,
+      "C2 colorSel KRAS mutated: every c a KRAS category, Mutated counted as a separate join counts it",
+      "rows " + rows.length + ", c: " + show(c) + " — expected " + plotted + " rows, Mutated=" + want);
+  });
+
+  await caseRow("C3 colorSel KRAS mutated, ringSel SEX", async () => {
+    const rows = await rowsOf(kras, sex);
+    const r = tally(rows, "r");
+    const want = await countsBy(sex);
+    const keys = new Set([...r.keys(), ...want.keys()]);
+    ok(rows.length === plotted && [...r.keys()].every((k) => k === "Male" || k === "Female" || k === "") &&
+      [...keys].every((k) => (r.get(k) || 0) === (want.get(k) || 0)),
+    "C3 colorSel KRAS mutated, ringSel SEX: every r Male, Female or \"\", counted as a separate join counts them",
+    "rows " + rows.length + ", r: " + show(r) + " — expected " + plotted + " rows, " + show(want));
+  });
+}
+
 {
   const STUDY = "coadread_tcga_pan_can_atlas_2018";
   const r = await resolverFor(STUDY, { oncokbPin: await oncokbPin(), ...(await studyProfiles(STUDY)) });
@@ -211,6 +331,9 @@ await guarded("N2 TCF7L2 copyNumberSv, coadread", async () => {
   const FGA = clin("FRACTION_GENOME_ALTERED");
   const is = (id: string, what: string, got: unknown, want: string) => ok(got === want, id + " " + what, JSON.stringify(got) + " — expected " + JSON.stringify(want));
 
+  // the resolver titles its own plot's axes (so a remote peer's plot is named); the other views
+  // title theirs through lib/clinical-titles.ts, whose query runs here through viewMeta (T11)
+  const titled = (axes: Record<string, PlotAxis | undefined>) => titledAxes(axes, { [STUDY]: r }, [STUDY]);
   if (!hasFederatedPlot(r)) ok(false, "T7 plotAxisKinds", STUDY + "'s resolver has no plotAxisKinds");
   else {
     const k = await r.plotAxisKinds({ x: clin("MUTATION_COUNT"), y: FGA });
@@ -228,6 +351,18 @@ await guarded("N2 TCF7L2 copyNumberSv, coadread", async () => {
 
   const t10 = await r.plot(null, { x: clin("CANCER_TYPE_DETAILED"), y: FGA, unit: "sample", colorBy: clin("SEX") });
   is("T10", "plot colorLabel (" + t10.shape + ")", t10.colorLabel, "Sex");
+
+  // L7 a cox covariate is read by the resolver with the model's labels: the reference level its
+  // documents name ("Not mutated") is a value it returns, the plot's "No mutation" is not
+  const cox = await (r as unknown as { coxRows(d: null, e: string, c: PlotAxis[]): Promise<{ rows: { values: (string | number)[] }[] }> })
+    .coxRows(null, "OS", [{ source: "alteration", gene: "KRAS", by: "mutated" }]);
+  const levels = new Set(cox.rows.map((x) => String(x.values[0])));
+  ok(levels.has("Not mutated") && !levels.has("No mutation"), "L7 coxRows: KRAS mutated as a covariate keeps \"Not mutated\"", [...levels].join(", "));
+  // T11 the other views' step: titledAxes, its clinicalMetaSql run through the resolver's viewMeta
+  const t11 = await titled({ a: clin("MUTATION_COUNT"), b: clin("SEX"), c: clin("NOT_AN_ATTRIBUTE_HERE") });
+  is("T11", "titledAxes MUTATION_COUNT", t11.a?.source === "clinical" ? t11.a.label : undefined, "Mutation Count");
+  is("T11", "titledAxes SEX", t11.b?.source === "clinical" ? t11.b.label : undefined, "Sex");
+  ok(t11.c?.source === "clinical" && t11.c.label === undefined, "T11 titledAxes: an attribute the study does not declare keeps no label", JSON.stringify(t11.c));
 }
 
 console.log(failures ? "\n" + failures + " of " + checks + " plot statistics checks FAILED" : "\nall " + checks + " plot statistics checks passed");

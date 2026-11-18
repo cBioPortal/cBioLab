@@ -4,12 +4,13 @@ import type { ViewResult } from "../../types.ts";
 import { pearsonR, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
 import { logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
-import { fitOf, portalBox, ringsAbsence, spearmanRho, corrPValue, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
+import { fitOf, portalBox, ringsAbsence, spearmanRho, corrPValue, AXIS_LABELS, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
 import { DEFAULT_POINT_LAYERS, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../plot-layers.ts";
 import { untimed, Untimed, type ViewRun, type DocView } from "../run.ts";
 import { resolveAxes } from "../../plot-profile.ts";
+import { titledAxes } from "../../clinical-titles.ts";
 import { OQL_NOT_PROFILED } from "../../plot-oql.ts";
 import { naturalSort } from "./natural-sort.ts";
 import { fmtInt, fmtNum } from "../../chart/format.ts";
@@ -67,7 +68,7 @@ async function pooledPairs(sites: string[], resolvers: Record<string, Resolver>,
   const closed = sites.filter((s) => !plotCasesOf(resolvers[s]));
   if (closed.length) return { pairs: null, why: closed.join(", ") + " may not show individual cases" };
   const perSite = await peerSafe(sites.map((s) => resolvers[s]),
-    () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotScatterPoints(def, spec, POOLED_VALUES_CAP))), () => [null]);
+    () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotScatterPoints(def, pairsOnly(spec), POOLED_VALUES_CAP))), () => [null]);
   const pairs = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : null;
   if (!pairs) return { pairs: null, why: "not every study handed over its pairs (one past " + fmtInt(POOLED_VALUES_CAP) + ", or a peer that cannot)" };
   if (pairs.length !== n) return { pairs: null, why: "the studies' pairs (" + fmtInt(pairs.length) + ") did not add up to the plotted " + fmtInt(n) };
@@ -101,17 +102,17 @@ function poolViolin(parts: ViolinBin[][]): ViolinBin[] {
 }
 
 /** copy-number levels in their own order, as the portal draws them */
-const CNA_LEVELS = ["Deep deletion", "Shallow deletion", "Diploid", "Gain", "Amplification"];
+const CNA_LEVELS = [AXIS_LABELS.portal.deepDel, AXIS_LABELS.portal.shallowDel, "Diploid", "Gain", "Amplification"];
 /** mutation classes in the portal's order (PlotsTabUtils.tsx mutTypeCategoryOrder), then the cases without one */
 const MUT_TYPES = ["Missense", "Inframe", "Truncating", "Splice", "Promoter", "Other", "Multiple"];
-const NO_MUTATION = ["Not mutated", OQL_NOT_PROFILED];
+const NO_MUTATION = [AXIS_LABELS.portal.noMutation, OQL_NOT_PROFILED];
 
 /**
  * The order an axis's categories are drawn in, as the portal's makeBoxScatterPlotData orders a
  * box plot's (PLT-BX-1): a data type with an order of its own keeps it — copy-number levels deep
  * deletion to amplification, mutation classes (Missense, Inframe, Truncating, Splice, Promoter,
  * Other, Multiple, then no mutation and not profiled; each class's Driver before its VUS),
- * Mutated / Not mutated / Not profiled, Driver / VUS / … — and any other is alphabetical, by code
+ * Mutated / No mutation / Not profiled, Driver / VUS / … — and any other is alphabetical, by code
  * unit as lodash's sortBy compares strings (`rest`; a contingency table's is naturalSort, as the
  * portal's TablePlot sorts). A category outside a type's order follows it, by `rest` (the portal
  * puts a box's first, an artefact of indexOf, and leaves a table's out). An OQL axis, which the
@@ -132,7 +133,7 @@ export function categoryOrder(cat: PlotRequest["x"], rest: (a: string, b: string
       "Not mutated", "Not profiled for mutations"]);
     if (cat.by === "copyNumberSv") return listed(["Amplification", "Gain", "Diploid", "Shallow Deletion", "Deep Deletion", "Structural Variant", OQL_NOT_PROFILED]);
     if (cat.by === "cna") return listed(["Deep deletion", "Neutral", "Amplification", OQL_NOT_PROFILED]);
-    if (cat.by === "sv") return listed(["Structural variant", "No structural variant", OQL_NOT_PROFILED]);
+    if (cat.by === "sv") return listed([AXIS_LABELS.portal.sv, AXIS_LABELS.portal.noSv, AXIS_LABELS.portal.svNotProfiled]);
     return listed(["Mutated", ...NO_MUTATION]);
   }
   if (cat.source === "alteration") return "oql" in cat ? null : listed(["Mutated", ...NO_MUTATION]);
@@ -184,15 +185,32 @@ async function drawAll(rc: PlotCasesCapable, def: Def, spec: PlotRequest, data: 
     if (!all || !all.length) return;
     data.points = all; data.overlay = "points";
     data.pointSet = { rule: "all", drawn: all.length };
-    if (spec.colorBy) data.legend = legendFor(all.map((x) => x.c || ""), false, spec.colorBy);
-    if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(all.map((x) => x.r || ""), true, spec.ringBy)];
-    if (ringsAbsence(spec.ringBy)) data.ringAbsent = true;
+    colourKey(data, spec, all);
     return;
   }
   const all = await rc.plotScatterPoints(def, spec);
   if (!all || !all.length) return;
   data.xyPoints = all;
   data.pointSet = { rule: "all", drawn: all.length };
+  colourKey(data, spec, all);
+}
+
+/** the request without its colour and ring: a statistic over the pairs needs neither */
+function pairsOnly(spec: PlotRequest): PlotRequest {
+  const rest = { ...spec };
+  delete rest.colorBy; delete rest.ringBy;
+  return rest;
+}
+
+/** the key to points coloured and ringed by a category, a box's or a scatter's, titled by the axes they come from (PLT-CL-8, PLT-SC-6) */
+function colourKey(data: PlotData, spec: PlotRequest, pts: { c?: string; r?: string }[]): void {
+  // a participant that predates coloured points answers without the categories: said, not drawn plain
+  const unanswered = [spec.colorBy && pts.every((x) => x.c === undefined) ? "colour" : "", spec.ringBy && pts.every((x) => x.r === undefined) ? "ring" : ""].filter(Boolean);
+  if (pts.length && unanswered.length) data.colourNote = "The points are not coloured: the study's participant answered without their " + unanswered.join(" and ") + " categories.";
+  if (spec.colorBy && !unanswered.includes("colour")) { data.legend = legendFor(pts.map((x) => x.c || ""), false, spec.colorBy); data.colorLabel = axisLabel(spec.colorBy); }
+  if (spec.ringBy && !unanswered.includes("ring")) { data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true, spec.ringBy)]; data.ringLabel = axisLabel(spec.ringBy);
+    if (ringsAbsence(spec.ringBy)) data.ringAbsent = true;
+  }
 }
 
 /** what the caption says when the plotted cohort is drawn as density rather than as its cases */
@@ -620,6 +638,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
     axes = resolveAxes({ x: pv.x, y: pv.y, colorBy: pv.colorBy, ringBy: pv.ringBy }, catalogs);
     axes = await assayEntitiesKnown(c, axes, sites) as typeof axes;
     axes = withDrivers(axes, pv.drivers);
+    axes = await titledAxes(axes, resolvers, sites);
     range = plotRangeOf(pv.range, axisLogs(axes));
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   let spec = { x: axes.x, y: axes.y, unit,
@@ -648,7 +667,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), data.colourNote, layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data })
       };
       return pr;
@@ -664,7 +683,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           missing.join(", ") + " does not yet (a remote federation peer, most likely)." });
       }
       const fr = resolvers as Record<string, Resolver & FederatedPlotCapable>;
-      const { xk, yk, shape, xLabel, yLabel } = await fr[sites[0]].plotAxisKinds(spec);
+      const { xk, yk, shape, xLabel, yLabel, colorLabel: siteColorLabel } = await fr[sites[0]].plotAxisKinds(spec);
       if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
       const lr = axisLogs(spec);
       const label = { x: { label: xLabel, kind: xk, ...(lr.x ? { log: lr.x } : {}) }, y: { label: yLabel, kind: yk, ...(lr.y ? { log: lr.y } : {}) } };
@@ -757,9 +776,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           if (pts.length && pts.length <= POINTS_CAP) {
             data.points = pts; data.overlay = "points";
             data.pointSet = { rule: "all", drawn: pts.length };
-            if (spec.colorBy) data.legend = legendFor(pts.map((x) => x.c || ""), false, spec.colorBy);
-            if (spec.ringBy) data.legend = [...(data.legend || []), ...legendFor(pts.map((x) => x.r || ""), true, spec.ringBy)];
-            if (ringsAbsence(spec.ringBy)) data.ringAbsent = true;
+            colourKey(data, spec, pts);
           }
         }
         // Without the points, a density: every site bins over one shared range, so the counts add.
@@ -770,7 +787,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           await peerSafe(sites.map((s) => resolvers[s]), async () => {
             const violin = poolViolin(await Promise.all(sites.map((s) => fr[s].plotViolinCounts(doc.cohorts[cn], spec, xk, yk, vBins, range))));
             box.violin = violin; box.violinBins = vBins; box.violinExtent = range; box.overlay = "violin";
-            if (spec.colorBy) { box.colorLabel = axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || ""), false, spec.colorBy); }
+            if (spec.colorBy) { box.colorLabel = spec.colorBy.source === "clinical" && !spec.colorBy.label && siteColorLabel ? siteColorLabel : axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || ""), false, spec.colorBy); }
             box.note += " The density behind each box is binned by every site over one shared range, the pooled whiskers and up to" +
               " one whisker span beyond them, so its counts add exactly; a value past that range is off the figure and not in it.";
           }, (why) => { box.note += " No density is drawn behind the boxes: " + why + "."; });
@@ -789,7 +806,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       markLogOff(data, logs);
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, data.colourNote, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data, moments }) };
       return pr;
     }

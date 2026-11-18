@@ -14,7 +14,7 @@
 // a local aggregate-only instance.
 import type { CohortDef, CohortSizes, ExploreResult } from "./types.ts";
 import type { DriverSettings } from "./driver-settings.ts";
-import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, PairOql, LollipopOql, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
+import type { AggregateCapable, GeneCounts, Instance, SurvivalCount, PairCounts, PairOql, LollipopOql, LollipopRows, AttrStats, PairMoments, VariantReport, LollipopReport, ProfileMoments, QueryLogEntry, SurvivalAnchor, EndpointColumns, TimelineSpan, CourseCount, CourseOpts, SequenceOpts, SequenceFlow, PlotData, PlotRequest, FederatedPlotCapable, PlotCasesCapable, ViolinBin } from "./federation.ts";
 import type { AxisKind, PlotAxis, PlotShape, HighlightPoint, PlotPoint, PlotXYPoint, PointRank, SparseCells, Whiskers, PlotCell } from "./plot.ts";
 import type { Moments } from "./stats.ts";
 import type { ProfileInfo } from "./profile-catalog.ts";
@@ -321,7 +321,7 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
   async plot(def: CohortDef | null | undefined, spec: PlotRequest): Promise<PlotData> {
     return this.plotOp<PlotData>("plot", def, spec);
   }
-  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
+  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis; colorBy?: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string; colorLabel?: string }> {
     return this.plotOp("axisKinds", null, spec);
   }
   async plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }> {
@@ -398,8 +398,10 @@ export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotC
     this.remember(r);
     return r.variantCounts || { variants: [], totals: [], minCount };
   }
-  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, drivers?: DriverSettings): Promise<LollipopReport> {
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, drivers?: DriverSettings, rows?: LollipopRows): Promise<LollipopReport> {
     this.guard(def);
+    // the table's search and filters read row values (a sample id among them), which never leave for a peer
+    if (rows) throw new Error(this.study + " is a federation peer's, so its lollipop cannot be narrowed by the mutation table's search or filters");
     if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: false };
     const r = await this.call("aggregates",
       { study: this.study, cohort: def || {}, lollipopGenes: genes, minCount, ...(oql ? { lollipopOql: oql } : {}), ...(drivers ? { lollipopDrivers: drivers } : {}) });

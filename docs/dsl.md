@@ -1,6 +1,6 @@
 <!-- GENERATED FILE — do not edit. Source: lib/dsl-reference.ts; regenerate with `npm run docs:gen`. -->
 
-# cbio-lab DSL (v2.9)
+# cbio-lab DSL (v2.10)
 
 One declarative JSON object — the **Analysis document** — describes everything cbio-lab does:
 which patients form each cohort, and which views compare them. The server compiles it to
@@ -11,7 +11,7 @@ SQL each cohort compiled to.
 ## Analysis document
 
 ```
-{ "dsl":     "2.9",                         // the document's version; see "Versions" below
+{ "dsl":     "2.10",                         // the document's version; see "Versions" below
   "study":   "<default study id>",            // validated against cancer_study
   "cohorts": { "<name>": cohortDef, ... },    // max 16 — the store every view's "cohorts" names from
   "views":   [ view, ... ],                   // max 6; each lists its own "cohorts": ["<name>", ...]
@@ -102,7 +102,7 @@ Up to 16 authored cohorts and 48 cohorts in all, children included. Expanded bef
 each child `extends` its parent and runs in the parent's studies. (Not to be confused with the
 `{"kind":"split"}` leaf below, which selects the engine's fixed discovery or validation half.)
 
-**Versions.** A document carries `"dsl": "2.9"`. One written for an older version is
+**Versions.** A document carries `"dsl": "2.10"`. One written for an older version is
 upgraded when it is read — the result's `upgraded` says from which version and what changed
 (2.2 → 2.3 moved top-level `partitions` onto the cohorts they split as `splits`, and renamed
 their children from `"<partition> / <arm>"` to `"<cohort> / <partition> / <arm>"`, views
@@ -125,7 +125,7 @@ rather than silently ignoring what it does not understand.
 | `event` | `{"kind":"event","a":sel,"b"?:sel,"rel":rel,"priorGuard"?:bool,"lineGap"?:90}` | timeline sub-DSL (below) |
 | `sampleList` | `{"kind":"sampleList","ids":["<study>:<id>", ...]}` or `{"kind":"sampleList","set":"<id set>"}` | explicit, cross-study list of sample ids: inline in `ids` (up to about 200 KB of ids per study, roughly 10,000 — refused by name past that), or a **stored id set** named by `set`, of any size up to 250,000 (see below) |
 | `patientList` | `{"kind":"patientList","ids":["<study>:<id>", ...]}` or `{"kind":"patientList","set":"<id set>"}` | explicit, cross-study list of patient ids, same two forms and limits |
-| `profiled` | `{"kind":"profiled","type":"MUTATION"\|"CNA"\|"SV", "gene"?:"KRAS" \| "genes"?:["KRAS","NRAS"]}` | patient has a sample on a gene panel for that data type — with `gene`, a panel covering that gene (or whole-exome); with `genes` (≤32), covering every one of them, the same as one `gene` clause per gene in a single clause. Combine with `not` to separate wild-type from not-profiled: `not` alone keeps patients never tested for the gene |
+| `profiled` | `{"kind":"profiled","type":"MUTATION"\|"CNA"\|"SV" \| "profile":"rna_seq_v2_mrna", "ifHeld"?:true, "gene"?:"KRAS" \| "genes"?:["KRAS","NRAS"], "anyGene"?:true}` | patient has a sample on a gene panel for that data type (with `profile` instead: in that one profile of the study, any data type, expression and protein included; `ifHeld` makes a study without it match nobody rather than refuse) — with `gene`, a panel covering that gene (or whole-exome); with `genes` (≤32), covering every one of them, the same as one `gene` clause per gene in a single clause, or with `anyGene:true` covering at least one of them (not wholly unprofiled for the list). Combine with `not` to separate wild-type from not-profiled: `not` alone keeps patients never tested for the gene |
 | `caseList` | `{"kind":"caseList","id":"sequenced"}` or `{"kind":"caseList","category":"all_cases_with_mutation_data"}` | portal sample list; bare ids get the study prefix. By `category` instead (the portal's sample-list categories): each study's list of that category, the first by id — how the portal resolves a multi-study query's case set; a study without one contributes no samples |
 | `genomicData` | `{"kind":"genomicData","gene":G,"profileType":P,"range"\|"values"}` | continuous per-gene values (cna, mrna z-scores, …); unknown profiles error listing what the study has |
 | `genericAssay` | `{"kind":"genericAssay","profileType":P,"entity":E,"range"\|"values"\|"measured":true}` | generic assay values (mutational signatures, …); `measured`: any value at all, which a split on an entity uses to give unmeasured patients their own child |
@@ -396,10 +396,13 @@ and the pair decides the shape — the portal's own rule:
 study's own description of that profile (`genetic_profile`: its alteration type and datatype), never
 from its name: a **mutation** profile (MAF) groups cases by mutation type, or with `by: "mutated"`
 mutated or not; a **structural-variant** profile by whether the case has one; a **discrete
-copy-number** profile by its own calls (Deep deletion, Shallow deletion, Diploid, Gain,
+copy-number** profile by its own calls (Deep Deletion, Shallow Deletion, Diploid, Gain,
 Amplification, drawn in that order); and a **continuous** one (mRNA, z-scores, log2 copy number,
 protein) is a number. A case with no mutation, SV or high-level call in the gene is the wild-type
-answer only when it is profiled for that gene; otherwise it is **Not profiled**. A profile a study
+answer only when it is profiled for that gene; otherwise it is **Not profiled**. The categories carry
+the portal's names: "No mutation", "With Structural Variants" / "No Structural Variants" / "Not profiled
+for structural variants" (a cox or logistic covariate keeps "Not mutated", "Structural variant" and
+"No structural variant", the reference levels its documents name). A profile a study
 does not have is refused with the list it does have, and one that two pooled studies describe
 differently is refused, never read as one thing. A **generic-assay** profile (mutational signatures,
 arm-level copy number, methylation probes, phosphosites, treatment response, …) reads one `entity`
@@ -410,15 +413,10 @@ profile lacks is refused with the closest it has. A patient-level assay's value 
 patient's samples. The engine runs a profile axis as the lower-level forms it resolves to, which a
 document may also give directly: `{"source":"molecular","profileType","gene","discrete"?}`,
 `{"source":"assay","profileType","entity","categorical"?,"patientLevel"?}` and
-`{"source":"alteration","gene","by":"mutationType"|"mutated"|"driver"|"cna"|"sv"|"topMutationType"|"copyNumberSv"}`. The last two
-colour points as the portal's Plots tab colours them by a gene: `topMutationType` is each case's best
-mutation class by the portal's render priority ("Missense (Driver)", "Truncating (VUS)", or "Missense"
-without `drivers`; "Not mutated"; "Not profiled for mutations"), for `colorBy`; `copyNumberSv` is its
-strongest discrete copy-number call ("Amplification" … "Deep Deletion", "Diploid" with none), "Structural
-Variant" over it, "Not profiled" for neither, for `ringBy`. `by: "driver"` is the
+`{"source":"alteration","gene","by":"mutationType"|"mutated"|"driver"|"cna"|"sv"}`. `by: "driver"` is the
 portal's "Driver vs VUS": Driver when any of the case's mutations is a putative driver by the view's
 `drivers` sources (OncoKB, the study's `cbp_driver` and `cbp_driver_tiers`), VUS when none is,
-Not mutated, Not profiled. A view that holds `drivers` also splits a mutation type into
+No mutation, Not profiled. A view that holds `drivers` also splits a mutation type into
 "Missense (Driver)" / "Missense (VUS)" and so on, as the portal's Plots tab colours them.
 
 number × number draws a **density scatter**, number × category a **box**, category × category a
@@ -2405,7 +2403,7 @@ Non-small cell lung cancer in MSK-CHORD (7,809 patients). The first view groups 
 
 ### Example 21: Plot axes from the study's own profiles: ERBB2 copy number against expression
 
-TCGA breast cancer (PanCancer Atlas), every sample. The first view groups ERBB2 mRNA z-scores (relative to all samples) by ERBB2's GISTIC copy-number call, from Shallow deletion to Amplification: the 122 amplified samples sit far above the rest. The second groups fraction of genome altered by TP53's mutation type from the study's mutation profile; the 18 samples not in that profile are Not profiled, not counted as unmutated.
+TCGA breast cancer (PanCancer Atlas), every sample. The first view groups ERBB2 mRNA z-scores (relative to all samples) by ERBB2's GISTIC copy-number call, from Shallow Deletion to Amplification: the 122 amplified samples sit far above the rest. The second groups fraction of genome altered by TP53's mutation type from the study's mutation profile; the 18 samples not in that profile are Not profiled, not counted as unmutated.
 
 ```json
 {

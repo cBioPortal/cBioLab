@@ -16,6 +16,15 @@ import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
 import { FloatingTip } from "../_ui/tooltip.tsx";
+import { ImageDownload } from "./image-download.tsx";
+import { saveBlob } from "../../lib/study-view-download.ts";
+import { TIMELINE_ZIP, timelineDataFiles } from "../../lib/timeline-tables.ts";
+import { strToU8, zipSync } from "fflate";
+
+/** `files` saved as one ZIP archive named `name` */
+function saveZip(name: string, files: { name: string; text: string }[]): void {
+  saveBlob(name, new Blob([zipSync(Object.fromEntries(files.map((f) => [f.name, strToU8(f.text)]))) as BlobPart], { type: "application/zip" }));
+}
 
 type Spec = { patient?: { study: string; id: string }; collapsed?: string[]; expandGaps?: boolean } & Record<string, unknown>;
 
@@ -114,6 +123,9 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
               </label>
               <Button type="button" variant="outline" size="sm" className={TB} disabled={!collapsed.length} data-tip="unfold every nested track"
                 onClick={() => patch({ collapsed: undefined })}><ChevronsUpDown />expand all tracks</Button>
+              <ImageDownload name="timeline" formats={["pdf", "png", "svg"]} label="download the timeline" tip="download the timeline as drawn (its folded tracks, every year or not)"
+                svg={() => p ? timelineSvg(p, { width, collapsed, expandGaps: !!spec.expandGaps, theme: "light" }).svg : null}
+                extra={p && p.events.length ? [{ label: "Data (ZIP)", save: () => saveZip(TIMELINE_ZIP, timelineDataFiles(p.patient, p.events)) }] : undefined} />
             </div>
           </div>
         </div>

@@ -23,7 +23,7 @@ export interface DatafilesView extends TableQuery {
   ifHeld?: boolean;
   /** how a line's DRIVER reads: the page's driver settings (OncoKB, hotspots, the study's calls); OncoKB alone without */
   drivers?: DriverSettings;
-  /** rows per page of the case table (default 25, at most 1000) */
+  /** rows per page of the case table (default 20, the portal's; at most 1000) */
   rows?: number;
 }
 
@@ -40,7 +40,10 @@ export interface DataFile {
   portalFile?: string;
   /** rows the file holds (one per sample of the cohort, or of the list) */
   rows: number;
-  /** the studies whose samples it holds, where that is fewer than the view's: a profile only some studies have */
+  /**
+   * the studies that have this file's profile, where some queried study does not: mutations, sv and cna list the
+   * others' samples too, NP throughout (the portal's selected files); any other profile's file holds these studies' samples alone
+   */
   studies?: string[];
 }
 

@@ -1,10 +1,14 @@
 // Evolution figure: one patient's mutations across their samples — a line per mutation through its
-// VAF in each sample (the portal's Genomic Evolution line chart), or a heatmap of mutation × sample.
-// Colours of the heatmap's cells are the oncoprint's (lib/oncoprint-style.ts): its sequential ramp
-// for VAF, its grey for profiled-but-unaltered, its white-with-a-bar for not profiled.
+// VAF in each sample (the portal's Genomic Evolution line chart), or its heatmap: a row per sample
+// (or, transposed, per mutation), clustered as the portal clusters it. Colours come from
+// lib/oncoprint-style.ts: the portal's VAF ramp, its grey for profiled-but-unaltered, its
+// white-with-a-bar for not profiled.
 import type { DrawnResultOf } from "../../types.ts";
 import { palette, frame, caption, label, textWidth, legend, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, fmtInt, esc, FS, SW, r1, type SvgOpts, type Scale } from "../../svg-kit.ts";
-import { STYLE, numericColor, encodeNumeric } from "../../oncoprint-style.ts";
+import { portalEvolutionVaf } from "../../chart/format.ts";
+import { STYLE, rampColor } from "../../oncoprint-style.ts";
+import { heatmapOrder, mutationName } from "./order.ts";
+import { axisMarks, dayScale, type AxisTick } from "../../timeline-tracks.ts";
 import type { EvolutionCell, EvolutionMutation, EvolutionSample } from "./types.ts";
 
 /** the table columns that identify a mutation: one key names its line or heatmap row and its table row alike */
@@ -27,7 +31,24 @@ export function cellText(c: EvolutionCell): string {
     default: return "not profiled";
   }
 }
-const mutationName = (m: EvolutionMutation) => m.gene + " " + m.proteinChange;
+/**
+ * A cell's state as the portal's Genomic Evolution tooltip says it (PatientViewMutationsTabUtils
+ * mutationTooltip): "VAF: 0.38 (46 reads of 121 total)", "Mutated, but we don't have VAF data.",
+ * "Mutation uncalled (VAF: …)", "Mutation not detected" (with its VAF when reads were counted),
+ * "<sample> is not sequenced for <gene> mutations."
+ */
+export function portalCellTip(c: EvolutionCell, sampleId: string, gene: string): string {
+  const total = c.alt != null && c.ref != null ? c.alt + c.ref : null;
+  const vaf = c.vaf ?? (total ? c.alt! / total : null);
+  const reads = vaf != null && total != null ? "VAF: " + portalEvolutionVaf(vaf) + " (" + c.alt + " reads of " + total + " total)" : null;
+  switch (c.status) {
+    case "called": return reads ?? "Mutated, but we don't have VAF data.";
+    case "noVaf": return "Mutated, but we don't have VAF data.";
+    case "uncalled": return reads ? "Mutation uncalled (" + reads + ")" : "Mutation uncalled";
+    case "absent": return reads ? "Mutation not detected (" + reads + ")" : "Mutation not detected";
+    default: return sampleId + " is not sequenced for " + gene + " mutations.";
+  }
+}
 const mutationTip = (m: EvolutionMutation, samples: EvolutionSample[]) =>
   mutationName(m) + (m.mutationType ? " (" + m.mutationType.replace(/_/g, " ") + ")" : "") + " — " + m.cells.map((c, i) => samples[i].label + ": " + cellText(c)).join(" · ");
 
@@ -57,6 +78,37 @@ export function lineCells(m: EvolutionMutation): { i: number; c: EvolutionCell }
   return all.slice(a, b + 1);
 }
 
+/**
+ * The line chart's x axis as the portal's, which is the patient timeline's (TickAxis), laid out by the
+ * timeline's own axisMarks: a line and a label at each year ("0", "1y", "-2y"), month ticks inside a
+ * year wide enough for them, a squiggle where empty years are cut with a dashed guide up through the
+ * plot, and a faint guide up through the plot at each year; the day-0 line in the muted ink, as the
+ * timeline draws it. Labels share one row under the axis.
+ */
+function timeAxis(ticks: AxisTick[], X: (day: number) => number, left: number, right: number, axY: number, top: number, p: ReturnType<typeof palette>): string[] {
+  const out = [`<line x1="${r1(left)}" y1="${r1(axY)}" x2="${r1(right)}" y2="${r1(axY)}" stroke="${p.muted}" stroke-width="${SW.line}"/>`];
+  const ly = axY + 17;
+  for (const m of axisMarks(ticks, X, left, right, (t) => textWidth(t, FS.small))) {
+    if (m.kind === "cut")
+      out.push(`<g transform="translate(${r1(m.x)} 0)"><title>${m.years} years with no events, cut</title>` +
+        `<path d="M-6 ${r1(axY)} q3 -6 6 0 t6 0" fill="none" stroke="${p.muted}" stroke-width="1.2"/>` +
+        `<line x1="0" x2="0" y1="${r1(top)}" y2="${r1(axY)}" stroke="${p.muted}" stroke-width="${SW.hair}" stroke-dasharray="2 3"/></g>`);
+    else if (m.kind === "year") {
+      out.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(top)}" y2="${r1(axY)}" stroke="${m.day === 0 ? p.muted : p.line}" stroke-width="${SW.hair}"/>`,
+        `<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(axY)}" y2="${r1(axY + 6)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) out.push(label(m.label.x, ly, m.label.text, { size: FS.small, fill: p.muted, anchor: "middle" }));
+    } else {
+      out.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${r1(axY)}" y2="${r1(axY + 3)}" stroke="${p.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) out.push(label(m.x, ly, m.label, { size: FS.small, fill: p.muted, anchor: "middle" }));
+    }
+  }
+  out.push(label((left + right) / 2, ly + 15, TIME_TITLE, { size: FS.small, fill: p.muted, anchor: "middle" }));
+  return out;
+}
+
+/** the time axis's title */
+const TIME_TITLE = "Time from diagnosis, when each sample was collected";
+
 function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const out: string[] = [];
@@ -75,8 +127,10 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
   let xs: number[], bottom: number;
   if (e.x === "time") {
     const days = samples.map((s) => s.day!);
-    const xsc = linear(Math.min(...days), Math.max(...days), left + pad, right - pad);
-    xs = days.map((t) => xsc(t));
+    let X: (day: number) => number;
+    if (e.axis?.length) { const { x } = dayScale(e.axis, right - left); X = (t) => left + x(t); }
+    else X = linear(Math.min(...days), Math.max(...days), left + pad, right - pad);
+    xs = days.map((t) => X(t));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));
     const markTop = top + H + 12;
     // samples taken the same day stack their markers
@@ -84,8 +138,13 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
     const rows = xs.map((x) => { const k = Math.round(x); const n = seen.get(k) || 0; seen.set(k, n + 1); return n; });
     samples.forEach((s, i) => out.push(marker(xs[i], markTop + MARK_R + rows[i] * (2 * MARK_R + 2), s)));
     const axY = markTop + (Math.max(...rows) + 1) * (2 * MARK_R + 2) + 4;
-    out.push(axisBottom(xsc, axY, p, { title: "Days from diagnosis, when each sample was collected", fmt: (t) => fmtInt(t), minX: 0, maxX: W, line: true }));
-    bottom = axY + bottomAxisHeight("x");
+    if (e.axis?.length) {
+      out.push(...timeAxis(e.axis, X, left, right, axY, top, p));
+      bottom = axY + 38;
+    } else {
+      out.push(axisBottom(X as Scale, axY, p, { title: "Days from diagnosis, when each sample was collected", fmt: (t) => fmtInt(t), minX: 0, maxX: W, line: true }));
+      bottom = axY + bottomAxisHeight("x");
+    }
   } else {
     xs = samples.map((_, i) => samples.length === 1 ? (left + right) / 2 : left + pad + i * (right - left - 2 * pad) / (samples.length - 1));
     out.push(axisLeft(y, left, p, { title: yTitle, gridTo: right }));
@@ -139,34 +198,70 @@ function keyRow(parts: string[], x0: number, y0: number, maxW: number, p: Return
   return { svg: out.join(""), height: y - y0 + rowH / 2 + 4 };
 }
 
-const heatFill = (vaf: number) => numericColor(encodeNumeric(Math.max(0, Math.min(1, vaf)), 0, 1), null, STYLE);
+/** a VAF's colour: the portal's VAF heatmap ramp, rgb(241,242,181) → rgb(19,80,88) (lib/oncoprint-style.ts) */
+const heatFill = (vaf: number) => rampColor(STYLE.ramps.vaf, Math.max(0, Math.min(1, vaf)));
 
-function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
-  const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!;
+/** The heatmap; `width` is wider than `W` when the default layout's columns need more room. */
+function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number; width: number } {
+  const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const G = STYLE.glyph, out: string[] = [];
-  const labelW = Math.min(W * 0.4, Math.max(60, ...drawn.map((m) => textWidth(mutationName(m), FS.small))) + 10);
-  const colW = Math.max(14, Math.min(56, (W - 16 - labelW) / samples.length)), rowH = 14, gap = 1;
-  const x0 = 8 + labelW, top = 4;
-  samples.forEach((s, j) => out.push(marker(x0 + j * colW + colW / 2, top + MARK_R, s)));
-  const y0 = top + 2 * MARK_R + 6;
-  drawn.forEach((m, i) => {
-    const y = y0 + i * rowH;
-    out.push(`<g class="evo-row"${m.key ? ` data-key="${esc(m.key)}"` : ""}>`, `<rect x="8" y="${r1(y)}" width="${r1(x0 + samples.length * colW - 8)}" height="${rowH}" fill="transparent"/>`);
-    out.push(label(x0 - 6, y + rowH / 2 + FS.small * 0.35, mutationName(m), { size: FS.small, fill: p.ink, anchor: "end", maxW: labelW - 6 }));
-    const cells = m.cells.map((c, j) => {
-      const x = x0 + j * colW, w = colW - gap, h = rowH - gap;
-      const band = (b: readonly [number, number], color: string) => `<rect x="${r1(x)}" y="${r1(y + b[0] * h)}" width="${r1(w)}" height="${r1((b[1] - b[0]) * h)}" fill="${color}"/>`;
-      let body: string;
-      if (c.status === "called" || c.status === "uncalled") {
-        body = band([0, 1], heatFill(c.vaf!)) + (c.status === "uncalled" ? `<circle cx="${r1(x + w / 2)}" cy="${r1(y + h / 2)}" r="2" fill="${c.vaf! > 0.5 ? "#ffffff" : p.ink}"/>` : "");
-      } else if (c.status === "absent") body = band([0, 1], STYLE.palette.unaltered);
-      else if (c.status === "noVaf") body = band([0, 1], STYLE.palette.unaltered) + band(G.mutation.band, G.mutation.single.color);
-      else body = band([0, 1], G.notProfiled.fill) + band(G.notProfiled.stripe.band, G.notProfiled.stripe.color);
-      return `<g data-s="${j}"><title>${esc(mutationName(m) + " in " + samples[j].label + " (" + samples[j].id + "): " + cellText(c))}</title>${body}</g>`;
+  const ord = e.heatmapOrder ?? heatmapOrder(drawn, samples.length, d);
+  const names = drawn.map(mutationName);
+  /** one cell of mutation i in sample j at (x, y), w × h */
+  const cell = (i: number, j: number, x: number, y: number, w: number, h: number) => {
+    const c = drawn[i].cells[j];
+    const band = (b: readonly [number, number], color: string) => `<rect x="${r1(x)}" y="${r1(y + b[0] * h)}" width="${r1(w)}" height="${r1((b[1] - b[0]) * h)}" fill="${color}"/>`;
+    let body: string;
+    if (c.status === "called" || c.status === "uncalled") {
+      body = band([0, 1], heatFill(c.vaf!)) + (c.status === "uncalled" ? `<circle cx="${r1(x + w / 2)}" cy="${r1(y + h / 2)}" r="2" fill="${c.vaf! > 0.5 ? "#ffffff" : p.ink}"/>` : "");
+    } else if (c.status === "absent") body = band([0, 1], STYLE.palette.unaltered);
+    else if (c.status === "noVaf") body = band([0, 1], STYLE.palette.unaltered) + band(G.mutation.band, G.mutation.single.color);
+    else body = band([0, 1], G.notProfiled.fill) + band(G.notProfiled.stripe.band, G.notProfiled.stripe.color);
+    return `<g data-s="${j}"><title>${esc(names[i] + " in " + samples[j].label + " (" + samples[j].id + "): " + cellText(c))}</title>${body}</g>`;
+  };
+  const gap = 1, top = 4;
+  let y0: number, gridBottom: number;
+  let width = W;
+  if (d.transpose) {
+    // a row per mutation, labelled; a column per sample, its numbered marker above
+    const labelW = d.mutationLabels ? Math.min(W * 0.4, Math.max(60, ...names.map((n) => textWidth(n, FS.small))) + 10) : 8;
+    const colW = Math.max(14, Math.min(56, (W - 16 - labelW) / samples.length)), rowH = 14;
+    const x0 = 8 + labelW;
+    ord.samples.forEach((j, k) => out.push(marker(x0 + k * colW + colW / 2, top + MARK_R, samples[j])));
+    y0 = top + 2 * MARK_R + 6;
+    ord.mutations.forEach((i, r) => {
+      const y = y0 + r * rowH, m = drawn[i];
+      out.push(`<g class="evo-row"${m.key ? ` data-key="${esc(m.key)}"` : ""}>`, `<rect x="8" y="${r1(y)}" width="${r1(x0 + samples.length * colW - 8)}" height="${rowH}" fill="transparent"/>`);
+      if (d.mutationLabels) out.push(label(x0 - 6, y + rowH / 2 + FS.small * 0.35, names[i], { size: FS.small, fill: p.ink, anchor: "end", maxW: labelW - 6 }));
+      out.push(...ord.samples.map((j, k) => cell(i, j, x0 + k * colW, y, colW - gap, rowH - gap)), "</g>");
     });
-    out.push(...cells, "</g>");
-  });
-  let h = y0 + drawn.length * rowH + 10;
+    gridBottom = y0 + drawn.length * rowH;
+  } else {
+    // the portal's default: a row per sample, its numbered marker at the left; a column per mutation, labelled below
+    // a column is at least 6 px, or a label's line height when labelled; past that the figure widens
+    const x0 = 8 + 2 * MARK_R + 8, rowH = 18;
+    const colW = Math.max(d.mutationLabels ? FS.small + 2 : 6, Math.min(20, (W - 16 - x0) / Math.max(1, drawn.length)));
+    width = Math.max(W, x0 + drawn.length * colW + 8);
+    y0 = top;
+    ord.samples.forEach((j, r) => out.push(marker(8 + MARK_R, y0 + r * rowH + rowH / 2, samples[j])));
+    ord.mutations.forEach((i, k) => {
+      const x = x0 + k * colW, m = drawn[i];
+      out.push(`<g class="evo-row"${m.key ? ` data-key="${esc(m.key)}"` : ""}>`, `<rect x="${r1(x)}" y="${r1(y0)}" width="${r1(colW)}" height="${r1(samples.length * rowH)}" fill="transparent"/>`);
+      out.push(...ord.samples.map((j, r) => cell(i, j, x, y0 + r * rowH, colW - gap, rowH - gap)), "</g>");
+    });
+    gridBottom = y0 + samples.length * rowH;
+    if (d.mutationLabels) {
+      // rotated a quarter turn, a label's glyphs lie on the +x side of its baseline: the baseline sits
+      // 0.35 em left of the column's centre so the text is centred under its column
+      const lh = Math.min(140, Math.max(...names.map((n) => textWidth(n, FS.small))) + 6);
+      ord.mutations.forEach((i, k) => {
+        const bx = x0 + k * colW + colW / 2 - FS.small * 0.35;
+        out.push(label(bx, gridBottom + 4, names[i], { size: FS.small, fill: p.ink, rotate: 90, maxW: lh - 6 }));
+      });
+      gridBottom += lh;
+    }
+  }
+  let h = gridBottom + 10;
   // the key: the VAF ramp, then the states without a VAF
   const rampW = 120, stops = [0, 0.25, 0.5, 0.75, 1];
   out.push(`<defs><linearGradient id="evo-ramp">${stops.map((t) => `<stop offset="${t}" stop-color="${heatFill(t)}"/>`).join("")}</linearGradient></defs>`);
@@ -183,7 +278,7 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
   ], rx + rampW + 18, h - 2, W - rx - rampW - 26, p);
   out.push(key.svg);
   h += Math.max(30, key.height + 4);
-  return { svg: out.join(""), height: h };
+  return { svg: out.join(""), height: h, width };
 }
 
 /** `o.caption: false` leaves the caveat out, for a page that prints it beside the figure. */
@@ -191,11 +286,15 @@ export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { capti
   const e = v.evolution, pt = e.patient;
   if (!pt || !e.drawn || !e.drawn.length) return null;
   const p = palette(o.theme), W = Math.max(420, o.width || 760);
-  const body = e.display.chart === "heatmap" ? heatmap(v, W, p) : lineChart(v, W, p);
+  const body: { svg: string; height: number; width?: number } = e.display.chart === "heatmap" ? heatmap(v, W, p) : lineChart(v, W, p);
+  const FW = Math.max(W, body.width ?? W);
   let y = body.height + 4;
   const key = sampleKey(pt.samples, y, W, p);
   y += key.height + 4;
   const cap = caption(o.caption === false ? "" : v.caveat || "", W, y, p.muted);
-  return frame(W, y + cap.height + 8, body.svg + key.svg + cap.svg, p.bg, false,
-    "Genomic evolution — " + pt.id + ": " + e.drawn.length + " mutations across " + pt.samples.length + " samples (" + (e.display.chart === "heatmap" ? "heatmap" : "VAF lines") + ")", { tip: false });
+  const hm = e.display.chart === "heatmap"
+    ? "heatmap, a row per " + (e.display.transpose ? "mutation" : "sample") + (e.display.cluster ? ", clustered" : "")
+    : "VAF lines";
+  return frame(FW, y + cap.height + 8, body.svg + key.svg + cap.svg, p.bg, false,
+    "Genomic evolution — " + pt.id + ": " + e.drawn.length + " mutations across " + pt.samples.length + " samples (" + hm + ")", { tip: false });
 }

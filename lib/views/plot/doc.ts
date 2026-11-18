@@ -15,7 +15,7 @@ export const plotDoc: KindDoc = {
   // drivers: which sources call a mutation a putative driver, for by:"driver" and to split a mutation type into (Driver)/(VUS)
   // <layer> = {"rule":"outliers"} | {"rule":"extremes","axis":"x|y","n":50?} | {"rule":"trend","n":50?} | {"cohort":C}
   //   default [{"rule":"outliers"}]; [] draws none; the first layer draws a case two share
-  // <axis> = {"source":"clinical","attribute":A,"log":?}
+  // <axis> = {"source":"clinical","attribute":A,"log":?,"label":?}  // label: the title, else the study's display name
   //        | {"source":"profile","profile":P,"gene":G,"by":"mutationType|mutated|driver"?,"log":?}
   //            // P is one of the study's profiles; what it is (mutations, SVs, discrete or
   //            // continuous copy number, mRNA, protein) comes from the study's own description

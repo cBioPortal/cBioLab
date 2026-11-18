@@ -140,7 +140,8 @@ export const TableRequest = z.object({
    * write the shown columns as a cBioPortal Study View file (lib/study-view-case-files.ts): TSV,
    * the study column under this header, attributes headed by their names or ids, a missing value NA
    */
-  caseFile: z.object({ study: z.enum(["Study ID", "Cancer Study"]), header: z.enum(["names", "ids"]) }).optional(),
+  caseFile: z.object({ study: z.enum(["Study ID", "Cancer Study"]), header: z.enum(["names", "ids"]),
+    table: z.object({ studyColumn: z.boolean() }).optional() }).optional(),
   ...customData,
 });
 
@@ -159,6 +160,7 @@ export const GenesRequest = z.object({
   symbols: z.array(z.string()).optional(),
   search: z.string().max(40).optional(),
   geneset: z.string().max(200).optional(),
+  panel: z.object({ id: z.string().regex(/^[A-Za-z0-9._ -]{1,120}$/), study: z.string().regex(/^[A-Za-z0-9._-]{1,120}$/) }).optional(),
 });
 
 /** POST /api/assay-entities — a generic-assay profile's entities matching `q`, for an axis's entity picker. */

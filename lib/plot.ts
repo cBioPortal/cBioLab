@@ -34,7 +34,7 @@ const OQL_PROFILED_TYPES: Partial<Record<string, ("MUTATION" | "CNA" | "SV")[]>>
 
 /** what goes on one axis */
 export type PlotAxis =
-  | { source: "clinical"; attribute: string; log?: boolean }
+  | { source: "clinical"; attribute: string; log?: boolean; label?: string }
   /**
    * One of the study's own molecular profiles, by its id without the study prefix, and a gene. What
    * the axis is follows from the profile's own type and datatype (lib/profile-catalog.ts): a
@@ -104,6 +104,18 @@ function alterationGenes(a: { gene?: string; genes?: string[] }): string[] {
 }
 /** a patient-mode category for a patient whose samples carry different values */
 export const MULTIPLE = "Multiple";
+
+/**
+ * The words a categorical axis's cases are labelled with. A plot takes the portal's (PLT-DT-3…5,
+ * PLT-DT-9, PLT-DT-11: "No mutation", "With Structural Variants", "Deep Deletion"); the cox and
+ * logistic views (`AxisCtx.labels: "model"`) keep the ones their documented reference levels name.
+ */
+export const AXIS_LABELS = {
+  portal: { noMutation: "No mutation", sv: "With Structural Variants", noSv: "No Structural Variants",
+    svNotProfiled: "Not profiled for structural variants", deepDel: "Deep Deletion", shallowDel: "Shallow Deletion" },
+  model: { noMutation: "Not mutated", sv: "Structural variant", noSv: "No structural variant",
+    svNotProfiled: OQL_NOT_PROFILED, deepDel: "Deep deletion", shallowDel: "Shallow deletion" },
+} as const;
 export type AxisKind = "num" | "cat" | "none";
 export type PlotShape = "scatter" | "box" | "table" | "waterfall";
 
@@ -178,6 +190,8 @@ export interface AxisCtx {
   oncokbPin?: string | null; profiles?: string[];
   /** the Genome Nexus releases a driver axis reads Cancer Hotspots at (lib/variant-annotation.ts) */
   variantPins?: VariantPins;
+  /** the cox and logistic views' labels ("Not mutated"); a plot's are the portal's (AXIS_LABELS) */
+  labels?: "model";
 }
 
 const GENE_RE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,19}$/;
@@ -194,9 +208,10 @@ export function plotShape(x: AxisKind, y: AxisKind): PlotShape {
 }
 
 /** what an axis is called on the figure */
-export function axisLabel(a: PlotAxis, names?: ReadonlyMap<string, string>): string {
+export function axisLabel(a: PlotAxis): string {
+  // the attribute's display name, put on the axis by lib/clinical-titles.ts; its id where there is none
   if (a.source === "clinical") {
-    const name = names?.get(a.attribute) || a.attribute;
+    const name = a.label || a.attribute;
     return a.log ? name + LOG_SUFFIX.log2 : name;
   }
   if (a.source === "molecular") {
@@ -215,8 +230,11 @@ export function axisLabel(a: PlotAxis, names?: ReadonlyMap<string, string>): str
   if (a.source === "alteration") {
     if ("label" in a && a.label) return a.label;
     const genes = alterationGenes(a);
-    const name = genes.length > 1 ? (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") : genes[0];
-    return name + (a.by === "cna" ? " copy number" : a.by === "sv" ? " structural variant" : a.by === "mutationType" ? " mutation type" : a.by === "driver" ? " driver vs VUS" : " mutation status");
+    if (genes.length > 1) return (genes.length <= 4 ? genes.join("/") + " (any)" : genes.length + " genes (any)") + " mutation status";
+    // one gene, as the portal's getAxisLabel titles it (PLT-DT-19); copy number by the event table has no portal axis
+    const g = genes[0];
+    return a.by === "cna" ? g + " copy number" : a.by === "sv" ? g + ": Variant vs No Variant" : a.by === "mutationType" ? g + ": Mutations"
+      : a.by === "driver" ? g + ": Driver vs VUS Mutations" : g + ": Mutated vs Wild Type";
   }
   if (a.source === "cohort") return "cohort";
   return "ordered cases";
@@ -250,6 +268,14 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean; 
   }
   if (a.source === "clinical" && !ATTR_RE.test(String(a.attribute || "")))
     throw new Error(which + " axis: '" + a.attribute + "' is not a clinical attribute name");
+  // a title: a string, short; and only on the axes that declare one (a gene set's or a query's is its own)
+  const lab = (a as { label?: unknown }).label;
+  if (lab != null) {
+    if (typeof lab !== "string" || lab.length > 200) throw new Error(which + " axis: a label is a title of at most 200 characters");
+    if (a.source === "profile") throw new Error(which + " axis: a profile axis takes its title from the study's profile; drop label");
+    if (a.source === "alteration" && ("genes" in a || isOqlAxis(a)))
+      throw new Error(which + " axis: a label is only for a one-gene alteration axis; a gene set's or an OQL query's title is its own");
+  }
   if (a.source === "profile") {
     if (!PROFILE_RE.test(String(a.profile || ""))) throw new Error(which + " axis: '" + a.profile + "' is not a profile");
     if (a.entity != null) {
@@ -286,7 +312,6 @@ export function validateAxis(a: PlotAxis, which: string, o: { cohort?: boolean; 
     return;
   }
   if (a.source === "alteration") {
-    if ("label" in a && a.label != null && (typeof a.label !== "string" || a.label.length > 200)) throw new Error(which + " axis: an alteration axis's label is a title of at most 200 characters");
     const genes = alterationGenes(a);
     if (!genes.length) throw new Error(which + " axis: an alteration axis needs a gene, a gene set, or an OQL query");
     for (const g of genes) if (!GENE_RE.test(g)) throw new Error(which + " axis: '" + g + "' is not a valid gene symbol");
@@ -323,6 +348,7 @@ function logOf(a: PlotAxis, expr: string): string {
 }
 
 export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): string {
+  const L = AXIS_LABELS[ctx.labels ?? "portal"];
   const db = ctx.db || DB, study = ctx.study, sample = ctx.unit === "sample";
   // A row keyed by sample is in the plot when its sample is one of the cohort's; a row keyed by
   // patient when its patient owns one. In patient mode a patient's values therefore come from the
@@ -365,7 +391,7 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     // them; a value outside the five levels is its own category, as written. In patient mode a
     // patient whose samples disagree is "Multiple", the rule every categorical axis follows.
     const gene = String(a.gene).toUpperCase();
-    const level = "multiIf(x = -2, 'Deep deletion', x = -1, 'Shallow deletion', x = 0, 'Diploid', x = 1, 'Gain', x = 2, 'Amplification', toString(x))";
+    const level = "multiIf(x = -2, " + sq(L.deepDel) + ", x = -1, " + sq(L.shallowDel) + ", x = 0, 'Diploid', x = 1, 'Gain', x = 2, 'Amplification', toString(x))";
     return "SELECT id, if(uniqExact(lv) > 1, " + sq(MULTIPLE) + ", any(lv)) AS v FROM (\n" +
       "SELECT " + strip(sample ? "sd.sample_unique_id" : "sd.patient_unique_id", study) + " AS id, " + level.replace(/\bx\b/g, finiteSql("ga.alteration_value")) + " AS lv\n" +
       "FROM " + db + ".genetic_alteration_derived ga\n" +
@@ -459,23 +485,23 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     const value = by === "cna"
       ? "if(countIf(g.cna_alteration >= 2) > 0, 'Amplification', if(countIf(g.cna_alteration <= -2) > 0, 'Deep deletion', 'Neutral'))"
       : by === "sv"
-        ? "if(countIf(" + hit + ") > 0, 'Structural variant', 'No structural variant')"
+        ? "if(countIf(" + hit + ") > 0, " + sq(L.sv) + ", " + sq(L.noSv) + ")"
       : by === "driver"
         // the portal's "Driver vs VUS": Driver when any of the case's mutations is a putative driver
-        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated', countIf(g.variant_type = 'mutation' AND g.drv = 1) > 0, 'Driver', 'VUS')"
+        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, " + sq(L.noMutation) + ", countIf(g.variant_type = 'mutation' AND g.drv = 1) > 0, 'Driver', 'VUS')"
       : by === "topMutationType"
         ? topMutationTypeSql(!!(drivers && drivers.annotated))
       : by === "mutationType" && drivers && drivers.annotated
         // the class of the case's driver mutations when it has any, else of its VUS, and which
-        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated'," +
+        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, " + sq(L.noMutation) + "," +
           " countIf(g.variant_type = 'mutation' AND g.drv = 1) > 0, concat(" + oneClass("g.variant_type = 'mutation' AND g.drv = 1") + ", ' (Driver)')," +
           " concat(" + oneClass("g.variant_type = 'mutation'") + ", ' (VUS)'))"
       : by === "mutationType"
         // one class per case; a case carrying two of them is its own honest category
-        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, 'Not mutated'," +
+        ? "multiIf(countIf(g.variant_type = 'mutation') = 0, " + sq(L.noMutation) + "," +
           " length(groupUniqArrayIf(" + MUT_CLASS + ", g.variant_type = 'mutation')) > 1, 'Multiple'," +
           " arrayElement(groupUniqArrayIf(" + MUT_CLASS + ", g.variant_type = 'mutation'), 1))"
-        : "if(countIf(g.variant_type = 'mutation') > 0, 'Mutated', 'Not mutated')";
+        : "if(countIf(g.variant_type = 'mutation') > 0, 'Mutated', " + sq(L.noMutation) + ")";
     // A case with no such alteration is "not mutated" (neutral, no SV) only when it is profiled for
     // every gene of the axis in that alteration type; otherwise it is "Not profiled", never counted
     // as wild type (the panel-aware rule). The case column is alt_case, not id, for the reason the
@@ -486,7 +512,7 @@ export function axisSelect(a: PlotAxis, ctx: AxisCtx, kind: AxisKind = "num"): s
     const sid = strip("sd.sample_unique_id", study);
     const profCols = genes.map((g, i) => "max(" + sid + " IN (SELECT profiled_id FROM (" + profiledCasesSql(g, type, { study, db, unit: "sample" }) + "))) AS p" + i);
     const profiled = genes.map((_, i) => "p" + i + " = 1").join(" AND ");
-    return "SELECT alt_case AS id, if(hits = 0 AND NOT (" + profiled + "), " + sq(by === "topMutationType" ? GENE_NOT_PROFILED_MUT : OQL_NOT_PROFILED) + ", v0) AS v FROM (\n" +
+    return "SELECT alt_case AS id, if(hits = 0 AND NOT (" + profiled + "), " + sq(by === "topMutationType" ? GENE_NOT_PROFILED_MUT : by === "sv" ? L.svNotProfiled : OQL_NOT_PROFILED) + ", v0) AS v FROM (\n" +
       "SELECT " + idCol + " AS alt_case, " + value + " AS v0, countIf(" + hit + ") AS hits,\n  " + profCols.join(",\n  ") + "\n" +
       "FROM " + db + ".sample_derived sd\n" +
       "LEFT JOIN (\n     " + events + "\n) g ON g.sample_unique_id = sd.sample_unique_id\n" +
@@ -932,13 +958,16 @@ export function plotHighlightCountSql(cohortSql: string, highlightSql: string): 
  * builders and is reachable only from `PatientLevelResolver`.
  */
 export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: string, cap = POINTS_CAP,
-  sparse?: SparseCells): PatientSql {
+  sparse?: SparseCells, colorSel?: string, ringSel?: string): PatientSql {
   const limit = "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
+  // each case's fill and ring category, as a box's points carry them; "" where it has none
   if (!sparse) return patientSql("WITH cohort AS (" + cohortSql + "),\n" +
     "     xs AS (" + xSel + "),\n" +
-    "     ys AS (" + ySel + ")\n" +
-    "SELECT xs.id AS id, xs.v AS x, ys.v AS y\n" +
-    "FROM xs INNER JOIN ys ON ys.id = xs.id\n" + limit);
+    "     ys AS (" + ySel + ")" +
+    (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") + (ringSel ? ",\n     rs AS (" + ringSel + ")" : "") + "\n" +
+    "SELECT xs.id AS id, xs.v AS x, ys.v AS y" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + "\n" +
+    "FROM xs INNER JOIN ys ON ys.id = xs.id" +
+    (colorSel ? "\nLEFT JOIN cs ON cs.id = xs.id" : "") + (ringSel ? "\nLEFT JOIN rs ON rs.id = xs.id" : "") + "\n" + limit);
   // the cases of every cell holding at most `cellMax` of them, binned exactly as plotBinsSql
   // bins the density over the same extent and grid
   const [bx, by] = clampGrid(sparse.grid), e = sparse.extent;
@@ -1115,7 +1144,7 @@ function lgamma(z: number): number {
 /** one drawn value, with its case id and whatever it is coloured by */
 export interface PlotPoint { id: string; g: string; v: number; c?: string; r?: string }
 /** one drawn scatter case, with its id */
-export interface PlotXYPoint { id: string; x: number; y: number }
+export interface PlotXYPoint { id: string; x: number; y: number; c?: string; r?: string }
 /**
  * Whether the plotted cohort's own cases are drawn as points. `all`: every case, at or under the
  * points cap. `none`: density alone, and `why` says why. Subsets drawn in colour over it are the
@@ -1213,6 +1242,8 @@ export interface PlotData {
   ringLabel?: string;
   /** a gene's copy-number ring draws Diploid and Not profiled too (the portal's grey and black strokes), where another ring leaves absence unringed */
   ringAbsent?: boolean;
+  /** why the points carry no colour though the view asks for one */
+  colourNote?: string;
   legend?: { label: string; color: string; ring?: boolean }[];
   violinBins?: number;
   /** the value range the violin's bins were cut over, which is not the range the box is drawn on */

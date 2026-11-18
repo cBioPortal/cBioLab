@@ -12,7 +12,7 @@ import { fmtInt } from "../../lib/chart/format.ts";
 import type { CohortDef, View } from "../../lib/types.ts";
 import type { PlotCell } from "../../lib/plot.ts";
 import { ChartMenu } from "./partitions.tsx";
-import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg } from "./chart-files.ts";
+import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg, type Say } from "./chart-files.ts";
 import { chartFileName } from "../../lib/study-view-download.ts";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import {
@@ -30,6 +30,8 @@ const DENSITY_KEY = "cbiolab.explore.density";
 
 interface Props {
   studies: string[];
+  /** the selection a chart's per-case file lists, as every Explore download reads it */
+  selection: () => { def: CohortDef; study: string } | null;
   draft: Draft;
   /** the attributes this study has, with the level each is recorded at */
   attrs: { attribute: string; per?: string }[];
@@ -43,7 +45,7 @@ interface Props {
 type PlotData = { shape: string; n: number; extent?: { x0: number; x1: number; y0: number; y1: number }; grid?: [number, number];
   bins?: PlotCell[]; stats?: { pearson: number | null; spearman: number | null }; coverage?: { total: number; nx: number; ny: number } };
 
-export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km }: Props) {
+export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km }: Props) {
   const hasScatter = [MUTATION_COUNT, FGA].every((a) => attrs.some((x) => x.attribute === a));
   // the reader's own menu settings, kept by this browser; read after mounting, so a server render never touches storage
   const [dset, setDset] = useState<DensitySettings>({});
@@ -62,8 +64,11 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
   // the density figure as a file, set by the drawn chart; a save that fails says why under the chart
   const densityFile = useRef<(() => string | null) | null>(null);
   const [fileError, setFileError] = useState<{ chart: string; message: string } | null>(null);
-  // the selection a chart's per-case file lists
-  const selection = studies.length ? { def: { ...(studies.length > 1 ? { studies } : {}), all: (draft ? draft.all : []) as CohortDef["all"] }, study: studies[0] } : null;
+  /** a chart's file messages, under that chart; a finished download clears only its own */
+  const sayFor = (chart: string): Say => (update) => setFileError((cur) => {
+    const m = update(cur?.chart === chart ? cur.message : null);
+    return m == null ? (cur?.chart === chart ? null : cur) : { chart, message: m };
+  });
 
   useEffect(() => {
     if (!studies.length || (!ep && !hasScatter)) return;
@@ -101,7 +106,7 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
           <span className="xc-title">{ep === "OS" ? "Overall survival" : ep + " survival"} of the selection</span>
           <ChartMenu label="the survival chart" actions={[{ label: "Download", title: "save this chart as a file",
             sub: [caseFileAction("Data", { kind: "survival", status: ep + "_STATUS", months: ep + "_MONTHS" }, chartFileName((ep === "OS" ? "Overall" : ep) + " survival", "data"),
-              () => selection, (message) => setFileError(message ? { chart: "survival", message } : null)),
+              selection, sayFor("survival")),
             ...figureActions((ep === "OS" ? "Overall" : ep) + " survival", () => {
               const curves = res?.survival?.curves;
               return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" })) : null;
@@ -134,7 +139,7 @@ export function ExploreCharts({ studies, draft, attrs, endpoints, addClauses, km
             { label: "Download", title: "save this chart as a file",
               sub: [caseFileAction("Data", { kind: "density", x: axes.x.attribute, y: axes.y.attribute },
                 chartFileName(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]), "data"),
-                () => selection, (message) => setFileError(message ? { chart: "density", message } : null)),
+                selection, sayFor("density")),
               ...figureActions(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]),
                 () => densityFile.current ? densityFile.current() : null, (message) => setFileError({ chart: "density", message }))] }]} />
         </div>

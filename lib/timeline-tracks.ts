@@ -91,6 +91,7 @@ export function numericResult(e: PatientEvent): { v: number; censored: boolean }
 const endOf = (e: PatientEvent) => (e.end != null && e.end > e.start ? e.end : e.start);
 const itemOf = (e: PatientEvent, i: number): TlItem => ({ i, start: e.start, end: endOf(e) });
 
+
 function nest(events: PatientEvent[], idx: number[], keys: string[], uid: string, label: string, depth: number): TlTrack {
   if (!keys.length) return { uid, label, depth, items: idx.map((i) => itemOf(events[i], i)), children: [], draw: "events" };
   const groups = new Map<string, number[]>();
@@ -163,6 +164,9 @@ export function buildTracks(events: PatientEvent[]): TlTrack[] {
 export function allItems(t: TlTrack): TlItem[] {
   return t.items.concat(...t.children.map(allItems));
 }
+
+/** The items the timeline's axis spans: every drawn track's events (an event with no type is not drawn). */
+export const timelineAxisItems = (events: PatientEvent[]): TlItem[] => buildTracks(events).flatMap(allItems);
 
 /** The rows drawn: each track, then its children unless it is collapsed (which then carries all their items). */
 export function flattenTracks(tracks: TlTrack[], collapsed: ReadonlySet<string>): { track: TlTrack; items: TlItem[]; collapsed: boolean }[] {
@@ -300,10 +304,79 @@ export function dayScale(ticks: AxisTick[], width: number): { x: (day: number) =
   return { x, span };
 }
 
+/** the portal's month on the axis (cbioportal-clinical-timeline TickIntervalEnum.MONTH) */
+export const MONTH = 30.41666;
+
+/**
+ * The month ticks inside the year starting at `yearStart`, drawn when a year is wider than 150 px, as
+ * the portal's axis draws them (TickAxis): one at each of the 11 months after the year's start, every
+ * 4th labelled, every one past 700 px a year. A label counts months from the year's start — "4m" in
+ * the first year, "2y 4m" later — and, before diagnosis, back from the next year: "-8m", "-1y 8m".
+ */
+export function monthTicks(yearStart: number, pxPerYear: number): { day: number; label: string | null }[] {
+  if (!(pxPerYear > 150)) return [];
+  const count = Math.round(yearStart / YEAR);
+  const out: { day: number; label: string | null }[] = [];
+  for (let i = 1; i < 12; i++) {
+    const shown = i % 4 === 0 || pxPerYear > 700;
+    let label: string | null = null;
+    if (shown) {
+      if (count < 0) {
+        const m = 12 - i, major = count + 1 === 0 ? "" : (count + 1) + "y";
+        label = count === -1 ? "-" + m + "m" : major + " " + m + "m";
+      } else label = count === 0 ? i + "m" : count + "y " + i + "m";
+    }
+    out.push({ day: yearStart + MONTH * i, label });
+  }
+  return out;
+}
+
 /** A year tick's label as the portal writes it: "0", "2y", "-3y". */
 export function yearLabel(startDay: number): string {
   const n = Math.round(startDay / YEAR);
   return n === 0 ? "0" : n + "y";
+}
+
+/** One mark of an axis over `ticks`, in drawing order: see {@link axisMarks}. */
+export type AxisMark =
+  /** a cut: where it sits and how many empty years it stands for */
+  | { kind: "cut"; x: number; years: number }
+  /** a year line; its label, centred at `label.x`, where it has room */
+  | { kind: "year"; x: number; day: number; label?: { x: number; text: string } }
+  /** a month tick inside a year wider than 150 px; its label where it has room */
+  | { kind: "month"; x: number; label?: string };
+
+export function axisMarks(ticks: AxisTick[], X: (day: number) => number, lo: number, hi: number, measure: (s: string) => number): AxisMark[] {
+  const out: AxisMark[] = [];
+  const cuts = ticks.filter((tk) => tk.trim).map((tk) => X(tk.start));
+  let lastRight = -Infinity;
+  for (const tk of ticks) {
+    if (tk.trim) {
+      const cx = X(tk.start);
+      out.push({ kind: "cut", x: cx, years: tk.trim.years });
+      lastRight = Math.max(lastRight, cx + 8);
+      continue;
+    }
+    for (let d = Math.ceil(tk.start / YEAR) * YEAR; d <= tk.end; d += YEAR) {
+      const x = X(d), text = yearLabel(d), w = measure(text);
+      const cx = Math.min(Math.max(x, lo + w / 2), hi - w / 2);
+      const clear = cx - w / 2 > lastRight + 6 && cuts.every((c) => Math.abs(c - cx) > w / 2 + 8);
+      out.push({ kind: "year", x, day: d, ...(clear ? { label: { x: cx, text } } : {}) });
+      if (clear) lastRight = cx + w / 2;
+      for (const m of monthTicks(d, X(d + YEAR) - x)) {
+        if (m.day > tk.end) break;
+        const mx = X(m.day);
+        let shown = false;
+        if (m.label) {
+          const mw = measure(m.label);
+          shown = mx - mw / 2 > lastRight + 6 && mx + mw / 2 < hi && cuts.every((c) => Math.abs(c - mx) > mw / 2 + 8);
+          if (shown) lastRight = mx + mw / 2;
+        }
+        out.push({ kind: "month", x: mx, ...(shown ? { label: m.label! } : {}) });
+      }
+    }
+  }
+  return out;
 }
 
 /**

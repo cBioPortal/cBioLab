@@ -1,5 +1,5 @@
 // The cancertypes view's Data download: the portal's cancer_types_summary.tsv (CancerSummaryChart getData).
-import { categoryLabel } from "./figure.ts";
+import { categoryLabel, geneSource } from "./figure.ts";
 import type { CancertypesGroup, CancertypesResult } from "./types.ts";
 
 /** our counts under the portal's keys, in its stack order (CancerSummaryContent OrderedAlterationLabelMap) */
@@ -16,7 +16,7 @@ const field = (s: string) => /[\t\n\r"]/.test(s) ? "\"" + s.replace(/"/g, "\"\""
  */
 export function cancertypesTsv(r: CancertypesResult, panel: number, gene: string | null): string {
   const pn = r.panels[panel];
-  const src = gene ? pn.perGene?.find((x) => x.gene === gene) ?? pn : pn;
+  const src = geneSource(pn, gene);
   const freq = r.show === "frequency";
   const rows: string[][] = [[categoryLabel(r.groupBy), freq ? "Alteration Frequency" : "Absolute Counts", "Alteration Type", "Alteration Count"]];
   for (const g of src.groups)

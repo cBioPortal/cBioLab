@@ -12,6 +12,7 @@ import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { dbsnpUrl, gnomadText, hgvsgUrl, impactLevel, msaUrls, num, signalRows, truncate, upperFirst,
   type GnomadRow, type MaPrediction, type Prediction, type SignalEntry } from "../../lib/mutation-cell-text.ts";
 import { portalPct, portalSig2 } from "../../lib/chart/format.ts";
+import { mutationTypeLabel, mutationTypeColor, mutationTypeTip } from "../../lib/mutation-type.ts";
 
 export type CellTip = { at: TipBox; body: React.ReactNode };
 type Show = (t: CellTip | null, x: number, y: number) => void;
@@ -286,4 +287,11 @@ export function FunctionalImpactCell({ detail, show }: { detail: Detail; show: S
       })}
     </span>
   );
+}
+
+/** Mutation Type as the portal draws it: the label in its colour, the stored text as tooltip where it differs */
+export function MutationTypeCell({ raw }: { raw: string }) {
+  const label = mutationTypeLabel(raw);
+  const bold = ["Missense", "Nonsense", "Splice", "IF del", "Fusion", "Silent"].includes(label) || label === raw;
+  return <span className={bold ? "font-semibold" : undefined} style={{ color: mutationTypeColor(raw) }} data-tip={mutationTypeTip(raw) ?? undefined}>{label}</span>;
 }

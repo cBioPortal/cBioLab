@@ -76,7 +76,8 @@ async function main() {
       alt.error || (a.patient?.id + ": " + a.tables.mutations.total + " mutations"));
     ok("the peer's patient list and its tables count the same mutations", listed === a.tables.mutations.total && isPeer(row?.values[cols.indexOf("source")]), listed + " vs " + a.tables.mutations.total);
     ok("a peer table is annotated, and says with which OncoKB version", a.oncokbPin != null && a.tables.mutations.rows.some((x) => x.values[3] !== ""), String(a.oncokbPin));
-    const vafs = a.tables.mutations.rows.map((x) => x.values[7]);
+    const vafAt = a.tables.mutations.columns.findIndex((c) => c.id === "vaf");
+    const vafs = a.tables.mutations.rows.map((x) => x.values[vafAt]);
     ok("a peer table is sorted by the peer as asked", vafs.length > 1 && vafs.every((v, i) => i === 0 || vafs[i - 1] >= v), vafs.join(", "));
     ok("prev / next step through the peer's patients", a.position && a.position.prev?.study === PEER && a.position.next?.study === PEER, JSON.stringify(a.position));
     const page = await post("/api/view-page", { doc: doc([altSpec]), view: 0, table: "mutations", offset: 5, limit: 5 });

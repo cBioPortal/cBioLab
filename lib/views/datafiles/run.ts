@@ -14,7 +14,7 @@ import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { plural, refuse } from "../shared.ts";
 import { datafilesCountsSql, type DataType, type LinePlan } from "./sql.ts";
-import { STATUS_TABLES, lineColumns, matrixColumns, matrixRowSource, statusColumns, statusRowSource, type FileColumn, type MatrixFile, type StatusTable, type StudyPlan } from "./tables.ts";
+import { STATUS_TABLES, everySample, lineColumns, matrixColumns, matrixRowSource, statusColumns, statusRowSource, type FileColumn, type MatrixFile, type StatusTable, type StudyPlan } from "./tables.ts";
 import type { DataFile, DatafilesResult, DatafilesView, LineFrequency } from "./types.ts";
 import { datafilesMethod } from "./method.ts";
 import { resolveDrivers } from "../../driver-settings.ts";
@@ -63,17 +63,22 @@ export function fileList(catalogs: Record<string, ProfileInfo[]>, studies: strin
   const sv = holding((p) => p.type === "STRUCTURAL_VARIANT");
   if (sv.length) out.push({ id: "sv", name: "Structural Variants (OQL is not in effect)", studies: sv, matrix: { kind: "sv" }, portalFile: "structural_variants.txt",
     description: "per sample and gene: its structural variants' event info, space-separated; NA when it has none; NP when its panel did not cover the gene" });
-  const profiles = new Map<string, ProfileInfo>();
-  for (const st of studies) for (const p of catalogs[st] || []) if (inGeneticAlterationDerived(p.type) && !profiles.has(p.profile)) profiles.set(p.profile, p);
   const rank = (p: ProfileInfo) => { const i = PROFILE_ORDER.indexOf(p.type); return i < 0 ? PROFILE_ORDER.length : i; };
-  // the portal's cna.txt is its selected copy-number profile, the first discrete one; any other takes its name
-  let cna = false;
-  for (const p of [...profiles.values()].sort((a, b) => rank(a) - rank(b) || a.order - b.order || a.profile.localeCompare(b.profile))) {
-    const discrete = p.type === "COPY_NUMBER_ALTERATION" && p.datatype.toUpperCase() === "DISCRETE";
-    const asCna = discrete && !cna;
-    if (asCna) cna = true;
+  const byOrder = (a: ProfileInfo, b: ProfileInfo) => rank(a) - rank(b) || a.order - b.order || a.profile.localeCompare(b.profile);
+  const isDiscrete = (p: ProfileInfo) => p.type === "COPY_NUMBER_ALTERATION" && p.datatype.toUpperCase() === "DISCRETE";
+  // the portal's cna.txt: each study's selected copy-number profile, its first discrete one, read study by study
+  const cnaOf: Record<string, string> = {};
+  for (const st of studies) { const p = (catalogs[st] || []).filter(isDiscrete).sort(byOrder)[0]; if (p) cnaOf[st] = p.profile; }
+  if (Object.keys(cnaOf).length) out.push({ id: "cna", name: "Copy-number Alterations (OQL is not in effect)", studies: Object.keys(cnaOf), matrix: { kind: "cna", profiles: cnaOf },
+    portalFile: "cna.txt", description: "per sample and gene: its value in its study's discrete copy-number profile (" + [...new Set(Object.values(cnaOf))].join(", ") +
+      "); NA when none is stored; NP when its panel did not cover the gene" });
+  const selected = new Set(Object.values(cnaOf));
+  const profiles = new Map<string, ProfileInfo>();
+  for (const st of studies) for (const p of catalogs[st] || []) if (inGeneticAlterationDerived(p.type) && !selected.has(p.profile) && !profiles.has(p.profile)) profiles.set(p.profile, p);
+  for (const p of [...profiles.values()].sort(byOrder)) {
+    const discrete = isDiscrete(p);
     out.push({ id: "profile:" + p.profile, name: p.name || p.profile, studies: holding((x) => x.profile === p.profile), matrix: { kind: "profile", profile: p.profile, discrete },
-      portalFile: asCna ? "cna.txt" : (p.name || p.profile) + ".txt",
+      portalFile: (p.name || p.profile) + ".txt",
       description: "per sample and gene: its value in " + p.profile + " (" + p.type.toLowerCase().replace(/_/g, " ") + ", " + p.datatype.toLowerCase() + ")" +
         (discrete ? "; NA when none is stored; NP when its panel did not cover the gene" : "; NA when none is stored") });
   }
@@ -93,8 +98,8 @@ const rowsOf = (r: Rows, cols: FileColumn[], text: (x: Record<string, unknown>, 
   cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
   values: cols.map((c) => text(x, c)) }));
 
-/** The table's page size from its spec: 1 to TABLE_ROWS_MAX, 25 when unset; NaN when out of range. */
-const pageSize = (n: unknown) => n == null ? 25 : Math.floor(Number(n));
+/** The table's page size from its spec: 1 to TABLE_ROWS_MAX, 20 (the portal's) when unset; NaN when out of range. */
+const pageSize = (n: unknown) => n == null ? 20 : Math.floor(Number(n));
 
 export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<ViewResult> {
   const { vNames, pin } = ctx;
@@ -148,8 +153,9 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
     const cols = file ? matrixColumns(genes) : statusColumns(id as StatusTable, lines);
     const defs = cols.map((c) => c.id);
     const shown = shownColumns(tq, cols, defs);
-    const r = await runRows(ctx, "datafiles:" + id, file ? file.studies : holders, tq, defs, shown, n,
-      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db) : statusRowSource(id as StatusTable, parts, lines, planOf),
+    // a gene-by-sample file lists every queried sample, as the portal's: NP in a study without its profile
+    const r = await runRows(ctx, "datafiles:" + id, file && !everySample(file.matrix) ? file.studies : holders, tq, defs, shown, n,
+      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db, (p) => file.studies.includes(p.study)) : statusRowSource(id as StatusTable, parts, lines, planOf),
       ctx.values ? { column: ctx.values, numeric: false } : undefined);
     const lineIds = lineColumns(lines).map((c) => c.id);
     const reads = (x: Record<string, unknown>, c: FileColumn): Cell => {
@@ -157,7 +163,8 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
       // the status tables' columns, read off their rows as tables.ts names them
       if (c.id === "sample") return String(x.sid ?? "");
       if (c.id === "patient") return String(x.patient ?? "");
-      if (c.id === "altered") return id === "matrix" ? (x.status === "altered" ? "1" : x.status === "unaltered" ? "0" : "NP") : String(x.status ?? "");
+      if (c.id === "study") return String(x.study ?? "");
+      if (c.id === "altered") return x.status === "altered" ? "1" : x.status === "unaltered" ? "0" : "NP";
       return String(x[(id === "matrix" ? "m" : "c") + lineIds.indexOf(c.id)] ?? "");
     };
     return { r, rows: { columns: cols, shown, defaults: defs, query: tq, rows: rowsOf(r, cols, reads), offset: r.offset, pageSize: n,
@@ -165,11 +172,16 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   };
   const result = (d: DatafilesResult, extra: Partial<ViewResult> = {}): ViewResult =>
     ({ kind: "datafiles", cohorts: vNames, datafiles: d, participation: ctx.participationFor(ctx.vStudies, true), ...extra } as ViewResult);
-  const lineInfo = lines.map((l, k) => ({ ...l, column: caseCols[3 + k].id }));
+  const lineIds = lineColumns(lines).map((c) => c.id);
+  const lineInfo = lines.map((l, k) => ({ ...l, column: lineIds[k] }));
   const empty = { samples: 0, altered: 0, unaltered: 0, unprofiled: 0 };
   const files = (counts: DatafilesResult["counts"], perStudy: Record<string, number>): DataFile[] => [
-    ...offered.map((f) => ({ id: f.id, name: f.name, description: f.description, group: "data" as const, portalFile: f.portalFile, rows: f.studies.reduce((n, st) => n + (perStudy[st] || 0), 0),
-      ...(f.studies.length < ctx.vStudies.length ? { studies: f.studies } : {}) })),
+    ...offered.map((f) => {
+      const every = everySample(f.matrix), partial = f.studies.length < holders.length;
+      return { id: f.id, name: f.name, description: f.description + (every && partial ? "; NP throughout for a study without it" : ""),
+        group: "data" as const, portalFile: f.portalFile, rows: (every ? holders : f.studies).reduce((n, st) => n + (perStudy[st] || 0), 0),
+        ...(partial ? { studies: f.studies } : {}) };
+    }),
     { id: "altered", name: "Altered samples", group: "list", rows: counts.altered, description: "the samples the query alters (any line), one per row" },
     { id: "unaltered", name: "Unaltered samples", group: "list", rows: counts.unaltered,
       description: "the samples no line alters that were profiled for every queried gene in every data type the query reads, one per row" },
