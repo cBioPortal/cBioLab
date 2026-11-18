@@ -60,7 +60,7 @@ export const ExploreRequest = z.object({
   /** generic-assay entities to chart, one each */
   assayCharts: z.array(z.object({ profileType: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/), entity: z.string().max(120) })).max(6).optional(),
   derived: z.array(z.object({ metric: z.string(), eventType: z.string().optional(), lineGap: z.number().optional() })).optional(),
-  /** only what describes the selection: its clinical attributes (kind, coverage, metadata), totals and data types; no value lists, histograms, gene tables, events or case lists */
+  /** one study only: what describes the selection, its clinical attributes (kind, coverage, metadata), totals and data types; no value lists, histograms, naCount, gene tables, events or case lists (ExploreArgs.attributesOnly). Ignored for several studies or a remote peer's */
   attributesOnly: z.boolean().optional(),
   /** count only OncoKB drivers in the gene tables and gene charts */
   drivers: z.boolean().optional(),

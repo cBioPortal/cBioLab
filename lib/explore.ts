@@ -191,7 +191,10 @@ export interface ExploreArgs {
    * Only what describes the selection: the clinical attributes with their kind, coverage and
    * metadata, the totals and the data types, computed exactly as for the full facets. No value
    * lists, histograms, gene tables, gene charts, derived facets, events or case lists: a page that
-   * lays itself out from these need not wait for the facets it does not draw.
+   * lays itself out from these need not wait for the facets it does not draw. A numeric facet
+   * carries no `naCount` (the histogram pass counts it), and its min/max/median are the
+   * selection's own: for an attribute the draft filters on, the full facets give them without that
+   * attribute's own clauses instead.
    */
   attributesOnly?: boolean;
 }
@@ -320,7 +323,7 @@ async function buildExploreOne(args: ExploreArgs): Promise<ExploreResult> {
       })),
     ...numAttrs.map((r): ClinicalFacet => ({
       attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np), samples: withData(r), distinct: Number(r.nv),
-      min: Number(r.mn), max: Number(r.mx), median: Number(r.md), naCount: Number(r.na)
+      min: Number(r.mn), max: Number(r.mx), median: Number(r.md), ...(only ? {} : { naCount: Number(r.na) })
     }))
   ].map((f) => {
     const m = meta.get(f.attribute);
