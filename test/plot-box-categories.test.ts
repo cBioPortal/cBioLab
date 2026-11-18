@@ -13,7 +13,8 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runPlot } from "../lib/views/plot/run.ts";
-import { withAxis } from "../lib/views/plot/axis-edit.ts";
+import { swapAxes, withAxis } from "../lib/views/plot/axis-edit.ts";
+import type { PlotView } from "../lib/views/plot/types.ts";
 import { CATEGORY_CAP, DEFAULT_BINS, POINTS_CAP, coverageNote, keptCategoriesSql, plotSelects, portalBox, tukey,
   type PlotData, type PlotGroup, type PlotPoint, type PlotRequest, type PointRank, type Whiskers } from "../lib/plot.ts";
 import { toLog } from "../lib/plot-log.ts";
@@ -284,44 +285,87 @@ describe("a filtered box's point layers and density (blocking 2)", () => {
   });
 });
 
-describe("settings left from another pair of axes (blocking 3)", () => {
-  test("A1 changing either axis drops the filter and the median order; the rest of the view is kept, the old one untouched", () => {
-    const v = { kind: "plot" as const, x: { source: "clinical" as const, attribute: "CAT" }, y: { source: "clinical" as const, attribute: "VAL" },
-      unit: "patient" as const, categories: ["A"], sortByMedian: true, regression: true };
-    const nx = withAxis(v, "x", { source: "clinical", attribute: "SEX" });
-    assert.deepEqual(nx, { kind: "plot", x: { source: "clinical", attribute: "SEX" }, y: v.y, unit: "patient", regression: true });
-    const ny = withAxis(v, "y", { source: "clinical", attribute: "AGE" });
-    assert.equal(ny.categories, undefined);
-    assert.equal(ny.sortByMedian, undefined);
-    assert.deepEqual(v.categories, ["A"], "the old view is not changed");
+describe("settings left from another pair of axes, kept as cBioPortal keeps them (PLT-AX-1b, PLT-AX-9, PLT-AX-10, PLT-AX-11)", () => {
+  const CAT = { source: "clinical" as const, attribute: "CAT" }, VAL = { source: "clinical" as const, attribute: "VAL" };
+  const box = { kind: "plot" as const, x: CAT as PlotView["x"], y: VAL as PlotView["x"], unit: "patient" as const, categories: ["A"], sortByMedian: true, regression: true };
+  const kept = (v: Partial<PlotView>) => [v.categories?.join() ?? "-", v.sortByMedian ?? "-"].join(" ");
+
+  test("A1 a change to the numeric axis keeps both", () => {
+    assert.equal(kept(withAxis(box, "y", { source: "clinical", attribute: "AGE" }, "x")), "A true");
+    assert.equal(kept(withAxis(box, "y", { source: "profile", profile: "rna_seq_v2_mrna", gene: "KRAS" }, "x")), "A true", "a numeric axis's data type too");
   });
 
-  test("A2 on a scatter or a table, categories and sortByMedian are refused before any value is read", async () => {
-    for (const [shape, extra, word] of [["scatter", { x: { source: "clinical", attribute: "AGE" }, y: { source: "clinical", attribute: "TMB" } }, "scatter"],
-      ["table", { y: { source: "clinical", attribute: "STAGE" } }, "contingency table"]] as const) {
-      for (const [view, named] of [[{ sortByMedian: true }, /^sortByMedian applies to a box plot/], [{ categories: ["A"] }, /^categories applies to a box plot/],
-        [{ categories: ["A"], sortByMedian: true }, /^categories and sortByMedian apply to a box plot/]] as const) {
+  test("A2 the categorical axis: a new gene or entity, a log scale or a title keeps both", () => {
+    const mut = { ...box, x: { source: "alteration", gene: "KRAS", by: "mutationType" } as PlotView["x"] };
+    assert.equal(kept(withAxis(mut, "x", { source: "alteration", gene: "TP53", by: "mutationType" }, "x")), "A true", "gene");
+    const prof = { ...box, x: { source: "profile", profile: "mutations", gene: "KRAS" } as PlotView["x"] };
+    assert.equal(kept(withAxis(prof, "x", { source: "profile", profile: "mutations", gene: "BRAF" }, "x")), "A true", "a profile axis's gene");
+    const ga = { ...box, x: { source: "assay", profileType: "armlevel_cna", entity: "1p", categorical: true } as PlotView["x"] };
+    assert.equal(kept(withAxis(ga, "x", { source: "assay", profileType: "armlevel_cna", entity: "1q", categorical: true }, "x")), "A true", "entity");
+    assert.equal(kept(withAxis(box, "x", { ...CAT, label: "Category" }, "x")), "A true", "title");
+  });
+
+  test("A3 the categorical axis's data type or source changing clears the filter only; the median order stays", () => {
+    assert.equal(kept(withAxis(box, "x", { source: "clinical", attribute: "SEX" }, "x")), "- true", "another attribute (source)");
+    assert.equal(kept(withAxis(box, "x", { source: "alteration", gene: "KRAS", by: "mutated" }, "x")), "- true", "another data type");
+    const mut = { ...box, x: { source: "alteration", gene: "KRAS", by: "mutationType" } as PlotView["x"] };
+    assert.equal(kept(withAxis(mut, "x", { source: "alteration", gene: "KRAS", by: "driver" }, "x")), "- true", "Plot Mutations by (source)");
+    const next = withAxis(box, "x", { source: "clinical", attribute: "SEX" }, "x");
+    assert.deepEqual(next, { kind: "plot", x: { source: "clinical", attribute: "SEX" }, y: VAL, unit: "patient", sortByMedian: true, regression: true });
+    assert.deepEqual(box.categories, ["A"], "the old view is not changed");
+  });
+
+  test("A4 with no box on screen no axis is known to hold the filter, so a change keeps both; a swap keeps both", () => {
+    assert.equal(kept(withAxis(box, "x", { source: "clinical", attribute: "SEX" })), "A true");
+    const s = swapAxes(box);
+    assert.deepEqual([s.x, s.y], [VAL, CAT]);
+    assert.equal(kept(s), "A true");
+  });
+
+  test("A5 on a scatter or a table both are set aside, said in the caption, and nothing is queried with the filter", async () => {
+    for (const [shape, extra, word] of [["scatter", { x: { source: "clinical", attribute: "AGE" }, y: { source: "clinical", attribute: "TMB" } }, "a scatter"],
+      ["table", { y: { source: "clinical", attribute: "STAGE" } }, "a contingency table"]] as const) {
+      for (const [view, named] of [[{ sortByMedian: true }, "Sort Categories by Median \\(sortByMedian\\) does"],
+        [{ categories: ["A"] }, "Filter categories \\(the view's categories\\) does"],
+        [{ categories: ["A"], sortByMedian: true }, "Filter categories \\(the view's categories\\) and Sort Categories by Median \\(sortByMedian\\) do"]] as const) {
         const calls: Call[] = [];
         const r = await run({ s1: site(VALUES, { shape, calls }) }, { ...extra, ...view });
-        assert.match(r.error ?? "", named, shape + " " + JSON.stringify(view));
-        assert.match(r.error ?? "", new RegExp("drawn as a " + word));
-        assert.deepEqual(calls.map((x) => x.op), ["axisKinds"], "nothing but the axes' kinds was asked");
+        assert.equal(r.error, undefined, shape + " " + JSON.stringify(view));
+        assert.equal(r.plot!.shape, shape);
+        assert.match(caption(r), new RegExp(named + " not apply to " + word + ", as on cBioPortal's Plots tab: (it is|they are) kept in the view and applied again when its axes make a box plot\\."));
+        assert.ok(calls.every((x) => !x.categories), "no query carried the filter: " + JSON.stringify(calls));
+        assert.equal(r.plot!.filtered, undefined);
       }
+      const plain = await run({ s1: site(VALUES, { shape }) }, extra);
+      assert.doesNotMatch(caption(plain), /does not apply|do not apply/, "nothing said without the settings");
     }
   });
 
-  test("A3 a plot by cohort refuses a leftover categories or sortByMedian, before any cohort is plotted", async () => {
-    for (const view of [{ categories: ["A"] }, { sortByMedian: true }]) {
-      const calls: Call[] = [];
-      const r = await run({ s1: site(VALUES, { calls }) }, { x: { source: "cohort" }, cohorts: ["All", "Some"], ...view });
-      assert.match(r.error ?? "", /a plot by cohort draws one box per cohort/, JSON.stringify(view));
-      assert.deepEqual(calls, [], "no cohort was plotted");
-    }
-    const ok = await run({ s1: site(VALUES) }, { x: { source: "cohort" }, cohorts: ["All", "Some"], categories: [] });
-    assert.equal(ok.error, undefined, "an empty list is no filter");
+  test("A6 a plot by cohort sets both aside: its boxes are drawn in full, the caption says so", async () => {
+    const calls: Call[] = [];
+    const r = await run({ s1: site(VALUES, { calls }) }, { x: { source: "cohort" }, categories: ["A"], sortByMedian: true });
+    assert.equal(r.error, undefined);
+    assert.equal(r.plot!.n, 10, "every case of the cohort, not A's 3");
+    assert.ok(calls.length && calls.every((x) => !x.categories), "no cohort's queries carried the filter");
+    assert.match(caption(r), /Filter categories \(the view's categories\) and Sort Categories by Median \(sortByMedian\) do not apply to a plot by cohort, whose boxes are the view's cohorts/);
+    const bad = await run({ s1: site(VALUES) }, { x: { source: "cohort" }, categories: "A" });
+    assert.match(bad.error ?? "", /categories lists the categories/, "a malformed setting is still refused");
   });
 
-  test("A4 a participant that answers every category under a filter (one that predates it) is refused, by name", async () => {
+  test("A7 back on a box, the settings kept through a table apply again", async () => {
+    // box (filter on CAT) -> the numeric axis becomes categorical (a table) -> back to a number
+    const toTable = withAxis({ kind: "plot", cohorts: ["All"], unit: "patient", points: [], x: CAT, y: VAL, categories: ["C", "B"], sortByMedian: true } as Partial<PlotView>,
+      "y", { source: "clinical", attribute: "STAGE" }, "x");
+    const t = await run({ s1: site(VALUES, { shape: "table" }) }, toTable as Record<string, unknown>);
+    assert.match(caption(t), /do not apply to a contingency table/);
+    const back = withAxis(toTable, "y", VAL);
+    assert.equal(kept(back), "C,B true");
+    const r = await run({ s1: site(VALUES) }, back as Record<string, unknown>);
+    assert.deepEqual(order(r), ["B", "C"], "filtered to B and C, by median");
+    assert.doesNotMatch(caption(r), /not apply/);
+  });
+
+  test("A8 a participant that answers every category under a filter (one that predates it) is refused, by name", async () => {
     const r = await run({ s1: site(VALUES, { ignoresFilter: true, peer: true }) }, { categories: ["A"] });
     assert.match(r.error ?? "", /^s1 answered a box for "[BCD]", a category the view's filter leaves out: .*predates Filter categories/);
     const f = await run({ s1: site(VALUES), s2: site({ A: [1], E: [2] }, { ignoresFilter: true, peer: true }) }, { categories: ["A"] });
@@ -333,7 +377,7 @@ describe("a box plot sorted by median", () => {
   test("S1: sortByMedian orders B, D, A, C (B and D tie at 2: category order kept)", async () => {
     const r = await runBox({ sortByMedian: true });
     assert.deepEqual(order(r), ["B", "D", "A", "C"]);
-    assert.equal(r.plot!.sortedByMedian, true);
+    assert.equal(r.plot!.sortedByMedian, "values");
   });
 
   test("S2: on a log axis the order is by the raw medians, from the points converted back", async () => {
@@ -361,6 +405,10 @@ describe("a box plot sorted by median", () => {
     const drawn = await runBox({ sortByMedian: true }, { log: true });
     assert.match(caption(drawn), /Boxes are ordered by their median, lowest first\./);
     assert.doesNotMatch(caption(drawn), /approximate/, "from the raw values when every value is drawn");
+    assert.equal(r.plot!.sortedByMedian, "boxes");
+    const step = (x: Result) => x.method!.steps.find((st) => st.title === "Boxes by median, lowest first")!.detail;
+    assert.match(step(r), /^Each box's own median from the query above .*the order is approximate/);
+    assert.match(step(drawn), /^Each category's median of its raw values/);
   });
 
   test("S4: several studies: the pooled boxes are sorted", async () => {

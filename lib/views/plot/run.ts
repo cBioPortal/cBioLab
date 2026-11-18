@@ -233,16 +233,19 @@ function boxChoicesProblem(pv: PlotView): string | null {
   return null;
 }
 
-/** whether the view asks for a box's category filter or median order, which only a box plot takes */
-const wantsBoxChoices = (pv: PlotView): boolean =>
-  !!pv.sortByMedian || (Array.isArray(pv.categories) ? pv.categories.length > 0 : pv.categories != null);
-
-/** the refusal of a box's settings on a pair drawn as another shape, naming what the view asked for */
-function notABox(pv: PlotView, k: { shape: string; xLabel: string; yLabel: string }): string {
-  const asked = [pv.categories && pv.categories.length ? "categories" : "", pv.sortByMedian ? "sortByMedian" : ""].filter(Boolean).join(" and ");
-  return asked + " " + (asked.includes(" and ") ? "apply" : "applies") + " to a box plot (one categorical axis and one numeric), as cBioPortal's " +
-    "Filter categories and Sort Categories by Median do; " + k.xLabel + " against " + k.yLabel + " is drawn as a " +
-    (k.shape === "table" ? "contingency table" : k.shape) + ". Leave " + (asked.includes(" and ") ? "them" : "it") + " out of the view.";
+/**
+ * The caption's line when the view's category filter or median order does not apply: a scatter, a
+ * contingency table and a plot by cohort have no categories to filter or boxes to order. As on
+ * cBioPortal the settings stay in the view, set aside, and apply again once the axes make a box
+ * plot; empty when the view has neither.
+ */
+function notApplied(pv: PlotView, shape: "scatter" | "table" | "cohort"): string {
+  const asked = [Array.isArray(pv.categories) && pv.categories.length ? "Filter categories (the view's categories)" : "",
+    pv.sortByMedian ? "Sort Categories by Median (sortByMedian)" : ""].filter(Boolean);
+  if (!asked.length) return "";
+  const what = shape === "cohort" ? "a plot by cohort, whose boxes are the view's cohorts" : shape === "table" ? "a contingency table" : "a scatter";
+  return asked.join(" and ") + (asked.length > 1 ? " do" : " does") + " not apply to " + what + ", as on cBioPortal's Plots tab: " +
+    (asked.length > 1 ? "they are" : "it is") + " kept in the view and applied again when its axes make a box plot.";
 }
 
 /**
@@ -307,9 +310,9 @@ function boxChoices(data: PlotData, pv: PlotView, categories: string[] | undefin
     };
     const at = new Map(data.groups.map((g, i) => [g.g, i]));
     data.groups = [...data.groups].sort((a, b) => medianOf(a) - medianOf(b) || at.get(a.g)! - at.get(b.g)!);
-    data.sortedByMedian = true;
     // a box whose values are not drawn as points is ordered by its own median, not its raw values'
     const own = data.groups.some((g) => byGroup.get(g.g)?.length !== g.n);
+    data.sortedByMedian = own ? "boxes" : "values";
     notes.push("Boxes are ordered by their median, lowest first" + (own
       ? ". The values are not drawn as points, so each box is ordered by its own median rather than its raw values', and the order is approximate: two close medians can swap."
       : "."));
@@ -641,14 +644,15 @@ async function runPlotByCohort(pv: PlotView, c: ViewRun): Promise<ViewResult | U
   const { cohorts, vNames, participationFor } = c;
   if (pv.colorBy || pv.ringBy || (Array.isArray(pv.points) && pv.points.length))
     return untimed({ kind: "plot", error: "a plot by cohort draws each cohort's cases plainly: colorBy, ringBy and point layers are not offered with it" });
-  if (wantsBoxChoices(pv))
-    return untimed({ kind: "plot", error: "a plot by cohort draws one box per cohort, and the view's cohorts choose them: categories and sortByMedian " +
-      "(Filter categories, Sort Categories by Median) apply to a box over a categorical axis, and are not offered with it" });
+  const problem = boxChoicesProblem(pv);
+  if (problem) return untimed({ kind: "plot", error: problem });
   if (!vNames.length) return untimed({ kind: "plot", error: "a plot by cohort needs the cohorts it compares" });
   const unit = pv.unit === "patient" ? "patient" as const : "sample" as const;
   const parts: PlotData[] = [];
   for (const n of vNames) {
-    const r0 = await runPlot({ ...pv, x: { source: "cohort", label: n }, points: [], cohorts: [n], [ONE_COHORT]: true } as unknown as DocView,
+    // each cohort's run without the box settings, which a plot by cohort sets aside (notApplied)
+    const r0 = await runPlot({ ...pv, x: { source: "cohort", label: n }, points: [], cohorts: [n], categories: undefined, sortByMedian: undefined,
+      [ONE_COHORT]: true } as unknown as DocView,
       { ...c, vNames: [n], vStudies: cohorts[n].studies });
     const r = (r0 instanceof Untimed ? r0.result : r0) as { error?: string; plot?: PlotData };
     if (r.error || !r.plot) return untimed({ kind: "plot", error: (vNames.length > 1 ? n + ": " : "") + (r.error || "no plot") });
@@ -679,7 +683,7 @@ async function runPlotByCohort(pv: PlotView, c: ViewRun): Promise<ViewResult | U
   return {
     kind: "plot", plot: data, cohorts: vNames, studies, participation: participationFor(studies, false),
     method: plotMethod({ cohort: vNames.join(", "), studies, unit, data }),
-    note: [coverageNote(data, unit), combineNote(data, unit), cases,
+    note: [coverageNote(data, unit), combineNote(data, unit), cases, notApplied(pv, "cohort"),
       vNames.length > 1 ? "One " + (data.shape === "table" ? "column" : "box") + " per cohort; a " + unit + " in more than one cohort is in each." : ""]
       .filter(Boolean).join(" ") || undefined
   };
@@ -739,15 +743,15 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
     ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}), ...(range ? { range } : {}) };
   const problem = layersProblem(pv, c, cn) ?? boxChoicesProblem(pv);
   if (problem) return untimed({ kind: "plot", error: problem });
-  const categories = plotCategoriesOf(pv.categories);
-  // a box's category filter and median order are refused on another shape before any value is
-  // read: the shape follows from the axes' kinds, which the first study's metadata gives
+  // a category filter goes into the queries of a box alone: the shape follows from the axes' kinds,
+  // which the first study's metadata gives before any value is read; on another shape it is set aside
   let kinds: Awaited<ReturnType<FederatedPlotCapable["plotAxisKinds"]>> | undefined;
-  if (wantsBoxChoices(pv)) {
+  let categories = plotCategoriesOf(pv.categories);
+  if (categories) {
     const r = resolvers[sites[0]];
-    if (!hasFederatedPlot(r)) return untimed({ kind: "plot", error: sites[0] + " cannot say what shape the plot is before drawing it, so categories and sortByMedian cannot be checked" });
+    if (!hasFederatedPlot(r)) return untimed({ kind: "plot", error: sites[0] + " cannot say what shape the plot is before drawing it, so the view's categories cannot be applied" });
     try { kinds = await r.plotAxisKinds(spec); } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
-    if (kinds.shape !== "box") return untimed({ kind: "plot", error: notABox(pv, kinds) });
+    if (kinds.shape !== "box") categories = undefined;
   }
   let logs: LogChecks;
   try {
@@ -777,7 +781,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       const pr: ViewResult = {
         kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), data.colourNote, data.categoryNote, layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), densityNote(data, unit), data.colourNote, data.categoryNote, data.shape === "box" ? "" : notApplied(pv, data.shape), layerNote(ls, unit), driverNote(pv.drivers, spec)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data })
       };
       return pr;
@@ -921,7 +925,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       markLogOff(data, logs);
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),
-        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, data.colourNote, data.categoryNote, layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
+        note: [logNote(logs, data), coverageNote(data, unit), combineNote(data, unit), data.note, data.colourNote, data.categoryNote, data.shape === "box" ? "" : notApplied(pv, data.shape), layerNote(ls, unit)].filter(Boolean).join(" ") || undefined,
         method: plotMethod({ cohort: cn, studies: sites, unit, data, moments }) };
       return pr;
     }

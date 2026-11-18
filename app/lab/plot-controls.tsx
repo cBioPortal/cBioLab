@@ -18,7 +18,7 @@ import { CHIP, FIELD } from "../_ui/toolbar.ts";
 import { profileUse, type ProfileInfo } from "../../lib/profile-catalog.ts";
 import { DriverSettingsMenu } from "../_oncoprint/DriverSettingsMenu.tsx";
 import type { PlotData } from "../../lib/plot.ts";
-import { withAxis } from "../../lib/views/plot/axis-edit.ts";
+import { swapAxes, withAxis } from "../../lib/views/plot/axis-edit.ts";
 import { PlotHover } from "./plot-hover.tsx";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_BASE, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
@@ -197,9 +197,11 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
   };
   const axisName = (side: "x" | "y") => plot?.[side].label || side;
   const unit = spec.unit || "sample";
+  // the categorical axis of the box on screen, whose data type or source changing clears the category filter
+  const filterSide = plot?.shape === "box" ? (plot.x.kind === "cat" ? "x" as const : "y" as const) : undefined;
   const axisFields = (side: "x" | "y") => <>
     <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} catalog={catalog} loading={loading} busy={busy}
-      onChange={(a) => update((vv) => withAxis(vv, side, withRnaSeqLog(a, vv[side], catalog)))} />
+      onChange={(a) => update((vv) => withAxis(vv, side, withRnaSeqLog(a, vv[side], catalog), filterSide))} />
     <LogToggle spec={spec} side={side} numeric={plot?.[side].kind === "num"} off={plot?.logOff?.[side]} busy={busy} update={update} />
   </>;
   const total = plot?.coverage?.total;
@@ -224,7 +226,7 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
           </AxisBlock>
           <Button variant="link" size="inline" className="plot-swap self-center text-md" disabled={busy}
             data-tip="put the horizontal axis's definition on the vertical axis, and the vertical one's on the horizontal"
-            onClick={() => update((vv) => ({ ...vv, x: vv.y, y: vv.x }))}><ArrowUp />Swap axes<ArrowDown /></Button>
+            onClick={() => update(swapAxes)}><ArrowUp />Swap axes<ArrowDown /></Button>
           <AxisBlock title="Vertical axis">
             {axisFields("y")}
           </AxisBlock>

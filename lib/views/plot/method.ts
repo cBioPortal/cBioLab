@@ -148,7 +148,11 @@ export function plotMethod(t: PlotTrace): MethodRecord {
         "the points and the point layers are over the " + fmtN(d.n) + " " + u + "s in them, of the " + fmtN(d.filtered.paired) + " with a value on both axes.",
       params: [["categories", d.filtered.categories.join(", ")]] });
     if (d.sortedByMedian) steps.push({ kind: "transform", title: "Boxes by median, lowest first",
-      detail: "Each category's median of its raw values (a log axis's converted back), lowest first, a tie kept in category order: cBioPortal's Sort Categories by Median (PLT-AX-10, PLT-STM-9). The order changes no number." });
+      detail: (d.sortedByMedian === "values"
+        ? "Each category's median of its raw values (a log axis's converted back), lowest first"
+        : "Each box's own median from the query above (a log axis's converted back), lowest first, since its values are not drawn as points; " +
+          "cBioPortal takes the median of the raw values, so on a log axis or across studies two close medians can swap, and the order is approximate") +
+        ", a tie kept in category order: cBioPortal's Sort Categories by Median (PLT-AX-10, PLT-STM-9). The order changes no number." });
     if (pooled) steps.push(d.quartiles === "pooled"
       ? { kind: "transform", title: "Pool each group across studies",
         detail: "Every study's values per group, put together and boxed by the rule above, as the portal computes a box over several studies (PLT-MD-2)." }

@@ -1283,8 +1283,12 @@ export interface PlotData {
    * have a value on both axes before the filter (`n` counts the kept categories' cases)
    */
   filtered?: { categories: string[]; paired: number };
-  /** the boxes are ordered by their raw values' median, lowest first (the view's `sortByMedian`) */
-  sortedByMedian?: boolean;
+  /**
+   * The boxes are ordered by their median, lowest first (the view's `sortByMedian`): `values`, of the
+   * raw values drawn as points; `boxes`, of each box's own median where its values are not drawn,
+   * an approximate order
+   */
+  sortedByMedian?: "values" | "boxes";
   /** a gene's copy-number ring draws Diploid and Not profiled too (the portal's grey and black strokes), where another ring leaves absence unringed */
   ringAbsent?: boolean;
   /** why the points carry no colour though the view asks for one */
