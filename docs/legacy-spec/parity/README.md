@@ -55,7 +55,7 @@ Re-measurement against master `cc9004b7` (01) and `bc53b944` (02–05) (2026-11-
 | **Comparison** | 161 | 24 | 59 | 39 | 29 | 2 | 7 | 1 | 20% | 39% |
 | **Study View** | 253 | 59 | 87 | 23 | 71 | 5 | 8 | 0 | 28% | 46% |
 | **Patient** | 173 | 81 | 43 | 6 | 35 | 4 | 4 | 0 | 51% | 64% |
-| **All** | **1,305** | 400 | 396 | 139 | 281 | 32 | 47 | 9 | **37%** | **52%** |
+| **All** | **1,305** | 387 | 409 | 139 | 281 | 29 | 50 | 9 | **36%** | **51%** |
 
 One legacy bug is reproduced in cBioLab, and is not counted as a match:
 - ~~05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).~~ Fixed rather than copied (#250); re-scored 2026-11-16.
