@@ -33,27 +33,27 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 
 | Scorecard | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞 ok | N/A | ? | Strict | Half |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [01 OncoPrint](01-oncoprint.md) | 104 | 50 | 39 | 2 | 10 | 1 | 2 | 0 | 51% | 70% |
-| [02 Cancer Types Summary](02-cancer-types-summary.md) | 59 | 11 | 15 | 14 | 15 | 1 | 3 | 0 | 25% | 38% |
-| [03 Mutual Exclusivity](03-mutual-exclusivity.md) | 40 | 5 | 11 | 11 | 11 | 1 | 1 | 0 | 18% | 31% |
-| [04 Plots](04-plots.md) | 170 | 13 | 42 | 33 | 75 | 2 | 5 | 0 | 12% | 24% |
-| [05 Mutations](05-mutations.md) | 139 | 27 | 44 | 18 | 33 | 4 | 7 | 6 | 27% | 43% |
-| [06 Structural Variants](06-structural-variants.md) | 54 | 28 | 12 | 7 | 5 | 2 | 0 | 0 | 56% | 67% |
+| [01 OncoPrint](01-oncoprint.md) | 104 | 51 | 38 | 2 | 10 | 1 | 2 | 0 | 52% | 70% |
+| [02 Cancer Types Summary](02-cancer-types-summary.md) | 59 | 21 | 12 | 12 | 10 | 1 | 3 | 0 | 42% | 53% |
+| [03 Mutual Exclusivity](03-mutual-exclusivity.md) | 40 | 6 | 11 | 11 | 10 | 1 | 1 | 0 | 20% | 34% |
+| [04 Plots](04-plots.md) | 170 | 16 | 42 | 30 | 75 | 2 | 5 | 0 | 14% | 26% |
+| [05 Mutations](05-mutations.md) | 139 | 38 | 41 | 13 | 30 | 4 | 7 | 6 | 35% | 50% |
+| [06 Structural Variants](06-structural-variants.md) | 54 | 30 | 12 | 7 | 3 | 2 | 0 | 0 | 59% | 70% |
 | [07 Co-expression](07-coexpression.md) | 49 | 10 | 14 | 11 | 6 | 1 | 6 | 1 | 35% | 49% |
 | [08 CN Segments](08-cn-segments.md) | 29 | 6 | 9 | 4 | 5 | 3 | 1 | 1 | 34% | 50% |
-| [09 Pathways](09-pathways.md) | 33 | 5 | 10 | 5 | 6 | 2 | 4 | 0 | 33% | 48% |
-| [10 Results › Download](10-results-download.md) | 41 | 5 | 23 | 6 | 4 | 1 | 2 | 0 | 20% | 48% |
+| [09 Pathways](09-pathways.md) | 33 | 5 | 12 | 3 | 6 | 2 | 4 | 0 | 33% | 52% |
+| [10 Results › Download](10-results-download.md) | 41 | 7 | 21 | 6 | 4 | 1 | 2 | 0 | 24% | 50% |
 | [20 Comparison core](20-comparison-core.md) | 73 | 6 | 24 | 17 | 22 | 0 | 4 | 0 | 14% | 30% |
-| [21 Comparison molecular](21-comparison-molecular.md) | 88 | 14 | 36 | 24 | 8 | 2 | 3 | 1 | 22% | 42% |
-| [30 Study View summary](30-study-summary.md) | 135 | 46 | 40 | 15 | 29 | 3 | 2 | 0 | 38% | 53% |
-| [31 Study View shell](31-study-view-shell.md) | 118 | 14 | 26 | 11 | 59 | 4 | 4 | 0 | 19% | 30% |
-| [40 Patient summary](40-patient-summary.md) | 92 | 35 | 25 | 12 | 15 | 4 | 1 | 0 | 43% | 57% |
-| [41 Patient tabs](41-patient-tabs.md) | 81 | 18 | 15 | 15 | 30 | 0 | 3 | 0 | 26% | 35% |
-| **Results** | 718 | 160 | 219 | 111 | 170 | 18 | 31 | 8 | 29% | 44% |
-| **Comparison** | 161 | 20 | 60 | 41 | 30 | 2 | 7 | 1 | 18% | 37% |
-| **Study View** | 253 | 60 | 66 | 26 | 88 | 7 | 6 | 0 | 29% | 42% |
-| **Patient** | 173 | 53 | 40 | 27 | 45 | 4 | 4 | 0 | 35% | 47% |
-| **All** | **1,305** | 293 | 385 | 205 | 333 | 31 | 48 | 9 | **29%** | **43%** |
+| [21 Comparison molecular](21-comparison-molecular.md) | 88 | 18 | 35 | 22 | 7 | 2 | 3 | 1 | 26% | 46% |
+| [30 Study View summary](30-study-summary.md) | 135 | 48 | 40 | 14 | 28 | 3 | 2 | 0 | 39% | 54% |
+| [31 Study View shell](31-study-view-shell.md) | 118 | 24 | 34 | 9 | 43 | 5 | 3 | 0 | 27% | 42% |
+| [40 Patient summary](40-patient-summary.md) | 92 | 51 | 25 | 2 | 9 | 4 | 1 | 0 | 61% | 74% |
+| [41 Patient tabs](41-patient-tabs.md) | 81 | 30 | 18 | 4 | 26 | 0 | 3 | 0 | 41% | 52% |
+| **Results** | 718 | 190 | 212 | 99 | 159 | 18 | 31 | 8 | 33% | 48% |
+| **Comparison** | 161 | 24 | 59 | 39 | 29 | 2 | 7 | 1 | 20% | 39% |
+| **Study View** | 253 | 72 | 74 | 23 | 71 | 8 | 5 | 0 | 34% | 48% |
+| **Patient** | 173 | 81 | 43 | 6 | 35 | 4 | 4 | 0 | 51% | 64% |
+| **All** | **1,305** | 367 | 388 | 167 | 294 | 32 | 47 | 9 | **34%** | **49%** |
 
 One legacy bug is reproduced in cBioLab, and is not counted as a match:
 - ~~05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).~~ Fixed rather than copied (#250); re-scored 2026-11-16.

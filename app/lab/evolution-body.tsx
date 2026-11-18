@@ -6,15 +6,17 @@
 // (app/lab/patient-nav.tsx); the cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { evolutionSvg, evolutionKey, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
+import { evolutionSvg, evolutionKey, portalCellTip, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
 import type { TableQuery } from "../../lib/types";
 import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../lib/views/evolution/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
+import { OptionSelect } from "../_ui/choice.tsx";
+import { patientPatch } from "../../lib/views/evolution/groups.ts";
 
-type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; mutations?: Record<string, unknown> } & Record<string, unknown>;
+type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; transpose?: boolean; cluster?: boolean; mutationLabels?: boolean; expandGaps?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
 export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: {
   v: { evolution: EvolutionResult; caveat?: string } & Record<string, unknown>; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
@@ -78,7 +80,8 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
   };
   const clickFigure = (ev: React.MouseEvent) => { const k = (ev.target as Element).closest?.("[data-key]")?.getAttribute("data-key"); if (k) toggle(k); };
   const tipped = tip ? e.drawn?.find((m) => m.key === tip.key) : undefined;
-  const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch({ patient: to }); };
+  // another patient starts ungrouped, as the portal's Group by starts over on each patient's page
+  const go = (to: PatientKey | null | undefined) => { if (to && !updating) patch(patientPatch(to)); };
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.id;
   const setQuery = (q: TableQuery) => {
     const rows = (spec.mutations as { rows?: number } | undefined)?.rows;
@@ -92,7 +95,7 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     // eslint-disable-next-line jsx-a11y-x/no-static-element-interactions -- arrow-key shortcuts for the patient buttons PatientNav already provides
     <div className="tl-view" tabIndex={-1} onKeyDown={patientKeys(e.position, go)}>
       {!fixed && <PatientNav shown={p ? p.id : null} position={e.position} total={e.total} updating={updating} go={go} what="draw it"
-        openList={() => setListOpen(true)} first={() => patch({ patient: undefined })} />}
+        openList={() => setListOpen(true)} first={() => patch(patientPatch(null))} />}
       {p ? (
         <div className="tl-head">
           <span className="tl-who mono">{p.id}</span>
@@ -107,19 +110,43 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               <Button type="button" variant={chart === "line" ? "default" : "outline"} size="sm" className={TB} aria-pressed={chart === "line"}
                 data-tip="a line per mutation through its VAF in each sample" onClick={() => patch({ chart: undefined })}>Line chart</Button>
               <Button type="button" variant={chart === "heatmap" ? "default" : "outline"} size="sm" className={TB} aria-pressed={chart === "heatmap"}
-                data-tip="a row per mutation, a column per sample, coloured by VAF" onClick={() => patch({ chart: "heatmap" })}>Heatmap</Button>
+                data-tip="a row per sample and a column per mutation, coloured by VAF" onClick={() => patch({ chart: "heatmap" })}>Heatmap</Button>
             </div>
             <div className="tbz">
-              <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
-                <Checkbox checked={!!spec.sequential || !!e.noDay?.length} disabled={!!e.noDay?.length || chart === "heatmap"} onCheckedChange={(on) => patch({ sequential: (on === true) || undefined })} /> sequential
-              </label>
-              <label className="chk" data-tip={chart === "heatmap" ? "the heatmap's colours always run from 0 to 1" : "the y axis on a log scale; a VAF of 0 sits at its floor, 0.001"}>
-                <Checkbox checked={!!spec.logScale} disabled={chart === "heatmap"} onCheckedChange={(on) => patch({ logScale: (on === true) || undefined })} /> log scale
-              </label>
-              <label className="chk" data-tip={chart === "heatmap" ? "the heatmap's colours always run from 0 to 1" : "the y axis spans the VAFs drawn rather than 0 to 1"}>
-                <Checkbox checked={!!spec.dataRange} disabled={chart === "heatmap"} onCheckedChange={(on) => patch({ dataRange: (on === true) || undefined })} /> y axis to data range
-              </label>
+              <span className="meta">Group by</span>
+              <OptionSelect value={spec.groupBy || ""} ariaLabel="group the samples by" disabled={chart === "heatmap" || (!e.groupOptions?.length && !spec.groupBy)} className="max-w-56"
+                title={chart === "heatmap" ? "only the line chart is grouped" : e.ungrouped ? e.ungrouped : !e.groupOptions?.length ? "the samples have no clinical attributes to group by" : "a line per mutation and group of samples sharing a value, each group in its colour, as the portal's Group by"}
+                onValueChange={(v) => patch({ groupBy: v || undefined })}>
+                <option value="">None</option>
+                {(e.groupOptions || []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                {spec.groupBy && !e.groupOptions?.some((o) => o.id === spec.groupBy) && <option value={spec.groupBy}>{spec.groupBy} (not this patient's)</option>}
+              </OptionSelect>
+              {e.ungrouped && chart === "line" && <span className="meta" role="status">not grouped: {e.ungrouped}</span>}
             </div>
+            {chart === "heatmap" ? <div className="tbz">
+              <label className="chk" data-tip="order the samples and the mutations by their VAFs (average linkage, 1 − Spearman), as the portal clusters its heatmap">
+                <Checkbox checked={spec.cluster !== false} onCheckedChange={(on) => patch({ cluster: on === true ? undefined : false })} /> cluster
+              </label>
+              <label className="chk" data-tip="a row per mutation and a column per sample, rather than a row per sample">
+                <Checkbox checked={!!spec.transpose} onCheckedChange={(on) => patch({ transpose: (on === true) || undefined })} /> transpose
+              </label>
+              <label className="chk" data-tip="label each mutation GENE protein change">
+                <Checkbox checked={spec.mutationLabels !== false} onCheckedChange={(on) => patch({ mutationLabels: on === true ? undefined : false })} /> show mutation labels
+              </label>
+            </div> : <div className="tbz">
+              <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
+                <Checkbox checked={!!spec.sequential || !!e.noDay?.length} disabled={!!e.noDay?.length} onCheckedChange={(on) => patch({ sequential: (on === true) || undefined })} /> sequential
+              </label>
+              <label className="chk" data-tip="the y axis on a log scale; a VAF of 0 sits at its floor, 0.001">
+                <Checkbox checked={!!spec.logScale} onCheckedChange={(on) => patch({ logScale: (on === true) || undefined })} /> log scale
+              </label>
+              <label className="chk" data-tip="the y axis spans the VAFs drawn rather than 0 to 1">
+                <Checkbox checked={!!spec.dataRange} onCheckedChange={(on) => patch({ dataRange: (on === true) || undefined })} /> y axis to data range
+              </label>
+              <label className="chk" data-tip={e.x !== "time" ? "only the line chart placed by collection day has a time axis" : "draw every year on the time axis; by default runs of four or more years with no event are cut to a squiggle, as on the timeline"}>
+                <Checkbox checked={!!spec.expandGaps} disabled={e.x !== "time"} onCheckedChange={(on) => patch({ expandGaps: (on === true) || undefined })} /> every year
+              </label>
+            </div>}
           </div>
         </div>
       ) : <p className="meta">No patient to draw: the cohort has no patient with two or more samples and allele counts.</p>}
@@ -144,7 +171,7 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
           {(close) => (
             <DataTable t={e} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit="patients"
               title="choose a patient" onQuery={(q) => patch({ ...q })}
-              onRow={(row) => { if (!isSel(row)) patch({ patient: { study: row.study, id: row.patient } }); close(); }} selected={isSel}
+              onRow={(row) => { if (!isSel(row)) patch(patientPatch({ study: row.study, id: row.patient })); close(); }} selected={isSel}
               cell={(id, x) => id === "patient" ? <span className="mono">{x}</span> : undefined} />
           )}
         </PatientsDialog>
@@ -159,11 +186,7 @@ const TIP_ROOM = 125;
 /** A mark's tooltip, as the portal's: the mutation, the sample, and its VAF with the reads behind it. */
 function EvolutionTip({ m, sample, s, x, y, below }: { m: EvolutionMutation; sample: EvolutionSample; s: number; x: number; y: number; below: boolean }) {
   const c = m.cells[s];
-  const reads = c.alt != null && c.ref != null ? " (" + c.alt.toLocaleString() + " reads of " + (c.alt + c.ref).toLocaleString() + " total)" : "";
-  const state = c.status === "called" ? "VAF: " + c.vaf!.toFixed(2) + reads
-    : c.status === "uncalled" ? "VAF: " + c.vaf!.toFixed(2) + reads + ", uncalled"
-    : c.status === "absent" ? "Not found (VAF 0)" + (c.alt != null && c.ref != null ? " in " + (c.alt + c.ref).toLocaleString() + " reads" : "")
-    : c.status === "noVaf" ? "Called, no allele counts" : "Not profiled for " + m.gene;
+  const state = portalCellTip(c, sample.id, m.gene);
   // kept inside the figure: shifted sideways near its edges, the arrow still on the point
   const el = useRef<HTMLDivElement>(null);
   const [shift, setShift] = useState(0);

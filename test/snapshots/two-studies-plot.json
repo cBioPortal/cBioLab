@@ -244,8 +244,8 @@
           "spearman": -0.11706432914584441,
           "slope": -0.12815725764648467,
           "intercept": 18.373049900699872,
-          "pPearson": 0.00004224541664106695,
-          "pSpearman": 0.00026220187704929787
+          "pPearson": 0.000042264766071365036,
+          "pSpearman": 0.0002623406544952066
         },
         "note": "2 studies pooled (luad_tcga_pan_can_atlas_2018, lusc_tcga_pan_can_atlas_2018). Each site reports six sums (n, Σx, Σy, Σxy, Σx², Σy²), exact and additive, for Pearson's r and the regression line; the bin grid uses one shared scale (each site's own extent, pooled) so cells sum correctly. Spearman's rank correlation is over every study's pairs ranked together, as the portal ranks them.",
         "coverage": {
@@ -679,7 +679,7 @@
           {
             "kind": "statistic",
             "title": "p-values",
-            "detail": "For each coefficient r over n points: t = |r|·√((n − 2)/(1 − r²)), two-sided Student's t on n − 2 degrees of freedom; p = 0 when |r| = 1, none for n ≤ 2 (the portal's PLT-STM-6)."
+            "detail": "For each coefficient r over n points, rounded to 5 decimals first as the portal keeps it: t = |r|·√((n − 2)/(1 − r²)), two-sided Student's t on n − 2 degrees of freedom; p = 0 when the rounded |r| = 1, none for n ≤ 2 (the portal's PLT-STM-6)."
           }
         ],
         "implementation": {
@@ -706,10 +706,10 @@
             "abs": 1e-9
           },
           "plot:pPearson": {
-            "v": 0.00004224541664106695
+            "v": 0.000042264766071365036
           },
           "plot:pSpearman": {
-            "v": 0.00026220187704929787
+            "v": 0.0002623406544952066
           }
         }
       }

@@ -1,11 +1,14 @@
 // A Study View chart's Download ▸ SVG and PDF (docs/legacy-spec/parity/download-cases.md, FG): the
 // figure as a standalone file, named after the chart, and the menu entries that save it.
-import { chartFileName, saveText } from "../../lib/study-view-download.ts";
+import { chartFileName, saveBlob, saveText } from "../../lib/study-view-download.ts";
 import { esc, FS } from "../../lib/svg-kit.ts";
 import { densityGradientStops, type CorrelationLine, type DensityLegend } from "../../lib/study-view-density.ts";
 import { fmtInt } from "../../lib/chart/format.ts";
 import { svgToPdf } from "../_oncoprint/pdf.ts";
 import type { ChartAction } from "./partitions.tsx";
+import { caseFileDoc, caseFileFormat, type CaseFile } from "../../lib/study-view-case-files.ts";
+import type { CohortDef } from "../../lib/types.ts";
+import { api } from "./api.ts";
 
 /** the page's colour variables as the light theme's literals, so a saved figure reads the same anywhere */
 const LITERALS: [RegExp, string][] = [
@@ -83,16 +86,6 @@ export function pdfFonts(svg: string): string {
       open + '<g font-family="IBM Plex Sans">' + body + "</g>" + close);
 }
 
-/** saves a PDF of the figure, a page its own size */
-function saveBlob(file: string, blob: Blob): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = file;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
-
 /** a standalone SVG (standaloneSvg) saved as a PDF */
 export async function savePdf(file: string, svg: string): Promise<void> {
   saveBlob(file, await svgToPdf(pdfFonts(svg)));
@@ -128,4 +121,81 @@ export function figureActions(chartName: string, figure: () => string | null, on
         savePdf(chartFileName(chartName, "pdf"), s).catch((e) => onError("Could not make the PDF: " + String((e as Error)?.message || e)));
       } },
   ];
+}
+
+/** the line breaks in a blob, counted a chunk at a time */
+async function lineBreaks(blob: Blob): Promise<number> {
+  let n = 0;
+  const reader = blob.stream().getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return n;
+    for (let i = 0; i < value.length; i++) if (value[i] === 10) n++;
+  }
+}
+
+const INCOMPLETE = "# DOWNLOAD INCOMPLETE: ";
+
+/**
+ * Fetches a per-case file (download-cases.md PC) through the patient-level table route and saves
+ * it. Answers what the file leaves out (studies that may not list their patients, attributes past
+ * the table's limit), or null; throws, saving nothing, when the route refuses or the file arrived
+ * incomplete — its last line says it was cut short, or it holds fewer lines than the route said.
+ */
+export async function saveCaseFile(file: CaseFile, fileName: string, def: CohortDef, study: string): Promise<string | null> {
+  const res = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
+    body: await api.tablePayload({ doc: caseFileDoc(file, def, study), view: 0, caseFile: caseFileFormat(file) }) });
+  if (!res.ok) throw new Error((await res.text()).replace(/^cannot download: /, "").trim());
+  const blob = await res.blob();
+  const tail = await blob.slice(Math.max(0, blob.size - 4096)).text();
+  const cut = tail.lastIndexOf(INCOMPLETE);
+  if (cut >= 0) throw new Error(tail.slice(cut + INCOMPLETE.length).trim());
+  const want = res.headers.get("x-line-breaks");
+  if (want != null) {
+    const got = await lineBreaks(blob);
+    if (got !== Number(want)) throw new Error("the file arrived incomplete (" + got + " of " + want + " lines)");
+  }
+  saveBlob(fileName, blob);
+  const left = [res.headers.get("x-left-out"), res.headers.get("x-columns-cut")];
+  const said = [left[0] ? "the studies that may not list their patients: " + decodeURIComponent(left[0]) : "",
+    left[1] ? "all but " + decodeURIComponent(left[1]) : ""].filter(Boolean);
+  return said.length ? said.join("; ") : null;
+}
+
+/** a message setter that can keep what is shown (a React state setter is one) */
+export type Say = (update: (current: string | null) => string | null) => void;
+
+/** the downloads being prepared, by what they ask for (two can share a file name: the header's and the tab's clinical data); the same request again is ignored until it ends */
+const preparing = new Set<string>();
+
+/**
+ * One per-case download, as every entry and button runs it: says it is preparing the file, saves
+ * it, then replaces that message with what the file leaves out (or clears it) — only if the message
+ * is still its own; a failure always says why. `busy` follows it.
+ */
+export async function runCaseFile(file: CaseFile, fileName: string, sel: { def: CohortDef; study: string } | null, say: Say,
+  busy?: (on: boolean) => void): Promise<void> {
+  if (!sel) { say(() => "select a study first"); return; }
+  const asked = JSON.stringify([fileName, file, sel.def, sel.study]);
+  if (preparing.has(asked)) return;
+  preparing.add(asked);
+  busy?.(true);
+  const mine = "preparing " + fileName + "…";
+  say(() => mine);
+  try {
+    const left = await saveCaseFile(file, fileName, sel.def, sel.study);
+    const done = left ? fileName + " leaves out " + left : null;
+    say((cur) => cur === mine ? done : cur);
+  } catch (e) {
+    say(() => "Could not download " + fileName + ": " + String((e as Error)?.message || e));
+  } finally {
+    preparing.delete(asked);
+    busy?.(false);
+  }
+}
+
+/** A chart menu's Full Data or Data entry: runCaseFile over the selection `sel` gives at the click. */
+export function caseFileAction(label: "Full Data" | "Data", file: CaseFile, fileName: string, sel: () => { def: CohortDef; study: string } | null,
+  say: Say): ChartAction {
+  return { label, title: "each selected case's value, as " + fileName, onClick: () => { void runCaseFile(file, fileName, sel(), say); } };
 }

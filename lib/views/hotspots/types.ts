@@ -2,6 +2,7 @@
 import type {  } from "../../types.ts";
 
 import type { DriverSettings } from "../../driver-settings.ts";
+import type { LollipopRows } from "../../federation.ts";
 export interface HotspotsView {
   /** the analyst's own one-line annotation, drawn above the figure (plain text, never markdown) */
   note?: string; kind: "hotspots"; genes: string[]; cohorts?: string[]; minCount?: number;
@@ -25,7 +26,20 @@ export interface HotspotsView {
    * filters the mutation table to those protein positions. Applied where the figure is drawn, so a
    * change re-runs nothing.
    */
-  codons?: Record<string, number[]> }
+  codons?: Record<string, number[]>;
+  /**
+   * The mutation table's query for one of `genes` (its search over the shown columns and its column
+   * filters): that gene's stems and badges count only the rows the table keeps, as the portal's
+   * filtered data. The table's Alteration and Protein Position filters (this grid's and these stems'
+   * selection) are not applied here; the Somatic Mutation Frequency ignores it.
+   */
+  table?: LollipopRows;
+  /**
+   * Each gene's y-axis maximum (the portal's Y-Axis Max: a slider up to the default, a number box beyond it;
+   * below 1 is drawn as 1); a stem taller than it is drawn capped at the top. Applied where the figure is
+   * drawn, so a change re-runs nothing. Omitted: the tallest stem, at least 5.
+   */
+  yMax?: Record<string, number> }
 /** Recurrent protein changes in one gene, with the cohort's mutated total. */
 /** One drawn stem: a codon, its height (distinct patient + change pairs), and how it is coloured. */
 export interface LollipopPosition {
@@ -60,6 +74,12 @@ export interface HotspotGene {
   /** samples with a somatic mutation in the gene, and samples in the cohort */
   somaticSamples: number; cohortSamples: number;
   /**
+   * samples with a germline mutation in the gene (status matching /germline/i), and the rate's denominator: the
+   * cohort's germline-consented samples where a study lists them, else every one. The portal shows the rate only
+   * when above 0. Absent when a site on older code did not report them.
+   */
+  germlineSamples?: number; germlineCohortSamples?: number;
+  /**
    * Mutation rows by protein impact type, putative driver vs VUS — the portal's badge tally
    * beside the lollipop. Every row counts, drawn or not; `other` covers silent and unknown types.
    */
@@ -77,6 +97,8 @@ declare module "../../types.ts" {
       hide?: string[];
       /** the codons selected on each gene's lollipop, as the figure draws them */
       codons?: Record<string, number[]>;
+      /** each gene's y-axis maximum the reader set, as the figure draws it */
+      yMax?: Record<string, number>;
       /** every study of the query is on GRCh38, so its transcript links go to GRCh38 Ensembl */
       grch38?: boolean;
       /** false: no driver source annotates these mutations, so the grid counts them by type alone (the portal's annotation off) */

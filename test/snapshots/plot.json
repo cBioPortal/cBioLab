@@ -26,7 +26,7 @@
         },
         "groups": [
           {
-            "g": "Shallow deletion",
+            "g": "Shallow Deletion",
             "n": 260,
             "lo": -3.8045,
             "hi": 0.351,
@@ -92,19 +92,19 @@
             "n": 67
           },
           {
-            "g": "Shallow deletion",
-            "b": 9,
-            "n": 13
+            "g": "Shallow Deletion",
+            "b": 16,
+            "n": 10
+          },
+          {
+            "g": "Shallow Deletion",
+            "b": 3,
+            "n": 2
           },
           {
             "g": "Amplification",
             "b": 25,
             "n": 2
-          },
-          {
-            "g": "Shallow deletion",
-            "b": 5,
-            "n": 4
           },
           {
             "g": "Gain",
@@ -132,19 +132,24 @@
             "n": 3
           },
           {
+            "g": "Shallow Deletion",
+            "b": 15,
+            "n": 20
+          },
+          {
             "g": "Gain",
             "b": 9,
             "n": 1
           },
           {
+            "g": "Shallow Deletion",
+            "b": 12,
+            "n": 32
+          },
+          {
             "g": "Amplification",
             "b": 22,
             "n": 3
-          },
-          {
-            "g": "Shallow deletion",
-            "b": 6,
-            "n": 6
           },
           {
             "g": "Diploid",
@@ -162,18 +167,13 @@
             "n": 2
           },
           {
-            "g": "Gain",
-            "b": 24,
-            "n": 1
-          },
-          {
-            "g": "Amplification",
-            "b": 26,
-            "n": 6
+            "g": "Shallow Deletion",
+            "b": 19,
+            "n": 3
           },
           {
             "…": "68 more",
-            "sha256": "6226d739d598cb9a"
+            "sha256": "33eb07b03a46353d"
           }
         ],
         "violinBins": 40,
@@ -190,7 +190,7 @@
         "points": [
           {
             "id": "TCGA-BH-A0BC-01",
-            "g": "Shallow deletion",
+            "g": "Shallow Deletion",
             "v": -1.0313
           },
           {
@@ -200,7 +200,7 @@
           },
           {
             "id": "TCGA-D8-A27M-01",
-            "g": "Shallow deletion",
+            "g": "Shallow Deletion",
             "v": -1.1943
           },
           {
@@ -210,7 +210,7 @@
           },
           {
             "id": "TCGA-AR-A1AY-01",
-            "g": "Shallow deletion",
+            "g": "Shallow Deletion",
             "v": -0.8701
           },
           {
@@ -275,7 +275,7 @@
           },
           {
             "id": "TCGA-BH-A1EU-01",
-            "g": "Shallow deletion",
+            "g": "Shallow Deletion",
             "v": -1.0684
           },
           {
@@ -290,7 +290,7 @@
           },
           {
             "…": "1048 more",
-            "sha256": "ae5b2d782b1b6fdf"
+            "sha256": "2dcec98f480fad6a"
           }
         ],
         "pointSet": {
@@ -301,7 +301,7 @@
           "Amplification",
           "Diploid",
           "Gain",
-          "Shallow deletion"
+          "Shallow Deletion"
         ],
         "layers": [
           {
@@ -313,7 +313,7 @@
             "points": [
               {
                 "id": "TCGA-A2-A4S1-01",
-                "g": "Shallow deletion",
+                "g": "Shallow Deletion",
                 "v": -3.8045
               },
               {
@@ -323,7 +323,7 @@
               },
               {
                 "id": "TCGA-A1-A0SK-01",
-                "g": "Shallow deletion",
+                "g": "Shallow Deletion",
                 "v": -3.1583
               },
               {
@@ -353,17 +353,17 @@
               },
               {
                 "id": "TCGA-C8-A1HJ-01",
-                "g": "Shallow deletion",
+                "g": "Shallow Deletion",
                 "v": -2.6429
               },
               {
                 "id": "TCGA-GI-A2C8-01",
-                "g": "Shallow deletion",
+                "g": "Shallow Deletion",
                 "v": -2.5033
               },
               {
                 "id": "TCGA-HN-A2NL-01",
-                "g": "Shallow deletion",
+                "g": "Shallow Deletion",
                 "v": -2.435
               },
               {
@@ -383,7 +383,7 @@
               },
               {
                 "id": "TCGA-D8-A13Y-01",
-                "g": "Shallow deletion",
+                "g": "Shallow Deletion",
                 "v": -2.2046
               },
               {
@@ -413,7 +413,7 @@
               },
               {
                 "…": "21 more",
-                "sha256": "1763683319d8878a"
+                "sha256": "aab09a4b3459b8dd"
               }
             ],
             "drawn": 41
@@ -477,10 +477,10 @@
         },
         "verification": "In the database, the coefficients and quartiles are checked against scipy 1.18.1 (pearsonr, spearmanr) and the portal's jStat rule on known values by scripts/check-plot-stats.ts.",
         "check": {
-          "plot:Shallow deletion:loWhisker": {
+          "plot:Shallow Deletion:loWhisker": {
             "v": -1.7458
           },
-          "plot:Shallow deletion:hiWhisker": {
+          "plot:Shallow Deletion:hiWhisker": {
             "v": 0.351
           },
           "plot:Diploid:loWhisker": {
@@ -574,7 +574,7 @@
             "hiWhisker": 0.6513
           },
           {
-            "g": "Not mutated",
+            "g": "No mutation",
             "n": 706,
             "lo": 0,
             "hi": 0.9971,
@@ -598,6 +598,11 @@
         ],
         "violin": [
           {
+            "g": "No mutation",
+            "b": 28,
+            "n": 3
+          },
+          {
             "g": "Not profiled",
             "b": 0,
             "n": 6
@@ -608,19 +613,9 @@
             "n": 1
           },
           {
-            "g": "Not mutated",
-            "b": 30,
-            "n": 4
-          },
-          {
             "g": "Missense",
             "b": 28,
             "n": 5
-          },
-          {
-            "g": "Not mutated",
-            "b": 8,
-            "n": 33
           },
           {
             "g": "Truncating",
@@ -636,6 +631,16 @@
             "g": "Truncating",
             "b": 12,
             "n": 4
+          },
+          {
+            "g": "No mutation",
+            "b": 10,
+            "n": 41
+          },
+          {
+            "g": "No mutation",
+            "b": 21,
+            "n": 11
           },
           {
             "g": "Truncating",
@@ -663,19 +668,24 @@
             "n": 1
           },
           {
-            "g": "Not mutated",
-            "b": 23,
-            "n": 13
+            "g": "No mutation",
+            "b": 38,
+            "n": 1
           },
           {
-            "g": "Not mutated",
-            "b": 1,
-            "n": 19
+            "g": "No mutation",
+            "b": 3,
+            "n": 46
           },
           {
             "g": "Truncating",
             "b": 26,
             "n": 5
+          },
+          {
+            "g": "No mutation",
+            "b": 14,
+            "n": 26
           },
           {
             "g": "Splice",
@@ -688,18 +698,8 @@
             "n": 9
           },
           {
-            "g": "Splice",
-            "b": 8,
-            "n": 1
-          },
-          {
-            "g": "Missense",
-            "b": 10,
-            "n": 6
-          },
-          {
             "…": "123 more",
-            "sha256": "ddb05dbc992682e5"
+            "sha256": "e0c4486f8a41f8a9"
           }
         ],
         "violinBins": 40,
@@ -721,7 +721,7 @@
           },
           {
             "id": "TCGA-AO-A12B-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.1121
           },
           {
@@ -731,7 +731,7 @@
           },
           {
             "id": "TCGA-A8-A07F-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.6103
           },
           {
@@ -741,12 +741,12 @@
           },
           {
             "id": "TCGA-A8-A091-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.3068
           },
           {
             "id": "TCGA-E2-A1L8-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.1645
           },
           {
@@ -756,7 +756,7 @@
           },
           {
             "id": "TCGA-BH-A0W7-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.3048
           },
           {
@@ -776,7 +776,7 @@
           },
           {
             "id": "TCGA-AO-A1KQ-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.5026
           },
           {
@@ -786,27 +786,27 @@
           },
           {
             "id": "TCGA-C8-A9FZ-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.6245
           },
           {
             "id": "TCGA-OL-A66N-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.2094
           },
           {
             "id": "TCGA-BH-A28Q-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.1605
           },
           {
             "id": "TCGA-A2-A04Y-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.147
           },
           {
             "id": "TCGA-D8-A1XU-01",
-            "g": "Not mutated",
+            "g": "No mutation",
             "v": 0.9465
           },
           {
@@ -816,7 +816,7 @@
           },
           {
             "…": "1048 more",
-            "sha256": "720bf7719a5722b2"
+            "sha256": "60b4a0f21c297409"
           }
         ],
         "pointSet": {
@@ -827,7 +827,7 @@
           "Inframe",
           "Missense",
           "Multiple",
-          "Not mutated",
+          "No mutation",
           "Not profiled",
           "Splice",
           "Truncating"
@@ -847,62 +847,62 @@
               },
               {
                 "id": "TCGA-BH-A1F8-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.9971
               },
               {
                 "id": "TCGA-D8-A1XU-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.9465
               },
               {
                 "id": "TCGA-HN-A2NL-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.9228
               },
               {
                 "id": "TCGA-EW-A1J6-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.9022
               },
               {
                 "id": "TCGA-D8-A1J8-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.8977
               },
               {
                 "id": "TCGA-BH-A0BA-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.8633
               },
               {
                 "id": "TCGA-A8-A07Z-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.8203
               },
               {
                 "id": "TCGA-AR-A0TZ-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.8185
               },
               {
                 "id": "TCGA-3C-AAAU-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.7787
               },
               {
                 "id": "TCGA-A8-A06T-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.7708
               },
               {
                 "id": "TCGA-AO-A0J7-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.7671
               },
               {
                 "id": "TCGA-E2-A14O-01",
-                "g": "Not mutated",
+                "g": "No mutation",
                 "v": 0.7348
               },
               {
@@ -1007,10 +1007,10 @@
           "plot:Multiple:hiWhisker": {
             "v": 0.6513
           },
-          "plot:Not mutated:loWhisker": {
+          "plot:No mutation:loWhisker": {
             "v": 0
           },
-          "plot:Not mutated:hiWhisker": {
+          "plot:No mutation:hiWhisker": {
             "v": 0.7076499999999999
           },
           "plot:Not profiled:loWhisker": {

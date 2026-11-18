@@ -29,7 +29,7 @@ export function statusColumns(t: StatusTable, lines: { line: string; gene: strin
   const sample = { id: "sample", name: "Sample ID", numeric: false }, patient = { id: "patient", name: "Patient ID", numeric: false };
   if (t === "altered" || t === "unaltered") return [sample, patient];
   if (t === "matrix") return [sample, { id: "altered", name: "Altered (1 / 0 / NP)", numeric: false }, ...lineColumns(lines)];
-  return [sample, patient, { id: "altered", name: "Altered", numeric: false }, ...lineColumns(lines)];
+  return [{ id: "study", name: "Study ID", numeric: false }, sample, patient, { id: "altered", name: "Altered", numeric: false }, ...lineColumns(lines)];
 }
 export const STATUS_DEFAULTS = (t: StatusTable, lines: { line: string; gene: string }[]) => statusColumns(t, lines).map((c) => c.id);
 
@@ -55,9 +55,9 @@ function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan): { c
 }
 
 /**
- * One of the status tables over every (cohort, study) part: `cases` — each sample's status
- * ("altered", "unaltered" when profiled for every line's gene and data types, else "not profiled")
- * and per line the events it matched, "no alteration" or "not profiled" (profiled in none of the
+ * One of the status tables over every (cohort, study) part: `cases` — each sample's study and status
+ * as the portal's Altered column writes it (1 altered; 0 unaltered, when profiled for every line's gene
+ * and data types; else NP, where the portal writes 0 — a sample not profiled is not unaltered) and per line the events it matched, "no alteration" or "not profiled" (profiled in none of the
  * line's types); `altered` / `unaltered` — those samples alone; `matrix` — the portal's sample
  * matrix, 1 / 0 with NP where the sample is not profiled. Default order: altered first, then sample.
  */
@@ -74,22 +74,28 @@ export function statusRowSource(t: StatusTable, parts: TablePart[], lines: { lin
   const text = (c: FileColumn): string => {
     if (c.id === "sample") return "sid";
     if (c.id === "patient") return "patient";
-    if (c.id === "altered") return t === "matrix" ? "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')" : "status";
+    if (c.id === "study") return "study";
+    if (c.id === "altered") return "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')";
     return (t === "matrix" ? "m" : "c") + lineIds.indexOf(c.id);
   };
   return {
     with: "WITH " + ctes + ",\n" +
       "base AS (\n" + union + "),\n" +
-      "rows AS (SELECT *, " + status + " AS status" + derived + ",\n    multiIf(status = 'altered', 0, status = 'unaltered', 1, 2) AS rank FROM base " + keep + ")\n",
+      "rows AS (SELECT *, " + status + " AS status" + derived + ",\n    multiIf(status = 'altered', 2, status = 'unaltered', 1, 0) AS rank FROM base " + keep + ")\n",
     columns: cols.map((c): QueryColumn => ({ ...c, text: text(c), ...(c.id === "altered" ? { order: "rank" } : {}) })),
     select: "*",
-    defaultOrder: "rank ASC",
+    defaultOrder: "rank DESC",
     tiebreak: "sid, ord",
   };
 }
 
 /** A gene-by-sample file: each queried gene's mutations, structural variants, or values in one molecular profile. */
-export type MatrixFile = { kind: "mutations" } | { kind: "sv" } | { kind: "profile"; profile: string; discrete: boolean };
+export type MatrixFile = { kind: "mutations" } | { kind: "sv" } | { kind: "profile"; profile: string; discrete: boolean }
+  /** the portal's cna.txt: each study's own selected (first) discrete copy-number profile, by study */
+  | { kind: "cna"; profiles: Record<string, string> };
+
+/** a file the portal writes for every queried sample, NP for a study without its kind of profile (RDL-STM-4); the rest list their holders' samples (RDL-STM-5) */
+export const everySample = (f: MatrixFile): boolean => f.kind !== "profile";
 
 export function matrixColumns(genes: string[]): FileColumn[] {
   return [{ id: "sample", name: "Sample ID", numeric: false }, { id: "patient", name: "Patient ID", numeric: false },
@@ -107,15 +113,16 @@ function matrixValues(f: MatrixFile, study: string, db: string, genes: string[],
       "      AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", cohort) + " GROUP BY sid, gene",
     missing: "WT", type: "MUTATION" };
   if (f.kind === "sv") return {
-    values: "SELECT " + bare + " AS sid, hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(sv_event_info)), ', ') AS val\n" +
+    values: "SELECT " + bare + " AS sid, hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupArray(sv_event_info)), ' ') AS val\n" +
       "    FROM " + db + ".genomic_event_derived WHERE " + genomicStudySql(study) + " AND variant_type = 'structural_variant'\n" +
       "      AND hugo_gene_symbol IN " + inGenes + " AND " + inCohortSamples(bare, cohort) + " GROUP BY sid, gene",
     missing: "NA", type: "SV" };
+  const profile = f.kind === "cna" ? f.profiles[study] : f.profile;
   return {
     values: "SELECT " + bare + " AS sid, hugo_gene_symbol AS gene, any(ifNull(alteration_value, 'NA')) AS val\n" +
-      "    FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study) + " AND profile_type = " + sq(f.profile) + "\n" +
+      "    FROM " + db + ".genetic_alteration_derived WHERE cancer_study_identifier = " + sq(study) + " AND profile_type = " + sq(profile) + "\n" +
       "      AND hugo_gene_symbol IN " + inGenes + " AND " + inCohortSamples(bare, cohort) + " GROUP BY sid, gene",
-    missing: "NA", type: f.discrete ? "CNA" : null };
+    missing: "NA", type: f.kind === "cna" || f.discrete ? "CNA" : null };
 }
 
 /**
@@ -124,12 +131,22 @@ function matrixValues(f: MatrixFile, study: string, db: string, genes: string[],
  * structural variants (event info; NA when none) or its value in the profile (NA when none is
  * stored) — NP where its panel did not cover the gene in that data type (mutations, structural
  * variants and discrete copy number; the panels record nothing finer for the other profiles).
- * The query's OQL is not in effect, as on the portal: every call of the gene is listed.
+ * The query's OQL is not in effect, as on the portal: every call of the gene is listed. A part whose
+ * study `holds` no such profile still has a row per sample, NP in every gene (the portal's file lists
+ * every queried sample); none of its data is read.
  */
-export function matrixRowSource(f: MatrixFile, parts: TablePart[], genes: string[], db: string): RowSource {
+export function matrixRowSource(f: MatrixFile, parts: TablePart[], genes: string[], db: string, holds: (part: TablePart) => boolean = () => true): RowSource {
   if (!parts.length) throw new Error("matrixRowSource needs at least one part");
   const ctes: string[] = [], selects: string[] = [];
   parts.forEach((p, i) => {
+    if (!holds(p)) {
+      ctes.push("c" + i + " AS (" + p.cohortSql + ")");
+      selects.push(
+        "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord, s.pid AS patient, s.sid AS sid" +
+        genes.map((_, j) => ", 'NP' AS g" + j).join("") + "\n" +
+        "  FROM (SELECT DISTINCT pid, sid FROM c" + i + ") s\n");
+      return;
+    }
     const v = matrixValues(f, p.study, db, genes, "c" + i);
     ctes.push("c" + i + " AS (" + p.cohortSql + "),\n" + "v" + i + " AS (\n    " + v.values + ")" +
       (v.type ? genes.map((g, j) => ",\n" + "p" + i + "_" + j + " AS (" + profiledCasesSql(g, v.type!, { study: p.study, db, unit: "sample" }) + ")").join("") : ""));

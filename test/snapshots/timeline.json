@@ -1435,10 +1435,14 @@
           "samples": [
             {
               "id": "P-0000012-T02-IM3",
+              "label": "1",
+              "color": "black",
               "type": "Primary"
             },
             {
               "id": "P-0000012-T03-IM3",
+              "label": "2",
+              "color": "red",
               "type": "Metastasis"
             }
           ]
@@ -1480,16 +1484,6 @@
                 "numeric": false
               },
               {
-                "id": "copy",
-                "name": "Copy #",
-                "numeric": false
-              },
-              {
-                "id": "freq",
-                "name": "Cohort %",
-                "numeric": true
-              },
-              {
                 "id": "vaf",
                 "name": "Allele Freq",
                 "numeric": true
@@ -1502,6 +1496,16 @@
               {
                 "id": "refCount",
                 "name": "Ref Reads",
+                "numeric": true
+              },
+              {
+                "id": "copy",
+                "name": "Copy #",
+                "numeric": false
+              },
+              {
+                "id": "freq",
+                "name": "Cohort %",
                 "numeric": true
               },
               {
@@ -1538,6 +1542,11 @@
                 "id": "status",
                 "name": "MS",
                 "numeric": false
+              },
+              {
+                "id": "inAll",
+                "name": "Profiled in all samples",
+                "numeric": true
               }
             ],
             "shown": [
@@ -1546,9 +1555,8 @@
               "proteinChange",
               "annotation",
               "mutationType",
-              "copy",
-              "freq",
-              "vaf"
+              "vaf",
+              "freq"
             ],
             "defaults": [
               "samples",
@@ -1556,9 +1564,8 @@
               "proteinChange",
               "annotation",
               "mutationType",
-              "copy",
-              "freq",
-              "vaf"
+              "vaf",
+              "freq"
             ],
             "query": {},
             "rows": [
@@ -1572,19 +1579,20 @@
                   "ATRX",
                   "K983*",
                   "Likely Oncogenic",
-                  "Nonsense_Mutation",
-                  "",
-                  3.334664536741214,
+                  "Nonsense",
                   0.1978,
                   110,
                   446,
+                  "",
+                  3.334664536741214,
                   "SNP",
                   "23",
                   76937801,
                   76937801,
                   "T",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1593,7 +1601,8 @@
                       "alt": 110,
                       "ref": 446
                     }
-                  ]
+                  ],
+                  "mutationType": "Nonsense_Mutation"
                 }
               },
               {
@@ -1606,19 +1615,20 @@
                   "BLM",
                   "A363fs",
                   "Likely Oncogenic",
-                  "Frame_Shift_Del",
-                  "",
-                  1.409744408945687,
+                  "FS del",
                   0.1276,
                   43,
                   294,
+                  "",
+                  1.409744408945687,
                   "DEL",
                   "15",
                   91298168,
                   91298168,
                   "G",
                   "-",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1627,7 +1637,8 @@
                       "alt": 43,
                       "ref": 294
                     }
-                  ]
+                  ],
+                  "mutationType": "Frame_Shift_Del"
                 }
               },
               {
@@ -1640,19 +1651,20 @@
                   "FBXW7",
                   "G61*",
                   "Likely Oncogenic · Level 3A",
-                  "Nonsense_Mutation",
-                  "",
-                  4.472843450479234,
+                  "Nonsense",
                   0.2281,
                   130,
                   440,
+                  "",
+                  4.472843450479234,
                   "SNP",
                   "4",
                   153332775,
                   153332775,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1661,7 +1673,8 @@
                       "alt": 130,
                       "ref": 440
                     }
-                  ]
+                  ],
+                  "mutationType": "Nonsense_Mutation"
                 }
               },
               {
@@ -1674,19 +1687,20 @@
                   "FBXW7",
                   "X413_splice",
                   "Likely Oncogenic · Level 3A",
-                  "Splice_Site",
-                  "",
-                  4.472843450479234,
+                  "Splice",
                   0.2553,
                   85,
                   248,
+                  "",
+                  4.472843450479234,
                   "SNP",
                   "4",
                   153249542,
                   153249542,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1695,7 +1709,8 @@
                       "alt": 85,
                       "ref": 248
                     }
-                  ]
+                  ],
+                  "mutationType": "Splice_Site"
                 }
               },
               {
@@ -1708,19 +1723,20 @@
                   "MAP3K1",
                   "E302*",
                   "Likely Oncogenic",
-                  "Nonsense_Mutation",
-                  "",
-                  3.1389776357827475,
+                  "Nonsense",
                   0.1743,
                   72,
                   341,
+                  "",
+                  3.1389776357827475,
                   "SNP",
                   "5",
                   56160630,
                   56160630,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1729,7 +1745,8 @@
                       "alt": 72,
                       "ref": 341
                     }
-                  ]
+                  ],
+                  "mutationType": "Nonsense_Mutation"
                 }
               },
               {
@@ -1742,19 +1759,20 @@
                   "MAP3K1",
                   "X696_splice",
                   "Likely Oncogenic",
-                  "Splice_Site",
-                  "",
-                  3.1389776357827475,
+                  "Splice",
                   0.2007,
                   57,
                   227,
+                  "",
+                  3.1389776357827475,
                   "SNP",
                   "5",
                   56174930,
                   56174930,
                   "T",
                   "G",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1763,7 +1781,8 @@
                       "alt": 57,
                       "ref": 227
                     }
-                  ]
+                  ],
+                  "mutationType": "Splice_Site"
                 }
               },
               {
@@ -1776,19 +1795,20 @@
                   "PTPRD",
                   "E915*",
                   "Likely Oncogenic",
-                  "Nonsense_Mutation",
-                  "",
-                  4.329419282690311,
+                  "Nonsense",
                   0.1764,
                   94,
                   439,
+                  "",
+                  4.329419282690311,
                   "SNP",
                   "9",
                   8486074,
                   8486074,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1797,7 +1817,8 @@
                       "alt": 94,
                       "ref": 439
                     }
-                  ]
+                  ],
+                  "mutationType": "Nonsense_Mutation"
                 }
               },
               {
@@ -1810,19 +1831,20 @@
                   "PTPRD",
                   "P1338T",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  4.329419282690311,
+                  "Missense",
                   0.298,
                   135,
                   318,
+                  "",
+                  4.329419282690311,
                   "SNP",
                   "9",
                   8436666,
                   8436666,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1831,7 +1853,8 @@
                       "alt": 135,
                       "ref": 318
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -1844,19 +1867,20 @@
                   "PTPRT",
                   "G969V",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  4.788721143861331,
+                  "Missense",
                   0.1422,
                   63,
                   380,
+                  "",
+                  4.788721143861331,
                   "SNP",
                   "20",
                   40748610,
                   40748610,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1865,7 +1889,8 @@
                       "alt": 63,
                       "ref": 380
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -1878,19 +1903,20 @@
                   "PTPRT",
                   "X1053_splice",
                   "Likely Oncogenic",
-                  "Splice_Site",
-                  "",
-                  4.788721143861331,
+                  "Splice",
                   0.0508,
                   13,
                   243,
+                  "",
+                  4.788721143861331,
                   "SNP",
                   "20",
                   40739128,
                   40739128,
                   "C",
                   "G",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1899,7 +1925,8 @@
                       "alt": 13,
                       "ref": 243
                     }
-                  ]
+                  ],
+                  "mutationType": "Splice_Site"
                 }
               },
               {
@@ -1912,19 +1939,20 @@
                   "SMARCA4",
                   "E1211*",
                   "Likely Oncogenic · Level 3A",
-                  "Nonsense_Mutation",
-                  "",
-                  4.333067092651757,
+                  "Nonsense",
                   0.2076,
                   82,
                   313,
+                  "",
+                  4.333067092651757,
                   "SNP",
                   "19",
                   11144050,
                   11144050,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1933,7 +1961,8 @@
                       "alt": 82,
                       "ref": 313
                     }
-                  ]
+                  ],
+                  "mutationType": "Nonsense_Mutation"
                 }
               },
               {
@@ -1946,19 +1975,20 @@
                   "TP53",
                   "T256P",
                   "Likely Oncogenic",
-                  "Missense_Mutation",
-                  "",
-                  52.412140575079874,
+                  "Missense",
                   0.5022,
                   114,
                   113,
+                  "",
+                  52.412140575079874,
                   "SNP",
                   "17",
                   7577515,
                   7577515,
                   "T",
                   "G",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -1967,7 +1997,8 @@
                       "alt": 114,
                       "ref": 113
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -1980,19 +2011,20 @@
                   "TP53",
                   "P67Qfs*56",
                   "Likely Oncogenic",
-                  "Frame_Shift_Del",
-                  "",
-                  52.412140575079874,
+                  "FS del",
                   0.4018,
                   88,
                   131,
+                  "",
+                  52.412140575079874,
                   "DEL",
                   "17",
                   7579487,
                   7579487,
                   "G",
                   "-",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2001,7 +2033,8 @@
                       "alt": 88,
                       "ref": 131
                     }
-                  ]
+                  ],
+                  "mutationType": "Frame_Shift_Del"
                 }
               },
               {
@@ -2014,19 +2047,20 @@
                   "ATR",
                   "R2431M",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  2.6677316293929714,
+                  "Missense",
                   0.1743,
                   84,
                   398,
+                  "",
+                  2.6677316293929714,
                   "SNP",
                   "3",
                   142178126,
                   142178126,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2035,7 +2069,8 @@
                       "alt": 84,
                       "ref": 398
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -2048,19 +2083,20 @@
                   "AXIN2",
                   "I375M",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  2.056873552200655,
+                  "Missense",
                   0.1369,
                   89,
                   561,
+                  "",
+                  2.056873552200655,
                   "SNP",
                   "17",
                   63534396,
                   63534396,
                   "G",
                   "C",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2069,7 +2105,8 @@
                       "alt": 89,
                       "ref": 561
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -2082,19 +2119,20 @@
                   "BRIP1",
                   "D393V",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  1.3538338658146964,
+                  "Missense",
                   0.146,
                   92,
                   538,
+                  "",
+                  1.3538338658146964,
                   "SNP",
                   "17",
                   59876623,
                   59876623,
                   "T",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2103,7 +2141,8 @@
                       "alt": 92,
                       "ref": 538
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -2116,19 +2155,20 @@
                   "CCNE1",
                   "A47V",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  0.5351437699680511,
+                  "Missense",
                   0.1494,
                   39,
                   222,
+                  "",
+                  0.5351437699680511,
                   "SNP",
                   "19",
                   30303904,
                   30303904,
                   "C",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2137,7 +2177,8 @@
                       "alt": 39,
                       "ref": 222
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -2150,19 +2191,20 @@
                   "CREBBP",
                   "M2161I",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  3.4424920127795526,
+                  "Missense",
                   0.2481,
                   67,
                   203,
+                  "",
+                  3.4424920127795526,
                   "SNP",
                   "16",
                   3778565,
                   3778565,
                   "C",
                   "A",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2171,7 +2213,8 @@
                       "alt": 67,
                       "ref": 203
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -2184,19 +2227,20 @@
                   "DOT1L",
                   "W305C",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  2.2563897763578273,
+                  "Missense",
                   0.1584,
                   61,
                   324,
+                  "",
+                  2.2563897763578273,
                   "SNP",
                   "19",
                   2207631,
                   2207631,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2205,7 +2249,8 @@
                       "alt": 61,
                       "ref": 324
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -2218,19 +2263,20 @@
                   "FLT4",
                   "S293R",
                   "Unknown",
-                  "Missense_Mutation",
-                  "",
-                  2.751597444089457,
+                  "Missense",
                   0.1787,
                   42,
                   193,
+                  "",
+                  2.751597444089457,
                   "SNP",
                   "5",
                   180056365,
                   180056365,
                   "G",
                   "T",
-                  "SOMATIC"
+                  "SOMATIC",
+                  null
                 ],
                 "detail": {
                   "reads": [
@@ -2239,12 +2285,13 @@
                       "alt": 42,
                       "ref": 193
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
                 "…": "5 more",
-                "sha256": "ac4099ffd7be8d40"
+                "sha256": "2b844ee2031f65fb"
               }
             ],
             "offset": 0,
@@ -2291,6 +2338,11 @@
                 "id": "freq",
                 "name": "Cohort %",
                 "numeric": true
+              },
+              {
+                "id": "inAll",
+                "name": "Profiled in all samples",
+                "numeric": true
               }
             ],
             "shown": [
@@ -2322,7 +2374,8 @@
                   "AMP",
                   "Oncogenic · Level 4",
                   "12q14.1",
-                  1.5575079872204474
+                  1.5575079872204474,
+                  null
                 ]
               },
               {
@@ -2336,7 +2389,8 @@
                   "AMP",
                   "Oncogenic",
                   "1q21.2",
-                  1.5095846645367412
+                  1.5095846645367412,
+                  null
                 ]
               },
               {
@@ -2350,7 +2404,8 @@
                   "AMP",
                   "Unknown",
                   "1q22",
-                  0.7388769071012061
+                  0.7388769071012061,
+                  null
                 ]
               }
             ],
@@ -2505,6 +2560,33 @@
             "all": 0
           }
         },
+        "profiling": {
+          "mutations": {
+            "study": true,
+            "profiled": [
+              "P-0000012-T02-IM3",
+              "P-0000012-T03-IM3"
+            ]
+          },
+          "cna": {
+            "study": true,
+            "profiled": [
+              "P-0000012-T02-IM3",
+              "P-0000012-T03-IM3"
+            ]
+          },
+          "sv": {
+            "study": true,
+            "profiled": [
+              "P-0000012-T02-IM3",
+              "P-0000012-T03-IM3"
+            ]
+          }
+        },
+        "mixedPanels": {
+          "mutations": false,
+          "cna": false
+        },
         "oncokbPin": "v7.5"
       },
       "participation": {
@@ -2519,7 +2601,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {

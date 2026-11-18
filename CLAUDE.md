@@ -58,7 +58,7 @@ Other docs: [`DOMAIN.md`](docs/DOMAIN.md) (what the domain's words mean),
 this project is "fast"), [`ENVIRONMENT.md`](docs/ENVIRONMENT.md) (settings),
 [`SESSIONS.md`](docs/SESSIONS.md) (several working copies on one machine),
 [`PORTAL-PARITY.md`](docs/PORTAL-PARITY.md) (what cBioLab still lacks from cBioPortal — a PR never edits it: its body lists, under `## Tracker`, the items it ticks and the sub-items it leaves, and they are ticked on master after merge),
-[`legacy-spec/`](docs/legacy-spec/) (the legacy portal's behaviour per tab — every control, mode and statistic's method, with IDs a parity check cites),
+[`legacy-spec/`](docs/legacy-spec/) (the legacy portal's behaviour per tab — every control, mode and statistic's method, with IDs a parity check cites; its `parity/` scorecards are, like PORTAL-PARITY, changed through a PR's `## Tracker` and updated on master after merge),
 [`LINKS.md`](docs/LINKS.md) (Copy link and stored links `?s=`, a page's address past its limit, stored id lists read by id and
 withdrawn by their owner — before changing how a page reads or writes its URL).
 

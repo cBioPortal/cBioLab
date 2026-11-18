@@ -26,8 +26,8 @@ import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
-import { axisKind, axisLabel, axisSelect, corrPValue, fitOf, logRuleOf, plotShape, tukey, validateAxis,
-  categoryColor, CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
+import { axisKind, axisLabel, axisSelect, axisCategoryColor, corrPValue, fitOf, logRuleOf, plotShape, tukey, validateAxis,
+  CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotNegativesSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
   type AxisKind, type HighlightPoint, type PlotAxis, type PlotData, type PlotPoint, type PlotRequest, type PlotShape,
@@ -39,14 +39,37 @@ export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLaye
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
-import { pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
+import { checkQuery, pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
-export function legendFor(values: string[], ring = false): { label: string; color: string; ring?: boolean }[] {
+/**
+ * Each clinical attribute's type and display name as a study declares them: a row per declaration
+ * (a, dt, name), metadata only. The resolver reads a plot's axis kinds and titles from it, and
+ * lib/clinical-titles.ts the titles every other view needs.
+ */
+export function clinicalMetaSql(attrs: string[], study: string, db: string): AggregateSql {
+  return aggregateSql("SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name\n" +
+    "FROM " + clinicalMetaTable(db) + " cam\n" +
+    "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+    "WHERE cs.cancer_study_identifier = " + sq(study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")");
+}
+
+/** a display name as an axis title: trimmed, cut to the 200 characters a label may hold; null when there is none */
+export function displayTitle(name: unknown): string | null {
+  const n = name == null ? "" : String(name).trim();
+  return !n ? null : n.length > 200 ? n.slice(0, 199) + "…" : n;
+}
+
+/** a clinical axis titled by its display name, unless the axis already carries a label */
+export function named(a: PlotAxis, names: ReadonlyMap<string, string>): PlotAxis {
+  return a.source === "clinical" && !a.label && names.has(a.attribute) ? { ...a, label: names.get(a.attribute)! } : a;
+}
+
+export function legendFor(values: string[], ring = false, axis?: PlotAxis): { label: string; color: string; ring?: boolean }[] {
   const counts = new Map<string, number>();
   for (const v of values) if (v) counts.set(v, (counts.get(v) || 0) + 1);
   return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, COLOR_CAP)
-    .map(([label], i) => ({ label, color: categoryColor(label, i), ...(ring ? { ring: true } : {}) }));
+    .map(([label], i) => ({ label, color: axisCategoryColor(axis, label, i), ...(ring ? { ring: true } : {}) }));
 }
 
 const num = (v: unknown): number | null => { if (v == null || v === "") return null; const x = Number(v); return Number.isFinite(x) ? x : null; };
@@ -73,6 +96,7 @@ import { DAYS_PER_MONTH } from "./time-units.ts";
 import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
+import { MUTATION_COLUMNS, mutationRowKeysSql, rowKeySql } from "./mutation-table.ts";
 import { annotatingSql, offeredSources, unannotatedOrSql } from "./driver-sql.ts";
 import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 import { variantPins, type VariantPins } from "./variant-annotation.ts";
@@ -134,7 +158,8 @@ export interface VariantReport { variants: VariantCount[]; totals: GeneMutationT
 export interface LollipopChange { gene: string; pos: number | null; change: string; n: number; rows: number; driver: boolean; impact?: string }
 /** Raw mutation rows of one type at one codon — what a lollipop's colour is decided from. */
 export interface LollipopType { gene: string; pos: number | null; mtype: string; driver: boolean; rows: number }
-export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number }
+/** `germlineSamples`: samples with a germline mutation of the gene (status matching /germline/i), the portal's germline rate's numerator */
+export interface LollipopTotal { gene: string; patients: number; pairs: number; somaticSamples: number; germlineSamples?: number }
 /**
  * A site's per-codon lollipop counts. `annotated` is false when no OncoKB pin was available, in
  * which case every change reads as a driver — cBioPortal's own rule when driver annotation is off.
@@ -142,6 +167,8 @@ export interface LollipopTotal { gene: string; patients: number; pairs: number; 
 export interface LollipopReport {
   changes: LollipopChange[]; types: LollipopType[]; totals: LollipopTotal[];
   cohortSamples: number; minCount: number; annotated: boolean;
+  /** the germline rate's denominator: the cohort's samples on the study's germline-consented list, or every one with no list (absent from a site on older code) */
+  germlineCohortSamples?: number;
   /** the page's driver settings the split followed, when the caller gave them (lollipopCounts' `drivers`) */
   drivers?: DriverSettings;
 }
@@ -419,8 +446,21 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * only this instance knows what its panels cover. That is also why a federated
  * co-occurrence is more correct than one computed from pooled exports.
  */
+/**
+ * A table's rows per cohort and study: kept by the query (`n`), every one (`all`), and duplicates among
+ * every one (`dup`, RowSource.duplicateKey); with RowSource.units, the distinct samples (`ns`) and
+ * patients (`np`) among those kept. The Mutations and SV tables page only their own instances' rows (no
+ * `remote`), so today a peer's counts never carry `dup`.
+ */
+export interface RowCounts { cohort: string; study: string; n: number; all: number; dup?: number; ns?: number; np?: number }
 /** the query's lines a Mutations tab follows, and how their DRIVER reads */
 export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
+/**
+ * The Mutations tab's table query for one gene (its search over the shown columns, its column filters),
+ * which the portal's lollipop and badges follow (MUT-FM-1); the table's Alteration and Protein Position
+ * filters, the grid's and the plot's own selection, are not applied to them.
+ */
+export interface LollipopRows extends Pick<TableQuery, "search" | "filters" | "columns"> { gene: string }
 /** each gene's mutation filter under the query's lines, where one applies */
 export function mutationFilters(oql: LollipopOql, genes: string[], o: { study: string; db: string; oncokbPin: string | null; hotspotPins: VariantPins | null }): MutationFilters {
   const out: MutationFilters = {};
@@ -578,12 +618,17 @@ const filteredGenesSql = (genes: string[], filters?: MutationFilters): string =>
   !filters || !Object.keys(filters).length ? ""
     : "\n             AND (" + genes.map((g) => "(`GENE.hugoGeneSymbol` = " + sq(g) + (filters[g] ? " AND " + filters[g] : "") + ")").join("\n               OR ") + ")";
 
+/**
+ * The mutation table's rows for one gene under its search and column filters (lib/mutation-table.ts
+ * mutationRowKeysSql): `keys` selects their (sid, proteinChange, mutationType, rowKeySql).
+ */
+export interface LollipopRowKeys { gene: string; keys: string }
 
 function lollipopCte(cohortSql: string, genes: string[], study: string, minCount: number, pin: string | null, db: string, hotspotPins: VariantPins | null = null,
-  filters?: MutationFilters, fusionLines?: string[], drivers?: ResolvedDrivers): string {
+  filters?: MutationFilters, fusionLines?: string[], drivers?: ResolvedDrivers, rowKeys?: LollipopRowKeys): string {
   const floor = Math.max(1, Math.floor(minCount));
   const list = genes.map(sq).join(",");
-  if (drivers) return lollipopCteWith(cohortSql, genes, study, floor, pin, db, hotspotPins, filters, fusionLines, drivers, list);
+  if (drivers) return lollipopCteWith(cohortSql, genes, study, floor, pin, db, hotspotPins, filters, fusionLines, drivers, list, rowKeys);
   const fusionDriver = pin ? svDriverSql("vn") : "toUInt8(1)";
   // a driver by OncoKB or as a Cancer Hotspot, the portal's default sources. With no pin there is no
   // annotation to split drivers from VUS, and cBioPortal then colours everything as a driver; the
@@ -594,7 +639,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
       "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION')" +
       (hotspotKeys ? "\n        OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (" + hotspotKeys + ")" : "") + ", 1, 0)"
     : "1";
-  return lollipopCteSql(cohortSql, genes, study, floor, pin, db, filters, fusionLines, list, driver, fusionDriver);
+  return lollipopCteSql(cohortSql, genes, study, floor, pin, db, filters, fusionLines, list, driver, fusionDriver, rowKeys);
 }
 
 /**
@@ -605,7 +650,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
  * grid then shows per type.
  */
 function lollipopCteWith(cohortSql: string, genes: string[], study: string, floor: number, pin: string | null, db: string, hotspotPins: VariantPins | null,
-  filters: MutationFilters | undefined, fusionLines: string[] | undefined, d: ResolvedDrivers, list: string): string {
+  filters: MutationFilters | undefined, fusionLines: string[] | undefined, d: ResolvedDrivers, list: string, rowKeys?: LollipopRowKeys): string {
   const src = offeredSources(d, pin, hotspotPins);
   const or: string[] = [];
   if (d.custom) or.push("ifNull(driverFilter, '') = " + sq(PUTATIVE_DRIVER));
@@ -618,17 +663,17 @@ function lollipopCteWith(cohortSql: string, genes: string[], study: string, floo
   const annotating = annotatingSql(d, src.sure, db, study);
   const driver = unannotatedOrSql(annotating, or.length ? "toUInt8(" + or.join("\n        OR ") + ")" : "toUInt8(0)");
   const fusionDriver = unannotatedOrSql(annotating, src.oncokb ? svDriverSql("vn") : "toUInt8(0)");
-  return lollipopCteSql(cohortSql, genes, study, floor, pin, db, filters, fusionLines, list, driver, fusionDriver);
+  return lollipopCteSql(cohortSql, genes, study, floor, pin, db, filters, fusionLines, list, driver, fusionDriver, rowKeys);
 }
 
 function lollipopCteSql(cohortSql: string, genes: string[], study: string, floor: number, pin: string | null, db: string,
-  filters: MutationFilters | undefined, fusionLines: string[] | undefined, list: string, driver: string, fusionDriver: string): string {
+  filters: MutationFilters | undefined, fusionLines: string[] | undefined, list: string, driver: string, fusionDriver: string, rowKeys?: LollipopRowKeys): string {
   const fusionFilter = fusionLines ? oqlFusionFilterSql(fusionLines, "v.gene1", "v.gene2", fusionDriver) : null;
   return (
     "WITH cohort AS (" + cohortSql + "),\n" +
     (pin ? svCallCtes(db, genes, pin, { gene: "sva", pair: "svp" }) : "") +
     "     v AS (SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
-    "                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status,\n" +
+    "                  sv.class AS class, sv.event_info AS eventInfo, sv.sv_status AS status, sv.site1_chromosome AS chr, sv.site1_position AS start,\n" +
     "                  " + siteKey("sv.site1_entrez_gene_id") + " AS k1, " + siteKey("sv.site2_entrez_gene_id") + " AS k2\n" +
     "           FROM " + db + ".structural_variant sv\n" +
     "           JOIN " + db + ".genetic_profile gp ON gp.genetic_profile_id = sv.genetic_profile_id\n" +
@@ -640,8 +685,9 @@ function lollipopCteSql(cohortSql: string, genes: string[], study: string, floor
     "           WHERE cs.cancer_study_identifier = " + sq(study) + " AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'\n" +
     "             AND (sv.site1_entrez_gene_id IN (" + entrezOf(db, genes) + ") OR sv.site2_entrez_gene_id IN (" + entrezOf(db, genes) + "))\n" +
     "             AND " + inCohortSamples("smp.stable_id") + "),\n" +
-    "     m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
-    "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver, toUInt8(0) AS sv, gene AS rgene\n" +
+    "     " + (rowKeys ? "ma" : "m") + " AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,\n" +
+    "                  patientId AS pid, sampleId AS sid, mutationStatus AS status, " + driver + " AS driver, toUInt8(0) AS sv, gene AS rgene,\n" +
+    "                  " + rowKeySql("chr", "startPosition", "endPosition", "referenceAllele", "tumorSeqAllele") + " AS rk\n" +
     "           FROM " + db + ".mutation_derived\n" +
     "           WHERE " + mutationStudySql(study) + " AND `GENE.hugoGeneSymbol` IN (" + list + ")\n" +
     "             AND molecularProfileId NOT LIKE '%uncalled%' AND proteinChange != ''\n" +
@@ -649,19 +695,21 @@ function lollipopCteSql(cohortSql: string, genes: string[], study: string, floor
     "           UNION ALL\n" +
     "           SELECT arrayJoin(arrayFilter(x -> x IN (" + list + "), arrayDistinct([v.gene1, v.gene2]))) AS gene, NULL AS pos,\n" +
     "                  " + fusionProteinChangeSql("v.") + " AS change, 'Fusion' AS mtype, v.pid AS pid, v.sid AS sid, v.status AS status,\n" +
-    "                  " + fusionDriver + " AS driver, toUInt8(1) AS sv, v.gene1 AS rgene\n" +
+    "                  " + fusionDriver + " AS driver, toUInt8(1) AS sv, v.gene1 AS rgene, " + rowKeySql("v.chr", "v.start", "NULL", "NULL", "NULL") + " AS rk\n" +
     "           FROM v" +
     (pin ? "\n           LEFT JOIN sva AS a1 ON a1.gene = v.gene1 AND v.gene1 != '' LEFT JOIN sva AS a2 ON a2.gene = v.gene2 AND v.gene2 != ''\n" +
       "           LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = " + svTypeSql("v.") + " AND vn.tumor_type = ''" : "") +
     (fusionFilter ? "\n           WHERE " + fusionFilter : "") + "),\n" +
+    // the table's search and filters narrow its gene's rows here, as the portal's filtered data does the lollipop's and badges'
+    (rowKeys ? "     m AS (SELECT * FROM ma WHERE gene != " + sq(rowKeys.gene) + " OR (sid, change, ifNull(mtype, ''), rk) IN (\n" + rowKeys.keys + ")),\n" : "") +
     "     kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= " + floor + ")\n"
   );
 }
 /** Per (codon, change): distinct patients (the height), raw rows (the label's ordering), and the change's
  * driver status and protein impact class (its commonest), so the plot can be filtered by class in the browser. */
 export function lollipopChangesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null,
-  filters?: MutationFilters, fusionLines?: string[], drivers?: ResolvedDrivers): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines, drivers) +
+  filters?: MutationFilters, fusionLines?: string[], drivers?: ResolvedDrivers, rowKeys?: LollipopRowKeys): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines, drivers, rowKeys) +
     "SELECT gene, pos, change, uniqExact(pid) AS n, count() AS rows, max(driver) AS driver, topK(1)(" + impactSql("mtype") + ")[1] AS impact\n" +
     "FROM m WHERE sv = 0 GROUP BY gene, pos, change HAVING n >= " + Math.max(1, Math.floor(minCount)));
 }
@@ -672,8 +720,8 @@ export function lollipopChangesSql(cohortSql: string, genes: string[], study: st
  * membership test compares pos through ifNull rather than letting NULL fail the tuple match.
  */
 export function lollipopTypesSql(cohortSql: string, genes: string[], study: string, minCount = 1, pin: string | null = null, db: string = DB, hotspotPins: VariantPins | null = null,
-  filters?: MutationFilters, fusionLines?: string[], drivers?: ResolvedDrivers): AggregateSql {
-  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines, drivers) +
+  filters?: MutationFilters, fusionLines?: string[], drivers?: ResolvedDrivers, rowKeys?: LollipopRowKeys): AggregateSql {
+  return aggregateSql(lollipopCte(cohortSql, genes, study, minCount, pin, db, hotspotPins, filters, fusionLines, drivers, rowKeys) +
     "SELECT gene, pos, mtype, driver, count() AS rows\n" +
     "FROM m WHERE (gene, ifNull(pos, -1), change) IN (SELECT gene, ifNull(pos, -1), change FROM kept) GROUP BY gene, pos, mtype, driver");
 }
@@ -692,7 +740,8 @@ export function lollipopTotalsSql(cohortSql: string, genes: string[], study: str
   const pin = drivers && pins ? pins.pin : fusions?.pin ?? null, hotspotPins = drivers && pins ? pins.hotspotPins : null;
   return aggregateSql(lollipopCte(cohortSql, genes, study, 1, pin, db, hotspotPins, filters, fusions?.lines, drivers) +
     "SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,\n" +
-    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples" +
+    "       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,\n" +
+    "       uniqExactIf(sid, (rgene = gene OR sv = 0) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND " + germlineConsentedCond(db, study, "sid") + ") AS germline_samples" +
     (drivers ? ",\n       " + annotatingSql(drivers, offeredSources(drivers, pin, hotspotPins).sure, db, study) + " AS annotating" : "") + "\n" +
     "FROM m GROUP BY gene");
 }
@@ -704,6 +753,34 @@ export function cohortSizesSql(cohortSql: string): AggregateSql {
 /** Samples in the cohort — the somatic mutation frequency's denominator. */
 export function cohortSampleCountSql(cohortSql: string): AggregateSql {
   return aggregateSql("WITH cohort AS (" + cohortSql + ")\nSELECT uniqExact(sid) AS n FROM cohort");
+}
+
+/**
+ * A sample (`sid`, its bare id) may count toward the germline rate: it is on the study's germline-consented
+ * list (`<study>_germline`), or the study has none — the portal counts only the consented samples' germline
+ * mutations (MutationUtils germlineMutationRate, over germlineConsentedSamples).
+ */
+function germlineConsentedCond(db: string, study: string, sid: string): string {
+  const list = sq(study + "_germline");
+  return "((SELECT count() FROM " + db + ".sample_list WHERE stable_id = " + list + ") = 0 OR " + sid + " IN (SELECT smp.stable_id FROM " + db + ".sample_list sl " +
+    "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id JOIN " + db + ".sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = " + list + "))";
+}
+
+/**
+ * The germline rate's denominator: the cohort's samples on the study's germline-consented list
+ * (`<study>_germline`) when the study has one (`lists` > 0), else none is said and every cohort sample
+ * counts — the portal's germlineConsentedSamples, which only a listed study has (ResultsViewPageStore
+ * 3995-4015).
+ */
+export function germlineConsentedCountSql(cohortSql: string, study: string, db: string = DB): AggregateSql {
+  const list = sq(study + "_germline");
+  return aggregateSql("WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT (SELECT count() FROM " + db + ".sample_list WHERE stable_id = " + list + ") AS lists,\n" +
+    "       uniqExactIf(smp.stable_id, " + inCohortSamples("smp.stable_id") + ") AS n\n" +
+    "FROM " + db + ".sample_list sl\n" +
+    "JOIN " + db + ".sample_list_list sll ON sll.list_id = sl.list_id\n" +
+    "JOIN " + db + ".sample smp ON smp.internal_id = sll.sample_id\n" +
+    "WHERE sl.stable_id = " + list);
 }
 
 /** Patients carrying ANY mutation in each gene in one of the cohort's samples — the lollipop's denominator. */
@@ -1317,8 +1394,9 @@ export interface AggregateCapable {
   pairMoments(def: CohortDef | null | undefined, pairs: [string, string][], profileType: string): Promise<PairMoments[]>;
   variantCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number): Promise<VariantReport>;
   /** per-codon counts for the lollipop (see lollipopCte) — aggregates only */
-  /** `drivers`: the page's driver settings the Driver/VUS split follows; omitted, OncoKB at the pin and Cancer Hotspots */
-  lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number, oql?: LollipopOql, drivers?: DriverSettings): Promise<LollipopReport>;
+  /** `drivers`: the page's driver settings the Driver/VUS split follows; omitted, OncoKB at the pin and Cancer Hotspots.
+   *  `rows`: the mutation table's search and filters for one gene, which narrow that gene's stems and badges */
+  lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount?: number, oql?: LollipopOql, drivers?: DriverSettings, rows?: LollipopRows): Promise<LollipopReport>;
   profileMoments(def: CohortDef | null | undefined, genes: string[], profileType: string): Promise<ProfileMoments[]>;
   /** the SQL this participant would run, for provenance */
   cohortSql(def: CohortDef | null | undefined): CohortSql;
@@ -1358,7 +1436,7 @@ export interface PatientLevelCapable extends AggregateCapable {
   viewRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
   /** a table view's rows (lib/table-query.ts) in this instance, with their ids — see PatientLevelResolver.rowsPage */
   rowsPage(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }>;
-  rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]>;
+  rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]>;
   rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]>;
   rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null>;
   /** one patient's timeline events and samples — see PatientLevelResolver.patientTimeline */
@@ -1416,7 +1494,7 @@ export interface PeerRowsRequest {
   oncokbPin?: string | null;
 }
 export interface PeerRowsAnswer {
-  rows?: ChRow[]; counts?: { cohort: string; study: string; n: number; all: number }[]; values?: ChRow[]; rank?: number | null;
+  rows?: ChRow[]; counts?: RowCounts[]; values?: ChRow[]; rank?: number | null;
   /** the OncoKB version the peer annotated its rows with (null: not annotated) */
   oncokbPin?: string | null;
   /** which samples the peer read, echoed so a peer that ignored the request is caught */
@@ -1486,7 +1564,7 @@ export function studyAccess(r: Resolver): StudyAccess {
  * participants lack a capability, not find out from an undefined method call.
  */
 export interface FederatedPlotCapable {
-  plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }>;
+  plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis; colorBy?: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string; colorLabel?: string }>;
   plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }>;
   /** a numeric axis's lowest value here and how many values are below 0, before a log scale is drawn */
@@ -1667,7 +1745,7 @@ abstract class BaseResolver implements AggregateCapable {
     };
   }
 
-  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, drivers?: DriverSettings): Promise<LollipopReport> {
+  async lollipopCounts(def: CohortDef | null | undefined, genes: string[], minCount = 1, oql?: LollipopOql, drivers?: DriverSettings, rows?: LollipopRows): Promise<LollipopReport> {
     const pin = this.ctx.oncokbPin ?? null;
     const d = drivers === undefined ? undefined : resolveDrivers(drivers);
     // the settings this report applied, echoed so a caller can tell a site that ignored them
@@ -1679,18 +1757,30 @@ abstract class BaseResolver implements AggregateCapable {
     const pos = (x: unknown) => x == null || x === "" ? null : Number(x);
     const filters = oql ? mutationFilters(oql, genes, { study: this.study, db, oncokbPin: pin, hotspotPins }) : undefined;
     const fusionLines = oql?.lines;
-    const [c, t, tot, cs] = await Promise.all([
-      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d), conn),
-      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d), conn),
+    if (rows) {
+      // the table's search and filters read row values (a sample id among them): only a participant that may show those rows narrows by them
+      if (!isPatientLevel(this as unknown as Resolver))
+        throw new Error(this.study + " is not patient-level here, so its lollipop cannot be narrowed by the mutation table's search or filters");
+      if (!genes.includes(rows.gene)) throw new Error("the table's gene " + rows.gene + " is not among the lollipop's genes (" + genes.join(", ") + ")");
+      const bad = checkQuery(rows, MUTATION_COLUMNS); if (bad) throw new Error("rows: " + bad);
+    }
+    const rowKeys = rows
+      ? { gene: rows.gene, keys: mutationRowKeysSql({ cohort: "", study: this.study, cohortSql: cohort }, db, rows.gene, pin, hotspotPins, oql, rows) } : undefined;
+    const [c, t, tot, cs, gc] = await Promise.all([
+      this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),
+      this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),
       this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters, fusionLines ? { lines: fusionLines, pin } : undefined, d, { pin, hotspotPins }), conn),
-      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn)
+      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn),
+      this.runLogged<ChRow>("lollipop:germline-consented", germlineConsentedCountSql(cohort, this.study, db), conn)
     ]);
     return {
+      germlineCohortSamples: Number(gc.data[0]?.lists) > 0 ? Number(gc.data[0]?.n || 0) : Number(cs.data[0]?.n || 0),
       minCount, annotated: src ? src.sure || tot.data.some((x) => Number(x.annotating) === 1) : !!pin, cohortSamples: Number(cs.data[0]?.n || 0), ...echo,
       changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1,
         ...(x.impact ? { impact: String(x.impact) } : {}) })),
       types: t.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), mtype: String(x.mtype), driver: Number(x.driver) === 1, rows: Number(x.rows) })),
-      totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples) }))
+      totals: tot.data.map((x) => ({ gene: String(x.gene), patients: Number(x.patients), pairs: Number(x.pairs), somaticSamples: Number(x.somatic_samples),
+        ...(x.germline_samples != null ? { germlineSamples: Number(x.germline_samples) } : {}) }))
     };
   }
 
@@ -1788,25 +1878,20 @@ abstract class BaseResolver implements AggregateCapable {
    * Which of these axes' clinical attributes the STUDY declares as numbers. Only it knows: it
    * declared them. An attribute it does not declare has no answer here rather than a guess.
    */
-  protected async clinicalKinds(axes: PlotAxis[]): Promise<Map<string, "num" | "cat">> {
+  protected async clinicalKinds(axes: (PlotAxis | undefined)[]): Promise<Map<string, "num" | "cat">> {
     return (await this.clinicalMeta(axes)).kinds;
   }
 
-  /** each clinical axis's type as the study declares it, and its display name (the portal's axis title, PLT-DT-19) */
+  /** each clinical axis's type as the study declares it, and its display name (the portal's title, PLT-DT-19): one query */
   protected async clinicalMeta(axes: (PlotAxis | undefined)[]): Promise<{ kinds: Map<string, "num" | "cat">; names: Map<string, string> }> {
-    const db = this.instance.conn.db;
-    const attrs = axes.filter((a) => a?.source === "clinical").map((a) => (a as { attribute: string }).attribute);
+    const attrs = [...new Set(axes.filter((a) => a?.source === "clinical").map((a) => (a as { attribute: string }).attribute))];
     const kinds = new Map<string, "num" | "cat">(), names = new Map<string, string>();
     if (!attrs.length) return { kinds, names };
-    const meta = await this.runQuiet<ChRow>(aggregateSql(
-      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, cam.display_name AS name\n" +
-      "FROM " + clinicalMetaTable(db) + " cam\n" +
-      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
-      "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + attrs.map(sq).join(",") + ")"))
-      .catch(() => ({ data: [] as ChRow[] }));
+    const meta = await this.runQuiet<ChRow>(clinicalMetaSql(attrs, this.study, this.instance.conn.db)).catch(() => ({ data: [] as ChRow[] }));
     for (const r of meta.data) {
       kinds.set(String(r.a), String(r.dt) === "NUMBER" ? "num" : "cat");
-      if (r.name) names.set(String(r.a), String(r.name));
+      const n = displayTitle(r.name);
+      if (n) names.set(String(r.a), n);
     }
     return { kinds, names };
   }
@@ -1826,7 +1911,7 @@ abstract class BaseResolver implements AggregateCapable {
     const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
 
     const { kinds, names } = await this.clinicalMeta([spec.x, spec.y, spec.colorBy]);
-    const title = (a: PlotAxis) => axisLabel(a, names);
+    const title = (a: PlotAxis) => axisLabel(named(a, names));
     const kindOf = (attr: string) => kinds.get(attr);
     const xk = axisKind(spec.x, kindOf), yk = axisKind(spec.y, kindOf);
     const shape = plotShape(xk, yk);
@@ -1897,7 +1982,7 @@ abstract class BaseResolver implements AggregateCapable {
     return done({ shape, n: groups.reduce((a, g) => a + g.n, 0), ...label, groups,
       violin, violinBins: VIOLIN_BINS, overlay: "violin",
       ...(vx0 != null && vx1 != null ? { violinExtent: [vx0, vx1] as [number, number] } : {}),
-      ...(spec.colorBy ? { colorLabel: title(spec.colorBy), legend: legendFor(violin.map((v) => v.c || "")) } : {}) });
+      ...(spec.colorBy ? { colorLabel: title(spec.colorBy), legend: legendFor(violin.map((v) => v.c || ""), false, spec.colorBy) } : {}) });
   }
 
   // ---- a federated plot: one pass per site, pooled by lib/views/plot/run.ts -------
@@ -1918,11 +2003,12 @@ abstract class BaseResolver implements AggregateCapable {
    * site whose metadata classifies an attribute differently cannot quietly split the combined
    * figure into two incompatible shapes.
    */
-  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string }> {
+  async plotAxisKinds(spec: { x: PlotAxis; y: PlotAxis; colorBy?: PlotAxis }): Promise<{ xk: AxisKind; yk: AxisKind; shape: PlotShape; xLabel: string; yLabel: string; colorLabel?: string }> {
     validateAxis(spec.x, "x", { cohort: true }); validateAxis(spec.y, "y");
-    const { kinds, names } = await this.clinicalMeta([spec.x, spec.y]);
+    const { kinds, names } = await this.clinicalMeta([spec.x, spec.y, spec.colorBy]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
-    return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(spec.x, names), yLabel: axisLabel(spec.y, names) };
+    return { xk, yk, shape: plotShape(xk, yk), xLabel: axisLabel(named(spec.x, names)), yLabel: axisLabel(named(spec.y, names)),
+      ...(spec.colorBy ? { colorLabel: axisLabel(named(spec.colorBy, names)) } : {}) };
   }
 
   /** what an OQL axis needs from this participant: its pinned OncoKB version and its profiles */
@@ -2226,10 +2312,15 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "scatter") return [];
+    // the fill and ring categories travel with every case, as a box's points carry them; not with
+    // the sparse cells an outliers layer draws in its own colour
+    const colorSel = !sparse && spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
+    const ringSel = !sparse && spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
     const r = await this.runPatientRows<ChRow>(sparse ? "plot:outliers" : "plot:points",
-      plotScatterPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, cap, sparse), conn);
+      plotScatterPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, cap, sparse, colorSel, ringSel), conn);
     if (r.data.length > cap) return null;
-    return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }));
+    return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y),
+      ...(colorSel ? { c: String(p.c ?? "") } : {}), ...(ringSel ? { r: String(p.r ?? "") } : {}) }));
   }
 
   /**
@@ -2313,7 +2404,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const db = this.instance.conn.db, conn = this.instance.conn;
     const kindsMap = await this.clinicalKinds(covariates);
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()), labels: "model" as const };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     // a patient not profiled for a covariate's gene has no value to fit, so the fit leaves them
     // out (in the query the method record re-runs) and counts them, rather than coding "unknown"
@@ -2360,9 +2451,10 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     return { rows: r.data, total: r.data.length ? Number(r.data[0].total) : 0 };
   }
   /** per part: the rows the query keeps and every row. Counts only. */
-  async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<{ cohort: string; study: string; n: number; all: number }[]> {
+  async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]> {
     const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db), q, defaults), this.instance.conn);
-    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all) }));
+    return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all), ...(x.dup != null ? { dup: Number(x.dup) } : {}),
+      ...(x.ns != null && x.np != null ? { ns: Number(x.ns), np: Number(x.np) } : {}) }));
   }
   /** a column's distinct values with counts, or its range — what its filter offers */
   async rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {
@@ -2403,7 +2495,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kindsMap = await this.clinicalKinds([outcome, ...covariates]);
     const outcomeKind = axisKind(outcome, (a) => kindsMap.get(a));
     const kinds = covariates.map((c) => axisKind(c, (a) => kindsMap.get(a)));
-    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+    const ctx = { study: this.study, db, unit: "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()), labels: "model" as const };
     const outcomeSel = { label: "y0", sel: axisSelect(outcome, ctx, outcomeKind) };
     const sels = covariates.map((c, i) => ({ label: "c" + i, sel: axisSelect(c, ctx, kinds[i]) }));
     // as for Cox: not profiled for the outcome's or a covariate's gene is left out and counted

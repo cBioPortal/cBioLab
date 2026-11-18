@@ -50,15 +50,19 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       // the portal's genomic overview: the patient's samples' mutations and copy-number segments along the genome, in IGV
       ...(data.held.includes("CNA") || data.held.includes("MUTATION") ? [v("Genomic overview", { kind: "segments", overview: true })] : []),
       // in sample mode, the sample's alterations alone, as the portal's sample view lists them
-      ...(genomic ? [v("Genomic alterations", { kind: "alterations", ...(q.sample ? { samples: "cohort" } : {}) })] : []),
+      // 10 rows a page, as the portal's patient tables page them (PAT-MT-1, PAT-CNA-3)
+      ...(genomic ? [v("Genomic alterations", { kind: "alterations", ...(q.sample ? { samples: "cohort" } : {}), mutations: { rows: 10 }, cna: { rows: 10 } })] : []),
     ] },
     // each mutation's allele frequency across the patient's samples, offered as the portal offers it: more than one sample in view and a mutation with a VAF
     ...(q.sample || !data.held.includes("MUTATION") || !((data.samples ?? 0) > 1) || data.vaf !== true ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
     // the portal's PathwayMapper tab: the pathway holding most of the patient's altered genes, then the canonical ten as bars
     ...(genomic ? [{ title: "Pathways", views: [v("Pathway diagram", { kind: "pathwaymap" }), v("Canonical pathways", { kind: "pathways", measure: "any" })] }] : []),
     { title: "Clinical Data", views: [
-      v("Patient", { kind: "table", unit: "patient" }),
-      v("Samples", { kind: "table", unit: "sample" }),
+      // as the portal lists them: Attribute | Value, and an attribute per row with a column per sample (PTB-CD-2, PTB-CD-3)
+      v("Patient", { kind: "table", unit: "patient", transpose: true }),
+      v("Samples", { kind: "table", unit: "sample", transpose: true, rows: 100 }),
+      // the portal's "Timeline Data": the patient's events, a table per event type (PTB-CD-4)
+      v("Timeline Data", { kind: "timeline", tables: true }),
     ] },
     { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
     // the view refuses, naming what there is, when this patient has no signature values

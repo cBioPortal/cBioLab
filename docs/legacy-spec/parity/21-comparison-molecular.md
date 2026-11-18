@@ -20,23 +20,23 @@ Legacy numbers come from `POST /api/alteration-enrichments/fetch` (mutation-only
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 14 |
-| 🟡 partial | 36 |
-| 🔶 different | 24 |
-| ❌ missing | 8 |
+| ✅ match | 18 |
+| 🟡 partial | 35 |
+| 🔶 different | 22 |
+| ❌ missing | 7 |
 | 🐞 ok | 2 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 1 |
 | **Total IDs** | **88** |
 
-**Overall: 21.6 %** (✅ 14 + 🐞ok 2 + N/A 3 = 19 of 88). Counting 🟡 as half: 42.0 %.
+**Overall: 26.1 %** (✅ 18 + 🐞ok 2 + N/A 3 = 23 of 88). Counting 🟡 as half: 46.0 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | ? | One line |
 |---|---|---|---|---|---|---|---|---|---|
 | §0 Tabs (TAB) | 8 | 0 | 3 | 4 | 1 | 0 | 0 | 0 | Tab order right; labels differ; Mutations tab hidden for ≠2 groups; no Pathways; overlap default Include |
-| §1 Alteration types (AT) | 6 | 0 | 2 | 3 | 1 | 0 | 0 | 0 | No checkbox tree: three separate views (mutation / CNA / SV), no combined table, no [Select] |
-| §1 Layout (AL) | 7 | 2 | 2 | 1 | 2 | 0 | 0 | 0 | Three charts + table per view; no Co-occurrence, no sample/patient or Enriched-in select; ≤300 rows |
+| §1 Alteration types (AT) | 6 | 3 | 2 | 1 | 0 | 0 | 0 | 0 | No checkbox tree: three separate views (mutation / CNA / SV), no combined table, no [Select] |
+| §1 Layout (AL) | 7 | 3 | 1 | 1 | 2 | 0 | 0 | 0 | Three charts + table per view; no Co-occurrence, no sample/patient or Enriched-in select; ≤300 rows |
 | §1 Volcano (VO) | 6 | 0 | 4 | 1 | 1 | 0 | 0 | 0 | Present; y not capped at 10; group colours; drag-select only on expression/GA |
 | §1 Frequency scatter (FS) | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | Present, top 300 genes only |
 | §1 Bar plot (BP) | 4 | 0 | 3 | 1 | 0 | 0 | 0 | 0 | Default ordering only, fixed 10, from top-300 rows |

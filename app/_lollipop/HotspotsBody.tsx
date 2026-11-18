@@ -7,7 +7,7 @@
 // carries the summary and the selection in its caption instead.
 import React, { useMemo, useRef, useState } from "react";
 import type { ViewResultOf } from "../../lib/types.ts";
-import { filterHotspotGene, clickCodon, lollipopGeneEmpty, type CodonSelection } from "../../lib/lollipop.ts";
+import { filterHotspotGene, clickCodon, defaultYMax, lollipopGeneEmpty, nextYMax, type CodonSelection } from "../../lib/lollipop.ts";
 import { AlterationGrid, classesOf } from "./AlterationGrid.tsx";
 import { TranscriptSummary } from "./TranscriptSummary.tsx";
 import { ColorLegend } from "./ColorLegend.tsx";
@@ -21,7 +21,7 @@ import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
 import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
 
-/** The transcript and its ids, and the somatic mutation frequency — the portal's GeneSummary. */
+/** The transcript and its ids, and the somatic (and, when any, germline) mutation frequency — the portal's GeneSummary. */
 function GeneSummary({ g, grch38 }: { g: HotspotGene; grch38: boolean }) {
   const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
   return (
@@ -32,13 +32,40 @@ function GeneSummary({ g, grch38 }: { g: HotspotGene; grch38: boolean }) {
         <div className="lp-freq" data-tip={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
           <span>Somatic Mutation Frequency</span> <b>{freq}</b>
         </div>
+        {/* the portal adds the germline rate only when some sample has a germline mutation (MutationRateSummary), over the germline-consented samples where a study lists them */}
+        {(g.germlineSamples ?? 0) > 0 && (g.germlineCohortSamples ?? 0) > 0 && (
+          <div className="lp-freq" data-tip={(g.germlineSamples ?? 0).toLocaleString() + " of " + (g.germlineCohortSamples ?? 0).toLocaleString() + " samples carry a germline mutation in " + g.gene}>
+            <span>Germline Mutation Frequency</span> <b>{fmtShare((g.germlineSamples ?? 0) / (g.germlineCohortSamples ?? 1))}</b>
+          </div>
+        )}
       </div>}
     </>
   );
 }
 
+/**
+ * The portal's Y-Axis Max: a slider from 1 to the default maximum (the tallest stem, at least 5) and a number
+ * box that also takes larger values; below 1 is read as 1, and the default itself clears the setting.
+ */
+function YAxisMax({ gene, value, onChange }: { gene: HotspotGene; value?: number; onChange: (next: number | undefined) => void }) {
+  const def = defaultYMax(gene);
+  const set = (n: number) => { const next = nextYMax(n, def); if (next !== null) onChange(next); };
+  const shown = value ?? def;
+  return (
+    <label className="inline-flex items-center gap-1.5 text-sm" data-tip={"the y axis's maximum; the default is " + def + ", the tallest stem (at least 5)"}>
+      <span>Y-Axis Max:</span>
+      <input type="range" min={1} max={def} step={1} value={Math.min(shown, def)} aria-label={"y axis maximum for " + gene.gene} onChange={(e) => set(Number(e.target.value))} />
+      <input type="number" min={1} step={1} value={shown} className="w-16 rounded border px-1" aria-label={"y axis maximum for " + gene.gene + ", any value"}
+        onChange={(e) => { if (e.target.value.trim() !== "") set(Number(e.target.value)); }} />
+    </label>
+  );
+}
+
 /** One gene's plot: the renderer's figure, its stems clickable (use-stem-clicks.ts). */
-function GenePlot({ gene, selected, onSelect, annotated }: { gene: HotspotGene; selected: number[]; onSelect: (next: number[]) => void; annotated: boolean }) {
+function GenePlot({ gene, selected, onSelect, annotated, yMax, onYMax }: { gene: HotspotGene; selected: number[]; onSelect: (next: number[]) => void; annotated: boolean;
+  /** the y axis's maximum the reader set, and where a change writes it (undefined: the default) */
+  yMax?: number; onYMax: (next: number | undefined) => void }) {
+  const caps = yMax != null ? { [gene.gene]: yMax } : undefined;
   const box = useRef<HTMLDivElement>(null);
   const [legend, setLegend] = useState(false);
   useStemClicks(box, {
@@ -47,13 +74,14 @@ function GenePlot({ gene, selected, onSelect, annotated }: { gene: HotspotGene; 
   });
   return (
     <div className="lp-plot flex-[1_1_560px]">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <YAxisMax gene={gene} value={yMax} onChange={onYMax} />
         <LollipopTools legend={legend} onLegend={setLegend} filename={gene.gene + "_mutation_diagram"}
-          svg={() => { const w = box.current?.getBoundingClientRect().width; return w ? lollipopPanelsSvg([gene], { width: Math.round(w), theme: "light" }, "", { [gene.gene]: selected }) : null; }} />
+          svg={() => { const w = box.current?.getBoundingClientRect().width; return w ? lollipopPanelsSvg([gene], { width: Math.round(w), theme: "light" }, "", { [gene.gene]: selected }, caps) : null; }} />
       </div>
       {legend && <ColorLegend drivers={annotated} />}
       <div ref={box}>
-        <DrawAtWidth draw={(width) => lollipopPanelsSvg([gene], { width }, "", { [gene.gene]: selected })} deps={[gene, selected.join(",")]} />
+        <DrawAtWidth draw={(width) => lollipopPanelsSvg([gene], { width }, "", { [gene.gene]: selected }, caps)} deps={[gene, selected.join(","), yMax ?? ""]} />
       </div>
     </div>
   );
@@ -77,9 +105,11 @@ function SelectedCodons({ g, selected, onSelect }: { g: HotspotGene; selected: n
   );
 }
 
-export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons }: { v: ViewResultOf<"hotspots">; hide?: string[]; onHide: (next: string[] | undefined) => void;
+export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons, yMax, onYMax }: { v: ViewResultOf<"hotspots">; hide?: string[]; onHide: (next: string[] | undefined) => void;
   /** the stems selected on each gene's plot, and where a click writes the next selection */
-  codons?: CodonSelection; onCodons: (next: CodonSelection | undefined) => void }) {
+  codons?: CodonSelection; onCodons: (next: CodonSelection | undefined) => void;
+  /** each gene's y-axis maximum the reader set, and where a change writes it (omitted: no control) */
+  yMax?: Record<string, number>; onYMax?: (next: Record<string, number> | undefined) => void }) {
   const genes = useMemo(() => (v.hotspots || []) as HotspotGene[], [v.hotspots]);
   const hide = useMemo(() => new Set(hideList || []), [hideList]);
   const classes = classesOf(genes.map((g) => g.tally));
@@ -117,7 +147,7 @@ export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons }: { 
       )}
       {drawn.map((d, i) => (
         <div key={d.gene.gene} className="lp-gene">
-          <GenePlot gene={d.gene} selected={picked(d.gene.gene)} onSelect={(next) => pick(d.gene.gene, next)} annotated={v.annotated !== false} />
+          <GenePlot gene={d.gene} selected={picked(d.gene.gene)} onSelect={(next) => pick(d.gene.gene, next)} annotated={v.annotated !== false} yMax={yMax?.[d.gene.gene]} onYMax={(n) => { if (!onYMax) return; const all = { ...(yMax || {}) }; if (n == null) delete all[d.gene.gene]; else all[d.gene.gene] = n; onYMax(Object.keys(all).length ? all : undefined); }} />
           <div className="lp-side">
             <GeneSummary g={genes[i]} grch38={!!v.grch38} />
             <AlterationGrid tally={genes[i].tally} classes={classes} hide={hide} onHide={set} annotated={v.annotated !== false} />

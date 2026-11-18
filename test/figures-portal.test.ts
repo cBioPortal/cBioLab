@@ -22,15 +22,16 @@ describe("cancertypes", () => {
     assert.ok(svg.includes("30 / 150 samples, 160 in the group"), "a group with unprofiled samples says so");
     assert.ok(svg.includes("Alteration Frequency"));
   });
-  test("a '+' per group for a data type only some groups were profiled for, and one gene's bars on request", () => {
+  test("a '+' or '−' per group for every data type the query reads (CTS-CH-5), and one gene's bars on request", () => {
     const g = (k: string, label: string, n: number, m: number, sv: number) => ({ ...grp(k, label, n, m), profiledFor: { mutation: n, cna: 0, sv } });
     const two: ViewResult = { ...v, cancertypes: { ...v.cancertypes!, genes: ["KRAS", "NRAS"], panels: [{ ...v.cancertypes!.panels[0],
-      groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], categories: 2, filtered: undefined,
-      perGene: [{ gene: "KRAS", groups: [g("a", "A", 100, 40, 100)], categories: 1, minSamples: 10 }, { gene: "NRAS", groups: [g("b", "B", 100, 7, 0)], categories: 1, minSamples: 10 }] }] } };
+      profiledTypes: ["sv", "mutation"], groups: [g("a", "A", 100, 50, 100), g("b", "B", 100, 10, 0)], categories: 2, filtered: undefined,
+      perGene: [{ gene: "KRAS", altered: 40, profiled: 100, groups: [g("a", "A", 100, 40, 100)], categories: 1, minSamples: 10 }, { gene: "NRAS", altered: 7, profiled: 100, groups: [g("b", "B", 100, 7, 0)], categories: 1, minSamples: 10 }] }] } };
     const all = cancertypesPanelSvg(two.cancertypes!, 0);
     assert.ok(all.body.includes("Structural variant data") && !all.body.includes("CNA data"));
-    assert.equal((all.body.match(/>\+</g) || []).length, 1, "only the SV row differs between groups: one '+', for A");
-    assert.ok(all.body.includes("Every group was profiled for mutation data."), "a type every group has is said once, not marked per group");
+    assert.equal((all.body.match(/>\+</g) || []).length, 3, "mutation: A and B; structural variant: A");
+    assert.equal((all.body.match(/>\u2212</g) || []).length, 1, "structural variant: B was not profiled");
+    assert.ok(all.body.includes("<title>Not profiled</title>") && all.body.includes("<title>100 samples profiled</title>"));
     const nras = cancertypesPanelSvg(two.cancertypes!, 0, { gene: "NRAS" });
     assert.ok(nras.body.includes("B: 7.0% (7 / 100 samples)") && !nras.body.includes("A: "));
   });
@@ -51,6 +52,49 @@ describe("cancertypes", () => {
   });
   test("nothing profiled, no figure", () => {
     assert.equal(viewToSvg({ ...v, cancertypes: { ...v.cancertypes!, panels: [{ ...v.cancertypes!.panels[0], profiled: 0 }] } }), null);
+  });
+});
+
+describe("cancertypes stack, legend and colour (CTS-CH-3, CTS-CH-4)", () => {
+  const STACK = ["Multiple Alterations", "Protein Low", "Protein High", "mRNA Low", "mRNA High", "Deep Deletion", "Amplification", "Structural Variant", "Mutation"];
+  const full: CancertypesGroup = { key: "full", label: "Full", samples: 100, profiled: 100, altered: 45,
+    mutation: 9, sv: 8, amp: 7, homdel: 6, mrnaHigh: 5, mrnaLow: 4, protHigh: 3, protLow: 2, multiple: 1 };
+  const some: CancertypesGroup = { key: "some", label: "Some", samples: 100, profiled: 100, altered: 20,
+    mutation: 6, sv: 4, amp: 3, homdel: 2, multiple: 5 };
+  const result = (groups: CancertypesGroup[]) => ({ groupBy: "CANCER_TYPE", measure: "any", genes: ["KRAS"], minSamples: 1, minAltered: 0,
+    show: "count", unit: "sample", panels: [{ cohort: "all", samples: 200, profiled: 200, altered: 65, groups, categories: groups.length, minSamples: 1 }] }) as
+    NonNullable<Extract<ViewResult, { kind: "cancertypes" }>["cancertypes"]>;
+  /** a group's segments in document order: kind, y, fill */
+  const segments = (body: string, group: string) => [...body.matchAll(/<rect [^>]*y="([\d.]+)"[^>]*fill="([^"]+)"><title>([^<]*)<\/title><\/rect>/g)]
+    .map(([, y, fill, t]) => ({ y: Number(y), fill, m: t.match(new RegExp("^" + group + " — (.+?): ")) }))
+    .filter((s) => s.m).map((s) => ({ kind: s.m![1], y: s.y, fill: s.fill }));
+  /** the legend's entries in order: swatch fill and label */
+  const legendItems = (body: string) => [...body.matchAll(/<rect [^>]*rx="2" fill="([^"]+)"\/><text[^>]*>(?:<title>[^<]*<\/title>)?([^<]*)<\/text>/g)]
+    .map(([, fill, text]) => ({ fill, label: text }));
+
+  test("K1: a group's segments stack bottom to top as the portal's OrderedAlterationLabelMap", () => {
+    const { body } = cancertypesPanelSvg(result([full]), 0);
+    assert.deepEqual(segments(body, "Full").map((s) => s.kind), STACK);
+  });
+  test("K2: the first segment sits on the axis (largest y), Mutation on top (smallest y)", () => {
+    const segs = segments(cancertypesPanelSvg(result([full]), 0).body, "Full");
+    const ys = segs.map((s) => s.y);
+    assert.equal(segs.find((s) => s.y === Math.max(...ys))!.kind, "Multiple Alterations");
+    assert.equal(segs.find((s) => s.y === Math.min(...ys))!.kind, "Mutation");
+  });
+  test("L1: the legend lists the kinds present in reverse stack order", () => {
+    const { body } = cancertypesPanelSvg(result([some]), 0);
+    assert.deepEqual(legendItems(body).map((i) => i.label), ["Mutation", "Structural Variant", "Amplification", "Deep Deletion", "Multiple Alterations"]);
+  });
+  test("L2: a kind with no count in any group is not in the legend", () => {
+    const labels = legendItems(cancertypesPanelSvg(result([some, { ...some, key: "s2", label: "S2" }]), 0).body).map((i) => i.label);
+    for (const k of ["mRNA High", "mRNA Low", "Protein High", "Protein Low"]) assert.ok(!labels.includes(k), k);
+    assert.equal(labels.length, 5);
+  });
+  test("C1: Multiple Alterations is drawn and keyed in the portal's #666", () => {
+    const { body } = cancertypesPanelSvg(result([full]), 0);
+    assert.equal(segments(body, "Full").find((s) => s.kind === "Multiple Alterations")!.fill, "#666");
+    assert.equal(legendItems(body).find((i) => i.label === "Multiple Alterations")!.fill, "#666");
   });
 });
 

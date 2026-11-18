@@ -175,6 +175,8 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
   // Which of the plotted cohort and its layers are hidden: a reading gesture, kept in the browser
   // like a hover (invariant 9), and dropped when the layers drawn change.
   const drawn = (plot?.layers || []).map((l, i) => ({ ...l, i })).filter((l) => l.shown !== "none");
+  // a box always takes a colour (its density splits too); a scatter only while its cases are points
+  const colourable = plot?.shape === "box" || (plot?.shape === "scatter" && plot.pointSet?.rule === "all" && !!plot.xyPoints?.length);
   const drawnKey = drawn.map((l) => l.i + ":" + l.label).join("|");
   const [hidden, setHidden] = useState<string[]>([]);
   useEffect(() => setHidden([]), [drawnKey]);
@@ -314,11 +316,19 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
           {plot && <p className="plot-showing m-0 mb-2.5 rounded-sm bg-muted px-2.5 py-1.5 text-md">
             Showing {plot.n.toLocaleString()}{total != null && total > plot.n ? " of " + total.toLocaleString() : ""} {unit}{plot.n === 1 ? "" : "s"} with data on both axes
           </p>}
-          {/* colour and ring split a box's violin and points; a scatter's density and a contingency
-              have no per-case colour, so the controls appear only with a box on screen */}
-          {(plot?.shape === "box" || drawn.length > 0) && <div className="viewtb mt-0 mb-2.5">
-            {plot?.shape === "box" && <><div className="tbz">
-              <span className="tbl" data-tip="colours each group's violin and points by a category">colour samples by</span>
+          {/* colour and ring split a box's violin and points and a scatter's points; a scatter drawn as
+              density and a contingency have no per-case colour, and a density scatter says so */}
+          {(plot?.shape === "box" || plot?.shape === "scatter" || drawn.length > 0) && <div className="viewtb mt-0 mb-2.5">
+            {plot?.shape === "scatter" && !colourable && <div className="tbz">
+              <span className="tbl text-muted-foreground" data-tip="each cell of a density holds many cases, so there is no one colour to give it; a scatter is coloured when its cases are drawn as points">
+                colour samples by: drawn as density, no per-case colour</span>
+              {(spec.colorBy || spec.ringBy) && <button type="button" className="tbl underline" disabled={busy}
+                data-tip="this plot still asks for a colour or ring it cannot draw while it is a density; clear it"
+                onClick={() => update((vv) => { const n = { ...vv }; delete n.colorBy; delete n.ringBy; return n; })}>
+                clear {[spec.colorBy ? "colour" : "", spec.ringBy ? "ring" : ""].filter(Boolean).join(" and ")}</button>}
+            </div>}
+            {colourable && <><div className="tbz">
+              <span className="tbl" data-tip={plot?.shape === "box" ? "colours each group's violin and points by a category" : "colours each point by a category"}>colour samples by</span>
               <AxisPicker side="fill" axis={spec.colorBy} allowNone categorical attrs={attrs} catalog={catalog} loading={loading} busy={busy}
                 onChange={(a) => update((vv) => { const n = { ...vv }; if (a) n.colorBy = a; else delete n.colorBy; return n; })} />
             </div>

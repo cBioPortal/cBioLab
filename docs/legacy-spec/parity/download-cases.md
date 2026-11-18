@@ -20,10 +20,10 @@ The rows are built in `lib/study-view-download.ts`.
 
 | Chart | Portal's entries, in order | Here |
 |---|---|---|
-| Pie, clinical table (categorical) | Summary Data, Full Data, SVG, PDF (ST:231-239, 391-399) | Summary Data |
-| Bar (numeric) | Data, SVG, PDF (ST:306-316) | later (a per-case file) |
-| Density | Data, SVG, PDF (ST:783-848) | later |
-| Survival | Data, SVG, PDF (ST:651-663) | later |
+| Pie, clinical table (categorical) | Summary Data, Full Data, SVG, PDF (ST:231-239, 391-399) | Summary Data, Full Data (clinical), SVG, PDF |
+| Bar (numeric) | Data, SVG, PDF (ST:306-316) | Data (clinical), SVG, PDF |
+| Density | Data, SVG, PDF (ST:783-848) | Data, SVG, PDF |
+| Survival | Data, SVG, PDF (ST:651-663) | Data, SVG, PDF |
 | Mutated / CNA / SV gene tables | Data (ST:483-626) | with the gene tables' rows (every gene) |
 | Data Types, Case Lists | none (ST:635-650) | none |
 
@@ -69,3 +69,28 @@ The figures are built in `lib/study-view-figures.ts`.
 | FG11 | Text room | A saved pie's legend is sized for a fallback font (18% wider than IBM Plex Sans measures), so a viewer without Plex (DejaVu Sans, Arial) doesn't cut a long value off at the right edge | cBioLab (`FALLBACK`, `lib/study-view-figures.ts`) |
 | FG12 | ⚠ PDF font | The PDF's text is IBM Plex Sans, embedded. Only its regular weight is embedded, so a bold title prints regular (the portal's PDF uses its page font) | cBioLab (`pdfFonts`, `app/lab/chart-files.ts`) |
 | FG13 | Number at risk | Under the KM figure, a count that would touch the one before it (the first is pulled in at the plot's left edge) is left out, as the thinned ticks are | cBioLab (`riskTable`, `lib/views/survival/figure.ts`) |
+
+## Per-case files (PC)
+
+Further source: CC as above; DCN = `packages/cbioportal-frontend-commons/src/components/downloadControls/DownloadControls.tsx`
+(same file as DC). The file's rows come from the clinical `table` view through `POST /api/table` with a
+`format` (the patient-level path, docs/DATA-BOUNDARY.md); the doc, header and lines are built in
+`lib/study-view-case-files.ts`.
+
+| # | Case | Rule | Source |
+|---|---|---|---|
+| PC1 | Entries | A clinical pie or list chart: Summary Data, Full Data, SVG, PDF. A clinical bar chart, the density chart and the survival chart: Data, SVG, PDF. The header's "Download clinical data" button beside View patients. Gene-state and generic-assay charts: not yet (their values are not clinical rows) | ST:231-239, 306-316, 391-399, 651-663, 783-848; STV-AB-4 |
+| PC2 | File names | Full Data: the chart's name (spaces and tabs as `_`) then `.full.txt`. Data: the name then `.txt`. Clinical data: `<study>_clinical_data.tsv` for one study, `combined_study_clinical_data.tsv` for several | DCN:175-183 (`buildFileName`; Data's click passes no type); STV-AB-4 |
+| PC3 | Layout | Tab-separated, lines end in LF, no line ending after the last, no quoting, UTF-8. A missing value is `NA`. ⚠ A tab or line break inside a value is written as a space (the portal writes it as is, which splits the row) | SPS:10498-10531, 11396-11424 |
+| PC4 | Full Data header | `Study ID`, `Patient ID`, then `Sample ID` for a sample attribute (not for a patient attribute), then the chart's attribute's display name | SPS:10498-10507 |
+| PC5 | Full Data rows | One per selected case that has a value for the attribute: per sample for a sample attribute, per patient (once, however many of its samples are selected) for a patient attribute. A case with no value is left out (the portal's rows are the recorded values `fetchClinicalData` returns): every recorded value, a NUMBER attribute's `>89` or `high` included. Fixture: KI67_INDEX lists 6 samples (10, 20, 30, >90, high, high) | SPS:10476-10496, 10511-10527 |
+| PC6 | Bar Data | A clinical bar chart's Data is its Full Data (PC4, PC5) under PC2's Data name | ST:325-326; SPS:10533-10544 (no type → full) |
+| PC7 | Density Data | `Cancer Study`, `Patient ID`, `Sample ID`, the x attribute's display name, the y attribute's, x and y as the chart draws them (swapped after Swap Axes). One row per selected sample with both values recorded, whatever they are (`getSampleToClinicalData`, not the plot's points); a sample missing either is left out | SVU:746-780, 4999-5015 |
+| PC8 | Survival Data | `Study ID`, `Patient ID`, `<PREFIX>_STATUS`, `<PREFIX>_MONTHS`: the attributes' ids, not their names. One row per selected patient, `NA` where a value is missing | SVU:5017-5080; SPS:10366-10369 |
+| PC9 | Clinical data | `Study ID`, `Patient ID`, `Sample ID`, then every clinical attribute the studies record, sample and patient, by display name (an attribute in several studies once). One row per selected sample, carrying its patient's values; `NA` where missing. ⚠ Attributes in priority order (the portal: as its API lists them); at most 200 of them (`TABLE_COLUMNS_MAX`; the widest study records 170) | SPS:11339-11424; STV-STM-5 |
+| PC10 | ⚠ Row order | By patient id, then sample id, as the clinical table orders them (the portal: the order its API returns the selected cases) | cBioLab (`clinicalRowSource`) |
+| PC11 | Several studies | One file; each row names its own study | SPS:10511-10527 |
+| PC12 | ⚠ Studies that may not list patients | They contribute no rows, as on the Clinical Data tab; the page says which were left out and why. The portal has no such studies | cBioLab (docs/DATA-BOUNDARY.md) |
+| PC13 | No case selected | The header alone (the portal saves nothing for an empty clinical-data download) | SPS:11340-11342 |
+| PC14 | A download cut short | The page says it failed and saves nothing, rather than a file that reads as whole: the route ends a file it could not finish with a `# DOWNLOAD INCOMPLETE` line, and says how many line breaks a whole file holds (`caseFileLineBreaks`: the rows in the chart layout, whose lines each start with one; the rows plus the header's in the table layout, where every line ends with one), so a file cut off in transit is caught too | cBioLab (`/api/table`) |
+| PC15 | Attributes past the table's limit | A clinical-data file (every attribute) holds at most 200 (the table's limit); the page says how many of how many it holds. A file of named columns (a chart's Full Data or Data, the Clinical Data tab's) says nothing of it, whatever the study holds | cBioLab (TABLE_COLUMNS_MAX); review of #311 |

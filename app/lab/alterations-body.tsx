@@ -6,15 +6,21 @@
 // picker, as for every view.
 import React, { useEffect, useMemo, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { sampleMarks } from "../../lib/timeline-tracks.ts";
+import { GearMenu } from "../_ui/gear-menu.tsx";
+import { RadioGroup, RadioGroupItem } from "../_ui/radio-group";
+import { Settings } from "lucide-react";
 import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
+import { MutationTypeCell } from "./mutation-cells.tsx";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult, AlleleReads } from "../../lib/views/alterations/types";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
+
+/** what the portal's not-profiled alerts call each table's data */
+const NOT_PROFILED_FOR: Record<"mutations" | "cna" | "sv", string> = { mutations: "mutations", cna: "copy number alterations", sv: "structural variants" };
 
 /** The three tables, in the portal's order: the spec's key, and its name — its count line reads "7 Mutations", as the portal's does. */
 const TABLES = [
@@ -30,7 +36,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
 }) {
   const [listOpen, setListOpen] = useState(false);
   const p = a.patient;
-  const allMarks = useMemo(() => sampleMarks(p?.samples || [], []), [p]);
+  // numbered on the server as the header numbers them (collection day, type, id)
+  const allMarks = useMemo(() => new Map((p?.samples || []).map((m) => [m.id, m])), [p]);
   // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
   const marks = useMemo(() => p?.shown ? new Map([...allMarks].filter(([id]) => p.shown!.includes(id))) : allMarks, [p, allMarks]);
   // the Allele Freq bars' slots: one per sample in view, in sample order, as the Samples column's
@@ -102,15 +109,26 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               <svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
               <span className="mono">{m.id}</span>
             </span>))}
-          <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not. A gene's rows sit together, shaded alike, in sample order.</span>
+          {marks.size > 1 && <span className="note alt-key">Each row is one alteration in one gene across these samples: a sample's marker where it carries it, -- where it does not. A gene's rows sit together, shaded alike, in sample order.</span>}
         </div>
       ) : <p className="meta">No patient to list: the cohort's patient list is empty.</p>}
       {p && TABLES.map(({ key, name }) => {
         const t = a.tables[key];
         if (!t) return null;
+        // the portal's not-profiled alerts (PAT-CNA-2, PAT-SV-2, PAT-NP-1): no profile, no table; samples outside it named above it
+        const pr = a.profiling?.[key];
+        const what = NOT_PROFILED_FOR[key];
+        if (pr && !pr.study) return <section key={key} className="alt-table" aria-label={name}><p className="note" role="status">Study is not profiled for {what}.</p></section>;
+        const outside = pr ? [...marks.values()].filter((m) => !pr.profiled.includes(m.id)) : [];
+        const none = pr != null && outside.length === marks.size;
         return (
           <section key={key} className="alt-table" aria-label={name}>
-            <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
+            {outside.length > 0 && <p className="note flex flex-wrap items-center gap-1" role="status">
+              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
+                <svg width="14" height="14" aria-label={m.id}><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
+              </span>)} not profiled for {what}{none ? "" : "."}
+            </p>}
+            {!none && <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
               onQuery={(q) => setQuery(key, q)}
               {...(key === "sv" ? {} : {
                 onRow: (r: { values: unknown[] }) => {
@@ -121,13 +139,17 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
               })}
               num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : x.toLocaleString()}
+              colHead={(id) => id === "gene" && (key === "mutations" || key === "cna") && marks.size > 1 && a.mixedPanels?.[key]
+                ? <GenesProfiledMenu table={key} value={(spec.genesProfiled as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
+                    onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} /> : null}
               cell={(id, x, row) => id === "samples" ? sampleCell(x)
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
+                : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "status" && key === "sv" ? <SvStatus value={String(x || "")} />
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>
-                : undefined} />
+                : undefined} />}
           </section>);
       })}
       {listOpen && (
@@ -156,4 +178,26 @@ function SvStatus({ value }: { value: string }) {
   return kind
     ? <span className="px-[5px] text-sm font-bold text-black" style={{ background: kind.bg }} data-tip={value}>{kind.text}</span>
     : <span className="text-xs text-[#9d9d9d]" data-tip={value}>{value}</span>;
+}
+
+/** where the gene filter menus' open state outlives the card remounting when a pick re-runs the view */
+const MENU_STORE = new Map<string, boolean>();
+
+/**
+ * The portal's gene filter in the Gene header (GeneFilterMenu, PAT-MT-6), offered when the samples in
+ * view were sequenced with different panels and a row's gene is missing from one: every gene, or only
+ * those profiled in all the samples. It sets the view's `genesProfiled` (both tables read it).
+ */
+function GenesProfiledMenu({ table, value, what, disabled, onChange }: { table: string; value: "any" | "all"; what: string; disabled: boolean; onChange: (g: "any" | "all") => void }) {
+  const id = "genes-profiled-" + table;
+  return (
+    <GearMenu menuId={id} menuStore={MENU_STORE} title={value === "all" ? "showing genes profiled in all samples" : "different gene panels were used for the samples"}
+      ariaLabel="filter genes by the samples' gene panels" className="ml-1 h-5 px-1" label={<Settings className="size-3.5" />} wide>
+      <p className="mb-2 text-sm">Different gene panels were used for the samples. Filter {what} for:</p>
+      <RadioGroup value={value} onValueChange={(v) => onChange(v === "all" ? "all" : "any")} disabled={disabled} aria-label="genes profiled in">
+        <label className="flex items-center gap-2 text-sm" htmlFor={id + "-any"}><RadioGroupItem id={id + "-any"} value="any" /> Genes profiled in any sample</label>
+        <label className="flex items-center gap-2 text-sm" htmlFor={id + "-all"}><RadioGroupItem id={id + "-all"} value="all" /> Genes profiled in all samples</label>
+      </RadioGroup>
+    </GearMenu>
+  );
 }

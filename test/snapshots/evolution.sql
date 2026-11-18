@@ -168,6 +168,44 @@ WHERE 1
 ORDER BY samples DESC, patient, patient, ord
 LIMIT 3 OFFSET 0
 
+-- view 0 evolution: evolution:sample-attributes · glioma_msk_2018
+WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'glioma_msk_2018_', '') AS pid, replaceOne(sample_unique_id, 'glioma_msk_2018_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'glioma_msk_2018'
+    AND replaceOne(patient_unique_id, 'glioma_msk_2018_', '') IN (SELECT DISTINCT replaceOne(patient_unique_id, 'glioma_msk_2018_', '') AS pid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'glioma_msk_2018'
+    AND replaceOne(patient_unique_id, 'glioma_msk_2018_', '') IN ('IM-GBM-28')))),
+u0 AS (
+  SELECT patient_unique_id AS puid, sample_unique_id AS suid, 1 AS samples FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'glioma_msk_2018' AND replaceOne(sample_unique_id, 'glioma_msk_2018_', '') IN (SELECT sid FROM c0)
+),
+pv0 AS (
+  SELECT patient_unique_id AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'glioma_msk_2018' AND type = 'patient' AND 0
+    AND attribute_value != '' AND replaceOne(patient_unique_id, 'glioma_msk_2018_', '') IN (SELECT pid FROM c0)
+  GROUP BY k
+),
+sv0 AS (
+  SELECT sample_unique_id AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'glioma_msk_2018' AND type = 'sample' AND attribute_name IN ('MUTATION_COUNT','FRACTION_GENOME_ALTERED','SAMPLE_TYPE','CANCER_TYPE','CANCER_TYPE_DETAILED','GENE_PANEL','ONCOTREE_CODE','SAMPLE_COLLECTION_METHOD','SOMATIC_STATUS','SPECIMEN_PRESERVATION_TYPE','TMB_NONSYNONYMOUS','TISSUE_SITE')
+    AND attribute_value != '' AND replaceOne(sample_unique_id, 'glioma_msk_2018_', '') IN (SELECT sid FROM c0)
+  GROUP BY k
+),
+rows AS (
+  SELECT 'patient' AS cohort, 'glioma_msk_2018' AS study, 0 AS ord,
+         replaceOne(u.puid, 'glioma_msk_2018_', '') AS patient, replaceOne(u.suid, 'glioma_msk_2018_', '') AS sample, u.samples AS samples, mapUpdate(pv.m, sv.m) AS m
+  FROM u0 AS u LEFT JOIN pv0 AS pv ON pv.k = u.puid LEFT JOIN sv0 AS sv ON sv.k = u.suid
+)
+SELECT cohort, study, patient, sample, samples, m, count() OVER () AS total FROM rows
+WHERE 1
+ORDER BY patient, sample, patient, sample, ord
+LIMIT 1000 OFFSET 0
+
 -- view 0 evolution: evolution:samples:counts · glioma_msk_2018
 WITH pn AS (SELECT sample_unique_id, any(gene_panel_id) AS panel FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'glioma_msk_2018' AND alteration_type = 'MUTATION_EXTENDED' GROUP BY sample_unique_id),
@@ -188,6 +226,13 @@ SELECT *, count() OVER () AS total FROM rows
 WHERE 1
 ORDER BY sid, sid
 LIMIT 1000 OFFSET 0
+
+-- view 0 evolution: table:attributes · glioma_msk_2018
+SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
+FROM snapshot_db.clinical_attribute_meta m
+JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = m.cancer_study_id
+WHERE cs.cancer_study_identifier = 'glioma_msk_2018'
+ORDER BY priority DESC, name
 
 -- view 0 evolution: timeline:events · glioma_msk_2018
 WITH pt AS (

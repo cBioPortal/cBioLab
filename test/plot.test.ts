@@ -43,7 +43,7 @@ test("an axis that would read a whole profile is refused by name", () => {
   validateAxis({ source: "alteration", gene: "TP53", by: "driver" }, "x");
   validateAxis({ source: "alteration", gene: "TP53", by: "driver", drivers: { hotspots: true } }, "x");
   assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "driver", drivers: { hotspots: "yes" } } as never, "x"), /x axis: drivers.hotspots must be true or false/);
-  assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "oncogenic" } as never, "x"), /groups by "mutated", "mutationType", "driver", "cna" or "sv"/);
+  assert.throws(() => validateAxis({ source: "alteration", gene: "TP53", by: "oncogenic" } as never, "x"), /groups by "mutated", "mutationType", "driver", "cna", "sv", "topMutationType" or "copyNumberSv"; not "oncogenic"/);
   validateAxis(num, "x");   // the ordinary cases do not throw
   validateAxis(mol, "y");
 });
@@ -76,7 +76,7 @@ test("a gene-set axis compiles to hugo_gene_symbol IN (...), not a single =", ()
 test("an axis names itself the way the figure labels it", () => {
   assert.equal(axisLabel(num), "MUTATION_COUNT");
   assert.equal(axisLabel(mol), "TP53 rna_seq_mrna");
-  assert.equal(axisLabel(alt), "TP53 mutation type");
+  assert.equal(axisLabel(alt), "TP53: Mutations");
   assert.equal(axisLabel({ source: "alteration", gene: "MDM2", by: "cna" }), "MDM2 copy number");
 });
 
@@ -171,8 +171,8 @@ test("patient mode's coverage counts the patients with several samples, and the 
 
 test("an alteration axis answers for every case in the cohort, not only the altered ones", () => {
   const sql = axisSelect(alt, ctx, "cat");
-  assert.match(sql, /LEFT JOIN/, "a case with no mutation still has an answer: 'Not mutated'");
-  assert.match(sql, /Not mutated/);
+  assert.match(sql, /LEFT JOIN/, "a case with no mutation still has an answer: 'No mutation'");
+  assert.match(sql, /No mutation/);
   assert.match(sql, /Multiple/, "a case with two classes is its own category rather than being picked between");
   assert.match(axisSelect({ source: "alteration", gene: "MDM2", by: "cna" }, ctx, "cat"), /Amplification|Deep deletion/);
 });

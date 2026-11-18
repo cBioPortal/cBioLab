@@ -34,6 +34,11 @@
             "samples": 48179,
             "profiled": 48179,
             "altered": 10796,
+            "profiledTypes": [
+              "sv",
+              "mutation",
+              "cna"
+            ],
             "groups": [
               {
                 "key": "pancreatic cancer",
@@ -466,6 +471,8 @@
             "perGene": [
               {
                 "gene": "KRAS",
+                "profiled": 48179,
+                "altered": 9050,
                 "groups": [
                   {
                     "key": "pancreatic cancer",
@@ -898,6 +905,8 @@
               },
               {
                 "gene": "NRAS",
+                "profiled": 48179,
+                "altered": 1280,
                 "groups": [
                   {
                     "key": "melanoma",
@@ -1330,6 +1339,8 @@
               },
               {
                 "gene": "HRAS",
+                "profiled": 48179,
+                "altered": 609,
                 "groups": [
                   {
                     "key": "salivary gland cancer",
@@ -1793,7 +1804,7 @@
           {
             "kind": "fetch",
             "title": "Count patients per CANCER_TYPE group",
-            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group too, how many were profiled for mutations, copy number and structural variants at all. Counts only. A sample without a CANCER_TYPE takes its study's type of cancer (else \"Unknown\").",
+            "detail": "The cancertypes queries above. Per group, for the genes together and for each gene: the patients profiled for it, and of those the patients with any mutation, amplification, deep deletion or structural variant, split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each patient once. A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is. Per group and gene too, the patients profiled for each alteration type (mutation, copy number, structural variant, and mRNA / protein for an EXP / PROT line): the gene on a sample's panel for a profile of that type; for the genes together, any of them. Counts only. A sample without a CANCER_TYPE takes its study's type of cancer (else \"Unknown\").",
             "scope": "all patients · msk_impact_50k_2026",
             "rowsOut": 67,
             "params": [

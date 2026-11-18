@@ -753,6 +753,8 @@
                   "vus": 0
                 }
               },
+              "germlineSamples": 0,
+              "germlineCohortSamples": 171,
               "ids": {
                 "refseq": "NM_000546",
                 "ccds": "CCDS11118",
@@ -1382,6 +1384,8 @@
                   "vus": 0
                 }
               },
+              "germlineSamples": 0,
+              "germlineCohortSamples": 499,
               "ids": {
                 "refseq": "NM_000546",
                 "ccds": "CCDS11118",

@@ -15,11 +15,12 @@ export const plotDoc: KindDoc = {
   // drivers: which sources call a mutation a putative driver, for by:"driver" and to split a mutation type into (Driver)/(VUS)
   // <layer> = {"rule":"outliers"} | {"rule":"extremes","axis":"x|y","n":50?} | {"rule":"trend","n":50?} | {"cohort":C}
   //   default [{"rule":"outliers"}]; [] draws none; the first layer draws a case two share
-  // <axis> = {"source":"clinical","attribute":A,"log":?}
+  // <axis> = {"source":"clinical","attribute":A,"log":?,"label":?}  // label: the title, else the study's display name
   //        | {"source":"profile","profile":P,"gene":G,"by":"mutationType|mutated|driver"?,"log":?}
   //            // P is one of the study's profiles; what it is (mutations, SVs, discrete or
   //            // continuous copy number, mRNA, protein) comes from the study's own description
   //        | {"source":"alteration","gene":G,"by":"mutated|mutationType|driver|cna|sv"?}  // what a profile axis resolves to; driver: Driver vs VUS
+  //        | {"source":"alteration","gene":G,"by":"topMutationType|copyNumberSv"}  // colorBy / ringBy as the portal colours by a gene: top mutation class, copy number with SV over it
   //        | {"source":"alteration","genes":[G,...(2-20)],"by":"mutated"?}  // any-of-N as one category; only "mutated"
   //        | {"source":"alteration","oql":"KRAS: G12C, STK11: MUT","by":"any|statement"?}
   //            // any: Altered / Unaltered / Not profiled; statement: one group per statement (max 6)

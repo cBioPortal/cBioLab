@@ -491,6 +491,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_004985",
             "ccds": "CCDS8702",
@@ -913,6 +915,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_004333",
             "ccds": "CCDS5863",
@@ -1569,6 +1573,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_006218",
             "ccds": "CCDS43171",
@@ -2226,6 +2232,8 @@
               "vus": 0
             }
           },
+          "germlineSamples": 0,
+          "germlineCohortSamples": 5543,
           "ids": {
             "refseq": "NM_000546",
             "ccds": "CCDS11118",

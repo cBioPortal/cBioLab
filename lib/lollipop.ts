@@ -3,6 +3,7 @@
 // from the portal is a bug here rather than a design choice. Pure except fetchProteinInfo.
 import type { LollipopReport } from "./federation.ts";
 import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hotspots/types.ts";
+import type { TableQuery } from "./table-query.ts";
 
 // ---- mutation types: getCanonicalMutationType / getProteinImpactTypeFromCanonical ----------
 
@@ -102,7 +103,81 @@ export function clickCodon(selected: readonly number[], pos: number, multi: bool
   return [...new Set(next)].sort((a, b) => a - b);
 }
 
+/** The lollipop's y-axis title, as the portal's results page words it (a stem counts patients). */
+export const LOLLIPOP_Y_TITLE = "# patients";
+
+/** A tick on the lollipop's axes; only the ticks the portal labels carry a label. */
+export interface LollipopTick { pos: number; label?: string }
+
+/**
+ * The portal's tick step for an axis over [0, range]: the first candidate that gives fewer than
+ * maxTickCount − 1 steps, else the first power of ten from 10 up that does.
+ */
+export function lollipopTickInterval(candidates: number[], range: number, maxTickCount: number): number {
+  const c = candidates.find((x) => range / x < maxTickCount - 1);
+  if (c != null) return c;
+  let step = 10;
+  while (range / step > maxTickCount - 1) step *= 10;
+  return step;
+}
+
+/** every multiple of `step` strictly inside (0, max), labelled where `labelled` says */
+function between(step: number, max: number, labelled: (t: number) => boolean): LollipopTick[] {
+  const out: LollipopTick[] = [];
+  for (let t = step; t < max; t += step) out.push(labelled(t) ? { pos: t, label: String(t) } : { pos: t });
+  return out;
+}
+
+/**
+ * The x axis over a protein of `length` codons: "0", "<length>aa", and the steps between, every other
+ * one labelled except one within two thirds of a step of the end.
+ */
+export function lollipopXTicks(length: number): LollipopTick[] {
+  const step = lollipopTickInterval([50, 100, 200, 250, 500, 1000, 2500, 5000, 10000, 25000], length, 16);
+  return [{ pos: 0, label: "0" }, ...between(step, length, (t) => length - t > (2 * step) / 3 && t % (2 * step) === 0), { pos: length, label: length + "aa" }];
+}
+
+/** The y axis up to `max`: "0" and the maximum (">= " before it when a stem is taller), the steps between unlabelled. */
+export function lollipopYTicks(max: number, capped: boolean): LollipopTick[] {
+  const step = lollipopTickInterval([1, 2, 5, 10, 20, 50, 100, 200, 500], max, 10);
+  return [{ pos: 0, label: "0" }, ...between(step, max, () => false), { pos: max, label: (capped ? ">= " : "") + max }];
+}
+
 /** The selection with only the genes given kept and empty lists dropped; undefined when nothing is left. */
+/** a gene's y-axis maximum as the portal sets it by default: the tallest stem, at least 5 (MUT-STM-17) */
+export const defaultYMax = (g: Pick<HotspotGene, "positions">): number => Math.max(5, ...g.positions.map((q) => q.n));
+
+/**
+ * The Y-Axis Max control's next setting for a typed or slid value: rounded, at least 1 (the portal clamps
+ * below 1), and undefined — no setting — when it is the default; NaN leaves it unchanged (null).
+ */
+export function nextYMax(input: number, def: number): number | undefined | null {
+  if (!Number.isFinite(input)) return null;
+  const v = Math.max(1, Math.round(input));
+  return v === def ? undefined : v;
+}
+
+/**
+ * The view's `yMax` (each gene's y-axis maximum, the portal's Y-Axis Max) refused when malformed: an
+ * object from a gene of the view to a whole number of at least 1 (the control clamps what is typed to that).
+ */
+export function checkYMax(yMax: unknown, genes: readonly string[]): string | null {
+  if (yMax == null) return null;
+  const shape = "yMax is an object from gene to the y axis's maximum, like {\"KRAS\": 100}";
+  if (typeof yMax !== "object" || Array.isArray(yMax)) return shape;
+  for (const [g, v] of Object.entries(yMax as Record<string, unknown>)) {
+    if (!genes.includes(g)) return "yMax." + g + ": not a gene of this view — its genes are " + genes.join(", ");
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 1) return "yMax." + g + ": a whole number of at least 1 — " + shape;
+  }
+  return null;
+}
+
+/** the view's y-axis maxima kept for the genes it draws; undefined when none is left */
+export function pruneYMax(yMax: Record<string, number> | undefined, genes: readonly string[]): Record<string, number> | undefined {
+  const kept = Object.entries(yMax || {}).filter(([g]) => genes.includes(g));
+  return kept.length ? Object.fromEntries(kept) : undefined;
+}
+
 export function pruneCodons(codons: CodonSelection | undefined, genes: readonly string[]): CodonSelection | undefined {
   const kept = Object.entries(codons || {}).filter(([g, ps]) => genes.includes(g) && ps.length);
   return kept.length ? Object.fromEntries(kept) : undefined;
@@ -306,8 +381,11 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
   const changes = new Map<string, { pos: number | null; change: string; n: number; rows: number; impact?: string; driver: boolean }>();
   const types = new Map<string, { pos: number | null; mtype: string; driver: boolean; rows: number }>();
   let mutated = 0, pairs = 0, somaticSamples = 0, cohortSamples = 0;
+  // the germline rate's parts: a site on older code reports neither, which leaves them unknown, not 0
+  let germlineSamples: number | undefined = 0, germlineCohortSamples: number | undefined = 0;
   for (const rep of reports) {
     cohortSamples += rep.cohortSamples;
+    germlineCohortSamples = germlineCohortSamples === undefined || rep.germlineCohortSamples === undefined ? undefined : germlineCohortSamples + rep.germlineCohortSamples;
     for (const c of rep.changes) if (c.gene === gene) {
       const k = c.pos + "\u0000" + c.change, cur = changes.get(k);
       // a class from one site is kept; a site that sent none (older code) leaves it undefined
@@ -320,6 +398,9 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     }
     const tot = rep.totals.find((x) => x.gene === gene);
     if (tot) { mutated += tot.patients; pairs += tot.pairs; somaticSamples += tot.somaticSamples; }
+    // a site with no total for the gene has none of its mutations; one whose total lacks the count is on older code
+    if (tot) germlineSamples = germlineSamples === undefined || tot.germlineSamples === undefined ? undefined : germlineSamples + tot.germlineSamples;
+    else if (rep.germlineCohortSamples === undefined) germlineSamples = undefined;
   }
   const observedMax = Math.max(0, ...[...changes.values()].map((c) => c.pos ?? 0));
   const proteinLength = protein?.proteinLength || observedMax || 10;
@@ -360,6 +441,21 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     // one is about the data and the other about what a site chose not to disclose
     unpositioned, withheld: Math.max(0, pairs - returned),
     ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}),
-    somaticSamples, cohortSamples, tally, ...(protein?.ids ? { ids: protein.ids } : {})
+    somaticSamples, cohortSamples, tally, ...(germlineSamples !== undefined && germlineCohortSamples !== undefined ? { germlineSamples, germlineCohortSamples } : {}), ...(protein?.ids ? { ids: protein.ids } : {})
   };
+}
+
+/** the mutation table's filters that are the lollipop's own selection — its grid's cells and its stems — and so never narrow it */
+export const LOLLIPOP_OWN_FILTERS: ReadonlySet<string> = new Set(["alteration", "proteinPos"]);
+/**
+ * The part of the mutation table's query that narrows the lollipop and badges (the portal's filtered
+ * data): its search and its column filters other than LOLLIPOP_OWN_FILTERS; null when nothing does.
+ */
+export function lollipopNarrowing<Q extends TableQuery>(q: Q): Q | null {
+  const filters = Object.fromEntries(Object.entries(q.filters || {}).filter(([id]) => !LOLLIPOP_OWN_FILTERS.has(id)));
+  const search = (q.search || "").trim();
+  if (!search && !Object.keys(filters).length) return null;
+  const out = { ...q } as Q;
+  delete out.filters; delete out.search; delete out.sort;
+  return { ...out, ...(search ? { search } : {}), ...(Object.keys(filters).length ? { filters } : {}) };
 }

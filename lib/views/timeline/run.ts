@@ -9,7 +9,8 @@ import { timelinePatientRowSource, TIMELINE_COLUMNS, TIMELINE_DEFAULT_COLUMNS, P
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { refuse, type ViewResolver } from "../shared.ts";
-import { clinicalRowSource, tableAttributesSql } from "../../clinical-table.ts";
+import { patientSampleAttributes } from "../../patient-sample-attributes.ts";
+import { isAbortError } from "../../ch.ts";
 import type { TimelineView } from "./types.ts";
 import { timelineMethod } from "./method.ts";
 
@@ -18,6 +19,7 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
   if (vNames.length !== 1) return refuse("timeline", ctx, "a timeline view steps through one cohort's patients; this one draws " + vNames.length + " — name one in cohorts");
   const show = view.rows == null ? 25 : Math.floor(Number(view.rows));
   if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return refuse("timeline", ctx, "rows (the page size of the patient list) is 1 to " + TABLE_ROWS_MAX);
+  if (view.tables != null && typeof view.tables !== "boolean") return refuse("timeline", ctx, "tables is true (the events as tables, one per event type) or false");
   if (view.patient != null && (typeof view.patient !== "object" || typeof view.patient.study !== "string" || typeof view.patient.id !== "string" || !PATIENT_ID.test(view.patient.id)))
     return refuse("timeline", ctx, "patient is {study, id}: a study of the view's cohorts and a patient id in it, e.g. {\"study\": \"msk_chord_2024\", \"id\": \"P-0000012\"}");
   if (view.collapsed != null && (!Array.isArray(view.collapsed) || view.collapsed.some((u) => typeof u !== "string" || u.length > 300)))
@@ -80,8 +82,10 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
       if (!hasPatientTimeline(res)) return refuse("timeline", ctx, want.study + " cannot disclose a patient's timeline");
       patient = await (res as Resolver & PatientTimelineCapable).patientTimeline(want.id);
       if (patient.samples.length && !peerRowsFor(res, "timeline") && hasViewAggregates(res)) {
-        const attrs = await sampleAttributes(res as ViewResolver & PatientLevelCapable, want.study, want.id);
-        if (attrs) patient = { ...patient, sampleAttrs: attrs };
+        // the tooltip goes without them when they cannot be read; an abandoned request still throws
+        const attrs = await patientSampleAttributes(res as ViewResolver & PatientLevelCapable, want.study, want.id)
+          .catch((e) => { if (isAbortError(e)) throw e; return null; });
+        if (attrs) patient = { ...patient, sampleAttrs: attrs.bySample };
       }
     } catch (e) { return refuse("timeline", ctx, (e as Error).message); }
   }
@@ -110,26 +114,4 @@ export async function runTimeline(view: TimelineView, ctx: ViewRun): Promise<Vie
         " via federation: a peer whose rules and this instance's both allow patient timelines (its Source column says so); every view their rules do not name treats it as aggregate-only. " : "") +
       tableTail(r, q, columns, "patient", "with patients who have a timeline first, then by patient id", excluded, vNames.length > 1),
   };
-}
-
-/**
- * Each of the patient's samples with its own clinical attributes (not its patient's), by attribute
- * id, which the timeline's sample-row tooltip lists as the portal's does (PAT-TL-TT-3). Read where the
- * patient lives, as the clinical table reads them; null when they cannot be read (the tooltip goes
- * without them, the timeline is still drawn).
- */
-async function sampleAttributes(res: ViewResolver & PatientLevelCapable, study: string, patient: string): Promise<Record<string, [string, string][]> | null> {
-  try {
-    const meta = await res.viewMeta("table:attributes", tableAttributesSql);
-    const cols = meta.filter((m) => Number(m.patient) !== 1).map((m) => ({ id: String(m.id), name: String(m.name || m.id), per: "sample" as const, numeric: false }));
-    if (!cols.length) return {};
-    const parts: TablePart[] = [{ cohort: "patient", study, cohortSql: res.cohortSql({ study, all: [{ kind: "patientList", ids: [study + ":" + patient] }] }) }];
-    const page = await res.rowsPage("timeline:sample-attributes", (db) => clinicalRowSource(parts, db, "sample", cols), {}, ["patient", "sample"], TABLE_ROWS_MAX, 0);
-    const out: Record<string, [string, string][]> = {};
-    for (const r of page.rows) {
-      const m = (r.m || {}) as Record<string, string>;
-      out[String(r.sample)] = cols.map((c) => [c.id, m[c.id] ?? ""] as [string, string]).filter(([, v]) => v !== "");
-    }
-    return out;
-  } catch { return null; }
 }

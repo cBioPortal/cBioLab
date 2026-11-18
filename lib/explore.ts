@@ -1,7 +1,7 @@
 // Faceted study explorer: what exists, in what numbers — optionally conditioned on a
 // draft cohort so every count narrows as clauses are added (study-view-style feedback).
 // Everything returned is designed to be clickable into a DSL clause.
-import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, type ChConn } from "./ch.ts";
+import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
 import { compileCohortDef } from "./cohort2.ts";
@@ -170,6 +170,7 @@ const GENE_FACET_LIMIT = 6;
 import { isClinicalLeaf } from "./types.ts";
 import { finiteSql } from "./sql-number.ts";
 import { chartBinSettings, chartOrder, chartPriority } from "./study-view-config.ts";
+import { gisticQValues, withQValues } from "./study-view-gene-tables.ts";
 
 
 export interface ExploreArgs {
@@ -285,9 +286,10 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   // a patient-level attribute's queried samples with a value (0 when its patients hold none of them)
   const samplesOf = new Map<string, number>((pre.patientSamples || []).map((r) => [String(r.a), Number(r.n)]));
   if (pre.patientSamples) for (const r of cls.data) if (r.type === "patient" && !samplesOf.has(String(r.a))) samplesOf.set(String(r.a), 0);
+  const withData = (r: ChRow) => r.type === "sample" ? Number(r.np) : samplesOf.get(String(r.a));
   const clinical: ClinicalFacet[] = [
     ...catAttrs.map((r): ClinicalFacet => ({
-      attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np),
+      attribute: r.a, per: r.type as "patient" | "sample", kind: "cat", patients: Number(r.np), samples: withData(r),
       distinct: Number(r.nv),
       values: disjValues.get(r.type + "|" + r.a) || valuesOf.get(r.type + "|" + r.a) || [],
       disjunctive: disjValues.has(r.type + "|" + r.a) || undefined,
@@ -302,16 +304,14 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
         String(meta.get(k.slice(k.indexOf("|") + 1))?.datatype ?? "").toUpperCase() !== "NUMBER")
       .map(([k, vals]): ClinicalFacet => ({
         attribute: k.slice(k.indexOf("|") + 1), per: k.slice(0, k.indexOf("|")) as "patient" | "sample", kind: "cat",
-        patients: 0, distinct: vals.length, values: vals, disjunctive: true,
+        patients: 0, samples: 0, distinct: vals.length, values: vals, disjunctive: true,
         na: baseNa(bases.get(k.slice(k.indexOf("|") + 1)), k.slice(0, k.indexOf("|")) as "patient" | "sample"),
       })),
     ...numAttrs.map((r): ClinicalFacet => ({
-      attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np), distinct: Number(r.nv),
+      attribute: r.a, per: r.type as "patient" | "sample", kind: "num", patients: Number(r.np), samples: withData(r), distinct: Number(r.nv),
       min: Number(r.mn), max: Number(r.mx), median: Number(r.md), naCount: Number(r.na)
     }))
-  ].map((facet) => {
-    const ns = facet.per === "patient" ? samplesOf.get(facet.attribute) : undefined;
-    const f = ns != null ? { ...facet, samples: ns } : facet;
+  ].map((f) => {
     const m = meta.get(f.attribute);
     return m ? {
       ...f,
@@ -370,7 +370,8 @@ async function buildExploreOne({ study, draft, oncokbPin, profiles, gaProfiles, 
   const unknownAttributes = meta.size ? clinicalAttrsOf(draft).filter((a) => !declared.has(a)) : [];
 
   const declaredAttributes = metaRows.data.map((r) => ({ attribute: String(r.a), per: ["1", "true"].includes(String(r.patient_attribute).toLowerCase()) ? "patient" as const : "sample" as const,
-    ...(r.display_name ? { displayName: String(r.display_name) } : {}), priority: Number(r.priority) || 0 }));
+    ...(r.display_name ? { displayName: String(r.display_name) } : {}), priority: Number(r.priority) || 0,
+    counted: pre.counted ? pre.counted(String(r.a)) : true }));
 
   return {
     study, draftCount, studyBreakdown,
@@ -664,15 +665,60 @@ export async function geneTables({ studies, db, conn, geneSearch, set = NO_SET, 
   return { rows, total: Number(distinct.data[0]?.n || 0) };
 };
 
+const significant = significantGenes(studies, db, conn);
 const [mut, cna, sv] = await Promise.all([
   geneTable("mutation", "MUTATION_EXTENDED"),
   geneTable("cna", "COPY_NUMBER_ALTERATION"),
   geneTable("structural_variant", "STRUCTURAL_VARIANT")
 ]);
-const mutatedGenes = mut.rows, cnaGenes = cna.rows, svGenes = sv.rows;
+const q = await significant;
+const mutatedGenes = withQValues("mutated", mut.rows, q.mutsig, q.gistic), cnaGenes = withQValues("cna", cna.rows, q.mutsig, q.gistic), svGenes = sv.rows;
 const geneTotals = { mutated: mut.total, cna: cna.total, sv: sv.total };
 
   return { mutatedGenes, cnaGenes, svGenes, geneTotals };
+}
+
+type QValues = { mutsig: Map<string, number>; gistic: Map<string, number> };
+const NO_Q: QValues = { mutsig: new Map(), gistic: new Map() };
+/** each study's q-values by its import: read once per import (they do not depend on the selection) */
+const qValuesByStudy = new Map<string, Promise<QValues>>();
+
+/**
+ * One study's MutSig q-values by gene and GISTIC's by gene and call (gene-tables-cases.md QV1-QV4);
+ * empty for several studies, as the portal gives none. The tables are optional: an instance
+ * without them has none, read from its table list; a lookup that fails is an error, never an empty
+ * answer. Kept per study and its import date, so a re-imported study is read again.
+ */
+async function significantGenes(studies: string[], db: string, conn: ChConn): Promise<QValues> {
+  if (studies.length !== 1) return NO_Q;
+  const imported = (await chQuery<ChRow>("SELECT toString(import_date) AS d FROM " + db + ".cancer_study WHERE cancer_study_identifier = " + sq(studies[0]), conn)).data[0]?.d;
+  const key = conn.id + "|" + db + "|" + studies[0] + "|" + String(imported ?? "");
+  const held = studiesChangeWhileRunning() ? undefined : qValuesByStudy.get(key);
+  if (held) return held;
+  for (const k of qValuesByStudy.keys()) if (k.startsWith(conn.id + "|" + db + "|" + studies[0] + "|")) qValuesByStudy.delete(k);
+  const p = readQValues(studies[0], db, conn);
+  qValuesByStudy.set(key, p);
+  p.catch(() => qValuesByStudy.delete(key));
+  return p;
+}
+
+async function readQValues(studyId: string, db: string, conn: ChConn): Promise<QValues> {
+  const tables = new Set((await chQuery<ChRow>("SELECT name FROM system.tables WHERE database = " + sq(db) +
+    " AND name IN ('mut_sig', 'gistic', 'gistic_to_gene')", conn)).data.map((r) => String(r.name)));
+  const study = "cs.cancer_study_identifier = " + sq(studyId);
+  const [m, g] = await Promise.all([
+    tables.has("mut_sig") ? chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, m.q_value AS q FROM " + db + ".mut_sig m\n" +
+      "JOIN " + db + ".gene g ON g.entrez_gene_id = m.entrez_gene_id\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id WHERE " + study, conn) : { data: [] as ChRow[] },
+    tables.has("gistic") && tables.has("gistic_to_gene") ? chQuery<ChRow>("SELECT g.hugo_gene_symbol AS g, gi.amp AS amp, gi.q_value AS q FROM " + db + ".gistic gi\n" +
+      "JOIN " + db + ".gistic_to_gene gg ON gg.gistic_roi_id = gi.gistic_roi_id\n" +
+      "JOIN " + db + ".gene g ON g.entrez_gene_id = gg.entrez_gene_id\n" +
+      "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gi.cancer_study_id WHERE " + study, conn) : { data: [] as ChRow[] },
+  ]);
+  return {
+    mutsig: new Map(m.data.map((r) => [String(r.g), Number(r.q)])),
+    gistic: gisticQValues(g.data.map((r) => ({ gene: String(r.g), amp: Number(r.amp) === 1, q: Number(r.q) }))),
+  };
 }
 
 // ---- per-gene alteration facets ------------------------------------------
@@ -1308,11 +1354,16 @@ function isNumericAttr(r: ChRow, meta: Map<unknown, ChRow>): boolean {
 }
 
 /** One study's rows of Explore's facet queries, as buildExploreOne would have fetched them. */
+/** the most clinical attributes the facet query returns per study (the rest are not counted) */
+const FACET_ATTR_LIMIT = 250;
+
 interface Prefetched { totals: ChRow; meta: ChRow[]; cls: ChRow[]; catValues: ChRow[]; events: ChRow[]; dataTypes: ChRow[]; lists: ChRow[];
   /** each patient-level attribute's queried samples whose patient has a value (a, n) */
   patientSamples?: ChRow[];
   /** a drafted attribute's values (rows of both levels) without its own clauses, keyed by attribute (draftedClinical) */
-  disjunctive?: Map<string, ChRow[]> }
+  disjunctive?: Map<string, ChRow[]>;
+  /** whether the clinical query counted this attribute: asked for it, and the study's rows were not cut at the limit */
+  counted?: (attribute: string) => boolean }
 
 /**
  * Disjunctive faceting: an attribute the draft constrains has its values counted against the
@@ -1401,7 +1452,7 @@ async function prefetchFacets(opts: {
       "FROM " + clinicalTable(db, attrAllow.length ? attrAllow : "all") + "\n" +
       "WHERE cancer_study_identifier IN " + IN + " AND attribute_value != ''" + inClinical(set, ownersIn(db, studies)) +
       (attrAllow.length ? "\n  AND attribute_name IN (" + attrAllow.map(sq).join(",") + ")" : "") + "\n" +
-      "GROUP BY s, type, a ORDER BY np DESC LIMIT 250 BY s", conn),
+      "GROUP BY s, type, a ORDER BY np DESC LIMIT " + FACET_ATTR_LIMIT + " BY s", conn),
     chQuery<ChRow>(studies.length === 1
       // one study: pick its patients first and filter the events by id, with no join over the
       // whole event table — half the CPU of the join below
@@ -1467,6 +1518,7 @@ async function prefetchFacets(opts: {
     totals: tot.get(st)?.[0] || { pts: "0", smp: "0" },
     meta: metaRows.get(st) || [], cls: cl.get(st) || [], catValues: vals.get(st) || [],
     events: ev.get(st) || [], dataTypes: dt.get(st) || [], lists: li.get(st) || [], patientSamples: ps.get(st) || [],
+    counted: (a: string) => (!attrAllow.length || attrAllow.includes(a)) && (cl.get(st) || []).length < FACET_ATTR_LIMIT,
     // every study gets each key, empty where it has no such values, as its own query would give
     ...(disj.length ? { disjunctive: new Map(disj.map(([k, m]) => [k, m.get(st) || []])) } : {}),
   }]));
@@ -1567,8 +1619,8 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     const nums = same.filter((i): i is Extract<ClinicalFacet, { kind: "num" }> => i.kind === "num");
     const cats = same.filter((i): i is Extract<ClinicalFacet, { kind: "cat" }> => i.kind === "cat");
     const patients = same.reduce((s: number, i) => s + i.patients, 0);
-    // a patient attribute's samples, summed over the studies, when every study counted them
-    const samples = same.every((i) => i.samples != null) ? same.reduce((s: number, i) => s + i.samples!, 0) : undefined;
+    // the selected samples with a value, summed over every study (whatever kind each drew it as), when every study counted them
+    const samples = items.every((i) => i.samples != null) ? items.reduce((s: number, i) => s + i.samples!, 0) : undefined;
     const withMeta = same.find((i) => i.displayName || i.priority != null) || same[0];
     const base = {
       attribute: same[0].attribute, per: same[0].per, patients, ...(samples != null ? { samples } : {}),
@@ -1641,6 +1693,8 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
 
   const evm = sumBy(parts.map(p => p.events), "type");
   // gene tables: sum altered/events/profiled per (gene, cna) across participants
+  // a q-value is one study's: several studies' tables carry none (gene-tables-cases.md QV4)
+  const oneStudysQ = (rows: GeneTableRow[]) => parts.length === 1 ? rows : rows.map(({ qValue: _q, ...r }) => r);
   const mergeGeneTable = (pick: (p: ExploreResult) => GeneTableRow[] | undefined): GeneTableRow[] => {
     const m = new Map<string, GeneTableRow>();
     for (const p of parts) for (const r of pick(p) || []) {
@@ -1689,13 +1743,14 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     draftCount: draft ? parts.reduce((s, p) => s + (p.draftCount || 0), 0) : null,
     studyBreakdown: parts.flatMap((p) => p.studyBreakdown || []).sort((a, b) => b.n - a.n),
     clinical,
-    declaredAttributes: [...new Map(parts.flatMap((p) => p.declaredAttributes || []).reverse().map((d) => [d.attribute, d])).values()].reverse(),
+    declaredAttributes: [...new Map(parts.flatMap((p) => p.declaredAttributes || []).reverse().map((d) => [d.attribute, d])).values()].reverse()
+      .map((d) => ({ ...d, counted: parts.every((p) => (p.declaredAttributes || []).every((e) => e.attribute !== d.attribute || e.counted !== false)) })),
     ...(derivedMerged.length ? { derived: derivedMerged } : {}),
     events: [...evm.entries()].map(([type, n]) => ({ type, n })).sort((x, y) => y.n - x.n),
     caseLists: byCount([...lm.values()]),
     geneFacets: [...gfMap.values()],
-    mutatedGenes: mergeGeneTable((p) => p.mutatedGenes),
-    cnaGenes: mergeGeneTable((p) => p.cnaGenes),
+    mutatedGenes: oneStudysQ(mergeGeneTable((p) => p.mutatedGenes)),
+    cnaGenes: oneStudysQ(mergeGeneTable((p) => p.cnaGenes)),
     svGenes: mergeGeneTable((p) => p.svGenes),
     geneTotals: {
       mutated: Math.max(...parts.map((p) => p.geneTotals?.mutated || 0)),

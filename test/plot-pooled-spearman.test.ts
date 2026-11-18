@@ -94,8 +94,10 @@ async function run(resolvers: Record<string, unknown>, extra: Record<string, unk
 const A: Pair[] = [[1, 2], [2, 2], [2, 1], [3, 4], [5, 6]];
 const B: Pair[] = [[4, 3], [4, 5], [6, 5], [7, 8], [8, 7], [9, 9]];
 
-const SPEARMAN = 0.9357798165137615, P_SPEARMAN = 2.2988775935973766e-05;
-const PEARSON = 0.9348437317698366, P_PEARSON = 2.4501932727152883e-05;
+// scipy 1.18.1 over the 11 pooled pairs; each p is of r as the portal keeps it, to 5 decimals (PLT-STM-6):
+// 0.93578 and 0.93484
+const SPEARMAN = 0.9357798165137615, P_SPEARMAN = 2.2988486555186116e-05;
+const PEARSON = 0.9348437317698366, P_PEARSON = 2.4508114119387822e-05;
 
 const NOT_REPORTED = /Spearman[^.]*not reported/i;
 
@@ -113,10 +115,32 @@ describe("a scatter pooled across studies", () => {
     nearRel(st.pSpearman, P_SPEARMAN, 1e-6, "pSpearman");
   });
 
-  test("R2: every site patient-level: Pearson's r is unrounded and its p is from it", async () => {
+  test("R2: every site patient-level: Pearson's r is unrounded and its p is from it to 5 decimals", async () => {
     const st = statsOf(await run({ study_a: site("study_a", "patient-level", A), study_b: site("study_b", "patient-level", B) }));
     near(st.pearson, PEARSON, 1e-12, "pearson, not rounded to 4 decimals");
     nearRel(st.pPearson, P_PEARSON, 1e-6, "pPearson");
+  });
+
+  test("R7: a pooled r that rounds to 1 at 5 decimals has p 0, as the portal tests it (unrounded, p 1.84e-6)", async () => {
+    // scipy: r 0.9999999999958333 over (1, 1), (2, 2), (3, 3.00001)
+    const r = await run({ study_a: site("study_a", "patient-level", [[1, 1], [2, 2]]), study_b: site("study_b", "patient-level", [[3, 3.00001]]) });
+    assert.equal(r.error, undefined);
+    const st = r.plot!.stats!;
+    near(st.pearson, 0.9999999999958333, 1e-9, "pearson");
+    assert.equal(st.pPearson, 0);
+  });
+
+  test("R8: the pairs for Spearman are asked for without the view's colour and ring (review of #300)", async () => {
+    const asked: unknown[] = [];
+    const a = site("study_a", "patient-level", A), b = site("study_b", "patient-level", B);
+    for (const r of [a, b]) {
+      const inner = r.plotScatterPoints as (d: unknown, spec: Record<string, unknown>, cap?: number) => Promise<unknown>;
+      r.plotScatterPoints = async (d: unknown, spec: Record<string, unknown>, cap?: number) => { asked.push(spec); return inner(d, spec, cap); };
+    }
+    const st = statsOf(await run({ study_a: a, study_b: b }, { colorBy: { source: "clinical", attribute: "SEX" }, ringBy: { source: "clinical", attribute: "SEX" } }));
+    near(st.spearman, SPEARMAN, 1e-12, "spearman");
+    assert.ok(asked.length >= 2);
+    for (const spec of asked) assert.ok(!("colorBy" in (spec as object)) && !("ringBy" in (spec as object)), "no colour or ring in the pairs' request");
   });
 
   test("R3: with the pooled pairs, the caption does not say Spearman is not reported", async () => {

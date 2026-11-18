@@ -19,12 +19,13 @@ for a change that computes nothing. -->
 - [ ] Tests written without the implementation in view (who or which agent wrote them)
 - [ ] The warehouse asked which value shapes occur; any the table lacked are added (the query)
 - [ ] Logic in SQL is run against the fixture study, not matched as text
-- [ ] Planted bugs in the area's file under `scripts/mutants/`, each caught (their ids)
+- [ ] Planted bugs in this change's own file, `scripts/mutants/<area>/<feature>.ts`, each caught (their ids)
 
 ## Tracker
 
-<!-- PORTAL-PARITY.md items this PR closes (quoted) and unticked sub-items to add. Don't edit
-     PORTAL-PARITY.md or docs/dsl.md here: both are updated on master after merge. -->
+<!-- PORTAL-PARITY.md items this PR closes (quoted) and unticked sub-items to add, and each changed
+     scorecard row (docs/legacy-spec/parity/NN-*.md) in full as it should read, with no tallies.
+     Don't edit PORTAL-PARITY.md, the scorecards or docs/dsl.md here: all are updated on master after merge. -->
 
 ## Verified
 

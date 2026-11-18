@@ -2,7 +2,7 @@
 // titles, column sort, header tooltips and Data file. The rules, case by case with the portal's
 // source lines, are in docs/legacy-spec/parity/gene-tables-cases.md. Browser-safe.
 import type { GeneTableRow } from "./types.ts";
-import { fmtInt, portalFreq } from "./chart/format.ts";
+import { fmtInt, portalFreq, portalQTip, portalQValue } from "./chart/format.ts";
 
 export type GeneTableKind = "mutated" | "cna" | "sv";
 
@@ -106,10 +106,11 @@ export function geneTableTsv(kind: GeneTableKind, rows: GeneTableRow[]): string 
     : kind === "sv" ? ["Gene", "# Structural Variant", "#", "Profiled Samples", "Freq"]
     : ["Gene", "Gistic(Q-value)", "Cytoband", "CNA", "Profiled Samples", "#", "Freq"];
   const freq = (r: GeneTableRow) => { const f = freqOf(r); return f == null ? "NA" : portalFreq(f * 100); };
+  const q = (r: GeneTableRow) => r.qValue == null ? "" : portalQValue(r.qValue);
   const line = (r: GeneTableRow): (string | number)[] =>
-    kind === "mutated" ? [r.gene, "", r.events, r.altered, r.profiled, freq(r)]
+    kind === "mutated" ? [r.gene, q(r), r.events, r.altered, r.profiled, freq(r)]
     : kind === "sv" ? [r.gene, r.events, r.altered, r.profiled, freq(r)]
-    : [r.gene, "", r.cytoband || "", CALL[r.cna ?? 0] || "", r.profiled, r.altered, freq(r)];
+    : [r.gene, q(r), r.cytoband || "", CALL[r.cna ?? 0] || "", r.profiled, r.altered, freq(r)];
   return [header.join("\t"), ...geneRowOrder(rows).map((r) => line(r).join("\t"))].join("\n");
 }
 
@@ -123,6 +124,12 @@ export function freqTipLines(kind: GeneTableKind, row: GeneTableRow): string[] {
     "# of samples profiled for " + WHAT[kind] + " in this gene: " + fmtInt(row.profiled),
     "Gene panels: " + (panels.length ? panels.join(", ") : "none")
   ];
+}
+
+/** the line a panel's gene-list dialog shows in place of, or beside, its genes; none when the list speaks for itself */
+export function panelNote(panel: string, genes: string[]): string | null {
+  if (panel === "WES") return "WES is whole-exome sequencing: it profiles every gene, so no list is kept for it.";
+  return genes.length ? null : "This panel lists no genes.";
 }
 
 /** the filter checking genes makes: union, one clause of a line per gene; intersection, a clause per gene */
@@ -171,4 +178,39 @@ const FILTERED: Record<GeneTableKind, string> = {
 /** the "#" header's tooltip; under the page's alteration filter, the portal's filtered text */
 export function alteredHeaderTip(kind: GeneTableKind, filtered: boolean): string {
   return filtered ? FILTERED[kind] + "\nThis table is filtered based on selections in the Alteration Filter menu." : geneHeaderTips(kind).altered!;
+}
+
+const MUTSIG_TIP = ["Candidate driver gene, as determined by the MutSig algorithm.",
+  "MutSig identifies likely driver genes by evaluating the frequency of observed mutations within the entire study.",
+  "Note that not all mutations in this gene are necessarily functional/driver events."];
+const GISTIC_TIP = ["Candidate driver gene, as determined by the GISTIC algorithm.",
+  "The GISTIC algorithm identifies likely driver copy number alterations by evaluating the frequency and amplitude of observed CNA events within the entire study."];
+
+/** a gene table row's q-value icon: "M" (MutSig) on the Mutated table, "G" (GISTIC) on the CNA table, with its tooltip's paragraphs; null without a q-value */
+export function qValueIcon(kind: GeneTableKind, qValue: number | undefined): { text: "M" | "G"; tip: string[] } | null {
+  if (qValue == null || kind === "sv") return null;
+  return kind === "mutated" ? { text: "M", tip: [...MUTSIG_TIP, "Q-value: " + portalQTip(qValue)] }
+    : { text: "G", tip: [...GISTIC_TIP, "Q-value: " + portalQTip(qValue)] };
+}
+
+/**
+ * GISTIC's q-values by gene and call ("<gene>|2" amplified, "<gene>|-2" deleted): the lowest of the
+ * regions listing the gene with that call (gene-tables-cases.md QV2)
+ */
+export function gisticQValues(rows: { gene: string; amp: boolean; q: number }[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const r of rows) {
+    const k = r.gene + "|" + (r.amp ? 2 : -2), cur = out.get(k);
+    if (cur == null || r.q < cur) out.set(k, r.q);
+  }
+  return out;
+}
+
+/** the rows with their q-values (QV1–QV4): MutSig's by gene on the Mutated table, GISTIC's by gene and call on the CNA table, none on SV */
+export function withQValues(kind: GeneTableKind, rows: GeneTableRow[], mutsig: Map<string, number>, gistic: Map<string, number>): GeneTableRow[] {
+  if (kind === "sv") return rows;
+  return rows.map((r) => {
+    const q = kind === "mutated" ? mutsig.get(r.gene) : gistic.get(r.gene + "|" + r.cna);
+    return q == null ? r : { ...r, qValue: q };
+  });
 }

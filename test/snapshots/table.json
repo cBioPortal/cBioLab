@@ -839,7 +839,33 @@
           }
         ],
         "total": 3109,
-        "all": 3109
+        "all": 3109,
+        "patientAttrs": [
+          "OS_STATUS",
+          "RACE",
+          "GENDER",
+          "STAGE_HIGHEST_RECORDED",
+          "ETHNICITY",
+          "CURRENT_AGE_DEID",
+          "SMOKING_PREDICTIONS_3_CLASSES",
+          "PRIOR_MED_TO_MSK",
+          "GLEASON_HIGHEST_REPORTED",
+          "HISTORY_OF_PDL1",
+          "NUM_ICDO_DX",
+          "SAMPLE_COUNT",
+          "GLEASON_FIRST_REPORTED",
+          "HER2",
+          "HR",
+          "OS_MONTHS",
+          "ADRENAL_GLANDS",
+          "BONE",
+          "CNS_BRAIN",
+          "INTRA_ABDOMINAL",
+          {
+            "…": "6 more",
+            "sha256": "d5645e0e8d697dbf"
+          }
+        ]
       },
       "participation": {
         "studies": [
