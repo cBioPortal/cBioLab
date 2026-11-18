@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { revalidateTag } from "next/cache";
 import { requireAdmin, AccessError } from "../../../lib/auth.ts";
-import { markResultCacheCleared, setSetting, settingsReport } from "../../../lib/settings.ts";
+import { clearResultCache, setSetting, settingsReport } from "../../../lib/settings.ts";
 import { RESULT_TAG } from "../../../lib/next-cache.ts";
 
 // The administrator's page (/admin), for the users in ADMIN_EMAILS (lib/auth.ts).
@@ -26,9 +26,9 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     if (body.action === "clearCache") {
       // a new key for every entry, in every process; and the entries themselves expire where the
-      // cache can expire them (Vercel's Runtime Cache, this process's memory)
-      await markResultCacheCleared(u.id);
-      revalidateTag(RESULT_TAG, { expire: 0 });
+      // cache can expire them (Vercel's Runtime Cache, this process's memory). Where settings cannot
+      // be changed the clear is the expiry alone, and the report's `unavailable` says why.
+      await clearResultCache(u.id, () => revalidateTag(RESULT_TAG, { expire: 0 }));
     } else if (body.action === "set" || body.action === "reset") {
       if (typeof body.name !== "string") throw new Error("name the setting");
       if (body.action === "set" && typeof body.value !== "string") throw new Error("value must be text");

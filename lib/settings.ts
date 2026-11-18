@@ -242,9 +242,15 @@ export async function settingsReport(): Promise<SettingsReport> {
   return { databases, rows, unavailable: state.unavailable, cacheCleared: cleared ? { at: cleared.value, by } : null, log };
 }
 
+/** Refused because this deployment's settings cannot be changed at all (`SettingsReport.unavailable`). */
+class SettingsUnavailable extends Error {
+  readonly why: string;
+  constructor(why: string) { super("settings cannot be changed here: " + why); this.why = why; }
+}
+
 async function write(name: string, value: string | null, by: string | null): Promise<void> {
   await refreshSettings(true);
-  if (state.unavailable) throw new Error("settings cannot be changed here: " + state.unavailable);
+  if (state.unavailable) throw new SettingsUnavailable(state.unavailable);
   const [old] = await dbQuery<{ value: string }>("select value from app_setting where name = $1", [name]);
   if (value == null) await dbQuery("delete from app_setting where name = $1", [name]);
   else await dbQuery("insert into app_setting (name, value, updated_by) values ($1, $2, $3)" +
@@ -272,4 +278,24 @@ export async function setSetting(name: string, value: string | null, by: string)
 /** Mark the result cache cleared now: every cached entry's key changes, in every process. */
 export async function markResultCacheCleared(by: string | null): Promise<void> {
   await write(CACHE_CLEARED, new Date().toISOString(), by);
+}
+
+/**
+ * Clear the result cache: record the clear (`markResultCacheCleared`), then expire the entries
+ * (`expire`, RESULT_TAG in lib/next-cache.ts, which needs no store). The entries expire whatever
+ * happens to the record. Where settings cannot be changed at all (no store, not migrated,
+ * unreachable) the clear is not recorded, so no key changes and only the expiry reaches the
+ * entries: the answer is why. Any other failure, of either step, is thrown.
+ */
+export async function clearResultCache(by: string | null, expire: () => void): Promise<string | null> {
+  let unrecorded: string | null = null, failed: { e: unknown } | null = null;
+  try {
+    await markResultCacheCleared(by);
+  } catch (e) {
+    if (e instanceof SettingsUnavailable) unrecorded = e.why;
+    else failed = { e };
+  }
+  expire();
+  if (failed) throw failed.e;
+  return unrecorded;
 }

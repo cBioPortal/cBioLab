@@ -18,7 +18,7 @@ for (const k of ["CLICKHOUSE2_URL", "FEDERATION_PEERS", "STUDY_DENY", "VERCEL_EN
 const { setDatabaseForTests } = await import("../lib/db.ts");
 const settings = await import("../lib/settings.ts");
 
-type Mode = "ok" | "fail" | "not-migrated" | "hang";
+type Mode = "ok" | "fail" | "not-migrated" | "hang" | "writes-fail";
 let mode: Mode = "ok";
 let reads = 0;
 const rows = new Map<string, { value: string; updated_at: string; updated_by: string | null }>();
@@ -27,6 +27,7 @@ setDatabaseForTests(async (sql, params) => {
   if (mode === "fail") throw new Error("connection refused");
   if (mode === "not-migrated") throw new Error("relation \"app_setting\" does not exist");
   if (mode === "hang") return new Promise(() => {});
+  if (mode === "writes-fail" && /^(insert|delete)/.test(sql)) throw new Error("disk full");
   const p = params as (string | null)[];
   if (/^select name, value, updated_at, updated_by from app_setting/.test(sql)) {
     reads++;
@@ -220,6 +221,61 @@ describe("with overrides on", () => {
     await assert.rejects(settings.setSetting("LOOPBACK_PEER_TOKEN", "t", "u1"), /cannot be changed here/);
     await assert.rejects(settings.setSetting("LOOPBACK_PEER", " c ", "u1"), /a or b/);
     assert.equal(log.length, n);
+  });
+
+  // Clearing the cache (the header's button, /admin): the entries always expire; recording the clear
+  // is best-effort only where the settings say they cannot be changed, and any other failure is reported.
+  //   store                    | expired | recorded              | outcome
+  //   answers                  | yes     | yes, logged           | null
+  //   no store (production)    | yes     | no                    | why: no DATABASE_URL
+  //   not migrated             | yes     | no                    | why: not created
+  //   unreachable when read    | yes     | no                    | why: could not be reached
+  //   read but a write fails   | yes     | no                    | rejects with the store's error
+  //   expiring fails           | tried   | yes                   | rejects with the expiry's error
+  describe("clearing the result cache", () => {
+    let expired = 0;
+    const expire = () => { expired++; };
+    const at = async (m: Mode, fn: () => Promise<void>) => { mode = m; expired = 0; try { await fn(); } finally { mode = "ok"; } };
+
+    test("a store that answers: the entries expire and the clear is recorded", () => at("ok", async () => {
+      const n = log.length;
+      assert.equal(await settings.clearResultCache("u4", expire), null);
+      assert.equal(expired, 1);
+      assert.equal(log.length, n + 1);
+      assert.deepEqual([log[0].name, log[0].email], [settings.CACHE_CLEARED, "u4@example.org"]);
+    }));
+
+    test("a production deployment with no store: the entries expire, and the answer says the clear was not recorded", () => at("ok", async () => {
+      process.env.VERCEL_ENV = "production";
+      try {
+        const n = log.length;
+        assert.match((await settings.clearResultCache(null, expire))!, /no DATABASE_URL/);
+        assert.equal(expired, 1);
+        assert.equal(log.length, n);
+      } finally {
+        delete process.env.VERCEL_ENV;
+      }
+    }));
+
+    test("app_setting not migrated: the entries expire, not recorded", () => at("not-migrated", async () => {
+      assert.match((await settings.clearResultCache(null, expire))!, /has not been created/);
+      assert.equal(expired, 1);
+    }));
+
+    test("a store never reached: the entries expire, not recorded", () => at("fail", async () => {
+      assert.match((await settings.clearResultCache(null, expire))!, /could not be reached/);
+      assert.equal(expired, 1);
+    }));
+
+    test("a store that fails the write: the entries still expire, and the failure is reported", () => at("writes-fail", async () => {
+      await assert.rejects(settings.clearResultCache("u4", expire), /disk full/);
+      assert.equal(expired, 1);
+    }));
+
+    test("expiring that fails is reported", () => at("ok", async () => {
+      await assert.rejects(settings.clearResultCache("u4", () => { expired++; throw new Error("no tag store"); }), /no tag store/);
+      assert.equal(expired, 1);
+    }));
   });
 
   test("a production deployment with no store: the environment is the whole answer", async () => {
