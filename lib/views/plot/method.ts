@@ -143,6 +143,16 @@ export function plotMethod(t: PlotTrace): MethodRecord {
       params: [["quartiles", "the portal's rule (jStat.quartiles, PLT-STM-8): of the n sorted values, q1 is the round(n/4)-th and q3 the round(3n/4)-th, halves rounded up, no interpolation"],
         ["median", "the middle value; for an even n the mean of the two middle values"],
         ["a group of one", "no quartiles, drawn as its value with no box"]] });
+    if (d.filtered) steps.push({ kind: "transform", title: "Only the chosen categories", scope, rowsOut: d.groups.length,
+      detail: "Every query above reads the categorical axis narrowed to the view's categories (cBioPortal's Filter categories, PLT-AX-9), so the boxes, their density, " +
+        "the points and the point layers are over the " + fmtN(d.n) + " " + u + "s in them, of the " + fmtN(d.filtered.paired) + " with a value on both axes.",
+      params: [["categories", d.filtered.categories.join(", ")]] });
+    if (d.sortedByMedian) steps.push({ kind: "transform", title: "Boxes by median, lowest first",
+      detail: (d.sortedByMedian === "values"
+        ? "Each category's median of its raw values (a log axis's converted back), lowest first"
+        : "Each box's own median from the query above (a log axis's converted back), lowest first, since its values are not drawn as points; " +
+          "cBioPortal takes the median of the raw values, so on a log axis or across studies two close medians can swap, and the order is approximate") +
+        ", a tie kept in category order: cBioPortal's Sort Categories by Median (PLT-AX-10, PLT-STM-9). The order changes no number." });
     if (pooled) steps.push(d.quartiles === "pooled"
       ? { kind: "transform", title: "Pool each group across studies",
         detail: "Every study's values per group, put together and boxed by the rule above, as the portal computes a box over several studies (PLT-MD-2)." }

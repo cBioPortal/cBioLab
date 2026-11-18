@@ -45,17 +45,27 @@
  *       display name, " (log2(value + 1))" after it on a log scale, and the colour axis likewise.
  *       Read against the warehouse's coadread_tcga_pan_can_atlas_2018, all samples; the names are
  *       cbioportal.org's for that study (REST clinical-attributes). Case table rows T7–T10.
+ *   F*  a box plot's Filter categories and Sort Categories by Median (PLT-AX-9, PLT-AX-10, PLT-STM-9;
+ *       cbioportal-frontend cd8c6df PlotsTab.tsx:5396-5420): F1 lib/plot.ts keptCategoriesSql on
+ *       literal rows; F2–F5 the filter in the plot's request (plotSelects), over
+ *       coadread_tcga_pan_can_atlas_2018 FGA by Cancer Type Detailed, every sample (scorecard
+ *       docs/legacy-spec/parity/04-plots.md Q5: Colon 370 · Mucinous 58 · Rectal 155, medians
+ *       0.2268 · 0.1140 · 0.2973 on cbioportal.org):
+ *       F2 kept Colon and Rectal: those two boxes alone, each the unfiltered plot's own; F3 the
+ *       coverage is the unfiltered plot's; F4 the case-level queries (points, outliers, ranked)
+ *       return only the kept categories' cases; F5 the view sorted by median: Mucinous, Colon, Rectal.
  *
  * Run: node --env-file=.env.local scripts/check-plot-stats.ts
  */
 import { chQuery, DB } from "../lib/ch.ts";
-import { axisSelect, oncoprintClassSql, plotBoxSql, plotScatterPointsSql, plotStatsSql, type AxisCtx, type PlotAxis } from "../lib/plot.ts";
+import { axisSelect, keptCategoriesSql, oncoprintClassSql, plotBoxSql, plotScatterPointsSql, plotStatsSql, type AxisCtx, type PlotAxis, type PlotRequest } from "../lib/plot.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { sq } from "../lib/compiler.ts";
 import { OQL_NOT_PROFILED } from "../lib/plot-oql.ts";
-import { resolverFor, hasFederatedPlot } from "../lib/federation.ts";
+import { resolverFor, hasFederatedPlot, plotCasesOf } from "../lib/federation.ts";
 import { studyProfiles } from "../lib/analysis.ts";
 import { titledAxes } from "../lib/clinical-titles.ts";
+import { runAnalysis } from "../lib/analysis.ts";
 import { oncokbPin } from "../lib/annotation.ts";
 
 /** [row id, values, expected q1, median, q3, lo, hi] */
@@ -363,6 +373,57 @@ const LABELS: LabelCase[] = [
   is("T11", "titledAxes MUTATION_COUNT", t11.a?.source === "clinical" ? t11.a.label : undefined, "Mutation Count");
   is("T11", "titledAxes SEX", t11.b?.source === "clinical" ? t11.b.label : undefined, "Sex");
   ok(t11.c?.source === "clinical" && t11.c.label === undefined, "T11 titledAxes: an attribute the study does not declare keeps no label", JSON.stringify(t11.c));
+}
+
+// ---- a box plot's Filter categories and Sort Categories by Median -----------
+{
+  const rows = [["c1", "Colon"], ["c2", "Colon"], ["c3", "Rectal"], ["c4", "O'Brien"], ["c5", "Mucinous"], ["c6", null]] as const;
+  const vals = "SELECT * FROM values('id String, v Nullable(String)', " + rows.map(([id, v]) => "(" + sq(id) + ", " + (v == null ? "NULL" : sq(v)) + ")").join(", ") + ")";
+  await guarded("F1 keptCategoriesSql", async () => {
+    const got = (await chQuery<{ id: string }>("SELECT id FROM (" + keptCategoriesSql(vals, ["Colon", "O'Brien", "Absent"]) + ") ORDER BY id")).data.map((r) => r.id);
+    ok(got.join() === "c1,c2,c4", "F1 keptCategoriesSql keeps Colon and O'Brien (quoted), nothing else, never a NULL", "got " + got.join(", ") + " — expected c1, c2, c4");
+  });
+}
+{
+  const STUDY = "coadread_tcga_pan_can_atlas_2018";
+  const r = await resolverFor(STUDY, { oncokbPin: await oncokbPin(), ...(await studyProfiles(STUDY)) });
+  const open: PlotRequest = { x: { source: "clinical", attribute: "CANCER_TYPE_DETAILED" }, y: { source: "clinical", attribute: "FRACTION_GENOME_ALTERED" }, unit: "sample" };
+  await guarded("F2–F4 the filter in the plot's request", async () => {
+    const all = await r.plot(null, open);
+    const name = (part: string) => (all.groups || []).find((g) => g.g.toLowerCase().includes(part))?.g;
+    const colon = name("colon adeno"), rectal = name("rectal"), mucinous = name("mucinous");
+    if (!colon || !rectal || !mucinous) throw new Error("coadread's Cancer Type Detailed has no Colon, Rectal or Mucinous group: " + (all.groups || []).map((g) => g.g).join(", "));
+    const kept = [colon, rectal];
+    const spec: PlotRequest = { ...open, categories: kept };
+    const f = await r.plot(null, spec);
+    const want = (all.groups || []).filter((g) => kept.includes(g.g));
+    const same = (a: typeof want, b: typeof want) => JSON.stringify([...a].sort((x, y) => x.g < y.g ? -1 : 1)) === JSON.stringify([...b].sort((x, y) => x.g < y.g ? -1 : 1));
+    ok(same(f.groups || [], want) && f.n === want.reduce((a, g) => a + g.n, 0), "F2 categories [Colon, Rectal]: those boxes alone, each the unfiltered plot's own",
+      (f.groups || []).map((g) => g.g + " n " + g.n + " median " + g.median).join("; ") + " (n " + f.n + ") — expected " + want.map((g) => g.g + " n " + g.n + " median " + g.median).join("; "));
+    ok(JSON.stringify(f.coverage) === JSON.stringify(all.coverage) && !!all.coverage, "F3 the filtered plot's coverage is the unfiltered plot's",
+      JSON.stringify(f.coverage) + " — expected " + JSON.stringify(all.coverage));
+    const rc = plotCasesOf(r);
+    if (!rc) { console.log("SKIP F4  [" + STUDY + "'s participant may not show cases]"); return; }
+    const pts = await rc.plotPoints(null, spec) || [];
+    const ws = (f.groups || []).map(({ g, loWhisker, hiWhisker }) => ({ g, loWhisker, hiWhisker }));
+    const outs = (await rc.plotOutlierPoints(null, spec, 1000, ws)).points;
+    const ranked = await rc.plotRankedPoints(null, spec, "cat", "num", { by: "y", n: 5 });
+    const strays = [...pts, ...outs, ...ranked].map((p) => "g" in p ? p.g : "").filter((g) => !kept.includes(g));
+    ok(!strays.length && pts.length === f.n && ranked.length > 0, "F4 points, outliers and ranked cases under the filter are the kept categories' alone",
+      "points " + pts.length + " (n " + f.n + "), outliers " + outs.length + ", ranked " + ranked.length + (strays.length ? "; outside the filter: " + [...new Set(strays)].join(", ") : ""));
+  });
+  await guarded("F5 sorted by median", async () => {
+    const res = await runAnalysis({ study: STUDY, cohorts: { All: { all: [] } },
+      views: [{ kind: "plot", cohorts: ["All"], unit: "sample", points: [], sortByMedian: true, x: open.x, y: open.y }] } as never);
+    const v = res.views[0] as { error?: string; plot?: { groups?: { g: string; median: number }[] } };
+    if (v.error) throw new Error(v.error);
+    const gs = (v.plot?.groups || []).map((g) => g.g);
+    const at = (part: string) => gs.findIndex((g) => g.toLowerCase().includes(part));
+    const m = at("mucinous"), c = at("colon adeno"), rr = at("rectal");
+    const ascending = (v.plot?.groups || []).every((g, i, a) => !i || a[i - 1].median <= g.median);
+    ok(m >= 0 && m < c && c < rr && ascending, "F5 FGA by Cancer Type Detailed, sorted by median: Mucinous, Colon, Rectal (the portal's 0.1140 < 0.2268 < 0.2973), every box ascending",
+      (v.plot?.groups || []).map((g) => g.g + " " + g.median).join(" · "));
+  });
 }
 
 console.log(failures ? "\n" + failures + " of " + checks + " plot statistics checks FAILED" : "\nall " + checks + " plot statistics checks passed");

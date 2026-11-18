@@ -185,10 +185,10 @@ export async function remoteFacets(study: string, url: string, draft: CohortDef 
   };
 }
 
-/** a plot request as it travels to a peer: the axes, unit, grid and axis ends, nothing else */
+/** a plot request as it travels to a peer: the axes, unit, grid, axis ends and a box's categories, nothing else */
 const plotSpecOut = (spec: PlotRequest) => ({ x: spec.x, y: spec.y, unit: spec.unit,
   ...(spec.colorBy ? { colorBy: spec.colorBy } : {}), ...(spec.ringBy ? { ringBy: spec.ringBy } : {}), ...(spec.bins ? { bins: spec.bins } : {}),
-  ...(spec.range ? { range: spec.range } : {}) });
+  ...(spec.range ? { range: spec.range } : {}), ...(spec.categories?.length ? { categories: spec.categories } : {}) });
 
 export class RemoteAggregateResolver implements AggregateCapable, FederatedPlotCapable {
   readonly instance: Instance;
