@@ -22,32 +22,32 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 23 |
-| 🟡 partial | 16 |
-| 🔶 different | 10 |
-| ❌ missing | 29 |
+| ✅ match | 30 |
+| 🟡 partial | 18 |
+| 🔶 different | 4 |
+| ❌ missing | 26 |
 | 🐞 ok | 0 |
 | 🐞 copied | 0 |
 | N/A | 3 |
 | ? | 0 |
 | **Total IDs** | **81** |
 
-**Overall: 25.9 %** (✅ 18 + 🐞ok 0 + N/A 3 = 21 of 81). Counting 🟡 as half: 35.2 %.
+**Overall: 40.7 %** (✅ 30 + 🐞ok 0 + N/A 3 = 33 of 81). Counting 🟡 as half: 51.9 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
-| §0 TAB inventory | 5 | 0 | 2 | 2 | 0 | 0 | 1 | Different order and gating; placeholder tabs; `?tab=` not path |
+| §0 TAB inventory | 5 | 1 | 3 | 0 | 0 | 0 | 1 | Different order and gating; placeholder tabs; `?tab=` not path |
 | §1 GE core | 4 | 2 | 1 | 0 | 1 | 0 | 0 | Same mutation set and selection model; no unprofiled alert |
-| §1 GE line chart | 7 | 1 | 4 | 0 | 2 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
-| §1 GE heatmap | 4 | 0 | 0 | 3 | 1 | 0 | 0 | Mutation × sample fixed, oncoprint ramp, no cluster/transpose/zoom/download |
+| §1 GE line chart | 7 | 4 | 2 | 0 | 1 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
+| §1 GE heatmap | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Mutation × sample fixed, oncoprint ramp, no cluster/transpose/zoom/download |
 | §1 GE table | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Own columns (VAF by sample, Max VAF); no "only selected" |
 | §2 Pathways | 4 | 0 | 2 | 2 | 0 | 0 | 0 | Same scores; numeric score not Yes/No; tie order → other default pathway |
-| §3 Clinical Data | 4 | 0 | 0 | 3 | 1 | 0 | 0 | Wide row-per-case tables; no timeline tables |
-| §4 Mutational Signatures | 7 | 5 | 2 | 0 | 0 | 0 | 0 | Close port; numbers identical; table paged |
+| §3 Clinical Data | 4 | 1 | 3 | 0 | 0 | 0 | 0 | Wide row-per-case tables; no timeline tables |
+| §4 Mutational Signatures | 7 | 6 | 1 | 0 | 0 | 0 | 0 | Close port; numbers identical; table paged |
 | §5 Resources, pathology, tissue, trials, custom | 10 | 0 | 0 | 0 | 10 | 0 | 0 | None built (tracked) |
 | §6 mRNA / Plots (beta) | 11 | 0 | 0 | 0 | 10 | 0 | 1 | None built (mRNA tracked) |
-| §7 Modes | 12 | 5 | 1 | 3 | 3 | 0 | 0 | Sample mode right; GE offered on 1-sample patients |
-| §9 Statistics | 12 | 5 | 3 | 1 | 2 | 0 | 1 | VAF and signature numbers identical; no clustering, no mRNA stats |
+| §7 Modes | 12 | 8 | 1 | 0 | 3 | 0 | 0 | Sample mode right; GE offered on 1-sample patients |
+| §9 Statistics | 12 | 6 | 3 | 1 | 1 | 0 | 1 | VAF and signature numbers identical; no clustering, no mRNA stats |
 
 ---
 
@@ -112,16 +112,16 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-GE-3 | ❌ | C | No alert; NP shown only as dashed line / NA cell |
 | PTB-GE-4 | ✅ | C | Hover highlights line, row, table row; click toggles kept picks (local) |
 | PTB-GE-LC-1 | ❌ | B | No Show/Hide Timeline |
-| PTB-GE-LC-2 | 🟡 | B | sequential (disabled + reason when days missing), log scale, y axis to data range ✅ (in document); no Group by, no "Show only selected mutations" |
+| PTB-GE-LC-2 | 🟡 | B | sequential (disabled + reason when days missing), log scale, y axis to data range, Group by (None + the samples' clinical attributes) ✅ (in document); no "Show only selected mutations" |
 | PTB-GE-LC-3 | 🟡 | B | Polylines + sample markers ✅; y title "Variant allele frequency"; extra legend (called / uncalled / not found / not profiled) |
-| PTB-GE-LC-4 | 🟡 | B | Sequential even spacing / collection day ✅; x axis in days (0…1,400) not 0, 4m, 8m, 1y |
-| PTB-GE-LC-5 | ❌ | B | No grouping |
-| PTB-GE-LC-6 | 🟡 | C | "VAF 0.38 (46 of 121 reads)", "called, no allele counts", "uncalled, VAF …", "not found", "not profiled" (`figure.ts:15-26`) — same states, other words |
+| PTB-GE-LC-4 | ✅ | BC | Sequential even spacing / collection day ✅; the x axis is the patient timeline's, as legacy: year ticks "0, 1y, 2y" with month ticks "4m, 8m", spanning all the patient's events (lgg_ucsf_2014 P04: specimens at 0/461/1075/1343, last event day 1854, axis to 5y, as the API gives), empty years cut, "every year" (expandGaps, in the document) for legacy's click on the cut; axis below the plot (legacy above) |
+| PTB-GE-LC-5 | ✅ | BC | Group by a sample attribute, as legacy (splitMutationsBySampleGroup): a line per mutation and group through that group's samples only, groups in the order of their first sample, the portal's unique colours (#3366cc, #dc3912, …) when there are 2+ groups, samples without a value a last uncoloured group, a marker row per group labelled in its colour (lgg_ucsf_2014 P04 by Sample Type: Primary 1, Recurrence 2–4) |
+| PTB-GE-LC-6 | ✅ | BC | The portal's tooltip: Gene, Protein Change, Sample ID, then "VAF: 0.69 (54 reads of 78 total)" (lgg_ucsf_2014 P04_Pri TP53 R248Q, 54/24 reads in the API), "Mutated, but we don't have VAF data.", "Mutation uncalled (…)", "Mutation not detected", "<sample> is not sequenced for <gene> mutations." (mutationTooltip) |
 | PTB-GE-LC-7 | ✅ | C | No download on the tab, as legacy without the timeline |
-| PTB-GE-HM-1 | ❌ | C | No Cluster, Transpose, labels toggle, zoom, download |
-| PTB-GE-HM-2 | 🔶 | C | Always a row per mutation, column per sample (legacy default is the transpose); no-VAF mutations dropped ✅ |
-| PTB-GE-HM-3 | 🔶 | C | Oncoprint sequential ramp, not yellow→teal; grey = profiled not found ✅, NA glyph ✅, called-no-counts glyph, uncalled dot |
-| PTB-GE-HM-4 | 🔶 | C | Table order; no clustering |
+| PTB-GE-HM-1 | 🟡 | C | Cluster ✅, Transpose ✅, mutation-labels toggle ✅ (gear menu, in the document); no zoom, no SVG/PNG/Data download |
+| PTB-GE-HM-2 | ✅ | C | Default a row per sample, a column per mutation, as legacy; Transpose gives a row per mutation; no-VAF mutations dropped ✅ |
+| PTB-GE-HM-3 | 🟡 | C | The legacy VAF ramp yellow→teal `rgb(241,242,181)`→`rgb(19,80,88)` ✅ (STYLE.ramps.vaf); grey = profiled not found ✅, NA glyph ✅; ours adds a called-no-counts glyph and an uncalled dot |
+| PTB-GE-HM-4 | ✅ | C | Clustered by default with the oncoprint heatmap clustering (both axes); Cluster off: samples in collection order, mutations by name in either orientation (legacy MutationOncoprint mutationWithIdOrder) |
 | PTB-GE-TB-1 | 🔶 | B | Columns Samples · Gene · Protein Change · Mutation Type · VAF by sample · Max VAF (6/13); 25 rows; no "Show only selected" (filter the table instead) |
 
 ### §2 Pathways
@@ -137,9 +137,9 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PTB-CD-1 | 🔶 | B | Two cards "Patient", "Samples"; no Timeline Data section |
-| PTB-CD-2 | 🔶 | B | One row, attributes as columns (P04 · 4 · 1:DECEASED · 22 …); per-column filter + CSV ✅; no Attribute \| Value, no priority order, no 1-decimal format, no panel links |
-| PTB-CD-3 | 🔶 | B | One row per sample, patient attributes repeated; legacy one column per sample |
+| PTB-CD-1 | ✅ | B | "Patient" and "Samples" tables as the portal's, and the Timeline Data tables under them (#316) ✅ |
+| PTB-CD-2 | 🟡 | B | Attribute \| Value, priority then name, every attribute with a value, a filter box ✅ (lgg P04: Overall Survival Status 1:DECEASED, Diagnosis Age 22, Number of Samples 4, OS 61, Sex Male — the portal API's five); no 1-decimal format yet (PTB-STM-11, with #290), no panel links, no copy/download |
+| PTB-CD-3 | 🟡 | B | Attribute × sample, a sample's own attributes, n/a where missing, raw values ✅ (P04: P04_Pri … P04_Rec3); samples in id order, not the collection-day order; no column sorts (the portal sorts Attribute) |
 | PTB-CD-4 | 🟡 | B | Timeline Data: a table per event type, START_DATE · STOP_DATE · EVENT_TYPE · each attribute key in first-seen order, PATIENT_ID and STYLE_* left out, days as recorded, each sortable (as text) and filterable ✅ (lgg P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows — the portal API's counts); laid out as its own card under the two tables |
 
 ### §4 Mutational Signatures
@@ -150,9 +150,9 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | PTB-MS-2 | ✅ | B | "Mutational Signature Type:" select, %/#, "Y-axis Max:" slider; settings in the document; sample select not exercised (1 sample) |
 | PTB-MS-3 | ✅ | C | "<ids> is/are not profiled for mutational signatures." (`signatures-body.tsx:121`) |
 | PTB-MS-4 | ✅ | B | "Sample: SP1003 \| Single Base Substitution (SBS) count: 347" + ⓘ |
-| PTB-MS-5 | 🟡 | B | Category strip, contexts, "Single Base Substitution (%)" ✅; no SVG/PNG/PDF button |
+| PTB-MS-5 | ✅ | B | Category strip, contexts, "Single Base Substitution (%)" ✅; Download ▸ SVG / PNG / PDF of the spectrum as drawn (with the chosen reference profile), named mutationalBarChart, as legacy (pancan_pcawg_2020 DO1000 saved in all three) |
 | PTB-MS-6 | ✅ | C | Row click → COSMIC v3.3 reference below (`reference.ts`) |
-| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; paged 25 of 65 (legacy all); extra "Signature contributions" bar chart; no download (tracked) |
+| PTB-MS-7 | 🟡 | B | Name + ⓘ, sample column, bold p<0.05, first sample desc ✅; every row on one page, as legacy (#343); extra "Signature contributions" bar chart; Copy / Download as the portal's table.tsv ✅ (every row in the table's sort, the search not narrowing it, "<1%"/whole percents, CRLF; pancan_pcawg_2020 DO1000: 65 rows, SBS40 65%, SBS5 22%, SBS1 13% as the API's 0.654/0.2208/0.1252) |
 
 ### §5 Files & Links, resources, pathology, tissue, trials, custom tabs
 
@@ -210,7 +210,7 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 |---|---|---|---|
 | PTB-STM-1 | ✅ | BC | 88/88 points; lines trimmed to first/last sample with reads (README); profiled-not-found = 0; NP never 0; interpolation bug not reproduced |
 | PTB-STM-2 | 🟡 | C | Data range and log (floor 0.001) ✅; tick-label rule not compared |
-| PTB-STM-3 | ❌ | C | No heatmap clustering |
+| PTB-STM-3 | 🟡 | C | Heatmap clustered with lib/oncoprint-cluster.ts (the oncoprint's heatmap clustering); clustered order not compared cell-by-cell with the portal |
 | PTB-STM-4 | ✅ | BC | Stored fraction; "<1%" below 1 %, else whole % (`data.ts:93-96`); 36/34/27/2 % |
 | PTB-STM-5 | ✅ | C | p < 0.05 bold; p = 0 also bolds (legacy bug not copied) |
 | PTB-STM-6 | ✅ | BC | Counts and total 347 ✅; % = round(100·count/total), 0 when the total is 0 (`spectrumPct`), as legacy; the multi-sample tooltip bug not copied |

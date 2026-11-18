@@ -23,17 +23,17 @@ Legacy numbers from `/api/clinical-data-counts`, `/api/clinical-data-bin-counts?
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 46 |
+| ✅ match | 48 |
 | 🟡 partial | 40 |
-| 🔶 different | 15 |
-| ❌ missing | 29 |
+| 🔶 different | 14 |
+| ❌ missing | 28 |
 | 🐞 ok | 3 |
 | 🐞 copied | 0 |
 | N/A | 2 |
 | ? | 0 |
 | **Total IDs** | **135** |
 
-**Overall: 37.8 %** (✅ 46 + 🐞ok 3 + N/A 2 = 51 of 135). Counting 🟡 as half: 52.6 %. (2026-11-11: 17.8 % / 31.9 %.)
+**Overall: 39.3 %** (✅ 48 + 🐞ok 3 + N/A 2 = 53 of 135). Counting 🟡 as half: 54.1 %. (2026-11-11: 17.8 % / 31.9 %.)
 
 Re-score of 2026-11-16: the rows PRs #203, #222, #257, #260, #261 and #266 had already updated were checked again, and 17 more verdicts changed, all for the better (#188, #190, #261). The default charts, NA slices and rows, % of every case, bins fixed for the study, two bars of a chart ORed and a second click unselecting all now match. Still open: the pie allowlist, slice labels and grey-out, list search and Select all, the missing chart kinds (violin, treatment, GA frequency, mutation-type, variant annotations) and the downloads beyond Summary Data.
 
@@ -46,9 +46,9 @@ Re-score of 2026-11-16: the rows PRs #203, #222, #257, #260, #261 and #266 had a
 | §5 Bar (BAR) | 9 | 4 | 4 | 0 | 0 | 1 | 0 | Bins fixed for the study, the portal's bar menu; bars of a chart OR; click, not drag, no grey-out |
 | §6 Gene tables (GT) | 11 | 5 | 5 | 0 | 1 | 0 | 0 | Every gene, sort, panels, Union / Intersection, query queue; no OncoKB filter, q-values or panel gene list |
 | §7 Other tables (OT) | 7 | 1 | 2 | 0 | 4 | 0 | 0 | Data types and case lists match; no treatment, GA-frequency, mutation-type or VA tables |
-| §8 Density scatter (SC) | 8 | 4 | 2 | 1 | 0 | 1 | 0 | Drawn as the portal draws it (#222); no other X vs Y, no download |
+| §8 Density scatter (SC) | 8 | 5 | 2 | 0 | 0 | 1 | 0 | Drawn as the portal draws it (#222); no other X vs Y, no download |
 | §9 Violin (VI) | 8 | 0 | 0 | 0 | 8 | 0 | 0 | No violin/box tables |
-| §10 Survival (KM) | 6 | 1 | 1 | 2 | 1 | 1 | 0 | One OS/PFS/… chart with a picker (kept on purpose); n / events / median match |
+| §10 Survival (KM) | 6 | 2 | 1 | 2 | 0 | 1 | 0 | One OS/PFS/… chart with a picker (kept on purpose); n / events / median match |
 | §11 Added charts (GS) | 7 | 1 | 3 | 1 | 2 | 0 | 0 | Gene mutation chart matches; CNA lacks GAIN/HETLOSS; GA one entity at a time |
 | §12 Special (SP) | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Studies breakdown ≈ Cancer Studies, also shown for one study; constant charts hidden |
 | §13 Downloads (DL) | 3 | 0 | 1 | 0 | 2 | 0 | 0 | Summary Data on categorical charts and the gene tables' Data; no Full Data, SVG or PDF |
@@ -211,7 +211,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-GT-3 | ✅ | B | Columns ✅; a header click sorts by any column, a second reverses; default Freq desc (SV # SV desc), ties by events then gene ([gene-tables-cases](gene-tables-cases.md)) |
 | STS-GT-4 | 🟡 | B | The portal's header tooltips ([gene-tables-cases](gene-tables-cases.md)); the alteration-filter variant not built (no Alteration Filter menu) |
 | STS-GT-5 | 🟡 | B | # Mut/# SV = events ✅, # = altered ✅, Freq ✅; CNA AMP/HOMDEL tag ✅; the Freq tooltip as the portal's, with "Gene panels: …" ([gene-tables-cases](gene-tables-cases.md)) GP1–GP5; no panel gene-list modal |
-| STS-GT-6 | 🟡 | B | A gene's search icon queues it for Query genes…, with the portal's messages ([gene-tables-cases](gene-tables-cases.md)) GQ1–GQ4; no OncoKB cancer-gene tooltip, no q-value icon |
+| STS-GT-6 | 🟡 | B | A gene's search icon queues it for Query genes…, with the portal's messages ([gene-tables-cases](gene-tables-cases.md)) GQ1–GQ4; the MutSig "M" / GISTIC "G" q-value icon and tooltip, single study (QV1–QV7; stad_tcga: 192 MutSig and 2,517 GISTIC rows, identical to the portal API). No OncoKB cancer-gene tooltip |
 | STS-GT-7 | ❌ | C | No OncoKB cancer-gene filter |
 | STS-GT-8 | ✅ | B | The `#` header's filter icon, dark under "Alterations: OncoKB drivers only" (the page's alteration filter), with the portal's filtered tooltip ([gene-tables-cases](gene-tables-cases.md)) GI1–GI2 |
 | STS-GT-9 | 🟡 | B | Check rows → [Apply filter], Union (one OQL clause) or Intersection (a clause per gene, refused past the selection's 8 filters), the choice kept by the browser; applied rows pinned, checked and disabled ([gene-tables-cases](gene-tables-cases.md)) GU1–GU6; compare via "…" |
@@ -238,7 +238,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-SC-2 | ✅ | B | 44×38 bins cut as the portal cuts them (FGA 0–1, MC from 0), a plasma dot per bin, the "# samples" legend; the middle label is the count at the middle of the bar (⚠ C6, [density-cases](density-cases.md)) |
 | STS-SC-3 | ✅ | BC | Pearson and Spearman with p, as the portal writes them; shown whenever n > 2 (⚠ S9) |
 | STS-SC-4 | ✅ | B | "Number of Samples", the x range to 2 places, the y range as formatRange |
-| STS-SC-5 | 🔶 | B | Swap Axes, Log Scale X / Y on the MC axis (kept by the browser); Download ▸ SVG, PDF with the legend and coefficients inside the file ([download-cases](download-cases.md) FG8). Not yet: Data |
+| STS-SC-5 | ✅ | B | Swap Axes, Log Scale X / Y on the MC axis (kept by the browser); Download ▸ SVG, PDF with the legend and coefficients inside the file ([download-cases](download-cases.md) FG8); Data, the samples with both values (PC7) |
 | STS-SC-6 | 🟡 | C | Drag a box → two range clauses (MC rounded to whole counts, FGA by span) (`explore-charts.tsx:89-92`); no custom bins added to the bar charts |
 | STS-SC-7 | ✅ | C | Own filters included (the plot is drawn over the draft) |
 | STS-SC-8 | 🐞 ok | C | Legacy dead code / out-of-range bin bug not present |
@@ -265,7 +265,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-KM-3 | 🔶 | B | Full KM with axes, number-at-risk table and "median 81.4 mo · n = 590 · 120 events" line |
 | STS-KM-4 | 🐞 ok | C | No selection on the curve (legacy's is dead code) |
 | STS-KM-5 | 🟡 | C | Left truncation is an analysis-view caveat, not offered on Explore's card |
-| STS-KM-6 | 🔶 | B | Download ▸ SVG, PDF of the curve with its number-at-risk table and legend ([download-cases](download-cases.md) FG9). Not yet: Data |
+| STS-KM-6 | ✅ | B | Download ▸ SVG, PDF of the curve with its number-at-risk table and legend ([download-cases](download-cases.md) FG9); Data, every selected patient's status and months (PC8) |
 
 ### §11 Added charts
 
@@ -292,7 +292,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-DL-1 | 🟡 | B | Categorical charts (clinical pie or list, generic-assay categorical, gene state): Download ▸ Summary Data, as the portal writes it ([download-cases](download-cases.md) SD1–SD16). SVG and PDF of every chart but the gene tables, Data Types and Case Lists (FG1–FG10). Not yet: Full Data, a numeric chart's Data |
+| STS-DL-1 | 🟡 | B | Categorical charts (clinical pie or list, generic-assay categorical, gene state): Download ▸ Summary Data, as the portal writes it ([download-cases](download-cases.md) SD1–SD16). SVG and PDF of every chart but the gene tables, Data Types and Case Lists (FG1–FG10). Full Data of a clinical pie or list chart and a clinical bar chart's Data, read through the patient-level table route (PC1–PC14). Not yet: a gene-state or generic-assay chart's Full Data / Data |
 | STS-DL-2 | ❌ | C | No download-hide switch (tracked: Data-governance switches) |
 | STS-DL-3 | ❌ | C | n/a — nothing to download (legacy TSV bugs therefore absent) |
 

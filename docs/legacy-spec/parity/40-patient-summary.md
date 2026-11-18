@@ -22,36 +22,36 @@ Legacy numbers from the expanded tables (all rows, "Show more" until gone) and `
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 41 |
-| 🟡 partial | 26 |
-| 🔶 different | 6 |
-| ❌ missing | 14 |
+| ✅ match | 51 |
+| 🟡 partial | 25 |
+| 🔶 different | 2 |
+| ❌ missing | 9 |
 | 🐞 ok | 4 |
 | 🐞 copied | 0 |
 | N/A | 1 |
 | ? | 0 |
 | **Total IDs** | **92** |
 
-**Overall: 43.5 %** (✅ 35 + 🐞ok 4 + N/A 1 = 40 of 92). Counting 🟡 as half: 57.1 %.
+**Overall: 60.9 %** (✅ 51 + 🐞ok 4 + N/A 1 = 56 of 92). Counting 🟡 as half: 74.5 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
-| URL | 6 | 2 | 1 | 2 | 0 | 1 | 0 | Portal params accepted; tab in `?tab=`; navCaseIds hash ignored |
-| SH header | 7 | 2 | 4 | 0 | 1 | 0 | 0 | Header text identical; no page title, no TMB-H/MSI-H badges, no PDX icon |
+| URL | 6 | 2 | 2 | 1 | 0 | 1 | 0 | Portal params accepted; tab in `?tab=`; navCaseIds hash ignored |
+| SH header | 7 | 3 | 4 | 0 | 0 | 0 | 0 | Header text identical; no page title, no TMB-H/MSI-H badges, no PDX icon |
 | CS clinical spans | 5 | 5 | 0 | 0 | 0 | 0 | 0 | Verbatim port of clean/derive/whitelist/punctuation |
-| NAV | 5 | 3 | 0 | 1 | 1 | 0 | 0 | Pager works; "N patients" opens a list, not study view; no exclude |
+| NAV | 5 | 5 | 0 | 0 | 0 | 0 | 0 | Pager works; "N patients" opens a list, not study view; no exclude |
 | TAB | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Different order and gating; placeholder tabs |
 | SUM | 2 | 2 | 0 | 0 | 0 | 0 | 0 | No actionability cards; sample mode scopes data, timeline whole patient |
 | TL tracks | 6 | 1 | 3 | 0 | 0 | 1 | 1 | Order/nesting right; labels not upper-cased; tie order differs |
 | TL events | 6 | 5 | 1 | 0 | 0 | 0 | 0 | Glyphs, stacks, sample markers, diamond, line charts |
-| TL tooltips | 4 | 0 | 1 | 3 | 0 | 0 | 0 | Hover-only, ≤4 events stacked; no pin/paging/sample clinical rows |
-| TL axis/zoom | 5 | 1 | 2 | 0 | 2 | 0 | 0 | Year ticks and trims; no month ticks, drag-zoom or download |
+| TL tooltips | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Hover-only, ≤4 events stacked; no pin/paging/sample clinical rows |
+| TL axis/zoom | 5 | 3 | 1 | 0 | 1 | 0 | 0 | Year ticks and trims; no month ticks, drag-zoom or download |
 | GO genomic overview | 9 | 9 | 0 | 0 | 0 | 0 | 0 | Close igv port; side columns' numbers identical |
-| MT mutations table | 6 | 0 | 2 | 2 | 2 | 0 | 0 | Same rows; one max VAF not per-sample bars; no mRNA, no gene filter |
-| CNA table | 5 | 1 | 2 | 1 | 0 | 1 | 0 | Same 74 rows; empty table instead of "not profiled" alert |
-| SV table | 5 | 0 | 2 | 1 | 1 | 1 | 0 | Different default columns; no Status/Annotation |
-| NP / GP panels | 5 | 1 | 1 | 0 | 3 | 0 | 0 | GO panel icons only; no alerts, pills, modal |
-| STM | 15 | 3 | 6 | 1 | 5 | 0 | 0 | Counts match; display rounding; no mRNA %, VAF plot, badges |
+| MT mutations table | 6 | 1 | 4 | 0 | 1 | 0 | 0 | Same rows; one max VAF not per-sample bars; no mRNA, no gene filter |
+| CNA table | 5 | 2 | 2 | 0 | 0 | 1 | 0 | Same 74 rows; empty table instead of "not profiled" alert |
+| SV table | 5 | 2 | 1 | 0 | 1 | 1 | 0 | Different default columns; no Status/Annotation |
+| NP / GP panels | 5 | 2 | 1 | 0 | 2 | 0 | 0 | GO panel icons only; no alerts, pills, modal |
+| STM | 15 | 7 | 4 | 0 | 4 | 0 | 0 | Counts match; display rounding; no mRNA %, VAF plot, badges |
 
 ---
 
@@ -115,9 +115,9 @@ Data version: every row set, read count and cohort numerator matches, so the war
 | PAT-URL-1 | 🔶 | BC | `/portal/patient?…&tab=<Title>` (title, not path id `/patient/<tab>`); unknown tab → Summary ✅ |
 | PAT-URL-2 | ✅ | B | `studyId` + `caseId` / `sampleId` accepted (also `study`/`patient`/`sample`); sample wins (`page.tsx:57`) |
 | PAT-URL-3 | 🟡 | C | Page state in `?changes=` (GE settings, collapse etc., invariant 9); no `resourceUrl`, plots params, `geneset_list` |
-| PAT-URL-4 | 🔶 | B | `#navCaseIds=` ignored (no pager shown); cohort carried as a definition `?cohort=` / stored `?s=` (`cohort-navigation.ts:21`); no POSTed list |
+| PAT-URL-4 | 🟡 | B | `#navCaseIds=study:patient,…` read as a cohort of those patients (an id without its study refused, as PAT-URL-6) ✅; stepped through in the cohort list's order, not the link's; no POSTed list; the page's own links still carry the cohort's definition (`?cohort=`) |
 | PAT-URL-5 | ✅ | C | `PatientView` keyed by study\|patient\|sample (`page.tsx:62`) |
-| PAT-URL-6 | 🐞 ok | C | No id-list parsing at all, so no `this.studyId` crash |
+| PAT-URL-6 | 🐞 ok | C | `#navCaseIds` ids without their study are refused, named, and the patient shown without the pager (`navigationFromHash`), where the portal's parseCohortIds throws: the bug not copied |
 
 ### §1 Header
 
@@ -147,8 +147,8 @@ Data version: every row set, read count and cohort numerator matches, so the war
 |---|---|---|---|
 | PAT-NAV-1 | ✅ | B | First / prev / [2] / "3 patients" / next / last; ends disabled |
 | PAT-NAV-2 | ✅ | B | Typed 3 + Enter → P05 |
-| PAT-NAV-3 | 🔶 | B | "N patients" opens a searchable list dialog in place, not study view |
-| PAT-NAV-4 | ❌ | C | No exclude-patient button |
+| PAT-NAV-3 | ✅ | B | "N patients" opens the Study View over the cohort in a new window (tooltip "Open all patients in study view"): lgg P01, P04, P05 → "3 patients match"; the searchable list stays as its own button |
+| PAT-NAV-4 | ✅ | B | ⊖ "Exclude the current patient": the cohort's definition excluding the patient (a `not` patient-list clause), opened at the next patient, the previous when it was the last: P04 of 3 → P05, "2 of 2 patients" |
 | PAT-NAV-5 | ✅ | C | `patientHref` uses patient mode (`cohort-navigation.ts:42`) |
 
 ### §1.4 Tabs
@@ -201,10 +201,10 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-TL-ZM-1 | 🟡 | B | Year ticks "0, 1y … 5y" ✅; no month minor ticks |
+| PAT-TL-ZM-1 | ✅ | B | Year ticks "0, 1y … 5y" ✅; past 150 px a year, a short tick each month, every 4th labelled ("4m", "1y 8m"; before 0 "-8m", "-1y 8m"), every one past 700 px (monthTicks), as the portal's TickAxis (lgg P04: 0 · 4m · 8m · 1y · 1y 4m …) |
 | PAT-TL-ZM-2 | 🟡 | B | ≥4 empty years cut to a dashed mark ✅; restored by an "every year" checkbox (in the document), not by clicking it |
 | PAT-TL-ZM-3 | ❌ | C | No drag-to-zoom, no cursor line |
-| PAT-TL-ZM-4 | ❌ | C | No download (PDF/PNG/SVG/ZIP) |
+| PAT-TL-ZM-4 | ✅ | C | Download ▸ PDF / PNG / SVG of the timeline as drawn (folded tracks, every year or not), named timeline (#345), and Data (ZIP): timeline.zip with a data_timeline_<type>.txt per event type, PATIENT_ID · START_DATE · STOP_DATE · EVENT_TYPE · the type's keys in first-seen order (STYLE_* kept), as legacy's downloadZippedTracks (lgg_ucsf_2014 P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows, columns and values as the API's clinical events) |
 | PAT-TL-ZM-5 | ✅ | C | Card width (ResizeObserver) |
 
 ### §4 Genomic Overview
@@ -225,20 +225,20 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-MT-1 | 🟡 | BC | Same rows (80/64/16); uncalled not listed (lgg has none); header "80 Mutations" ✅; 25 rows/page (legacy 10); default sort gene-grouped, driver genes first (`patient-alterations.ts:149`) vs Annotation desc; no "not profiled for mutations" alert |
-| PAT-MT-2 | 🔶 | B | Default: Samples · Gene · Protein Change · Annotation (OncoKB) · Mutation Type · Copy # · Cohort % · Allele Freq; Samples shown with 1 sample; Copy # shown with >1 sample; no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅ (17 columns) |
+| PAT-MT-1 | 🟡 | BC | Same rows (80/64/16); uncalled not listed (lgg has none); header "80 Mutations" ✅; 10 rows/page ✅; default sort gene-grouped, driver genes first (`patient-alterations.ts:149`) vs Annotation desc; no "not profiled for mutations" alert |
+| PAT-MT-2 | 🟡 | B | Default: Samples (2+ samples in view) · Gene · Protein Change · Annotation (OncoKB) · Mutation Type (the portal's labels, "FS del") · Allele Freq · Copy # (1 sample in view) · Cohort %, in the portal's order ✅ (lgg P04: Samples … Mutation Type, Allele Freq, Cohort %; TCGA-A6-2671: Gene … Allele Freq, Copy #, Cohort %); no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅; a hidden column stays in the menu where the portal excludes it |
 | PAT-MT-3 | 🟡 | B | One sample in view: the VAF as text ✅; several: a 6-px bar per sample, VAF × 12 px, sample colour ✅ (lgg P04 IDH1 R132C four bars); tooltip "0.38 (46 variant reads out of 121 total)" per sample ✅; sort by the samples' VAFs in sample order, null last ✅ (`check:patient-vaf`); no header VAF plot; download keeps the highest VAF, not the per-sample list |
 | PAT-MT-4 | 🟡 | B | Marker per carrying sample, "--" where not (equal-width slots) ✅; no grey not-profiled pill, no uncalled opacity |
 | PAT-MT-5 | ❌ | B | No mRNA Expr. column (P3 legacy 25 %, 29 % …) |
-| PAT-MT-6 | ❌ | C | No gene filter menu |
+| PAT-MT-6 | ✅ | B | The Gene header's menu, shown with several samples in view and a row whose gene some sample's panel leaves out: "Different gene panels were used for the samples. Filter mutations for:" ◉ Genes profiled in any sample / ○ all samples (the view's `genesProfiled`, both tables); msk_chord P-0025952 (IMPACT468 and IMPACT505): 185 → 182 rows, CTR9, NADK, SPRTN dropped (not on IMPACT468 per the portal API); the Genomic Overview and the VAF plot are not filtered |
 
 ### §6 Copy Number Alterations table
 
 | ID | verdict | how | note |
 |---|---|---|---|
 | PAT-CNA-1 | ✅ | B | ±2 only, merged by gene + call; 74/74 rows |
-| PAT-CNA-2 | 🔶 | B | lgg: "0 Copy Number Alterations … no rows", not "Study is not profiled …" |
-| PAT-CNA-3 | 🟡 | B | "74 Copy Number Alterations" ✅; 25 rows; sort driver genes first then gene |
+| PAT-CNA-2 | ✅ | B | No discrete profile → "Study is not profiled for copy number alterations." in place of the table (lgg P04, as on the portal) |
+| PAT-CNA-3 | 🟡 | B | "74 Copy Number Alterations" ✅; 10 rows ✅; sort driver genes first then gene |
 | PAT-CNA-4 | 🟡 | B | Samples (always) · Gene · CNA (AMP/HOMDEL, not DeepDel) · Annotation (OncoKB) · Cytoband ✅ · Cohort %; no mRNA Expr., Custom Driver, GISTIC badge, Gene panel |
 | PAT-CNA-5 | 🐞 ok | C | No gene filter, so the mutation-panel-map bug cannot occur |
 
@@ -247,7 +247,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 | ID | verdict | how | note |
 |---|---|---|---|
 | PAT-SV-1 | ✅ | BC | One row per the portal's key, both genes, positions and chromosomes and the class sorted (generateStructuralVariantId), so A–B and B–A merge; the row's fields one record's: paad_msk_2025 C-873T8K's 4 FGFR2/MYOF records (both orders, 2 samples) are 1 row on both sides (`check:patient-sv`) |
-| PAT-SV-2 | 🟡 | B | Empty: "0 Structural Variants … no rows" ✅; no "not profiled" alert (lgg) |
+| PAT-SV-2 | ✅ | B | No SV profile → "Study is not profiled for structural variants." (lgg) ✅; empty → "0 Structural Variants" ✅ |
 | PAT-SV-3 | 🟡 | B | Samples · Gene 1 · Gene 2 · Status (s / g badge, not sortable) · Variant Class · Event Info · Connection Type ✅; Breakpoint Type hidden ✅; no Annotation (tracked), +13 optional columns |
 | PAT-SV-4 | 🐞 ok | C | No SV gene filter |
 | PAT-SV-5 | ❌ | C | No server column config (tracked: Instance defaults) |
@@ -256,7 +256,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-NP-1 | ❌ | B | No "Sample(s) … not profiled for …" alert above any table |
+| PAT-NP-1 | ✅ | B | Per table, "Sample(s) <markers> not profiled for <mutations | copy number alterations | structural variants>" for the samples in view outside the profile (sample_profile, what the portal's gene-panel data lists); the table hidden when none is profiled (paad_msk_2025 P-0007179: sample 2 not profiled for structural variants, as the portal API's profiled: false); not shown for a peer's patient |
 | PAT-GP-1 | ✅ | C | Profiled = panel covers the gene (`profiledCte`, `patient-alterations.ts:77`; evolution `np`) |
 | PAT-GP-2 | 🟡 | B | GO panel icons ✅; no not-profiled pill, Gene panel column, tooltip link |
 | PAT-GP-3 | ❌ | C | No gene panel modal |
@@ -279,10 +279,10 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 | PAT-STM-9 | ❌ | B | No TMB-H / MSI-H badges |
 | PAT-STM-10 | ✅ | BC | Span floors ✅; the header's tooltip tables write a non-integer to one decimal, "< 0.1" when it rounds to 0 (`portalClinicalValue`): TCGA-A6-2671-01 Fraction Genome Altered 0.4881 → "0.5" |
 | PAT-STM-11 | 🟡 | C | `formatDays` identical (`timeline-tracks.ts:215`); 365-day ticks, trims ✅; line-chart y rule not checked |
-| PAT-STM-12 | 🟡 | BC | Header/timeline: collection day, type rank, natural id ✅ (`timeline-tracks.ts:196`); tables number without days (`alterations/run.ts:101`, tracked known issue) |
+| PAT-STM-12 | ✅ | BC | Collection day, type rank, natural id, in the header, timeline, alteration tables and signatures alike (`withSampleDays`, `lib/views/shared.ts`): msk_chord_2024 P-0004121's T02 (day −56) is 1 and T01 (day −40) is 2, as the portal API's sample-acquisition events order them |
 | PAT-STM-13 | ✅ | BC | Sorted panel ids → P1…Pn, W for WES (`igv.ts:100-107`) |
 | PAT-STM-14 | 🟡 | C | Mutation key adds mutationType/variantType (harmless); CNA ✅; SV tuple not sorted |
-| PAT-STM-15 | ❌ | C | No "profiled in all samples" filter |
+| PAT-STM-15 | ✅ | BC | Keep a row iff every sample in view is profiled for its gene (a panel it was profiled on holds it, or WES/WGS; a sample with no panel row is not profiled), by the table's own profile (the CNA table by the CNA panel: the portal's mutation-map bug, PAT-CNA-5, not copied); check:patient-sv G (FX-P33's EGFR, off PEERFIX_NO_EGFR) |
 
 ---
 
