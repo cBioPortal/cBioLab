@@ -1,6 +1,6 @@
 # Parity audit — Results › Download (spec `10-results-download.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`) and cbioportal.org (Q1 Download tab, same day): six verdicts changed, all in §2 and RDL-STM-2 (the frequency table rebuilt as the portal's, #301, #322)
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright, same day)
 - **Code paths (cBioLab):** `lib/views/datafiles/{run,sql,tables,types}.ts`, `lib/views/datafiles/README.md`, `app/lab/kinds/datafiles.tsx` (file rows, frequency table), `app/_table/DataTable.tsx` (case table), `lib/table-query.ts`, `app/portal/results-layout.ts` (tab, `pinsOf`)
@@ -20,9 +20,9 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 7 |
+| ✅ match | 11 |
 | 🟡 partial | 21 |
-| 🔶 different | 6 |
+| 🔶 different | 2 |
 | ❌ missing | 4 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
@@ -30,16 +30,16 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 | ? | 0 |
 | **Total IDs** | **41** |
 
-**Overall: 24.4 %** (✅ 7 + 🐞ok 1 + N/A 2 = 10 of 41). Counting 🟡 as half: 50.0 %.
+**Overall: 34.1 %** (✅ 11 + 🐞ok 1 + N/A 2 = 14 of 41). Counting 🟡 as half: 59.8 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 Chrome (0.x) | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Same three sections; no hide switch |
 | §1 Data files (1.x) | 13 | 3 | 8 | 1 | 1 | 0 | 0 | Every profile offered as CSV; no transposed; no generic-assay rows; lists open as a lab cohort |
-| §2 Gene frequency (2.x) | 6 | 0 | 2 | 4 | 0 | 0 | 0 | Counts identical; 1-decimal %, no bar, no sort/paging |
+| §2 Gene frequency (2.x) | 6 | 3 | 3 | 0 | 0 | 0 | 0 | Counts, %, bar and file as the portal's; extra Profiled column, no Columns menu or copy |
 | §3 Case table (3.x) | 6 | 0 | 4 | 0 | 1 | 1 | 0 | Cells match minus "(Driver)" tags; no Study ID column, no per-alteration columns |
 | §4 Modes (MD) | 6 | 1 | 1 | 1 | 1 | 0 | 2 | OQL handled as legacy |
-| §6 Statistics (STM) | 6 | 1 | 4 | 0 | 1 | 0 | 0 | Altered 485 / 344 and every line's count identical; Unaltered excludes not-profiled (invariant 7) |
+| §6 Statistics (STM) | 6 | 2 | 3 | 0 | 1 | 0 | 0 | Altered 485 / 344 and every line's count identical; Unaltered excludes not-profiled (invariant 7) |
 
 ---
 
@@ -115,12 +115,12 @@ Data version: every count identical.
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| RDL-2.1 | 🔶 | B | Gene \| OQL line (visible) \| Altered \| Profiled \| Altered %; extra Profiled column |
+| RDL-2.1 | 🟡 | B | Re-measured 2026-11-18 (was 🔶): Gene Symbol \| Num Samples Altered \| Profiled \| Percent Samples Altered, the OQL Line column hidden until its toggle ✅; ours adds the Profiled column |
 | RDL-2.2 | 🟡 | C | One row per line ✅; merged `[ ]` refused on the Results page (one gene per line, `run.ts:125`) |
-| RDL-2.3 | 🟡 | C | Unprofiled → "—" in %, altered shows 0, no "Not Profiled" |
-| RDL-2.4 | 🔶 | B | `toFixed(1)` "37.4%" vs `getPercentage` "37%" / "<1%"; no 200 px bar |
-| RDL-2.5 | 🔶 | C | CSV `percent_altered` = 37.4 (number), not "37%" / "2.5%" / "N/P"; extra `profiled` column |
-| RDL-2.6 | 🔶 | B | Query order, no sort/paging/filter/column menu; `gene_alteration_frequency.csv` |
+| RDL-2.3 | ✅ | C | Re-measured 2026-11-18 (was 🟡): a line nobody was profiled for reads "Not Profiled" in both columns, "N/P" in the file (`datafiles.tsx:170-171`, `frequency.ts` `frequencyTsv`) |
+| RDL-2.4 | ✅ | BC | Re-measured 2026-11-18 (was 🔶): a 200 px grey bar filled light green + getPercentage's text (`FrequencyBar`, `datafiles.tsx:27`); Q1 APC 396 67%, TP53 315 53%, KRAS 222 37%, BRAF 64 11%, NRAS 38 6% on both sides |
+| RDL-2.5 | ✅ | C | Re-measured 2026-11-18 (was 🔶): the file's Percent Samples Altered is `percentAltered`'s string (`portalPercentAltered`, `frequency.ts` `frequencyTsv`), "N/P" when unprofiled; the file has the portal's four columns |
+| RDL-2.6 | 🟡 | BC | Re-measured 2026-11-18 (was 🔶): Percent desc by altered/profiled ✅, header sorts ✅, 10 a page ✅, filter on gene (and line while shown) ✅, `gene_alteration_frequency.tsv` ✅ (Q1 order APC, TP53, KRAS, BRAF, NRAS as the portal); no "Columns" menu (an OQL Line toggle instead), no Copy |
 
 ### §3 Type of Genetic Alterations Across All Samples
 
@@ -151,7 +151,7 @@ Data version: every count identical.
 | ID | verdict | how | note |
 |---|---|---|---|
 | RDL-STM-1 | 🟡 | BC | Altered identical (485, 344), sample level ✅; Unaltered requires profiling for every line's gene and data type (55 vs 109; invariant 7, README); files are CSV with header and cohort/study/patient columns, Copy gives `study:sample` lines |
-| RDL-STM-2 | 🟡 | BC | Numerator, denominator (profiled for the gene in any type the line reads; 594 here) identical; rounding 1 decimal vs `percentAltered` |
+| RDL-STM-2 | ✅ | BC | Re-measured 2026-11-18 (was 🟡): numerator and denominator (profiled for the gene in any type the line reads; 594 here) identical; shown with getPercentage, filed with `percentAltered` (<3 % one decimal), as the portal |
 | RDL-STM-3 | 🟡 | C | One column per **line** (not per gene); unprofiled `NP` (legacy `0`); `Altered` 1/0/NP |
 | RDL-STM-4 | ✅ | BC | mutations / structural_variants / cna: every queried sample, STUDY_ID, SAMPLE_ID, genes; WT / NA when none; NP off the panel or for a study without the profile |
 | RDL-STM-5 | 🟡 | C | Same matrix for every non-selected profile; discrete CNA gets `NP` (legacy never); transposed bug moot (no transposed) |
