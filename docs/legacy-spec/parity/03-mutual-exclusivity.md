@@ -1,9 +1,9 @@
 # Parity audit — Results › Mutual Exclusivity (spec `03-mutual-exclusivity.md`)
 
-- **Date:** 2026-11-11
-- **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
-- **Legacy:** cbioportal.org (Playwright, same day)
-- **Code paths (cBioLab):** `app/portal/results-layout.ts:204,214` (tab → `cooccurrence` view on "Queried"), `app/portal/PortalTabs.tsx:171-181` (portal draws the kind's figure; no table), `lib/views/cooccurrence/{run,figure,kind,method,doc,types}.ts`, `lib/federation.ts:395-447` (`pairCountsSql`), `lib/stats.ts:12-26` (`fisherExact`), `:617-628` (`benjaminiHochberg`), `:642` (`cochranMantelHaenszel`), `:670-676` (`log2OddsRatio`), `app/lab/kinds/cooccurrence.tsx` (table card, `/lab` only)
+- **Date:** 2026-11-11; re-measured 2026-11-18
+- **cBioLab:** master @ `bc53b944`, `next dev` on `http://127.0.0.1:3109` (first audit: `session/spec` @ `f3197d75`)
+- **Legacy:** cbioportal.org (Playwright, 2026-11-11; Q1 and Q5 tables re-read 2026-11-18, unchanged)
+- **Code paths (cBioLab):** `app/portal/results-layout.ts:322-344` (tab → `cooccurrence` view on "Queried" with the query's OQL lines), `app/portal/PortalTabs.tsx:171-181` (portal draws the kind's figure; no table), `lib/views/cooccurrence/{run,figure,kind,method,doc,types}.ts`, `lib/federation.ts:395-447` (`pairCountsSql`), `lib/stats.ts:12-26` (`fisherExact`), `:617-628` (`benjaminiHochberg`), `:642` (`cochranMantelHaenszel`), `:670-676` (`log2OddsRatio`), `app/lab/kinds/cooccurrence.tsx` (table card, `/lab` only)
 
 **Queries used** (legacy ⇄ cBioLab)
 
@@ -24,9 +24,9 @@ Legacy shows p/q only as "<0.001" / `toFixed(3)`, so exact legacy p/q were recom
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 6 |
-| 🟡 partial | 11 |
-| 🔶 different | 11 |
+| ✅ match | 5 |
+| 🟡 partial | 14 |
+| 🔶 different | 9 |
 | ❌ missing | 10 |
 | 🐞 ok | 1 |
 | 🐞 copied | 0 |
@@ -34,16 +34,18 @@ Legacy shows p/q only as "<0.001" / `toFixed(3)`, so exact legacy p/q were recom
 | ? | 0 |
 | **Total IDs** | **40** |
 
-**Overall: 20.0 %** (✅ 6 + 🐞ok 1 + N/A 1 = 8 of 40). Counting 🟡 as half: 33.8 %.
+**Overall: 17.5 %** (✅ 5 + 🐞ok 1 + N/A 1 = 7 of 40). Counting 🟡 as half: 35.0 %. (2026-11-11 as published: 20.0 % / 33.8 %; its own rows counted 5 ✅ / 11 🟡 / 11 🔶 / 11 ❌, i.e. 17.5 % / 31.3 %.)
+
+Re-measurement of 2026-11-18 (master `bc53b944`): every ID judged again from the spec text against the code and the page, not from the PRs' Tracker lines. Against the first audit's rows 3 verdicts went up (MD-3 ❌ → 🟡, STM-3 and STM-5 🔶 → 🟡); against the row #247 wrote, MD-3 went down (✅ → 🟡, ↓ in the note: no OQL banner on the tab, as CTS-MD-5). The first audit's summary said 6 ✅ where its rows have 5, so its 20 % strict was overstated; counted from its rows it was 17.5 %, and the strict score is unchanged. cBioLab's numbers are unchanged on Q1, Q2b, Q4 and Q5, and so are legacy's for Q1 and Q5: Q1 identical on every count, log₂ OR, p and q; Q5 still 2 samples more per pair (mutation panel only as "profiled").
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
-| §0 Chrome & visibility | 4 | 1 | 3 | 0 | 0 | 0 | 0 | Tab and link ✅; hidden for <2 genes even when routed to; no OQL/filter banners |
+| §0 Chrome & visibility | 4 | 1 | 3 | 0 | 0 | 0 | 0 | Tab and link ✅; hidden for < 2 tracks even when routed to; the OQL in the page's note, no filter warnings |
 | §1 Error states | 3 | 0 | 0 | 2 | 1 | 0 | 0 | Error states unreachable (tab hidden) or replaced by "not assessable" pairs |
 | §2 Page content | 7 | 1 | 2 | 2 | 2 | 0 | 0 | A log₂ OR bar chart replaces the table; no checkboxes, no summary sentence |
 | §3 Table | 7 | 1 | 1 | 1 | 4 | 0 | 0 | No table on the portal (only on `/lab`); Q1 reference numbers identical |
-| §4 Modes | 10 | 1 | 2 | 1 | 4 | 1 | 1 | OQL and merged tracks not supported; profiled = mutation panel only; multi-study stratified |
-| §6 Statistics (STM) | 9 | 1 | 3 | 5 | 0 | 0 | 0 | Counts, log₂ OR, Fisher p, BH q identical on single-study queries with identical denominators; multi-study uses CMH; Haldane on zero cells |
+| §4 Modes | 10 | 1 | 3 | 1 | 3 | 1 | 1 | OQL lines as tracks ✅ but merged tracks refused; profiled = mutation panel only; multi-study stratified |
+| §6 Statistics (STM) | 9 | 1 | 5 | 3 | 0 | 0 | 0 | Counts, log₂ OR, Fisher p, BH q identical where denominators agree; multi-study CMH; Haldane on zero cells |
 
 ---
 
@@ -51,18 +53,18 @@ Legacy shows p/q only as "<0.001" / `toFixed(3)`, so exact legacy p/q were recom
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
-| 1 | **No table on the portal tab** — only a horizontal log₂ OR bar chart (row text "−1.7 · q = 2.2e-20"); Neither / A Not B / B Not A / Both, p and Tendency only in the SVG hover title. The table card exists only on `/lab` (`app/lab/kinds/cooccurrence.tsx`) | UI-6, TB-1, TB-2, STM-9 | not tracked |
+| 1 | **No table on the portal tab** — only a horizontal log₂ OR bar chart (row text "−1.7 · q = 2.2e-20"); Neither / A Not B / B Not A / Both, p and Tendency only in the SVG hover title. The table card exists only on `/lab` (`app/lab/kinds/cooccurrence.tsx`) | UI-6, TB-1, TB-2, STM-9 | (tracked) |
 | 2 | ~~**OQL ignored**~~ — fixed: tracks are the query's lines (Q2b KRAS: MUT / TP53: MUT HOMDEL 5530/797/3772/846, as legacy). Was: `KRAS: MUT` / `TP53: MUT HOMDEL` counted as whole genes (Q2b KRAS/TP53 5425/876/3714/930 vs legacy 5530/797/3772/846, log₂ OR 0.633 vs 0.638); labels are gene symbols | MD-3, STM-1, STM-3, 0.1 | (tracked) "the oncoprint and gene tabs still draw every alteration" |
 | 3 | **Merged tracks `[BRAF NRAS]` refused** by the Results page ("bad gene entry '[BRAF'") | MD-4 | (tracked) OQL coverage: per-track OQL inside merged groups |
-| 4 | **Multi-study test is CMH stratified by study**, not pooled Fisher: Q4 TP53/KRAS legacy p 2.1e-7, q 3.2e-7 (Co-occurrence, significant) vs cBioLab CMH p = q = 0.880 (not significant); PIK3CA/APC tendency flips (legacy −0.232 ME, cBioLab MH log₂ OR +0.543 Co-occurrence). Deliberate (`doc.ts:7`) | MD-8, STM-5..7 | not tracked |
-| 5 | **No Mutual exclusivity / Co-occurrence / Significant only checkboxes** | UI-4, UI-5, STM-8 | not tracked |
-| 6 | **Profiled = mutation panel only** (`federation.ts:427`), not "every selected profile": Q5 coadread 534–537 samples per pair vs legacy 532; Q4 +13–16 per pair; small p/q shifts (Q5 KRAS/TP53 p 0.655 vs 0.721) | STM-1, MD-8, TB-7 | not tracked |
-| 7 | **No search, column picker, copy, `table.tsv` download** | TB-1, TB-4, TB-6 | not tracked (hide-download switch tracked under Data-governance) |
-| 8 | **One gene**: tab hidden even when routed to (`?tab=Mutual+Exclusivity` lands on Oncoprint), no ER-1 message | 0.3, ER-1, MD-1 | not tracked |
-| 9 | **Gene cap 12** (`COOCCUR_GENE_LIMIT`, `shared.ts:14`): a 13-gene query errors on this tab; legacy has no cap | — (0.3) | not tracked |
+| 4 | **Multi-study test is CMH stratified by study**, not pooled Fisher: Q4 TP53/KRAS legacy p 2.1e-7, q 3.2e-7 (Co-occurrence, significant) vs cBioLab CMH p = q = 0.880 (not significant); PIK3CA/APC tendency flips (legacy −0.232 ME, cBioLab MH log₂ OR +0.543 Co-occurrence). Deliberate (`doc.ts:7`) | MD-8, STM-5..7 | (tracked) |
+| 5 | **No Mutual exclusivity / Co-occurrence / Significant only checkboxes** | UI-4, UI-5, STM-8 | (tracked) |
+| 6 | **Profiled = mutation panel only** (`federation.ts:427`), not "every selected profile": Q5 coadread 534–537 samples per pair vs legacy 532; Q4 +13–16 per pair; small p/q shifts (Q5 KRAS/TP53 p 0.655 vs 0.721) | STM-1, MD-8, TB-7 | (tracked) |
+| 7 | **No search, column picker, copy, `table.tsv` download** | TB-1, TB-4, TB-6 | (tracked) |
+| 8 | **One gene**: tab hidden even when routed to (`?tab=Mutual+Exclusivity` lands on Oncoprint), no ER-1 message | 0.3, ER-1, MD-1 | (tracked) |
+| 9 | **Gene cap 12** (`COOCCUR_GENE_LIMIT`, `shared.ts:14`): a 13-gene query errors on this tab; legacy has no cap | — (0.3) | (tracked) |
 | 10 | **Driver / VUS / germline filters and Show-only-profiled** not applied; no AlterationFilterWarning / CaseFilterWarning | MD-6, MD-7, 0.1 | (tracked) Driver-annotation settings |
-| 11 | **Zero-cell pairs**: Haldane +0.5 gives a finite log₂ OR (legacy ±∞ → "<-3"/">3"); tendency null when log₂ OR is 0 or ±∞ (legacy "Mutual exclusivity" for ≤ 0) | STM-5 | not tracked |
-| 12 | **Display formatting**: log₂ OR via `fmtNum` ("−1.7", "0.04"), q in scientific notation; no "<0.001", no "<-3" / ">3" | STM-9 | not tracked |
+| 11 | **Zero-cell pairs**: Haldane +0.5 gives a finite log₂ OR (legacy ±∞ → "<-3"/">3"); the tendency rule is now legacy's (> 0 co-occurrence, else mutual exclusivity) | STM-5 | (tracked) |
+| 12 | **Display formatting**: log₂ OR via `fmtNum` ("−1.7", "0.04"), q in scientific notation; no "<0.001", no "<-3" / ">3" | STM-9 | (tracked) |
 
 ---
 
@@ -119,7 +121,7 @@ Diagnosis:
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MEX-0.1 | 🟡 | B | Results header as in `01-oncoprint.md` RV-1; no OqlStatusBanner (OQL not applied; header line "the oncoprint and the gene tabs draw every alteration", `results/page.tsx:131-135`); no AlterationFilterWarning / CaseFilterWarning |
+| MEX-0.1 | 🟡 | B | Results header as in `01-oncoprint.md` RV-1; the OQL is applied, and said in the page's one note under the header ("The query's OQL decides who is Altered and what the oncoprint, Cancer Types Summary, Mutual Exclusivity and Pathways draw…"), not the tab's OqlStatusBanner; no AlterationFilterWarning / CaseFilterWarning |
 | MEX-0.2 | ✅ | BC | Tab "Mutual Exclusivity"; `?tab=Mutual+Exclusivity`; "Open in cBioPortal" maps to `mutualExclusivity` (`legacy-link.ts:35`) |
 | MEX-0.3 | 🟡 | BC | Hidden when < 2 distinct genes (`results-layout.ts:204,214`), listed as "Mutual Exclusivity (one gene)"; routed directly (Q6) the tab is absent and the page shows Oncoprint (legacy shows the tab + ER-1); > 12 genes the view errors (`COOCCUR_GENE_LIMIT`) |
 | MEX-0.4 | 🟡 | B | Generic card wait state; an error shows the engine's message instead of nothing |
@@ -136,7 +138,7 @@ Diagnosis:
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MEX-UI-1 | 🔶 | B | No OQL banner (see 0.1) |
+| MEX-UI-1 | 🔶 | B | No banner on the tab; the OQL is named in the page's note under the header (see 0.1) |
 | MEX-UI-2 | 🟡 | C | "N of M pairs are NOT assessable here — no panel … covers both genes (A/B, …). They are omitted" in the note; per pair, not per track; not an alert |
 | MEX-UI-3 | 🟡 | B | No "tested P pairs between T tracks" sentence; note ends "q-values are Benjamini–Hochberg across the 6 assessable pairs" |
 | MEX-UI-4 | ❌ | B | No Mutual exclusivity / Co-occurrence / Significant only checkboxes |
@@ -154,7 +156,7 @@ Diagnosis:
 | MEX-TB-4 | ❌ | B | No search |
 | MEX-TB-5 | ❌ | B | No pagination (all ≤ 66 rows drawn) |
 | MEX-TB-6 | ❌ | B | No copy or `table.tsv` download; no figure SVG/PNG download either |
-| MEX-TB-7 | ✅ | BC | Q1 reference reproduced exactly: every count, log₂ OR, p, q, tendency, row order (§3) |
+| MEX-TB-7 | ✅ | BC | Q1 reference reproduced exactly: every count, log₂ OR, p, q, tendency, row order (§3); legacy table re-read 2026-11-18, unchanged |
 
 ### §4 Modes & conditions
 
@@ -162,7 +164,7 @@ Diagnosis:
 |---|---|---|---|
 | MEX-MD-1 | 🟡 | B | 1 gene → tab hidden ✅, but also when routed to; no ER-1 |
 | MEX-MD-2 | 🟡 | C | Unprofiled handled per pair (dropped + named), not per track; no ER-2 |
-| MEX-MD-3 | ✅ | B | Tracks are the query's lines, named as legacy ("KRAS: MUT"); Q2b KRAS: MUT / TP53: MUT HOMDEL = legacy's counts |
+| MEX-MD-3 | 🟡 | B | ↓ Tracks are the query's lines, named as legacy ("KRAS: MUT", "TP53: MUT HOMDEL"); Q2b KRAS: MUT / TP53: MUT HOMDEL 5530/797/3772/846, log₂ OR 0.638, p 1.90e-16 = legacy. No OQL banner on the tab (the page's note instead), as CTS-MD-5 |
 | MEX-MD-4 | ❌ | B | `[BRAF NRAS]` refused by the Results page: "bad gene entry '[BRAF'" (tracked: OQL coverage) |
 | MEX-MD-5 | ✅ | BC | Always sample-level (`pairCountsSql` counts `bareSampleId`, `federation.ts:410`); Q1 profiled 10,945 = samples. Caption says "patients" (see bugs) |
 | MEX-MD-6 | ❌ | C | No Show only profiled (unprofiled samples are excluded per pair anyway) |
@@ -177,11 +179,11 @@ Diagnosis:
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MEX-STM-1 | 🔶 | BC | Unit = sample ✅. UNPROFILED = no MUTATION_EXTENDED panel row covering the gene (`federation.ts:423-429`), not "not profiled in every applicable selected profile"; ALTERED = `ALTERED_COND` (mutation, CNA ±2, SV; off-panel calls excluded), OQL and driver filters not applied. Q1/Q3 identical; Q5 +2–5, Q4 +13–16 samples |
+| MEX-STM-1 | 🔶 | BC | Unit = sample ✅; ALTERED = what the track's OQL line matches ✅. UNPROFILED = no MUTATION_EXTENDED panel row covering the gene (`federation.ts:513`), not "not profiled in every applicable selected profile": Q1/Q3 identical; Q5 +2 samples per pair (TP53/APC 534 vs legacy 532, re-checked 2026-11-18), Q4 +13–16 |
 | MEX-STM-2 | 🟡 | C | No track-level inclusion; pairs with 0 jointly profiled samples dropped (`run.ts:55-56`) |
-| MEX-STM-3 | 🔶 | B | Labels are gene symbols, "A / B" in the figure; no OQL-line labels, no merged labels |
+| MEX-STM-3 | 🟡 | BC | Bare line → gene symbol, an OQL line → its written-back line ("KRAS: MUT") (`run.ts:19-23`, `oqlTrackName`) ✅; merged-track labels impossible: `[BRAF NRAS]` refused (MD-4) |
 | MEX-STM-4 | ✅ | BC | C(T,2) in query order, A = earlier gene (`run.ts:20-21`); per-pair jointly profiled denominator (`federation.ts:438-444`); counts identical in Q1, Q3 |
-| MEX-STM-5 | 🔶 | C | Same formula, identical to 3 dp when no cell is 0 (all Q1/Q3/Q5 pairs); but +0.5 to every cell when any is 0 (`stats.ts:670-676`) → finite, legacy ±∞; rounded to 3 dp at source; tendency `null` when log₂ OR is 0 or ±∞ (`run.ts:48`), legacy "Mutual exclusivity" for ≤ 0; multi-study direction from MH OR |
+| MEX-STM-5 | 🟡 | C | Same formula, identical to 3 dp whenever no cell is 0 (all Q1/Q3/Q5 pairs, re-checked 2026-11-18); with a zero cell +0.5 to every cell (`stats.ts:841-847`) → finite, legacy ±∞. Tendency as legacy: log₂ OR > 0 co-occurrence, else mutual exclusivity (`run.ts:58-59`); multi-study direction from the MH OR (MD-8) |
 | MEX-STM-6 | 🟡 | BC | Two-sided Fisher, p identical to ≥ 3 s.f. on all 12 Q1/Q3 pairs; ties use a 1e-9 log tolerance (`stats.ts:23`, legacy none) and p is capped at 1; multi-study primary p = CMH (pooled Fisher kept as `p`) |
 | MEX-STM-7 | 🟡 | BC | BH step-up identical (Q1/Q3 q equal); over assessable pairs only, capped at 1 (`stats.ts:625`); multi-study on CMH p |
 | MEX-STM-8 | 🔶 | B | No checkbox filter; the figure colours rows by q < 0.05 ∧ direction (`figure.ts:15`) |
@@ -191,6 +193,6 @@ Diagnosis:
 
 ## 5. cBioLab bugs (wrong on its own terms)
 
-1. **"patients" for samples**: the note ("Denominators are the patients profiled for BOTH genes", `run.ts:74`), the DSL reference (`doc.ts:7`), the method step ("Of the patients with a sample on a mutation panel…", `method.ts:20`) and the `/lab` card subtitle (`cooccurrence.tsx:13`) say patients; `pairCountsSql` counts samples (its own comment says so, `federation.ts:396`). Q1: profiled 10,945 = the study's samples, not its 10,336 patients.
-2. **Multi-study log₂ OR disagrees between outputs**: the figure and `/lab` card draw log₂(MH OR) (`figure.ts:12`, `cooccurrence.tsx:30`), while the results text prints the pooled `log2Odds` (`kind.ts:14`) and the method record describes only the pooled formula (`method.ts:31`). Q4 TP53/KRAS: figure 0.055, text 1.049.
-3. **Tendency `null` (no label) for a log₂ OR of exactly 0, or ±∞** (`run.ts:48`): single-study log₂ OR is always finite (Haldane), so a pair with no association gets no tendency at all; multi-study an MH OR of 0 or ∞ (`Math.log2`) does too.
+1. ~~**"patients" for samples**~~ — fixed (#183): the note, DSL reference, method and `/lab` subtitle say samples (`run.ts:84`, `doc.ts:7`).
+2. ~~**Multi-study log₂ OR disagrees between outputs**~~ — fixed (#183): the results text prints the MH log₂ OR with the pooled one beside it (`kind.ts:14`), as the figure draws.
+3. ~~**Tendency `null` for a log₂ OR of exactly 0 or ±∞**~~ — fixed (#183): > 0 co-occurrence, else mutual exclusivity (`run.ts:58-59`).

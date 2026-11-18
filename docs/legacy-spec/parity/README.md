@@ -31,13 +31,13 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 
 ## Scores
 
-Re-measurement against master `cc9004b7` (01) and `bc53b944` (02, 05) (2026-11-18), each ID judged against the spec text in cBioLab's UI or code and the statistics by number against cbioportal.org: 01 OncoPrint, 02 Cancer Types Summary and 05 Mutations so far. The other rows are still the scores the PRs' own Trackers left.
+Re-measurement against master `cc9004b7` (01) and `bc53b944` (02, 03, 05) (2026-11-18), each ID judged against the spec text in cBioLab's UI or code and the statistics by number against cbioportal.org: 01 OncoPrint, 02 Cancer Types Summary, 03 Mutual Exclusivity and 05 Mutations so far. The other rows are still the scores the PRs' own Trackers left.
 
 | Scorecard | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞 ok | N/A | ? | Strict | Half |
 |---|---|---|---|---|---|---|---|---|---|---|
 | [01 OncoPrint](01-oncoprint.md) | 104 | 53 | 37 | 1 | 10 | 1 | 2 | 0 | 54% | 72% |
 | [02 Cancer Types Summary](02-cancer-types-summary.md) | 59 | 33 | 17 | 2 | 3 | 1 | 3 | 0 | 63% | 77% |
-| [03 Mutual Exclusivity](03-mutual-exclusivity.md) | 40 | 6 | 11 | 11 | 10 | 1 | 1 | 0 | 20% | 34% |
+| [03 Mutual Exclusivity](03-mutual-exclusivity.md) | 40 | 5 | 14 | 9 | 10 | 1 | 1 | 0 | 18% | 35% |
 | [04 Plots](04-plots.md) | 170 | 16 | 42 | 30 | 75 | 2 | 5 | 0 | 14% | 26% |
 | [05 Mutations](05-mutations.md) | 139 | 40 | 41 | 11 | 30 | 4 | 7 | 6 | 37% | 51% |
 | [06 Structural Variants](06-structural-variants.md) | 54 | 30 | 12 | 7 | 3 | 2 | 0 | 0 | 59% | 70% |
@@ -51,11 +51,11 @@ Re-measurement against master `cc9004b7` (01) and `bc53b944` (02, 05) (2026-11-1
 | [31 Study View shell](31-study-view-shell.md) | 118 | 18 | 40 | 10 | 42 | 2 | 6 | 0 | 22% | 39% |
 | [40 Patient summary](40-patient-summary.md) | 92 | 51 | 25 | 2 | 9 | 4 | 1 | 0 | 61% | 74% |
 | [41 Patient tabs](41-patient-tabs.md) | 81 | 30 | 18 | 4 | 26 | 0 | 3 | 0 | 41% | 52% |
-| **Results** | 718 | 206 | 216 | 86 | 152 | 18 | 31 | 8 | 36% | 51% |
+| **Results** | 718 | 205 | 219 | 84 | 152 | 18 | 31 | 8 | 35% | 51% |
 | **Comparison** | 161 | 24 | 59 | 39 | 29 | 2 | 7 | 1 | 20% | 39% |
 | **Study View** | 253 | 59 | 87 | 23 | 71 | 5 | 8 | 0 | 28% | 46% |
 | **Patient** | 173 | 81 | 43 | 6 | 35 | 4 | 4 | 0 | 51% | 64% |
-| **All** | **1,305** | 383 | 392 | 154 | 287 | 32 | 47 | 9 | **35%** | **50%** |
+| **All** | **1,305** | 382 | 395 | 152 | 287 | 32 | 47 | 9 | **35%** | **50%** |
 
 One legacy bug is reproduced in cBioLab, and is not counted as a match:
 - ~~05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).~~ Fixed rather than copied (#250); re-scored 2026-11-16.
