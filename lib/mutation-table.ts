@@ -16,7 +16,7 @@ import { annotatingSql, offeredSources, unannotatedOrSql } from "./driver-sql.ts
 import { PUTATIVE_DRIVER, type ResolvedDrivers } from "./driver-settings.ts";
 import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
-import { mutationTypeLabelSql } from "./mutation-type.ts";
+import { mutationTypeColumn } from "./mutation-type.ts";
 import { finiteSql } from "./sql-number.ts";
 import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
@@ -131,7 +131,7 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     case "gnomad": return { ...c, text: str("gnomadFreq"), num: "gnomadFreq" };
     case "dbsnp": return { ...c, text: "rsid", order: "nullIf(rsid, '')" };
     case "functionalImpact": return { ...c, text: "functionalImpact" };
-    case "mutationType": return { ...c, text: mutationTypeLabelSql("mutationType"), order: "nullIf(" + mutationTypeLabelSql("mutationType") + ", '')" };
+    case "mutationType": return { ...c, ...mutationTypeColumn("mutationType") };
     case "copyNumber": return { ...c, text: "copyNumber", order: "cnv" };
     case "exon": return { ...c, text: str("exon"), order: "toInt32OrNull(splitByChar('/', exon)[1])" };
     case "vafNormal": return { ...c, text: str("vafNormal"), num: num("vafNormal") };

@@ -427,16 +427,6 @@
                 "numeric": false
               },
               {
-                "id": "copy",
-                "name": "Copy #",
-                "numeric": false
-              },
-              {
-                "id": "freq",
-                "name": "Cohort %",
-                "numeric": true
-              },
-              {
                 "id": "vaf",
                 "name": "Allele Freq",
                 "numeric": true
@@ -449,6 +439,16 @@
               {
                 "id": "refCount",
                 "name": "Ref Reads",
+                "numeric": true
+              },
+              {
+                "id": "copy",
+                "name": "Copy #",
+                "numeric": false
+              },
+              {
+                "id": "freq",
+                "name": "Cohort %",
                 "numeric": true
               },
               {
@@ -498,9 +498,8 @@
               "proteinChange",
               "annotation",
               "mutationType",
-              "copy",
-              "freq",
-              "vaf"
+              "vaf",
+              "freq"
             ],
             "defaults": [
               "samples",
@@ -508,9 +507,8 @@
               "proteinChange",
               "annotation",
               "mutationType",
-              "copy",
-              "freq",
-              "vaf"
+              "vaf",
+              "freq"
             ],
             "query": {
               "filters": {
@@ -531,12 +529,12 @@
                   "KRAS",
                   "G12V",
                   "Oncogenic · Level 1",
-                  "Missense_Mutation",
-                  "",
-                  28.466453674121407,
+                  "Missense",
                   0.0758,
                   42,
                   512,
+                  "",
+                  28.466453674121407,
                   "SNP",
                   "12",
                   25398284,
@@ -553,7 +551,8 @@
                       "alt": 42,
                       "ref": 512
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -566,12 +565,12 @@
                   "PTEN",
                   "G127V",
                   "Likely Oncogenic · Level 1",
-                  "Missense_Mutation",
-                  "",
-                  4.788338658146965,
+                  "Missense",
                   0.6194,
                   262,
                   161,
+                  "",
+                  4.788338658146965,
                   "SNP",
                   "10",
                   89692896,
@@ -588,7 +587,8 @@
                       "alt": 262,
                       "ref": 161
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               },
               {
@@ -601,12 +601,12 @@
                   "TP53",
                   "P151R",
                   "Likely Oncogenic",
-                  "Missense_Mutation",
-                  "",
-                  52.412140575079874,
+                  "Missense",
                   0.761,
                   761,
                   239,
+                  "",
+                  52.412140575079874,
                   "SNP",
                   "17",
                   7578478,
@@ -623,7 +623,8 @@
                       "alt": 761,
                       "ref": 239
                     }
-                  ]
+                  ],
+                  "mutationType": "Missense_Mutation"
                 }
               }
             ],
@@ -1019,7 +1020,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them; Copy # on a mutation is the gene's deep calls anywhere in the patient. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "P-0024249 — Mutations: 3 of 7 rows (rows Annotation (OncoKB) contains “Oncogenic”); Copy Number Alterations: 3 rows; Structural Variants: 3 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it, or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 3,211 patients. Sorted by Structural Variants (highest first), missing values last, across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {

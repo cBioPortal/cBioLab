@@ -50,7 +50,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       // the portal's genomic overview: the patient's samples' mutations and copy-number segments along the genome, in IGV
       ...(data.held.includes("CNA") || data.held.includes("MUTATION") ? [v("Genomic overview", { kind: "segments", overview: true })] : []),
       // in sample mode, the sample's alterations alone, as the portal's sample view lists them
-      ...(genomic ? [v("Genomic alterations", { kind: "alterations", ...(q.sample ? { samples: "cohort" } : {}) })] : []),
+      // 10 rows a page, as the portal's patient tables page them (PAT-MT-1, PAT-CNA-3)
+      ...(genomic ? [v("Genomic alterations", { kind: "alterations", ...(q.sample ? { samples: "cohort" } : {}), mutations: { rows: 10 }, cna: { rows: 10 } })] : []),
     ] },
     // each mutation's allele frequency across the patient's samples, offered as the portal offers it: more than one sample in view and a mutation with a VAF
     ...(q.sample || !data.held.includes("MUTATION") || !((data.samples ?? 0) > 1) || data.vaf !== true ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
