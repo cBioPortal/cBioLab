@@ -1,6 +1,6 @@
 # Parity audit — Patient View › other tabs (spec `41-patient-tabs.md`)
 
-- **Date:** 2026-11-11
+- **Date:** 2026-11-11; re-measured 2026-11-18 against master `bc53b944` (dev server `http://127.0.0.1:3109`): P1 Genomic Evolution, Pathways, Clinical Data and P5 Mutational Signatures reloaded, the tab bar on P1–P4; no verdict changed
 - **cBioLab:** `session/spec` @ `f3197d75`, dev server `http://127.0.0.1:3156`
 - **Legacy:** cbioportal.org (Playwright, same day: page DOM + REST API)
 - **Code paths (cBioLab):** `app/portal/patient-layout.ts` (tabs, gating), `app/portal/PortalTabs.tsx`; Genomic Evolution `lib/views/evolution/{run,sql,figure,types}.ts`, `app/lab/evolution-body.tsx`; Pathways `lib/views/pathwaymap/*`, `app/lab/kinds/pathwaymap.tsx`, `lib/views/pathways`; Clinical Data `lib/views/table/*`; Mutational Signatures `lib/views/signatures/{run,data,figure,reference}.ts`, `app/lab/signatures-body.tsx`
@@ -36,22 +36,24 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
-| §0 TAB inventory | 5 | 1 | 3 | 0 | 0 | 0 | 1 | Different order and gating; placeholder tabs; `?tab=` not path |
+| §0 TAB inventory | 5 | 1 | 3 | 0 | 0 | 0 | 1 | Portal order and GE gating; Files & Links placeholder always; `?tab=` not path |
 | §1 GE core | 4 | 2 | 1 | 0 | 1 | 0 | 0 | Same mutation set and selection model; no unprofiled alert |
-| §1 GE line chart | 7 | 4 | 2 | 0 | 1 | 0 | 0 | Sequential/log/data-range present; no Group by, no timeline toggle |
-| §1 GE heatmap | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Mutation × sample fixed, oncoprint ramp, no cluster/transpose/zoom/download |
+| §1 GE line chart | 7 | 4 | 2 | 0 | 1 | 0 | 0 | Sequential/log/data-range, Group by, the timeline's axis; no timeline toggle, no "only selected" |
+| §1 GE heatmap | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Sample rows, the portal's VAF ramp, cluster/transpose/labels; no zoom/download |
 | §1 GE table | 1 | 0 | 0 | 1 | 0 | 0 | 0 | Own columns (VAF by sample, Max VAF); no "only selected" |
 | §2 Pathways | 4 | 0 | 2 | 2 | 0 | 0 | 0 | Same scores; numeric score not Yes/No; tie order → other default pathway |
-| §3 Clinical Data | 4 | 1 | 3 | 0 | 0 | 0 | 0 | Wide row-per-case tables; no timeline tables |
+| §3 Clinical Data | 4 | 1 | 3 | 0 | 0 | 0 | 0 | Attribute \| Value, Attribute × sample, Timeline Data tables; no 1-decimal, sorts, copy |
 | §4 Mutational Signatures | 7 | 6 | 1 | 0 | 0 | 0 | 0 | Close port; numbers identical; table paged |
 | §5 Resources, pathology, tissue, trials, custom | 10 | 0 | 0 | 0 | 10 | 0 | 0 | None built (tracked) |
 | §6 mRNA / Plots (beta) | 11 | 0 | 0 | 0 | 10 | 0 | 1 | None built (mRNA tracked) |
-| §7 Modes | 12 | 8 | 1 | 0 | 3 | 0 | 0 | Sample mode right; GE offered on 1-sample patients |
+| §7 Modes | 12 | 8 | 1 | 0 | 3 | 0 | 0 | Sample mode and GE gating right; no resources, download switch |
 | §9 Statistics | 12 | 6 | 3 | 1 | 1 | 0 | 1 | VAF and signature numbers identical; no clustering, no mRNA stats |
 
 ---
 
 ## 2. Top gaps (ranked by how often a portal user hits them)
+
+Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-decimal patient values, sorts and copy/download; 3 to zoom and download; 4 to the timeline toggle, "Show only selected" and axis titles; 9 closed (one page, download, whole %). 5, 6, 7, 8, 10–13 unchanged.
 
 | # | Gap | IDs | Tracked in PORTAL-PARITY.md |
 |---|---|---|---|
@@ -79,15 +81,15 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 | P1 VAF points (called, alt/ref) | STM-1 | 88 sample × mutation cells | 88 identical alt and ref; 144 "not found" = profiled VAF 0 | ✅ |
 | P1 sample x (time mode) | LC-4 | P04_Pri 0, Rec1 461, Rec2 1075, Rec3 1343 days (SPECIMEN) | days 0 / 461 / 1075 / 1343 | ✅ |
 | P1 pathway scores (TCGA-only) | STM-10 | TP53 Yes (TP53), Cell Cycle Yes (TP53), 8 × No | Cell Cycle 1, TP53 1 (TP53), 8 × 0 | 🟡 scores ✅; tie order and default pathway differ |
-| P1 Clinical Data samples | CD-3 | 4 sample columns, order Pri, Rec1, Rec2, Rec3 | 4 sample rows, same order | 🔶 layout only |
+| P1 Clinical Data samples | CD-3 | 4 sample columns, order Pri, Rec1, Rec2, Rec3 | 4 sample columns, same order (2026-11-18) | 🟡 |
 | P5 SBS contributions | STM-4 | SBS5 0.3618, SBS13 0.3437, SBS2 0.2746, SBS1 0.0199 (REST, 4 dp) → 36 / 34 / 27 / 2 % | 0.36181, 0.34369, 0.27459, 0.01991 → 36 / 34 / 27 / 2 %; zeros "<1%" | ✅ |
 | P5 signature rows | MS-7 | 65 | 65 | ✅ |
 | P5 SBS count | MS-4, STM-6 | 347 ("Sample: SP1003 \| Single Base Substitution (SBS) count: 347") | 347, same line | ✅ |
 | P5 SBS channels | STM-6 | 96 channel counts | 96, all equal | ✅ counts; % unrounded (🟡) |
 | P5 DBS | STM-4 | DBS2 1.0, count 1 | DBS offered as a version | ✅ (not drawn) |
 | P5 significance | STM-5 | no pvalue profile → nothing bold | "no p-values recorded", nothing bold | ✅ |
-| P2 tabs in sample mode | MD-1 | Summary, Pathways, Clinical Data | Summary, Pathways, Clinical Data, Files & Links, Clinical Trials (no GE) | ✅ GE hidden |
-| P3 GE on 1 sample | MD-2 | tab hidden | tab shown: "TCGA-A6-2671 has 1 sample; following mutations across samples needs at least two" | 🔶 |
+| P2 tabs in sample mode | MD-1 | Summary, Pathways, Clinical Data | Summary, Pathways, Clinical Data, Files & Links (no GE; 2026-11-18) | ✅ GE hidden |
+| P3 GE on 1 sample | MD-2 | tab hidden | tab hidden (2026-11-18; on the 11th shown, then refused) | ✅ |
 
 ---
 
@@ -225,5 +227,5 @@ Legacy GE/heatmap/signature UI details from the spec run (`…/scratchpad/PTB/`,
 
 ## 5. cBioLab bugs
 
-- **Genomic Evolution tab offered where it can only refuse** — single-sample patients (P3 TCGA-A6-2671, msk P-0000004) get the tab and a refusal; `patient-layout.ts:57` does not check ≥2 samples or allele counts, though the patient page knows the sample count.
+- ~~**Genomic Evolution tab offered where it can only refuse** — single-sample patients (P3 TCGA-A6-2671, msk P-0000004) get the tab and a refusal; `patient-layout.ts:57` does not check ≥2 samples or allele counts, though the patient page knows the sample count.~~ Fixed (2026-11-18: no GE tab on TCGA-A6-2671 or msk P-0000004).
 - No other behaviour broken on its own terms was found in these tabs.
