@@ -29,7 +29,7 @@ export function statusColumns(t: StatusTable, lines: { line: string; gene: strin
   const sample = { id: "sample", name: "Sample ID", numeric: false }, patient = { id: "patient", name: "Patient ID", numeric: false };
   if (t === "altered" || t === "unaltered") return [sample, patient];
   if (t === "matrix") return [sample, { id: "altered", name: "Altered (1 / 0 / NP)", numeric: false }, ...lineColumns(lines)];
-  return [sample, patient, { id: "altered", name: "Altered", numeric: false }, ...lineColumns(lines)];
+  return [{ id: "study", name: "Study ID", numeric: false }, sample, patient, { id: "altered", name: "Altered", numeric: false }, ...lineColumns(lines)];
 }
 export const STATUS_DEFAULTS = (t: StatusTable, lines: { line: string; gene: string }[]) => statusColumns(t, lines).map((c) => c.id);
 
@@ -55,9 +55,9 @@ function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan): { c
 }
 
 /**
- * One of the status tables over every (cohort, study) part: `cases` — each sample's status
- * ("altered", "unaltered" when profiled for every line's gene and data types, else "not profiled")
- * and per line the events it matched, "no alteration" or "not profiled" (profiled in none of the
+ * One of the status tables over every (cohort, study) part: `cases` — each sample's study and status
+ * as the portal's Altered column writes it (1 altered; 0 unaltered, when profiled for every line's gene
+ * and data types; else NP, where the portal writes 0 — a sample not profiled is not unaltered) and per line the events it matched, "no alteration" or "not profiled" (profiled in none of the
  * line's types); `altered` / `unaltered` — those samples alone; `matrix` — the portal's sample
  * matrix, 1 / 0 with NP where the sample is not profiled. Default order: altered first, then sample.
  */
@@ -74,16 +74,17 @@ export function statusRowSource(t: StatusTable, parts: TablePart[], lines: { lin
   const text = (c: FileColumn): string => {
     if (c.id === "sample") return "sid";
     if (c.id === "patient") return "patient";
-    if (c.id === "altered") return t === "matrix" ? "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')" : "status";
+    if (c.id === "study") return "study";
+    if (c.id === "altered") return "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')";
     return (t === "matrix" ? "m" : "c") + lineIds.indexOf(c.id);
   };
   return {
     with: "WITH " + ctes + ",\n" +
       "base AS (\n" + union + "),\n" +
-      "rows AS (SELECT *, " + status + " AS status" + derived + ",\n    multiIf(status = 'altered', 0, status = 'unaltered', 1, 2) AS rank FROM base " + keep + ")\n",
+      "rows AS (SELECT *, " + status + " AS status" + derived + ",\n    multiIf(status = 'altered', 2, status = 'unaltered', 1, 0) AS rank FROM base " + keep + ")\n",
     columns: cols.map((c): QueryColumn => ({ ...c, text: text(c), ...(c.id === "altered" ? { order: "rank" } : {}) })),
     select: "*",
-    defaultOrder: "rank ASC",
+    defaultOrder: "rank DESC",
     tiebreak: "sid, ord",
   };
 }
