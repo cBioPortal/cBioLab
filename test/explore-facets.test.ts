@@ -975,3 +975,24 @@ describe("gene tables hold every gene", () => {
     assert.equal(r.mutatedGenes!.length, 600);
   });
 });
+
+describe("review of #276 (multi-study Freq): one attribute charted as different kinds", () => {
+  const part = (o: Partial<ExploreResult>): ExploreResult => ({
+    study: "s", draftCount: null, clinical: [], events: [], caseLists: [], profiles: [], gaProfiles: [], stats: { ms: 0 }, ...o,
+  } as ExploreResult);
+  const num = (samples?: number) => part({ study: "n", totals: { patients: 100, samples: 100 },
+    clinical: [{ attribute: "GRADE", per: "sample", kind: "num", patients: 30, min: 1, max: 3, median: 2, ...(samples != null ? { samples } : {}) }] });
+  const cat = (samples?: number) => part({ study: "c", totals: { patients: 100, samples: 100 },
+    clinical: [{ attribute: "GRADE", per: "sample", kind: "cat", patients: 10, values: [{ v: "G1", n: 10 }], ...(samples != null ? { samples } : {}) }] });
+  const grade = (ps: ExploreResult[]) => mergeExplore(ps).clinical.filter((c) => c.attribute === "GRADE");
+
+  test("the merged facet's samples is the sum over both studies", () => {
+    const f = grade([num(30), cat(12)]);
+    assert.equal(f.length, 1);
+    assert.equal(f[0].samples, 42);
+  });
+  test("when either study lacks samples, the merged facet has none", () => {
+    assert.equal(grade([num(30), cat()])[0].samples, undefined);
+    assert.equal(grade([num(), cat(12)])[0].samples, undefined);
+  });
+});

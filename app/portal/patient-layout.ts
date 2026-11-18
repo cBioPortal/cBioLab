@@ -57,8 +57,9 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
     // the portal's PathwayMapper tab: the pathway holding most of the patient's altered genes, then the canonical ten as bars
     ...(genomic ? [{ title: "Pathways", views: [v("Pathway diagram", { kind: "pathwaymap" }), v("Canonical pathways", { kind: "pathways", measure: "any" })] }] : []),
     { title: "Clinical Data", views: [
-      v("Patient", { kind: "table", unit: "patient" }),
-      v("Samples", { kind: "table", unit: "sample" }),
+      // as the portal lists them: Attribute | Value, and an attribute per row with a column per sample (PTB-CD-2, PTB-CD-3)
+      v("Patient", { kind: "table", unit: "patient", transpose: true }),
+      v("Samples", { kind: "table", unit: "sample", transpose: true, rows: 100 }),
       // the portal's "Timeline Data": the patient's events, a table per event type (PTB-CD-4)
       v("Timeline Data", { kind: "timeline", tables: true }),
     ] },

@@ -27,6 +27,11 @@ export interface AlterationsView extends TableQuery {
    * patient view) or only the cohort's ("cohort" — its sample view, for a cohort of one sample)
    */
   samples?: "patient" | "cohort";
+  /**
+   * the Mutations and CNA tables' rows: every one ("any", the default) or only those whose gene every
+   * sample in view was profiled for ("all") — the portal's "Genes profiled in any / all samples" (PAT-MT-6)
+   */
+  genesProfiled?: "any" | "all";
   /** each table's own query (the top-level columns/search/filters/sort are the patient list's) */
   mutations?: AlterationTableQuery;
   cna?: AlterationTableQuery;
@@ -46,6 +51,8 @@ export interface AlterationsResult extends TableRows<string | number | null> {
   position?: TimelineResult["position"];
   /** the patient's three tables; on a page or values request, only the one asked for */
   tables: Partial<Record<"mutations" | "cna" | "sv", TableRows<string | number | null>>>;
+  /** whether the Mutations / CNA table holds a row whose gene some sample in view was not profiled for (the portal's "Different gene panels" menu); absent for a peer's patient */
+  mixedPanels?: { mutations: boolean; cna: boolean };
   /**
    * per table, whether the study holds the profile it reads (`study`) and which of the patient's
    * samples that profile holds (`profiled`): the portal's "Study is not profiled for …" and "Sample(s)

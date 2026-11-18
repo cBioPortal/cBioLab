@@ -165,7 +165,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS 
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,
        uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,
-       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND ((SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'msk_chord_2024_germline') = 0 OR sid IN (SELECT smp.stable_id FROM snapshot_db.sample_list sl JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = 'msk_chord_2024_germline'))) AS germline_samples
+       uniqExactIf(sid, (rgene = gene OR sv = 0) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND ((SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'msk_chord_2024_germline') = 0 OR sid IN (SELECT smp.stable_id FROM snapshot_db.sample_list sl JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = 'msk_chord_2024_germline'))) AS germline_samples
 FROM m GROUP BY gene
 
 -- view 0 hotspots: lollipop:types · msk_chord_2024

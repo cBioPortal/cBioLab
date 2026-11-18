@@ -19,7 +19,7 @@ import { DOC_VERSION } from "../../lib/doc-version.ts";
 import { cn } from "../../lib/cn";
 
 /** the lab's Explore, scoped to these studies */
-const exploreHref = (studies: string[]): string => "/lab?" + new URLSearchParams({ tab: "explore", study: studies.join(",") }).toString();
+export const exploreHref = (studies: string[]): string => "/lab?" + new URLSearchParams({ tab: "explore", study: studies.join(",") }).toString();
 /** a fresh analysis of all of one study, the document the lab's own "analyze" starts */
 const analyzeHref = (id: string): string => "/lab?" + new URLSearchParams({ tab: "analysis",
   doc: encodeParam({ dsl: DOC_VERSION, study: id, cohorts: { ["all of " + id]: { study: id, all: [] } }, views: [] }) }).toString();

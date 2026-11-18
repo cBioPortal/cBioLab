@@ -6,7 +6,7 @@
 // (app/lab/patient-nav.tsx); the cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { evolutionSvg, evolutionKey, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
+import { evolutionSvg, evolutionKey, portalCellTip, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
 import type { TableQuery } from "../../lib/types";
 import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../lib/views/evolution/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
@@ -162,11 +162,7 @@ const TIP_ROOM = 125;
 /** A mark's tooltip, as the portal's: the mutation, the sample, and its VAF with the reads behind it. */
 function EvolutionTip({ m, sample, s, x, y, below }: { m: EvolutionMutation; sample: EvolutionSample; s: number; x: number; y: number; below: boolean }) {
   const c = m.cells[s];
-  const reads = c.alt != null && c.ref != null ? " (" + c.alt.toLocaleString() + " reads of " + (c.alt + c.ref).toLocaleString() + " total)" : "";
-  const state = c.status === "called" ? "VAF: " + c.vaf!.toFixed(2) + reads
-    : c.status === "uncalled" ? "VAF: " + c.vaf!.toFixed(2) + reads + ", uncalled"
-    : c.status === "absent" ? "Not found (VAF 0)" + (c.alt != null && c.ref != null ? " in " + (c.alt + c.ref).toLocaleString() + " reads" : "")
-    : c.status === "noVaf" ? "Called, no allele counts" : "Not profiled for " + m.gene;
+  const state = portalCellTip(c, sample.id, m.gene);
   // kept inside the figure: shifted sideways near its edges, the arrow still on the point
   const el = useRef<HTMLDivElement>(null);
   const [shift, setShift] = useState(0);

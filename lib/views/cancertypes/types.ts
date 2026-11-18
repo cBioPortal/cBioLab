@@ -35,6 +35,8 @@ export interface CancertypesView {
   sort?: "alphabetical";
   /** draw percentages (default) or counts */
   show?: "frequency" | "count";
+  /** the portal's "Show Genomic Alteration Types": false draws one grey bar per group, its altered total, with no legend */
+  alterationTypes?: boolean;
   /** count patients (default, as the portal does — a patient counts in each group a sample of theirs is in) or samples */
   unit?: "patient" | "sample";
   /**
@@ -53,8 +55,11 @@ export interface CancertypesGroup {
   mutation: number; amp: number; homdel: number; sv: number; multiple: number;
   /** a line's EXP / PROT: mRNA and protein high and low */
   mrnaHigh?: number; mrnaLow?: number; protHigh?: number; protLow?: number;
-  /** units profiled for each data type at all (any gene) — the portal's "+" rows */
-  profiledFor?: { mutation: number; cna: number; sv: number };
+  /**
+   * units profiled for each data type — for this gene on a gene tab, for any queried gene on the genes
+   * together; mRNA and protein only when a line reads EXP / PROT — the portal's profiled-data strip
+   */
+  profiledFor?: { mutation: number; cna: number; sv: number; mrna?: number; prot?: number };
 }
 /** a panel's (or one gene tab's) drawn groups */
 export interface CancertypesGroups {
@@ -68,6 +73,12 @@ export interface CancertypesGroups {
 }
 export interface CancertypesPanel extends CancertypesGroups {
   cohort: string; samples: number; profiled: number; altered: number;
+  /**
+   * the profiled-data strip's rows: the data types the query reads (its OQL lines' alteration types — a bare
+   * gene mutation, copy number and structural variant — and mRNA / protein for an EXP / PROT line) that some
+   * unit of the cohort was profiled for, as the portal's rows are its selected profiles
+   */
+  profiledTypes?: (keyof NonNullable<CancertypesGroup["profiledFor"]>)[];
   /** the same, one gene at a time (the portal's per-gene tabs) */
   perGene?: ({ gene: string } & CancertypesGroups)[];
 }
@@ -75,6 +86,8 @@ export interface CancertypesResult {
   groupBy: string; measure: "driver" | "any"; genes: string[];
   /** the view's Min. # Total, or null for the default (each panel's `minSamples` is the one applied) */
   minSamples: number | null; minAltered: number; sort?: "alphabetical"; show: "frequency" | "count";
+  /** the bars drawn as one per group, without their alteration types */
+  alterationTypes?: false;
   unit: "patient" | "sample";
   panels: CancertypesPanel[];
   excluded?: { study: string; reason: string }[];

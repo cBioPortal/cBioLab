@@ -282,7 +282,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,
        uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,
-       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND ((SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'brca_tcga_pan_can_atlas_2018_germline') = 0 OR sid IN (SELECT smp.stable_id FROM snapshot_db.sample_list sl JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = 'brca_tcga_pan_can_atlas_2018_germline'))) AS germline_samples
+       uniqExactIf(sid, (rgene = gene OR sv = 0) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND ((SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'brca_tcga_pan_can_atlas_2018_germline') = 0 OR sid IN (SELECT smp.stable_id FROM snapshot_db.sample_list sl JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = 'brca_tcga_pan_can_atlas_2018_germline'))) AS germline_samples
 FROM m GROUP BY gene
 
 -- view 0 mutcompare: lollipop:totals · brca_tcga_pan_can_atlas_2018
@@ -325,7 +325,7 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
      kept AS (SELECT gene, pos, change FROM m GROUP BY gene, pos, change HAVING uniqExact(pid) >= 1)
 SELECT gene, uniqExactIf(pid, sv = 0) AS patients, uniqExactIf((pid, change), sv = 0) AS pairs,
        uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') = 0) AS somatic_samples,
-       uniqExactIf(sid, (sv = 0 OR rgene = gene) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND ((SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'brca_tcga_pan_can_atlas_2018_germline') = 0 OR sid IN (SELECT smp.stable_id FROM snapshot_db.sample_list sl JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = 'brca_tcga_pan_can_atlas_2018_germline'))) AS germline_samples
+       uniqExactIf(sid, (rgene = gene OR sv = 0) AND positionCaseInsensitive(ifNull(status, ''), 'germline') > 0 AND ((SELECT count() FROM snapshot_db.sample_list WHERE stable_id = 'brca_tcga_pan_can_atlas_2018_germline') = 0 OR sid IN (SELECT smp.stable_id FROM snapshot_db.sample_list sl JOIN snapshot_db.sample_list_list sll ON sll.list_id = sl.list_id JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id WHERE sl.stable_id = 'brca_tcga_pan_can_atlas_2018_germline'))) AS germline_samples
 FROM m GROUP BY gene
 
 -- view 0 mutcompare: lollipop:types · brca_tcga_pan_can_atlas_2018

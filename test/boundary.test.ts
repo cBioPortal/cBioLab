@@ -25,7 +25,7 @@ import {
   geneCountsSql, pairCountsSql,
   clinicalCountsSql, clinicalMomentsSql, clinicalHistogramSql, attributeQuantileSql, attributeCutsSql, momentPairsSql, variantCountsSql, geneMutationTotalsSql, profileMomentsSql,
   lollipopChangesSql, lollipopTypesSql, lollipopTotalsSql, cohortSampleCountSql, cohortSizesSql,
-  timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, logisticRowsSql,
+  timelineSpanSql, eventCourseSql, sequenceSql, sequenceKeysSql, logisticRowsSql, clinicalMetaSql,
   AggregateResolver, PatientLevelResolver, isPatientLevel
 } from "../lib/federation.ts";
 import * as federation from "../lib/federation.ts";
@@ -332,6 +332,8 @@ describe("federation SQL returns aggregates, never identifiers", () => {
   const BUILDERS: Record<string, () => string> = {
     // Plots: an axis selects (id, value) per case, but every builder here groups the id away.
   // If one ever projected a case id, this suite is what would stop it reaching a peer.
+  // a plot's and every view's clinical metadata: an attribute's type and display name, no case
+  "clinicalMetaSql": () => clinicalMetaSql(["MUTATION_COUNT", "SEX"], "x", "db"),
   "plotCountSql": () => plotCountSql(numAxis, catAxis, cohortSql, false),
   "plotCountSql:numeric": () => plotCountSql(numAxis, numAxis2, cohortSql, true),
   "plotStatsSql": () => plotStatsSql(numAxis, numAxis2, cohortSql),

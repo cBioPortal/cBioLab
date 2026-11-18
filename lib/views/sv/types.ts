@@ -27,6 +27,8 @@ export interface SvProfiled {
 
 export interface SvResult extends TableRows<string | number | null> {
   genes: string[];
+  /** rows beyond the first with one patient's same breakpoints (several samples), over every row: the portal's "includes N duplicate structural variants" (SV-STM-1); absent when none */
+  duplicates?: number;
   /** the OncoKB version the annotation column reads, or null when none is pinned */
   oncokbPin: string | null;
   /** the panel-aware counts behind the caveat; absent on a page or a column's values */

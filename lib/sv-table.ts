@@ -129,5 +129,7 @@ export function svRowSource(parts: TablePart[], db: string, genes: string[], pin
     // the portal's default: Annotation, descending (StructuralVariantTable 190-198)
     defaultOrder: SV_ANNOTATION_ORDER + " DESC, gene1, gene2",
     tiebreak: "sid, ord, svid",
+    // the same breakpoints in one patient's several samples (ResultsViewStructuralVariantMapperDataStore 34-50)
+    duplicateKey: "(study, patient, ifNull(toString(site1Chr), ''), ifNull(toString(site1Pos), ''), ifNull(toString(site2Chr), ''), ifNull(toString(site2Pos), ''))",
   };
 }

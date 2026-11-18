@@ -4,6 +4,7 @@ import { coxRegression, type CoxRow } from "../../stats.ts";
 import type { ViewResult } from "../../types.ts";
 import { isPatientLevel, type EndpointColumns } from "../../federation.ts";
 import { validateAxis, type AxisKind } from "../../plot.ts";
+import { titledAxes } from "../../clinical-titles.ts";
 import { type CoxTrace } from "../../method.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit, studyCatalogs, ATTR_NAME, assayEntitiesKnown } from "../shared.ts";
@@ -45,6 +46,8 @@ export async function runCox(view: DocView, c: ViewRun): Promise<ViewResult | Un
     covariates.forEach((cv, i) => validateAxis(cv, "covariate " + (i + 1)));
     const named = await assayEntitiesKnown(c, Object.fromEntries(covariates.map((cv, i) => ["covariate " + (i + 1), cv])), vStudies);
     covariates = covariates.map((cv, i) => named["covariate " + (i + 1)] || cv);
+    const titled = await titledAxes(Object.fromEntries(covariates.map((cv, i) => ["c" + i, cv])), resolvers, vStudies);
+    covariates = covariates.map((cv, i) => titled["c" + i] || cv);
   }
   catch (e) { return untimed({ kind: "cox", endpoint, error: (e as Error).message }); }
   const rawCutoff = cx.cutoffMonths;
