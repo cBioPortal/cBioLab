@@ -45,7 +45,7 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 | [10 Results › Download](10-results-download.md) | 41 | 7 | 21 | 6 | 4 | 1 | 2 | 0 | 24% | 50% |
 | [20 Comparison core](20-comparison-core.md) | 73 | 6 | 24 | 17 | 22 | 0 | 4 | 0 | 14% | 30% |
 | [21 Comparison molecular](21-comparison-molecular.md) | 88 | 18 | 35 | 22 | 7 | 2 | 3 | 1 | 26% | 46% |
-| [30 Study View summary](30-study-summary.md) | 135 | 48 | 40 | 14 | 28 | 3 | 2 | 0 | 39% | 54% |
+| [30 Study View summary](30-study-summary.md) | 135 | 41 | 47 | 13 | 29 | 3 | 2 | 0 | 34% | 51% |
 | [31 Study View shell](31-study-view-shell.md) | 118 | 24 | 34 | 9 | 43 | 5 | 3 | 0 | 27% | 42% |
 | [40 Patient summary](40-patient-summary.md) | 92 | 51 | 25 | 2 | 9 | 4 | 1 | 0 | 61% | 74% |
 | [41 Patient tabs](41-patient-tabs.md) | 81 | 30 | 18 | 4 | 26 | 0 | 3 | 0 | 41% | 52% |
