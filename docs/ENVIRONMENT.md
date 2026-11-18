@@ -155,6 +155,7 @@ cluster's SAML job refreshes every 3 h.
 |---|---|---|
 | `RESULT_CACHE` | on | `off`: answer every request directly, bypassing the result cache, to measure what a first reader waits for |
 | `RESULT_CACHE_MB` | `50` | the result cache's size in MB where it is process memory (anywhere but Vercel); read at server start |
+| `CLICKHOUSE_MATERIALIZED_CTE` | off | `1`: the plot queries compute each WITH subquery (the cohort, each axis) once per statement rather than wherever it is referenced (`AS MATERIALIZED`, sent with `enable_materialized_cte=1`, which ClickHouse marks experimental). Same answers, about half the time on a large cohort |
 | `CLICKHOUSE_MAX_INFLIGHT` | `8` | ClickHouse queries in flight at once per process; the rest queue (`docs/PERFORMANCE.md`) |
 | `EXPLORE_COHORT_EXTERNAL_LIMIT` | `50000` | the most patient ids Explore ships to ClickHouse for one draft cohort |
 | `EXPLORE_SCAN` | on | `off`: count a filtered Explore page chart by chart instead of with the single scan (`scanDraft`, lib/explore.ts); `always`: scan even below its 3 filter groups. For comparing the two |

@@ -378,6 +378,45 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
 ) GROUP BY id)
 SELECT xs.id AS id, xs.v AS x, ys.v AS y
 FROM xs INNER JOIN ys ON ys.id = xs.id
+LIMIT 10001
+
+-- view 0 plot: plot:highlight:points · luad_tcga_pan_can_atlas_2018
+WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018') WHERE sid IN (SELECT sid FROM ((SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
+    AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE startsWith(g.genetic_profile_stable_id, 'luad_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018'
+    AND g.hugo_gene_symbol IN ('TP53')
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
+     xs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
+SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'AGE' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'patient' AND replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort)
+  UNION ALL
+SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'AGE' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'sample' AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
+) GROUP BY id),
+     ys AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
+SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'patient' AND replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort)
+  UNION ALL
+SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'sample' AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
+) GROUP BY id)
+SELECT xs.id AS id, xs.v AS x, ys.v AS y
+FROM xs INNER JOIN ys ON ys.id = xs.id
 LIMIT 9843
 
 -- view 0 plot: plot:highlight:points · lusc_tcga_pan_can_atlas_2018
@@ -389,6 +428,45 @@ WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc
   WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('KRAS')
     AND ((g.hugo_gene_symbol = 'KRAS' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
+     xs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
+SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'AGE' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'patient' AND replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort)
+  UNION ALL
+SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'AGE' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'sample' AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
+) GROUP BY id),
+     ys AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
+SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'patient' AND replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT pid FROM cohort)
+  UNION ALL
+SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 0 AS pref
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
+    AND type = 'sample' AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
+) GROUP BY id)
+SELECT xs.id AS id, xs.v AS x, ys.v AS y
+FROM xs INNER JOIN ys ON ys.id = xs.id
+LIMIT 10001
+
+-- view 0 plot: plot:highlight:points · lusc_tcga_pan_can_atlas_2018
+WITH cohort AS (SELECT pid, sid FROM (SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018') WHERE sid IN (SELECT sid FROM ((SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
+    AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN ((SELECT DISTINCT replaceOne(g.sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS pid
+  FROM snapshot_db.genomic_event_derived g
+  WHERE startsWith(g.genetic_profile_stable_id, 'lusc_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018'
+    AND g.hugo_gene_symbol IN ('TP53')
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND g.variant_type = 'mutation' AND lower(g.mutation_type) != 'fusion')))))))),
      xs AS (SELECT id, if(countIf(pref = 1) > 0, anyIf(v, pref = 1), avgIf(v, pref = 0)) AS v FROM (
 SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id, if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) AS v, 1 AS pref
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type

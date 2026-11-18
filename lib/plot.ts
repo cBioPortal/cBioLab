@@ -13,7 +13,7 @@
 // Everything here is aggregate-only: no query in this module projects an identifier. That is
 // what lets an aggregate-only participant answer a plot at all (see docs/DATA-BOUNDARY.md).
 import { sq, genomicStudySql } from "./compiler.ts";
-import { DB } from "./ch.ts";
+import { DB, cte } from "./ch.ts";
 import { STYLE } from "./oncoprint-style.ts";
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
 import { driverCondSql } from "./driver-sql.ts";
@@ -655,9 +655,9 @@ export function keptCategoriesSql(sel: string, categories: string[]): string {
 }
 
 const pairCte = (x: string, y: string, cohortSql: string) =>
-  "WITH cohort AS (" + cohortSql + "),\n" +
-  "     xs AS (" + x + "),\n" +
-  "     ys AS (" + y + "),\n" +
+  "WITH " + cte("cohort", cohortSql) + ",\n" +
+  "     " + cte("xs", x) + ",\n" +
+  "     " + cte("ys", y) + ",\n" +
   "     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)\n";
 
 /**
@@ -673,7 +673,7 @@ export function plotCountSql(xSel: string, ySel: string, cohortSql: string, nume
 
 /** One numeric axis over the cohort: how many cases have it, its lowest value, and how many are below 0. Counts only. */
 export function plotNegativesSql(sel: string, cohortSql: string): AggregateSql {
-  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n     xs AS (" + sel + ")\n" +
+  return aggregateSql("WITH " + cte("cohort", cohortSql) + ",\n     " + cte("xs", sel) + "\n" +
     "SELECT count() AS n, min(v) AS lo, countIf(v < 0) AS neg FROM xs WHERE v IS NOT NULL");
 }
 
@@ -685,8 +685,8 @@ export function plotNegativesSql(sel: string, cohortSql: string): AggregateSql {
 export function plotCoverageSql(xSel: string, ySel: string, ctx: AxisCtx): AggregateSql {
   // the cohort's samples, or (patient mode) their owners
   const universe = ctx.unit === "sample" ? "SELECT DISTINCT sid AS id FROM cohort" : "SELECT DISTINCT pid AS id FROM cohort";
-  return aggregateSql("WITH cohort AS (" + ctx.cohortSql + "),\n     cases AS (" + universe + "),\n" +
-    "     xs AS (" + xSel + "),\n     ys AS (" + ySel + ")\n" +
+  return aggregateSql("WITH " + cte("cohort", ctx.cohortSql) + ",\n     " + cte("cases", universe) + ",\n" +
+    "     " + cte("xs", xSel) + ",\n     " + cte("ys", ySel) + "\n" +
     "SELECT count() AS total, countIf(id IN (SELECT id FROM xs)) AS nx, countIf(id IN (SELECT id FROM ys)) AS ny" +
     // patients with more than one sample IN THE COHORT: the ones whose samples a point combines
     (ctx.unit === "sample" ? "" : ",\n  (SELECT count() FROM (SELECT pid FROM cohort GROUP BY pid HAVING uniqExact(sid) > 1)) AS multi") +
@@ -820,9 +820,9 @@ function num(x: number): string {
  * even n. A group of one has no quartiles there (no box); here q1 = q3 = its value.
  */
 export function plotBoxSql(numSel: string, catSel: string, cohortSql: string): AggregateSql {
-  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n" +
-    "     vs AS (" + numSel + "),\n" +
-    "     gs AS (" + catSel + ")\n" +
+  return aggregateSql("WITH " + cte("cohort", cohortSql) + ",\n" +
+    "     " + cte("vs", numSel) + ",\n" +
+    "     " + cte("gs", catSel) + "\n" +
     "SELECT g, n, s[1] AS lo, s[n] AS hi,\n" +
     "       [s[greatest(1, intDiv(n + 2, 4))],\n" +
     "        if(n % 2 = 1, s[intDiv(n + 1, 2)], (s[intDiv(n, 2)] + s[intDiv(n, 2) + 1]) / 2),\n" +
@@ -851,9 +851,9 @@ export function plotViolinSql(numSel: string, catSel: string, cohortSql: string,
   // is drawn between its whiskers, and the renderer clips whatever falls outside.
   // With a colour, the density splits by class: the key gains one dimension and the payload
   // stays bounded by groups x bins x classes rather than by the cohort.
-  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n" +
-    "     vs AS (" + numSel + "),\n" +
-    "     gs AS (" + catSel + ")" + (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") + ",\n" +
+  return aggregateSql("WITH " + cte("cohort", cohortSql) + ",\n" +
+    "     " + cte("vs", numSel) + ",\n" +
+    "     " + cte("gs", catSel) + (colorSel ? ",\n     " + cte("cs", colorSel) : "") + ",\n" +
     "     j AS (SELECT gs.v AS g, vs.v AS x" + (colorSel ? ", cs.v AS c" : "") + " FROM vs INNER JOIN gs ON gs.id = vs.id" +
       (colorSel ? "\n            LEFT JOIN cs ON cs.id = vs.id" : "") + "),\n" +
     eCte +
@@ -907,11 +907,11 @@ export function outlierExtremity(v: number, w: Whiskers): number {
 
 /** a box's cases and their values, the start of both points queries */
 function boxCasesHead(numSel: string, catSel: string, cohortSql: string, colorSel?: string, ringSel?: string, extra = ""): string {
-  return "WITH cohort AS (" + cohortSql + "),\n" +
-    "     vs AS (" + numSel + "),\n" +
-    "     gs AS (" + catSel + ")" +
-    (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") +
-    (ringSel ? ",\n     rs AS (" + ringSel + ")" : "") + "\n" +
+  return "WITH " + cte("cohort", cohortSql) + ",\n" +
+    "     " + cte("vs", numSel) + ",\n" +
+    "     " + cte("gs", catSel) +
+    (colorSel ? ",\n     " + cte("cs", colorSel) : "") +
+    (ringSel ? ",\n     " + cte("rs", ringSel) : "") + "\n" +
     "SELECT vs.id AS id, gs.v AS g, vs.v AS v" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + extra + "\n" +
     "FROM vs INNER JOIN gs ON gs.id = vs.id" +
     (colorSel ? "\n  LEFT JOIN cs ON cs.id = vs.id" : "") +
@@ -945,9 +945,9 @@ export function plotRankedPointsSql(xSel: string, ySel: string, cohortSql: strin
 
 /** the pair of axes per case, keeping the case id: the start of every id-returning plot query */
 const pairIdCte = (x: string, y: string, cohortSql: string) =>
-  "WITH cohort AS (" + cohortSql + "),\n" +
-  "     xs AS (" + x + "),\n" +
-  "     ys AS (" + y + "),\n" +
+  "WITH " + cte("cohort", cohortSql) + ",\n" +
+  "     " + cte("xs", x) + ",\n" +
+  "     " + cte("ys", y) + ",\n" +
   "     pair AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id)\n";
 
 /** one group's whiskers, which is all a box's outlier query needs to know about it */
@@ -993,10 +993,10 @@ export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: stri
   sparse?: SparseCells, colorSel?: string, ringSel?: string): PatientSql {
   const limit = "LIMIT " + (Math.max(1, Math.min(50000, Math.round(cap))) + 1);
   // each case's fill and ring category, as a box's points carry them; "" where it has none
-  if (!sparse) return patientSql("WITH cohort AS (" + cohortSql + "),\n" +
-    "     xs AS (" + xSel + "),\n" +
-    "     ys AS (" + ySel + ")" +
-    (colorSel ? ",\n     cs AS (" + colorSel + ")" : "") + (ringSel ? ",\n     rs AS (" + ringSel + ")" : "") + "\n" +
+  if (!sparse) return patientSql("WITH " + cte("cohort", cohortSql) + ",\n" +
+    "     " + cte("xs", xSel) + ",\n" +
+    "     " + cte("ys", ySel) +
+    (colorSel ? ",\n     " + cte("cs", colorSel) : "") + (ringSel ? ",\n     " + cte("rs", ringSel) : "") + "\n" +
     "SELECT xs.id AS id, xs.v AS x, ys.v AS y" + (colorSel ? ", cs.v AS c" : "") + (ringSel ? ", rs.v AS r" : "") + "\n" +
     "FROM xs INNER JOIN ys ON ys.id = xs.id" +
     (colorSel ? "\nLEFT JOIN cs ON cs.id = xs.id" : "") + (ringSel ? "\nLEFT JOIN rs ON rs.id = xs.id" : "") + "\n" + limit);
@@ -1004,9 +1004,9 @@ export function plotScatterPointsSql(xSel: string, ySel: string, cohortSql: stri
   // bins the density over the same extent and grid
   const [bx, by] = clampGrid(sparse.grid), e = sparse.extent;
   if (!(sparse.cellMax >= 1)) throw new Error("plotScatterPointsSql: cellMax must be at least 1");
-  return patientSql("WITH cohort AS (" + cohortSql + "),\n" +
-    "     xs AS (" + xSel + "),\n" +
-    "     ys AS (" + ySel + "),\n" +
+  return patientSql("WITH " + cte("cohort", cohortSql) + ",\n" +
+    "     " + cte("xs", xSel) + ",\n" +
+    "     " + cte("ys", ySel) + ",\n" +
     "     e AS (SELECT " + num(e.x0) + " AS x0, " + num(e.x1) + " AS x1, " + num(e.y0) + " AS y0, " + num(e.y1) + " AS y1),\n" +
     "     c AS (SELECT xs.id AS id, xs.v AS x, ys.v AS y, " + binIndex("x", bx) + " AS bx, " + binIndex("y", by) + " AS by\n" +
     "           FROM xs INNER JOIN ys ON ys.id = xs.id, e),\n" +

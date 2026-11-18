@@ -119,7 +119,7 @@ async function exploreFor(body: any) {
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
     ? await buildExplore({ study: local[0], draft, oncokbPin: pin, geneSearch, attributes, geneCharts, derived, drivers, bins: body.bins,
-        ...oneProfiles, conn: connByStudy.get(local[0]) })
+        ...oneProfiles, conn: connByStudy.get(local[0]), attributesOnly: body.attributesOnly === true && studies.length === 1 })
     : await buildExploreFederated({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived, drivers, bins: body.bins });
   const assayFacets = body.assayCharts && body.assayCharts.length
     ? await buildAssayFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy,
