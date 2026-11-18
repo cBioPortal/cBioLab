@@ -43,17 +43,17 @@ Untracked gaps and the cBioLab bugs found are carried into [`../../PORTAL-PARITY
 | [08 CN Segments](08-cn-segments.md) | 29 | 6 | 9 | 4 | 5 | 3 | 1 | 1 | 34% | 50% |
 | [09 Pathways](09-pathways.md) | 33 | 5 | 12 | 3 | 6 | 2 | 4 | 0 | 33% | 52% |
 | [10 Results › Download](10-results-download.md) | 41 | 7 | 21 | 6 | 4 | 1 | 2 | 0 | 24% | 50% |
-| [20 Comparison core](20-comparison-core.md) | 73 | 6 | 24 | 17 | 22 | 0 | 4 | 0 | 14% | 30% |
-| [21 Comparison molecular](21-comparison-molecular.md) | 88 | 18 | 35 | 22 | 7 | 2 | 3 | 1 | 26% | 46% |
+| [20 Comparison core](20-comparison-core.md) | 73 | 11 | 30 | 8 | 20 | 0 | 4 | 0 | 21% | 41% |
+| [21 Comparison molecular](21-comparison-molecular.md) | 88 | 22 | 37 | 16 | 7 | 2 | 3 | 1 | 31% | 52% |
 | [30 Study View summary](30-study-summary.md) | 135 | 48 | 40 | 14 | 28 | 3 | 2 | 0 | 39% | 54% |
 | [31 Study View shell](31-study-view-shell.md) | 118 | 24 | 34 | 9 | 43 | 5 | 3 | 0 | 27% | 42% |
 | [40 Patient summary](40-patient-summary.md) | 92 | 51 | 25 | 2 | 9 | 4 | 1 | 0 | 61% | 74% |
 | [41 Patient tabs](41-patient-tabs.md) | 81 | 30 | 18 | 4 | 26 | 0 | 3 | 0 | 41% | 52% |
 | **Results** | 718 | 190 | 212 | 99 | 159 | 18 | 31 | 8 | 33% | 48% |
-| **Comparison** | 161 | 24 | 59 | 39 | 29 | 2 | 7 | 1 | 20% | 39% |
+| **Comparison** | 161 | 33 | 67 | 24 | 27 | 2 | 7 | 1 | 26% | 47% |
 | **Study View** | 253 | 72 | 74 | 23 | 71 | 8 | 5 | 0 | 34% | 48% |
 | **Patient** | 173 | 81 | 43 | 6 | 35 | 4 | 4 | 0 | 51% | 64% |
-| **All** | **1,305** | 367 | 388 | 167 | 294 | 32 | 47 | 9 | **34%** | **49%** |
+| **All** | **1,305** | 376 | 396 | 152 | 292 | 32 | 47 | 9 | **35%** | **50%** |
 
 One legacy bug is reproduced in cBioLab, and is not counted as a match:
 - ~~05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).~~ Fixed rather than copied (#250); re-scored 2026-11-16.
