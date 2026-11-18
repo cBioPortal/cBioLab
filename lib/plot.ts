@@ -624,6 +624,36 @@ function copyNumberSvSelect(gene: string, ctx: AxisCtx): string {
 
 // ---- the pair, and the four contracts -------------------------------------
 
+/**
+ * The request's two axes as selects, a box's categorical one narrowed to the request's
+ * `categories` (the portal's "Filter categories", PLT-AX-9). Every query over the pair reads them,
+ * so the boxes, their density, the points, the outliers and the ranked and cohort layers all count
+ * the kept categories alone. Coverage reads axisSelect itself: a case the filter leaves out still
+ * has a value on both axes. No categories, or an empty list, keeps every one; categories on a pair
+ * that is not a box is refused.
+ */
+export function plotSelects(spec: PlotRequest, ctx: AxisCtx, xk: AxisKind, yk: AxisKind): { xSel: string; ySel: string } {
+  const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+  const cats = spec.categories;
+  if (!cats || !cats.length) return { xSel, ySel };
+  const shape = plotShape(xk, yk);
+  if (shape !== "box") throw new Error("categories filters a box plot's boxes; this pair is drawn as a " + (shape === "table" ? "contingency table" : shape));
+  return xk === "cat" ? { xSel: keptCategoriesSql(xSel, cats), ySel } : { xSel, ySel: keptCategoriesSql(ySel, cats) };
+}
+
+/** a request's `categories`, checked: at most CATEGORY_CAP strings, each once; undefined for none or an empty list */
+export function plotCategoriesOf(raw: unknown): string[] | undefined {
+  if (raw == null) return undefined;
+  if (!Array.isArray(raw) || raw.some((x) => typeof x !== "string")) throw new Error("categories lists the categories whose boxes are drawn, as strings");
+  if (raw.length > CATEGORY_CAP) throw new Error("categories takes at most " + CATEGORY_CAP + " categories; this lists " + raw.length);
+  return raw.length ? [...new Set(raw as string[])] : undefined;
+}
+
+/** a categorical axis's select, keeping only the cases whose category is one of `categories` */
+export function keptCategoriesSql(sel: string, categories: string[]): string {
+  return "SELECT id, v FROM (" + sel + ") WHERE toString(v) IN (" + categories.map((c) => sq(String(c))).join(", ") + ")";
+}
+
 const pairCte = (x: string, y: string, cohortSql: string) =>
   "WITH cohort AS (" + cohortSql + "),\n" +
   "     xs AS (" + x + "),\n" +
@@ -677,14 +707,16 @@ export function combineNote(d: PlotData, unit: "patient" | "sample"): string {
 /** The sentence a plot leads its caption with when the pair left cases out; empty when none were. */
 export function coverageNote(d: PlotData, unit: "patient" | "sample"): string {
   const c = d.coverage;
-  if (!c || !(c.total > d.n)) return "";
+  // a box filtered to some categories counts its pairs before the filter: a case it leaves out has both values
+  const both = d.filtered ? d.filtered.paired : d.n;
+  if (!c || !(c.total > both)) return "";
   const f = (n: number) => n.toLocaleString("en-US");
   const miss = [
     c.total - c.nx > 0 ? f(c.total - c.nx) + " have no " + d.x.label : "",
     c.total - c.ny > 0 ? f(c.total - c.ny) + " have no " + d.y.label : ""
   ].filter(Boolean);
-  return f(d.n) + " of " + f(c.total) + " " + unit + "s have a value on both axes" +
-    (miss.length ? " (" + miss.join("; ") + ")" : "") + "; only those are drawn.";
+  return f(both) + " of " + f(c.total) + " " + unit + "s have a value on both axes" +
+    (miss.length ? " (" + miss.join("; ") + ")" : "") + "; only those " + (d.filtered ? "can be" : "are") + " drawn.";
 }
 
 /**
@@ -1206,6 +1238,8 @@ export interface PlotRequest {
   range?: PlotRange;
   /** colour the values by a category: the fill, and optionally a ring, as the portal does */
   colorBy?: PlotAxis; ringBy?: PlotAxis;
+  /** a box's "Filter categories": the categories of its categorical axis it is drawn over (plotSelects); absent or empty, all */
+  categories?: string[];
 }
 /** one highlighted case: a scatter's (x, y), or a box's group and value */
 export type HighlightPoint = { id: string; x: number; y: number } | { id: string; g: string; v: number };
@@ -1244,6 +1278,13 @@ export interface PlotData {
   categoryNote?: string;
   /** a box plot's categories before its filter, alphabetical: what "Filter categories" offers */
   categoryOptions?: string[];
+  /**
+   * A box drawn over the view's `categories` alone: the categories asked for, and how many cases
+   * have a value on both axes before the filter (`n` counts the kept categories' cases)
+   */
+  filtered?: { categories: string[]; paired: number };
+  /** the boxes are ordered by their raw values' median, lowest first (the view's `sortByMedian`) */
+  sortedByMedian?: boolean;
   /** a gene's copy-number ring draws Diploid and Not profiled too (the portal's grey and black strokes), where another ring leaves absence unringed */
   ringAbsent?: boolean;
   /** why the points carry no colour though the view asks for one */

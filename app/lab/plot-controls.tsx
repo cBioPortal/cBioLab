@@ -18,6 +18,7 @@ import { CHIP, FIELD } from "../_ui/toolbar.ts";
 import { profileUse, type ProfileInfo } from "../../lib/profile-catalog.ts";
 import { DriverSettingsMenu } from "../_oncoprint/DriverSettingsMenu.tsx";
 import type { PlotData } from "../../lib/plot.ts";
+import { withAxis } from "../../lib/views/plot/axis-edit.ts";
 import { PlotHover } from "./plot-hover.tsx";
 import { DEFAULT_POINT_LAYERS, POINTS_CAP, LAYER_BASE, LAYER_COLORS, POINT_LAYER_CAP, POINT_RULE_N, POINT_RULE_N_MAX, layerLabel, type PointLayerSpec } from "../../lib/plot-layers.ts";
 
@@ -198,10 +199,13 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
   const unit = spec.unit || "sample";
   const axisFields = (side: "x" | "y") => <>
     <AxisPicker side={side} stacked axis={spec[side]} attrs={attrs} catalog={catalog} loading={loading} busy={busy}
-      onChange={(a) => update((vv) => ({ ...vv, [side]: withRnaSeqLog(a, vv[side], catalog) }))} />
+      onChange={(a) => update((vv) => withAxis(vv, side, withRnaSeqLog(a, vv[side], catalog)))} />
     <LogToggle spec={spec} side={side} numeric={plot?.[side].kind === "num"} off={plot?.logOff?.[side]} busy={busy} update={update} />
   </>;
   const total = plot?.coverage?.total;
+  // a box's categories, and any the view names that this cohort lacks, so each can be unticked
+  const categoryOptions = plot?.shape === "box" && spec.x?.source !== "cohort" && plot.categoryOptions?.length
+    ? [...new Set([...plot.categoryOptions, ...(Array.isArray(spec.categories) ? spec.categories as string[] : [])])] : [];
   // Points is a choice only where the cases can be drawn: past the cap, or where a study may not
   // show them (a result asked for every case and got none), the plot is a density whatever the view says
   const pointsWhy = !plot ? null
@@ -240,19 +244,19 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
                 Show Regression Line
               </label>
             )}
-            {plot?.shape === "box" && (plot.categoryOptions?.length || 0) > 0 && (
+            {categoryOptions.length > 0 && (
               <div className="axfield flex flex-col gap-1">
                 <span className="axfield-name text-sm font-semibold text-foreground">Filter categories</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button type="button" variant="outline" size="sm" className="plot-categories justify-between" disabled={busy}
                       data-tip="draw only the boxes of the categories ticked here; none ticked draws them all">
-                      {spec.categories?.length ? spec.categories.length + " of " + plot.categoryOptions!.length : "all " + plot.categoryOptions!.length}
+                      {spec.categories?.length ? spec.categories.length + " of " + categoryOptions.length : "all " + categoryOptions.length}
                       <ChevronDown className="opacity-60" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="min-w-52 max-h-80 overflow-y-auto">
-                    {plot.categoryOptions!.map((g) => (
+                    {categoryOptions.map((g) => (
                       // stays open, so several can be ticked in one go
                       <DropdownMenuCheckboxItem key={g} checked={!!spec.categories?.includes(g)} onSelect={(e) => e.preventDefault()}
                         onCheckedChange={() => update((vv) => {
@@ -267,7 +271,7 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
                 </DropdownMenu>
               </div>
             )}
-            {plot?.shape === "box" && (plot.groups?.length || 0) > 1 && (
+            {plot?.shape === "box" && spec.x?.source !== "cohort" && (plot.groups?.length || 0) > 1 && (
               <label className="chk plot-sort-median text-md text-foreground" data-tip="order the boxes by their values' median, lowest first, as cBioPortal does">
                 <Checkbox checked={!!spec.sortByMedian} disabled={busy}
                   onCheckedChange={(c) => update((vv) => { const n = { ...vv }; if (c === true) n.sortByMedian = true; else delete n.sortByMedian; return n; })} />
@@ -314,7 +318,9 @@ export function PlotControls({ spec, plot, studies, attrs, catalog, loading, bus
         </aside>
         <div className="min-w-0">
           {plot && <p className="plot-showing m-0 mb-2.5 rounded-sm bg-muted px-2.5 py-1.5 text-md">
-            Showing {plot.n.toLocaleString()}{total != null && total > plot.n ? " of " + total.toLocaleString() : ""} {unit}{plot.n === 1 ? "" : "s"} with data on both axes
+            {plot.filtered
+              ? <>Showing {plot.n.toLocaleString()} of the {plot.filtered.paired.toLocaleString()} {unit}{plot.filtered.paired === 1 ? "" : "s"} with data on both axes: {plot.groups?.length || 0} of {plot.categoryOptions?.length || 0} categories</>
+              : <>Showing {plot.n.toLocaleString()}{total != null && total > plot.n ? " of " + total.toLocaleString() : ""} {unit}{plot.n === 1 ? "" : "s"} with data on both axes</>}
           </p>}
           {/* colour and ring split a box's violin and points and a scatter's points; a scatter drawn as
               density and a contingency have no per-case colour, and a density scatter says so */}

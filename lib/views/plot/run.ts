@@ -3,7 +3,7 @@
 import type { ViewResult } from "../../types.ts";
 import { pearsonR, regressionFromMoments, type Moments } from "../../stats.ts";
 import { plotCasesOf, hasFederatedPlot, legendFor, type Resolver, type FederatedPlotCapable, type PlotCasesCapable } from "../../federation.ts";
-import { fromLog, logRuleOf, logScaleExempt, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
+import { fromLog, logRuleOf, logScaleExempt, plotCategoriesOf, plotExtent, plotRangeOf, type LogRule, type PlotAxis, type PlotCell, type PlotRange } from "../../plot.ts";
 import { fitOf, portalBox, ringsAbsence, spearmanRho, corrPValue, AXIS_LABELS, DEFAULT_BINS, CATEGORY_CAP, POINTS_CAP, OUTLIER_CELL_MAX, VIOLIN_BINS, axisLabel, outlierExtremity, tukey, coverageNote, combineNote, sparseCellMax,
   type AxisKind, type HighlightPoint, type PlotData, type PlotGroup, type PlotLayer, type PlotPoint, type PlotRequest, type PointRank,
   type ViolinBin, type Whiskers } from "../../plot.ts";
@@ -226,54 +226,79 @@ function densityNote(data: PlotData, unit: "patient" | "sample"): string {
   return lead + (why && why !== "allPoints: false" && !why.startsWith("more than") ? " No case is drawn as a point: " + why + "." : "");
 }
 
-/** a box plot's point layers without the cases of the categories its filter leaves out */
-function keptLayers(ls: PlotLayer[], data: PlotData, pv: PlotView): PlotLayer[] {
-  if (data.shape !== "box" || !pv.categories || !pv.categories.length) return ls;
-  const keep = new Set(pv.categories);
-  const inKept = (p: HighlightPoint) => !("g" in p) || keep.has(p.g);
-  return ls.map((l) => {
-    const keptShared = (l.shared || []).map((p, i) => [p, i] as const).filter(([p]) => inKept(p));
-    return { ...l, ...(l.points ? { points: l.points.filter(inKept) } : {}),
-      ...(l.shared ? { shared: keptShared.map(([p]) => p), ...(l.sharedOwners ? { sharedOwners: keptShared.map(([, i]) => l.sharedOwners![i]) } : {}) } : {}) };
-  });
-}
-
-/** what is wrong with the view's category filter, or null */
-function categoriesProblem(pv: PlotView): string | null {
-  const cats = pv.categories;
-  if (cats != null && (!Array.isArray(cats) || cats.some((x) => typeof x !== "string")))
-    return "categories lists the categories whose boxes are drawn, as strings";
-  if (cats && cats.length > CATEGORY_CAP) return "categories takes at most " + CATEGORY_CAP + " categories; this lists " + cats.length;
+/** what is wrong with the view's box settings, before anything is queried; null when nothing is */
+function boxChoicesProblem(pv: PlotView): string | null {
+  if (pv.sortByMedian != null && typeof pv.sortByMedian !== "boolean") return "sortByMedian: give true or false";
+  try { plotCategoriesOf(pv.categories); } catch (e) { return String((e as Error).message || e); }
   return null;
 }
 
+/** whether the view asks for a box's category filter or median order, which only a box plot takes */
+const wantsBoxChoices = (pv: PlotView): boolean =>
+  !!pv.sortByMedian || (Array.isArray(pv.categories) ? pv.categories.length > 0 : pv.categories != null);
+
+/** the refusal of a box's settings on a pair drawn as another shape, naming what the view asked for */
+function notABox(pv: PlotView, k: { shape: string; xLabel: string; yLabel: string }): string {
+  const asked = [pv.categories && pv.categories.length ? "categories" : "", pv.sortByMedian ? "sortByMedian" : ""].filter(Boolean).join(" and ");
+  return asked + " " + (asked.includes(" and ") ? "apply" : "applies") + " to a box plot (one categorical axis and one numeric), as cBioPortal's " +
+    "Filter categories and Sort Categories by Median do; " + k.xLabel + " against " + k.yLabel + " is drawn as a " +
+    (k.shape === "table" ? "contingency table" : k.shape) + ". Leave " + (asked.includes(" and ") ? "them" : "it") + " out of the view.";
+}
+
 /**
- * A box plot's "Filter categories" and "Sort Categories by Median", after the category order, as
- * the portal applies them (PlotsTab.tsx:5396-5419): only the chosen categories' boxes and points;
- * then the boxes by ascending median of their raw values (a log axis's points converted back),
- * equal medians keeping the category order. A plot that is not a box refuses sortByMedian.
+ * Each category of a box's categorical axis with its cases, over every site and before the view's
+ * filter: what "Filter categories" offers, and how many cases have a value on both axes in all.
  */
-function applyCategoryChoices(data: PlotData, pv: PlotView): void {
-  if (pv.sortByMedian && data.shape !== "box") throw new Error("sortByMedian applies to a box plot; this pair is drawn as a " + data.shape);
+async function everyCategory(sites: string[], fr: Record<string, Resolver & FederatedPlotCapable>, def: Def, spec: PlotRequest,
+  xk: AxisKind, yk: AxisKind): Promise<Map<string, number>> {
+  const open = { ...spec };
+  delete open.categories;
+  const all = new Map<string, number>();
+  for (const rows of await Promise.all(sites.map((s) => fr[s].plotBoxRows(def, open, xk, yk))))
+    for (const r of rows) all.set(r.g, (all.get(r.g) || 0) + r.n);
+  if (all.size > CATEGORY_CAP)
+    throw new Error("more than " + CATEGORY_CAP + " groups on the categorical axis; narrow the cohort or pick another attribute");
+  return all;
+}
+
+/** a participant's boxes under a category filter: one answering a category the view leaves out predates the filter, and is refused rather than drawn */
+function filterHonoured(groups: { g: string }[], categories: string[], site: string): void {
+  const keep = new Set(categories);
+  const stray = groups.find((g) => !keep.has(g.g));
+  if (stray) throw new Error(site + " answered a box for " + JSON.stringify(stray.g) + ", a category the view's filter leaves out: its participant predates Filter categories; update that instance");
+}
+
+/** at most eight names, quoted, then how many more */
+const nameList = (xs: string[]) => xs.slice(0, 8).map((x) => "\u201c" + x + "\u201d").join(", ") + (xs.length > 8 ? " and " + (xs.length - 8) + " more" : "");
+
+/**
+ * A box plot's "Filter categories" and "Sort Categories by Median", as the portal applies them
+ * (PlotsTab.tsx:5396-5419). The filter is already in every query (plotSelects): this says what it
+ * kept, out of `every` category (each with its cases, before the filter). Then the boxes by
+ * ascending median of their raw values (a log axis's points converted back), equal medians keeping
+ * the category order (PLT-STM-9).
+ */
+function boxChoices(data: PlotData, pv: PlotView, categories: string[] | undefined, every: Map<string, number> | undefined, unit: "patient" | "sample"): void {
   if (data.shape !== "box" || !data.groups) return;
+  const all = every ?? new Map(data.groups.map((g) => [g.g, g.n]));
   // every category, for the filter to offer: alphabetical, as the portal lists them
-  data.categoryOptions = data.groups.map((g) => g.g).sort(alpha);
+  data.categoryOptions = [...all.keys()].sort(alpha);
   const notes: string[] = [];
-  const keep = pv.categories && pv.categories.length ? new Set(pv.categories) : null;
-  if (keep) {
-    const kept = data.groups.filter((g) => keep.has(g.g));
-    if (!kept.length) notes.push("None of the chosen categories (" + pv.categories!.slice(0, 8).join(", ") + (pv.categories!.length > 8 ? ", …" : "") + ") is in the plot.");
-    else notes.push("Filtered to " + kept.length + " of " + data.groups.length + " categories: " + kept.map((g) => g.g).join(", ") + ".");
-    data.groups = kept;
-    data.n = kept.reduce((a, g) => a + g.n, 0);
-    if (data.points) data.points = data.points.filter((p) => keep.has(p.g));
-    if (data.violin) data.violin = data.violin.filter((v) => keep.has(v.g));
+  if (categories) {
+    const paired = [...all.values()].reduce((a, n) => a + n, 0);
+    data.filtered = { categories, paired };
+    const kept = data.groups.map((g) => g.g);
+    const absent = categories.filter((g) => !all.has(g));
+    const cat = data.x.kind === "cat" ? data.x.label : data.y.label;
+    if (!kept.length) notes.push("None of the chosen categories (" + nameList(categories) + ") is in the plot, so it draws nothing.");
+    else notes.push("Filter categories: " + kept.length + " of " + all.size + " categories of " + cat + " drawn (" + nameList(kept) + "), " +
+      fmt(data.n) + " of the " + fmt(paired) + " " + unit + "s with a value on both axes; the boxes, points and point layers are over those alone.");
+    if (absent.length && kept.length) notes.push(nameList(absent) + (absent.length === 1 ? " is" : " are") + " not a category of " + cat + " here.");
   }
   if (pv.sortByMedian && data.groups.length > 1) {
     // the raw values' median, from the points where they are drawn (a log axis's converted back);
     // without points, the box's own median, which a log scale orders the same way but for an even count
-    const numSide = data.x.kind === "num" ? data.x : data.y;
-    const rule = numSide.log;
+    const rule = (data.x.kind === "num" ? data.x : data.y).log;
     const byGroup = new Map<string, number[]>();
     for (const p of data.points || []) (byGroup.get(p.g) ?? byGroup.set(p.g, []).get(p.g)!).push(rule ? fromLog(rule, p.v) : p.v);
     const medianOf = (g: PlotGroup) => {
@@ -282,7 +307,7 @@ function applyCategoryChoices(data: PlotData, pv: PlotView): void {
     };
     const at = new Map(data.groups.map((g, i) => [g.g, i]));
     data.groups = [...data.groups].sort((a, b) => medianOf(a) - medianOf(b) || at.get(a.g)! - at.get(b.g)!);
-    data.order = { ...(data.order || {}), [data.x.kind === "num" ? "y" : "x"]: data.groups.map((g) => g.g) };
+    data.sortedByMedian = true;
     notes.push("Boxes are ordered by their median, lowest first.");
   }
   if (notes.length) data.categoryNote = notes.join(" ");
@@ -612,6 +637,9 @@ async function runPlotByCohort(pv: PlotView, c: ViewRun): Promise<ViewResult | U
   const { cohorts, vNames, participationFor } = c;
   if (pv.colorBy || pv.ringBy || (Array.isArray(pv.points) && pv.points.length))
     return untimed({ kind: "plot", error: "a plot by cohort draws each cohort's cases plainly: colorBy, ringBy and point layers are not offered with it" });
+  if (wantsBoxChoices(pv))
+    return untimed({ kind: "plot", error: "a plot by cohort draws one box per cohort, and the view's cohorts choose them: categories and sortByMedian " +
+      "(Filter categories, Sort Categories by Median) apply to a box over a categorical axis, and are not offered with it" });
   if (!vNames.length) return untimed({ kind: "plot", error: "a plot by cohort needs the cohorts it compares" });
   const unit = pv.unit === "patient" ? "patient" as const : "sample" as const;
   const parts: PlotData[] = [];
@@ -705,6 +733,18 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   let spec = { x: axes.x, y: axes.y, unit,
     ...(axes.colorBy ? { colorBy: axes.colorBy } : {}), ...(axes.ringBy ? { ringBy: axes.ringBy } : {}), ...(range ? { range } : {}) };
+  const problem = layersProblem(pv, c, cn) ?? boxChoicesProblem(pv);
+  if (problem) return untimed({ kind: "plot", error: problem });
+  const categories = plotCategoriesOf(pv.categories);
+  // a box's category filter and median order are refused on another shape before any value is
+  // read: the shape follows from the axes' kinds, which the first study's metadata gives
+  let kinds: Awaited<ReturnType<FederatedPlotCapable["plotAxisKinds"]>> | undefined;
+  if (wantsBoxChoices(pv)) {
+    const r = resolvers[sites[0]];
+    if (!hasFederatedPlot(r)) return untimed({ kind: "plot", error: sites[0] + " cannot say what shape the plot is before drawing it, so categories and sortByMedian cannot be checked" });
+    try { kinds = await r.plotAxisKinds(spec); } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
+    if (kinds.shape !== "box") return untimed({ kind: "plot", error: notABox(pv, kinds) });
+  }
   let logs: LogChecks;
   try {
     logs = await checkLogScales(spec, sites, resolvers, doc.cohorts[cn]);
@@ -712,18 +752,21 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
   } catch (e) { return untimed({ kind: "plot", error: String((e as Error).message || e) }); }
   const bins: [number, number] = Array.isArray(pv.bins) && pv.bins.length === 2
     ? [Number(pv.bins[0]), Number(pv.bins[1])] : DEFAULT_BINS;
-  const problem = layersProblem(pv, c, cn) ?? categoriesProblem(pv);
-  if (problem) return untimed({ kind: "plot", error: problem });
+  // the request every query over the pair reads: a box's categories go with it (plotSelects)
+  const fspec: PlotRequest = categories ? { ...spec, categories } : spec;
+  const fr = resolvers as Record<string, Resolver & FederatedPlotCapable>;
   try {
     if (sites.length === 1) {
       const r0 = resolvers[sites[0]];
-      const data = await r0.plot(doc.cohorts[cn], { ...spec, bins: pv.bins ? bins : undefined });
+      const [data, every] = await Promise.all([r0.plot(doc.cohorts[cn], { ...fspec, bins: pv.bins ? bins : undefined }),
+        categories && kinds ? everyCategory(sites, fr, doc.cohorts[cn], spec, kinds.xk, kinds.yk) : undefined]);
+      if (categories) filterHonoured(data.groups || [], categories, sites[0]);
       if (!pv.regression) delete data.fit;
       orderLevels(data, spec);
-      await basePoints(pv, r0, doc.cohorts[cn], spec, data, sites[0]);
-      applyCategoryChoices(data, pv);
-      const ls = await pointLayers(pv, data, c, cn, sites, spec);
-      if (ls.length) data.layers = keptLayers(ls, data, pv);
+      await basePoints(pv, r0, doc.cohorts[cn], fspec, data, sites[0]);
+      boxChoices(data, pv, categories, every, unit);
+      const ls = await pointLayers(pv, data, c, cn, sites, fspec);
+      if (ls.length) data.layers = ls;
       if (data.n > POINTS_CAP && ls.some((l) => l.kind === "outliers" && l.shown === "points" && data.shape === "box")) data.overlay = "violin";
       markLogOff(data, logs);
       // what the pair left out leads: cases missing either axis are not on the figure at all
@@ -745,14 +788,14 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         return untimed({ kind: "plot", error: "a federated plot needs every participant to support it, and " +
           missing.join(", ") + " does not yet (a remote federation peer, most likely)." });
       }
-      const fr = resolvers as Record<string, Resolver & FederatedPlotCapable>;
-      const { xk, yk, shape, xLabel, yLabel, colorLabel: siteColorLabel } = await fr[sites[0]].plotAxisKinds(spec);
+      const { xk, yk, shape, xLabel, yLabel, colorLabel: siteColorLabel } = kinds ?? await fr[sites[0]].plotAxisKinds(spec);
       if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
       const lr = axisLogs(spec);
       const label = { x: { label: xLabel, kind: xk, ...(lr.x ? { log: lr.x } : {}) }, y: { label: yLabel, kind: yk, ...(lr.y ? { log: lr.y } : {}) } };
       const scaleNote = sites.length + " studies pooled (" + sites.join(", ") + ")";
       let data: PlotData;
       let moments: (Moments & { study: string })[] | undefined;
+      let every: Map<string, number> | undefined;
 
       if (shape === "scatter") {
         const extents = await Promise.all(sites.map((s) => fr[s].plotExtent(doc.cohorts[cn], spec, xk, yk)));
@@ -812,7 +855,11 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
             " site records it, so there is no shared-scale question here the way there is for a numeric axis." };
       } else {
         // box: numeric axis grouped by the categorical one, pooled per group
-        let groups = poolBoxRows(await Promise.all(sites.map((s) => fr[s].plotBoxRows(doc.cohorts[cn], spec, xk, yk))));
+        const [rows, all] = await Promise.all([Promise.all(sites.map((s) => fr[s].plotBoxRows(doc.cohorts[cn], fspec, xk, yk))),
+          categories ? everyCategory(sites, fr, doc.cohorts[cn], spec, xk, yk) : undefined]);
+        if (categories) rows.forEach((r, i) => filterHonoured(r, categories, sites[i]));
+        every = all;
+        let groups = poolBoxRows(rows);
         if (groups.length > CATEGORY_CAP)
           throw new Error("more than " + CATEGORY_CAP + " groups on the categorical axis; narrow the cohort or pick another attribute");
         const n = groups.reduce((a, g) => a + g.n, 0);
@@ -821,7 +868,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
         // past its cap answers null, and then no site's values are used.
         const closed = sites.filter((s) => !plotCasesOf(resolvers[s]));
         const perSite = closed.length ? [null] : await peerSafe(sites.map((s) => resolvers[s]),
-          () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotPoints(doc.cohorts[cn], spec, POOLED_VALUES_CAP))), () => [null]);
+          () => Promise.all(sites.map((s) => plotCasesOf(resolvers[s])!.plotPoints(doc.cohorts[cn], fspec, POOLED_VALUES_CAP))), () => [null]);
         const pts = perSite.every((p) => p) ? perSite.flatMap((p) => p!) : [];
         const exact = pts.length === n ? poolBoxValues(pts) : null;
         if (exact) groups = exact;
@@ -848,7 +895,7 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
           const { range, bins: vBins } = pooledViolinRange(groups);
           const box = data;
           await peerSafe(sites.map((s) => resolvers[s]), async () => {
-            const violin = poolViolin(await Promise.all(sites.map((s) => fr[s].plotViolinCounts(doc.cohorts[cn], spec, xk, yk, vBins, range))));
+            const violin = poolViolin(await Promise.all(sites.map((s) => fr[s].plotViolinCounts(doc.cohorts[cn], fspec, xk, yk, vBins, range))));
             box.violin = violin; box.violinBins = vBins; box.violinExtent = range; box.overlay = "violin";
             if (spec.colorBy) { box.colorLabel = spec.colorBy.source === "clinical" && !spec.colorBy.label && siteColorLabel ? siteColorLabel : axisLabel(spec.colorBy); box.legend = legendFor(violin.map((v) => v.c || ""), false, spec.colorBy); }
             box.note += " The density behind each box is binned by every site over one shared range, the pooled whiskers and up to" +
@@ -858,15 +905,15 @@ export async function runPlot(view: DocView, c: ViewRun): Promise<ViewResult | U
       }
 
       orderLevels(data, spec);
-      applyCategoryChoices(data, pv);
+      boxChoices(data, pv, categories, every, unit);
       // each site counts its own cases and their axes; the sums are exact. A failed count fails the
       // view: dropping the coverage note would hide how many cases the figure leaves out
       const covs = await Promise.all(sites.map((s) => fr[s].plotCoverage(doc.cohorts[cn], spec, xk, yk)));
       data.coverage = covs.reduce<NonNullable<PlotData["coverage"]>>(
         (a, c) => ({ total: a.total + c.total, nx: a.nx + c.nx, ny: a.ny + c.ny, ...(c.multi != null || a.multi != null ? { multi: (a.multi || 0) + (c.multi || 0) } : {}) }),
         { total: 0, nx: 0, ny: 0 });
-      const ls = await pointLayers(pv, data, c, cn, sites, spec);
-      if (ls.length) data.layers = keptLayers(ls, data, pv);
+      const ls = await pointLayers(pv, data, c, cn, sites, fspec);
+      if (ls.length) data.layers = ls;
       markLogOff(data, logs);
       const pr: ViewResult = { kind: "plot", plot: data, cohorts: [cn], studies: sites,
         participation: participationFor(sites, false),

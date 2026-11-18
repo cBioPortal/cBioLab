@@ -26,7 +26,7 @@ import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import { canonicalEventName, nameFoldSql, foldedEqualsSql } from "./event-names.ts";
 import { linesCtes, lineGapOf, inLineClassesSql, TREATMENT_EVENT } from "./treatment-lines.ts";
 import { compileCohortDef, eventTypeMatchSql, memberSamplesSql, lockDriftSql, inCohortSamples, inCohortPatients, bareSampleId } from "./cohort2.ts";
-import { axisKind, axisLabel, axisSelect, axisCategoryColor, corrPValue, fitOf, logRuleOf, plotShape, tukey, validateAxis,
+import { axisKind, axisLabel, axisSelect, axisCategoryColor, corrPValue, fitOf, logRuleOf, plotSelects, plotShape, tukey, validateAxis,
   CATEGORY_CAP, COLOR_CAP, DEFAULT_BINS, POINTS_CAP, VIOLIN_BINS,
   plotBinsSql, plotBoxSql, plotCountSql, plotCoverageSql, plotMomentsSql, plotNegativesSql, plotPointsSql, plotOutlierPointsSql, plotStatsSql, plotTableSql, plotViolinSql,
   highlightCohortSql, plotHighlightCountSql, plotScatterPointsSql, plotRankedPointsSql, OQL_NOT_PROFILED,
@@ -1916,11 +1916,11 @@ abstract class BaseResolver implements AggregateCapable {
     const xk = axisKind(spec.x, kindOf), yk = axisKind(spec.y, kindOf);
     const shape = plotShape(xk, yk);
     if (shape === "waterfall") throw new Error("an ordered-cases axis (a waterfall) is not implemented yet; give both axes a source");
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const logOf = (ax: PlotAxis) => { const rule = logRuleOf(ax); return rule ? { log: rule } : {}; };
     const label = { x: { label: title(spec.x), kind: xk, ...logOf(spec.x) }, y: { label: title(spec.y), kind: yk, ...logOf(spec.y) } };
     // alongside the plot's own queries, never failing it: a missing coverage just means no note
-    const coverage = this.runLogged<ChRow>("plot:coverage", plotCoverageSql(xSel, ySel, ctx), conn)
+    const coverage = this.runLogged<ChRow>("plot:coverage", plotCoverageSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx), conn)
       .then((r) => coverageOf(r.data[0] || {}))
       .catch(() => undefined);
     const done = async (d: PlotData): Promise<PlotData> => { const c = await coverage; return c ? { ...d, coverage: c } : d; };
@@ -2042,7 +2042,7 @@ abstract class BaseResolver implements AggregateCapable {
   async plotExtent(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ n: number; x0: number; x1: number; y0: number; y1: number }> {
     const ctx = (await this.plotCtx(def, spec));
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const r = await this.runLogged<ChRow>("plot:extent", plotCountSql(xSel, ySel, ctx.cohortSql, true), this.instance.conn);
     const row = r.data[0] || {};
     return { n: Number(row.n || 0), x0: Number(row.x0), x1: Number(row.x1), y0: Number(row.y0), y1: Number(row.y1) };
@@ -2056,7 +2056,7 @@ abstract class BaseResolver implements AggregateCapable {
 
   private async binCountsIn(label: string, ctx: Awaited<ReturnType<BaseResolver["plotCtx"]>>, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     bins: [number, number], extent: { x0: number; x1: number; y0: number; y1: number }): Promise<PlotCell[]> {
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const r = await this.runLogged<ChRow>(label, plotBinsSql(xSel, ySel, ctx.cohortSql, bins, extent), this.instance.conn);
     return r.data.map(binOf);
   }
@@ -2064,7 +2064,7 @@ abstract class BaseResolver implements AggregateCapable {
   /** This site's six sums for the pair — sufficient for a federated Pearson/regression (lib/stats.ts). */
   async plotMoments(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind): Promise<Moments> {
     const ctx = (await this.plotCtx(def, spec));
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const r = await this.runLogged<ChRow>("plot:moments", plotMomentsSql(xSel, ySel, ctx.cohortSql), this.instance.conn);
     const row = r.data[0] || {};
     return { n: Number(row.n || 0), sx: Number(row.sx || 0), sy: Number(row.sy || 0),
@@ -2075,7 +2075,7 @@ abstract class BaseResolver implements AggregateCapable {
   async plotTableCells(def: CohortDef | null | undefined, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ cx: string; cy: string; n: number }[]> {
     const ctx = (await this.plotCtx(def, spec));
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const r = await this.runLogged<ChRow>("plot:cells", plotTableSql(xSel, ySel, ctx.cohortSql), this.instance.conn);
     return r.data.map((row) => ({ cx: String(row.cx), cy: String(row.cy), n: Number(row.n) }));
   }
@@ -2096,7 +2096,7 @@ abstract class BaseResolver implements AggregateCapable {
     bins: number, range: [number, number]): Promise<ViolinBin[]> {
     const ctx = (await this.plotCtx(def, spec));
     const numFirst = xk === "num";
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const colorSel = spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
     const r = await this.runLogged<ChRow>("plot:violin",
       plotViolinSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql, bins, colorSel, range), this.instance.conn);
@@ -2107,7 +2107,7 @@ abstract class BaseResolver implements AggregateCapable {
   private async boxRowsIn(label: string, ctx: Awaited<ReturnType<BaseResolver["plotCtx"]>>, spec: PlotRequest, xk: AxisKind, yk: AxisKind):
     Promise<{ g: string; n: number; lo: number; hi: number; q1: number; median: number; q3: number }[]> {
     const numFirst = xk === "num";
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const r = await this.runLogged<ChRow>(label,
       plotBoxSql(numFirst ? xSel : ySel, numFirst ? ySel : xSel, ctx.cohortSql), this.instance.conn);
     return r.data.map((row) => {
@@ -2295,8 +2295,8 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "box") return null;
-    const numFirst = xk === "num";
-    return { ctx, numSel: axisSelect(numFirst ? spec.x : spec.y, ctx, "num"), catSel: axisSelect(numFirst ? spec.y : spec.x, ctx, "cat") };
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
+    return { ctx, numSel: xk === "num" ? xSel : ySel, catSel: xk === "num" ? ySel : xSel };
   }
 
   /**
@@ -2316,8 +2316,9 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     // the sparse cells an outliers layer draws in its own colour
     const colorSel = !sparse && spec.colorBy ? axisSelect(spec.colorBy, ctx, "cat") : undefined;
     const ringSel = !sparse && spec.ringBy ? axisSelect(spec.ringBy, ctx, "cat") : undefined;
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const r = await this.runPatientRows<ChRow>(sparse ? "plot:outliers" : "plot:points",
-      plotScatterPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, cap, sparse, colorSel, ringSel), conn);
+      plotScatterPointsSql(xSel, ySel, ctx.cohortSql, cap, sparse, colorSel, ringSel), conn);
     if (r.data.length > cap) return null;
     return r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y),
       ...(colorSel ? { c: String(p.c ?? "") } : {}), ...(ringSel ? { r: String(p.r ?? "") } : {}) }));
@@ -2332,8 +2333,9 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     const ctx = (await this.plotCtx(def, spec));
     const shape = plotShape(xk, yk);
     if (shape !== "scatter" && shape !== "box") return [];
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const r = await this.runPatientRows<ChRow>("plot:layer:" + rank.by,
-      plotRankedPointsSql(axisSelect(spec.x, ctx, xk), axisSelect(spec.y, ctx, yk), ctx.cohortSql, shape, xk === "num", rank), this.instance.conn);
+      plotRankedPointsSql(xSel, ySel, ctx.cohortSql, shape, xk === "num", rank), this.instance.conn);
     return shape === "scatter"
       ? r.data.map((p) => ({ id: String(p.id), x: Number(p.x), y: Number(p.y) }))
       : r.data.map((p) => ({ id: String(p.id), g: String(p.g), v: Number(p.v) }));
@@ -2348,7 +2350,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   async plotHighlightPoints(def: CohortDef | null | undefined, highlight: CohortDef, spec: PlotRequest, xk: AxisKind, yk: AxisKind,
     cap = POINTS_CAP): Promise<HighlightPoint[] | null> {
     const ctx = (await this.highlightCtx(def, highlight, spec));
-    const xSel = axisSelect(spec.x, ctx, xk), ySel = axisSelect(spec.y, ctx, yk);
+    const { xSel, ySel } = plotSelects(spec, ctx, xk, yk);
     const shape = plotShape(xk, yk);
     if (shape === "scatter") {
       const r = await this.runPatientRows<ChRow>("plot:highlight:points", plotScatterPointsSql(xSel, ySel, ctx.cohortSql, cap), this.instance.conn);
