@@ -353,6 +353,16 @@ describe("a box plot sorted by median", () => {
     assert.deepEqual(order(await runBox({ sortByMedian: true, categories: ["C", "B"] })), ["B", "C"]);
   });
 
+  test("S5: with no points drawn, the order comes from each box's own median, and the caption says it is approximate", async () => {
+    const r = await runBox({ sortByMedian: true, allPoints: false }, { log: true });
+    assert.equal(r.plot!.points, undefined, "no points drawn");
+    assert.deepEqual(order(r), ["B", "D", "A", "C"]);
+    assert.match(caption(r), /Boxes are ordered by their median, lowest first\. The values are not drawn as points, so each box is ordered by its own median rather than its raw values', and the order is approximate: two close medians can swap\./);
+    const drawn = await runBox({ sortByMedian: true }, { log: true });
+    assert.match(caption(drawn), /Boxes are ordered by their median, lowest first\./);
+    assert.doesNotMatch(caption(drawn), /approximate/, "from the raw values when every value is drawn");
+  });
+
   test("S4: several studies: the pooled boxes are sorted", async () => {
     const r = await run({ s1: site({ A: [9, 9], B: [1] }), s2: site({ A: [8], B: [2, 3] }) }, { sortByMedian: true });
     assert.deepEqual(order(r), ["B", "A"]);

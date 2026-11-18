@@ -308,7 +308,11 @@ function boxChoices(data: PlotData, pv: PlotView, categories: string[] | undefin
     const at = new Map(data.groups.map((g, i) => [g.g, i]));
     data.groups = [...data.groups].sort((a, b) => medianOf(a) - medianOf(b) || at.get(a.g)! - at.get(b.g)!);
     data.sortedByMedian = true;
-    notes.push("Boxes are ordered by their median, lowest first.");
+    // a box whose values are not drawn as points is ordered by its own median, not its raw values'
+    const own = data.groups.some((g) => byGroup.get(g.g)?.length !== g.n);
+    notes.push("Boxes are ordered by their median, lowest first" + (own
+      ? ". The values are not drawn as points, so each box is ordered by its own median rather than its raw values', and the order is approximate: two close medians can swap."
+      : "."));
   }
   if (notes.length) data.categoryNote = notes.join(" ");
 }
