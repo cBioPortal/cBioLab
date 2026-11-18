@@ -47,13 +47,13 @@ Re-measurement against master `cc9004b7` (01) and `bc53b944` (05) (2026-11-18), 
 | [10 Results › Download](10-results-download.md) | 41 | 7 | 21 | 6 | 4 | 1 | 2 | 0 | 24% | 50% |
 | [20 Comparison core](20-comparison-core.md) | 73 | 6 | 24 | 17 | 22 | 0 | 4 | 0 | 14% | 30% |
 | [21 Comparison molecular](21-comparison-molecular.md) | 88 | 18 | 35 | 22 | 7 | 2 | 3 | 1 | 26% | 46% |
-| [30 Study View summary](30-study-summary.md) | 135 | 48 | 40 | 14 | 28 | 3 | 2 | 0 | 39% | 54% |
-| [31 Study View shell](31-study-view-shell.md) | 118 | 24 | 34 | 9 | 43 | 5 | 3 | 0 | 27% | 42% |
+| [30 Study View summary](30-study-summary.md) | 135 | 41 | 47 | 13 | 29 | 3 | 2 | 0 | 34% | 51% |
+| [31 Study View shell](31-study-view-shell.md) | 118 | 18 | 40 | 10 | 42 | 2 | 6 | 0 | 22% | 39% |
 | [40 Patient summary](40-patient-summary.md) | 92 | 51 | 25 | 2 | 9 | 4 | 1 | 0 | 61% | 74% |
 | [41 Patient tabs](41-patient-tabs.md) | 81 | 30 | 18 | 4 | 26 | 0 | 3 | 0 | 41% | 52% |
 | **Results** | 718 | 196 | 212 | 93 | 159 | 18 | 31 | 8 | 34% | 49% |
 | **Comparison** | 161 | 24 | 59 | 39 | 29 | 2 | 7 | 1 | 20% | 39% |
-| **Study View** | 253 | 72 | 74 | 23 | 71 | 8 | 5 | 0 | 34% | 48% |
+| **Study View** | 253 | 59 | 87 | 23 | 71 | 5 | 8 | 0 | 28% | 46% |
 | **Patient** | 173 | 81 | 43 | 6 | 35 | 4 | 4 | 0 | 51% | 64% |
 | **All** | **1,305** | 373 | 388 | 161 | 294 | 32 | 47 | 9 | **35%** | **50%** |
 
