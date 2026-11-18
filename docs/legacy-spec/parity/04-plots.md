@@ -149,7 +149,7 @@ Data version: every n, every point set and every value compared is identical (Q2
 |---|---|---|---|
 | PLT-AX-1 | 🟡 | BC | One "Data" select merges data type and source: "Clinical attribute", then each profile by name grouped by type, then "OQL query" (`view-chrome.tsx:165-173`); no "Ordered samples", no "Gene Sets"; no 2-level type → source |
 | PLT-AX-1a | 🟡 | BC | coadread default identical (CNA gistic KRAS × mRNA RSEM KRAS, log off). No mRNA: horizontal = mutation type of gene 1, vertical = FGA / MUTATION_COUNT (`results-layout.ts:191,216`), not legacy's first-attribute-against-itself |
-| PLT-AX-1b | 🟡 | C | Changing Data resets gene/entity; no per-type session history; no viewLimitValues |
+| PLT-AX-1b | 🟡 | C | Changing the categorical axis's data type or source clears Filter categories, a new gene or entity keeps them, as legacy (`axis-edit.ts:29-32`, #318) ✅; the gene carries over to the new data rather than a per-type session history; no viewLimitValues; no colouring auto-choice (CL-3) |
 | PLT-AX-1c | ❌ | C | No "Same gene" option |
 | PLT-AX-2 | 🟡 | BC | Profiles by name ✅; the clinical select lists raw ids (`MUTATION_COUNT`, `view-chrome.tsx:205`), not display names by priority, though the axis title uses the display name; "Plot mutations by": mutation type / mutated vs not / driver vs VUS (no VAF, CCF, Clonality); no SV "by" select; no ⓘ description |
 | PLT-AX-3 | ❌ | C | No waterfall |
@@ -160,7 +160,7 @@ Data version: every n, every point set and every value compared is identical (Q2
 | PLT-AX-8 | 🟡 | C | `EntityField` search per generic-assay profile; no "Same <type>", no gene-related ordering, no 100-option header |
 | PLT-AX-9 | 🟡 | BC | "Filter categories" on a box plot: a checkbox list of every category, empty = all, cleared when the category axis's data changes, swapped with the axes (`plot-controls.tsx:249-275`) ✅; not searchable; kept in the document (invariant 9) |
 | PLT-AX-10 | ✅ | BC | ☐ "Sort Categories by Median" on a box plot with > 1 category: ascending median of the raw values (`plot-controls.tsx:276-282`, STM-9) |
-| PLT-AX-11 | 🐞 ok | BC | Swap exchanges the whole axis definitions (log, by and SV mode included), so the `structuralVariantCountBy` bug is not reproduced; disabled when a box already has its categories across |
+| PLT-AX-11 | 🐞 ok | BC | Swap exchanges the whole axis definitions (log, by and SV mode included), so the `structuralVariantCountBy` bug is not reproduced; Filter categories and Sort by Median stay with the categorical axis (`axis-edit.ts:35-37`, #318) |
 
 ### §3 Axis data
 
