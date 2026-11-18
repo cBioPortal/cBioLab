@@ -23,8 +23,8 @@ Legacy values read from `window.frontendOnc.model` (track info, id order) and `r
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 50 |
-| 🟡 partial | 39 |
+| ✅ match | 51 |
+| 🟡 partial | 38 |
 | 🔶 different | 2 |
 | ❌ missing | 10 |
 | 🐞 ok | 1 |
@@ -33,7 +33,7 @@ Legacy values read from `window.frontendOnc.model` (track info, id order) and `r
 | ? | 0 |
 | **Total IDs** | **104** |
 
-**Overall: 51.0 %** (✅ 50 + 🐞ok 1 + N/A 2 = 53 of 104). Counting 🟡 as half: 69.7 %. (2026-11-10: 23.1 % / 43.3 %.)
+**Overall: 51.9 %** (✅ 51 + 🐞ok 1 + N/A 2 = 54 of 104). Counting 🟡 as half: 70.2 %. (2026-11-10: 23.1 % / 43.3 %.)
 
 Re-score of 2026-11-16: 36 verdicts changed, all for the better; no regression in the ✅ rows spot-checked (SO-2, VI-1…3, VI-7, DL-3, GL-1, GL-3, TM-1, TM-4, MI-2, MD-5).
 
@@ -54,7 +54,7 @@ Re-score of 2026-11-16: 36 verdicts changed, all for the better; no regression i
 | §7 Mouse (MI) | 6 | 2 | 3 | 0 | 1 | 0 | 0 | Unchanged: no label drag, no cell highlight |
 | §8 Tooltips (TP) | 5 | 1 | 3 | 0 | 1 | 0 | 0 | Exact values now; no OncoKB/hotspot icons, no "View these N" |
 | §9 Modes (MD) | 13 | 5 | 6 | 0 | 0 | 0 | 2 | Germline, drivers-only disabling fixed; SVs all VUS on the oncoprint; Show only profiled missing |
-| §11 Statistics (STM) | 13 | 9 | 2 | 0 | 1 | 1 | 0 | Labels, aggregation, clustering, zoom as the portal's; no GSVA |
+| §11 Statistics (STM) | 13 | 10 | 1 | 0 | 1 | 1 | 0 | Labels, aggregation, clustering, zoom as the portal's; no GSVA |
 
 ---
 
@@ -279,5 +279,5 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 | ONC-STM-9 | ✅ | C | Average linkage, 1 − Spearman, rows + columns (`oncoprint-cluster.ts:2-3`) (#201) |
 | ONC-STM-10 | ❌ | C | Unchanged: no GSVA (tracked) |
 | ONC-STM-11 | ✅ | C | OncoKB Oncogenic / Likely / Resistance, Cancer Hotspots, custom calls (#168, #211) |
-| ONC-STM-12 | 🟡 | C | Unchanged: overlay threshold default 2, inclusive; not tied to the query's EXP/PROT or profile choice |
+| ONC-STM-12 | ✅ | BC | The query's z / RPPA z and mRNA / protein profile set the OQL's EXP / PROT, inclusive (lib/query-options.ts defaultOql); coadread MYC with rna_seq_v2_mrna_median_Zscores: 123 of 594 patients altered at z 2.0, 270 at z 1.0, as ClickHouse counts them directly. The lab view's own `overlays` (default 2) have no portal counterpart |
 | ONC-STM-13 | ✅ | BC | Fit = the altered span (#194) |

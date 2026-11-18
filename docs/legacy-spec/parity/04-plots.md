@@ -27,9 +27,9 @@ Legacy values read from `window.resultsViewPlotsTab` (`scatterPlotData`, `boxPlo
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 13 |
+| ✅ match | 16 |
 | 🟡 partial | 42 |
-| 🔶 different | 33 |
+| 🔶 different | 30 |
 | ❌ missing | 75 |
 | 🐞 ok | 2 |
 | 🐞 copied | 0 |
@@ -37,13 +37,13 @@ Legacy values read from `window.resultsViewPlotsTab` (`scatterPlotData`, `boxPlo
 | ? | 0 |
 | **Total IDs** | **170** |
 
-**Overall: 11.8 %** (✅ 13 + 🐞ok 2 + N/A 5 = 20 of 170). Counting 🟡 as half: 24.1 %.
+**Overall: 13.5 %** (✅ 16 + 🐞ok 2 + N/A 5 = 23 of 170). Counting 🟡 as half: 25.9 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 Chrome (CH) | 5 | 0 | 2 | 0 | 1 | 0 | 2 | Page-wide OQL note only; cross-study rule applied by dropping expression; no CaseFilterWarning |
 | §1 Layout (LY) | 4 | 0 | 2 | 1 | 1 | 0 | 0 | Sidebar + "Showing N" line + figure; no quick-plot pills; card-width figure |
-| §2 Axis menus (AX) | 14 | 0 | 6 | 1 | 6 | 1 | 0 | One Data select (profiles by name); 2 of 6 mutation groupings; no Same gene, filter/sort categories, limit-value, sort-order |
+| §2 Axis menus (AX) | 14 | 1 | 6 | 0 | 6 | 1 | 0 | One Data select (profiles by name); 2 of 6 mutation groupings; no Same gene, filter/sort categories, limit-value, sort-order |
 | §3 Axis data (DT) | 19 | 4 | 6 | 1 | 7 | 1 | 0 | CNA, continuous, clinical and panel-aware Not profiled match exactly; no Driver/VUS, VAF, CCF, clonality, SV type, gene sets |
 | §4 Plot types (PT) | 6 | 2 | 0 | 2 | 2 | 0 | 0 | Scatter and vertical box match; no waterfall; no horizontal boxes; discrete pair is a table only |
 | §5 Utilities (UT) | 9 | 0 | 0 | 2 | 7 | 0 | 0 | No search, connect, plot type, sort-by, horizontal bars; regression line always on |
@@ -59,8 +59,8 @@ Legacy values read from `window.resultsViewPlotsTab` (`scatterPlotData`, `boxPlo
 | §11 Highlight (HL) | 5 | 0 | 0 | 3 | 1 | 0 | 1 | Highlight = point layers (cohort / outliers / extremes / trend) + show/hide chips; no search, no selection bar |
 | §11 Messages (MS) | 7 | 0 | 4 | 0 | 1 | 0 | 2 | "Showing N of M samples with data on both axes" (numbers match); refusals in own words |
 | §11 Limit values (LV) | 4 | 0 | 0 | 1 | 3 | 0 | 0 | ">8"-style values dropped as non-numeric |
-| §13 Modes (MD) | 14 | 1 | 8 | 2 | 3 | 0 | 0 | Sample default + patient mode; multi-study counts match; no waterfall / limit-value / driver modes |
-| §15 Statistics (STM) | 22 | 4 | 5 | 6 | 7 | 0 | 0 | Pearson, n, p(Pearson), table counts, panel-aware categories exact; Spearman ties, box quartiles, log base, regression differ |
+| §13 Modes (MD) | 14 | 2 | 8 | 1 | 3 | 0 | 0 | Sample default + patient mode; multi-study counts match; no waterfall / limit-value / driver modes |
+| §15 Statistics (STM) | 22 | 5 | 5 | 5 | 7 | 0 | 0 | Pearson, n, p(Pearson), table counts, panel-aware categories exact; Spearman ties, box quartiles, log base, regression differ |
 
 ---
 

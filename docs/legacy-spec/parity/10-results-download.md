@@ -20,8 +20,8 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 
 | Verdict | Count |
 |---|---|
-| ✅ match | 5 |
-| 🟡 partial | 23 |
+| ✅ match | 7 |
+| 🟡 partial | 21 |
 | 🔶 different | 6 |
 | ❌ missing | 4 |
 | 🐞 ok | 1 |
@@ -30,12 +30,12 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 | ? | 0 |
 | **Total IDs** | **41** |
 
-**Overall: 19.5 %** (✅ 5 + 🐞ok 1 + N/A 2 = 8 of 41). Counting 🟡 as half: 47.6 %.
+**Overall: 24.4 %** (✅ 7 + 🐞ok 1 + N/A 2 = 10 of 41). Counting 🟡 as half: 50.0 %.
 
 | Section | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞ok | N/A | One line |
 |---|---|---|---|---|---|---|---|---|
 | §0 Chrome (0.x) | 4 | 2 | 2 | 0 | 0 | 0 | 0 | Same three sections; no hide switch |
-| §1 Data files (1.x) | 13 | 1 | 10 | 1 | 1 | 0 | 0 | Every profile offered as CSV; no transposed; no generic-assay rows; lists open as a lab cohort |
+| §1 Data files (1.x) | 13 | 3 | 8 | 1 | 1 | 0 | 0 | Every profile offered as CSV; no transposed; no generic-assay rows; lists open as a lab cohort |
 | §2 Gene frequency (2.x) | 6 | 0 | 2 | 4 | 0 | 0 | 0 | Counts identical; 1-decimal %, no bar, no sort/paging |
 | §3 Case table (3.x) | 6 | 0 | 4 | 0 | 1 | 1 | 0 | Cells match minus "(Driver)" tags; no Study ID column, no per-alteration columns |
 | §4 Modes (MD) | 6 | 1 | 1 | 1 | 1 | 0 | 2 | OQL handled as legacy |
@@ -97,15 +97,15 @@ Data version: every count identical.
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| RDL-1.1 | 🟡 | B | CNA as "Putative copy-number alterations from GISTIC" (the profile's name, not "Copy-number Alterations (OQL is not in effect)"); CSV only (tracked) |
-| RDL-1.2 | 🟡 | B | "Mutations (OQL is not in effect)" ✅; CSV only |
-| RDL-1.3 | 🟡 | BC | "Structural Variants (OQL is not in effect)" ✅; shown when the study holds an SV profile, not when any SV exists; CSV only |
+| RDL-1.1 | ✅ | B | "Copy-number Alterations (OQL is not in effect)" → `cna.txt` / `cna_transposed.txt`, each study's own selected (first) discrete copy-number profile; every queried sample, NP throughout for a study without one |
+| RDL-1.2 | ✅ | B | "Mutations (OQL is not in effect)"; Tab Delimited → `mutations.txt`, Transposed → `mutations_transposed.txt` (coadread KRAS + TP53: 594 rows, "G12D", WT, NP); every queried sample, NP throughout for a study without a mutation profile |
+| RDL-1.3 | 🟡 | BC | "Structural Variants (OQL is not in effect)" → `structural_variants.txt` / `_transposed.txt`, events space-separated ✅; shown when the study holds an SV profile, not when any SV exists |
 | RDL-1.4 | 🟡 | B | Every mRNA profile offered by name; no "selected in the query" row (the query's mRNA choice does not change the list) |
 | RDL-1.5 | 🟡 | B | Same for protein |
 | RDL-1.6 | 🟡 | B | "Altered samples" 485 rows: CSV, Copy, Open as cohort; no Download as `altered_samples.txt`, Query, Virtual Study |
 | RDL-1.7 | 🟡 | B | "Unaltered samples" 55 rows (see STM-1); same actions |
 | RDL-1.8 | 🟡 | B | "Sample matrix: … 1 = altered, 0 = unaltered, NP = not profiled": CSV only, no Copy |
-| RDL-1.9 | 🟡 | B | Each profile its own row with a description line (no ⓘ tooltip); CSV only |
+| RDL-1.9 | 🟡 | B | Each profile its own row with a description line (no ⓘ tooltip); Tab Delimited / Transposed → `<profile name>.txt` (the portal's transposed file is a one-line bug, RDL-STM-5; ours transposes) |
 | RDL-1.10 | ❌ | B | No generic-assay rows |
 | RDL-1.11 | 🟡 | B | Rows: GISTIC, Log2, mRNA, z (normal), z (all), z (diploid), CPTAC, CPTAC z, RPPA, RPPA z — same profiles; z-score order reversed vs legacy (diploid, all, normal) |
 | RDL-1.12 | ✅ | C | Mutation/SV types not in the profile list; ordered MUTATION, CNA, GENESET, MRNA, METHYLATION, …, PROTEIN (`run.ts:113`); one row per profile id (= name for one study) |
@@ -126,11 +126,11 @@ Data version: every count identical.
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| RDL-3.1 | 🟡 | B | Sample ID, Patient ID, Altered; no Study ID column (study in the CSV), no links, "altered/unaltered/not profiled" text instead of 1/0, no tooltip |
+| RDL-3.1 | 🟡 | B | Study ID, Sample ID, Patient ID, Altered ✅; Altered 1 / 0 with tooltip "1 = Sample harbors alteration in one of the input genes" ✅, NP for a sample not profiled for every gene and type (the portal writes 0; invariant 7); no study / sample / patient links |
 | RDL-3.2 | 🟡 | B | One column per line; header = gene for a bare gene ✅, the OQL text for others ("KRAS: AMP MUT=G12D", legacy same without ";") ✅; merged tracks impossible (refused) |
 | RDL-3.3 | ❌ | C | No hidden per-alteration columns |
 | RDL-3.4 | 🟡 | B | Calls joined ", " ✅ incl. CNA ("S127T, HOMDEL") ✅; "no alteration"/"not profiled" ✅; no "(Driver)", no Germline badge |
-| RDL-3.5 | 🟡 | B | Altered first ✅; 25/page (legacy 20); search, columns menu, CSV download (`/api/table`) always on |
+| RDL-3.5 | 🟡 | B | Altered first ✅; 20 per page ✅; search, columns menu, CSV download (`/api/table`) always on, not `alterations_across_samples.tsv` |
 | RDL-3.6 | 🐞 ok | C | Regex filters validated (`table-query.ts:120`): bad input is refused, not thrown |
 
 ### §4 Modes and conditions
@@ -153,7 +153,7 @@ Data version: every count identical.
 | RDL-STM-1 | 🟡 | BC | Altered identical (485, 344), sample level ✅; Unaltered requires profiling for every line's gene and data type (55 vs 109; invariant 7, README); files are CSV with header and cohort/study/patient columns, Copy gives `study:sample` lines |
 | RDL-STM-2 | 🟡 | BC | Numerator, denominator (profiled for the gene in any type the line reads; 594 here) identical; rounding 1 decimal vs `percentAltered` |
 | RDL-STM-3 | 🟡 | C | One column per **line** (not per gene); unprofiled `NP` (legacy `0`); `Altered` 1/0/NP |
-| RDL-STM-4 | ✅ | C | All cohort samples; mutations space-joined with " [germline]" and `WT`; SV `NA`; profiles raw value / `NA`; `NP` from panels for mutation, SV, discrete CNA (`tables.ts:100-150`); format CSV/no transposed counted under 1.x |
+| RDL-STM-4 | ✅ | BC | mutations / structural_variants / cna: every queried sample, STUDY_ID, SAMPLE_ID, genes; WT / NA when none; NP off the panel or for a study without the profile |
 | RDL-STM-5 | 🟡 | C | Same matrix for every non-selected profile; discrete CNA gets `NP` (legacy never); transposed bug moot (no transposed) |
 | RDL-STM-6 | ❌ | C | No generic-assay files |
 
