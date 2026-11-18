@@ -12,6 +12,7 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
   const { vNames } = ctx;
   { const e = overLimit("a table view", 6, vNames.length); if (e) return refuse("table", ctx, e.replace("at most 6", "at most 6 cohorts")); }
   const unit: "sample" | "patient" = view.unit === "patient" ? "patient" : "sample";
+  if (view.transpose != null && typeof view.transpose !== "boolean") return refuse("table", ctx, "transpose is true (a row per attribute, a column per patient or sample) or false");
   const show = view.rows == null ? 25 : Math.floor(Number(view.rows));
   if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return refuse("table", ctx, "rows (the page size) is 1 to " + TABLE_ROWS_MAX);
   const q = viewQuery(view);
@@ -66,8 +67,12 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
     const own: Record<string, string> = { patient: String(x.patient ?? ""), sample: String(x.sample ?? ""), samples: String(x.samples ?? "") };
     return { cohort: String(x.cohort), study: String(x.study), patient: own.patient, sample: own.sample, values: columns.map((c) => c.id in own && ids.some((i) => i.id === c.id) ? own[c.id] : m[c.id] ?? "") };
   });
+  // per sample, which attributes are its patient's (the Patient page's Samples table lists a sample's own)
+  const patientAttrs = unit === "sample" ? held.filter((c) => c.per === "patient").map((c) => c.id) : [];
   const table = { unit, columns, shown, defaults, query: q, rows, offset: r.offset, pageSize: show, lists: r.lists, total: r.total, all: r.all,
+    ...(patientAttrs.length ? { patientAttrs } : {}),
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}),
+    ...(held.length < usable.length ? { attributesOf: usable.length } : {}),
     ...(locate ? { position: await listPosition(r, true, () => Promise.resolve(r)) } : {}) };
   if (ctx.page || ctx.values) return { kind: "table", cohorts: vNames, table, participation: ctx.participationFor(ctx.vStudies, true) };
   const one = unit === "sample" ? "sample" : "patient";

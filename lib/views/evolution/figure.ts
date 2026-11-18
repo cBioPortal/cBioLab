@@ -5,6 +5,7 @@
 // white-with-a-bar for not profiled.
 import type { DrawnResultOf } from "../../types.ts";
 import { palette, frame, caption, label, textWidth, legend, linear, log, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight, fmtInt, esc, FS, SW, r1, type SvgOpts, type Scale } from "../../svg-kit.ts";
+import { portalEvolutionVaf } from "../../chart/format.ts";
 import { STYLE, rampColor } from "../../oncoprint-style.ts";
 import { heatmapOrder, mutationName } from "./order.ts";
 import { axisMarks, dayScale, type AxisTick } from "../../timeline-tracks.ts";
@@ -28,6 +29,24 @@ export function cellText(c: EvolutionCell): string {
     case "uncalled": return "uncalled, VAF " + vafText(c);
     case "absent": return "not found" + (c.alt != null && c.ref != null ? " (0 of " + fmtInt(c.alt + c.ref) + " reads)" : "");
     default: return "not profiled";
+  }
+}
+/**
+ * A cell's state as the portal's Genomic Evolution tooltip says it (PatientViewMutationsTabUtils
+ * mutationTooltip): "VAF: 0.38 (46 reads of 121 total)", "Mutated, but we don't have VAF data.",
+ * "Mutation uncalled (VAF: …)", "Mutation not detected" (with its VAF when reads were counted),
+ * "<sample> is not sequenced for <gene> mutations."
+ */
+export function portalCellTip(c: EvolutionCell, sampleId: string, gene: string): string {
+  const total = c.alt != null && c.ref != null ? c.alt + c.ref : null;
+  const vaf = c.vaf ?? (total ? c.alt! / total : null);
+  const reads = vaf != null && total != null ? "VAF: " + portalEvolutionVaf(vaf) + " (" + c.alt + " reads of " + total + " total)" : null;
+  switch (c.status) {
+    case "called": return reads ?? "Mutated, but we don't have VAF data.";
+    case "noVaf": return "Mutated, but we don't have VAF data.";
+    case "uncalled": return reads ? "Mutation uncalled (" + reads + ")" : "Mutation uncalled";
+    case "absent": return reads ? "Mutation not detected (" + reads + ")" : "Mutation not detected";
+    default: return sampleId + " is not sequenced for " + gene + " mutations.";
   }
 }
 const mutationTip = (m: EvolutionMutation, samples: EvolutionSample[]) =>

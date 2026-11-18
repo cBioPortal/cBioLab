@@ -36,6 +36,12 @@ export function portalVaf(f: number): string {
 }
 
 /**
+ * A VAF as the portal's Genomic Evolution tooltip writes it (mutationTooltip,
+ * PatientViewMutationsTabUtils.tsx): always 2 decimals — 0.0098 → "0.01", 0.375 → "0.38".
+ */
+export const portalEvolutionVaf = (f: number): string => f.toFixed(2);
+
+/**
  * A share of a Study View chart (0–100), as cbioportal.org writes it (`getFrequencyStr`,
  * StudyViewUtils.tsx): "0%", one decimal, "99.9%" for anything from 99.9 up to but short of 100,
  * "<0.1%" below a tenth, "NA" when negative or not a number.
@@ -243,6 +249,13 @@ export function portalKeptUnits(samples: number, patients: number): string {
   if (samples !== patients) return samples + (samples === 1 ? " sample" : " samples") + " / " + patients + (patients === 1 ? " patient" : " patients");
   return samples + (samples === 1 ? " sample/patient" : " samples/patients");
 }
+
+/**
+ * The portal's note on a table's count for one patient's rows repeated across samples, as MutationMapper
+ * multipleMutationInfo writes it (the bare number); undefined when there are none.
+ */
+export const portalDuplicatesNote = (n: number | undefined, one: string, many: string): string | undefined =>
+  n ? "includes " + String(n) + " duplicate " + (n === 1 ? one : many) + " in patients with multiple samples" : undefined;
 
 /**
  * A share given as 0–1 as the portal's frequency bars write it (FormatUtils getPercentage): "0%",

@@ -67,7 +67,7 @@ test("AC4 Order: input not mutated; every other field kept", () => {
 
 // ---- AC5 ----
 
-test("AC5 Disabled: a row with Freq 0 is disabled; others are not", () => {
+test("AC5 Disabled: an unchecked row with Freq 0 is disabled; others are not", () => {
   const lines = addChartLines([row("z", "Zero", 0), row("h", "Half", 5), row("f", "Full", 10)], 10);
   const byKey = Object.fromEntries(lines.map(l => [l.key, l]));
   assert.equal(byKey.z.freq, 0);
@@ -171,4 +171,33 @@ test("AC8 Unchecking clears the filter: keeps other attributes and non-clinical 
 
 test("AC8 Unchecking clears the filter: empty input → []", () => {
   assert.deepEqual(withoutAttribute([], "SEX"), []);
+});
+
+// ---- AC5 (rewritten) / AC10 ----
+
+const urow = (key: string, name: string, samples: number | undefined, checked = false): AddChartRow => ({ key, name, samples, checked });
+
+test("AC5 a checked row with Freq 0 stays enabled, so it can be unchecked", () => {
+  const lines = addChartLines([urow("z", "Zero", 0, true), urow("y", "Zero2", 0, false), urow("h", "Half", 5)], 10);
+  const byKey = Object.fromEntries(lines.map(l => [l.key, l]));
+  assert.equal(byKey.z.freq, 0);
+  assert.equal(byKey.z.disabled, false);
+  assert.equal(byKey.y.disabled, true);
+});
+
+test("AC10 uncounted: samples undefined → Freq NaN, not 0", () => {
+  assert.ok(Number.isNaN(chartFreq(undefined, 10)));
+});
+
+test("AC10 uncounted: not disabled, sorted after every counted row (0% included)", () => {
+  const lines = addChartLines([
+    urow("u1", "Aaa", undefined), urow("z", "Zero", 0), urow("h", "Half", 5), urow("u2", "Bbb", undefined, true),
+  ], 10);
+  const byKey = Object.fromEntries(lines.map(l => [l.key, l]));
+  for (const k of ["u1", "u2"]) {
+    assert.ok(Number.isNaN(byKey[k].freq), k);
+    assert.equal(byKey[k].disabled, false, k);
+  }
+  assert.deepEqual(lines.slice(0, 2).map(l => l.key).sort(), ["h", "z"]);
+  assert.deepEqual(lines.slice(2).map(l => l.key).sort(), ["u1", "u2"]);
 });

@@ -85,6 +85,12 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
 export const MUTATION_ANNOTATION_ORDER = "arrayConcat(" + oncokbSortSql("oncogenicity", "level", "resistanceLevel", "diagnosticLevel", "prognosticLevel") +
   ", [toFloat64(0), toFloat64(hot), toFloat64(0)])";
 
+/**
+ * A row's allele frequency as the portal writes it on screen and in its download (MUT-STM-5): 4 decimals below
+ * 0.01, else 2, trailing zeros kept; '' for none. The one rule: the table's cell, its search and its CSV all read it.
+ */
+export const VAF_TEXT = "if(vaf IS NULL, '', if(vaf < 0.01, toDecimalString(vaf, 4), toDecimalString(vaf, 2)))";
+
 /** Shown unless the view names its columns: the portal's own default set. */
 export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "copyNumber", "vaf", "mutCount"];
 
@@ -115,7 +121,8 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
-    case "vaf": return { ...c, text: str("round(vaf, 2)"), num: num("vaf") };
+    // as the screen and the download show it (the rows' vafText), so a search finds the shown number
+    case "vaf": return { ...c, text: "vafText", num: num("vaf") };
     // the portal sorts HGVSc by the number after "c." (Hgvsc.tsx), ClinVar by its significance
     case "hgvsc": return { ...c, text: "hgvsc", order: "toInt64OrNull(extract(hgvsc, 'c\\.(-?[0-9]+)'))" };
     case "clinvar": return { ...c, text: "if(clinvar = '' OR clinvarConflicting = '', clinvar, concat(clinvar, '(', clinvarConflicting, ')'))", order: "nullIf(clinvar, '')" };
@@ -205,7 +212,9 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "         " + mutationDrvSql(p, db, pin, pins, hot, drivers) + " AS drv,\n" +
     "         toUInt8(" + (pin ? hot : "0") + ") AS hot,\n" +
     "         m.mutationType AS mutationType, upper(m.variantType) AS variantType,\n" +
-    "         if(m.altCount + m.refCount > 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, m.altCount AS altCount, m.refCount AS refCount,\n" +
+    "         if(m.altCount > 0 AND m.refCount >= 0, m.altCount / (m.altCount + m.refCount), NULL) AS vaf, " + VAF_TEXT + " AS vafText,\n" +
+    // none for a 0 frequency, a count of 0 or less blank, as the portal's cells are: they sort and filter as missing
+    "         if(m.altCount > 0, m.altCount, NULL) AS altCount, if(m.refCount > 0, m.refCount, NULL) AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, m.chr AS chr, m.start AS start, m.end AS end, m.ref AS ref, m.var AS var, m.status AS status, m.pos AS pos,\n" +
     "         " + hgvsgSql("ifNull(m.chr, '')", "ifNull(m.start, 0)", "ifNull(m.end, 0)", "ifNull(m.ref, '')", "ifNull(m.var, '')") + " AS hgvsg,\n" +
     "         " + variantColumnsSql(gn ? "ifNull(g.gd, '')" : "''", gene) + ",\n" +
@@ -304,7 +313,7 @@ function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: stri
     "         " + drv + " AS drv,\n" +
     "         toUInt8(0) AS hot,\n" +
     "         'Fusion' AS mutationType, upper(v.class) AS variantType,\n" +
-    "         NULL AS vaf, NULL AS altCount, NULL AS refCount,\n" +
+    "         NULL AS vaf, '' AS vafText, NULL AS altCount, NULL AS refCount,\n" +
     "         toInt64OrNull(mc.v) AS mutCount, v.chr AS chr, v.start AS start, NULL AS end, NULL AS ref, NULL AS var, v.status AS status, NULL AS pos,\n" +
     "         '' AS hgvsg,\n" +
     "         " + variantColumnsSql("''", gene) + ",\n" +
@@ -388,6 +397,8 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
     // the portal's default: Annotation, descending (skin_results_view_tables_default_sort_column)
     defaultOrder: MUTATION_ANNOTATION_ORDER + " DESC, pos ASC NULLS LAST",
     tiebreak: "sid, ord, proteinChange",
+    // the same change in one patient's several samples (MutationUtils groupMutationsByGeneAndPatientAndProteinChange; one gene per table)
+    duplicateKey: "(study, patient, ifNull(proteinChange, ''))",
     units: { sample: "sid", patient: "patient" },
   };
 }

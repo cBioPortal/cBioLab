@@ -94,6 +94,8 @@ export function usePages<R>(first: R[], total: number, offset0: number, viewSize
 
 /** The pager under a table: previous, a window of page numbers, next; the rows shown; the page size. */
 export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
+  // the table's own size stays on offer after the reader picks another
+  const own = useRef(p.size).current;
   const nums: (number | null)[] = [];
   const lo = Math.max(0, p.page - 2), hi = Math.min(p.pages - 1, p.page + 2);
   if (lo > 0) nums.push(0, ...(lo > 1 ? [null] : []));
@@ -108,7 +110,7 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
       <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page"><ChevronRight /></Button>
       <span>Showing {from.toLocaleString()}–{to.toLocaleString()} of {p.total.toLocaleString()} {unit}</span>
       <label className="tbfield">per page <OptionSelect value={String(p.size)} onValueChange={(v) => p.setSize(Number(v))}>
-        {[...new Set([p.size, 25, 50, 100, 250])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
+        {[...new Set([own, p.size, 25, 50, 100, 250])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
       </OptionSelect></label>
       {p.error && <span className="mark">{p.error}</span>}
     </div></div>
@@ -330,6 +332,8 @@ export interface DataTableProps<V> {
   table?: string;
   /** what a row is, plural: "mutations", "samples" */
   unit: string;
+  /** said after the count ("includes 38 duplicate mutations in patients with multiple samples") */
+  countNote?: string;
   /** when the query keeps fewer rows than there are: the distinct samples and patients of those it keeps, said after the count */
   kept?: { samples: number; patients: number };
   /** the view's search, filters, sort and columns changed: write them to its spec (re-runs the view) */
@@ -360,7 +364,7 @@ export interface DataTableProps<V> {
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -420,7 +424,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     <div className="dt">
       <div className="dt-bar">
         <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}{kept ? " (" + portalKeptUnits(kept.samples, kept.patients) + ")" : null}</> : <>{t.total.toLocaleString()} {unit}</>}
-          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}</span>
+          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}{countNote ? ": " + countNote : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
@@ -475,6 +479,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
                         data-tip={(c.tip ? c.tip + " — click to " : "") + "sort the whole table by this column, across every page"}>
                         {c.name}{sorted ? (q.sort!.desc ? " ▾" : " ▴") : ""}
                       </button>}
+                      {!c.unsorted && colHead?.(c.id)}
                       {!plain && <span className="dt-anchor">
                         <button type="button" className={"dt-funnel" + (fon ? " on" : "")} aria-label={"filter " + c.name}
                           data-tip={fon ? "filtered: " + filterText(q.filters![c.id]) : "filter this column"} onClick={() => setMenu(menu === c.id ? null : c.id)}>

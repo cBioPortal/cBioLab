@@ -7,11 +7,13 @@ import assert from "node:assert/strict";
 
 process.env.CLICKHOUSE_DB = "cbio";
 const { setChTransport } = await import("../lib/ch.ts");
-const { checkGenes, searchGenes, geneSetMembers, MAX_CHECK, MAX_SET_GENES } = await import("../lib/genes.ts");
+const { checkGenes, searchGenes, geneSetMembers, panelGenes, MAX_CHECK, MAX_SET_GENES } = await import("../lib/genes.ts");
 
 /** the stand-in catalog */
 const GENES: Record<string, string> = { TP53: "protein-coding", KRAS: "protein-coding", KRASP1: "pseudo", MIR21: "" };
 const ALIASES: Record<string, string[]> = { P53: ["TP53"], KRAS2: ["KRAS"], AMB: ["TP53", "KRAS"], TP53: ["TP53"] };
+/** the stand-in gene panels, their genes A to Z as the database's ORDER BY gives them */
+const PANELS: Record<string, string[]> = { TINY_PANEL: ["BRAF", "KRAS", "TP53"] };
 const SETS: Record<string, { description: string; genes: string[] }> = {
   SMALL_SET: { description: "two genes", genes: ["TP53", "KRAS"] },
   BIG_SET: { description: "too many", genes: Array.from({ length: MAX_SET_GENES + 1 }, (_, i) => "G" + i) },
@@ -43,6 +45,10 @@ setChTransport(async (st) => {
   if (/WHERE s\.name = /.test(q)) {
     const name = /WHERE s\.name = '((?:[^'\\]|\\.)*)'/.exec(q)![1];
     return json((SETS[name]?.genes ?? []).map((s) => ({ s })));
+  }
+  if (/FROM \w+\.gene_panel_to_gene_derived WHERE gene_panel_id = /.test(q)) {
+    const id = /gene_panel_id = '((?:[^'\\]|\\.)*)'/.exec(q)![1];
+    return json((PANELS[id] ?? []).map((g) => ({ g })));
   }
   return json([]);
 });
@@ -133,4 +139,23 @@ test("an unknown gene set is named; a set past the limit is refused with the lim
 test("a gene set name reaches SQL only quoted", async () => {
   await assert.rejects(geneSetMembers("x' OR '1'='1"), /no gene set named/);
   assert.ok(sent.at(-1)!.includes("WHERE s.name = 'x\\' OR \\'1\\'=\\'1'"), String(sent.at(-1)));
+});
+
+// gene-tables-cases.md GP7, GP10: a panel's gene list
+
+test("GP7: a panel's genes come back A to Z, read from the connection's own database", async () => {
+  const conn = { id: "p", url: "http://stub.invalid", user: "u", password: "p", db: "cbio_peer", label: "the peer" };
+  assert.deepEqual(await panelGenes("TINY_PANEL", conn), ["BRAF", "KRAS", "TP53"]);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /FROM cbio_peer\.gene_panel_to_gene_derived WHERE gene_panel_id = 'TINY_PANEL' ORDER BY g/);
+});
+
+test("GP10: a panel the database does not hold is refused by name and database, not listed as empty", async () => {
+  const conn = { id: "p", url: "http://stub.invalid", user: "u", password: "p", db: "cbio_peer", label: "the peer" };
+  await assert.rejects(panelGenes("NO_SUCH_PANEL", conn), /no gene panel named “NO_SUCH_PANEL” in the peer/);
+});
+
+test("GP10: a panel id with a quote reaches SQL only escaped", async () => {
+  await assert.rejects(panelGenes("X' OR '1'='1"), /no gene panel named/);
+  assert.ok(sent.every((q) => !q.includes("'X' OR '1'='1'")));
 });

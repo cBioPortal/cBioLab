@@ -126,6 +126,12 @@ export function freqTipLines(kind: GeneTableKind, row: GeneTableRow): string[] {
   ];
 }
 
+/** the line a panel's gene-list dialog shows in place of, or beside, its genes; none when the list speaks for itself */
+export function panelNote(panel: string, genes: string[]): string | null {
+  if (panel === "WES") return "WES is whole-exome sequencing: it profiles every gene, so no list is kept for it.";
+  return genes.length ? null : "This panel lists no genes.";
+}
+
 /** the filter checking genes makes: union, one clause of a line per gene; intersection, a clause per gene */
 export function geneSelection(lines: string[], op: "union" | "intersection"): { kind: "oql"; q: string }[] {
   if (!lines.length) return [];

@@ -6,7 +6,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
-import { evolutionSvg, lineCells, cellText, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { evolutionSvg, lineCells, cellText, portalCellTip, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
@@ -16,7 +16,7 @@ import { pagedTable } from "../lib/views/rows.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult, PatientEvent } from "../lib/types.ts";
 import type { TableQuery, RowSource } from "../lib/table-query.ts";
-import type { EvolutionView, EvolutionResult, EvolutionMutation } from "../lib/views/evolution/types.ts";
+import type { EvolutionView, EvolutionResult, EvolutionMutation, EvolutionCell } from "../lib/views/evolution/types.ts";
 import { axisTicks, timelineAxisItems } from "../lib/timeline-tracks.ts";
 import { timelineSvg } from "../lib/timeline-svg.ts";
 import { palette } from "../lib/svg-kit.ts";
@@ -674,4 +674,20 @@ describe("evolution: the heatmap's order, layout and labels (HM10–HM17)", () =
       else { assert.match(v.caveat!, /the mutations by name/); assert.doesNotMatch(v.caveat!, /clustered/); }
     }
   });
+});
+
+describe("PTB-GE-LC-6: portalCellTip, the portal's Genomic Evolution tooltip", () => {
+  const cell = (status: EvolutionCell["status"], vaf: number | null = null, alt: number | null = null, ref: number | null = null): EvolutionCell => ({ status, vaf, alt, ref });
+  const tip = (c: EvolutionCell) => portalCellTip(c, "P04_Rec1", "TP53");
+  const cases: [string, EvolutionCell, string][] = [
+    ["T1 called with counts", cell("called", 0.6923, 54, 24), "VAF: 0.69 (54 reads of 78 total)"],
+    ["T2 called without counts", cell("called"), "Mutated, but we don't have VAF data."],
+    ["T3 noVaf", cell("noVaf"), "Mutated, but we don't have VAF data."],
+    ["T4 uncalled with counts", cell("uncalled", 0.12, 3, 22), "Mutation uncalled (VAF: 0.12 (3 reads of 25 total))"],
+    ["T5 uncalled without counts", cell("uncalled"), "Mutation uncalled"],
+    ["T6 absent with counts", cell("absent", null, 0, 40), "Mutation not detected (VAF: 0.00 (0 reads of 40 total))"],
+    ["T7 absent without counts", cell("absent"), "Mutation not detected"],
+    ["T8 not profiled", cell("np"), "P04_Rec1 is not sequenced for TP53 mutations."],
+  ];
+  for (const [name, c, want] of cases) test(name, () => assert.equal(tip(c), want));
 });

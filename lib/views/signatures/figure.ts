@@ -170,6 +170,19 @@ function spectrumChart(s: SignaturesResult, W: number, y0: number, p: Pal, head:
 }
 
 /**
+ * The spectrum alone, with its "Sample: … count: …" head and the chosen signature's reference profile
+ * under it: what the portal's Download saves (MutationalBarChart, "mutationalBarChart.svg"). Null with
+ * no spectrum to draw.
+ */
+export function signaturesSpectrumSvg(v: DrawnResultOf<"signatures">, o: SvgOpts = {}): string | null {
+  const s = v.signatures;
+  if (!s.patient || !s.version || !s.spectrum) return null;
+  const p = palette(o.theme), W = Math.max(420, o.width || 900);
+  const sc = spectrumChart(s, W, 8, p, true);
+  return frame(W, sc.y + 8, sc.svg, p.bg, false, "Sample " + s.spectrum.sample + " — " + versionLabel(s.version));
+}
+
+/**
  * The figure: the spectrum (with the reference profile under it once a signature is chosen) and then
  * each signature's contribution. `spectrumHead: false` leaves out the spectrum's "Sample: … count: …"
  * line, for a page that writes it above the figure.
