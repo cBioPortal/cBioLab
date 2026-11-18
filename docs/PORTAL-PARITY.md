@@ -255,6 +255,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Mutation Type as the portal's coloured label (#245)
     - [x] Copy # and Allele Freq (T) shown by default: the portal's eight default columns (MUT-COL-38) (#331)
       - [ ] Copy #: shown by default only when the query holds the discrete CNA profile, as legacy (MUT-COL-18)
+    - [x] Sorted by Annotation ↓ by default, the portal's [OncoKB, CIViC, hotspot, reVUE] array (`lib/mutation-table.ts:85,398`) (MUT-TB-9, MUT-STM-10) (#309; found ticked-off in code by the 2026-11-18 re-measurement). KRAS's first row is still A11_G12dup, not G12C, until the OncoKB level follows the tumour type (MUT-AN-3)
   - [ ] The Annotation column's icons, cards and header. The OncoKB level by tumour type, hotspots and CIViC are under *Mutation annotation breadth* (MUT-COL-7, MUT-AN-1…6)
   - [x] Table search and column filters reach the lollipop and badges (search "G12D": table 59 of 223, badges 59); the grid's own cells and the stem selection still narrow only the table, and the frequency ignores them all (MUT-TB-3, MUT-FM-1, MUT-FM-3, MUT-STM-4) (#286)
   - [x] The Y-Axis Max slider; axis "# patients" (ours "# KRAS Mutations"); top tick at the data, "≥" when capped (142; ours niced to 150) (MUT-LP-2, MUT-LP-6, MUT-STM-17) (#351)
