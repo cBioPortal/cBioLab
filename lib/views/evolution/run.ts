@@ -10,7 +10,10 @@ import { PATIENT_ID } from "../../patient-timeline.ts";
 import { axisTicks, timelineAxisItems, sampleDays, sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
-import { plural, refuse } from "../shared.ts";
+import { plural, refuse, type ViewResolver } from "../shared.ts";
+import { patientSampleAttributes } from "../../patient-sample-attributes.ts";
+import { isAbortError } from "../../ch.ts";
+import { groupOptions, sampleGroups } from "./groups.ts";
 import {
   EVOLUTION_COLUMNS, EVOLUTION_DEFAULT_COLUMNS, EVOLUTION_PATIENT_COLUMNS, EVOLUTION_PATIENT_DEFAULT_COLUMNS,
   evolutionMutationsSource, evolutionPatientsSource, evolutionSamplesSource,
@@ -73,8 +76,9 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   const mq = viewQuery(view.mutations || {});
   { const bad = checkQuery(mq, EVOLUTION_COLUMNS); if (bad) return no("mutations: " + bad); }
   if (ctx.table != null && ctx.table !== "mutations") return no("table is mutations, or none for the patient list");
-  const display = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange, expandGaps: !!view.expandGaps,
-    transpose: !!view.transpose, cluster: view.cluster !== false, mutationLabels: view.mutationLabels !== false } as const;
+  if (view.groupBy != null && (typeof view.groupBy !== "string" || !view.groupBy)) return no("groupBy is the id of a sample clinical attribute (one of the result's groupOptions), e.g. \"SAMPLE_TYPE\"");
+  const display: EvolutionResult["display"] = { chart: view.chart || "line", logScale: !!view.logScale, dataRange: !!view.dataRange, expandGaps: !!view.expandGaps,
+    transpose: !!view.transpose, cluster: view.cluster !== false, mutationLabels: view.mutationLabels !== false, groupBy: null };
 
   // who may answer: a local patient-level participant (no peer serves this view's rows)
   const { holders, excluded } = rowHolders(ctx);
@@ -162,6 +166,10 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
         return no(row ? whyNot(want, row) : want.id + " is not a patient of this cohort in " + want.study);
       }
     }
+    // the line chart's Group by reads the samples' own clinical attributes, alongside the rest
+    const attrsP = display.chart === "line"
+      ? patientSampleAttributes(ctx.resolvers[want.study] as unknown as ViewResolver & PatientLevelCapable, want.study, want.id, "evolution:sample-attributes").catch((err: Error) => err)
+      : null;
     const { samples, events } = await samplesOf(want);
     const order = samples.map((s) => s.id);
     const [position, m] = await Promise.all([
@@ -179,6 +187,23 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
     // the line chart placed by day is drawn on the patient timeline's axis, built from the same items
     const axis = x === "time" && display.chart === "line" ? axisTicks(timelineAxisItems(events), !view.expandGaps).ticks : null;
     const cut = !!axis?.some((t) => t.trim);
+    // Group by: an attribute this patient's samples do not carry, or attributes that cannot be read,
+    // draw the chart ungrouped and say why (the page clears groupBy when the patient changes, as the
+    // portal's Group by starts over on each patient's page)
+    let options: { id: string; name: string }[] | null = null, grouping: EvolutionResult["groupBy"] | null = null, ungrouped: string | null = null;
+    const attrs = attrsP ? await attrsP : null;
+    if (attrs instanceof Error && isAbortError(attrs)) throw attrs;
+    if (attrs instanceof Error) {
+      ungrouped = "the samples' clinical attributes could not be read (" + attrs.message + ")" + (view.groupBy ? ", so the chart is not grouped by " + view.groupBy : "");
+    } else if (attrs) {
+      options = groupOptions(attrs.columns, attrs.bySample, samples);
+      if (view.groupBy) {
+        const opt = options.find((o) => o.id === view.groupBy);
+        if (opt) grouping = { attribute: opt.id, name: opt.name, groups: sampleGroups(samples, attrs.bySample, opt.id) };
+        else ungrouped = "groupBy " + view.groupBy + " is not an attribute of " + want.id + "'s samples (" + (options.length ? "theirs: " + options.map((o) => o.id).join(", ") : "they have none") + "), so the chart is not grouped";
+      }
+    } else if (view.groupBy) ungrouped = "only the line chart is grouped; groupBy " + view.groupBy + " is kept for it";
+    if (grouping) display.groupBy = grouping.attribute;
     const undrawn = over ? "the mutation table's query keeps " + m.total.toLocaleString("en-US") + " mutations; one figure draws at most " + EVOLUTION_DRAW_MAX.toLocaleString("en-US") + " — narrow the table's search or filters" : undefined;
     const notSeq = samples.filter((s) => !s.panel).map((s) => s.id);
     const npCells = drawn ? drawn.reduce((a, d) => a + d.cells.filter((c) => c.status === "np").length, 0) : 0;
@@ -189,6 +214,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
       kind: "evolution", cohorts: vNames,
       evolution: { ...list, patient: { ...want, samples }, position, mutations: table, drawn, ...(undrawn ? { undrawn } : {}), noVaf, x,
         ...(!view.sequential && noDay.length ? { noDay } : {}), ...(axis ? { axis } : {}),
+        ...(options ? { groupOptions: options } : {}), ...(grouping ? { groupBy: grouping } : {}), ...(ungrouped ? { ungrouped } : {}),
         ...(drawn && display.chart === "heatmap" ? { heatmapOrder: heatmapOrder(drawn, samples.length, display) } : {}), display },
       method: evolutionMethod({ cohorts: vNames, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length, lists: r.lists, excluded, instances: r.groups,
         patient: want, samples: samples.length, table: { total: m.total, all: m.all, queryText: tq }, drawn: drawn?.length ?? null, noVaf }),
@@ -203,10 +229,13 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
         "not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene" + (notSeq.length ? " or the sample was not sequenced for mutations (" + notSeq.join(", ") + ")" : "") +
         " — never 0" + (npCells ? " (" + plural(npCells, "such cell") + " here)" : "") + ". " +
         (display.chart === "line" ? "A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment" +
+          (grouping ? "; grouped by " + grouping.name + " as the portal's Group by: a line per mutation and group, through that group's samples alone, each group in its colour (" +
+            grouping.groups.map((g) => (g.value || "no value") + ": " + g.samples.map((i) => samples[i].label).join(", ")).join("; ") + ")" : "") +
           (display.logScale ? "; the y axis is log-scaled, a VAF of 0 sitting at its floor of 0.001" : "") + (display.dataRange ? "; the y axis spans the VAFs drawn rather than 0 to 1" : "") + ". "
           : "The heatmap has " + (display.transpose ? "a row per mutation and a column per sample" : "a row per sample and a column per mutation") + ", " +
             (display.cluster ? "both clustered by VAF as the portal clusters an oncoprint heatmap" : "the samples in order and the mutations by name") +
             (display.mutationLabels ? "" : ", mutation labels hidden") + "; it colours each sample's VAF from 0 to 1 on the portal's VAF ramp; grey is not found, white with a bar is not profiled. ") +
+        (ungrouped ? "Group by: " + ungrouped + ". " : "") +
         "Fusions recorded as mutations are left out, as the portal leaves them out. " +
         "The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: " + tableTail(r, q, listColumns, "patient", "with the most samples first, then by patient id", excluded, false),
     };

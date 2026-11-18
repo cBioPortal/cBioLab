@@ -45,6 +45,12 @@ export interface EvolutionView extends TableQuery {
   mutationLabels?: boolean;
   /** the line chart's time axis draws every year, rather than cutting runs of four or more years with no event (default false), as the timeline's expandGaps */
   expandGaps?: boolean;
+  /**
+   * the line chart's Group by, as the portal's VAF chart: a sample clinical attribute's id (one of the
+   * result's `groupOptions`); a mutation's line is drawn once per group of samples sharing a value,
+   * through that group's samples alone, in the group's colour. Default none
+   */
+  groupBy?: string;
 }
 
 /**
@@ -97,8 +103,14 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   heatmapOrder?: { mutations: number[]; samples: number[] };
   /** placed by day: the patient's timeline axis, a tick a year from the first to the last of all the patient's events, empty stretches of four or more years cut, as the portal's line chart shares the timeline's axis */
   axis?: AxisTick[];
+  /** the attributes the line chart can be grouped by: the patient's samples' own clinical attributes, id and display name */
+  groupOptions?: { id: string; name: string }[];
+  /** the samples' groups when grouped: in order of a value's first sample; samples without a value last, unlabelled ("") */
+  groupBy?: { attribute: string; name: string; groups: EvolutionGroup[] };
+  /** why the chart is not grouped though groupBy was asked for, or why the attributes to group by could not be listed */
+  ungrouped?: string;
   /** the display as drawn, from the spec */
-  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean };
+  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean; /** the Group by attribute applied, or null when the chart is not grouped */ groupBy: string | null };
 }
 
 declare module "../../types.ts" {
@@ -109,4 +121,14 @@ declare module "../../types.ts" {
     };
   }
   interface ViewResultMain { evolution: "evolution" }
+}
+
+/** A group of the patient's samples sharing a value of the Group by attribute. */
+export interface EvolutionGroup {
+  /** the value; "" for the samples without one */
+  value: string;
+  /** its colour (the portal's unique colours, in order), or null when there is one group or no value: the default ink */
+  color: string | null;
+  /** indices into the patient's samples, in their order */
+  samples: number[];
 }
