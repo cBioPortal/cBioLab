@@ -21,20 +21,26 @@ export interface ClinicalTabProps {
   studies: string[];
   /** the visible clinical-attribute charts */
   charts: TabChart[];
+  /** shown: a tab kept mounted while another is shown reads nothing, and catches up when shown again */
+  active?: boolean;
 }
 
-export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps) {
+export function ClinicalDataTab({ selection, studies, charts, active = true }: ClinicalTabProps) {
   const [query, setQuery] = useState<TableQuery>({});
   const columns = useMemo(() => clinicalTabColumns(charts), [charts]);
   const doc = useMemo(() => selection ? clinicalTabDoc(selection.def, selection.study, columns, query) : null, [selection, columns, query]);
   const docText = doc ? JSON.stringify(doc) : "";
   /** the shown table and the document it came from; `failed`, the document whose request failed with `error` */
-  const [res, setRes] = useState<{ doc: string; shown?: { query: TableQuery; columns: string[] }; table?: TableResult; error?: string; failed?: string } | null>(null);
+  /** `loaded`, the document whose table this is: read once each; a failed or abandoned read is tried again */
+  const [res, setRes] = useState<{ doc: string; loaded?: string; shown?: { query: TableQuery; columns: string[] }; table?: TableResult; error?: string; failed?: string } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!doc) return;
+    // read once per document; a failed or abandoned read is tried again when the tab is shown again
+    if (!doc || !active || res?.loaded === docText) return;
+    // a retry shows the waiting state, not the failure it is retrying
+    setRes((prev) => prev && prev.failed === docText ? { ...prev, failed: undefined, error: undefined } : prev);
     const ac = new AbortController();
     api.analysis(doc, { signal: ac.signal })
       .then((r) => r.json())
@@ -43,16 +49,18 @@ export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps
         const v = j.views?.[0];
         // a failed refetch keeps the table it had, so the search box and the page stay
         setRes((prev) => j.error || !v || v.error || !v.table
-          ? { doc: prev?.doc ?? docText, shown: prev?.shown, table: prev?.table, error: String(j.error || v?.error || "the table returned nothing"), failed: docText }
-          : { doc: docText, shown: { query, columns }, table: v.table });
+          ? { doc: prev?.doc ?? docText, loaded: prev?.loaded, shown: prev?.shown, table: prev?.table, error: String(j.error || v?.error || "the table returned nothing"), failed: docText }
+          : { doc: docText, loaded: docText, shown: { query, columns }, table: v.table });
       })
-      .catch((e) => { if (!ac.signal.aborted) setRes((prev) => ({ doc: prev?.doc ?? docText, shown: prev?.shown, table: prev?.table, error: String((e as Error)?.message || e), failed: docText })); });
+      .catch((e) => { if (!ac.signal.aborted) setRes((prev) => ({ doc: prev?.doc ?? docText, loaded: prev?.loaded, shown: prev?.shown, table: prev?.table, error: String((e as Error)?.message || e), failed: docText })); });
     return () => ac.abort();
-  }, [docText]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on docText, the string form of doc
+  }, [docText, active]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on docText, the string form of doc
 
   if (!selection) return <div className="card"><p className="note">Select a study first.</p></div>;
   if (!res) return <div className="card"><p className="waiting" role="status"><span className="spinner" /> loading clinical data…</p></div>;
-  if (!res.table) return <div className="card"><p className="note">Could not load the clinical data: {res.error}</p></div>;
+  if (!res.table) return res.error
+    ? <div className="card"><p className="note">Could not load the clinical data: {res.error}</p></div>
+    : <div className="card"><p className="waiting" role="status"><span className="spinner" /> loading clinical data…</p></div>;
   const updating = res.doc !== docText && res.failed !== docText;
   // the file lists the rows shown: after a failed update, those of the last query that answered
   const asShown = res.failed === docText && res.shown ? res.shown : { query, columns };

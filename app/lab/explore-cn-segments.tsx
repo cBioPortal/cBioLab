@@ -16,17 +16,23 @@ export interface CnSegmentsTabProps {
   selection: { def: CohortDef; study: string } | null;
   /** the selected samples */
   selected: number;
+  /** shown: a tab kept mounted while another is shown reads nothing, and catches up when shown again */
+  active?: boolean;
 }
 
-export function CnSegmentsTab({ selection, selected }: CnSegmentsTabProps) {
+export function CnSegmentsTab({ selection, selected, active = true }: CnSegmentsTabProps) {
   const [settings, setSettings] = useState<CnSegmentsSettings>({});
   const reads = cnSegmentsReads(selected);
-  const doc = useMemo(() => selection && reads ? cnSegmentsDoc(selection.def, selection.study, settings) : null, [selection, reads, settings]);
+  // nothing to read for an empty selection: the info line says so
+  const doc = useMemo(() => selection && reads && selected > 0 ? cnSegmentsDoc(selection.def, selection.study, settings) : null, [selection, reads, selected, settings]);
   const docText = doc ? JSON.stringify(doc) : "";
   const [res, setRes] = useState<{ doc: string; v?: ViewResult; error?: string } | null>(null);
 
   useEffect(() => {
-    if (!doc) return;
+    // read once per document; a failed read is tried again when the tab is shown again
+    if (!doc || !active || (res?.doc === docText && !res.error)) return;
+    // a retry shows the waiting state, not the failure it is retrying
+    if (res?.doc === docText && res.error) setRes(null);
     const ac = new AbortController();
     api.analysis(doc, { signal: ac.signal })
       .then((r) => r.json())
@@ -37,11 +43,12 @@ export function CnSegmentsTab({ selection, selected }: CnSegmentsTabProps) {
       })
       .catch((e) => { if (!ac.signal.aborted) setRes({ doc: docText, error: String((e as Error)?.message || e) }); });
     return () => ac.abort();
-  }, [docText]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [docText, active]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!selection) return <div className="card"><p className="note">Select a study first.</p></div>;
   const busy = !!doc && (!res || res.doc !== docText);
-  const v = res?.v;
+  // with nothing to read (0 selected samples, or past the limit), no earlier selection's figure
+  const v = doc ? res?.v : undefined;
   const segmented = !busy && v?.kind === "segments" && v.segments ? v.segments.segmented : null;
   const spec = doc?.views?.[0] as unknown as Record<string, unknown> | undefined;
   const c = spec ? {
