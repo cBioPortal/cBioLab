@@ -41,7 +41,7 @@ async function assays({ browser, ok, BASE }) {
       await page.goto(BASE + "/lab?tab=explore&study=" + STUDY, { waitUntil: "domcontentloaded" });
       await page.locator(".facettitle").first().waitFor({ timeout: 120000 });   // the dialog lists what Explore's answer holds
       await page.getByRole("button", { name: /add chart/i }).first().click();
-      await page.getByRole("tab", { name: "Generic assays" }).click();
+      await page.getByRole("tab", { name: "Arm-level CNA" }).click();   // a tab per generic-assay type (STV-AC-2)
       await page.locator(".addchart [role=combobox]").first().click();
       await page.getByRole("option", { name: /arm-level/i }).click();
       await pick("chart entity", "8q", /^8q/);
@@ -60,7 +60,7 @@ async function assays({ browser, ok, BASE }) {
       await page.goto(BASE + "/lab?tab=explore&study=" + STUDY + ",coadread_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
       await page.locator(".facettitle").first().waitFor({ timeout: 120000 });
       await page.getByRole("button", { name: /add chart/i }).first().click();
-      await page.getByRole("tab", { name: "Generic assays" }).click();
+      await page.getByRole("tab", { name: "Arm-level CNA" }).click();   // a tab per generic-assay type (STV-AC-2)
       await page.locator(".addchart [role=combobox]").first().click();
       await page.getByRole("option", { name: /arm-level/i }).click();
       await pick("chart entity", "8q", /^8q/);
