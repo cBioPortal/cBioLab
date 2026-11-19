@@ -35,7 +35,6 @@
     "check:genefacets": "node --env-file=.env.local scripts/check-gene-facets.ts",
     "check:mutationtypes": "node --env-file=.env.local scripts/check-mutation-types.ts",
     "check:treatments": "node --env-file=.env.local scripts/check-treatments.ts",
-    "check:violin": "node --env-file=.env.local scripts/check-violin.ts",
     "check:values": "node --env-file=.env.local scripts/check-value-folding.ts",
     "check:oncoprint-values": "node --env-file=.env.local scripts/check-oncoprint-values.ts",
     "check:oncoprint-spectrum": "node --env-file=.env.local scripts/check-oncoprint-spectrum.ts",
