@@ -77,7 +77,8 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                       clinical: list[dict[str, Any]], heatmap: list[dict[str, Any]] | None = None, z_reference: dict[str, Any] | None = None,
                       derived: list[dict[str, Any]] | None = None, sort: list[dict[str, str]] | None = None, line_gap: int = 90,
                       study_of: dict[str, str] | None = None, display: dict[str, Any] | None = None,
-                      unit: str = "patient", hide_tracks: list[str] | None = None) -> Contract:
+                      unit: str = "patient", hide_tracks: list[str] | None = None,
+                      case_list_rank: dict[str, int] | None = None) -> Contract:
     heatmap = heatmap or []
     derived = derived or []
     sort = sort or [{"track": "genomic", "dir": "asc"}]
@@ -381,9 +382,22 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
         if s["track"] == "id":
             cmps.append(lambda x, y, sign=sign: sign * by_id(x, y))
             continue
+        if s["track"] == "caseList":
+            if case_list_rank is None:
+                raise ValueError("sort: 'caseList' needs a cohort chosen by a user-defined case list (a sampleList or patientList clause in its all)")
+            at = [case_list_rank.get(p) for p in all_pids]
+
+            def case_list_cmp(x: int, y: int, sign: int = sign, at: list[int | None] = at) -> int:
+                a, b = at[x], at[y]
+                if a is None or b is None:
+                    return 0 if a is b else (1 if a is None else -1)
+                return sign * ((a > b) - (a < b))
+            cmps.append(case_list_cmp)
+            continue
         t = sortable.get(s["track"])
         if t is None:
             raise ValueError("sort: '" + s["track"] + "' is not a track in this oncoprint — sortable: genomic, id" +
+                             (", caseList" if case_list_rank is not None else "") +
                              (", " + ", ".join(sortable) if sortable else "") + " (clinical sort keys must also be listed in clinical)")
         cmps.append(track_cmp(t, sign))
     cmps.append(genomic_cmp)
@@ -476,6 +490,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
                                 "MUTATION_COUNT their max, for anything else the value they agree on, otherwise \"Mixed\"; heatmap: the sample value furthest from 0; VAF: max)"),
                      "annotation": annotation_source, "lineGap": line_gap,
                      "sort": [("-" if s.get("dir") == "desc" else "") + s["track"] for s in sort],
+                     **({"caseList": True} if case_list_rank is not None else {}),
                      **_custom_driver_report(events)},
         display=dict(display) if display else dict(DEFAULT_DISPLAY),
         stats={"nColumns": len(columns), "ms": 0, **({"hiddenVus": hidden_vus} if hide_vus else {}), **({"hiddenGermline": hidden_germ} if hide_germ else {}),

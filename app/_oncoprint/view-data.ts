@@ -1,6 +1,6 @@
 // What of a view decides its answer, apart from what the figure applies in the browser: the test
 // for whether an edit re-runs it. Kept apart from view-display.ts so a test can load it.
-import { sortKeyText } from "./track-edits.ts";
+import { isEngineSortKey, sortKeyText } from "./track-edits.ts";
 
 /** the display keys the figure owns — written back without a re-run */
 export const FIGURE_KEYS = new Set(["showUnaltered", "whitespace", "gaps", "colorByType", "colorByGermline", "colors", "whiteBackground", "showOql", "clinicalLegends",
@@ -24,8 +24,8 @@ export function dataPart(v: Record<string, unknown>): Record<string, unknown> {
   if (v.kind === "pathwaymap") { const { pathway, rank, byFrequency, pancanOnly, ...rest } = v; void pathway; void rank; void byFrequency; void pancanOnly; return rest; }
   if (v.kind !== "oncoprint") return v;
   const { sort, display, ...rest } = v;
-  // a sort is applied in the browser, except a clustering: only the engine has the values to compute it
-  const cluster = ((sort || []) as unknown[]).map(sortKeyText).filter((k) => k.replace(/^-/, "").startsWith("cluster:"));
+  // a sort is applied in the browser, except a clustering or the case list order: only the engine has what they are computed from
+  const cluster = ((sort || []) as unknown[]).map(sortKeyText).filter(isEngineSortKey);
   const d = Object.fromEntries(Object.entries((display || {}) as Record<string, unknown>).filter(([k]) => !FIGURE_KEYS.has(k)));
   return { ...rest, ...(Object.keys(d).length ? { display: d } : {}), ...(cluster.length ? { cluster } : {}) };
 }

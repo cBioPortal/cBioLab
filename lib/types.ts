@@ -930,6 +930,8 @@ export interface Contract {
     annotation: string; lineGap: number; sort: string[];
     /** a clustered sort: average linkage on 1 − Spearman over the profile's values, and how far it went */
     cluster?: ClusterMethod;
+    /** the cohort is chosen by a user-defined case list, so the sort key "caseList" (its typed order) is on offer */
+    caseList?: boolean;
     /** the study's own driver calls among the figure's alterations: any cbp_driver value, and the cbp_driver_tiers values */
     customDrivers?: { binary: boolean; tiers: string[] };
     /** the automatic rows (lib/profile-names.ts AUTO_TRACKS) this figure draws, those the view hides included, in draw order */

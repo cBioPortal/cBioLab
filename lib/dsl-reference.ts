@@ -1239,7 +1239,8 @@ the frozen patients (a re-called mutation, an edited clinical field) are read as
 **Stored id sets.** A long list is saved once on the server — \`POST /api/id-sets\` with
 \`{name, level:"sample"|"patient", studies, ids}\`, or "+ Add cohort" → "From a list of ids" — and
 named by its id: \`{"kind":"sampleList","set":"<id>"}\`. The ids are matched to the studies' own
-samples or patients when the set is saved (the answer says how many matched nothing); a set's
+samples or patients when the set is saved (the answer says how many matched nothing), each study's ids
+kept once, in the order given, which an oncoprint's \`"caseList"\` sort draws; a set's
 members never change, so a document naming one always means the same cases, and a different list
 is a new set. The set travels to ClickHouse as an external table beside each statement that reads
 it, never as SQL text, so its size does not touch the 256 KB statement limit an inline list
@@ -1678,6 +1679,10 @@ so the reference population can be far larger than the drawn one without any val
 staircase, cBioPortal's: each gene row, top to bottom, ranks structural variant, then copy number,
 then mutation class, germline, mRNA and protein, a driver before any VUS of its kind, and not
 profiled after unaltered), \`"id"\` (the column id, in natural order: P2 before P10),
+\`"caseList"\` (cBioPortal's case list order: the columns in the order the cohort's user-defined list
+names them, the first \`sampleList\` / \`patientList\` clause of its \`all\` — a patient column at its
+first listed sample, a sample column at its listed patient, unlisted columns last; refused when the
+cohort names no such list; \`conventions.caseList\` says when it is on offer),
 \`"cluster:<profileType>"\` (cBioPortal's clustering of that heatmap profile: average linkage on
 1 − Spearman over its cases and its rows, computed in the engine because the browser never receives
 the values; cases with no value but 0 go last; exact up to 8,000 distinct rank patterns, past that a

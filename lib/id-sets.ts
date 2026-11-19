@@ -33,6 +33,20 @@ export interface LoadedIdSet {
   parts?: Record<string, Record<string, string[]>>;
 }
 
+/**
+ * Distinct ids per study, studies sorted, empty studies dropped. A typed list keeps the order its
+ * ids were given (`ordered`: the OncoPrint's "case list order" draws it); any other set is sorted.
+ */
+export function tidyIdSet(m: Record<string, string[]>, ordered = false): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const study of Object.keys(m).sort()) {
+    const ids = [...new Set(m[study].map(String))];
+    if (!ordered) ids.sort();
+    if (ids.length) out[study] = ids;
+  }
+  return out;
+}
+
 const membersOf = (s: LoadedIdSet, part: string): Record<string, string[]> | undefined => part ? s.parts?.[part] : s.perStudy;
 
 interface IdSetCtx {
