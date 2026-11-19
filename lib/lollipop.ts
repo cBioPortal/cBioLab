@@ -2,6 +2,7 @@
 // cbioportal-frontend-commons). Each rule below cites the function it copies, so a difference
 // from the portal is a bug here rather than a design choice. Pure except fetchProteinInfo.
 import type { LollipopReport } from "./federation.ts";
+import { portalPct } from "./chart/format.ts";
 import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hotspots/types.ts";
 import type { ColumnFilter, TableQuery } from "./table-query.ts";
 
@@ -539,3 +540,11 @@ export function lollipopFilename(gene: string): string {
 
 /** its formats, the portal's DownloadControls order for the plot */
 export const LOLLIPOP_FORMATS = ["svg", "png", "pdf"] as const;
+
+/**
+ * The Mutations tab's somatic or germline mutation frequency, as the portal's badge writes it (MutationStatusSelector:
+ * formatPercentValue(rate) + "%"): one decimal ("100.0%", "36.7%"), "< 0.1%" for a rate that rounds to nothing; "–" with no samples.
+ */
+export function mutationRateText(samples: number, of: number): string {
+  return of > 0 ? portalPct(samples / of) + "%" : "–";
+}
