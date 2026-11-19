@@ -23,7 +23,7 @@ export const TABLE_CHUNK = 10000;
 
 /** The study's clinical attributes, highest priority first (the portal's column order). Metadata only. */
 export function tableAttributesSql(study: string, db: string): AggregateSql {
-  return aggregateSql("SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority\n" +
+  return aggregateSql("SELECT m.attr_id AS id, m.display_name AS name, m.description AS description, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority\n" +
     "FROM " + clinicalMetaTable(db) + " m\n" +
     "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = m.cancer_study_id\n" +
     "WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +

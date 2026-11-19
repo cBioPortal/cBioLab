@@ -122,7 +122,7 @@ export async function runOncoprint(view: DocView, c: ViewRun): Promise<ViewResul
         ? { ...doc.cohorts[n],
           [PIDS_SQL]: Object.fromEntries(okStudies.filter((s) => cohorts[n].perStudy[s] && !atPeer.includes(s)).map((s) => [s, cohorts[n].perStudy[s].sql])),
           [PEER_STUDIES]: atPeer.filter((s) => cohorts[n].perStudy[s]) } as PidsCarrier
-        : { [PIDS_SQL]: multi
+        : { ...doc.cohorts[n], [PIDS_SQL]: multi
           ? Object.fromEntries(okStudies.filter((s) => cohorts[n].perStudy[s]).map((s) => [s, cohorts[n].perStudy[s].sql]))
           : cohorts[n].perStudy[okStudies[0]].sql
         } as PidsCarrier })) } }

@@ -1625,6 +1625,8 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .vtable .vt-check { display: flex; align-items: center; justify-content: space-between; gap: var(--s1); }
 .vt-foot { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s2); font-size: var(--t-sm); }
 .vt-min { display: inline-flex; align-items: center; gap: var(--s1); }
+/* a density chart's held selection (STV-FB-3b): the box its drag filters on, shown on the chart only */
+.xc-held { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
 .xc-density { display: block; touch-action: none; cursor: crosshair; user-select: none; }
 .xc-frame { fill: none; stroke: var(--line); }
 .xc-brush { fill: color-mix(in srgb, var(--accent) 15%, transparent); stroke: var(--accent); stroke-dasharray: 3 2; }

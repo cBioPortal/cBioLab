@@ -172,3 +172,30 @@ export function mutationStatusCell(raw: string | null | undefined): { kind: "som
 export function vafEmptyTip(value: unknown): string | null {
   return value == null || value === "" ? "Data not available." : null;
 }
+
+/** what the mutation table counts its rows as, in its title and pager: the portal's "N Mutations", "1 Mutation" (MUT-TB-1) */
+export function mutationUnit(n: number): string {
+  return n === 1 ? "Mutation" : "Mutations";
+}
+
+/** the tip of a clinical attribute's cell with no value (ClinicalAttributeColumnFormatter's LazyLoadedTableCell naAlt) */
+export const CLINICAL_NA_TIP = "Clinical attribute not available for this sample.";
+
+/**
+ * A clinical attribute's cell (MUT-COL-36), as the portal's TruncatedText draws it (maxLength 30, the default
+ * buffer 2): a value longer than 32 characters cut to its first 30 and "...", the whole value as its tip; no value
+ * is an empty cell whose tip says the attribute is not available. A number is written as the value it holds.
+ */
+export function clinicalCellText(value: unknown): { text: string; tip: string | null } {
+  if (value == null || value === "") return { text: "", tip: CLINICAL_NA_TIP };
+  const text = String(value);
+  return text.length > 32 ? { text: text.substring(0, 30) + "...", tip: text } : { text, tip: null };
+}
+
+/**
+ * The unit a mutation table counts in, for its title, pager and search box: numbered by every row it holds, the total
+ * a filtered title's "N of M" ends on ("1 of 223 Mutations", "1 Mutation" when the table holds one).
+ */
+export function mutationTableUnit(t: { all: number }): string {
+  return mutationUnit(t.all);
+}

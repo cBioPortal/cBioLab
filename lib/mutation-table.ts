@@ -24,7 +24,9 @@ import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, s
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc";
   /** the Columns menu's Clinical tab (MUT-TB-5), with its Freq: the percent of queried samples with a value (MUT-STM-15) */
-  group?: "clinical"; freq?: number }
+  group?: "clinical"; freq?: number;
+  /** a clinical attribute's column (MUT-COL-36): its cell is the attribute's value, cut at 30 characters, "not available" when none */
+  attribute?: true }
 
 /** the columns whose first header click sorts descending (MutationTable defaultSortDirection 'desc'); every other column's is ascending, numbers too */
 const FIRST_SORT_DESC = new Set(["gnomad", "clinvar", "dbsnp"]);
@@ -151,7 +153,9 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     // spelled as the table shows it, so search and the value list match what is on screen
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: MUTATION_ANNOTATION_ORDER };
     // the portal's sort values (MUT-STM-9): position, then the letters' character codes; chromosome as a number, X 23, Y 24
-    case "proteinChange": return { ...c, text: str("proteinChange"), order: proteinChangeSortSql("proteinChange") };
+    // searched as the change with a germline call's status after it, "G12DGermline" (ProteinChangeColumnFormatter getFilterValue)
+    case "proteinChange": return { ...c, text: str("proteinChange"), order: proteinChangeSortSql("proteinChange"),
+      search: "if(positionCaseInsensitiveUTF8(" + str("status") + ", 'germline') > 0, concat(" + str("proteinChange") + ", " + str("status") + "), " + str("proteinChange") + ")" };
     case "chr": return { ...c, text: str("chr"), order: chromosomeSortSql("chr") };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };

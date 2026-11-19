@@ -40,6 +40,8 @@ export interface QueryColumn {
   id: string; name: string; numeric: boolean;
   /** the column as text: what search and text filters match, and what a value list lists */
   text: string;
+  /** what the table's search matches in this column, when it is not `text` (Protein Change adds a germline call's status) */
+  search?: string;
   /** numeric columns: the value as a number (NULL when missing) — range filters and sorting */
   num?: string;
   /** an order other than text/num (protein change by codon, say) */
@@ -173,7 +175,7 @@ export function whereSql(src: RowSource, q: TableQuery, defaults: string[], exce
   const s = (q.search || "").trim();
   if (s) {
     const shown = shownColumns(q, src.columns, defaults).map((id) => src.columns.find((c) => c.id === id)!);
-    conds.push("(" + shown.map((c) => "positionCaseInsensitiveUTF8(" + c.text + ", " + sq(s) + ") > 0").join(" OR ") + ")");
+    conds.push("(" + shown.map((c) => "positionCaseInsensitiveUTF8(" + (c.search ?? c.text) + ", " + sq(s) + ") > 0").join(" OR ") + ")");
   }
   for (const [id, f] of Object.entries(q.filters || {})) {
     if (id === except) continue;

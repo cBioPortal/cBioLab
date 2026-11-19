@@ -602,23 +602,36 @@ async function explore({ ok, BASE, page, browser }) {
     await card.locator("svg.xc-density").waitFor({ timeout: 240000 });
     const title = (await card.locator(".xc-title").innerText()).trim();
     const both = await page.locator("[data-chart=mutcount-fga]").count();
-    // a drag on the added chart filters on both its attributes; Remove chart takes the chart and those filters
+    // a drag on the added chart filters on both its attributes, shown on the chart only (no pill, STV-FB-3b);
+    // its Reset clears it, and Remove chart takes the chart and its filters
     const fig = card.locator("svg.xc-density");
-    await card.scrollIntoViewIfNeeded();
-    const bb = await fig.boundingBox();
-    await page.mouse.move(bb.x + bb.width * 0.25, bb.y + bb.height * 0.3); await page.mouse.down();
-    await page.mouse.move(bb.x + bb.width * 0.6, bb.y + bb.height * 0.8, { steps: 10 }); await page.mouse.up();
-    await page.waitForFunction(() => /Diagnosis Age/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
-    const dragged = (await page.locator(".svpills").innerText()).replace(/\s+/g, " ");
+    const drag = async () => {
+      await card.scrollIntoViewIfNeeded();
+      const bb = await fig.boundingBox();
+      await page.mouse.move(bb.x + bb.width * 0.25, bb.y + bb.height * 0.3); await page.mouse.down();
+      await page.mouse.move(bb.x + bb.width * 0.6, bb.y + bb.height * 0.8, { steps: 10 }); await page.mouse.up();
+      await card.locator("[data-held]").waitFor({ timeout: 240000 });
+    };
+    const filtered = () => page.evaluate(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""));
+    await drag();
+    await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const meta = (await card.locator(".meta").first().innerText()).trim();
+    const pills = (await page.locator(".svpills").innerText().catch(() => "")).replace(/\s+/g, " ");
+    const draggedFilters = await filtered();
+    await card.locator("[data-chart-reset]").click();
+    await card.locator("[data-held]").waitFor({ state: "detached", timeout: 240000 });
+    await page.waitForFunction(() => !/patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const resetFilters = await filtered();
+    await drag();
     await card.getByRole("button", { name: /actions for/ }).click();
     await page.getByRole("menuitem", { name: "Remove chart" }).click();
-    await page.waitForFunction(() => !/Diagnosis Age|Mutation Count/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    await page.waitForFunction(() => !/patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
     const removed = await page.locator("[data-chart=xvsy]").count();
-    xyDetail = JSON.stringify({ mixed, numeric, title, both, dragged: dragged.slice(0, 120), removed });
+    xyDetail = JSON.stringify({ mixed, numeric, title, both, meta: meta.slice(0, 120), pills: pills.slice(0, 80), draggedFilters, resetFilters, removed });
     xyOk = mixed === "Add violin/box plot table" && numeric === "Add density plot" && title === "Mutation Count vs Diagnosis Age" && both === 1
-      && /Diagnosis Age/.test(dragged) && /Mutation Count/.test(dragged) && removed === 0;
+      && /selected: Diagnosis Age .+, Mutation Count /.test(meta) && !/Diagnosis Age|Mutation Count/.test(pills) && draggedFilters && !resetFilters && removed === 0;
   } catch (e) { xyDetail = String(e.message).split("\n")[0]; }
-  ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one; its drag filters, Remove chart clears them", xyOk, xyDetail);
+  ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one; its drag filters, shown on the chart only, Reset and Remove chart clear it", xyOk, xyDetail);
 
   // the generic-assay frequency table (STS-OT-5), shown by default for arm-level CNA: altered
   // categories only, losses first, Freq of every selected sample; a row applied filters to its count

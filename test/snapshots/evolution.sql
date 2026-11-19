@@ -236,7 +236,7 @@ ORDER BY sid, sid
 LIMIT 1000 OFFSET 0
 
 -- view 0 evolution: table:attributes · glioma_msk_2018
-SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
+SELECT m.attr_id AS id, m.display_name AS name, m.description AS description, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
 FROM snapshot_db.clinical_attribute_meta m
 JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = m.cancer_study_id
 WHERE cs.cancer_study_identifier = 'glioma_msk_2018'

@@ -670,7 +670,8 @@ export default function AnalysisPage() {
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
                 })()}
                 addClauses={exploreState.addDensitySelection} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />}
-                density={exploreState.chartChecked("genomic|density")} pairs={exploreState.xyCharts} onRemovePair={exploreState.removeXyChart} />
+                density={exploreState.chartChecked("genomic|density")} pairs={exploreState.xyCharts} onRemovePair={exploreState.removeXyChart}
+                onClearDensity={exploreState.clearDensitySelection} />
               {(explore.violinFacets || []).filter((f) => exploreState.violinCharts.some((p) => violinPairKey(p) === violinPairKey(f))).map((f) => (
                 <ViolinCard key={violinPairKey(f)} facet={f} selected={(chartValues(parseDraft(), f.categorical) || []).map(String)}
                   nameOf={(a) => (explore.clinical || []).find((c: any) => c.attribute === a)?.displayName || a}
