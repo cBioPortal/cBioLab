@@ -541,8 +541,12 @@
     "del": "blue",
     "width": 30,
     "height": 8,
+    "top": 2,
+    "svgHeight": 12,
     "textMargin": 6,
-    "textWidth": 35
+    "textWidth": 35,
+    "textBaseline": 9.5,
+    "fontSize": 10
   },
   "geometry": {
     "rowH": 20,

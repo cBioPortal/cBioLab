@@ -176,14 +176,14 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
  */
 function CohortCell({ row, gene, cna, shown }: { row: { detail?: Record<string, unknown> }; gene: string; cna?: string; shown: boolean }) {
   const c = row.detail?.cohort as CohortCount | undefined;
-  if (!c || !shown) return <span className="alt-cohort-na" data-tip="Data not available." />;
+  if (!c || !shown) return <span className="alt-cohort-na" data-tip="Data not available.">&nbsp;</span>;
   const b = cohortBar(c, cna);
   const tip = cohortTooltip(gene, c, cna);
   return (
     <svg width={b.width} height={b.height} data-tip={tip} role="img" aria-label={tip}>
-      <rect y={2} width={b.barWidth} height={b.barHeight} fill={b.background} />
-      {b.bars.map((r, i) => <rect key={i} y={2} width={r.width} height={b.barHeight} fill={r.color} />)}
-      <text x={b.textX} y={9.5} fontSize={10} fill="currentColor">{b.text}</text>
+      <rect y={b.top} width={b.barWidth} height={b.barHeight} fill={b.background} />
+      {b.bars.map((r, i) => <rect key={i} y={b.top} width={r.width} height={b.barHeight} fill={r.color} />)}
+      <text x={b.textX} y={b.textY} fontSize={b.fontSize} fill="currentColor">{b.text}</text>
     </svg>
   );
 }
