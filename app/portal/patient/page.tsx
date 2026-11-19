@@ -171,7 +171,7 @@ function PatientView({ study, patient, sample, nav, tab, note }: { study: string
       left={fresh?.left || []}
       aside={nav && owned ? <CohortNav nav={nav} at={{ study, id: owned }} tab={tab} /> : undefined}>
       {record
-        ? <PatientHeader record={record} sample={sample || null} hrefFor={(to) => hrefFor(study, to, nav, tab)} />
+        ? <PatientHeader record={record} study={study} sample={sample || null} hrefFor={(to) => hrefFor(study, to, nav, tab)} />
         : recordError ? <p className="note">{recordError}</p>
         : <div data-tw className="mt-3 flex flex-col gap-1.5" role="status" aria-label="loading the patient's header"><span className="skeleton h-5 w-96" /><span className="skeleton h-5 w-80" /></div>}
     </PortalSummary>

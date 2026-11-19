@@ -7,7 +7,7 @@ import { api } from "./api.ts";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "../_ui/dialog";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
-import { filterPanelGenes, panelGeneRows, panelGenesTsv } from "../../lib/gene-panel-list.ts";
+import { filterPanelGenes, genePanelLinks, panelGeneRows, panelGenesTsv } from "../../lib/gene-panel-list.ts";
 import { saveBlob } from "../../lib/study-view-download.ts";
 
 type Shown = { panel: string; genes?: string[]; error?: string };
@@ -56,4 +56,11 @@ export function useGenePanelDialog(study: string) {
     </Dialog>
   );
   return { open, node };
+}
+
+/** A "Gene Panel" value with each panel a link to the window (PAT-GP-4); N/A and WXS as text. */
+export function GenePanelValue({ value, open }: { value: string; open: (panel: string) => void }) {
+  return <span>{genePanelLinks(value).map((l, i) => <span key={i}>{i > 0 && ", "}{l.panel
+    ? <button type="button" className="linkish" data-tip={"the genes of " + l.panel} onClick={() => open(l.panel!)}>{l.text}</button>
+    : l.text}</span>)}</span>;
 }
