@@ -1923,7 +1923,7 @@ export async function buildAssayFreqTables(o: {
   profilesByStudy: Map<string, { profiles?: string[]; gaProfiles?: string[] }>;
   connByStudy?: Map<string, ChConn>;
   catalog: { profile: string; type: string; datatype: string; name: string; assayType?: string; patientLevel?: boolean }[];
-  /** selected studies a peer holds: named on a table whose profile they hold, never counted (its federation API has no such counts) */
+  /** selected studies a peer holds: named on every table, never counted (its federation API has no such counts) */
   peers?: string[];
 }): Promise<{ tables: AssayFreqTable[]; notShown: string[] }> {
   const ctx: DefCtx = { oncokbPin: o.oncokbPin, profilesByStudy: o.profilesByStudy };
@@ -1933,8 +1933,9 @@ export async function buildAssayFreqTables(o: {
     .filter((p) => holding(o.studies, p.profile).length || holding(o.peers, p.profile).length);
   const profiles = held.slice(0, ASSAY_FREQ_TABLE_LIMIT), notShown = held.slice(ASSAY_FREQ_TABLE_LIMIT).map((p) => p.name);
   const tables = await ensureChContext(() => Promise.all(profiles.map(async (p): Promise<AssayFreqTable> => {
-    const holders = holding(o.studies, p.profile), peers = holding(o.peers, p.profile);
-    const leftOut = peers.length ? { leftOut: peers } : {};
+    const holders = holding(o.studies, p.profile);
+    // every selected peer study, holding the profile or not: none is in Freq's denominator
+    const leftOut = o.peers && o.peers.length ? { leftOut: o.peers } : {};
     // the table's own filter: one leaf per entity, or an any of them for several (freqTableClause)
     const leaf = (c: unknown): boolean => { const l = c as { kind?: string; profileType?: string; not?: unknown } | null;
       return !!l && ((l.kind === "genericAssay" && l.profileType === p.profile) || (!!l.not && leaf(l.not))); };

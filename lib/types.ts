@@ -1041,7 +1041,7 @@ export interface AssayFreqTable {
   /** the selected local studies holding the profile; `total` counts every selected local study's cases */
   studies: string[];
   disjunctive?: true;
-  /** selected studies a peer holds with the profile, not counted here (its federation API has no such counts) */
+  /** selected studies a peer holds, not counted here, the profile held or not (its federation API has no such counts) */
   leftOut?: string[];
 }
 

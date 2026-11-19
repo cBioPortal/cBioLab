@@ -1281,15 +1281,16 @@ describe("generic-assay frequency tables", () => {
     assert.ok(sent.filter((q) => /GROUP BY e, v/.test(q)).every((q) => !/st3_armlevel_cna/.test(q)), "only holders are read for values");
   });
 
-  test("a peer's studies holding the profile are named, not counted; a profile only a peer holds still has its table", async () => {
-    const h = new Map([["st1", { gaProfiles: ["armlevel_cna"] }], ["peer1", { gaProfiles: ["armlevel_cna", "loh"] }]]);
+  test("every selected peer study is named, not counted, as on the mutation-type tables; a profile only a peer holds still has its table", async () => {
+    // peer2 does not hold the profile (or its list went unanswered): its cases are not in Freq either
+    const h = new Map([["st1", { gaProfiles: ["armlevel_cna"] }], ["peer1", { gaProfiles: ["armlevel_cna", "loh"] }], ["peer2", {}]]);
     on(/GROUP BY e, v/, [{ e: "1p_status", v: "Loss", n: 148 }]);
     on(/WITH ents AS/, []);
     on(/sample_derived/, [{ n: 594 }]);
-    const { tables } = await buildAssayFreqTables({ studies: ["st1"], peers: ["peer1"], profilesByStudy: h, catalog });
+    const { tables } = await buildAssayFreqTables({ studies: ["st1"], peers: ["peer1", "peer2"], profilesByStudy: h, catalog });
     const arm = tables.find((t) => t.profileType === "armlevel_cna")!, loh = tables.find((t) => t.profileType === "loh")!;
-    assert.deepEqual([arm.leftOut, arm.rows.length], [["peer1"], 1]);
-    assert.deepEqual([loh.leftOut, loh.rows, loh.studies], [["peer1"], [], []]);
+    assert.deepEqual([arm.leftOut, arm.rows.length], [["peer1", "peer2"], 1]);
+    assert.deepEqual([loh.leftOut, loh.rows, loh.studies], [["peer1", "peer2"], [], []]);
   });
 
   test("past the table limit the rest are named, the limit counted over profiles some selected study holds", async () => {

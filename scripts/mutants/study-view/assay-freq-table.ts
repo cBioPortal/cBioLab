@@ -19,4 +19,7 @@ export const mutants: Mutant[] = [
   { id: "freq-table-total-holders-only", layer: "counts", guard: "unit", file: "lib/explore.ts",
     effect: "Freq divides by the cases of the studies holding the profile only, so a selection with a study lacking it reads higher than the portal's (which divides by every selected case).",
     find: "const totals = await Promise.all(byConnection(o.studies, o.connByStudy)", replace: "const totals = await Promise.all(byConnection(holders, o.connByStudy)" },
+  { id: "freq-table-peer-without-profile-unnamed", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "A selected peer study without the profile is not named on the table, which then reads as if its cases were in Freq's denominator.",
+    find: "const leftOut = o.peers && o.peers.length ? { leftOut: o.peers } : {};", replace: "const leftOut = holding(o.peers, p.profile).length ? { leftOut: holding(o.peers, p.profile) } : {};" },
 ];
