@@ -13,4 +13,8 @@ export const mutants: Mutant[] = [
   { id: "gene-tab-cna-first-study-only", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
     effect: "Over two studies holding discrete copy number under different ids (gistic, cna), the option counts the larger study's samples only (300 where the selection's are 592).",
     find: "fmtInt(held.reduce((n, d) => n + d.n, 0))", replace: "fmtInt(top.n)" },
+  { id: "gene-tab-chips-hidden-without-profile", layer: "cohorts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "With no selected sample profiled, the gene tab hides the charted genes' chips, so their charts cannot be removed until the selection changes.",
+    find: "note: current ? null : \"No selected study has mutation or copy-number data to chart a gene from.\", chips };",
+    replace: "note: current ? null : \"No selected study has mutation or copy-number data to chart a gene from.\", chips: current ? chips : [] };" },
 ];

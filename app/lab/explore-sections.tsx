@@ -21,7 +21,7 @@ import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../..
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
-import { addChartLines, assayTabs, bulkButtons, geneChartProfiles, genomicChartLines, type GeneChartKind, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, assayTabs, bulkButtons, genomicChartLines, geneTabView, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -1030,20 +1030,14 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
  */
 function GeneChartPicker({ ctx }: { ctx: ExploreCtx }) {
   const { chartGene, unchartGene, geneChartInput, setGeneChartInput, exploreBusy, geneCharts, geneKinds, mutationTypeCharts } = ctx;
-  const profiles = geneChartProfiles(ctx.explore!.dataTypes || []);
   const [profile, setProfile] = useState<"mutation" | "cna">("mutation");
   const [byType, setByType] = useState(false);
-  const current = profiles.find((p) => p.kind === profile) ?? profiles[0];
-  const kind: GeneChartKind = current?.kind === "cna" ? "CNA" : byType ? "types" : "MUTATION";
+  const { profiles, current, kind, note, chips } = geneTabView(ctx.explore!.dataTypes || [], { genes: geneCharts, kinds: geneKinds, types: mutationTypeCharts }, profile, byType);
   const add = () => chartGene(geneChartInput, kind);
-  const chips: { gene: string; kind: GeneChartKind; text: string }[] = [
-    ...geneCharts.flatMap((g) => (geneKinds[g] || []).map((k) => ({ gene: g, kind: k as GeneChartKind, text: k === "CNA" ? "copy number" : "mutations" }))),
-    ...mutationTypeCharts.map((g) => ({ gene: g, kind: "types" as GeneChartKind, text: "mutation types" })),
-  ];
   return (
     <div>
       {/* the charted genes' chips stay, so a chart can be removed whatever the selection holds */}
-      {!current ? <p className="note mt-0 mb-3">No selected study has mutation or copy-number data to chart a gene from.</p> : <div className="row baseline g5 flex-wrap">
+      {!current ? <p className="note mt-0 mb-3">{note}</p> : <div className="row baseline g5 flex-wrap">
         <Choice className="w-80" value={current.kind} onChange={(v) => setProfile(v as "mutation" | "cna")} title="the profile the chart reads"
           options={profiles.map((p) => [p.kind, p.label] as const)} />
         {current.kind === "mutation" && <Choice className="w-48" value={byType ? "types" : "mutated"} onChange={(v) => setByType(v === "types")}

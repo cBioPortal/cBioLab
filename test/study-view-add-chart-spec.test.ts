@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, geneTabView, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -288,4 +288,22 @@ test("a generic-assay type's tab: the portal's configured text, else its words c
   const coadread = [{ type: "GENERIC_ASSAY", assayType: "METHYLATION" }, { type: "GENERIC_ASSAY", assayType: "ARMLEVEL_CNA" },
     { type: "GENERIC_ASSAY", assayType: "METHYLATION" }, { type: "GENERIC_ASSAY", assayType: "GENETIC_ANCESTRY" }, { type: "MRNA_EXPRESSION" }];
   assert.deepEqual(assayTabs(coadread).map((t) => t.label), ["Arm-level CNA", "Genetic Ancestry", "Methylation"]);
+});
+
+// STV-AC-5: the gene tab's charted genes can always be removed (Reviewer, #459): tiles have no close of their own
+test("the gene tab: its chips, each with what it removes, show whatever the selection's profiles hold", () => {
+  const charts = { genes: ["KRAS"], kinds: { KRAS: ["MUTATION" as const, "CNA" as const] }, types: ["TP53"] };
+  const chips = [{ gene: "KRAS", kind: "MUTATION", text: "mutations" }, { gene: "KRAS", kind: "CNA", text: "copy number" }, { gene: "TP53", kind: "types", text: "mutation types" }];
+  // no selected sample profiled: no profile to pick, the note, and every chip
+  const none = geneTabView([{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 0 }], charts, "mutation", false);
+  assert.equal(none.current, null);
+  assert.match(none.note!, /No selected study has mutation or copy-number data/);
+  assert.deepEqual(none.chips, chips);
+  // with profiles: the picker, its kind, and the same chips
+  const dt = [{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 534 },
+    { profile: "gistic", label: "Putative copy-number alterations from GISTIC", alterationType: "COPY_NUMBER_ALTERATION", n: 592 }];
+  const some = geneTabView(dt, charts, "cna", false);
+  assert.deepEqual([some.current?.kind, some.kind, some.note, some.chips], ["cna", "CNA", null, chips]);
+  assert.equal(geneTabView(dt, charts, "mutation", true).kind, "types", "Mutation Type");
+  assert.equal(geneTabView(dt.slice(1), charts, "mutation", false).current?.kind, "cna", "the profile asked for absent: the first offered");
 });

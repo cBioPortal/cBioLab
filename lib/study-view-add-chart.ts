@@ -92,6 +92,25 @@ export function geneChartProfiles(dataTypes: { profile: string; label: string; a
 /** the gene charts asked for: genes whose status charts Explore counts, which of the two each shows, and genes charted by mutation type */
 export interface GeneCharts { genes: string[]; kinds: Record<string, ("MUTATION" | "CNA")[]>; types: string[] }
 
+/**
+ * What the gene tab shows (STV-AC-5): the profile picked (`chosen`, else the first offered) and the
+ * kind of chart Add makes, or, with no profile to chart from, a note in their place; and always
+ * every charted gene's chips with what each removes, since a chart's tile has no close of its own.
+ */
+export function geneTabView(dataTypes: Parameters<typeof geneChartProfiles>[0], charts: GeneCharts, chosen: "mutation" | "cna", byType: boolean): {
+  profiles: ReturnType<typeof geneChartProfiles>; current: ReturnType<typeof geneChartProfiles>[number] | null; kind: GeneChartKind;
+  note: string | null; chips: { gene: string; kind: GeneChartKind; text: string }[];
+} {
+  const profiles = geneChartProfiles(dataTypes);
+  const current = profiles.find((p) => p.kind === chosen) ?? profiles[0] ?? null;
+  const chips = [
+    ...charts.genes.flatMap((g) => (charts.kinds[g] || []).map((k) => ({ gene: g, kind: k as GeneChartKind, text: k === "CNA" ? "copy number" : "mutations" }))),
+    ...charts.types.map((g) => ({ gene: g, kind: "types" as GeneChartKind, text: "mutation types" })),
+  ];
+  return { profiles, current, kind: current?.kind === "cna" ? "CNA" : byType ? "types" : "MUTATION",
+    note: current ? null : "No selected study has mutation or copy-number data to chart a gene from.", chips };
+}
+
 /** how many charts a gene list draws: one per gene and kind shown, one per mutation-type table */
 export const geneChartCount = (s: GeneCharts): number => s.genes.reduce((n, g) => n + (s.kinds[g]?.length || 0), 0) + s.types.length;
 
