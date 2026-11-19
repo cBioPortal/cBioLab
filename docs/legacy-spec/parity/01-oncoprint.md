@@ -182,8 +182,8 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| ONC-LY-1 | 🟡 | B | Unchanged: clinical → genes → heatmap; no gap between clinical and genetic groups |
-| ONC-LY-2 | 🟡 | B | Unchanged: label | info | cells; no ⋮ (click label opens menu); labels truncated ("Profiled for cop...") |
+| ONC-LY-1 | ✅ | B | clinical → genes → heatmap, a 10 px gap after each track group (clinical, genetic, each heatmap profile), as the portal's track_group_padding (`lib/oncoprint-rows.ts`) (#485) |
+| ONC-LY-2 | 🟡 | B | label \| info \| cells; labels cut as the portal's, past 18 characters to 15 and "..." (#480); no ⋮ (click label opens menu) |
 | ONC-LY-3 | 🟡 | BC | Unchanged: "Profiled for <type>" rows named by alteration type (legacy: "Profiled in" + profile name, e.g. "Putative copy-number alterations from GISTIC"); Study of origin, # Samples per Patient ✅ |
 | ONC-LY-4 | ✅ | B | Integer %, "<1%", the portal's double rounding under 3% (Q1 "37% / 37%", Q5 KRAS "11% / 11%") (#192). Ours alone: the driver % before the portal's one number |
 | ONC-LY-5 | 🟡 | BC | Merged rows drawn "[A / B]"; the Results page still refuses `[BRAF NRAS] KRAS` ("bad gene entry '[BRAF'") (tracked: OQL coverage) |

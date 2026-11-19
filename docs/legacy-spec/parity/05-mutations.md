@@ -211,7 +211,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-33 | 🟡 | C | ClinVar column (#245); blank on Q1 |
 | MUT-COL-34 | 🟡 | C | dbSNP column (#245); blank on Q1 |
 | MUT-COL-35 | 🟡 | C | SIGNAL column (#245); blank on Q1 |
-| MUT-COL-36 | 🟡 | B | A hidden column per attribute of the queried studies but CANCER_TYPE_DETAILED, MUTATION_COUNT (and CANCER_TYPE, our Cancer Type column), by display name, sample attributes by sample and patient by patient, NUMBER as numbers (coadread KRAS: 92 columns, as the portal) (#420); the description as header tip, the "not available" tip, cut at 30 (#474); NUMBER attributes searched |
+| MUT-COL-36 | ✅ | B | A hidden column per attribute of the queried studies but CANCER_TYPE_DETAILED, MUTATION_COUNT (and CANCER_TYPE, our Cancer Type column), by display name, sample attributes by sample and patient by patient, NUMBER as numbers (coadread KRAS: 92 columns, as the portal) (#420); the description as header tip, the "not available" tip, cut at 30 (#474); STRING attributes alone searched, as the portal (#478) |
 | MUT-COL-37 | ❌ | C | Unchanged: no namespace columns |
 | MUT-COL-38 | ✅ | B | The portal's 8 by default: Sample ID, Cancer Type Detailed, Protein Change, Annotation, Mutation Type, Copy #, Allele Freq (T), # Mut in Sample |
 | MUT-COL-T1 | ✅ | B | Label mapping and colours (`lib/mutation-type.ts`) (#245) |
@@ -242,7 +242,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | ID | verdict | how | note |
 |---|---|---|---|
 | MUT-TB-1 | ✅ | B | "223 Mutations (page 1 of 9)", "59 of 223 Mutations", "1 Mutation" (#472), the duplicate suffix when N > 0 (#409) |
-| MUT-TB-2 | 🟡 | B | Search, columns, [Copy] (the table.tsv's text, "Copied!") and download TSV (#413); the order is ours (search first), the portal's Copy · Download · Columns · search |
+| MUT-TB-2 | ✅ | B | Search, columns, [Copy] (the table.tsv's text, "Copied!") and download TSV (#413), in the portal's order Copy · Download · Columns · search (#482) |
 | MUT-TB-3 | ✅ | B | Search "G12D" → table 59 of 223, the lollipop and badges 59 too (the hotspots view's `table`, `linkMutations`) |
 | MUT-TB-4 | ✅ | B | ‹ Show more › with Reset, 25 → 50 → 100 → 200, hidden at ≤ 25 rows, no per-page select (`lib/table-pager.ts`, ShowMorePager) (#409) |
 | MUT-TB-5 | ✅ | B | "Mutations n / m" and "Clinical n / m" tabs; Clinical: Name | Freq, sorted by Freq then name, 0% disabled; Select all (n) / Deselect all / Reset columns (#423); "Columns (n / m)", hiding a column clears its filter (#476) |

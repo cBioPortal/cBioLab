@@ -227,13 +227,13 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-VI-1 | ❌ | C | No clinical violin table |
-| STS-VI-2 | ❌ | C | — |
-| STS-VI-3 | ❌ | C | — |
-| STS-VI-4 | ❌ | C | — |
-| STS-VI-5 | ❌ | C | — |
-| STS-VI-6 | ❌ | C | — |
-| STS-VI-7 | ❌ | C | — |
+| STS-VI-1 | ✅ | C | Add chart › X vs Y with a numeric × categorical pair; "<numeric>[ (log)] vs <categorical>"; violin and box on, log off (`ViolinCard`) |
+| STS-VI-2 | ✅ | C | category · curve and box · # with checkbox · Median / Quartile 1 / Quartile 3 (`violinNumber`); sortable, # descending; category column not resizable |
+| STS-VI-3 | ✅ | C | "Hide # <" 10 (`violinRows`); "No data." |
+| STS-VI-4 | ✅ | C | the portal's curve (Gaussians, 100 points, sigma 4 steps), min(1, 12 / peak), ≤ 7 values as points, 3 × IQR outliers as points, #dddddd box 10 px (`violinTable`, `violinPath`); equal to /api/clinical-data-violin-plots/fetch on 6 cases |
+| STS-VI-5 | 🟡 | C | Box tooltip Median / Quartile 1 / Quartile 3; points carry no sample tooltip (values only reach the browser) |
+| STS-VI-6 | 🟡 | C | A category's checkbox toggles the categorical filter; no range drag |
+| STS-VI-7 | ✅ | C | Log Scale (Mutation Count only), Show Violin Plot, Show Box Plot; quartile columns in counts on log (the portal shows log-space, a bug) |
 | STS-VI-8 | ❌ | C | No gene-specific violin |
 
 ### §10 Survival mini chart
@@ -244,7 +244,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-KM-2 | ✅ | B | Patients of the selection, one curve, no p-value; the curve in #2986E2 (`PORTAL_STUDY_VIEW_KM`), as the portal |
 | STS-KM-3 | 🔶 | B | Full KM with axes, number-at-risk table and "median 81.4 mo · n = 590 · 120 events" line |
 | STS-KM-4 | 🐞 ok | C | No selection on the curve (legacy's is dead code) |
-| STS-KM-5 | ❌ | C | ↓ The Explore card sends only `{kind, endpoint}` (`explore-charts.tsx:79`): no "Left truncation" checkbox and no `TT_CPT_REPORT_MOS` entry anywhere |
+| STS-KM-5 | ❌ | C | ↓ The Explore card sends only `{kind, endpoint}` (`explore-charts.tsx:79`): no "Left truncation" checkbox and no `TT_CPT_REPORT_MOS` entry anywhere; data-blocked (#492): the portal offers it only for `heme_onc_nsclc_genie_bpc`, behind a feature flag, entered from `TT_CPT_REPORT_MOS`, and neither is in the warehouse |
 | STS-KM-6 | ✅ | B | Download ▸ SVG, PDF of the curve with its number-at-risk table and legend ([download-cases](download-cases.md) FG9); Data, every selected patient's status and months (PC8) |
 
 ### §11 Added charts

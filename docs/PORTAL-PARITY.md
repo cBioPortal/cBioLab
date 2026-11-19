@@ -126,8 +126,12 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] "Show only selected mutations" on the line chart: only the clicked mutations drawn, none with nothing clicked, the data range following them (PTB-GE-LC-2) (#421)
     - [x] Show / Hide Timeline: the patient's timeline above the line chart, the chart's time axis on the timeline's, in the document (PTB-GE-LC-1) (#427)
   - [ ] Table: Annotation, Allele Freq bars and Cohort columns; the portal's page size (ours 25) (PTB-TB-1) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
-  - [ ] The unprofiled-sample alert, here and on Patient → Pathways (ours draws not-profiled cells dashed or NA) (PTB-GE-3, PTB-PW-1, PTB-MD-5) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
+    - [x] The portal's page size, 10 rows (PTB-GE-TB-1) (#481)
+    - [x] "Show only selected mutations" above the table: only the picked mutations, every row with none picked, kept in the browser (PTB-GE-TB-1) (#481)
+  - [x] The unprofiled-sample alert, here and on Patient → Pathways (ours draws not-profiled cells dashed or NA) (PTB-GE-3, PTB-PW-1, PTB-MD-5) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md)) (#477, #487)
     - [x] On Genomic Evolution: "Sample(s) ⟨markers⟩ not profiled for mutations" above the chart, from each sample's mutation panel (PTB-GE-3) (#477)
+    - [x] On Pathways: a line per profile (mutations, copy number alterations) the study holds, from the Patient tables' profiling (PTB-PW-1) (#487)
+    - [ ] On Pathways in sample mode (?sample=): the layout does not know the sample's patient, so no alert
 - [x] **Patient → Mutational Signatures** — the `signatures` view: contributions per sample, the spectrum with the portal's toolbar, and the COSMIC v3.3 reference under a clicked row (#156)
   - [ ] The patient header's significant-signatures badge (no warehouse study has a p-value profile yet, so it would show nothing today)
   - [x] The signature table's download (the portal's table exports; ours is client-side `PortalTable` with no CSV) (#348)
@@ -258,7 +262,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The views that join the OncoKB store per gene (`lib/federation.ts` driverJoin: gene tables, cancer types, exclusivity, pathways, and others) still call a structural variant by its genes' gene-level Fusion rows, which the store does not hold
   - [ ] Tracks › Heatmap and generic-assay rows: ours lists raw profile ids (`rna_seq_v2_mrna_median_Zscores`) and shows the tab for several studies; the portal's profile names, hidden across studies. No Select / Clear all for entities, no bar or stacked generic-assay tracks, no categorical generic assay (ours refuses it) (ONC-TR-2, ONC-TR-3, ONC-TT-9, ONC-TT-10, ONC-TP-5, ONC-MD-2) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
   - [ ] Tracks › Groups and Custom Charts: ours "Cohort rows" (at most 3 document cohorts as Yes/No rows) and "Custom" uploads (ONC-TR-4) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
-  - [ ] Layout and legend: no gap between the clinical and genetic groups; labels cut at 17 characters with no ⋮ button (ours: click the label); the Profiled rows named by alteration type ("Profiled for copy number alterations"; the portal's "Profiled in" + the profile's name) (ONC-LY-1, ONC-LY-2, ONC-LY-3) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
+  - [x] Track labels cut as the portal's: past 18 characters, the first 15 and "..." (ONC-LY-2) (#480)
+  - [x] A 10 px gap between track groups (clinical, genetic, each heatmap profile), as the portal's track_group_padding (ONC-LY-1) (#485)
+  - [ ] Layout and legend: no ⋮ button (ours: click the label); the Profiled rows named by alteration type ("Profiled for copy number alterations"; the portal's "Profiled in" + the profile's name) (ONC-LY-2, ONC-LY-3) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
     - [x] Display › show OQL filters is offered only when a row has OQL (`app/_oncoprint/OncoprintFigure.tsx:817`); the portal's View menu always has it, off by default without OQL, and on writes each row's default OQL line (ONC-VI-6, re-measured 2026-11-18) (#380)
       - Ours alone: our oncoprint reads every mutation, copy-number and SV profile of a study, so the default line names every such type the study holds
     - [x] A mutation's glyph class as the portal's getOncoprintMutationType: Translation_Start_Site, Start_Codon_SNP, nonstop and Fusion truncating; promoter by its protein change; unlisted types other (ONC-GL-2) (#436)
@@ -294,7 +300,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] The per-query clinical-attribute and namespace columns; the Exon header's "(N in total)"; ASCN (six columns) (MUT-STM-12)
       - [x] A hidden column per clinical attribute of the queried studies (sample attributes by sample, patient by patient; NUMBER as numbers), the lollipop narrowed by them as the table (MUT-COL-36) (#420)
       - [x] Their header tooltip (the attribute's description), the "not available" cell tip, the 30-character cut (MUT-COL-36) (#474)
-      - [ ] Search on STRING attributes only
+      - [x] Search on STRING attributes only (MUT-COL-36) (#478)
   - [ ] Table chrome: Show more (ours a numbered pager and per-page select), a Columns menu with a Clinical tab and Freq, TSV of every row (ours CSV of the filtered rows), Copy, an annotation filter (MUT-TB-2, MUT-TB-4, MUT-TB-5, MUT-TB-7, MUT-TB-8, MUT-STM-15)
     - [x] Download as the portal's table.tsv: every row in the table's order whatever its search and filters, columns by name, tab-separated, CRLF (MUT-TB-8) (#411)
     - [x] The Columns menu's Mutations and Clinical tabs with counts, the Clinical tab's Freq (samples with a value ÷ queried samples, a patient attribute by its samples), sorted, 0% disabled, Select / Deselect all (MUT-TB-5, MUT-STM-15) (#423)
@@ -415,6 +421,8 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [ ] Treatment tables: Intersection, Compare, the ⓘ description, the Data download; the Groups / Target tiers (STS-OT-6)
     - [x] The GA frequency table, arm-level CNA by default, as the portal counts it (STS-OT-5) (#460)
     - [x] X-vs-Y density for any two numeric attributes (STS-SC-1) (#462)
+    - [x] The clinical violin table, as the portal counts it (STS-VI-1…4, STS-VI-7; its checkbox of STS-VI-6) (#470)
+    - [ ] The violin table's range drag and point tooltips (STS-VI-5, STS-VI-6)
   - [ ] Value lists: colour swatches and Compare from the tooltip, with the pies (STS-TBL-1, STS-TBL-6)
   - [x] Bars: 10ⁿ superscripts on log-scale ticks (STS-BAR-3) (#439)
   - [ ] The Studies chart as a pie (a table past 20 studies); the multi-study header (STS-SP-1, STS-MD-2)
@@ -447,6 +455,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] Survival: one card with an endpoint picker, kept on purpose in place of a KM tile per endpoint; the numbers match (STS-KM-1) (#203)
     - ~~A KM tile per endpoint, drawn small (STS-KM-1, STS-KM-3)~~ Kept on purpose (2026-11-13): one full card with a picker.
     - [ ] The survival chart's download, and left truncation offered on the card (STS-KM-5, STS-KM-6)
+      - [ ] Left truncation (STS-KM-5): [data: the portal offers it only for heme_onc_nsclc_genie_bpc, behind a feature flag, entered from TT_CPT_REPORT_MOS; neither the study nor the attribute is in the warehouse] (#492)
   - [x] Density: x = FGA, y = mutation count, linear; 44×38 bins cut as the portal cuts them; plasma colours and legend; Pearson / Spearman text; Swap Axes and Log Scale; the portal's tooltip (STS-SC-2…5, STS-STM-15; [density-cases](legacy-spec/parity/density-cases.md)) (#222)
     - [x] The chart's Download (Data, SVG, PDF) (STS-SC-5; download-cases FG8, PC7) (#270, PR #273)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4, STS-MD-16)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
@@ -461,7 +470,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
 - [ ] **Study View → filters, actions and tabs** ([31-study-view-shell](legacy-spec/parity/31-study-view-shell.md))
   - [x] The Clinical Data tab: a table per case of the visible charts' attributes, with search, sort and download (STV-TAB-1, STV-CD-1…9, STV-STM-12; [clinical-tab-cases](legacy-spec/parity/clinical-tab-cases.md) CT1–CT12) (PR #274)
     - [x] Header tooltips (name, description, attribute id), "Cancer Study" as its own column, the tab in the URL (#454, #390)
-    - [ ] The Columns menu (Clinical / Genomic / X vs Y) (STV-MD-13)
+    - [x] The Columns menu (Clinical / Genomic / X vs Y) (STV-MD-13) (#492)
   - [x] "Download clinical data" (⤓) for the selection: every attribute of each selected sample, `<study>_clinical_data.tsv` (STV-AB-4, STV-STM-5, STV-HD-2; download-cases PC9) (PR #273)
   - Not as the portal, on purpose (the user, 2026-11-19): the gene tables' Data file keeps the corrected CNA columns (the profiled count under "Profiled Samples", the altered under "#") and the Freq on screen (altered on a covering panel ÷ profiled), where the portal's file swaps the two columns and divides every altered sample (gene-tables-cases GD6, GD7)
   - [x] Filters in the URL: the bookmark, `#filterJson`, `filterAttributeId` / `filterValues` (STV-URL-2, STV-URL-3, STV-BM-1…3, STV-FB-7; see bugs) (#189)
@@ -480,8 +489,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] The ⚙ settings: manual submit (a Submit button, pending pills) and the Alteration Filter menu (ours "Alterations: all / OncoKB drivers only") (STV-AB-5, STV-AB-6, STV-FB-1, STV-FB-6, STV-MD-7)
   - [x] Filter pills named by chart ("Diagnosis Age : 50 < x ≤ 55 or 70 < x ≤ 75", "Sex : Female"), a value or range per pill with its ×, interval ends edited in place, "Clear All Filters" (STV-FB-1…5) (#191)
     - [x] An edited end makes custom bins on the chart (STV-FB-4): its ends join the chart's edges, so the filter is drawn as bars (#203)
-    - [ ] Gene-chart and generic-assay pills named by chart (STV-FB-3 #5, #13, #14): ours the generic clause pills
+    - [ ] Generic-assay pills named by chart (STV-FB-3 #13, #14): ours the generic clause pills
       - [x] Gene-table pills: a pill per gene, coloured by alteration, the OQL in the tooltip, removed one by one (STV-FB-3 #9) (#457)
+      - [x] Gene-chart and mutation-type pills named by chart, a state per pill (STV-FB-3 #5, #7) (#489)
     - [ ] Survival-attribute pills (STV-FB-3a)
       - [x] A density drag shown on its chart only, with its Reset, not as pills (STV-FB-3b) (#473)
     - [x] Several separate ranges of one chart are one pill, from the first range's start to the last's end, as the portal (which reads wider than the filter; the user's choice, 2026-11-19) (STV-FB-4) (#471)
@@ -491,15 +501,16 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
       - [x] The Genomic tab, its charts and Freq (STV-AC-2, STV-AC-4) (#455)
       - [x] A tab per generic-assay type (STV-AC-2, STV-AC-8) (#456)
       - [x] The gene tab's profile select with sample counts, one chart per gene and profile (STV-AC-5, STV-STM-4) (#459)
-    - [ ] The X vs Y tab's violin table for a numeric × categorical pair (STV-AC-7)
+    - [x] The X vs Y tab's violin table for a numeric × categorical pair (STV-AC-7) (#470)
       - [x] The X vs Y tab: the portal's button for each pair, a density chart per numeric pair (STV-AC-7) (#462)
   - [ ] CN Segments and Plots tabs on the Study View (STV-CN-1…3, STV-PL-1, STV-STM-13)
     - [x] CN Segments: offered when a selected study holds segments; the portal's info line and its 20,000-sample limit; the segments view over the selection (STV-CN-1, STV-CN-3, STV-STM-13; [study-cn-segments-cases](legacy-spec/parity/study-cn-segments-cases.md)) (PR #292)
     - [ ] CN Segments' `.seg` download (STV-CN-2), with Per-sample CN segments' download
+      - Deferred (#492): it needs a per-case segments file route on the patient-level side (sample ids with each segment), which the table route's row sources do not serve today; tracked with Results' CN Segments download (CF3)
     - [ ] Plots (STV-PL-1)
   - [ ] Per-user layout: Save settings, the restore banner, reset charts (STV-LP-1…6, STV-AC-1, STV-MD-9, STS-MD-13)
   - [ ] Found by the re-measurement of 2026-11-18 (master `bc53b944`):
-    - [ ] The Clinical Data tab's Columns menu (Add chart is hidden there), "Show more" and the 100vh − 220px table height (STV-CD-5, STV-CD-9, STV-MD-13)
+    - [x] The Clinical Data tab's Columns menu (Add chart is hidden there), "Show more" and the 100vh − 220px table height (STV-CD-5, STV-CD-9, STV-MD-13) (#492)
     - [x] The selection as the portal writes it: "Selected: N patients | M samples" (STV-AB-1) (#452)
     - [x] A density drag shown on its chart only, not as two range pills (STV-FB-3b) (#473)
       - [x] Gene, case-list and other generic pills with the portal's lower-case "or", parentheses and outer "and" (STV-FB-2) (#453)
@@ -601,6 +612,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] The Timeline Data tables, one per event type (PTB-CD-4) (#316)
     - [x] Attribute | Value and Attribute × sample, a sample's own attributes (PTB-CD-1…3) (#314)
     - [x] The patient table's 1-decimal values (PTB-STM-11) (#376)
+    - [x] The Samples table's columns in the page's sample order, the header's markers (PTB-CD-3) (#493)
   - [x] The alteration tables and the signatures number the samples by collection day, as the header and timeline do (PAT-STM-12) (#284)
   - [x] Summary layout: no Timeline card when the patient has no clinical events (ours a "0 events" card: msk_impact_2017 P-0000004), and the tables in the portal's order Mutations, Structural Variants, Copy Number Alterations (ours Mutations, CNA, SV) (PAT-SUM layout, §2 of the spec) ([40-patient-summary](legacy-spec/parity/40-patient-summary.md)) (#397)
 
@@ -618,6 +630,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] The query's OQL on Results: a query gene whose line carries OQL is altered where its lines match (alterationFrequencyDataForQueryGenes), the other nodes every alteration; coadread `KRAS: AMP MUT=G12D` 10.6 % (63 / 594), as the portal
     - Ours alone: two lines of one gene count the samples either alters; the portal hands PathwayMapper two values for one node
   - [ ] The Comparison page's Pathways tab
+  - [x] The Patient page's ranking in the portal's patient mode: Pathway name · Pathway altered (bold Yes/No) · Genes matched, and only the PanCanAtlas choice (PTB-PW-3, PTB-PW-4) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md)) (#486)
   - [ ] Ranking table search and CSV; "add genes to query"
   - [ ] NDEx
   - [ ] The PathwayMapper toolbar: Save PNG/SVG, Perform layout, Edit pathway, Help (PWY-1.3…1.5) ([09-pathways](legacy-spec/parity/09-pathways.md))
