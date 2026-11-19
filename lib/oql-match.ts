@@ -134,6 +134,26 @@ export function oqlTrackName(line: string): string {
   return entries[0].gene + oqlSublabel(entries[0].specs);
 }
 
+/**
+ * The line a row without OQL is drawn by, as its sublabel (": AMP HOMDEL MUT FUSION"): the
+ * portal's buildDefaultOQLProfile (ResultsViewPageStore 333-363) over the selected profiles in
+ * their order, each type's commands once, in the order its first profile comes. `profiles` are
+ * the selected profiles in that order; `exp` / `prot` the z-score thresholds of the mRNA and
+ * protein rules.
+ */
+export function defaultOqlSublabel(profiles: readonly { type: string }[], exp = 2, prot = 2): string {
+  const COMMANDS: Record<string, string[]> = {
+    MUTATION_EXTENDED: ["MUT"],
+    COPY_NUMBER_ALTERATION: ["AMP", "HOMDEL"],
+    MRNA_EXPRESSION: ["EXP>=" + exp, "EXP<=-" + exp],
+    PROTEIN_LEVEL: ["PROT>=" + prot, "PROT<=-" + prot],
+    STRUCTURAL_VARIANT: ["FUSION"],
+  };
+  const out: string[] = [];
+  for (const p of profiles) for (const c of COMMANDS[p.type] || []) if (!out.includes(c)) out.push(c);
+  return out.length ? ": " + out.join(" ") : "";
+}
+
 /** the row's sublabel: its line written back less the gene (": AMP MUT=G12D"), "" with no OQL */
 export function oqlSublabel(specs: readonly OqlSpec[] | null | undefined): string {
   if (!hasOql(specs)) return "";

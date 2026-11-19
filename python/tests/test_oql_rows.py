@@ -119,6 +119,13 @@ class Sublabels(unittest.TestCase):
         self.assertEqual(track_sublabel_text({"sublabel": ": AMP MUT=G12D MUT=G13D"}), ": AMP MUT=G12D ...")
         self.assertEqual(track_sublabel_text({"sublabel": ": MUT=TRUNC_(1-99)"}), ": MUT=TRUNC_(1-99)", "18 characters is not cut")
 
+    def test_a_row_without_oql_prints_the_default_line(self):
+        from cohortlab.style import track_sublabel_text
+        meta = {"defaultSublabel": ": AMP HOMDEL MUT FUSION"}
+        self.assertEqual(track_sublabel_text(meta, {"showOql": True}), ": AMP HOMDEL MU...")
+        self.assertEqual(track_sublabel_text(meta, {"showOql": False}), "")
+        self.assertEqual(track_sublabel_text({"sublabel": ": AMP", **meta}, {"showOql": True}), ": AMP", "the row's own line first")
+
     def test_sublabel_is_cut_to_the_room_before_the_pct(self):
         # ours alone: the gutter is fixed, so the figure cuts further rather than run into the row's %
         texts = _texts(_contract(": AMP MUT=G12D MUT=G13D"))

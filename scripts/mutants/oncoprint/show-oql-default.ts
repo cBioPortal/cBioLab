@@ -1,0 +1,35 @@
+// Planted bugs: Show OQL filters and the default OQL line (ONC-VI-6)
+import type { GuardCommands, Mutant } from "../types.ts";
+
+export const guards: GuardCommands = {};
+
+export const mutants: Mutant[] = [
+  { id: "onc-show-oql-always-on",
+    layer: "counts",
+    guard: "unit",
+    file: "lib/oncoprint.ts",
+    effect: "Show OQL filters is on for a query without OQL, so every row prints the default line, where the portal starts it off.",
+    find: "display: normalizeDisplay(spec.display, spec.drivers, geneTracks.some((t) => t.oql)) };",
+    replace: "display: normalizeDisplay(spec.display, spec.drivers, true) };" },
+  { id: "onc-default-oql-unordered",
+    layer: "counts",
+    guard: "unit",
+    file: "lib/oncoprint.ts",
+    effect: "The default line follows the warehouse's profile order (\": FUSION MUT AMP HOMDEL\"), not the portal's (\": AMP HOMDEL MUT FUSION\" on coadread).",
+    find: "out.push(...mine.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));",
+    replace: "out.push(...mine);" },
+  { id: "onc-default-oql-any-cna",
+    layer: "counts",
+    guard: "unit",
+    file: "lib/oncoprint.ts",
+    effect: "A continuous copy-number profile (log2CNA) counts as selected for the default line, which the portal never selects.",
+    find: "(type === \"COPY_NUMBER_ALTERATION\" && datatype === \"DISCRETE\")",
+    replace: "type === \"COPY_NUMBER_ALTERATION\"" },
+  { id: "onc-default-oql-not-drawn",
+    layer: "counts",
+    guard: "unit",
+    file: "lib/oncoprint-assemble.ts",
+    effect: "A row without OQL shows nothing after its label with Show OQL filters on, where the portal shows the default line.",
+    find: ": input.defaultOql && gt.members.length === 1 ? { defaultSublabel: input.defaultOql } : {}),",
+    replace: ": {}),"},
+];

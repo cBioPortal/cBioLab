@@ -31,6 +31,7 @@ import { forData } from "./driver-settings.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { clusterHeatmap } from "./oncoprint-cluster.ts";
 
+import { defaultOqlSublabel } from "./oql-match.ts";
 import { PROFILED_TYPES, SPECTRUM_TRACK, SPECTRUM_NAME, AUTO_TRACKS, isAutoTrack, type ProfiledType } from "./profile-names.ts";
 import { inGeneticAlterationDerived } from "./profile-catalog.ts";
 import { assembleContract, normalizeDisplay, normalizeSort, type AssembleInput, type EventRow } from "./oncoprint-assemble.ts";
@@ -442,6 +443,34 @@ export function assayHeatmapSql(profileType: string, entities: string[], study: 
     "GROUP BY pid, gene";
 }
 
+/**
+ * The profiles the query's default OQL line is built from, in the portal's order (its
+ * selectedMolecularProfiles: each study's profiles by id, studies in turn): every mutation,
+ * discrete copy-number and structural-variant profile a study holds, and the mRNA / protein
+ * profile the query's EXP / PROT read. A peer's study, whose profile kinds are not known here,
+ * adds the types its columns were profiled for after the rest.
+ */
+export async function defaultOqlProfiles(studies: string[], peers: { has(s: string): boolean }, masks: { mask: number }[],
+  spec: Pick<OncoprintSpec, "exp" | "prot">, kindsOf: (s: string) => Promise<Map<string, string>>): Promise<{ id: string; type: string }[]> {
+  const out: { id: string; type: string }[] = [];
+  for (const s of studies) {
+    if (peers.has(s)) continue;
+    const mine: { id: string; type: string }[] = [];
+    for (const [id, kind] of await kindsOf(s)) {
+      const [type, datatype] = kind.split(" ");
+      if (type === "MUTATION_EXTENDED" || type === "STRUCTURAL_VARIANT" || (type === "COPY_NUMBER_ALTERATION" && datatype === "DISCRETE")
+        || (type === "MRNA_EXPRESSION" && id === spec.exp) || (type === "PROTEIN_LEVEL" && id === spec.prot)) mine.push({ id, type });
+    }
+    out.push(...mine.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
+  }
+  if (studies.some((s) => peers.has(s))) {
+    const any = masks.reduce((m, r) => m | r.mask, 0);
+    const asked = (type: string) => type === "MRNA_EXPRESSION" ? !!spec.exp : type === "PROTEIN_LEVEL" ? !!spec.prot : true;
+    PROFILED_TYPES.forEach(([type], i) => { if (any & (1 << i) && asked(type)) out.push({ id: "", type }); });
+  }
+  return out;
+}
+
 export function normalizeSpec(spec: OncoprintSpec) {
   // `geneList` is the rows (a symbol, or a merged group); `genes` is the flat symbol list every
   // query and the coverage mask are built from. One normalizer owns both, and the assembler runs
@@ -489,7 +518,9 @@ export function normalizeSpec(spec: OncoprintSpec) {
     return { kind, profileType, threshold: Number.isFinite(threshold) && threshold > 0 ? threshold : 2 };
   }).filter((o) => o.profileType);
   return { genes, geneList, rangeGenes, levelGenes, levelPins, clinical, derivedEvents, lineGap, sort, heatmap, unit, overlays,
-    hideTracks: specHideTracks(spec.hideTracks), display: normalizeDisplay(spec.display, spec.drivers) };
+    hideTracks: specHideTracks(spec.hideTracks),
+    // Show OQL filters is on by default only for a query with OQL (ResultsViewOncoprint 528)
+    display: normalizeDisplay(spec.display, spec.drivers, geneTracks.some((t) => t.oql)) };
 }
 
 /** the automatic rows a view switches off: labels from AUTO_TRACKS, anything else refused */
@@ -1088,10 +1119,14 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   for (const de of derivedEvents)
     derivedIn.push({ label: de.label, pids: new Set<string>((await cohortColumns(cohortRowsSql({ ...de.expression, lineGap }, study, derivedConn!.db, pin), study, opts.log, "oncoprint:derivedEvent", unit, derivedConn!)).pids) });
 
+  // ---- the default OQL line a row without OQL is drawn by (the portal's defaultOQLQuery) ----
+  const defaultOql = defaultOqlSublabel(await defaultOqlProfiles(studies, peers, profiledMasks, spec,
+    (s) => studyProfileKinds(s, dbOf(s), connOf(s))));
+
   const queryMs = Date.now() - t0;
   const tAsm = Date.now();
   const contract = assembleContract({
-    genes: geneList, groups, studies, studyOf, events, coverage, profiled: { types: profiledTypes, masks: profiledMasks }, samples: samplesPer,
+    genes: geneList, groups, studies, studyOf, events, coverage, profiled: { types: profiledTypes, masks: profiledMasks }, samples: samplesPer, defaultOql,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
     clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank, clusterMethod,
     ...(hideTracks.length ? { hideTracks } : {})

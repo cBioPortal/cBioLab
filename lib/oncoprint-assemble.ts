@@ -80,7 +80,7 @@ const ANNOTATE_MODES = ["oncokb", "none"] as const;
  * The view's driver settings (`drivers`) are resolved here too: `display.annotate: "none"` and
  * `display.hideVUS` are their older spellings, read as defaults the settings override.
  */
-export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: DriverSettings): ResolvedDisplay {
+export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: DriverSettings, showOqlDefault = true): ResolvedDisplay {
   const src = (d || {}) as Record<string, unknown>;
   for (const k of Object.keys(src))
     if (!(DISPLAY_KEYS as readonly string[]).includes(k))
@@ -126,7 +126,7 @@ export function normalizeDisplay(d: DisplaySpec | undefined, driverSpec?: Driver
     hideGermline: drivers.hideGermline,
     drivers,
     whiteBackground: bool("whiteBackground", false),
-    showOql: bool("showOql", true),
+    showOql: bool("showOql", showOqlDefault),
     // the staircase switches, echoed only when off the portal's defaults
     ...(!bool("sortByMutationType", true) ? { sortByMutationType: false } : {}),
     ...(!bool("sortByDrivers", true) ? { sortByDrivers: false } : {}),
@@ -167,6 +167,11 @@ export interface AssembleInput {
    * some patient has more than one.
    */
   samples?: { pid: string; n: number }[];
+  /**
+   * The line a single-gene row without OQL is drawn by (": AMP HOMDEL MUT FUSION",
+   * defaultOqlSublabel), shown after its label when the display shows OQL, as the portal's.
+   */
+  defaultOql?: string;
   /** driver call per event, and the source to echo in conventions */
   isDriver: (r: EventRow) => boolean;
   annotationSource: string;
@@ -743,7 +748,8 @@ export function assembleContract(input: AssembleInput): Contract {
     tracks.push({
       kind: "gene", label: gt.label, ...(gt.key !== gt.label ? { key: gt.key } : {}), cells,
       ...(gt.members.length > 1 ? { members: gt.members } : {}),
-      ...(gt.oql ? { sublabel: oqlSublabel(gt.oql) } : {}),
+      ...(gt.oql ? { sublabel: oqlSublabel(gt.oql) }
+        : input.defaultOql && gt.members.length === 1 ? { defaultSublabel: input.defaultOql } : {}),
       altered, profiled, driverAltered, freqPct, driverPct,
       // Pooled is enough on its own with one group; with several, the figure already
       // draws a boundary between them, so the text/provenance side gets the same split
