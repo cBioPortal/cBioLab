@@ -1388,7 +1388,7 @@ filtered, sorted table; the page is the reader's and is not.
 - \`search: "text"\` — keeps rows containing the text, case-insensitively, in any shown column
   (numbers as written).
 - \`filters: {"<column>": filter}\` — a row is kept when it passes every filter. A text column takes
-  \`{"op": "contains"|"notContains"|"equals"|"notEquals"|"startsWith"|"endsWith"|"regex", "value": "…"}\`
+  \`{"op": "contains"|"notContains"|"equals"|"notEquals"|"startsWith"|"notStartsWith"|"endsWith"|"notEndsWith"|"regex", "value": "…"}\`
   (case-insensitive but for \`regex\`, RE2 syntax) or \`{"values": ["…", …]}\` (≤500 exact values; \`""\`
   is blank); a numeric column takes \`{"min"?: n, "max"?: n}\` (inclusive; a blank value fails it).
   Any column takes \`{"present": true}\`: the rows with a value, whatever it is (a numeric

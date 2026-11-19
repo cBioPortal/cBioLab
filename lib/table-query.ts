@@ -12,8 +12,9 @@
 import { sq } from "./compiler.ts";
 import { patientSql, type PatientSql } from "./sql-kinds.ts";
 
-export type TextFilterOp = "contains" | "notContains" | "equals" | "notEquals" | "startsWith" | "endsWith" | "regex";
-export const TEXT_FILTER_OPS: readonly TextFilterOp[] = ["contains", "notContains", "equals", "notEquals", "startsWith", "endsWith", "regex"];
+export type TextFilterOp = "contains" | "notContains" | "equals" | "notEquals" | "startsWith" | "notStartsWith" | "endsWith" | "notEndsWith" | "regex";
+/** the portal's header-filter conditions, in its order (CategoricalFilterMenu) */
+export const TEXT_FILTER_OPS: readonly TextFilterOp[] = ["contains", "notContains", "equals", "notEquals", "startsWith", "notStartsWith", "endsWith", "notEndsWith", "regex"];
 
 /** One column's filter: a text condition, a set of exact values, a numeric range (inclusive), or "has a value". */
 export type ColumnFilter =
@@ -139,7 +140,9 @@ export function isRange(f: ColumnFilter): f is { min?: number; max?: number } { 
 export function isValues(f: ColumnFilter): f is { values: string[] } { return "values" in f; }
 export function isPresent(f: ColumnFilter): f is { present: true } { return "present" in f; }
 
+/** a text condition, case-insensitive but the regular expression, as the portal's (MutationUtils matchCategoricalFilterSearch): no text keeps every row */
 function textCond(x: string, f: { op: TextFilterOp; value: string }): string {
+  if (f.value === "") return "1";
   const v = sq(f.value), lx = "lowerUTF8(" + x + ")", lv = "lowerUTF8(" + v + ")";
   switch (f.op) {
     case "contains": return "positionCaseInsensitiveUTF8(" + x + ", " + v + ") > 0";
@@ -147,7 +150,9 @@ function textCond(x: string, f: { op: TextFilterOp; value: string }): string {
     case "equals": return lx + " = " + lv;
     case "notEquals": return lx + " != " + lv;
     case "startsWith": return "startsWith(" + lx + ", " + lv + ")";
+    case "notStartsWith": return "NOT startsWith(" + lx + ", " + lv + ")";
     case "endsWith": return "endsWith(" + lx + ", " + lv + ")";
+    case "notEndsWith": return "NOT endsWith(" + lx + ", " + lv + ")";
     case "regex": return "match(" + x + ", " + v + ")";
   }
 }
@@ -276,8 +281,8 @@ export function describeQuery(q: TableQuery, all: { id: string; name: string }[]
       parts.push(name(id) + (f.values.length === 1 ? " = “" + f.values[0] + "”" : " one of " + f.values.slice(0, 6).map((v) => "“" + v + "”").join(", ") + (f.values.length > 6 ? " and " + (f.values.length - 6) + " more" : "")));
     } else {
       const words: Record<TextFilterOp, string> = { contains: "contains", notContains: "does not contain", equals: "is", notEquals: "is not",
-        startsWith: "starts with", endsWith: "ends with", regex: "matches" };
-      parts.push(name(id) + " " + words[f.op] + " " + (f.op === "regex" ? "/" + f.value + "/" : "“" + f.value + "”"));
+        startsWith: "starts with", notStartsWith: "does not start with", endsWith: "ends with", notEndsWith: "does not end with", regex: "matches" };
+      if (f.value !== "") parts.push(name(id) + " " + words[f.op] + " " + (f.op === "regex" ? "/" + f.value + "/" : "“" + f.value + "”"));
     }
   }
   return parts.length ? "rows " + parts.join("; ") : "";
