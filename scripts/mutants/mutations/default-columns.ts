@@ -22,7 +22,7 @@ export const mutants: Mutant[] = [
   { id: "defaults-cna-every-study", layer: "counts", guard: "unit", file: "lib/views/mutations/run.ts",
     effect: "Copy # is hidden by default unless every queried study has a discrete CNA profile, where the portal shows it when any does.",
     find: "catalogs.some((c) => c!.some(", replace: "catalogs.every((c) => c!.some(" },
-  { id: "vaf-empty-cell-no-tip", layer: "counts", guard: "unit", file: "app/lab/kinds/mutations.tsx",
+  { id: "vaf-empty-cell-no-tip", layer: "counts", guard: "unit", file: "lib/mutation-cell-text.ts",
     effect: "An Allele Freq (T) cell with no frequency is blank with no tooltip, where the portal's says \"Data not available.\".",
-    find: "data-tip={VAF_NA_TIP}", replace: "" },
+    find: "return value == null || value === \"\" ? \"Data not available.\" : null;", replace: "return null;" },
 ];

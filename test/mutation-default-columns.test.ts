@@ -16,6 +16,7 @@ import type { MutationsView } from "../lib/views/mutations/types.ts";
 import type { ProfileInfo } from "../lib/profile-catalog.ts";
 import type { TableQuery } from "../lib/table-query.ts";
 import { renderViewCards } from "./support/render-views.ts";
+import { vafEmptyTip } from "../lib/mutation-cell-text.ts";
 
 process.env.GENOME_NEXUS_PIN = "gn-hg19";
 process.env.GENOME_NEXUS_GRCH38_PIN = "gn-hg38";
@@ -276,4 +277,9 @@ test("C1 the mutations card: a row without a frequency has an empty Allele Freq 
   const cell = rowOf("S-value");
   assert.equal(text(cell), "0.31", cell);
   assert.doesNotMatch(cell, /Data not available/, cell);
+});
+
+test("C2 vafEmptyTip: the portal's NA tip for a cell with no frequency, none for one with", () => {
+  for (const x of [null, undefined, ""]) assert.equal(vafEmptyTip(x), "Data not available.");
+  for (const x of ["0.31", "0.0030", 0.5]) assert.equal(vafEmptyTip(x), null);
 });
