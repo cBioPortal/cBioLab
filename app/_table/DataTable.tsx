@@ -13,7 +13,7 @@ import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { ViewPageBody, TableBody } from "../../lib/api-schemas.ts";
 import { ChevronLeft, ChevronRight, Columns3, Copy, Download, X } from "lucide-react";
 import { copyText } from "./copy-text.ts";
-import { cutShort } from "../../lib/table-tsv.ts";
+import { copyTableKey, cutShort } from "../../lib/table-tsv.ts";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
@@ -443,9 +443,12 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   // the portal's Copy, in its two steps: a first click fetches the table.tsv text ("Copy Ready!"), a second copies
   // it within that click, which the browser's clipboard needs (a copy after a long fetch is refused)
   const [copyState, setCopyState] = useState<{ phase: "idle" } | { phase: "loading" } | { phase: "ready"; text: string } | { phase: "done" } | { phase: "failed"; why: string }>({ phase: "idle" });
-  // a fetch still running when the table changes (a sort, a filter) answers for the old table: its generation tells
+  // a fetch still running when the table changes (its document: a sort, a filter, a gene, a cohort, a driver
+  // setting; or its rows) answers for the old table: its generation tells. The same table answered again (a
+  // re-render, a page turn) keeps what was fetched.
   const copyGen = useRef(0);
-  useEffect(() => { copyGen.current++; setCopyState({ phase: "idle" }); }, [t]);
+  const copyKey = copyTableKey(t, { doc: docJson ? docJson() : "", view: vi, ...(table ? { table } : {}) });
+  useEffect(() => { copyGen.current++; setCopyState({ phase: "idle" }); }, [copyKey]);
   const fetchCopy = async () => {
     const g = ++copyGen.current;
     setCopyState({ phase: "loading" });
