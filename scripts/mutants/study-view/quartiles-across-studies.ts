@@ -10,4 +10,10 @@ export const mutants: Mutant[] = [
   { id: "pooled-cut-counts-ignored", layer: "cohorts", guard: "unit", file: "lib/partition-arms.ts",
     effect: "Each value counts once whatever how many cases hold it, so a common value weighs as little as a rare one in the cut.",
     find: "merged.set(c.v, (merged.get(c.v) || 0) + c.n);", replace: "merged.set(c.v, 1);" },
+  { id: "pooled-cut-first-study-only", layer: "cohorts", guard: "unit", file: "lib/analysis.ts",
+    effect: "A quartile split over several studies cuts at the first study's values only, so the groups are the wrong sizes over the whole selection.",
+    find: ": { kind, per, valueCounts: perStudyStats.flatMap((st) => st?.valueCounts || []) })", replace: ": { kind, per, valueCounts: perStudyStats.slice(0, 1).flatMap((st) => st?.valueCounts || []) })" },
+  { id: "pooled-cut-truncated-used", layer: "cohorts", guard: "unit", file: "lib/analysis.ts",
+    effect: "A study past the histogram's cap is cut from part of its values instead of refused.",
+    find: "if (dist.histogramTruncated || !dist.valueCounts)", replace: "if (!dist.valueCounts && false)" },
 ];

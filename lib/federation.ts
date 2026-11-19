@@ -190,9 +190,9 @@ export interface AttrStats {
   /** numeric: additive moments, from which mean and variance are exact */
   n?: number; sum?: number; sumsq?: number; min?: number; max?: number;
   /**
-   * numeric, single-study callers only (attributeStats' `histograms` option): the complete
-   * (value, count) distribution — enough for an exact median/IQR or a rank-sum test, computed
-   * by the caller. Not requested (and not meaningful to combine across sites) otherwise.
+   * numeric (attributeStats' `histograms` option): the complete (value, count) distribution —
+   * enough for an exact median/IQR or a rank-sum test, computed by the caller, or summed across
+   * studies for a quantile split's pooled cut (proposePartition). Not requested otherwise.
    */
   valueCounts?: { v: number; n: number }[];
   /** true when histograms were requested but this attribute had more than HISTOGRAM_CAP distinct
@@ -990,23 +990,6 @@ export function attributeCutsSql(cohortSql: string, attribute: string, ps: numbe
     "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
     "  AND attribute_value != ''\n" +
     "  AND " + inCohortClinical(study)
-  ));
-}
-
-/**
- * A numeric attribute's values in a cohort, each with how many cases hold it: values and counts, no
- * identifier, for a quantile split over several studies to pool (pooledCuts) by the rule
- * attributeCutsSql runs within one.
- */
-export function attributeValueCountsSql(cohortSql: string, attribute: string, study: string, db: string = DB): AggregateSql {
-  return aggregateSql((
-    "WITH cohort AS (" + cohortSql + ")\n" +
-    "SELECT " + finiteSql("attribute_value") + " AS v, count() AS n\n" +
-    "FROM " + clinicalTable(db, [attribute]) + "\n" +
-    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
-    "  AND attribute_value != ''\n" +
-    "  AND " + inCohortClinical(study) + "\n" +
-    "GROUP BY v HAVING v IS NOT NULL"
   ));
 }
 

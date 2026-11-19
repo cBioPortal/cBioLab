@@ -67,7 +67,7 @@ export function quantilePoints(n: number): number[] {
 /**
  * A quantile split's cut points over value counts pooled from several studies, by the rule the
  * one-study split runs in ClickHouse (attributeCutsSql's quantilesExact): for each p, the value at
- * position ⌊p·n⌋ of the n sorted values, the last when that runs past the end; with the largest
+ * position ⌊p·n⌋ of the n sorted values, clamped to the last; with the largest
  * value and n, the row quantilePartition reads.
  */
 export function pooledCuts(counts: { v: number; n: number }[], ps: number[]): { qs: number[]; hi: number; n: number } {
@@ -76,7 +76,8 @@ export function pooledCuts(counts: { v: number; n: number }[], ps: number[]): { 
   const sorted = [...merged].sort((a, b) => a[0] - b[0]);
   const n = sorted.reduce((a, [, k]) => a + k, 0);
   if (!n) return { qs: [], hi: NaN, n: 0 };
-  const at = (i: number) => { let seen = 0; for (const [v, k] of sorted) { seen += k; if (seen > i) return v; } return sorted[sorted.length - 1][0]; };
+  // the i-th value (0-based) of the sorted values, i < n
+  const at = (i: number) => { let seen = 0; for (const [v, k] of sorted) { seen += k; if (seen > i) return v; } return NaN; };
   return { qs: ps.map((p) => at(Math.min(n - 1, Math.floor(p * n)))), hi: sorted[sorted.length - 1][0], n };
 }
 
