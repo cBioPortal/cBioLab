@@ -232,14 +232,22 @@ export function useExploreState(page: ExplorePage) {
    * long id lists are stored as sets first (unowned when the reader is not signed in), and a link still too long for the
    * address bar is a stored link (app/_links).
    */
+  /** the patient view on the selection's first patient, stepping through the rest, in a new window as the portal's "View selected cases" (STV-AB-2) */
   const viewPatients = async () => {
     let d = barDef();
     if (!d) { setExMsg("select at least one study first"); return; }
     setExMsg(null);
+    // opened on the click itself, so the browser does not block it; this tab when it does
+    const w = window.open("", "_blank");
+    try { if (w) { w.document.title = "Patients"; w.document.body.textContent = "Opening the selected patients…"; } } catch { /* a blocked or cross-origin tab still navigates */ }
     try {
       if (encodeParam(d).length > currentLinkUrlMax()) d = await storeCohortLists(d, barDefaultName());
-      window.location.assign(await linkTo("/portal/patient", { cohort: encodeParam(d) }));
-    } catch (e) { setExMsg("Could not open the patients: " + String((e as Error)?.message || e)); }
+      const url = await linkTo("/portal/patient", { cohort: encodeParam(d) });
+      if (w && !w.closed) w.location.href = url; else window.location.assign(url);
+    } catch (e) {
+      w?.close();
+      setExMsg("Could not open the patients: " + String((e as Error)?.message || e));
+    }
   };
   const analyzeDraft = () => {
     const d = barDef();
