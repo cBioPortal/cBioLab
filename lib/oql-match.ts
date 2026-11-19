@@ -110,7 +110,7 @@ export const hasOql = (specs: readonly OqlSpec[] | null | undefined): boolean =>
 
 const range = (r: OqlRange): string => "(" + (r.start ?? "") + "-" + (r.end ?? "") + (r.contained ? "*" : "") + ")";
 /** one command as the portal writes it back */
-function specText(s: OqlSpec): string {
+export function specText(s: OqlSpec): string {
   const drv = s.driver ? "_DRIVER" : "";
   switch (s.type) {
     case "ANY": return s.driver ? "DRIVER" : "";

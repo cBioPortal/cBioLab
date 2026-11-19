@@ -19,6 +19,7 @@ import { portalPercentage } from "../../../lib/chart/format.ts";
 import { frequencyFilter, frequencySort, frequencyTsv, type FrequencyColumn } from "../../../lib/views/datafiles/frequency.ts";
 import { Input } from "../../_ui/input";
 import { cn } from "../../../lib/cn";
+import { exploreHref } from "../../portal/query-editor.tsx";
 
 /**
  * A line's altered share as the portal's frequency table draws it (FrequencyBar, barWidth 200): the
@@ -40,6 +41,12 @@ type Result = DrawnResultOf<"datafiles">["datafiles"];
 /** The document as it stands, for a file's request. */
 function readDoc(docJson: () => string): TableBody["doc"] | null {
   try { return JSON.parse(docJson()) as TableBody["doc"]; } catch { return null; }
+}
+
+/** a case table id as the portal links it (CaseAlterationTable): the study to its summary, a sample or patient to its page, each in a new tab */
+function IdLink({ id, value, study }: { id: "study" | "sample" | "patient"; value: string; study: string }) {
+  const href = id === "study" ? exploreHref(value) : "/portal/patient?" + new URLSearchParams({ study, [id]: value }).toString();
+  return <a className="whitespace-nowrap" href={href} target="_blank" rel="noreferrer">{value}</a>;
 }
 
 /** A sample list's ids, "<study>:<sample>", read from the file the download serves. */
@@ -204,7 +211,8 @@ function DatafilesBody({ d, spec, vi, updating, docJson, onQuery }: { d: Result;
       <section aria-label="type of genetic alterations across all samples">
         <h4 className="mb-2 font-semibold">Type of genetic alterations across all samples</h4>
         <DataTable t={d} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit="samples" onQuery={onQuery}
-          cell={(id, x) => id === "altered" ? <span className={x === "1" ? undefined : "text-muted-foreground"} data-tip={x === "NP" ? "not profiled for every queried gene and data type (the portal writes 0)" : "1 = Sample harbors alteration in one of the input genes"}>{x}</span>
+          cell={(id, x, row) => id === "study" || id === "sample" || id === "patient" ? <IdLink id={id} value={String(x)} study={row.study} />
+            : id === "altered" ? <span className={x === "1" ? undefined : "text-muted-foreground"} data-tip={x === "NP" ? "not profiled for every queried gene and data type (the portal writes 0)" : "1 = Sample harbors alteration in one of the input genes"}>{x}</span>
             : id !== "sample" && id !== "patient" && id !== "study" && (x === "no alteration" || x === "not profiled") ? <span className="text-muted-foreground">{x}</span> : undefined} />
       </section>
     </div>

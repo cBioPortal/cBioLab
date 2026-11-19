@@ -30,6 +30,6 @@ export const mutants: Mutant[] = [
     guard: "unit",
     file: "lib/views/datafiles/tables.ts",
     effect: "The altered and unaltered lists and the sample matrix run the driver annotation for notes nobody reads.",
-    find: "statusRows(parts, plan, t === \"cases\")",
-    replace: "statusRows(parts, plan, true)" },
+    find: "statusRows(parts, plan, t === \"cases\", caseAlts)",
+    replace: "statusRows(parts, plan, true, caseAlts)" },
 ];
