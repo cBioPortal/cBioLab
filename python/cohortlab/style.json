@@ -565,6 +565,19 @@
     "textBaseline": 9.5,
     "fontSize": 10
   },
+  "vafPlot": {
+    "width": 200,
+    "height": 200,
+    "top": 20,
+    "right": 30,
+    "xTicks": 3,
+    "yTicks": 8,
+    "barOpacityMany": 0.1,
+    "barOpacityOne": 0.3,
+    "barOpacityPicked": 0.5,
+    "curveWidth": 1.5,
+    "curveOpacity": 0.9
+  },
   "notProfiledPill": {
     "fill": "#cccccc",
     "width": 12,

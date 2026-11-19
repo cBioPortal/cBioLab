@@ -2783,6 +2783,37 @@
           "mutations": false,
           "cna": false
         },
+        "vafs": {
+          "P-0000012-T02-IM3": [
+            0.5022026431718062
+          ],
+          "P-0000012-T03-IM3": [
+            0.05078125,
+            0.10687022900763359,
+            0.12574850299401197,
+            0.12759643916913946,
+            0.13692307692307693,
+            0.141156462585034,
+            0.1414141414141414,
+            0.14221218961625282,
+            0.14603174603174604,
+            0.14942528735632185,
+            0.15844155844155844,
+            0.17427385892116182,
+            0.17433414043583534,
+            0.17598908594815826,
+            0.17636022514071295,
+            0.17857142857142858,
+            0.17872340425531916,
+            0.19008264462809918,
+            0.1941747572815534,
+            0.19784172661870503,
+            {
+              "…": "10 more",
+              "sha256": "eac7de23aea25ba9"
+            }
+          ]
+        },
         "oncokbPin": "v7.5"
       },
       "participation": {
@@ -2819,7 +2850,7 @@
           {
             "kind": "fetch",
             "title": "Read P-0000012's three tables",
-            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; blank for a mutation with no keyword (in-frame indels, splice region), as the portal's variant counts. A mutation's Cohort cell also gives its keyword's share (IDH1 R132 missense, APC truncating; the darker part of the bar and the tooltip's \"out of which N (x%) have … mutations\"): the study's samples with a called mutation carrying the row's keyword, over the same denominator, the samples profiled for the gene; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. The Allele Freq header's VAF plot (the alterations:vafs query) takes, for each sample in view, the allele frequency of every Mutations row it carries with read counts, whatever the table's search, filters or page: a histogram in 0.05 bins from −0.1 to 1 (the left axis counts mutations) and a Gaussian kernel density over the same range, its bandwidth Silverman's 1.06 × SD × n^(−1/5) of the sample's own frequencies, at least 0.01. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; blank for a mutation with no keyword (in-frame indels, splice region), as the portal's variant counts. A mutation's Cohort cell also gives its keyword's share (IDH1 R132 missense, APC truncating; the darker part of the bar and the tooltip's \"out of which N (x%) have … mutations\"): the study's samples with a called mutation carrying the row's keyword, over the same denominator, the samples profiled for the gene; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
             "params": [
               [
                 "Mutations",
@@ -2841,6 +2872,7 @@
             "runAlterations",
             "alterationPatientRowSource",
             "patientMutationsSource",
+            "patientVafSource",
             "patientCnaSource",
             "patientSvSource",
             "pageSql",
@@ -2850,7 +2882,7 @@
           "file": "lib/views/alterations/run.ts, lib/patient-alterations.ts, lib/table-query.ts",
           "commit": null
         },
-        "verification": "A listing: no statistic is computed, so there is no script — the queries are the numbers."
+        "verification": "The tables are a listing: no statistic is computed, so there is no script — the queries are the numbers. The VAF plot's values are alterations:vafs's rows as returned; its histogram and density are drawn from them in the browser, not numbers the result reports, and their rules (bins, Silverman's bandwidth, the kernel) are checked against values computed apart in Python (test/alterations-vaf-plot.test.ts)."
       }
     }
   ]
