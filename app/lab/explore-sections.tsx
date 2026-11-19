@@ -824,7 +824,7 @@ function compareAction(values: (PartitionArm & { n: number })[], checked: Partit
   const more = values.filter((v) => v.n > 0).length - top.length;
   if (top.length < 2) return { label: g.verb + " groups", disabled: true, title: g.doing + " needs at least 2 groups, and this chart has " + top.length + " " + what };
   return { label: more ? g.verb + " top " + top.length + " groups" : g.verb + " groups", onClick: () => onCompare(top),
-    title: g.opens + " each " + what + " as a group" + (more ? " — the " + top.length + " most frequent; " + more + " more are left out (check rows to choose)" : "") +
+    title: g.opens + " each " + what + " as a group" + (more ? " — the " + top.length + " most frequent; " + more + " more are left out" + (checked ? " (check rows to choose)" : "") : "") +
       ", over the rest of your selection" + g.past(top.length) };
 }
 
@@ -905,14 +905,13 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 const label = c.displayName || c.attribute;
                 const chart: ChartKey = { kind: "clinical", attribute: c.attribute };
                 const n = selectionArmCount(chart);
-                const checked = c.kind === "cat" ? c.values.filter((v: any) => picks.has(String(v.v)))
-                  .sort((x: any, y: any) => picks.picked.indexOf(String(x.v)) - picks.picked.indexOf(String(y.v))) : [];
                 const valueArm = (v: any) => ({ name: armLabel(String(v.v)), where: { kind: "clinical", attribute: c.attribute, values: [v.v] } as Leaf, n: v.n });
                 const selected = n > 1 ? forBoth((t) => ({ label: GROUPS[t].verb + " selected (" + (n > 8 ? "8+" : n) + ")",
                   title: GROUPS[t].opens + " each selected " + (c.kind === "num" ? "range" : "value") + " of " + label + " as a group, over the rest of your selection",
                   onClick: () => compareSelection(chart, t) })) : [];
                 if (c.kind === "cat") return <ChartMenu label={label} actions={[...(addMode ? [] : [
-                  ...forBoth((t) => compareAction(c.values.map(valueArm), PIE_ATTRIBUTES.has(c.attribute) ? null : checked.map(valueArm), "value of " + label, (arms) => compareItems(chart, arms, t), t)),
+                  // one group per value whatever is checked, as the portal's Compare Groups (STS-HD-7)
+                  ...forBoth((t) => compareAction(c.values.map(valueArm), null, "value of " + label, (arms) => compareItems(chart, arms, t), t)),
                   ...selected]),
                   summaryDownload(label, c.per, c.values.map((v: any) => ({ value: String(v.v), count: v.n })), c.na || 0, c.distinct, ctx.setExMsg,
                     (vs) => naturalOrder(vs, (v) => v.value),
