@@ -64,6 +64,41 @@ export function specialChartsShown(checked: (key: string) => boolean, leaves: un
   };
 }
 
+/** what Add chart's gene tab charts (STV-AC-5): a gene's mutation status, its mutation types, or its copy number */
+export type GeneChartKind = "MUTATION" | "types" | "CNA";
+
+/**
+ * The gene tab's profile select, as the portal lists it: the selection's mutation and discrete
+ * copy-number profiles, each "<name> (N samples)", N the selected samples profiled. `dataTypes` is
+ * Explore's count per profile kind.
+ */
+export function geneChartProfiles(dataTypes: { profile: string; label: string; alterationType: string; n: number }[]): { kind: "mutation" | "cna"; label: string }[] {
+  const mut = dataTypes.find((d) => d.alterationType === "MUTATION_EXTENDED" && d.n > 0);
+  const cna = dataTypes.find((d) => d.alterationType === "COPY_NUMBER_ALTERATION" && ["gistic", "cna", "cna_rae", "cna_consensus"].includes(d.profile) && d.n > 0);
+  return [
+    ...(mut ? [{ kind: "mutation" as const, label: mut.label + " (" + mut.n.toLocaleString("en-US") + " samples)" }] : []),
+    ...(cna ? [{ kind: "cna" as const, label: cna.label + " (" + cna.n.toLocaleString("en-US") + " samples)" }] : []),
+  ];
+}
+
+/** the gene charts asked for: genes whose status charts Explore counts, which of the two each shows, and genes charted by mutation type */
+export interface GeneCharts { genes: string[]; kinds: Record<string, ("MUTATION" | "CNA")[]>; types: string[] }
+
+/** a gene chart added (`on`) or removed, at most `limit` genes of each list, as the portal adds one chart per gene and profile */
+export function geneChartsChanged(s: GeneCharts, gene: string, kind: GeneChartKind, on: boolean, limit = 6): GeneCharts {
+  if (kind === "types") {
+    const types = on ? (s.types.includes(gene) ? s.types : [...s.types, gene].slice(-limit)) : s.types.filter((g) => g !== gene);
+    return { ...s, types };
+  }
+  const had = s.kinds[gene] || [];
+  const kinds = on ? (had.includes(kind) ? had : [...had, kind]) : had.filter((k) => k !== kind);
+  const all = { ...s.kinds };
+  if (kinds.length) all[gene] = kinds; else delete all[gene];
+  const genes = kinds.length ? (s.genes.includes(gene) ? s.genes : [...s.genes, gene].slice(-limit)) : s.genes.filter((g) => g !== gene);
+  for (const g of Object.keys(all)) if (!genes.includes(g)) delete all[g];
+  return { genes, kinds: all, types: s.types };
+}
+
 /** the Genomic tab's charts (STV-AC-2): drawn by default, each a checkbox in Add chart that hides or shows it */
 export const GENOMIC_CHARTS = [
   { key: "genomic|mutated", name: "Mutated Genes", table: "mutated" as const },

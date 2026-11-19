@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, geneChartProfiles, geneChartsChanged, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -217,6 +217,31 @@ test("the special tables: drawn when checked, or while the draft filters on what
     ["a sequence of two events is not this table's filter", none, [seq], true, { events: false, caseLists: false }],
   ];
   for (const [name, checked, leaves, hasEvents, want] of cases) assert.deepEqual(specialChartsShown(checked, leaves, hasEvents), want, name);
+});
+
+// STV-AC-5: the gene tab, one chart per gene and profile
+test("the gene tab's profiles: mutations and discrete copy number, each with its profiled samples", () => {
+  const dt = [{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 534 },
+    { profile: "rna_seq_v2_mrna", label: "mRNA expression", alterationType: "MRNA_EXPRESSION", n: 592 },
+    // a continuous copy-number profile listed first: the chart reads the discrete one's levels
+    { profile: "linear_cna", label: "Capped relative linear copy-number values", alterationType: "COPY_NUMBER_ALTERATION", n: 592 },
+    { profile: "gistic", label: "Putative copy-number alterations from GISTIC", alterationType: "COPY_NUMBER_ALTERATION", n: 592 }];
+  assert.deepEqual(geneChartProfiles(dt), [{ kind: "mutation", label: "Mutations (534 samples)" }, { kind: "cna", label: "Putative copy-number alterations from GISTIC (592 samples)" }]);
+  assert.deepEqual(geneChartProfiles(dt.slice(1, 3)), [], "no mutation or discrete copy-number profile, nothing to chart a gene from");
+});
+
+test("a gene chart added and removed: each kind on its own, the gene counted while either status chart is shown", () => {
+  const empty = { genes: [], kinds: {}, types: [] };
+  const mut = geneChartsChanged(empty, "KRAS", "MUTATION", true);
+  assert.deepEqual(mut, { genes: ["KRAS"], kinds: { KRAS: ["MUTATION"] }, types: [] });
+  const both = geneChartsChanged(mut, "KRAS", "CNA", true);
+  assert.deepEqual(both.kinds, { KRAS: ["MUTATION", "CNA"] });
+  assert.deepEqual(geneChartsChanged(both, "KRAS", "MUTATION", false), { genes: ["KRAS"], kinds: { KRAS: ["CNA"] }, types: [] });
+  assert.deepEqual(geneChartsChanged(geneChartsChanged(both, "KRAS", "MUTATION", false), "KRAS", "CNA", false), empty);
+  assert.deepEqual(geneChartsChanged(mut, "KRAS", "types", true), { genes: ["KRAS"], kinds: { KRAS: ["MUTATION"] }, types: ["KRAS"] }, "mutation types apart");
+  const seven = ["A", "B", "C", "D", "E", "F", "G"].reduce((s, g) => geneChartsChanged(s, g, "CNA", true), empty as Parameters<typeof geneChartsChanged>[0]);
+  assert.deepEqual(seven.genes, ["B", "C", "D", "E", "F", "G"], "at most six genes, the earliest dropped");
+  assert.equal(seven.kinds.A, undefined);
 });
 
 // STV-AC-2, STV-AC-4: the Genomic tab's charts, as the portal lists them (coadread, seen)
