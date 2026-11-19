@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pruneSort, removeTrack, canRemoveTrack, withClinical, withGenes, withHeatmap, clinicalTrackRows, trackFreqText, selectAll, trackAttrs } from "../app/_oncoprint/track-edits.ts";
+import { pruneSort, removeTrack, canRemoveTrack, withClinical, withGenes, withHeatmap, clinicalTrackRows, trackFreqText, selectAll, trackAttrs, tracksMenuRows, tracksMenuText } from "../app/_oncoprint/track-edits.ts";
 
 const clustered = { genes: ["KRAS", "TP53"], clinical: ["AGE"], heatmap: [{ profileType: "mrna_zscore" }], sort: ["cluster:mrna_zscore", "AGE"] };
 
@@ -67,4 +67,15 @@ test("the Tracks menu's ties are by name in code-unit order, as lodash sortBy (T
   const rows = clinicalTrackRows([{ attribute: "E", kind: "cat", patients: 1, displayName: "Éclair" }, { attribute: "Z", kind: "cat", patients: 1, displayName: "zeta" }],
     { patients: 1, samples: 1 });
   assert.deepEqual(rows.map((r) => r.label), ["zeta", "Éclair"]);
+});
+
+test("a Tracks menu item is the attribute's display name alone, numeric or not (ONC-TR-1, TracksMenu)", () => {
+  const attrs = [{ attribute: "AGE", kind: "num" as const, patients: 10, per: "patient" as const, displayName: "Diagnosis Age" },
+    { attribute: "SEX", kind: "cat" as const, patients: 10, per: "patient" as const, displayName: "Sex" }];
+  const rows = tracksMenuRows({ attrs, totals: { patients: 10, samples: 10 }, autoTracks: [] });
+  const text = (n: string) => tracksMenuText(n, { tab: "clinical", rowLabel: rows.find((r) => r.attribute === n)?.label });
+  assert.equal(text("AGE"), "Diagnosis Age");
+  assert.equal(text("SEX"), "Sex");
+  assert.equal(tracksMenuText("VAF", { tab: "clinical" }), "VAF (mutation allele fraction)");
+  assert.equal(tracksMenuText("ga_profile", { tab: "heatmap", assayName: "Mutational signatures" }), "Mutational signatures (generic assay)");
 });

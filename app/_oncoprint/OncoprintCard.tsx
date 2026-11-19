@@ -12,7 +12,7 @@ import { figureDisplayOf, withFigureDisplay, sortKeysOf, withSortKeys, DRIVER_SC
 import { driversOf, withDrivers } from "../../lib/driver-settings.ts";
 import { assayTrackLabel, isAutoTrack } from "../../lib/profile-names.ts";
 import { CLINICAL_TRACK_LIMIT } from "../../lib/views/oncoprint/types.ts";
-import { tracksMenuRows, withClinicalTab, selectAll, trackFreqText, type TrackAttr, geneRowCount, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack } from "./track-edits.ts";
+import { tracksMenuRows, withClinicalTab, selectAll, trackFreqText, type TrackAttr, geneRowCount, withHeatmap, withDerived, withGenes, moveTrack, removeTrack, canRemoveTrack, splitGeneTrack, tracksMenuText } from "./track-edits.ts";
 import { isCustomAttr, attributeLabel, parseCustomAttr } from "../../lib/custom-data-names.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { UploadBinding } from "../lab/custom-data-client.ts";
@@ -158,8 +158,7 @@ export function TracksMenu({ attrs, totals, spectrum, sequenced, autoTracks = []
               <div key={name}>
                 <label className="meta" style={{ display: "flex", gap: "0.4rem", alignItems: "baseline", padding: "0.1rem 0" }}>
                   <Checkbox className="self-center" checked={on} disabled={busy || (!on && (chosen.length >= cap || r?.pct === 0))} onCheckedChange={() => toggle(name)} />
-                  <span style={{ flex: 1 }} data-tip={tab === "custom" || ga || r ? name : undefined}>{name === "VAF" ? "VAF (mutation allele fraction)" : ga ? ga.name + " (generic assay)"
-                    : r ? r.label : attributeLabel(name, tab === "custom" ? "short" : "long")}{a?.kind === "num" ? " (numeric)" : ""}
+                  <span style={{ flex: 1 }} data-tip={tab === "custom" || ga || r ? name : undefined}>{tracksMenuText(name, { tab, rowLabel: r?.label, assayName: ga?.name })}
                     {tab === "custom" && <span className="meta"> · {parseCustomAttr(name)?.dataset}</span>}</span>
                   {r && (r.pct != null || r.kind === "spectrum") ? <span style={{ fontVariantNumeric: "tabular-nums" }}
                     data-tip={r.kind === "auto" ? "drawn for every queried sample"
