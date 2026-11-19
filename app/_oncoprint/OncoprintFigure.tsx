@@ -83,11 +83,14 @@ export interface FigureDisplay {
   whiteBackground?: boolean;
   /** the genomic staircase's switches, the portal's Sort › Mutation Type / Driver / Ignore VUS */
   sortByMutationType: boolean; sortByDrivers: boolean; sortIgnoreVUS: boolean;
-  /** each gene row's OQL line after its label, the portal's "Show OQL filters" */
-  showOql: boolean;
+  /**
+   * each gene row's OQL line after its label (a row without one, the query's default line), the
+   * portal's "Show OQL filters"; unset, on only for a query with OQL, as the engine resolves it
+   */
+  showOql?: boolean;
 }
 export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true, colorByGermline: true,
-  sortByMutationType: true, sortByDrivers: true, sortIgnoreVUS: false, showOql: true };
+  sortByMutationType: true, sortByDrivers: true, sortIgnoreVUS: false };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
   cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number;
@@ -701,13 +704,14 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const set = (p: Partial<FigureDisplay>) => onDisplay({ ...display, ...p });
   /**
    * How many viewing options are away from their default. The display button wears the count so
-   * folding them behind it never hides the fact that one of them is on.
+   * folding them behind it never hides the fact that one of them is on. Show OQL filters is left
+   * out: what it changes is in the figure itself, the grey line after each row's name.
    */
   const offDefaults = (Number(display.showUnaltered !== DEFAULT_FIGURE_DISPLAY.showUnaltered) +
     Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
     Number(display.colorByGermline !== DEFAULT_FIGURE_DISPLAY.colorByGermline) +
-    Number(!!display.whiteBackground) + Number(display.gaps !== "none") + Number(!display.showOql)) || 0;
+    Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
   // the staircase switches, as the portal's Sort menu offers them: Mutation Type needs colour by
   // type, Driver an annotation, Ignore VUS the driver switch and VUS not already hidden
   const staircaseOff = Number(!display.sortByMutationType) + Number(!display.sortByDrivers) + Number(display.sortIgnoreVUS);
@@ -817,9 +821,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <label className="chk" data-tip="white instead of grey for unaltered cells — for print; profiled and unprofiled then look alike, apart from the stripe">
                   <Checkbox checked={!!display.whiteBackground} disabled={busy}
                     onCheckedChange={(c) => set({ whiteBackground: (c === true) || undefined })} /> white background (for print)</label>
-                {data.tracks.some((t) => t.sublabel) && (
-                  <label className="chk" data-tip="each gene row's OQL line, in grey after its name — the portal's Show OQL filters">
-                    <Checkbox checked={display.showOql} disabled={busy}
+                {data.tracks.some((t) => t.kind === "gene") && (
+                  <label className="chk" data-tip="each gene row's OQL line, in grey after its name (a row without one, the query's default line) — the portal's Show OQL filters, on by default when the query has OQL">
+                    <Checkbox checked={display.showOql ?? !!data.display.showOql} disabled={busy}
                       onCheckedChange={(c) => set({ showOql: (c === true) })} /> show OQL filters</label>
                 )}
                 <label className="setrow" data-tip={gapTrack ? "split each cohort into runs of " + gapTrack.label : "choose a categorical track as the sort key first"}>

@@ -461,11 +461,12 @@ export function truncateLabel(label: string, S: Style = STYLE): string {
  * still ends in a closing bracket rather than losing it to the ellipsis.
  */
 /**
- * A row's sublabel as the gutter prints it, when the display shows OQL: past 18 characters, its
- * first 15 and "..." (oncoprintlabelview shortenLabelIfNecessary, getMaximumLabelLength).
+ * A row's sublabel as the gutter prints it, when the display shows OQL (its own line, else the
+ * query's default line): past 18 characters, its first 15 and "..." (oncoprintlabelview
+ * shortenLabelIfNecessary, getMaximumLabelLength).
  */
-export function trackSublabelText(track: { sublabel?: string }, display?: { showOql?: boolean } | null): string {
-  const s = track.sublabel || "";
+export function trackSublabelText(track: { sublabel?: string; defaultSublabel?: string }, display?: { showOql?: boolean } | null): string {
+  const s = track.sublabel || track.defaultSublabel || "";
   if (!s || display?.showOql === false) return "";
   return s.length > 18 ? s.slice(0, 15) + "..." : s;
 }

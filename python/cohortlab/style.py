@@ -412,8 +412,8 @@ def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
 
 
 def track_sublabel_text(meta: dict[str, Any], display: dict[str, Any] | None = None) -> str:
-    """A row's OQL line as the gutter prints it (port of trackSublabelText): past 18 characters, its first 15 and "..."."""
-    s = meta.get("sublabel") or ""
+    """A row's OQL line (else the query's default line) as the gutter prints it (port of trackSublabelText): past 18 characters, its first 15 and "..."."""
+    s = meta.get("sublabel") or meta.get("defaultSublabel") or ""
     if not s or (display or {}).get("showOql") is False:
         return ""
     return s[:15] + "..." if len(s) > 18 else s

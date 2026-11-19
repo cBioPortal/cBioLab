@@ -9,10 +9,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseOql, type OqlSpec } from "../lib/oql-parse.ts";
-import { eventWanted, oqlSublabel } from "../lib/oql-match.ts";
+import { defaultOqlSublabel, eventWanted, oqlSublabel } from "../lib/oql-match.ts";
 import { normalizeGeneTracks, geneSymbols, parseGeneList, formatGeneList, toGeneList } from "../lib/gene-tracks.ts";
 import { assembleContract, normalizeDisplay, BITS, NOT_PROFILED, type AssembleInput, type EventRow } from "../lib/oncoprint-assemble.ts";
-import { normalizeSpec } from "../lib/oncoprint.ts";
+import { defaultOqlProfiles, normalizeSpec } from "../lib/oncoprint.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import { STYLE, trackSublabelText, fitSublabel } from "../lib/oncoprint-style.ts";
 import { resolveDrivers, isDriverEvent, type DriverSettings } from "../lib/driver-settings.ts";
@@ -519,6 +519,61 @@ test("O33: a spec's gene list with OQL keeps each row's line through normalizeSp
   const tracks = normalizeGeneTracks(n.geneList).tracks;
   assert.deepEqual((tracks[0] as { oql?: OqlSpec[] }).oql, specs("AMP MUT=G12D"));
   assert.equal(n.display.showOql, true);
+});
+
+// ---------------------------------------------------------------------------------------------
+// ONC-VI-6: Show OQL filters always offered, on by default only with OQL; a row without OQL
+// shows the query's default line (ResultsViewOncoprint 528; ResultsViewPageStore 333-363, 2510-2527;
+// oqlfilter unparseOQLQueryLine; OncoprintUtils formatGeneticTrackSublabel)
+// ---------------------------------------------------------------------------------------------
+
+test("VI-6: the default line follows buildDefaultOQLProfile, type by type in profile order", () => {
+  const p = (...types: string[]) => types.map((type) => ({ type }));
+  // coadread: gistic, mutations, structural_variants in the study's profile order
+  assert.equal(defaultOqlSublabel(p("COPY_NUMBER_ALTERATION", "MUTATION_EXTENDED", "STRUCTURAL_VARIANT")), ": AMP HOMDEL MUT FUSION");
+  assert.equal(defaultOqlSublabel(p("MUTATION_EXTENDED", "MRNA_EXPRESSION", "PROTEIN_LEVEL")), ": MUT EXP>=2 EXP<=-2 PROT>=2 PROT<=-2");
+  assert.equal(defaultOqlSublabel(p("MRNA_EXPRESSION"), 1.5), ": EXP>=1.5 EXP<=-1.5", "the z-score threshold as written");
+  assert.equal(defaultOqlSublabel(p("MUTATION_EXTENDED", "COPY_NUMBER_ALTERATION", "MUTATION_EXTENDED")), ": MUT AMP HOMDEL", "each command once (default_oql_uniq)");
+  assert.equal(defaultOqlSublabel(p("GENERIC_ASSAY")), "", "no command for other types");
+  assert.equal(defaultOqlSublabel([]), "");
+});
+
+test("VI-6: the default line's profiles: each study's by id, mRNA / protein only as the query reads them", async () => {
+  // as the warehouse lists them, not in id order
+  const coadread = new Map([["structural_variants", "STRUCTURAL_VARIANT SV"], ["mutations", "MUTATION_EXTENDED MAF"],
+    ["armlevel_cna", "GENERIC_ASSAY LIMIT-VALUE"], ["log2CNA", "COPY_NUMBER_ALTERATION LOG2-VALUE"],
+    ["rppa_Zscores", "PROTEIN_LEVEL Z-SCORE"], ["gistic", "COPY_NUMBER_ALTERATION DISCRETE"],
+    ["rna_seq_v2_mrna_median_Zscores", "MRNA_EXPRESSION Z-SCORE"]]);
+  const none = { has: () => false };
+  const types = async (spec: { exp?: string; prot?: string }) =>
+    (await defaultOqlProfiles(["s"], none, [], spec, async () => coadread)).map((x) => x.id);
+  assert.deepEqual(await types({}), ["gistic", "mutations", "structural_variants"]);
+  assert.equal(defaultOqlSublabel(await defaultOqlProfiles(["s"], none, [], {}, async () => coadread)), ": AMP HOMDEL MUT FUSION");
+  assert.deepEqual(await types({ exp: "rna_seq_v2_mrna_median_Zscores", prot: "rppa_Zscores" }),
+    ["gistic", "mutations", "rna_seq_v2_mrna_median_Zscores", "rppa_Zscores", "structural_variants"]);
+  // a peer's study: the types its columns were profiled for, mRNA only when the query reads it
+  const peer = { has: (s: string) => s === "p" };
+  const masks = [{ mask: 0b01001 }, { mask: 0b00010 }];   // mutations + mRNA, copy number
+  const both = await defaultOqlProfiles(["s", "p"], peer, masks, {}, async () => new Map([["mutations", "MUTATION_EXTENDED MAF"]]));
+  assert.deepEqual(both.map((x) => x.type), ["MUTATION_EXTENDED", "MUTATION_EXTENDED", "COPY_NUMBER_ALTERATION"]);
+  assert.equal(defaultOqlSublabel(both), ": MUT AMP HOMDEL");
+});
+
+test("VI-6: a single-gene row without OQL carries the default line; a row's own line and a merged row do not", () => {
+  const c = assembleContract(fixture(["KRAS: AMP", "TP53", { label: "both", genes: ["KRAS", "TP53"] }], { defaultOql: ": AMP HOMDEL MUT FUSION" }));
+  const by = (l: string) => c.tracks.find((t) => t.kind === "gene" && t.label === l)!;
+  assert.equal(by("KRAS").sublabel, ": AMP"); assert.equal(by("KRAS").defaultSublabel, undefined);
+  assert.equal(by("TP53").sublabel, undefined); assert.equal(by("TP53").defaultSublabel, ": AMP HOMDEL MUT FUSION");
+  assert.equal(by("both").defaultSublabel, undefined, "no sublabel for merged tracks");
+  assert.equal(trackSublabelText(by("TP53"), { showOql: true }), ": AMP HOMDEL MU...", "cut at 18 characters as any sublabel");
+  assert.equal(trackSublabelText(by("TP53"), { showOql: false }), "");
+});
+
+test("VI-6: Show OQL filters is on by default only for a query with OQL; a set value is kept", () => {
+  assert.equal(normalizeSpec({ genes: ["KRAS", "TP53"] } as never).display.showOql, false);
+  assert.equal(normalizeSpec({ genes: ["KRAS: MUT", "TP53"] } as never).display.showOql, true);
+  assert.equal(normalizeSpec({ genes: ["KRAS", "TP53"], display: { showOql: true } } as never).display.showOql, true);
+  assert.equal(normalizeSpec({ genes: ["KRAS: MUT"], display: { showOql: false } } as never).display.showOql, false);
 });
 
 // ---------------------------------------------------------------------------------------------
