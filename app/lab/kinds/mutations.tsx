@@ -5,6 +5,8 @@ import { DataTable, specQuery } from "../../_table/DataTable.tsx";
 import { portalDuplicatesNote } from "../../../lib/chart/format.ts";
 import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
+import { useStemHover } from "../../_lollipop/stem-hover.ts";
+import { rowAtStem } from "../../../lib/lollipop.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
@@ -17,11 +19,15 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
   onQuery: (q: TableQuery) => void }) {
   const t = v.mutations;
   const tips = useCellTips();
+  // the lollipop's stem under the pointer: its codon's rows are highlighted, as on the portal's table
+  const hover = useStemHover();
+  const posAt = t.columns.findIndex((c) => c.id === "proteinPos");
   return (
     <div className="pb">
       {tips.node}
       <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} countNote={portalDuplicatesNote(t.duplicates, "mutation", "mutations")} {...(t.kept ? { kept: t.kept } : {})} onQuery={onQuery}
         num={(id, x) => id === "vafNormal" ? String(x) : x.toLocaleString()}
+        hot={hover && posAt >= 0 ? (r) => rowAtStem(hover, t.gene, r.values[posAt]) : undefined}
         colHead={(id) => id === "functionalImpact" ? <FunctionalImpactHead show={tips.show} /> : null}
         cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
           : id === "hgvsg" ? <HgvsgCell hgvsg={String(x ?? "")} detail={r.detail} show={tips.show} />
