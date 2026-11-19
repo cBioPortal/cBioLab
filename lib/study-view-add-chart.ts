@@ -3,6 +3,8 @@
 // takes with it when unchecked. The rules, case by case: docs/legacy-spec/parity/add-chart-cases.md.
 // Browser-safe; no I/O.
 import { isClinicalLeaf, type Clause } from "./types.ts";
+import { fmtInt } from "./chart/format.ts";
+import { PROFILE_KINDS } from "./study-view-gene-tables.ts";
 
 /** a row of the list: its key, its name, the selected samples with data (unknown when not counted), and whether it is checked */
 export interface AddChartRow { key: string; name: string; samples: number | undefined; checked: boolean }
@@ -70,19 +72,32 @@ export type GeneChartKind = "MUTATION" | "types" | "CNA";
 /**
  * The gene tab's profile select, as the portal lists it: the selection's mutation and discrete
  * copy-number profiles, each "<name> (N samples)", N the selected samples profiled. `dataTypes` is
- * Explore's count per profile kind.
+ * Explore's count per profile kind; the discrete copy-number kinds are the CNA gene table's
+ * (PROFILE_KINDS.cna), summed, since two studies may hold it under different ids ("gistic", "cna"),
+ * the label the one with the most samples.
  */
 export function geneChartProfiles(dataTypes: { profile: string; label: string; alterationType: string; n: number }[]): { kind: "mutation" | "cna"; label: string }[] {
-  const mut = dataTypes.find((d) => d.alterationType === "MUTATION_EXTENDED" && d.n > 0);
-  const cna = dataTypes.find((d) => d.alterationType === "COPY_NUMBER_ALTERATION" && ["gistic", "cna", "cna_rae", "cna_consensus"].includes(d.profile) && d.n > 0);
+  const option = (kind: "mutation" | "cna", rows: typeof dataTypes) => {
+    const held = rows.filter((d) => d.n > 0);
+    if (!held.length) return [];
+    const top = held.reduce((a, b) => (b.n > a.n ? b : a), held[0]);
+    return [{ kind, label: top.label + " (" + fmtInt(held.reduce((n, d) => n + d.n, 0)) + " samples)" }];
+  };
   return [
-    ...(mut ? [{ kind: "mutation" as const, label: mut.label + " (" + mut.n.toLocaleString("en-US") + " samples)" }] : []),
-    ...(cna ? [{ kind: "cna" as const, label: cna.label + " (" + cna.n.toLocaleString("en-US") + " samples)" }] : []),
+    ...option("mutation", dataTypes.filter((d) => d.alterationType === "MUTATION_EXTENDED")),
+    ...option("cna", dataTypes.filter((d) => d.alterationType === "COPY_NUMBER_ALTERATION" && PROFILE_KINDS.cna.includes(d.profile))),
   ];
 }
 
 /** the gene charts asked for: genes whose status charts Explore counts, which of the two each shows, and genes charted by mutation type */
 export interface GeneCharts { genes: string[]; kinds: Record<string, ("MUTATION" | "CNA")[]>; types: string[] }
+
+/** how many charts a gene list draws: one per gene and kind shown, one per mutation-type table */
+export const geneChartCount = (s: GeneCharts): number => s.genes.reduce((n, g) => n + (s.kinds[g]?.length || 0), 0) + s.types.length;
+
+/** whether a change asks Explore for something new: its genes or mutation-type tables; another kind of a counted gene is already there */
+export const geneChartsAsked = (before: GeneCharts, after: GeneCharts): boolean =>
+  before.genes.join("|") !== after.genes.join("|") || before.types.join("|") !== after.types.join("|");
 
 /** a gene chart added (`on`) or removed, at most `limit` genes of each list, as the portal adds one chart per gene and profile */
 export function geneChartsChanged(s: GeneCharts, gene: string, kind: GeneChartKind, on: boolean, limit = 6): GeneCharts {

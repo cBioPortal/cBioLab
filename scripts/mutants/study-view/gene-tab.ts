@@ -9,5 +9,8 @@ export const mutants: Mutant[] = [
     find: "const genes = kinds.length ? (s.genes.includes(gene)", replace: "const genes = on ? (s.genes.includes(gene)" },
   { id: "gene-tab-any-cna-profile", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
     effect: "The gene tab offers a continuous copy-number profile (linear CNA) as the copy-number chart's, whose levels the chart does not read.",
-    find: "&& [\"gistic\", \"cna\", \"cna_rae\", \"cna_consensus\"].includes(d.profile) && d.n > 0);", replace: "&& d.n > 0);" },
+    find: "d.alterationType === \"COPY_NUMBER_ALTERATION\" && PROFILE_KINDS.cna.includes(d.profile)", replace: "d.alterationType === \"COPY_NUMBER_ALTERATION\"" },
+  { id: "gene-tab-cna-first-study-only", layer: "counts", guard: "unit", file: "lib/study-view-add-chart.ts",
+    effect: "Over two studies holding discrete copy number under different ids (gistic, cna), the option counts the larger study's samples only (300 where the selection's are 592).",
+    find: "fmtInt(held.reduce((n, d) => n + d.n, 0))", replace: "fmtInt(top.n)" },
 ];

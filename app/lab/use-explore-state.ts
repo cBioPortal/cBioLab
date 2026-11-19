@@ -8,7 +8,7 @@ import { useSaved } from "../_saved/saved-context.tsx";
 import { useEffect, useRef, useState } from "react";
 import { normalizeDef } from "./pills";
 import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, NumericBin, PartitionArm, PartitionDef } from "../../lib/types.ts";
-import { GENOMIC_CHARTS, geneChartsChanged, withoutAttribute, type GeneChartKind } from "../../lib/study-view-add-chart.ts";
+import { GENOMIC_CHARTS, geneChartsAsked, geneChartsChanged, withoutAttribute, type GeneChartKind } from "../../lib/study-view-add-chart.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, withoutChart, comparisonCohorts, type ChartKey } from "../../lib/partition-arms.ts";
@@ -628,12 +628,16 @@ export function useExploreState(page: ExplorePage) {
 
   /** which of a charted gene's two status charts are shown (STV-AC-5: one chart per gene and profile) */
   const [geneKinds, setGeneKinds] = useState<Record<string, ("MUTATION" | "CNA")[]>>({});
+  const geneKindsRef = useRef<Record<string, ("MUTATION" | "CNA")[]>>({});
   const changeGeneChart = (g: string, kind: GeneChartKind, on: boolean) => {
-    const next = geneChartsChanged({ genes: geneChartsRef.current, kinds: geneKinds, types: mutationTypeChartsRef.current }, g, kind, on);
+    // read from the refs, so two changes before a render both count
+    const before = { genes: geneChartsRef.current, kinds: geneKindsRef.current, types: mutationTypeChartsRef.current };
+    const next = geneChartsChanged(before, g, kind, on);
     geneChartsRef.current = next.genes; setGeneCharts(next.genes);
     mutationTypeChartsRef.current = next.types; setMutationTypeCharts(next.types);
-    setGeneKinds(next.kinds);
-    fetchExplore();
+    geneKindsRef.current = next.kinds; setGeneKinds(next.kinds);
+    // another kind of a gene already counted is drawn from the answer in hand
+    if (geneChartsAsked(before, next)) fetchExplore();
   };
   /** chart a gene for one profile, as the portal's Add chart does: its mutation status, its mutations by type, or its copy number */
   const chartGene = (raw: string, kind: GeneChartKind) => {

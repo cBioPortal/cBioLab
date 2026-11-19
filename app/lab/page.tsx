@@ -4,6 +4,7 @@ import { currentLinkUrlMax, linkParams, writeSearch } from "../_links/link-state
 import { TAB_PARAM, readFilters, readTab, writeTab, type StudyViewTab } from "../../lib/study-view-url.ts";
 import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
+import { geneChartCount } from "../../lib/study-view-add-chart.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
@@ -630,7 +631,10 @@ export default function AnalysisPage() {
                 return shown < all && <span className="meta" data-charted={shown + "/" + all}>
                   {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
               })()}
-              {geneCharts.length + mutationTypeCharts.length > 0 && <span className="meta">{geneCharts.length + mutationTypeCharts.length} gene chart{geneCharts.length + mutationTypeCharts.length === 1 ? "" : "s"}</span>}
+              {(() => {
+                const n = geneChartCount({ genes: geneCharts, kinds: exploreState.geneKinds, types: mutationTypeCharts });
+                return n > 0 && <span className="meta">{n} gene chart{n === 1 ? "" : "s"}</span>;
+              })()}
               {(() => {
                 // drivers only where every selected study has OncoKB calls here; the server refuses the rest too
                 const without = exStudies.filter((id) => studies.find((x) => x.id === id)?.oncokb === false);

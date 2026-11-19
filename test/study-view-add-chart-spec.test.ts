@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, geneChartProfiles, geneChartsChanged, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -228,6 +228,25 @@ test("the gene tab's profiles: mutations and discrete copy number, each with its
     { profile: "gistic", label: "Putative copy-number alterations from GISTIC", alterationType: "COPY_NUMBER_ALTERATION", n: 592 }];
   assert.deepEqual(geneChartProfiles(dt), [{ kind: "mutation", label: "Mutations (534 samples)" }, { kind: "cna", label: "Putative copy-number alterations from GISTIC (592 samples)" }]);
   assert.deepEqual(geneChartProfiles(dt.slice(1, 3)), [], "no mutation or discrete copy-number profile, nothing to chart a gene from");
+  // two studies, one's discrete copy number "gistic", the other's "cna": one option, their samples summed
+  const two = [{ profile: "gistic", label: "Putative copy-number alterations from GISTIC", alterationType: "COPY_NUMBER_ALTERATION", n: 300 },
+    { profile: "cna", label: "Copy-number alterations", alterationType: "COPY_NUMBER_ALTERATION", n: 292 }];
+  assert.deepEqual(geneChartProfiles(two), [{ kind: "cna", label: "Putative copy-number alterations from GISTIC (592 samples)" }]);
+  assert.deepEqual(geneChartProfiles([{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 1234 }]),
+    [{ kind: "mutation", label: "Mutations (1,234 samples)" }]);
+});
+
+test("the charts a gene list draws: one per gene and kind, and one per mutation-type table", () => {
+  assert.equal(geneChartCount({ genes: ["KRAS"], kinds: { KRAS: ["MUTATION", "CNA"] }, types: ["TP53"] }), 3);
+  assert.equal(geneChartCount({ genes: [], kinds: {}, types: [] }), 0);
+});
+
+test("only a change to the genes or the mutation-type tables asks Explore again; showing another kind of a counted gene does not", () => {
+  const mut = { genes: ["KRAS"], kinds: { KRAS: ["MUTATION" as const] }, types: [] };
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "KRAS", "CNA", true)), false);
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "EGFR", "CNA", true)), true);
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "KRAS", "types", true)), true);
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "KRAS", "MUTATION", false)), true, "its last kind gone: the gene leaves the request");
 });
 
 test("a gene chart added and removed: each kind on its own, the gene counted while either status chart is shown", () => {

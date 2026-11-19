@@ -1034,8 +1034,7 @@ function GeneChartPicker({ ctx }: { ctx: ExploreCtx }) {
   const [profile, setProfile] = useState<"mutation" | "cna">("mutation");
   const [byType, setByType] = useState(false);
   const current = profiles.find((p) => p.kind === profile) ?? profiles[0];
-  if (!current) return <p className="note mt-0 mb-3">No selected study has mutation or copy-number data to chart a gene from.</p>;
-  const kind: GeneChartKind = current.kind === "cna" ? "CNA" : byType ? "types" : "MUTATION";
+  const kind: GeneChartKind = current?.kind === "cna" ? "CNA" : byType ? "types" : "MUTATION";
   const add = () => chartGene(geneChartInput, kind);
   const chips: { gene: string; kind: GeneChartKind; text: string }[] = [
     ...geneCharts.flatMap((g) => (geneKinds[g] || []).map((k) => ({ gene: g, kind: k as GeneChartKind, text: k === "CNA" ? "copy number" : "mutations" }))),
@@ -1043,7 +1042,8 @@ function GeneChartPicker({ ctx }: { ctx: ExploreCtx }) {
   ];
   return (
     <div>
-      <div className="row baseline g5 flex-wrap">
+      {/* the charted genes' chips stay, so a chart can be removed whatever the selection holds */}
+      {!current ? <p className="note mt-0 mb-3">No selected study has mutation or copy-number data to chart a gene from.</p> : <div className="row baseline g5 flex-wrap">
         <Choice className="w-80" value={current.kind} onChange={(v) => setProfile(v as "mutation" | "cna")} title="the profile the chart reads"
           options={profiles.map((p) => [p.kind, p.label] as const)} />
         {current.kind === "mutation" && <Choice className="w-48" value={byType ? "types" : "mutated"} onChange={(v) => setByType(v === "types")}
@@ -1053,8 +1053,8 @@ function GeneChartPicker({ ctx }: { ctx: ExploreCtx }) {
           onChange={(e) => setGeneChartInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
         <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={add}>Add Chart</Button>
-      </div>
-      {!chips.length && (
+      </div>}
+      {current && !chips.length && (
         <p className="note flush mt-1.5">
           Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
           it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
