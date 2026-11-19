@@ -408,7 +408,7 @@ def natural_ranks(values: list[str]) -> list[int]:
 
 def truncate_label(label: str, S: dict[str, Any] = STYLE) -> str:
     n = S["geometry"]["labelMaxChars"]
-    return label[: n - 1] + "…" if len(label) > n else label
+    return label[: n - 3] + "..." if len(label) > n else label
 
 
 def track_sublabel_text(meta: dict[str, Any], display: dict[str, Any] | None = None) -> str:
@@ -439,7 +439,7 @@ def track_label_text(track: Any, S: dict[str, Any] = STYLE) -> str:
         return truncate_label(label, S)
     open_b, close_b = S["geometry"]["mergedBrackets"]
     n = max(1, S["geometry"]["labelMaxChars"] - len(open_b) - len(close_b))
-    return open_b + (label[: n - 1] + "…" if len(label) > n else label) + close_b
+    return open_b + (label[: max(1, n - 3)] + "..." if len(label) > n else label) + close_b
 
 
 def glyph_presence(codes: Any, S: dict[str, Any] = STYLE) -> dict[str, Any]:
