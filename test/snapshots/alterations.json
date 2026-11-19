@@ -542,7 +542,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -584,7 +584,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -626,7 +626,7 @@
                   "G",
                   "C",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -727,7 +727,7 @@
                   "Likely Oncogenic",
                   "5q11.2",
                   0.3194888178913738,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -748,7 +748,7 @@
                   "Likely Oncogenic · Level 1",
                   "14q24.1",
                   0.0878594249201278,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -769,7 +769,7 @@
                   "Unknown",
                   "5q11.2",
                   0.23963575365444525,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {

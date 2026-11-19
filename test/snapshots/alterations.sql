@@ -28,14 +28,21 @@ fa AS (SELECT hugo_gene_symbol AS gene, cna_alteration AS alt, uniqExact(sample_
 fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (SELECT gene FROM g)
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'COPY_NUMBER_ALTERATION' GROUP BY gene),
+vs AS (SELECT sample_unique_id AS su FROM snapshot_db.sample_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND patient_unique_id = 'msk_chord_2024_P-0024249'),
+pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM snapshot_db.sample_to_gene_panel_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND alteration_type = 'COPY_NUMBER_ALTERATION' AND sample_unique_id IN (SELECT su FROM vs)),
+cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),
+miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
+  arraySort(groupArrayIf(replaceOne(vs.su, 'msk_chord_2024_', ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np
+  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         CAST(NULL AS Nullable(UInt8)) AS inAll,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
          g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = if(g.alt > 0, 'AMPLIFICATION', 'DELETION')
-  LEFT JOIN fa ON fa.gene = g.gene AND fa.alt = g.alt LEFT JOIN fp ON fp.gene = g.gene 
+  LEFT JOIN fa ON fa.gene = g.gene AND fa.alt = g.alt LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN miss ON miss.gene = g.gene
 ))
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
@@ -55,14 +62,21 @@ fa AS (SELECT hugo_gene_symbol AS gene, cna_alteration AS alt, uniqExact(sample_
 fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (SELECT gene FROM g)
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'COPY_NUMBER_ALTERATION' GROUP BY gene),
+vs AS (SELECT sample_unique_id AS su FROM snapshot_db.sample_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND patient_unique_id = 'msk_chord_2024_P-0024249'),
+pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM snapshot_db.sample_to_gene_panel_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND alteration_type = 'COPY_NUMBER_ALTERATION' AND sample_unique_id IN (SELECT su FROM vs)),
+cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),
+miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
+  arraySort(groupArrayIf(replaceOne(vs.su, 'msk_chord_2024_', ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np
+  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         CAST(NULL AS Nullable(UInt8)) AS inAll,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
          g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = if(g.alt > 0, 'AMPLIFICATION', 'DELETION')
-  LEFT JOIN fa ON fa.gene = g.gene AND fa.alt = g.alt LEFT JOIN fp ON fp.gene = g.gene 
+  LEFT JOIN fa ON fa.gene = g.gene AND fa.alt = g.alt LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN miss ON miss.gene = g.gene
 ))
 SELECT *, count() OVER () AS total FROM rows
 WHERE 1
@@ -135,11 +149,12 @@ vs AS (SELECT sample_unique_id AS su FROM snapshot_db.sample_derived WHERE cance
 pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND alteration_type = 'COPY_NUMBER_ALTERATION' AND sample_unique_id IN (SELECT su FROM vs)),
 cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),
-miss AS (SELECT gg.gene AS gene, countIf(vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov)) AS n
-  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene),
+miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
+  arraySort(groupArrayIf(replaceOne(vs.su, 'msk_chord_2024_', ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np
+  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
          g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf
   FROM g
@@ -177,11 +192,12 @@ vs AS (SELECT sample_unique_id AS su FROM snapshot_db.sample_derived WHERE cance
 pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM snapshot_db.sample_to_gene_panel_derived
   WHERE cancer_study_identifier = 'msk_chord_2024' AND alteration_type = 'MUTATION_EXTENDED' AND sample_unique_id IN (SELECT su FROM vs)),
 cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),
-miss AS (SELECT gg.gene AS gene, countIf(vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov)) AS n
-  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene),
+miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
+  arraySort(groupArrayIf(replaceOne(vs.su, 'msk_chord_2024_', ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np
+  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
@@ -221,9 +237,16 @@ kc AS (SELECT keyword AS kw, uniqExact(sampleId) AS n FROM snapshot_db.mutation_
 fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (SELECT gene FROM g)
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED' GROUP BY gene),
+vs AS (SELECT sample_unique_id AS su FROM snapshot_db.sample_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND patient_unique_id = 'msk_chord_2024_P-0024249'),
+pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM snapshot_db.sample_to_gene_panel_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND alteration_type = 'MUTATION_EXTENDED' AND sample_unique_id IN (SELECT su FROM vs)),
+cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),
+miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
+  arraySort(groupArrayIf(replaceOne(vs.su, 'msk_chord_2024_', ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np
+  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         CAST(NULL AS Nullable(UInt8)) AS inAll,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
@@ -231,7 +254,7 @@ rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange
-  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw 
+  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw LEFT JOIN miss ON miss.gene = g.gene
 ))
 SELECT cohort, study, countIf((positionCaseInsensitiveUTF8(if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level '))))), 'Oncogenic') > 0)) AS n, count() AS all FROM rows GROUP BY cohort, study
 
@@ -264,9 +287,16 @@ kc AS (SELECT keyword AS kw, uniqExact(sampleId) AS n FROM snapshot_db.mutation_
 fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot_db.sample_to_gene_panel_derived sp
   JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (SELECT gene FROM g)
   WHERE sp.cancer_study_identifier = 'msk_chord_2024' AND sp.alteration_type = 'MUTATION_EXTENDED' GROUP BY gene),
+vs AS (SELECT sample_unique_id AS su FROM snapshot_db.sample_derived WHERE cancer_study_identifier = 'msk_chord_2024' AND patient_unique_id = 'msk_chord_2024_P-0024249'),
+pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM snapshot_db.sample_to_gene_panel_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND alteration_type = 'MUTATION_EXTENDED' AND sample_unique_id IN (SELECT su FROM vs)),
+cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),
+miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
+  arraySort(groupArrayIf(replaceOne(vs.su, 'msk_chord_2024_', ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np
+  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         CAST(NULL AS Nullable(UInt8)) AS inAll,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
@@ -274,7 +304,7 @@ rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
   FROM g
   LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange
-  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw 
+  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw LEFT JOIN miss ON miss.gene = g.gene
 ))
 SELECT * EXCEPT (vafs), count() OVER () AS total FROM rows
 WHERE (positionCaseInsensitiveUTF8(if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level '))))), 'Oncogenic') > 0)

@@ -548,6 +548,12 @@
     "textBaseline": 9.5,
     "fontSize": 10
   },
+  "notProfiledPill": {
+    "fill": "#cccccc",
+    "width": 12,
+    "height": 2.5,
+    "y": 5
+  },
   "geometry": {
     "rowH": 20,
     "rowGap": 3,

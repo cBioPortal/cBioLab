@@ -138,7 +138,8 @@ export const vafSort = (n: number) => (dir: "ASC" | "DESC") => n === 0 ? "vaf " 
  * `alterationType` (the portal's PAT-GP-1): a sample is profiled for a gene when any of its panels for
  * that type holds it or is whole-exome/genome (WES — the panel table gives a profiled sample with no
  * panel a WES row); a sample with no panel row for the type is not in that profile, so not profiled.
- * `miss` (gene, n); 0 is the portal's "profiled in all samples" (PAT-STM-15).
+ * `miss` (gene, n, np): n of them, np their ids A to Z (the Samples cell's not-profiled marks, PAT-GP-2);
+ * n 0 is the portal's "profiled in all samples" (PAT-STM-15).
  */
 function missCte(p: TablePart, patient: string, db: string, alterationType: string, samples: AlterationSamples): string {
   const st = sq(p.study), pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
@@ -147,8 +148,9 @@ function missCte(p: TablePart, patient: string, db: string, alterationType: stri
     "pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM " + db + ".sample_to_gene_panel_derived\n" +
     "  WHERE cancer_study_identifier = " + st + " AND alteration_type = " + sq(alterationType) + " AND sample_unique_id IN (SELECT su FROM vs)),\n" +
     "cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),\n" +
-    "miss AS (SELECT gg.gene AS gene, countIf(vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov)) AS n\n" +
-    "  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene),\n";
+    "miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,\n" +
+    "  arraySort(groupArrayIf(replaceOne(vs.su, " + pre + ", ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np\n" +
+    "  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),\n";
 }
 
 /**
@@ -204,7 +206,7 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       (covered ? missCte(p, patient, db, "MUTATION_EXTENDED", samples) : "") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
-      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll,\n" +
+      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll, " + (covered ? "miss.np" : "CAST([] AS Array(String))") + " AS notProfiled,\n" +
       "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
       // what the Cohort cell draws and says: samples with a mutation in the gene, with the row's keyword, out of those profiled
       "         toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,\n" +
@@ -247,7 +249,7 @@ export function patientCnaSource(p: TablePart, patient: string, db: string, pin:
       (covered ? missCte(p, patient, db, "COPY_NUMBER_ALTERATION", samples) : "") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, " + annSelect(pin) + ",\n" +
-      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll,\n" +
+      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll, " + (covered ? "miss.np" : "CAST([] AS Array(String))") + " AS notProfiled,\n" +
       "         g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
       "         toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf\n" +
       "  FROM g\n" +

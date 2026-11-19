@@ -1592,7 +1592,7 @@
                   "T",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1634,7 +1634,7 @@
                   "G",
                   "-",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1676,7 +1676,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1718,7 +1718,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1760,7 +1760,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1802,7 +1802,7 @@
                   "T",
                   "G",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1844,7 +1844,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1886,7 +1886,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1928,7 +1928,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1970,7 +1970,7 @@
                   "C",
                   "G",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2012,7 +2012,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2054,7 +2054,7 @@
                   "T",
                   "G",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2096,7 +2096,7 @@
                   "G",
                   "-",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2138,7 +2138,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2180,7 +2180,7 @@
                   "G",
                   "C",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2222,7 +2222,7 @@
                   "T",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2264,7 +2264,7 @@
                   "C",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2306,7 +2306,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2348,7 +2348,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2390,7 +2390,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2411,7 +2411,7 @@
               },
               {
                 "…": "5 more",
-                "sha256": "6bc59c033fdfe1f9"
+                "sha256": "394140478da4002b"
               }
             ],
             "offset": 0,
@@ -2495,7 +2495,7 @@
                   "Oncogenic · Level 4",
                   "12q14.1",
                   1.5575079872204474,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -2516,7 +2516,7 @@
                   "Oncogenic",
                   "1q21.2",
                   1.5095846645367412,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -2537,7 +2537,7 @@
                   "Unknown",
                   "1q22",
                   0.7388769071012061,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {

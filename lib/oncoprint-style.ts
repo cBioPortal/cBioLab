@@ -159,6 +159,8 @@ export const STYLE = {
   // a grey bar, the gene's share over it, a mutation's keyword share darker still; copy number red or blue
   cohortBar: { background: "#ccc", gene: "lightgreen", keyword: "green", amp: "red", del: "blue", width: 30, height: 8, top: 2, svgHeight: 12,
     textMargin: 6, textWidth: 35, textBaseline: 9.5, fontSize: 10 },
+  // the Patient tables' Samples cell where the row's gene is off the sample's panel (SampleLabelNotProfiled): a grey pill
+  notProfiledPill: { fill: "#cccccc", width: 12, height: 2.5, y: 5 },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,
