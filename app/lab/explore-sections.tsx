@@ -182,7 +182,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               <Dna />Query genes…{queuedGenes.length ? " (" + queuedGenes.length + ")" : ""}
             </Button>}
             {!addMode && <Button variant="outline" className="viewpatients" disabled={!!viewWhy} onClick={() => void viewPatients()}
-              data-tip={viewWhy || "open the Patient page on the first of " + (parseDraft() ? "the patients your filters select" : "the selected studies' patients") +
+              data-tip={viewWhy || "open the Patient page in a new window on the first of " + (parseDraft() ? "the patients your filters select" : "the selected studies' patients") +
                 ", and step through the rest"}>
               <Users />View patients
             </Button>}
