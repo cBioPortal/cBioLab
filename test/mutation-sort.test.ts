@@ -162,3 +162,13 @@ test("chromosomeSortSql is an expression over the one passed", () => {
   assert.ok(sql.includes("x"), sql);
   assert.ok(chromosomeSortSql("chr").includes("chr"));
 });
+
+// the Mutations table orders its Protein Change and Chromosome columns by these keys (their SQL is run in
+// check-mutation-columns S1, over the fixture's rows in S2 and S3)
+test("W1 the mutation table's proteinChange and chr columns order by the portal's keys", async () => {
+  const { mutationRowSource } = await import("../lib/mutation-table.ts");
+  const src = mutationRowSource([{ cohort: "A", study: "s1", cohortSql: "SELECT 'p' AS pid, 's' AS sid" }], "c1", "KRAS", null, { hg19: null, hg38: null });
+  const order = (id: string) => (src.columns.find((c) => c.id === id) as { order?: string } | undefined)?.order;
+  assert.equal(order("proteinChange"), proteinChangeSortSql("proteinChange"));
+  assert.equal(order("chr"), chromosomeSortSql("chr"));
+});

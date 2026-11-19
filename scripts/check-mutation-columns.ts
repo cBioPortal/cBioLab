@@ -33,8 +33,9 @@
  *   S2 sorted by Protein Change: by position, then the letters' character codes (KRAS G12C < G12D < G12V
  *      < G13D < Q61H, PTEN D92N < R130G < R130Q < X200_splice, EGFR in full); descending is the
  *      reverse, a change with no number (MUTATED) last both ways.
- *   S3 sorted by Chromosome: by the number, so PTEN's "chr10" row ties with its "10" rows and the
- *      tiebreak (sample id) orders all of them, both ways.
+ *   S3 sorted by Chromosome in the table: PTEN's rows are all on 10 (the importer stores the file's
+ *      "chr10" as "10"), so they tie and the tiebreak (sample id) orders them, both ways. No fixture
+ *      gene's table spans chromosomes whose text and number orders differ, so the key itself is S1's.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
@@ -454,15 +455,13 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
   }
 }
 {
-  // S3 PTEN's rows are on "10" but FX-P29's R130G on "chr10": all sort as 10, so the tiebreak (sample id)
-  // orders them both ways; a text sort would put the chr10 row after every "10" row ascending and before them descending
+  // S3 PTEN's rows all sort as 10 (FX-P29's "chr10" is stored as "10"), so the tiebreak (sample id) orders them both ways
   for (const desc of [false, true]) {
     const r = await table("PTEN", { sort: { column: "chr", ...(desc ? { desc: true } : {}) } });
     if (typeof r === "string") { ok(`S3 PTEN sorted by Chromosome ${desc ? "descending" : "ascending"}`, false, r); continue; }
     const chrs = r.map((x) => v(x, "chr")), sids = r.map((x) => x.sample);
-    const pass = chrs.includes("chr10") && chrs.includes("10") && chrs.every((c) => c === "10" || c === "chr10") &&
-      sids.every((s, i) => i === 0 || sids[i - 1] <= s);
-    ok(`S3 PTEN sorted by Chromosome ${desc ? "descending" : "ascending"}: "chr10" ties with "10", so the rows are in sample id order`,
+    const pass = r.length > 1 && chrs.every((c) => c === "10") && sids.includes("FX-P29-T1") && sids.every((s, i) => i === 0 || sids[i - 1] <= s);
+    ok(`S3 PTEN sorted by Chromosome ${desc ? "descending" : "ascending"}: every row on 10 (FX-P29's "chr10" too), so the rows are in sample id order`,
       pass, JSON.stringify(r.map((x) => x.sample + " " + String(v(x, "chr")))));
   }
 }

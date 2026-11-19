@@ -16,7 +16,7 @@ export const mutants: Mutant[] = [
   { id: "pc-sort-sql-codon-only", layer: "counts", guard: "mutation-columns", file: "lib/mutation-table.ts",
     effect: "The Mutations table sorts Protein Change by codon alone, so KRAS G12C/D/V come in sample order.",
     find: "order: proteinChangeSortSql(\"proteinChange\")", replace: "order: \"pos\"" },
-  { id: "chr-sort-sql-text", layer: "counts", guard: "mutation-columns", file: "lib/mutation-table.ts",
+  { id: "chr-sort-sql-text", layer: "counts", guard: "unit", file: "lib/mutation-table.ts",
     effect: "The Mutations table sorts Chromosome as text (\"10\" < \"17\" < \"2\" < \"chr10\").",
     find: ", order: chromosomeSortSql(\"chr\") }", replace: " }" },
   { id: "pc-sort-sql-letters-dropped", layer: "counts", guard: "mutation-columns", file: "lib/mutation-sort.ts",
