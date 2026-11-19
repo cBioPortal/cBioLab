@@ -536,7 +536,7 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
   //             FX-P20-T1 0.375 (29; 71, Q61H)
   //     dropped FX-P02-T1 0.104, P05-T1 0.579, P06-T1 0.172, P08-T1 0.129, P14-T1 0.589, P15-T1 0.516, P18-T1 0.127
   //   a male patient's sample in range is dropped by SEX alone: FX-P01-T1 (Male, 0.354; mutation line 2, G12C)
-  // 7 rows; 6 (patient, change) pairs (FX-P04's two samples carry the same G13D)
+  // 7 rows (6 (patient, change) pairs: FX-P04's two samples carry the same G13D)
   const L1_ROWS = ["FX-P02-T2 G12D", "FX-P04-T1 G13D", "FX-P04-T2 G13D", "FX-P10-T1 G12C", "FX-P12-T1 G12D", "FX-P16-T1 G12C", "FX-P20-T1 Q61H"];
   const L1_FGA: Record<string, number> = { "FX-P02-T2": 0.322, "FX-P04-T1": 0.207, "FX-P04-T2": 0.246, "FX-P10-T1": 0.438, "FX-P12-T1": 0.246, "FX-P16-T1": 0.326, "FX-P20-T1": 0.375 };
   const filters: Record<string, ColumnFilter> = { SEX: { values: ["Female"] }, FRACTION_GENOME_ALTERED: { min: 0.2, max: 0.5 } };
@@ -561,8 +561,10 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
     tally = !g ? "refused: " + String(hr.error || JSON.stringify(hr).slice(0, 200))
       : String(Object.values(g.tally).reduce((n, t) => n + t.driver + t.vus, 0)) + " (missense " + g.tally.missense.driver + "/" + g.tally.missense.vus + "), pairs " + g.mutations;
   } catch (e) { tally = "threw: " + String((e as Error).message).slice(0, 200); }
-  ok("L1 the hotspots view with the same table query tallies the same 7 mutations, all missense, over 6 (patient, change) pairs",
-    tally.startsWith("7 (missense ") && tally.endsWith(", pairs 6") && /missense (\d+)\/(\d+)/.test(tally) &&
+  // the tally follows the table's query; the gene's totals (its mutations as patient + change pairs) do not, as the
+  // portal's frequency ignores the tab's filters (#286): KRAS's 24 rows hold 20 distinct (patient, change) pairs
+  ok("L1 the hotspots view with the same table query tallies the same 7 mutations, all missense; its totals stay the gene's 20 (patient, change) pairs",
+    tally.startsWith("7 (missense ") && tally.endsWith(", pairs 20") && /missense (\d+)\/(\d+)/.test(tally) &&
     tally.match(/missense (\d+)\/(\d+)/)!.slice(1).reduce((n, x) => n + Number(x), 0) === 7, tally);
 }
 
