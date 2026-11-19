@@ -48,6 +48,15 @@ describe("the alterations view's tables", () => {
     assert.match(alterationSource("mutations", part, "P-1", "db", null, []).with, /NOT LIKE '%uncalled%'/, "uncalled calls are left out, as the portal leaves them out");
     assert.match(alterationSource("cna", part, "P-1", "db", null, []).with, /abs\(cna_alteration\) >= 2/, "the deep calls only");
   });
+  test("PAT-STM-2: a mutation with no keyword has no Cohort %, as the portal's variant counts give it none", () => {
+    // coadread TCGA-A6-2671 CPD N210_D215del, BABAM2 X261_splice, ADAM32 X720_splice: no keyword, blank on the portal
+    const sql = alterationSource("mutations", part, "P-1", "db", null, []).with;
+    assert.match(sql, /ifNull\(keyword, ''\) AS kw/);
+    assert.match(sql, /max\(kw\) AS kw/);
+    assert.match(sql, /if\(g\.kw != '' AND ifNull\(fp\.n, 0\) > 0, 100 \* ifNull\(fa\.n, 0\) \/ fp\.n, NULL\) AS freq/);
+    // the denominator stays the samples profiled for the gene (invariant 7)
+    assert.match(sql, /fp AS \(SELECT pg\.gene AS gene/);
+  });
   test("samples: \"cohort\" reads only the cohort's samples, in every table and in the patient list's counts", () => {
     const inCohort = /IN \(SELECT sid FROM ck\)/;
     for (const t of ALTERATION_TABLES) {
