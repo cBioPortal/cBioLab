@@ -245,11 +245,10 @@ async function buildExploreOne(args: ExploreArgs): Promise<ExploreResult> {
   const pre = prefetched ?? (await prefetchFacets({ studies: [study], db, conn, attributes,
     set: draftSet, scan, drafted: draftedClinical(draft).map((d) => d.attr), attributesOnly: only })).get(study)!;
 
-  // how many patients this study contributes under the current draft (or in total): the
-  // owners of the draft's samples
-  const studyN = draftCount ?? Number(pre.totals.pts);
+  // how many samples this study contributes under the current draft (or in total), as the portal's
+  // Cancer Studies chart counts them (STS-STM-19)
   const studyBreakdown: StudyBreakdownRow[] = [
-    { study, n: studyN, instance: conn.id, instanceLabel: conn.label }
+    { study, n: Number(pre.totals.smp), instance: conn.id, instanceLabel: conn.label }
   ];
   // both units, as the portal's study-view header reports them: facets are
   // counted in their natural unit, so the header anchors what each one means

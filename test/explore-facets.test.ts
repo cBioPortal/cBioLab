@@ -357,7 +357,7 @@ describe("one study", () => {
     const r = await buildExplore({ study: S, conn: PRIMARY });
     assert.equal(r.draftCount, null);
     assert.deepEqual(r.totals, { patients: 100, samples: 120 });
-    assert.deepEqual(r.studyBreakdown, [{ study: S, n: 100, instance: "a", instanceLabel: "primary" }]);
+    assert.deepEqual(r.studyBreakdown, [{ study: S, n: 120, instance: "a", instanceLabel: "primary" }], "samples, not patients (100)");
     // SEX's database priority 1 is the default, so the portal's table gives it 9 (above AGE's 5)
     assert.deepEqual(r.clinical.map((c) => [c.attribute, c.kind, c.priority]), [["SEX", "cat", 9], ["AGE", "num", 5], ["CODE", "cat", undefined], ["TMB", "num", undefined]]);
     const age = r.clinical[1];
@@ -439,6 +439,7 @@ describe("one study", () => {
     const female = { all: [{ kind: "clinical" as const, attribute: "SEX", values: ["Female"] }] };
 
     test("resolved once and shipped as a table, which every facet reads; a drafted attribute is counted without its own clause", async () => {
+      on(/^SELECT cancer_study_identifier AS s, uniqExact\(patient_unique_id\) AS pts[\s\S]*_cohort_st1/, [{ s: S, pts: 2, smp: 3 }]);
       facetAnswers();
       on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }, { pid: "P2", sid: "S2" }, { pid: "P2", sid: "S3" }]);
       const r = await buildExplore({ study: S, draft: female, skipGenes: true });
@@ -446,7 +447,7 @@ describe("one study", () => {
       assert.equal(sent.filter((q) => /SELECT DISTINCT pid, sid FROM/.test(q)).length, 1);
       assert.ok(!sent.some((q) => /uniqExact\(pid\) AS n, uniqExact\(sid\) AS ns/.test(q)), "its size came from the rows");
       assert.ok(sent.filter((q) => /^SELECT cancer_study_identifier AS s, uniqExact\(patient_unique_id\) AS pts/.test(q)).every((q) => q.includes("_cohort_st1")));
-      assert.deepEqual(r.studyBreakdown![0].n, 2);
+      assert.equal(r.studyBreakdown![0].n, 3, "the study's samples in the draft (2 patients, 3 samples), as the portal's Cancer Studies chart counts");
       const sex = r.clinical.find((c) => c.attribute === "SEX")!;
       assert.equal((sex as { disjunctive?: boolean }).disjunctive, true);
       // the disjunctive value count has no draft left: every SEX value of the study

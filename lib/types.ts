@@ -1052,7 +1052,9 @@ export interface GeneTableRow {
 
 /** one row per selected study: how the current draft distributes across them */
 export interface StudyBreakdownRow {
-  study: string; n: number;
+  study: string;
+  /** the study's samples in the selection */
+  n: number;
   /** which instance holds it (federation) */
   instance: string; instanceLabel: string;
 }
