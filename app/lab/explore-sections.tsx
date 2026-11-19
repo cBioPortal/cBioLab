@@ -25,7 +25,7 @@ import { addChartLines, assayTabs, bulkButtons, genomicChartLines, geneTabView, 
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
-import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
+import { chartFileName, geneStateCode, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
@@ -713,9 +713,12 @@ const forBoth = (make: (t: GroupsTarget) => ChartAction | null): ChartAction[] =
  * why, when the chart holds only its most frequent values.
  */
 function summaryDownload(name: string, unit: DownloadUnit, values: CategoryCount[], na: number, distinct: number | undefined,
-  onError: (message: string) => void, order?: (vs: CategoryCount[]) => CategoryCount[], full?: ChartAction): ChartAction {
+  onError: (message: string) => void, order?: (vs: CategoryCount[]) => CategoryCount[], full?: ChartAction,
+  /** the category the file writes for a value shown, where the portal's file writes a code (SD14) */
+  code?: (value: string) => string): ChartAction {
   const cut = summaryCut(values.length, distinct);
-  const counts = na > 0 ? [...values, { value: "NA", count: na }] : values;
+  const shown = na > 0 ? [...values, { value: "NA", count: na }] : values;
+  const counts = code ? shown.map((c) => ({ ...c, value: code(c.value) })) : shown;
   const file = chartFileName(name, "summary");
   return { label: "Download", title: "save this chart's data as a file", sub: [
     { label: "Summary Data", disabled: !!cut, title: cut || "each value with its count and percentage, as " + file,
@@ -1283,7 +1286,9 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
             {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
             <span className="meta">sample-level · {f.total.toLocaleString()} samples</span>
             <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
-              states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg)]} />
+              states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg, undefined, undefined,
+              // the file writes the portal's codes (SD14); the figure, the names on screen
+              (label) => { const st = states.find((x) => x.label === label); return st ? geneStateCode(f.type, st.state, !!explore.drivers, st.label) : label; })]} />
           </div>
           <ValueList unit="samples" hint={"keep the samples in any of the checked states of " + f.gene}
             rows={states.map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",
