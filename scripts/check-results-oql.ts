@@ -62,8 +62,9 @@
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 import { cancerTypesSql, cancerTypeSamplesSql } from "../lib/views/cancertypes/sql.ts";
-import { lineCtes, type StudyOpts } from "../lib/views/datafiles/sql.ts";
-import { matrixRowSource } from "../lib/views/datafiles/tables.ts";
+import { lineCtes, type LinePlan, type StudyOpts } from "../lib/views/datafiles/sql.ts";
+import { alterationColumns, matrixRowSource, statusRowSource } from "../lib/views/datafiles/tables.ts";
+import { parseOql } from "../lib/oql-parse.ts";
 import { pageSql } from "../lib/table-query.ts";
 import { pairCountsSql, geneCountsSql, lollipopChangesSql } from "../lib/federation.ts";
 import { oqlMutationFilterSql } from "../lib/oql.ts";
@@ -567,6 +568,42 @@ async function dlCells(tag: string, line: string, extra: Partial<StudyOpts> & Re
     if (!got) continue;
     for (const [sid, cell] of Object.entries(want))
       ok("Download " + tag + " [" + line + "] " + sid + ": " + JSON.stringify(cell), got[sid] === cell, "ours " + JSON.stringify(got[sid]));
+  }
+}
+
+// L6: the case table's per-alteration columns, hidden at first (CaseAlterationTable 445-517, generatePseudoOqlSummary):
+// "<gene>: <command>" for each command of the gene's lines (a bare line's, the default OQL: AMP HOMDEL MUT FUSION here),
+// the gene's calls of that kind the lines matched, with their notes; "not profiled" when the gene is off the sample's
+// panel for that data type, whatever was called; else "no alteration". AMP and HOMDEL both read copy number.
+// Query [KRAS: MUT=G12D, EGFR], drivers {} with the hotspot pins. From the fixture files:
+//   FX-P02-T1 KRAS G12D (OncoKB Oncogenic); FX-P01-T1 KRAS G12C, not wanted by MUT=G12D.
+//   FX-P23-T1 EGFR amplification (OncoKB): AMP and HOMDEL both "AMP (driver)"; MUT its L858R (OncoKB).
+//   FX-P44-T1 EGFR mutations as L5, and its MAF Fusion row EGFR-SEPT14, a mutation call to the bare line (as its own column has it); no EGFR copy number.
+//   FX-P31-T1 on PEERFIX_NO_EGFR (no EGFR for mutations or copy number): EGFR MUT, AMP "not profiled".
+{
+  const cohort = compileCohortDef(null, { study: STUDY, db: conn.db });
+  const oql = ["KRAS: MUT=G12D", "EGFR"];
+  const plan: LinePlan[] = [{ line: oql[0], gene: "KRAS", types: ["MUTATION"] }, { line: oql[1], gene: "EGFR", types: ["MUTATION", "CNA", "SV"] }];
+  const alts = alterationColumns(oql.map((l) => ({ gene: parseOql(l)[0].gene, specs: parseOql(l)[0].specs })), ["AMP", "HOMDEL", "MUT", "FUSION"]);
+  ok("L6 columns: KRAS: MUT=G12D, then EGFR's default OQL", JSON.stringify(alts.map((c) => c.name)) ===
+    JSON.stringify(["KRAS: MUT=G12D", "EGFR: AMP", "EGFR: HOMDEL", "EGFR: MUT", "EGFR: FUSION"]), alts.map((c) => c.name).join(", "));
+  const opts = { study: STUDY, db: conn.db, pin: ONCOKB, profiles: ["mutations", "cna", "structural_variants"], drivers: {}, hotspotPins: HOTSPOT_PINS } as StudyOpts;
+  const src = statusRowSource("cases", [{ cohort: "Q", study: STUDY, cohortSql: cohort }], oql.map((l, k) => ({ line: l, gene: plan[k].gene })),
+    () => ({ lines: plan, opts }), alts);
+  try {
+    const rows = (await chQuery<Row>(pageSql(src, {}, ["sample", ...alts.map((c) => c.id)], 1000, 0), conn)).data;
+    const cell = (sid: string, name: string) => String(rows.find((r) => r.sid === sid)?.["h" + alts.findIndex((c) => c.name === name)] ?? "(no row)");
+    const want: [string, string, string][] = [
+      ["FX-P02-T1", "KRAS: MUT=G12D", "G12D (driver)"], ["FX-P01-T1", "KRAS: MUT=G12D", "no alteration"],
+      ["FX-P23-T1", "EGFR: AMP", "AMP (driver)"], ["FX-P23-T1", "EGFR: HOMDEL", "AMP (driver)"], ["FX-P23-T1", "EGFR: MUT", "L858R (driver)"],
+      ["FX-P44-T1", "EGFR: MUT", "A289V, C797S, EGFR-SEPT14, G719A, L858R [germline] (driver), L861Q [germline], MUTATED, S768I [germline], V769M"],
+      ["FX-P44-T1", "EGFR: AMP", "no alteration"],
+      ["FX-P31-T1", "EGFR: MUT", "not profiled"], ["FX-P31-T1", "EGFR: AMP", "not profiled"],
+    ];
+    ok("L6 a row per sample (59)", rows.length === 59, "ours " + rows.length);
+    for (const [sid, name, v] of want) ok("Download L6 " + sid + " " + name + ": " + JSON.stringify(v), cell(sid, name) === v, "ours " + JSON.stringify(cell(sid, name)));
+  } catch (e) {
+    ok("L6 runs", false, (e as Error).message.slice(0, 300));
   }
 }
 

@@ -23,6 +23,12 @@ export interface StudyOpts { study: string; db: string; pin: string | null; prof
 
 /** The CTE name for one gene and data type's profiled samples, under prefix `p`. */
 const profiledName = (p: string, gene: string, type: DataType) => p + "_prof_" + gene.replace(/[^A-Za-z0-9]/g, "_") + "_" + type;
+/** `sid` profiled for `gene` in `type`, by the CTE lineCtes made for it under prefix `p` (only when a line of the gene reads that type) */
+export const profiledIn = (p: string, gene: string, type: DataType, sid: string): string => sid + " IN (SELECT profiled_id FROM " + profiledName(p, gene, type) + ")";
+
+/** a call's kind as the case table's per-alteration columns read it (CaseAlterationTable: MUT, CNA, FUSION, EXP, PROT), as a condition on an event row */
+export const CALL_KINDS = { mut: "o = 1", cna: "o = 2", sv: "o = 3", exp: "o = 4 AND startsWith(call_, 'EXP')", prot: "o = 4 AND startsWith(call_, 'PROT')" } as const;
+export type CallKind = keyof typeof CALL_KINDS;
 
 /**
  * The CTEs one (cohort, study) part needs, every name under prefix `p`: `<p>_e<k>` — each sample of
@@ -30,15 +36,17 @@ const profiledName = (p: string, gene: string, type: DataType) => p + "_prof_" +
  * order, comma-separated) — and one `<p>_prof_<gene>_<type>` per gene and data type the lines read:
  * the study's samples profiled for that gene in that type, by their panels (profiledCasesSql, the
  * profiled clause's rule). With `notes` (the case table), each event is followed by its note, as the
- * portal's text of a cell: " [germline]", " (driver)" (oqlEventsSql).
+ * portal's text of a cell: " [germline]", " (driver)" (oqlEventsSql), and `<p>_e<k>` also holds the
+ * line's calls of each kind as an array (`k_mut`, `k_cna`, …), for the per-alteration columns.
  */
 export function lineCtes(p: string, cohort: string, lines: LinePlan[], o: StudyOpts, { notes = false }: { notes?: boolean } = {}): string {
   const out: string[] = [];
   lines.forEach((l, k) => {
     out.push(p + "_e" + k + " AS (\n" +
-      "  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, " + (notes ? "concat(ev, note)" : "ev") + ")))), ', ') AS ev\n" +
-      "  FROM (" + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, pins: o.pins, study: o.study, db: o.db, notes,
-        ...(o.drivers !== undefined ? { drivers: o.drivers, hotspotPins: o.hotspotPins } : {}) }) + ")\n" +
+      "  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, " + (notes ? "concat(call_, note)" : "ev") + ")))), ', ') AS ev" +
+      (notes ? Object.entries(CALL_KINDS).map(([k, cond]) => ",\n    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), " + cond + "))) AS k_" + k).join("") : "") + "\n" +
+      "  FROM (" + (notes ? "SELECT sid, o, ev AS call_, note FROM (" : "") + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, pins: o.pins, study: o.study, db: o.db, notes,
+        ...(o.drivers !== undefined ? { drivers: o.drivers, hotspotPins: o.hotspotPins } : {}) }) + (notes ? ")" : "") + ")\n" +
       "  WHERE sid IN (SELECT sid FROM " + cohort + ")\n" +
       "  GROUP BY sid)");
   });
