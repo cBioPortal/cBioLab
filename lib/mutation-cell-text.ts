@@ -141,6 +141,30 @@ export function msaUrls(msa: string): { view: string; download: string } {
 }
 
 /**
+ * The Protein Change cell as the portal draws it (ProteinChangeColumnFormatter renderWithMutationStatus):
+ * the change cut by TruncatedText at 40 characters, the whole text its tooltip, and a "Germline" tag
+ * when the call's status reads as germline (isGermlineMutationStatus, /germline/i).
+ */
+export function proteinChangeCell(change: string | null | undefined, status: string | null | undefined): { shown: string; full: string; germline: boolean } {
+  const full = change ?? "";
+  return { shown: truncate(full, 40), full, germline: /germline/i.test(status ?? "") };
+}
+
+/**
+ * The MS (Mutation Status) cell as the portal draws it (MutationStatusColumnFormatter renderFunction):
+ * "S" for a status containing "somatic", else "G" for one containing "germline" (either case), each on
+ * its badge with the stored value as tooltip; any other value as written, small and grey; none blank.
+ */
+export function mutationStatusCell(raw: string | null | undefined): { kind: "somatic" | "germline" | "other" | "none"; text: string; tip: string | null } {
+  const v = raw ?? "";
+  if (!v) return { kind: "none", text: "", tip: null };
+  const low = v.toLowerCase();
+  if (low.includes("somatic")) return { kind: "somatic", text: "S", tip: v };
+  if (low.includes("germline")) return { kind: "germline", text: "G", tip: v };
+  return { kind: "other", text: v, tip: null };
+}
+
+/**
  * The tooltip of an Allele Freq (T) cell with no frequency (none, 0, or a count missing): the portal's
  * TableCellStatusIndicator NA, which has no text, only this tip (TumorAlleleFreqColumnFormatter
  * renderFunction); null for a cell that has a frequency.
