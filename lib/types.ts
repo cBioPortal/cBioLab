@@ -998,6 +998,22 @@ export type ClinicalFacet =
  * (`mutations`, the portal's # Mut) and the samples holding one (`samples`, its #), over the
  * selection without this table's own filter. Freq is `samples` ÷ `total`, the selected samples.
  */
+/**
+ * A clinical violin table's counts (STS-VI-1): for each category of the categorical attribute, the
+ * numeric attribute's values per sample with how many samples hold each, over the selection
+ * without the numeric attribute's own filter (`n`) and over the whole selection (`sel`), as the
+ * portal counts them. Values and counts, never ids; lib/study-view-violin.ts draws the table.
+ */
+export interface ViolinFacet {
+  categorical: string;
+  numeric: string;
+  categories: { category: string; values: { v: number; n: number; sel: number }[] }[];
+  /** why the table is not drawn: more distinct (category, value) pairs than VIOLIN_VALUE_LIMIT */
+  error?: string;
+  /** selected studies not counted here (a peer's, whose federation API has no such counts) */
+  leftOut?: string[];
+}
+
 export interface MutationTypeFacet {
   gene: string;
   /** samples in the selection the table is counted over */
@@ -1190,6 +1206,8 @@ export interface ExploreResult {
   treatments?: TreatmentFacets;
   /** one gene's mutations by type per table the reader asked for (MutationTypeFacet) */
   mutationTypeFacets?: MutationTypeFacet[];
+  /** one clinical violin table per pair the reader added (ViolinFacet) */
+  violinFacets?: ViolinFacet[];
   /** portal-equivalent gene tables (samples, panel-aware denominators) */
   mutatedGenes?: GeneTableRow[];
   cnaGenes?: GeneTableRow[];

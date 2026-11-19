@@ -1,5 +1,5 @@
 import { parseBody, ExploreRequest } from "../../../lib/api-schemas.ts";
-import { buildExplore, buildExploreFederated, buildAssayFacets, buildAssayFreqTables, buildTreatmentFacets, buildMutationTypeFacets } from "../../../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets, buildAssayFreqTables, buildTreatmentFacets, buildMutationTypeFacets, buildViolinFacets } from "../../../lib/explore.ts";
 import { ENTITY_RE } from "../../../lib/generic-assay.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
@@ -120,6 +120,12 @@ async function exploreFor(body: any) {
     ? await buildMutationTypeFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, genes: body.mutationTypeCharts, leftOut: remote })
     : undefined;
   const mt = mutationTypeFacets ? { mutationTypeFacets } : {};
+  // a peer's studies are not counted in the violin tables either: its federation API has no such counts
+  const violinFacets = Array.isArray(body.violinCharts) && body.violinCharts.length
+    ? await buildViolinFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, leftOut: remote,
+        charts: body.violinCharts.map((c: { categorical?: unknown; numeric?: unknown }) => ({ categorical: String(c?.categorical), numeric: String(c?.numeric) })) })
+    : undefined;
+  const vt = violinFacets ? { violinFacets } : {};
   // the portal shows its treatment tables whenever a selected study has treatments; a peer's
   // studies are not counted in them, as its federation API has no treatment counts, so the tables
   // name each peer study whose timeline has treatments
@@ -132,7 +138,7 @@ async function exploreFor(body: any) {
   treatmentsP.catch(() => undefined);
   const tx = (t: Awaited<typeof treatmentsP>) => t ? { treatments: t } : {};
   if (!local.length) {
-    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...mt, ...tx(await treatmentsP) };
+    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...mt, ...vt, ...tx(await treatmentsP) };
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
@@ -150,5 +156,5 @@ async function exploreFor(body: any) {
     oncokbPin: pin, profilesByStudy, connByStudy, catalog: profileCatalog });
   const assayFreqTables = freq.tables;
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...(assayFreqTables.length ? { assayFreqTables } : {}), ...(freq.notShown.length ? { assayFreqTablesNotShown: freq.notShown } : {}), ...mt, ...tx(treatments) };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...(assayFreqTables.length ? { assayFreqTables } : {}), ...(freq.notShown.length ? { assayFreqTablesNotShown: freq.notShown } : {}), ...mt, ...vt, ...tx(treatments) };
 }

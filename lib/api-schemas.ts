@@ -11,6 +11,8 @@
 // Browser-safe: the client imports it.
 import { z } from "zod";
 import { PAGE_ROWS_MAX } from "./table-pager.ts";
+import { ATTR_NAME_RE } from "./custom-data-names.ts";
+import { VIOLIN_CHART_LIMIT } from "./study-view-violin.ts";
 import type { CohortDef, View } from "./types.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
@@ -60,6 +62,8 @@ export const ExploreRequest = z.object({
   geneCharts: z.array(z.string()).optional(),
   /** genes to chart as the portal's Mutation Type Counts table, one each */
   mutationTypeCharts: z.array(z.string()).max(6).optional(),
+  /** a clinical violin table per (categorical, numeric) pair of attribute ids (lib/study-view-violin.ts) */
+  violinCharts: z.array(z.object({ categorical: z.string().regex(ATTR_NAME_RE), numeric: z.string().regex(ATTR_NAME_RE) })).max(VIOLIN_CHART_LIMIT).optional(),
   /** generic-assay entities to chart, one each */
   assayCharts: z.array(z.object({ profileType: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/), entity: z.string().max(120) })).max(6).optional(),
   derived: z.array(z.object({ metric: z.string(), eventType: z.string().optional(), lineGap: z.number().optional() })).optional(),
