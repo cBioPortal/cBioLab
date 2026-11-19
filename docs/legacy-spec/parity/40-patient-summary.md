@@ -91,7 +91,7 @@ Re-measured 2026-11-18: 2 fixed; 6 down to Files & Links on every patient and th
 | P1 GO mutation count per sample | STM-6 | 12 / 28 / 18 / 55 | 12 / 28 / 18 / 55 | ✅ |
 | P2 sample mode GO / table | STM-6, SUM-2 | 28; header "2 P04_Rec1 … Show all 4 samples" | 28; 28 Mutations; same header | ✅ |
 | P3 mutation rows | MT-1 | 64 | 64, same set | ✅ |
-| P3 Cohort % | STM-2 | 61 equal, 3 blank (BABAM2 X261_splice, ADAM32 X720_splice, CPD N210_D215del) | equal after rounding; blanks 1.1 / 3.2 / 3.4 % | 🟡 |
+| P3 Cohort % | STM-2 | 61 equal, 3 blank (BABAM2 X261_splice, ADAM32 X720_splice, CPD N210_D215del) | 64 equal, the 3 blank (#385) | ✅ |
 | P3 Allele Freq text | STM-1 | 64 values | 59 equal; 5 differ: APC S943Qfs*12 0.18→0.17, PC V944M 0.76→0.77, EZHIP G373A 0.38→0.39, HRNR S2028G 0.11→0.10, SCN1A H553Q 0.43→0.42 | 🔶 bug |
 | P3 Copy # | MT-2 | ShallowDel 24, Gain 35, Diploid 2, Amp 2, blank 1 | blank 62, AMP 2 | 🔶 deep calls only |
 | P3 CNA rows / cytoband / Cohort % | CNA-1, STM-3 | 74 rows, ANK1 AMP 5 % … | 74 rows; cytoband 74/74; Cohort % 74/74 equal after rounding (ANK1 4.6 %) | ✅ counts, 🟡 format |
@@ -231,7 +231,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 | PAT-MT-2 | 🟡 | B | Default: Samples (2+ samples in view) · Gene · Protein Change · Annotation (OncoKB) · Mutation Type (the portal's labels, "FS del") · Allele Freq · Copy # (1 sample in view) · Cohort %, in the portal's order ✅ (lgg P04: Samples … Mutation Type, Allele Freq, Cohort %; TCGA-A6-2671: Gene … Allele Freq, Copy #, Cohort %); no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅; a hidden column stays in the menu where the portal excludes it |
 | PAT-MT-3 | 🟡 | B | One sample in view: the VAF as text ✅; several: a 6-px bar per sample, VAF × 12 px, sample colour ✅ (lgg P04 IDH1 R132C four bars); tooltip "0.38 (46 variant reads out of 121 total)" per sample ✅; sort by the samples' VAFs in sample order, null last ✅ (`check:patient-vaf`); no header VAF plot; download keeps the highest VAF, not the per-sample list |
 | PAT-MT-4 | 🟡 | B | Marker per carrying sample, "--" where not (equal-width slots) ✅; no grey not-profiled pill, no uncalled opacity |
-| PAT-MT-5 | ❌ | B | No mRNA Expr. column (P3 legacy 25 %, 29 % …) |
+| PAT-MT-5 | ✅ | B | mRNA Expr. after Copy # with one sample in view and an rna_seq…_zscores profile: line, dot (blue < 25, red > 75, grey), whole %, the portal's tooltip and NA words (`app/lab/alterations-body.tsx` MrnaCell, `lib/views/alterations/mrna-cell.ts`); P3 APC 25 %, KMT2C 29 % = portal; absent with several samples (P1) |
 | PAT-MT-6 | ✅ | B | The Gene header's menu, shown with several samples in view and a row whose gene some sample's panel leaves out: "Different gene panels were used for the samples. Filter mutations for:" ◉ Genes profiled in any sample / ○ all samples (the view's `genesProfiled`, both tables); msk_chord P-0025952 (IMPACT468 and IMPACT505): 185 → 182 rows, CTR9, NADK, SPRTN dropped (not on IMPACT468 per the portal API); the Genomic Overview and the VAF plot are not filtered |
 
 ### §6 Copy Number Alterations table
@@ -271,9 +271,9 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 | ID | verdict | how | note |
 |---|---|---|---|
 | PAT-STM-1 | ✅ | BC | alt/(alt+ref) per sample, each drawn (P04's four IDH1 reads equal the portal API's: 46/75, 61/101, 38/61, 62/94); 4 decimals below 0.01, else 2 (`portalVaf`); TCGA-A6-2671 APC 10/57 shows 0.18; VAF 0 legacy bugs not copied |
-| PAT-STM-2 | 🟡 | BC | Numerator any mutation (not uncalled) ✅; denominator = samples profiled for the gene (invariant 7; equals the sequenced list on WES and IMPACT341 genes); "72%", "<1%", "0%" as getPercentage ✅ (APC on TCGA-A6-2671: portal 387/534 "72%", ours 72.47 → "72%"); no keyword numerator B, bar, tooltip, MutSig badge |
-| PAT-STM-3 | 🟡 | BC | Same alteration (±2) ÷ samples profiled for the gene by the CNA panel; numbers equal; "<1%" and rounded % as getPercentage ✅ (ANK1 27/592 "5%"); no tooltip, no GISTIC |
-| PAT-STM-4 | ❌ | B | No mRNA percentile |
+| PAT-STM-2 | 🟡 | BC | Numerator any mutation (not uncalled) ✅; blank without a keyword ✅ (#385); keyword numerator B, the FrequencyBar (light green gene, green keyword) and the tooltip "387 samples (72%) … 376 (70%) have APC truncating mutations." ✅ (`lib/views/alterations/cohort-cell.ts`; counts = portal variant-counts on 162/162 keyword rows of TCGA-A6-2671, P-0000228, P-0000004, lgg P04); denominator = samples profiled for the gene (invariant 7; a question for the user, msk_impact_2017 ZFHX3 ours 4% vs 3%); "72%", "<1%", "0%" as getPercentage ✅; no MutSig badge (no data) |
+| PAT-STM-3 | 🟡 | BC | Same alteration (±2) ÷ samples profiled for the gene by the CNA panel; numbers equal; "<1%" and rounded % as getPercentage ✅ (ANK1 27/592 "5%"); red/blue FrequencyBar and the tooltip "27 samples (5%) in this study have amplified ANK1" ✅; no GISTIC (no data) |
+| PAT-STM-4 | ✅ | B | First /^.+rna_seq.*_zscores$/i profile in id order; rank with ties at the highest over every numeric value of the gene, rank / n × 100 to 2 places half up (`lib/patient-alterations.ts` mrnaCte); P3 57/57 genes = portal mrna-percentile (z and percentile), 7 without data empty on both |
 | PAT-STM-5 | ✅ | BC | ≥50 kb and \|mean\| ≥ 0.2, toFixed(1) (`igv.ts:75-84`); 48.8 %, 27.8 % |
 | PAT-STM-6 | ✅ | B | 12/28/18/55, 64, 16 |
 | PAT-STM-7 | ❌ | C | No VAF histogram / KDE plot |
