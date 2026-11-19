@@ -43,7 +43,7 @@
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines; scripts/gate.sh sets them).
  */
 import { chQuery, chWrite, connById } from "../lib/ch.ts";
-import { assayHeatmapSql, buildContract, clinicalNamesSql, clinicalSql, genomicEventsSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
+import { assayHeatmapSql, buildContract, clinicalNamesSql, columnFactsSql, clinicalSql, genomicEventsSql, heatmapSql, profileInventorySql } from "../lib/oncoprint.ts";
 import { oqlCasesSql, oqlEventsSql, parseOql } from "../lib/oql.ts";
 import { eventWanted } from "../lib/oql-match.ts";
 import { buildExplore } from "../lib/explore.ts";
@@ -303,6 +303,19 @@ const autoOk = (name: string, pass: boolean, detail: string) => { autoChecks++; 
     labels(shown) === "# Samples per Patient | KRAS" && JSON.stringify(shown.conventions.autoTracks) === '["# Samples per Patient"]', labels(shown));
   autoOk("hideTracks leaves it out of the figure, still named in conventions.autoTracks",
     labels(hidden) === "KRAS" && JSON.stringify(hidden.conventions.autoTracks) === '["# Samples per Patient"]', labels(hidden));
+  // sample columns keep the row, each with its patient's queried samples, as the portal's patient
+  // attribute (ONC-MD-1): FX-P01 has two samples, FX-P05 one
+  const bySample = await buildContract({ study: STUDY, genes: ["KRAS"], unit: "sample" } as never);
+  const st = bySample.tracks.find((t) => t.label === "# Samples per Patient");
+  const nOf = (id: string) => st?.values?.[bySample.columns.indexOf(id)];
+  autoOk("sample columns: # Samples per Patient is the patient's count",
+    nOf("FX-P01-T1") === 2 && nOf("FX-P01-T2") === 2 && nOf("FX-P05-T1") === 1,
+    JSON.stringify({ "FX-P01-T1": nOf("FX-P01-T1"), "FX-P01-T2": nOf("FX-P01-T2"), "FX-P05-T1": nOf("FX-P05-T1") }));
+  // a query naming samples counts only those: FX-P02-T2 without FX-P02's other sample is 1
+  const named = "SELECT arrayJoin(['FX-P01-T1','FX-P01-T2','FX-P02-T2'])";
+  const facts = (await chQuery<{ pid: string; samples: number | string }>(columnFactsSql(STUDY, conn.db, "sample", named), conn)).data
+    .map((x) => x.pid + ":" + Number(x.samples)).sort().join(",");
+  autoOk("sample columns of a named-sample query count the patient's queried samples", facts === "FX-P01-T1:2,FX-P01-T2:2,FX-P02-T2:1", facts);
   const rows = tracksMenuRows({ attrs: trackAttrs(r as never), totals: r.totals, spectrum: true, sequenced, autoTracks: shown.conventions.autoTracks || [] });
   const head = rows.slice(0, 2).map((x) => x.label + " " + trackFreqText(x.pct)).join(", ");
   // the spectrum first; then MUTATION_COUNT (100%, stored priority 30) ahead of # Samples per Patient (100%, priority 0)

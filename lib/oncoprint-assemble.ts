@@ -163,8 +163,8 @@ export interface AssembleInput {
    */
   profiled?: { types: ProfiledType[]; masks: { pid: string; mask: number }[] };
   /**
-   * Samples per column, patient columns only. Adds the portal's "# Samples per Patient" row when
-   * some patient has more than one.
+   * Per column, its patient's queried samples (a sample column carries its patient's count). Adds
+   * the portal's "# Samples per Patient" row when some patient has more than one.
    */
   samples?: { pid: string; n: number }[];
   /** driver call per event, and the source to echo in conventions */
@@ -426,7 +426,7 @@ export function assembleContract(input: AssembleInput): Contract {
     allPids.forEach((p, i) => { const s = studyOf.get(p); if (s != null) cells[i] = catIdx.get(s)!; });
     clinTracks.push({ kind: "clinical", label: STUDY_TRACK, categories: studies.slice(), cells });
   }
-  if (input.samples && unit === "patient") {
+  if (input.samples) {
     const n = new Int32Array(allPids.length);
     for (const r of input.samples) { const i = pidIndex.get(r.pid); if (i !== undefined) n[i] = r.n; }
     let max = 0;

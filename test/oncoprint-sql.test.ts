@@ -17,6 +17,10 @@ test("column facts count every sample of a column, profiled or not, and type mas
   assert.match(sql, /FROM \S*\.sample_derived sd\nLEFT JOIN/, "a column profiled for nothing still has a row");
   assert.match(sql, /uniqExact\(sd\.sample_unique_id\) AS samples/);
   assert.match(sql, /indexOf\(\['MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT','MRNA_EXPRESSION','PROTEIN_LEVEL'\]/);
+  // a sample column: its patient's queried samples, counted under the same sample filter (ONC-MD-1)
+  const bySample = columnFactsSql("s", "db", "sample", "'S1','S2'");
+  assert.match(bySample, /any\(pn\.n\) AS samples/);
+  assert.match(bySample, /JOIN \(SELECT patient_unique_id, uniqExact\(sample_unique_id\) AS n FROM db\.sample_derived\n\s+WHERE cancer_study_identifier = 's'\n\s+AND replaceOne\(sample_unique_id, 's_', ''\) IN \('S1','S2'\)\n\s+GROUP BY patient_unique_id\) pn ON pn\.patient_unique_id = sd\.patient_unique_id/);
 });
 
 test("a generic-assay heatmap reads the study's own profile, one row per (column, entity), numbers only", () => {
