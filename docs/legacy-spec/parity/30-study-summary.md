@@ -204,7 +204,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 |---|---|---|---|
 | STS-OT-1 | ✅ | B | "Data types" card: profile id + name + count + Freq (÷ selected samples, the portal's format), sorted by Freq; counts identical; pick → `profiled` clause for MUT/CNA/SV only, Intersection by default (Union to choose, kept by the browser): coadread mutations + gistic 532, as the portal |
 | STS-OT-2 | 🟡 | BC | Every case list, by kind across studies, counted in samples, Freq of the selected samples; coadread's 14 lists match cbioportal.org's counts ([empty-caselists-cases](empty-caselists-cases.md) CL1–CL10). Always shown (the portal only when filtered on one) |
-| STS-OT-3 | ❌ | C | No mutation-type counts table |
+| STS-OT-3 | ✅ | C | Add chart → Gene status → Add mutation types: Mutation Type · # Mut · # · Freq (÷ selected samples), as the portal's counts (msk_impact_2017 TP53, all 8 types); Apply filters on the checked types (`genomicData` MUTATION_TYPE; TP53 Nonsense or Splice Site 993, the portal's) |
 | STS-OT-4 | ❌ | C | No variant-annotations table |
 | STS-OT-5 | ❌ | B | No GA frequency table; Add chart › Generic assays charts one entity at a time (see GS-5/6) |
 | STS-OT-6 | ❌ | B | No treatment tables |
@@ -252,7 +252,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-GS-1 | 🟡 | B | ↓ "KRAS: somatic mutations" Mutated / Not mutated / Not profiled = 218 / 316 / 60 (= legacy) ✅; drawn as a list without the portal's colours (#1b9e77 / #d95f02 / #D3D3D3), labels lower-case "Not mutated" (`lib/explore.ts:876-878`) |
-| STS-GS-2 | ❌ | C | No mutation-type option |
+| STS-GS-2 | ✅ | C | The mutation-type option as its own button beside Add (`chartGene(g, true)`) |
 | STS-GS-3 | 🟡 | B | ↓ "KRAS: copy-number alterations" Amplified / Gained / Diploid / Heterozygously deleted / Homozygously deleted / Not profiled = 6 / 128 / 390 / 67 / 1 / 2 (= legacy `/api/genomic-data-counts/fetch`) ✅, a click a `genomicData` clause on the discrete profile's values (`lib/explore.ts`, `lib/gene-state-clauses.ts`); drawn as a list without the portal's CNA colours |
 | STS-GS-4 | ❌ | C | No continuous-profile gene bar |
 | STS-GS-5 | 🟡 | C | Generic assays › one entity → histogram (`buildAssayFacets`), bars by the DataBinner over every study's values (as the portal's, 6 entities compared), ≤6 charts |

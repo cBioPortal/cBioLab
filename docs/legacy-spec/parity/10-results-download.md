@@ -75,7 +75,7 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 | Q5 `KRAS: AMP MUT=G12D` | STM-2, MD-1 | 63 · 11% | 63 / 594 · 10.6% | 🟡 count ✅ |
 | Q5 TP53 | STM-2 | 315 · 53% | 315 · 53.0% | 🟡 |
 | Q1 case table, first rows | 3.4 | TCGA-3L-AA1B-01: — / G12D(Driver) / L597V(Driver) / — / R1450*(Driver), R876*(Driver) | — / G12D / L597V / — / R1450*, R876* | 🟡 same calls, no driver tag |
-| Q5 case table TCGA-5M-AATE-01 TP53 (Q1) | 3.4 | S127T(Driver), HOMDEL(Driver) | S127T, HOMDEL | 🟡 |
+| Q5 case table TCGA-5M-AATE-01 TP53 (Q1) | 3.4 | S127T(Driver), HOMDEL(Driver) | S127T (driver), HOMDEL (driver) | ✅ |
 | Q1 file rows | STM-4 | all 594 samples | 594 rows per file | ✅ |
 
 Data version: every count identical.
@@ -126,10 +126,10 @@ Data version: every count identical.
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| RDL-3.1 | 🟡 | B | Study ID, Sample ID, Patient ID, Altered ✅; Altered 1 / 0 with tooltip "1 = Sample harbors alteration in one of the input genes" ✅, NP for a sample not profiled for every gene and type (the portal writes 0; invariant 7); no study / sample / patient links |
+| RDL-3.1 | ✅ | B | Study ID, Sample ID, Patient ID, Altered ✅; Altered 1 / 0 with tooltip "1 = Sample harbors alteration in one of the input genes" ✅, NP for a sample not profiled for every gene and type (the portal writes 0; invariant 7); the IDs link to the study summary, sample and patient pages in a new tab (#435) |
 | RDL-3.2 | 🟡 | B | One column per line; header = gene for a bare gene ✅, the OQL text for others ("KRAS: AMP MUT=G12D", legacy same without ";") ✅; merged tracks impossible (refused) |
-| RDL-3.3 | ❌ | C | No hidden per-alteration columns |
-| RDL-3.4 | 🟡 | B | Calls joined ", " ✅ incl. CNA ("S127T, HOMDEL") ✅; "no alteration"/"not profiled" ✅; no "(Driver)", no Germline badge |
+| RDL-3.3 | ✅ | C | Hidden per-alteration columns "<gene>: <command>", a bare line's from the default OQL, a later line's first; each the gene's calls of that kind, "not profiled" off the panel; AMP and HOMDEL both copy number, as legacy (`tables.ts` `alterationColumns`) (#435) |
+| RDL-3.4 | ✅ | B | Calls joined ", " incl. CNA; each followed by " [germline]" / " (driver)" as the portal writes a cell's text (Q1 TCGA-5M-AATE-01 TP53 "S127T (driver), HOMDEL (driver)"), drivers by the page's settings; "no alteration"/"not profiled" ✅; text, not the styled badge (#431) |
 | RDL-3.5 | 🟡 | B | Altered first ✅; 20 per page ✅; search, columns menu, CSV download (`/api/table`) always on, not `alterations_across_samples.tsv` |
 | RDL-3.6 | 🐞 ok | C | Regex filters validated (`table-query.ts:120`): bad input is refused, not thrown |
 
