@@ -6,12 +6,14 @@
 // (app/lab/patient-nav.tsx); the cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { evolutionSvg, evolutionKey, portalCellTip, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
+import { evolutionSvg, evolutionKey, heatmapColumns, portalCellTip, EVOLUTION_KEY_COLUMNS, HEAT_CELL } from "../../lib/views/evolution/figure.ts";
 import type { TableQuery } from "../../lib/types";
 import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../lib/views/evolution/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
+import { Slider } from "../_ui/slider";
+import { ZoomIn, ZoomOut } from "lucide-react";
 import { TB } from "../_ui/toolbar.ts";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { patientPatch } from "../../lib/views/evolution/groups.ts";
@@ -35,7 +37,12 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     return () => ro.disconnect();
   }, []);
   const p = e.patient;
-  const svg = useMemo(() => evolutionSvg(v as never, { width, caption: false }), [v, width]);
+  const chart = spec.chart || "line";
+  // the heatmap's zoom (the portal's horizontal zoom, kept in the browser): null fits the card
+  const [zoom, setZoom] = useState<number | null>(null);
+  const heatZoom = chart === "heatmap" ? zoom ?? undefined : undefined;
+  const svg = useMemo(() => evolutionSvg(v as never, { width, caption: false, zoom: heatZoom }), [v, width, heatZoom]);
+  const cols = useMemo(() => chart === "heatmap" && p && e.drawn?.length ? heatmapColumns(v as never, width) : null, [chart, p, e.drawn, v, width]);
   // the mutation under the pointer, on a line, a heatmap row or a table row: the others are dimmed
   const [hot, setHot] = useState<string | null>(null);
   // the mutations clicked (a line, a heatmap row or a table row; a second click lets go): they stay picked out
@@ -88,7 +95,6 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     const next = Object.fromEntries(Object.entries({ ...q, rows }).filter(([, x]) => x !== undefined));
     patch({ mutations: Object.keys(next).length ? next : undefined });
   };
-  const chart = spec.chart || "line";
   const noDayWhy = e.noDay?.length ? "no collection day is recorded for " + e.noDay.join(", ") + ", so the samples are drawn in sequence" : null;
 
   return (
@@ -133,6 +139,7 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               <label className="chk" data-tip="label each mutation GENE protein change">
                 <Checkbox checked={spec.mutationLabels !== false} onCheckedChange={(on) => patch({ mutationLabels: on === true ? undefined : false })} /> show mutation labels
               </label>
+              {cols && <HeatZoom fit={cols.fit / HEAT_CELL} min={cols.floor / HEAT_CELL} value={zoom} onChange={setZoom} />}
             </div> : <div className="tbz">
               <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
                 <Checkbox checked={!!spec.sequential || !!e.noDay?.length} disabled={!!e.noDay?.length} onCheckedChange={(on) => patch({ sequential: (on === true) || undefined })} /> sequential
@@ -218,6 +225,24 @@ function SampleMarks({ ids, samples }: { ids: string[]; samples: EvolutionSample
             <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m?.label || "?"}</text>
           </svg>);
       })}
+    </span>
+  );
+}
+
+/**
+ * The heatmap's zoom, the portal's (MutationOncoprint zoomControls): − narrows the columns by 0.7, +
+ * widens them by 1 / 0.7, the slider between the narrowest and the portal's 20 px (or the fit, if wider);
+ * `value` null is the fit to the card.
+ */
+function HeatZoom({ fit, min, value, onChange }: { fit: number; min: number; value: number | null; onChange: (z: number | null) => void }) {
+  const max = Math.max(1, fit), now = value ?? fit;
+  // back at the fit, the figure fits the card again rather than keeping a zoomed width
+  const clamp = (z: number) => { const c = Math.min(max, Math.max(min, z)); return Math.abs(c - fit) < 0.005 ? null : c; };
+  return (
+    <span className="tbfield" data-tip="zoom the heatmap's columns in or out; past the card's width it scrolls">
+      <Button type="button" variant="outline" size="sm" className={TB} aria-label="zoom out of the heatmap" disabled={now <= min} onClick={() => onChange(clamp(now * 0.7))}><ZoomOut /></Button>
+      <Slider aria-label="heatmap zoom" className="w-[90px]" min={min} max={max} step={0.01} value={[now]} onValueChange={(vs) => onChange(clamp(vs[0]))} />
+      <Button type="button" variant="outline" size="sm" className={TB} aria-label="zoom in to the heatmap" disabled={now >= max} onClick={() => onChange(clamp(now / 0.7))}><ZoomIn /></Button>
     </span>
   );
 }

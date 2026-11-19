@@ -221,12 +221,35 @@ function keyRow(parts: string[], x0: number, y0: number, maxW: number, p: Return
 /** a VAF's colour: the portal's VAF heatmap ramp, rgb(241,242,181) → rgb(19,80,88) (lib/oncoprint-style.ts) */
 const heatFill = (vaf: number) => rampColor(STYLE.ramps.vaf, Math.max(0, Math.min(1, vaf)));
 
-/** The heatmap; `width` is wider than `W` when the default layout's columns need more room. */
-function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number; width: number } {
+/** The heatmap's column at zoom 1, the portal's cell (MutationOncoprint INIT_PARAMS init_cell_width). */
+export const HEAT_CELL = 20;
+
+/**
+ * The heatmap's columns at `W`: the width that fits them (`fit`) and the narrowest a column is drawn
+ * (`floor`: a label's line height when labelled, 6 px; 14 px for a sample's marker when transposed).
+ */
+export function heatmapColumns(v: DrawnResultOf<"evolution">, W: number): { fit: number; floor: number } {
+  const e = v.evolution, n = e.display.transpose ? e.patient!.samples.length : e.drawn!.length, d = e.display;
+  if (d.transpose) return { fit: Math.max(14, Math.min(56, (W - 16 - rowLabelWidth(v, W)) / n)), floor: 14 };
+  const floor = d.mutationLabels ? FS.small + 2 : 6;
+  return { fit: Math.max(floor, Math.min(HEAT_CELL, (W - 16 - (8 + 2 * MARK_R + 8)) / Math.max(1, n))), floor };
+}
+
+/** The transposed heatmap's room for its rows' labels (GENE pChange), or a margin when they are hidden. */
+const rowLabelWidth = (v: DrawnResultOf<"evolution">, W: number) => v.evolution.display.mutationLabels
+  ? Math.min(W * 0.4, Math.max(60, ...v.evolution.drawn!.map((m) => textWidth(mutationName(m), FS.small))) + 10) : 8;
+
+/**
+ * The heatmap; `width` is wider than `W` when its columns need more room. `zoom` (the portal's
+ * horizontal zoom) draws each column `zoom` × HEAT_CELL wide, never under the floor; without it they fit `W`.
+ */
+function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>, zoom?: number): { svg: string; height: number; width: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const G = STYLE.glyph, out: string[] = [];
   const ord = e.heatmapOrder ?? heatmapOrder(drawn, samples.length, d);
   const names = drawn.map(mutationName);
+  const cols = heatmapColumns(v, W);
+  const colW = zoom == null ? cols.fit : Math.max(cols.floor, zoom * HEAT_CELL);
   /** one cell of mutation i in sample j at (x, y), w × h */
   const cell = (i: number, j: number, x: number, y: number, w: number, h: number) => {
     const c = drawn[i].cells[j];
@@ -241,12 +264,12 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
   };
   const gap = 1, top = 4;
   let y0: number, gridBottom: number;
-  let width = W;
+  let width: number;
   if (d.transpose) {
     // a row per mutation, labelled; a column per sample, its numbered marker above
-    const labelW = d.mutationLabels ? Math.min(W * 0.4, Math.max(60, ...names.map((n) => textWidth(n, FS.small))) + 10) : 8;
-    const colW = Math.max(14, Math.min(56, (W - 16 - labelW) / samples.length)), rowH = 14;
+    const labelW = rowLabelWidth(v, W), rowH = 14;
     const x0 = 8 + labelW;
+    width = Math.max(W, x0 + samples.length * colW + 8);
     ord.samples.forEach((j, k) => out.push(marker(x0 + k * colW + colW / 2, top + MARK_R, samples[j])));
     y0 = top + 2 * MARK_R + 6;
     ord.mutations.forEach((i, r) => {
@@ -260,7 +283,6 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
     // the portal's default: a row per sample, its numbered marker at the left; a column per mutation, labelled below
     // a column is at least 6 px, or a label's line height when labelled; past that the figure widens
     const x0 = 8 + 2 * MARK_R + 8, rowH = 18;
-    const colW = Math.max(d.mutationLabels ? FS.small + 2 : 6, Math.min(20, (W - 16 - x0) / Math.max(1, drawn.length)));
     width = Math.max(W, x0 + drawn.length * colW + 8);
     y0 = top;
     ord.samples.forEach((j, r) => out.push(marker(8 + MARK_R, y0 + r * rowH + rowH / 2, samples[j])));
@@ -301,12 +323,15 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
   return { svg: out.join(""), height: h, width };
 }
 
-/** `o.caption: false` leaves the caveat out, for a page that prints it beside the figure. */
-export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { caption?: boolean }): string | null {
+/**
+ * `o.caption: false` leaves the caveat out, for a page that prints it beside the figure; `o.zoom`, the
+ * heatmap's zoom (HEAT_CELL px columns at 1), a zoomed heatmap keeping its width rather than shrinking to the page's.
+ */
+export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { caption?: boolean; zoom?: number }): string | null {
   const e = v.evolution, pt = e.patient;
   if (!pt || !e.drawn || !e.drawn.length) return null;
   const p = palette(o.theme), W = Math.max(420, o.width || 760);
-  const body: { svg: string; height: number; width?: number } = e.display.chart === "heatmap" ? heatmap(v, W, p) : lineChart(v, W, p);
+  const body: { svg: string; height: number; width?: number } = e.display.chart === "heatmap" ? heatmap(v, W, p, o.zoom) : lineChart(v, W, p);
   const FW = Math.max(W, body.width ?? W);
   let y = body.height + 4;
   const key = sampleKey(pt.samples, y, W, p);
@@ -315,6 +340,6 @@ export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { capti
   const hm = e.display.chart === "heatmap"
     ? "heatmap, a row per " + (e.display.transpose ? "mutation" : "sample") + (e.display.cluster ? ", clustered" : "")
     : "VAF lines";
-  return frame(FW, y + cap.height + 8, body.svg + key.svg + cap.svg, p.bg, false,
+  return frame(FW, y + cap.height + 8, body.svg + key.svg + cap.svg, p.bg, o.zoom != null && e.display.chart === "heatmap" && FW > W,
     "Genomic evolution — " + pt.id + ": " + e.drawn.length + " mutations across " + pt.samples.length + " samples (" + hm + ")", { tip: false });
 }
