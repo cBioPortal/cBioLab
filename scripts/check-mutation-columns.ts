@@ -50,6 +50,9 @@
  *   P9-P11 the header text filter's negated conditions (MUT-TB-6, MutationUtils matchCategoricalFilterSearch): KRAS
  *      filtered on Protein Change by notStartsWith "g12" (case-insensitive), notEndsWith "D", and notContains ""
  *      (a blank filter keeps every row), each kept count worked out below.
+ *   F1-F3 the table search on Protein Change (MUT-COL-6, ProteinChangeColumnFormatter.getFilterValue): a row whose
+ *      mutation status contains "germline" (any case) is searched as change + status, no space ("D92NGermline");
+ *      the header filter on Protein Change reads the change alone. Run on PTEN with the default columns (MS not shown).
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
@@ -623,6 +626,40 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
   ok("P10 the kept rows are G12C ×6, G12V ×5 and Q61H ×3", p10rows === [...Array(6).fill("G12C"), ...Array(5).fill("G12V"), ...Array(3).fill("Q61H")].join(","), String(p10rows));
   const p11 = await pc("notContains", "");
   ok(`P11 KRAS Protein Change notContains "": every row (${KRAS_N})`, p11 === KRAS_N, String(p11));
+  {
+    // F1-F3 PTEN's 8 rows (data_mutations.txt; HGVSp_Short stored without "p."), sample | change | Mutation_Status (line):
+    //   FX-P10-T1 R130Q SOMATIC (42)   FX-P29-T1 X200_splice SOMATIC (150)   FX-P29-T1 R130G SOMATIC (154)
+    //   FX-P12-T1 D92N Germline (161)  FX-P13-T1 D92N germline (162)         FX-P14-T1 D92N GERMLINE (163)
+    //   FX-P15-T1 D92N Germline_LOH (164)                                    FX-P17-T1 D92N blank (165)
+    // status contains "germline", case-insensitive: lines 161-164, 4 rows, all D92N; FX-P17-T1's D92N (blank status) is not.
+    // No other default column (sample, cancer type, annotation, mutation type, copy #, allele freq, # mut) holds "germline".
+    const GERMLINE_ROWS = ["FX-P12-T1 D92N", "FX-P13-T1 D92N", "FX-P14-T1 D92N", "FX-P15-T1 D92N"];
+    const kept = async (q: Query) => {
+      const r = await table("PTEN", q);
+      return typeof r === "string" ? r : JSON.stringify(r.map((x) => x.sample + " " + String(v(x, "proteinChange"))).sort());
+    };
+    const all = await count("PTEN", {});
+    ok("F fixture: PTEN has 8 rows", all === 8, String(all));
+    for (const q of ["germline", "GERMLINE"]) {
+      const got = await kept({ search: q });
+      ok(`F1 PTEN search "${q}", default columns: the 4 rows whose status contains germline (Germline, germline, GERMLINE, Germline_LOH), not FX-P17-T1's blank`,
+        got === JSON.stringify(GERMLINE_ROWS), got);
+    }
+    for (const q of ["D92Ngermline", "d92nGERMLINE"]) {
+      const got = await kept({ search: q });
+      ok(`F2 PTEN search "${q}": the 4 germline D92N rows only, not FX-P17-T1's D92N (blank status)`, got === JSON.stringify(GERMLINE_ROWS), got);
+    }
+    for (const [q, why] of [["R130Qgermline", "FX-P10-T1's R130Q is SOMATIC"], ["D92N germline", "change and status are joined with no space"]] as const) {
+      const got = await count("PTEN", { search: q });
+      ok(`F2 PTEN search "${q}": no row (${why})`, got === 0, String(got));
+    }
+    {
+      const got = await count("PTEN", { filters: { proteinChange: { op: "contains", value: "germline" } } });
+      ok("F3 PTEN Protein Change filter contains \"germline\": no row (the filter reads the change alone)", got === 0, String(got));
+      const d92n = await count("PTEN", { filters: { proteinChange: { op: "contains", value: "D92N" } } });
+      ok("F3 PTEN Protein Change filter contains \"D92N\": 5 rows (lines 161-165), so the filter itself runs", d92n === 5, String(d92n));
+    }
+  }
 }
 
 console.log(`\n${checks - failures}/${checks} mutation column checks passed`);

@@ -151,7 +151,9 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     // spelled as the table shows it, so search and the value list match what is on screen
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: MUTATION_ANNOTATION_ORDER };
     // the portal's sort values (MUT-STM-9): position, then the letters' character codes; chromosome as a number, X 23, Y 24
-    case "proteinChange": return { ...c, text: str("proteinChange"), order: proteinChangeSortSql("proteinChange") };
+    // searched as the change with a germline call's status after it, "G12DGermline" (ProteinChangeColumnFormatter getFilterValue)
+    case "proteinChange": return { ...c, text: str("proteinChange"), order: proteinChangeSortSql("proteinChange"),
+      search: "if(positionCaseInsensitiveUTF8(" + str("status") + ", 'germline') > 0, concat(" + str("proteinChange") + ", " + str("status") + "), " + str("proteinChange") + ")" };
     case "chr": return { ...c, text: str("chr"), order: chromosomeSortSql("chr") };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
