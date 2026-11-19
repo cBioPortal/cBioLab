@@ -18,15 +18,13 @@ import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor, wi
 
 /** values returned per categorical facet (a pie shows a few; a ranked list more) */
 /**
- * Safety bound on values per facet, NOT a display choice — the UI scrolls, so
- * there is no reason to trim for the screen. Measured on MSK-CHORD: fetching
- * every categorical value is 78ms vs 89ms capped at 20 (LIMIT n BY costs more
- * than it saves) and 47KB vs 20KB, against a page that already ships 165KB.
- * Only 6 of 41 categorical attributes exceed 20 values and the largest is 189.
- * The bound exists so one pathological free-text attribute cannot blow up the
- * payload; a facet that hits it says so.
+ * Safety bound on values per facet, NOT a display choice: the list scrolls (virtualised), and a
+ * chart carries every value in practice, as the portal's does, so its Summary Data is whole. The
+ * largest categorical list in the warehouse is 5,033 values (pancan_mimsi_msk_2024
+ * SAMPLE_DISPLAY_NAME: 450KB, +130KB, against 320KB at the old 200); the bound exists so one
+ * pathological free-text attribute cannot blow up the payload, and a facet that hits it says so.
  */
-const FACET_VALUE_LIMIT = 200;
+export const FACET_VALUE_LIMIT = 20_000;
 
 /**
  * Above this many samples a resolved cohort is not worth shipping with every query, and the
@@ -1833,8 +1831,8 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
 
 /** how many generic-assay entities may be charted at once */
 export const ASSAY_CHART_LIMIT = 6;
-/** a categorical entity's values shown, most common first */
-const ASSAY_VALUE_LIMIT = 30;
+/** a categorical entity's values kept, most common first: every one in practice, as a clinical chart's (FACET_VALUE_LIMIT) */
+const ASSAY_VALUE_LIMIT = FACET_VALUE_LIMIT;
 
 /**
  * cBioPortal's treatment tables (STS-OT-6) over the selected studies: patients per agent, and

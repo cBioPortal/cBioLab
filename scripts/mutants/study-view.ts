@@ -150,7 +150,7 @@ export const mutants: Mutant[] = [
     find: "chartName.replace(/[ \\t]/g, \"_\")",
     replace: "chartName.replace(/ /g, \"_\")" },
   { id: "summary-cut-not-said", layer: "counts", guard: "unit", file: "lib/explore.ts",
-    effect: "A categorical chart over several studies whose merged values were cut to 200 reads as complete, so its Summary Data is offered as if whole.",
+    effect: "A categorical chart over several studies whose merged values were cut to the bound (FACET_VALUE_LIMIT) reads as complete, so its Summary Data is offered as if whole.",
     find: "const distinct = Math.max(base.distinct ?? 0, vals.size) || undefined;",
     replace: "const distinct = base.distinct;" },
   { id: "figure-bar-no-floor", layer: "counts", guard: "unit", file: "lib/study-view-figures.ts",
@@ -302,4 +302,7 @@ export const mutants: Mutant[] = [
     effect: "A chart's one-column Data file on a study of more than 200 attributes says attributes were left out of it.",
     find: "return !t.query.columns?.length && t.attributesOf != null",
     replace: "return t.attributesOf != null" },
+  { id: "facet-values-cut-at-200", layer: "counts", guard: "unit", file: "lib/explore.ts",
+    effect: "A chart lists only its 200 most frequent values again, so a chart of more (218 lists in the warehouse, up to 5,033 values) is cut and its Summary Data refused.",
+    find: "export const FACET_VALUE_LIMIT = 20_000;", replace: "export const FACET_VALUE_LIMIT = 200;" },
 ];
