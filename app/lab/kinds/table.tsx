@@ -15,9 +15,9 @@ import { GENE_PANEL_ATTRIBUTE } from "../../../lib/gene-panel-list.ts";
  * column per patient — "Value" for one — or per sample (lib/views/table/transpose.ts). A filter box
  * narrows the attributes.
  */
-function TransposedTable({ t }: { t: TableResult }) {
+function TransposedTable({ t, sampleOrder }: { t: TableResult; sampleOrder?: readonly string[] }) {
   const [filter, setFilter] = useState("");
-  const { heads, rows: attrs } = transposedRows(t);
+  const { heads, rows: attrs } = transposedRows(t, sampleOrder);
   // a "Gene Panel" row's panels open the gene panel window, as the portal's tables link them (PAT-GP-4)
   const panels = useGenePanelDialog(t.rows[0]?.study || "");
   const f = filter.trim().toLowerCase();
@@ -74,6 +74,6 @@ export const tableUi: KindUi<"table"> = {
   maxCohorts: 6,
   sub: (spec, v) => "one row per " + (spec.unit === "patient" ? "patient" : "sample") + (v.table ? " · " + v.table.total.toLocaleString() + " rows, " + v.table.columns.length + " attributes" : ""),
   Controls,
-  body: (c) => c.v.table ? (c.spec.transpose ? <TransposedTable t={c.v.table as TableResult} /> : <ClinicalTableBody c={c} />) : null,
+  body: (c) => c.v.table ? (c.spec.transpose ? <TransposedTable t={c.v.table as TableResult} sampleOrder={c.sampleOrder} /> : <ClinicalTableBody c={c} />) : null,
   drawsOwnWaiting: true,
 };

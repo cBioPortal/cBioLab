@@ -32,7 +32,7 @@ type Patch = Record<string, unknown>;
 
 type ViewState = { sent: string; result?: ViewResult; error?: string; loading: boolean };
 
-export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, onCounts, catalog, fixedPatient, legacy }: {
+export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, onCounts, catalog, fixedPatient, sampleOrder, legacy }: {
   doc: AnalysisDoc; tabs: PageTab[]; titles: string[];
   /** the page's first tabs only (PageLayout.partial): a tab the page opens on that is not among them yet is waited for */
   partial?: boolean;
@@ -47,6 +47,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
   onCounts?: (c: Record<string, number>) => void;
   /** the page is about one patient (the Patient page), so its patient views do not step through others */
   fixedPatient?: boolean;
+  /** the patient's samples in the page's order (the header's numbered markers) */
+  sampleOrder?: readonly string[];
   /** the page's state for its "Open in cBioPortal" link, and whether the portal holds its studies (null while the study list loads) */
   legacy: { page: LegacyPage; held: Record<string, PortalHold> | null };
 }) {
@@ -193,7 +195,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
         // waiting from the render the edit lands in, not only once the effect has sent it
         const busy = !st || st.loading || st.sent !== sent;
         // vi and docJson name the view in the request it came from, which a table pages through
-        const mc = { vi: 0, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], catalog: catalog.profileCatalog || [], events: [], locked: [...(tab?.chooser?.locks || []), ...(tab?.locks || [])], fixedPatient,
+        const mc = { vi: 0, spec, v: v || {}, busy, updating: busy, attrs: [], profiles: [], assays: [], catalog: catalog.profileCatalog || [], events: [], locked: [...(tab?.chooser?.locks || []), ...(tab?.locks || [])], fixedPatient, sampleOrder,
           patch: (p: Patch) => edit(vi, { ...spec, ...p } as unknown as View), docJson: () => JSON.stringify(slice) };
         const body = v && !v.error && v.kind === "hotspots" && v.hotspots
           ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)}

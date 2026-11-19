@@ -180,6 +180,7 @@ function PatientView({ study, patient, sample, nav, tab, note }: { study: string
     {!ready
       ? <PortalLoading />
       : <PortalTabs legacy={{ page: { page: "patient", study, ...(sample ? { sample } : { patient }) }, held: basics?.portal || null }} doc={page.doc!} tabs={page.layout!.tabs} titles={page.layout!.titles} partial={page.layout!.partial} open={page.open} onOpen={page.openTab} onDoc={page.update}
-          catalog={{ attrs: known?.attrs || [], profiles: known?.profiles || [], profileCatalog: known?.profileCatalog || [], loading: !known }} fixedPatient />}
+          catalog={{ attrs: known?.attrs || [], profiles: known?.profiles || [], profileCatalog: known?.profileCatalog || [], loading: !known }} fixedPatient
+          sampleOrder={record ? [...record.samples].map((s) => s.id).sort((a, b) => Number(record.marks.get(a)?.label ?? Infinity) - Number(record.marks.get(b)?.label ?? Infinity)) : undefined} />}
   </>);
 }
