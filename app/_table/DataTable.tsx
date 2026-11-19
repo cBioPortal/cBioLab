@@ -22,6 +22,7 @@ import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import { SHOW_MORE_SIZES, pageOfText, pagerHidden, resetOffered, showMoreDisabled, showMoreSize } from "../../lib/table-pager.ts";
 import { headerSort, type SortableColumn } from "../../lib/table-sort.ts";
+import { columnsPatch } from "../../lib/table-columns.ts";
 
 /** a page number in the pager, filled while it is the page shown */
 const PAGE = "min-w-ctl justify-center aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground";
@@ -326,7 +327,7 @@ function ColumnsMenu({ columns, shown, onShown }: { columns: { id: string; name:
   const count = (t: "own" | "clinical") => list(t).filter((c) => shown.includes(c.id)).length + " / " + list(t).length;
   return (
     <div className="dt-filter">
-      <b>Columns ({shown.length} of {columns.length})</b>
+      <b>Columns ({shown.length} / {columns.length})</b>
       {tabs && <div className="row" role="tablist" aria-label="column groups">
         {(["own", "clinical"] as const).map((t) => (
           <Button key={t} type="button" variant={tab === t ? "secondary" : "ghost"} size="sm" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
@@ -519,9 +520,9 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         {!plain && <span className="dt-anchor">
           <Button type="button" variant="outline" size="sm" className={cn(TB, "aria-expanded:border-primary aria-expanded:bg-accent aria-expanded:text-accent-foreground")}
             aria-expanded={menu === "\x01columns"} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
-            data-tip="choose the columns shown"><Columns3 />columns ({shownIdx.length}/{t.columns.length})</Button>
+            data-tip="choose the columns shown"><Columns3 />columns ({shownIdx.length} / {t.columns.length})</Button>
           <Popover open={menu === "\x01columns"} onClose={() => setMenu(null)} align="right">
-            <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set({ columns: ids }, true)} />
+            <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set(columnsPatch(q, ids, shownIds, t.defaults || t.shown), true)} />
           </Popover>
         </span>}
         {ownDownload ? <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !t.total || ownDownload.disabled}
