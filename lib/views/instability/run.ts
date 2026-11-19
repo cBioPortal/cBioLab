@@ -51,7 +51,7 @@ export async function runInstability(view: InstabilityView, ctx: ViewRun): Promi
       const def = doc.cohorts[n];
       const [cov, sc, ar] = await Promise.all([
         ok[st].viewAggregate("instability:coverage:" + n, def, genomeCoverageSql),
-        ok[st].viewAggregate("instability:scores:" + n, def, (c, s, d) => instabilityScoresSql(c, s, d, o)),
+        ok[st].viewAggregate("instability:scores:" + n, def, (c, s, d, m) => instabilityScoresSql(c, s, d, o, m), { materialize: true }),
         ok[st].viewAggregate("instability:arms:" + n, def, (c, s, d) => instabilityArmsSql(c, s, d, o))
       ]);
       samples += Number(cov[0]?.samples || 0);

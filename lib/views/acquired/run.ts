@@ -51,8 +51,8 @@ export async function runAcquired(view: AcquiredView, ctx: ViewRun): Promise<Vie
     await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
       const def = doc.cohorts[n];
       const [fn, rows] = await Promise.all([
-        ok[st].viewAggregate("acquired:funnel:" + n, def, (c, s, d) => acquiredFunnelSql(c, s, d, sides)),
-        ok[st].viewAggregate("acquired:genes:" + n, def, (c, s, d) => acquiredCountsSql(c, s, d, scan ? null : genes, sides, pin, measure))
+        ok[st].viewAggregate("acquired:funnel:" + n, def, (c, s, d, m) => acquiredFunnelSql(c, s, d, sides, m), { materialize: true }),
+        ok[st].viewAggregate("acquired:genes:" + n, def, (c, s, d, m) => acquiredCountsSql(c, s, d, scan ? null : genes, sides, pin, measure, m), { materialize: true })
       ]);
       const f = fn[0] || {};
       panel.anchored += Number(f.anchored || 0); panel.dated += Number(f.dated || 0);
