@@ -80,6 +80,23 @@ async function lollipop({ browser, ok, BASE }) {
       const s3 = await selected(), t3 = await tableCount();
       ok("lollipop: a click on the plot away from any stem clears the selection", s3 === 0 && t3.kept === t0.kept,
         "selected " + s3 + ", table " + JSON.stringify(t3) + " (all " + t0.kept + "), under the click: " + under + ", plot " + JSON.stringify(plot));
+
+      // E2 (MUT-LP-4): the download menu offers SVG, PNG and PDF, in that order, each named <GENE>_lollipop.<ext>.
+      const dlButton = page.getByRole("button", { name: "download the mutation diagram" }).first();
+      await dlButton.click();
+      const items = (await page.getByRole("menuitem").allInnerTexts()).map((t) => t.trim());
+      ok("E2 lollipop download: the menu offers SVG, PNG and PDF, in that order", JSON.stringify(items) === JSON.stringify(["SVG", "PNG", "PDF"]), JSON.stringify(items));
+      const magic = { svg: (b) => b.toString("utf8").trimStart().startsWith("<svg"), png: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), pdf: (b) => b.subarray(0, 4).toString("latin1") === "%PDF" };
+      for (const ext of ["svg", "png", "pdf"]) {
+        // a chosen entry closes the menu (with a fade-out), so each format reopens it
+        if (ext !== "svg") { await page.getByRole("menuitem").first().waitFor({ state: "detached", timeout: 10000 }); await dlButton.click(); }
+        const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 60000 }).catch(() => null), page.getByRole("menuitem", { name: ext.toUpperCase(), exact: true }).click()]);
+        const name = dl ? dl.suggestedFilename() : "(no download)";
+        let body = Buffer.alloc(0);
+        if (dl) { const fp = await dl.path(); body = fp ? require("fs").readFileSync(fp) : body; }
+        ok("E2 lollipop download: " + ext.toUpperCase() + " is named <GENE>_lollipop." + ext + " and is a " + ext.toUpperCase() + " file",
+          /^[A-Z0-9-]+_lollipop\./.test(name) && name.endsWith("_lollipop." + ext) && magic[ext](body), name + ", " + body.length + " bytes, starts " + JSON.stringify(body.subarray(0, 8).toString("latin1")));
+      }
     } catch (e) {
       ok("lollipop: the alteration grid", false, String(e.message).split("\n")[0].slice(0, 200));
     }
