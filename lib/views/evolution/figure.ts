@@ -50,6 +50,12 @@ export function portalCellTip(c: EvolutionCell, sampleId: string, gene: string):
     default: return sampleId + " is not sequenced for " + gene + " mutations.";
   }
 }
+/**
+ * The samples the tab's "Sample(s) … not profiled for mutations" alert names (SampleNotProfiledAlert,
+ * PTB-GE-3): those of the patient's samples, in their order, outside the study's mutation profile
+ * (no mutation panel); none when every sample is in it.
+ */
+export const notProfiledForMutations = (samples: EvolutionSample[]): EvolutionSample[] => samples.filter((s) => !s.panel);
 const mutationTip = (m: EvolutionMutation, samples: EvolutionSample[]) =>
   mutationName(m) + (m.mutationType ? " (" + m.mutationType.replace(/_/g, " ") + ")" : "") + " — " + m.cells.map((c, i) => samples[i].label + ": " + cellText(c)).join(" · ");
 
