@@ -40,9 +40,9 @@ test("K1 clinicalColumns over two studies: each attribute once, per and numeric 
   const got = clinicalColumns([s1, s2], new Set());
   assert.deepEqual(got.map((c) => ({ ...c })), [
     { id: "SEX", name: "Sex", per: "patient", numeric: false },
-    { id: "AGE", name: "Diagnosis Age", per: "patient", numeric: true },
+    { id: "AGE", name: "Diagnosis Age", per: "patient", numeric: true, unsearched: true },
     { id: "SAMPLE_TYPE", name: "Sample Type", per: "sample", numeric: false },
-    { id: "TMB", name: "TMB (nonsynonymous)", per: "sample", numeric: true },
+    { id: "TMB", name: "TMB (nonsynonymous)", per: "sample", numeric: true, unsearched: true },
   ]);
 });
 
