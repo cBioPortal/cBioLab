@@ -86,7 +86,7 @@ export async function runRmst(view: RmstView, ctx: ViewRun): Promise<ViewResult>
         recs.push(...expandSurvivalCounts(counts));
         return;
       }
-      const rows = await ok[st].viewAggregate("rmst:anchor:" + n, doc.cohorts[n], (c, s, d) => txEndpointCountsSql(c, s, d, opts));
+      const rows = await ok[st].viewAggregate("rmst:anchor:" + n, doc.cohorts[n], (c, s, d, m) => txEndpointCountsSql(c, s, d, opts, m), { materialize: true });
       let siteLate = 0, siteAnch = 0;
       for (const r of rows) {
         const cnt = Number(r.n);

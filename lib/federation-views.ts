@@ -6,6 +6,7 @@
 import { survivalMonthsSql, survivalEventSql, endpointRowsSql, endpointValueSql } from "./survival-sql.ts";
 import { osCte } from "./survival-queries.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
+import { cte, materializedSetting } from "./ch.ts";
 import { ALTERED_COND, driverJoin, inCohortClinical } from "./federation.ts";
 import { clinicalValueFoldSql, nameFoldSql, foldedEqualsSql, foldedInSql } from "./event-names.ts";
 import { clinicalTable } from "./custom-data.ts";
@@ -67,12 +68,13 @@ export function genomeCoverageSql(cohortSql: string, study: string, db: string):
  * puts each patient's samples on two sides: the paired view's sample attribute, the acquired
  * view's samples before and after a treatment start.
  */
-export function sideCountsTail(study: string, db: string, genes: string[] | null, pin: string | null, measure: "driver" | "any", exclude?: string): string {
+export function sideCountsTail(study: string, db: string, genes: string[] | null, pin: string | null, measure: "driver" | "any", exclude?: string,
+  materialized = false): string {
   const scan = genes == null;
   const geneList = scan ? "SELECT DISTINCT gene FROM alt" : genes.map(sq).join(",");
   const hit = measure === "driver" ? "max(ann.is_driver)" : "1";
   return (
-    "alt AS (\n" +
+    cte("alt", "\n" +
     "  SELECT g.hugo_gene_symbol AS gene, ps.pid AS pid, ps.side AS side, " + (pin || measure === "any" ? hit : "0") + " AS hit\n" +
     "  FROM " + db + ".genomic_event_derived g\n" +
     (pin && measure === "driver" ? driverJoin(pin) : "") +
@@ -81,8 +83,7 @@ export function sideCountsTail(study: string, db: string, genes: string[] | null
     // narrows the events before the annotation join rather than after it
     "    AND g.sample_unique_id IN (SELECT suid FROM ps)" + (exclude ? " AND " + exclude : "") + "\n" +
     "  GROUP BY gene, pid, side\n" +
-    (scan ? "  HAVING hit > 0\n" : "") +
-    "),\n" +
+    (scan ? "  HAVING hit > 0\n" : ""), materialized) + ",\n" +
     "cov AS (\n" +
     "  SELECT DISTINCT pg.gene AS gene, ps.pid AS pid, ps.side AS side\n" +
     "  FROM " + db + ".sample_to_gene_panel_derived sp\n" +
@@ -649,7 +650,7 @@ export function progressionCte(study: string, db: string, pr: ProgressionEvent):
  * follow-up — the check that the timeline and OS_MONTHS share day 0. A cohort patient with no
  * anchored record is in no row; the caller counts them from the cohort's size.
  */
-export function txEndpointCountsSql(cohortSql: string, study: string, db: string, o: TxEndpointOpts): AggregateSql {
+export function txEndpointCountsSql(cohortSql: string, study: string, db: string, o: TxEndpointOpts, materialized = false): AggregateSql {
   const pick = o.anchor.occurrence === "LAST" ? "max" : "min";
   const evFrom = (alias: string) => cohortEventsFrom(db, study, alias);
   const hasKv = (alias: string, key: string, valueCond: string) => eventHasKv(db, alias, key, valueCond);
@@ -660,7 +661,7 @@ export function txEndpointCountsSql(cohortSql: string, study: string, db: string
     "    AND " + foldedEqualsSql("ce.event_type", o.anchor.eventType) + "\n" +
     (o.anchor.key ? hasKv("ce", o.anchor.key, foldedEqualsSql("value", String(o.anchor.value ?? ""))) : "") +
     ")",
-    "anch AS (SELECT pid, " + pick + "(s) AS a FROM arec GROUP BY pid)",
+    cte("anch", "SELECT pid, " + pick + "(s) AS a FROM arec GROUP BY pid", materialized),
     lastDayCte(study, db),
   ];
   let x: string;
@@ -724,10 +725,10 @@ export function txEndpointCountsSql(cohortSql: string, study: string, db: string
     "         ld > fu + " + CLOCK_SLACK_DAYS + " AS late\n" +
     "  FROM per\n" +
     ")");
-  return aggregateSql("WITH cohort AS (" + cohortSql + "),\n" + ctes.join(",\n") + "\n" +
+  return aggregateSql("WITH " + cte("cohort", cohortSql, materialized) + ",\n" + ctes.join(",\n") + "\n" +
     "SELECT kind, if(kind = 'record', round(entry, 4), 0) AS entry, if(kind = 'record', round(tt, 4), 0) AS t,\n" +
     "       if(kind = 'record', ev, 0) AS ev, late, count() AS n\n" +
-    "FROM cls GROUP BY kind, entry, t, ev, late ORDER BY t");
+    "FROM cls GROUP BY kind, entry, t, ev, late ORDER BY t" + materializedSetting(materialized));
 }
 
 // ---------------------------------------------------------------------------

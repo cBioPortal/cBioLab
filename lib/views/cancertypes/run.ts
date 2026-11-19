@@ -116,7 +116,7 @@ export async function runCancertypes(view: CancertypesView, ctx: ViewRun): Promi
     const oql = lines ? { lines, profiles: (await ctx.studyProfiles(st)).profiles, pins: levelPins,
       ...(view.drivers !== undefined ? { drivers: view.drivers, hotspotPins } : {}) } : undefined;
     return Promise.all([
-    r.viewAggregate("cancertypes:" + n, doc.cohorts[n], (c, s, d) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit, oql)),
+    r.viewAggregate("cancertypes:" + n, doc.cohorts[n], (c, s, d, m) => cancerTypesSql(c, s, d, genes, attribute, pin, measure, unit, oql, m), { materialize: true }),
     attribute === "CANCER_TYPE" && typeAnswers.has(n + "\0" + st) ? typeAnswers.get(n + "\0" + st)!
       : r.viewAggregate("cancertypes:samples:" + n, doc.cohorts[n], (c, s, d) => cancerTypeSamplesSql(c, s, d, attribute, unit))
   ]); });

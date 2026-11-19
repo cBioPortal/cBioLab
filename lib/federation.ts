@@ -1602,8 +1602,9 @@ export interface FederatedPlotCapable {
  * answer rather than silently leaving its patients out.
  */
 export interface ViewAggregateCapable {
+  /** `materialize`: build is handed whether its statement may hold materialized subqueries on this connection (lib/ch.ts cte) */
   viewAggregate(label: string, def: CohortDef | null | undefined,
-    build: (cohortSql: CohortSql, study: string, db: string) => AggregateSql): Promise<ChRow[]>;
+    build: (cohortSql: CohortSql, study: string, db: string, materialized: boolean) => AggregateSql, opts?: { materialize?: boolean }): Promise<ChRow[]>;
   viewAggregateMany(label: string, defs: (CohortDef | null | undefined)[],
     build: (cohortSqls: CohortSql[], study: string, db: string) => AggregateSql): Promise<ChRow[]>;
   viewMeta(label: string, build: (study: string, db: string) => AggregateSql): Promise<ChRow[]>;
@@ -2163,8 +2164,9 @@ abstract class BaseResolver implements AggregateCapable {
    * document cannot reach it; every builder it is given is swept by test/boundary.test.ts.
    */
   async viewAggregate(label: string, def: CohortDef | null | undefined,
-    build: (cohortSql: CohortSql, study: string, db: string) => AggregateSql): Promise<ChRow[]> {
-    const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db), this.instance.conn);
+    build: (cohortSql: CohortSql, study: string, db: string, materialized: boolean) => AggregateSql, opts?: { materialize?: boolean }): Promise<ChRow[]> {
+    const materialized = opts?.materialize ? await materializedCteSupported(this.instance.conn) : false;
+    const r = await this.runLogged<ChRow>(label, build(this.cohortSql(def), this.study, this.instance.conn.db, materialized), this.instance.conn);
     return r.data;
   }
   /** The same for an aggregate over SEVERAL cohorts at once (how they overlap): each definition is
