@@ -120,12 +120,12 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 |---|---|---|---|
 | STS-LY-1 | 🔶 | B | CSS grid `.facetgrid`, cards ~301 px wide, 5 columns at 1600 px; heights follow content; not react-grid-layout |
 | STS-LY-2 | 🔶 | B | Fixed shapes: clinical cards one cell; gene tables, survival, density, data types wider; no w×h model |
-| STS-LY-3 | 🟡 | BC | Clinical charts by priority, then name (`lib/study-view-config.ts:31`, `lib/explore.ts:322`); the other cards in a fixed CSS order (`app/globals.css:248-253`): gene tables first, survival and density last (legacy ranks them 400 / 200, above the gene tables); no findSpot |
+| STS-LY-3 | 🟡 | BC | Every card by priority, then name, clinical and other kinds together (`cardOrders`, `lib/study-view-config.ts`); charts the reader adds last; no findSpot (the grid flows in order) |
 | STS-LY-4 | ❌ | B | No drag |
 | STS-LY-5 | ❌ | B | No resize |
 | STS-LY-6 | ❌ | C | No highlight of a newly added chart |
 | STS-LY-7 | ✅ | BC | The portal's defaults (#188): coadread charts 17 of 59, Sex, Race, Ethnicity and Subtype among them; constant charts (Cancer Type, Samples per Patient) hidden |
-| STS-LY-8 | 🟡 | C | ↓ Clinical priorities and the DB-priority-1 override from the portal's table (`lib/study-view-config.ts:11-28`); priority < 0 still offered in Add chart (legacy drops it); the non-clinical priorities (survival 400, density 200, SV 85 before CNA 80) not used, CSS order instead |
+| STS-LY-8 | ✅ | C | Clinical priorities and the DB-priority-1 override from the portal's table; the non-clinical priorities (`CARD_PRIORITY`: survival 400, density 200, SV 85 before CNA 80, …); priority < 0 dropped from Add chart (`chartOffered`) |
 | STS-LY-9 | 🔶 | BC | Pie only for `PIE_ATTRIBUTES` (SEX, GENDER, *_STATUS, SAMPLE_TYPE, SOMATIC_STATUS; `explore-sections.tsx:57`), every other STRING a list; NUMBER → histogram ✅ |
 | STS-LY-10 | 🟡 | B | Skeleton grid while building, "updating…" over survival/density, busy class on the grid; no progress list, no per-chart error text beyond the API error |
 | STS-LY-11 | 🟡 | BC | 0 samples: the portal's message, no charts, the filter bar kept ([empty-caselists-cases](empty-caselists-cases.md) EM1–EM5). No invalid-sample alert, no saved-layout banner |
@@ -134,13 +134,13 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-HD-1 | 🟡 | B | ↓ displayName + "· sample-level · N samples"; gene tables "Mutated Genes (534 profiled samples)" (#261) ✅; but left-aligned and wrapped over two lines ("American Joint Committee on Cancer Metastasis Stage Code"), not centred and ellipsized (`.facettitle`, `app/globals.css:669`) |
+| STS-HD-1 | ✅ | B | displayName centred on one line, ellipsized ("American Joint Committee on Cancer M…"), the whole name in the tooltip; gene tables "Mutated Genes (534 profiled samples)" (#261); ours adds a count line under the title ("sample-level · 1,084 samples") |
 | STS-HD-2 | 🔶 | B | "…" menu button always visible, not hover-only |
 | STS-HD-3 | ❌ | B | No ⓘ, ↶ reset, ✕ delete buttons; only the "…" menu (remove a filter via its pill, hide a chart via Add chart) |
 | STS-HD-4 | 🟡 | B | Title `data-tip` = "ID — description"; no survival unit lines |
 | STS-HD-5 | 🟡 | B | Numeric charts: Log Scale (when offered), Compare / Analyze groups, Custom Bins…, Show NA, Download, in the portal's order (`explore-sections.tsx:842-861`); pie: Compare, Analyze, Download; no Swap Axes or Show Table/Pie |
 | STS-HD-6 | ❌ | C | No pie ↔ table switch (shape fixed by allowlist) |
-| STS-HD-7 | 🟡 | BC | Compare → new tab `/portal/comparison` with one group per value, top 20 by count ✅ (`explore-sections.tsx:621-638`); bar: Quartiles / Median / Current bins ✅ (single study only for quartiles); checked rows restrict the groups (legacy ignores the selection); extra "Analyze groups" target |
+| STS-HD-7 | 🟡 | BC | Compare → new tab `/portal/comparison` with one group per value, top 20 by count, whatever is checked, as the portal; bar: Quartiles / Median / Current bins (single study only for quartiles); extra "Analyze groups" target |
 
 ### §3 Pie chart
 
@@ -160,25 +160,25 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-TBL-1 | 🟡 | B | Value list: checkbox, value, bar, count, % of every patient, NA row (Race White 48.0 %, NA 232; #190); no header row, no swatch |
-| STS-TBL-2 | 🟡 | BC | Count order (ordinal attributes in natural order); selected rows marked, not pinned |
-| STS-TBL-3 | ❌ | B | No search box under a list |
+| STS-TBL-1 | 🟡 | B | Value list: checkbox, value, bar, count, % of every patient, NA row (Race White 48.0 %, NA 232; #190) and a "# / Freq" header (`ValueList`, `app/lab/pick-list.tsx`); no swatch |
+| STS-TBL-2 | ✅ | BC | Count order (ordinal attributes in natural order), the values the filter holds pinned first (`listRows`, `lib/value-list.ts`) |
+| STS-TBL-3 | ✅ | B | A list of 10 rows or more has "Search...": the value, count or Freq as written (`listRowMatches`) |
 | STS-TBL-4 | 🟡 | B | Checkboxes stage; [Apply filter] writes one OR clause (`ValueList`) |
-| STS-TBL-5 | ❌ | B | No Select all / Deselect all ("Clear" of staged picks only) |
+| STS-TBL-5 | ✅ | B | Select all / Deselect all over the rows the search shows, each shown only when it changes something (`listBulk`) |
 | STS-TBL-6 | 🟡 | B | Compare via "…" menu: checked rows → groups, none checked → top 20 values; one checked → disabled "Check another row" |
-| STS-TBL-7 | 🟡 | C | ↑ Rows 24 px (`VALROW_H`, `app/lab/pick-list.tsx:94`), legacy 25; no header row; the list scrolls after 9 rows |
+| STS-TBL-7 | ✅ | C | Rows 25 px (`VALROW_H`), as the portal's; a header row; the list scrolls after 9 rows |
 
 ### §5 Bar chart
 
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-BAR-1 | ✅ | BC | Clinical and generic-assay bins from `lib/data-binner.ts` (DataBinner port, STATIC); the MSI scores' initial custom bins ✅; generic-assay entities identical to the portal API (brca AFR, EUR, AAAS_pS462, cg00000029; luad_cas_2020 SBS1, SBS4) |
-| STS-BAR-2 | 🟡 | B | Numeric bins then category bins ✅; HTML bars, NA as a right-hand "NA n" note; no y axis |
-| STS-BAR-3 | 🟡 | B | Tick = bin start ("≤35 40 50 …", thinned to fit); no trailing end tick, no 10^n superscripts |
-| STS-BAR-4 | 🟡 | B | ↓ Tip "35–40 · 11 patients — click to filter": the unit follows the attribute's level (legacy bug not copied ✅), but the range is "35–40", not "(35, 40]", and there is no "Number of samples: / Range:" layout (`explore-sections.tsx:767-768, 950`) |
-| STS-BAR-5 | 🟡 | BC | Click a bar adds its range; a second bar of the chart ORs and a click takes it out (#188); unselected bars greyed (`hbar off`, `explore-sections.tsx:951`); no drag |
+| STS-BAR-2 | 🟡 | B | Numeric bins then category bins ✅; a y axis of integer counts (`countAxis`) ✅; HTML bars, NA as a right-hand "NA n" note |
+| STS-BAR-3 | ✅ | B | Tick = bin start ("≤35 40 50 …", thinned to fit) and the last bin's end at the right edge; on log-scale bars 10ⁿ, half steps blank (`portalLogTick`; coadread DAYS_TO_BIRTH "−10⁵ −10⁴") |
+| STS-BAR-4 | ✅ | B | "Number of patients: 39 / Range: (45, 50]" (`portalBinRange`), the unit the chart's own (legacy "samples" bug not copied); the app's tooltip, not a 150 px popover |
+| STS-BAR-5 | ✅ | BC | A drag across bars selects them, replacing the chart's filter (`selectBins`): coadread AGE bars (45, 60] 145, as the portal; a click adds or removes one bar (#188); unselected bars greyed |
 | STS-BAR-6 | ✅ | B | Show NA [off]: off the "NA n" note, on an NA bar last (clicking it filters to NA); the y-max takes it in only when drawn; kept per chart by the browser |
-| STS-BAR-7 | 🟡 | C | ↓ Offered as the portal offers it (`looksLogarithmic`, `lib/study-view-bins.ts:24-34`); unchecking gives linear bars (Days to Birth ≤-32000 … >-12000). But toggling keeps the chart's filter, where the spec clears it |
+| STS-BAR-7 | ✅ | C | Offered as the portal offers it (`looksLogarithmic`); toggling clears the chart's filter, a custom-data chart's kept (`logScaleToggled`); unchecking gives linear bars (Days to Birth ≤-32000 …) |
 | STS-BAR-8 | ✅ | C | Custom Bins dialog: Quartiles / Median split / Generate bins (size, min value) / Custom bins [default], the box starting from the bars' edges (0 kept, unlike legacy); a non-number refused by name. Disabled, saying why, on a chart of ≤10 values (legacy shows it and ignores it) |
 | STS-BAR-9 | ✅ | BC | "Compare groups ▸ Quartiles / Median / Current bins" (`explore-sections.tsx:640-652`) |
 
@@ -203,12 +203,12 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-OT-1 | ✅ | B | "Data types" card: profile id + name + count + Freq (÷ selected samples, the portal's format), sorted by Freq; counts identical; pick → `profiled` clause for MUT/CNA/SV only, Intersection by default (Union to choose, kept by the browser): coadread mutations + gistic 532, as the portal |
-| STS-OT-2 | 🟡 | BC | Every case list, by kind across studies, counted in samples, Freq of the selected samples; coadread's 14 lists match cbioportal.org's counts ([empty-caselists-cases](empty-caselists-cases.md) CL1–CL10). Always shown (the portal only when filtered on one) |
-| STS-OT-3 | ❌ | C | No mutation-type counts table |
+| STS-OT-2 | ✅ | BC | Every case list, by kind across studies, counted in samples, Freq of the selected samples; coadread's 14 lists match cbioportal.org's counts ([empty-caselists-cases](empty-caselists-cases.md) CL1–CL10). Shown when added in Add chart or while a case list is filtered on, as the portal (`specialChartsShown`) |
+| STS-OT-3 | ✅ | C | Add chart → Gene status → Add mutation types: Mutation Type · # Mut · # · Freq (÷ selected samples), as the portal's counts (msk_impact_2017 TP53, all 8 types); Apply filters on the checked types (`genomicData` MUTATION_TYPE; TP53 Nonsense or Splice Site 993, the portal's) |
 | STS-OT-4 | ❌ | C | No variant-annotations table |
 | STS-OT-5 | ❌ | B | No GA frequency table; Add chart › Generic assays charts one entity at a time (see GS-5/6) |
-| STS-OT-6 | ❌ | B | No treatment tables |
-| STS-OT-7 | 🟡 | B | ↓ "Timeline events" card, patients per event type (592 / 588 / 214, = the portal API) with Freq ÷ selected patients (99.7 % / 99.0 % / 36.0 %) ✅; shown by default where legacy offers it in Add Chart only (`explore-sections.tsx`) |
+| STS-OT-6 | 🟡 | B | Treatment per Patient and per Sample (pre/post), equal to the portal's counts (coadread, msk_chord_2024, luad, and others; first-start Pre/Post rule); Union filter (`treatment` clause); no Intersection, Compare, ⓘ, download, Groups / Target tiers |
+| STS-OT-7 | ✅ | B | "Timeline Events Availability", patients per event type (592 / 588 / 214, = the portal API) with Freq ÷ selected patients (99.7 % / 99.0 % / 36.0 %); offered in Add chart only, as the portal (`specialChartsShown`) |
 
 ### §8 Density scatter
 
@@ -219,7 +219,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-SC-3 | ✅ | BC | Pearson and Spearman with p, as the portal writes them; shown whenever n > 2 (⚠ S9) |
 | STS-SC-4 | ✅ | B | "Number of Samples", the x range to 2 places, the y range as formatRange |
 | STS-SC-5 | ✅ | B | Swap Axes, Log Scale X / Y on the MC axis (kept by the browser); Download ▸ SVG, PDF with the legend and coefficients inside the file ([download-cases](download-cases.md) FG8); Data, the samples with both values (PC7) |
-| STS-SC-6 | 🟡 | C | Drag a box → two range clauses (MC rounded to whole counts, FGA by span) (`explore-charts.tsx:89-92`); no custom bins added to the bar charts |
+| STS-SC-6 | ✅ | C | Drag a box → two range clauses (MC rounded to whole counts, FGA by span), and their ends added to the two bar charts as a temporary set of edges while the filters hold (`withDensityBins`) |
 | STS-SC-7 | ✅ | C | Own filters included (the plot is drawn over the draft) |
 | STS-SC-8 | 🐞 ok | C | Legacy dead code / out-of-range bin bug not present |
 
@@ -241,7 +241,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-KM-1 | 🔶 | B | One card "Overall survival of the selection" with an endpoint select (OS, PFS, …), not one 1×1 tile per prefix — kept on purpose (decided 2026-11-13) |
-| STS-KM-2 | 🟡 | B | ↓ Patients of the selection, one curve, no p-value ✅; curve colour `SERIES[0]` #0072B2 (`lib/chart/style.ts:35`), legacy #2986E2 |
+| STS-KM-2 | ✅ | B | Patients of the selection, one curve, no p-value; the curve in #2986E2 (`PORTAL_STUDY_VIEW_KM`), as the portal |
 | STS-KM-3 | 🔶 | B | Full KM with axes, number-at-risk table and "median 81.4 mo · n = 590 · 120 events" line |
 | STS-KM-4 | 🐞 ok | C | No selection on the curve (legacy's is dead code) |
 | STS-KM-5 | ❌ | C | ↓ The Explore card sends only `{kind, endpoint}` (`explore-charts.tsx:79`): no "Left truncation" checkbox and no `TT_CPT_REPORT_MOS` entry anywhere |
@@ -251,8 +251,8 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-GS-1 | 🟡 | B | ↓ "KRAS: somatic mutations" Mutated / Not mutated / Not profiled = 218 / 316 / 60 (= legacy) ✅; drawn as a list without the portal's colours (#1b9e77 / #d95f02 / #D3D3D3), labels lower-case "Not mutated" (`lib/explore.ts:876-878`) |
-| STS-GS-2 | ❌ | C | No mutation-type option |
+| STS-GS-1 | 🟡 | B | "KRAS: somatic mutations" Mutated / Not Mutated / Not Profiled = 218 / 316 / 60 (= legacy, the portal's labels); drawn as a list without the portal's colours (#1b9e77 / #d95f02 / #D3D3D3) |
+| STS-GS-2 | ✅ | C | The mutation-type option as its own button beside Add (`chartGene(g, true)`) |
 | STS-GS-3 | 🟡 | B | ↓ "KRAS: copy-number alterations" Amplified / Gained / Diploid / Heterozygously deleted / Homozygously deleted / Not profiled = 6 / 128 / 390 / 67 / 1 / 2 (= legacy `/api/genomic-data-counts/fetch`) ✅, a click a `genomicData` clause on the discrete profile's values (`lib/explore.ts`, `lib/gene-state-clauses.ts`); drawn as a list without the portal's CNA colours |
 | STS-GS-4 | ❌ | C | No continuous-profile gene bar |
 | STS-GS-5 | 🟡 | C | Generic assays › one entity → histogram (`buildAssayFacets`), bars by the DataBinner over every study's values (as the portal's, 6 entities compared), ≤6 charts |
@@ -313,7 +313,7 @@ Filters not in the URL (as legacy); study list and drivers toggle are (`?study=`
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-STM-1 | 🟡 | BC | ↓ Count by folded value at the attribute's level, NA row; all 40 categorical charts identical to the portal API on Q1, Q2, Q4. But the kept spelling is the most frequent (legacy the greatest), and a chart lists at most 200 values (`FACET_VALUE_LIMIT`, `lib/explore.ts:36`; OTHER_PATIENT_ID "showing 200 of 592 values") |
+| STS-STM-1 | 🟡 | BC | Count by folded value at the attribute's level, NA row; all 40 categorical charts identical to the portal API on Q1, Q2, Q4; the kept spelling the greatest and values merged across studies by their fold, as the portal (`keptSpelling`). A chart lists at most 200 values (`FACET_VALUE_LIMIT`; OTHER_PATIENT_ID "showing 200 of 592 values") |
 | STS-STM-2 | ✅ | BC | Disjunctive counts for categorical, derived, gene and assay facets; numeric charts counted over the other filters too (#188) |
 | STS-STM-3 | ✅ | B | % of every case (Race White 48.0 % of 594) (#190) |
 | STS-STM-4 | ✅ | C | The whole dispatch: discrete first, then CUSTOM (adjustCustomBins), GENERATE, MEDIAN, QUARTILE (median fallback), log unless disabled, scientific, linear. 29 recorded cases match the portal's bars (`test/fixtures/data-binner-methods.json`) |

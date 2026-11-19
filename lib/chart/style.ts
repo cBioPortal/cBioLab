@@ -18,6 +18,9 @@ export const SW = { hair: 0.75, line: 1, series: 2 } as const;
 /** cbioportal.org's colour for a Study View chart's NA slice or bar (`pickClinicalDataColors`) */
 export const PORTAL_NA = "#D3D3D3";
 
+/** cbioportal.org's Study View survival curve, the selection's one group (STS-KM-2) */
+export const PORTAL_STUDY_VIEW_KM = "#2986E2";
+
 /** the one neutral for "other", "not significant", "not profiled" marks */
 export const OTHER = "#9aa5ad";
 

@@ -47,6 +47,9 @@
  *      ["Female"], data_clinical_patient.txt) and a sample NUMBER range (FRACTION_GENOME_ALTERED 0.2 to 0.5,
  *      data_clinical_sample.txt) keeps exactly the rows worked out below; the hotspots view given the same
  *      table query tallies the same number of mutations.
+ *   P9-P11 the header text filter's negated conditions (MUT-TB-6, MutationUtils matchCategoricalFilterSearch): KRAS
+ *      filtered on Protein Change by notStartsWith "g12" (case-insensitive), notEndsWith "D", and notContains ""
+ *      (a blank filter keeps every row), each kept count worked out below.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
@@ -590,6 +593,36 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
     const pc = cols.find((x) => x.id === "proteinChange");
     ok("L1 Freq: Protein Change carries no group or freq", !!pc && pc.group === undefined && pc.freq === undefined, JSON.stringify(pc));
   }
+  // P9-P11 KRAS's 24 rows (data_mutations.txt; HGVSp_Short stored without "p."; data_sv.txt has no KRAS site, so no
+  // fusion row), by protein change:
+  //   G12C 6: FX-P01-T1 (line 2), FX-P01-T2 (3), FX-P06-T1 (21), FX-P10-T1 (31), FX-P11-T1 (43), FX-P16-T1 (57)
+  //   G12D 5: FX-P02-T1 (5), FX-P02-T2 (6), FX-P07-T1 (25), FX-P12-T1 (46), FX-P17-T1 (60)
+  //   G12V 5: FX-P03-T1 (9), FX-P03-T2 (10), FX-P08-T1 (28), FX-P13-T1 (49), FX-P18-T1 (63)
+  //   G13D 5: FX-P04-T1 (14), FX-P04-T2 (15), FX-P09-T1 (29), FX-P14-T1 (52), FX-P19-T1 (67)
+  //   Q61H 3: FX-P05-T1 (18), FX-P15-T1 (54), FX-P20-T1 (71)
+  // P9  notStartsWith "g12": G13D 5 + Q61H 3 = 8 (= 24 - the 16 G12C/G12D/G12V rows startsWith "G12" keeps)
+  // P10 notEndsWith "D": G12C 6 + G12V 5 + Q61H 3 = 14 (G12D and G13D, 10 rows, end in D)
+  // P11 notContains "": all 24
+  const KRAS_N = 24;
+  const pc = (op: "startsWith" | "notStartsWith" | "notEndsWith" | "notContains", value: string) =>
+    count("KRAS", { filters: { proteinChange: { op, value } } });
+  const kept = async (op: "notStartsWith" | "notEndsWith", value: string) => {
+    const r = await table("KRAS", { filters: { proteinChange: { op, value } } });
+    return typeof r === "string" ? r : r.map((x) => String(v(x, "proteinChange"))).sort().join(",");
+  };
+  const all = await count("KRAS", {});
+  ok(`fixture: KRAS has ${KRAS_N} rows`, all === KRAS_N, String(all));
+  const p9 = await pc("notStartsWith", "g12"), g12 = await pc("startsWith", "G12");
+  ok("P9 KRAS Protein Change notStartsWith \"g12\": 8 rows (G13D ×5, Q61H ×3), case-insensitive", p9 === 8, String(p9));
+  ok("P9 notStartsWith \"g12\" keeps every row but the 16 startsWith \"G12\" keeps", typeof all === "number" && g12 === 16 && p9 === all - g12, `${String(p9)} + ${String(g12)} of ${String(all)}`);
+  const p9rows = await kept("notStartsWith", "g12");
+  ok("P9 the kept rows are G13D ×5 and Q61H ×3", p9rows === [...Array(5).fill("G13D"), ...Array(3).fill("Q61H")].join(","), String(p9rows));
+  const p10 = await pc("notEndsWith", "D");
+  ok("P10 KRAS Protein Change notEndsWith \"D\": 14 rows (G12C ×6, G12V ×5, Q61H ×3)", p10 === 14, String(p10));
+  const p10rows = await kept("notEndsWith", "D");
+  ok("P10 the kept rows are G12C ×6, G12V ×5 and Q61H ×3", p10rows === [...Array(6).fill("G12C"), ...Array(5).fill("G12V"), ...Array(3).fill("Q61H")].join(","), String(p10rows));
+  const p11 = await pc("notContains", "");
+  ok(`P11 KRAS Protein Change notContains "": every row (${KRAS_N})`, p11 === KRAS_N, String(p11));
 }
 
 console.log(`\n${checks - failures}/${checks} mutation column checks passed`);

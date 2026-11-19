@@ -8,7 +8,8 @@ import { useSaved } from "../_saved/saved-context.tsx";
 import { useEffect, useRef, useState } from "react";
 import { normalizeDef } from "./pills";
 import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, NumericBin, PartitionArm, PartitionDef } from "../../lib/types.ts";
-import { withoutAttribute } from "../../lib/study-view-add-chart.ts";
+import { GENOMIC_CHARTS, geneChartsAsked, geneChartsChanged, withoutAttribute, type GeneChartKind } from "../../lib/study-view-add-chart.ts";
+import { densityPairKey, type DensityPair } from "../../lib/study-view-density.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, withoutChart, comparisonCohorts, type ChartKey } from "../../lib/partition-arms.ts";
@@ -21,7 +22,8 @@ import { useExplore, type ExploreAsk } from "./use-explore.ts";
 import { toggleBin, selectBins, toggleNa, toggleValue } from "../../lib/explore-selection.ts";
 import { defaultChartKeys } from "../../lib/study-view-config.ts";
 import { FILTERS_PARAM, writeFilters } from "../../lib/study-view-url.ts";
-import { serverBins, type ChartBins } from "../../lib/study-view-bins.ts";
+import { binsAfterEdit, logScaleToggled, oneValueBars, serverBins, type ChartBins } from "../../lib/study-view-bins.ts";
+import { densityBinEdges, densityBinsAfterDrag, densityBinsWithout, withDensityBins, xyChartRemoval, type DensityBins } from "../../lib/study-view-density.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { encodeParam } from "../portal/page-doc.ts";
 import { currentLinkUrlMax, linkParams, linkTo, writeSearch } from "../_links/link-state.ts";
@@ -36,7 +38,7 @@ export type GroupsTarget = "comparison" | "analysis";
 /** a saved cohort open in Explore to change its filters */
 export type EditingCohort = { id: string; name: string; def: CohortDef };
 
-import { toggleQueued } from "../../lib/study-view-gene-tables.ts";
+import { toggleQueued, withoutGeneTableClauses } from "../../lib/study-view-gene-tables.ts";
 import { driverOql, geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
 import { CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import type { DocStore } from "./doc-store.ts";
@@ -98,7 +100,7 @@ export function useExploreState(page: ExplorePage) {
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
   const [addChartOpen, setAddChartOpen] = useState(false);
-  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "assay" | "derived" | "custom">("clinical");
+  const [chartTab, setChartTab] = useState<"clinical" | "genomic" | "gene" | `assay:${string}` | "derived" | "custom" | "xvsy">("clinical");
   const [cName, setCName] = useState("");
   const [cDefText, setCDefTextState] = useState(JSON.stringify({ all: [] }, null, 2));
   // The draft as last set, for callers holding an older render's closure (a mount effect, a
@@ -142,6 +144,9 @@ export function useExploreState(page: ExplorePage) {
   /** genes charted as their own alteration facet (the portal's per-gene charts) */
   const [geneCharts, setGeneCharts] = useState<string[]>([]);
   const geneChartsRef = useRef<string[]>([]);   // fetchExplore reads this, not the closure
+  /** genes charted as the portal's Mutation Type Counts table */
+  const [mutationTypeCharts, setMutationTypeCharts] = useState<string[]>([]);
+  const mutationTypeChartsRef = useRef<string[]>([]);
   /** generic-assay entities charted one each (a signature, an arm, a probe) */
   const [assayCharts, setAssayCharts] = useState<{ profileType: string; entity: string }[]>([]);
   const assayChartsRef = useRef<{ profileType: string; entity: string }[]>([]);
@@ -154,6 +159,8 @@ export function useExploreState(page: ExplorePage) {
    * first needed, so a page drawn on the server never touches storage.
    */
   const binStore = useRef<Record<string, Record<string, ChartBins>> | null>(null);
+  /** a density drag's edges on the Mutation Count and FGA bars: kept for the page only, never with the reader's bins (STS-SC-6) */
+  const densityBins = useRef<DensityBins[]>([]);
   const [, setBinsVersion] = useState(0);
   const binsOf = (studies: string[]): Record<string, ChartBins> => {
     if (!binStore.current) {
@@ -422,8 +429,9 @@ export function useExploreState(page: ExplorePage) {
    * with a single value (lib/study-view-config.ts). Read from the answer with no draft applied
    * (use-explore.ts `vocab`), so a facet click never changes which charts show.
    */
-  const defaultCharts = (): Set<string> => new Set(defaultChartKeys(exploring.vocab.current.attrs,
-    { filtered: false, totalSamples: exploring.vocab.current.samples, allowed: coverageOk }));
+  // the clinical charts the portal draws by default, and every Genomic-tab chart (drawn unless unchecked)
+  const defaultCharts = (): Set<string> => new Set([...defaultChartKeys(exploring.vocab.current.attrs,
+    { filtered: false, totalSamples: exploring.vocab.current.samples, allowed: coverageOk }), ...GENOMIC_CHARTS.map((c) => c.key)]);
   const draftedAttrs = (): Set<string> => {
     const keys = new Set<string>();
     const walk = (cs: any[]) => { for (const c of cs || []) {
@@ -471,10 +479,11 @@ export function useExploreState(page: ExplorePage) {
       attributes: attrsOverride ?? attrsForBar(attrCoverage, studiesOverride),
       geneCharts: geneChartsRef.current,
       assayCharts: assayChartsRef.current,
+      mutationTypeCharts: mutationTypeChartsRef.current,
       derived: exDerivedRef.current,
       uploads: customDataKey(),
       drivers: driversRef.current,
-      bins: serverBins(binsOf(studies)),
+      bins: serverBins(withDensityBins(binsOf(studies), densityBins.current, draftOverride !== undefined ? draftOverride : parseDraft())),
     }, !(attrsOverride ?? []).length && !(attrCoverage > 0));
   };
 
@@ -582,6 +591,26 @@ export function useExploreState(page: ExplorePage) {
    * Deliberately plainer than addClause: no kind-specific merging, because
    * these clauses only mean what they mean together.
    */
+  /** a numeric chart's bars, plus these edges as custom bins, so a range filtered on is drawn as its own bars (STV-FB-4, STS-SC-6) */
+  const addBinEdges = (attribute: string, ends: number[]) => {
+    const f = explore?.clinical.find((x) => x.attribute === attribute && x.kind === "num");
+    if (f?.kind === "num" && f.bins && !oneValueBars(f.bins)) setChartBins(attribute, binsAfterEdit(chartBins(attribute), f.bins, ends), false);
+  };
+  /** a density drag's two ranges (STS-SC-6): their ends become custom bins of the two bar charts, then the filters apply */
+  const addDensitySelection = (clauses: any[]) => {
+    // a temporary set, not the reader's Custom Bins, kept per attribute: a drag replaces its own two
+    // attributes' edges (another density chart's stay), and they last while their filters do
+    const dragged = clauses.map((c) => c.attribute as string);
+    densityBins.current = densityBinsAfterDrag(densityBinsWithout(densityBins.current, dragged), densityBinEdges(clauses).flatMap((e) => {
+      const f = explore?.clinical.find((x) => x.attribute === e.attribute && x.kind === "num");
+      if (f?.kind !== "num" || !f.bins || oneValueBars(f.bins)) return [];
+      const c = clauses.find((x) => x.attribute === e.attribute);
+      // the bars' own edges and the drag's ends, as binsAfterEdit lays them (always custom)
+      const { edges } = binsAfterEdit(undefined, f.bins, e.ends).bins as { method: "custom"; edges: number[] };
+      return [{ attribute: e.attribute, range: c.range, edges }];
+    }));
+    addClauses(clauses);
+  };
   const addClauses = (clauses: any[]) => {
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
     if (!d || !Array.isArray(d.all)) d = { all: [] };
@@ -600,22 +629,38 @@ export function useExploreState(page: ExplorePage) {
   const geneStatesClauses = (gene: string, type: "MUTATION" | "CNA", states: string[]): { clauses: any[] } | { why: string } =>
     geneStatesClausesFor(gene, type, states, !!explore?.drivers);
 
-  const chartGene = (raw: string) => {
+  /** which of a charted gene's two status charts are shown (STV-AC-5: one chart per gene and profile) */
+  const [geneKinds, setGeneKinds] = useState<Record<string, ("MUTATION" | "CNA")[]>>({});
+  const geneKindsRef = useRef<Record<string, ("MUTATION" | "CNA")[]>>({});
+  const changeGeneChart = (g: string, kind: GeneChartKind, on: boolean) => {
+    // read from the refs, so two changes before a render both count
+    const before = { genes: geneChartsRef.current, kinds: geneKindsRef.current, types: mutationTypeChartsRef.current };
+    const next = geneChartsChanged(before, g, kind, on);
+    geneChartsRef.current = next.genes; setGeneCharts(next.genes);
+    mutationTypeChartsRef.current = next.types; setMutationTypeCharts(next.types);
+    geneKindsRef.current = next.kinds; setGeneKinds(next.kinds);
+    // another kind of a gene already counted is drawn from the answer in hand
+    if (geneChartsAsked(before, next)) fetchExplore();
+  };
+  /** chart a gene for one profile, as the portal's Add chart does: its mutation status, its mutations by type, or its copy number */
+  const chartGene = (raw: string, kind: GeneChartKind) => {
     const g = String(raw || "").toUpperCase().trim();
     if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)) return;
-    const next = geneCharts.includes(g) ? geneCharts : [...geneCharts, g].slice(-6);
-    geneChartsRef.current = next;
-    setGeneCharts(next);
     setGeneChartInput("");
-    fetchExplore();
+    changeGeneChart(g, kind, true);
   };
-  const unchartGene = (g: string) => {
-    const next = geneCharts.filter((x) => x !== g);
-    geneChartsRef.current = next;
-    setGeneCharts(next);
-    fetchExplore();
-  };
+  const unchartGene = (g: string, kind: GeneChartKind) => changeGeneChart(g, kind, false);
 
+  /** the reader's X vs Y density charts (STV-AC-7), one per pair of attributes */
+  const [xyCharts, setXyCharts] = useState<DensityPair[]>([]);
+  const addXyChart = (pair: DensityPair) => setXyCharts((cur) => cur.some((p) => densityPairKey(p) === densityPairKey(pair)) ? cur : [...cur, pair]);
+  /** Remove chart, as the portal's: the chart goes with its filters on both attributes and their temporary bar edges */
+  const removeXyChart = (pair: DensityPair) => {
+    const r = xyChartRemoval(xyCharts, densityBins.current, pair);
+    setXyCharts(r.pairs);
+    densityBins.current = r.bins;
+    clearAttributeFilters(r.clear);
+  };
   const chartAssay = (profileType: string, entity: string) => {
     if (assayCharts.some((c) => c.profileType === profileType && c.entity === entity)) return;
     const next = [...assayCharts, { profileType, entity }].slice(-6);
@@ -712,6 +757,27 @@ export function useExploreState(page: ExplorePage) {
     } catch (e) {
       setExMsg("Could not remove the filters on " + attributes.join(", ") + ": " + String((e as Error)?.message || e));
     }
+  };
+  /** Log Scale switched on or off (STS-BAR-7): the bars change and the chart's filter is cleared (logScaleToggled) */
+  const toggleLogScale = (attribute: string, cur: ChartBins | undefined) => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    const all: Clause[] = d && Array.isArray(d.all) ? d.all : [];
+    const next = logScaleToggled(attribute, cur, all);
+    setChartBins(attribute, next.bins, false);
+    if (next.all.length !== all.length) {
+      const def = { ...d, all: next.all };
+      setCDefText(JSON.stringify(def, null, 2));
+      fetchExplore(next.all.length ? def : null);
+    } else fetchExplore();
+  };
+  /** take a gene table's own filter out of the draft (its chart unchecked in Add chart) */
+  const clearGeneTableFilter = (kind: "mutated" | "cna" | "sv") => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { return; }
+    const all = withoutGeneTableClauses(d.all || [], kind);
+    if (all.length === (d.all || []).length) return;
+    d.all = all;
+    setCDefText(JSON.stringify(d, null, 2));
+    fetchExplore(all.length ? d : null);
   };
   const removeDraftClause = (i: number) => {
     try {
@@ -826,7 +892,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, toggleLogScale, addBinEdges, addDensitySelection, chartGene, unchartGene, geneKinds, mutationTypeCharts, assayCharts, chartAssay, unchartAssay, xyCharts, addXyChart, removeXyChart, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, clearGeneTableFilter, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

@@ -2,7 +2,7 @@
 // chart (STV-FB-3), the interval text (STV-FB-4), its editable ends, and each pill's ×.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill } from "../lib/study-view-pills.ts";
+import { editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill, geneTablePills, removeOqlLine, joinedByAnd } from "../lib/study-view-pills.ts";
 import { naClause } from "../lib/explore-selection.ts";
 import type { ClinicalLeaf, CohortDef } from "../lib/types.ts";
 
@@ -108,4 +108,40 @@ describe("an interval's numbers after an edit", () => {
     assert.deepEqual(intervalEnds(d, 0, 0), []);
     assert.deepEqual(intervalEnds(d, 9, 0), []);
   });
+});
+
+// STV-FB-3 #9: a gene table's selection drawn as the portal's filter bar draws it
+test("a gene table's selection is a pill per gene, coloured as the oncoprint colours its alteration; any other OQL keeps the generic pill", () => {
+  const pills = geneTablePills({ kind: "oql", q: "APC: MUT; KRAS: AMP; CDKN2A: HOMDEL; ALK: FUSION; TP53: MUT_DRIVER", chart: "mutated" });
+  assert.deepEqual(pills!.map((p) => [p.gene, p.color]), [["APC", "#008000"], ["KRAS", "#ff0000"], ["CDKN2A", "#0000ff"], ["ALK", "#8b00c9"], ["TP53", "#008000"]]);
+  assert.equal(pills![4].line, "TP53: MUT_DRIVER", "the OQL line in its tooltip");
+  for (const q of ["KRAS: MUT=G12C", "EGFR: AMP; KRAS: MUT=G12C", "TP53", "KRAS: GAIN", ""])
+    assert.equal(geneTablePills({ kind: "oql", q, chart: "mutated" }), null, q);
+  // only a gene table's clause, which carries its name: a Gene status chart writes the same text beside "profiled KRAS"
+  assert.equal(geneTablePills({ kind: "oql", q: "KRAS: MUT" }), null, "a Gene status chart's clause stays a generic pill");
+  assert.equal(geneTablePills({ kind: "clinical", attribute: "SEX" }), null);
+});
+
+test("removing a gene takes its line out of the clause, and the clause with its last gene", () => {
+  const draft = { all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }, { kind: "oql", q: "APC: MUT; TP53: MUT", chart: "mutated" }] } as unknown as CohortDef;
+  const one = removeOqlLine(draft, 1, "APC: MUT");
+  assert.deepEqual(one.all![1], { kind: "oql", q: "TP53: MUT", chart: "mutated" }, "the rest keeps the table's name");
+  assert.deepEqual(removeOqlLine(one, 1, "TP53: MUT").all, [draft.all![0]]);
+  assert.equal((draft.all![1] as { q: string }).q, "APC: MUT; TP53: MUT", "the draft given is not changed");
+});
+
+// STV-FB-2: the words between the bar's groups, as the portal's GroupLogic writes them
+test("two generic groups in a row from the same chart are joined by \"and\"; a clinical chart's pill or another chart's group by nothing", () => {
+  const draft = { all: [
+    { any: [{ kind: "oql", q: "APC: MUT" }, { kind: "oql", q: "TP53: MUT" }] },    // a gene-table selection
+    { kind: "oql", q: "KRAS: MUT" },                                                 // another one: "and"
+    { kind: "clinical", attribute: "SEX", op: "=", value: "Female" },                // a clinical pill: no word
+    { kind: "caseList", id: "coadread_all" },                                        // another chart: no word
+    { kind: "caseList", id: "coadread_cna" },                                        // the same chart: "and"
+    { kind: "treatment", agents: ["A"] },                                            // treatments per patient
+    { kind: "treatment", agents: ["B"], time: "Pre" },                               // per sample: another table
+  ] } as unknown as CohortDef;
+  const groups = filterGroups(draft, () => undefined);
+  assert.deepEqual(joinedByAnd(draft, groups), [false, true, false, false, true, false, false]);
+  assert.deepEqual(joinedByAnd(null, []), []);
 });

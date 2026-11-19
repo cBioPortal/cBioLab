@@ -6,9 +6,10 @@ import type { Clause, CohortDef, Leaf, View } from "../../lib/types.ts";
 import type { SelectedProfile } from "../../lib/query-options.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
 import { hasOql, oqlHasMutationOql, oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
-import { ALTERATION_CELLS, STATUS_COLUMN, cellLabel, lollipopNarrowing, pruneCodons } from "../../lib/lollipop.ts";
+import { ALTERATION_CELLS, STATUS_COLUMN, cellLabel, lollipopGeneEmpty, lollipopNarrowing, pruneCodons } from "../../lib/lollipop.ts";
+import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
 import type { TableQuery } from "../../lib/table-query.ts";
-import { arrange, type PageLayout, type TabBanner } from "./page-doc.ts";
+import { arrange, type PageLayout, type TabBanner, type TabChooser } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
 import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 import { survivalDefault } from "./comparison-layout.ts";
@@ -266,6 +267,19 @@ export function svCheckCohort(q: ResultsQuery): CohortDef {
   return { ...scope, all: [...q.filters, { kind: "oql", q: q.genes.map((g) => g + ": FUSION").join("; ") } as Clause] } as CohortDef;
 }
 
+/**
+ * The Mutations tab's greyed chips (MUT-GT-2): the portal greys a gene whose tab would hold no mutation
+ * (Mutations.tsx generateTabs, over mutationsByGene: the query's OQL where the tab follows it, fusions
+ * included). The tab's own lollipop over every chip gene, without its table, codon or y-axis settings,
+ * says which: a gene drawn empty (lollipopGeneEmpty) is greyed.
+ */
+export function mutationsChipEmpties(genes: string[]): NonNullable<TabChooser["empties"]> {
+  return {
+    view: (vs: View[]) => ({ ...vs[0], genes, codons: undefined, table: undefined, yMax: undefined, hide: undefined } as unknown as View),
+    empty: (result: unknown) => (((result as { hotspots?: HotspotGene[] } | null)?.hotspots) || []).filter(lollipopGeneEmpty).map((g) => g.gene),
+  };
+}
+
 /** The Structural Variants tab's table and the tab's gene chips, the portal's per-gene sub-tabs: one gene's calls at a time. */
 /** the portal's alert above the Structural Variants table (ResultsViewPage, SV-5), word for word */
 export const SV_ALERT = "This is an experimental feature. The structural variant gene and event info annotations might not always be correct. " +
@@ -367,7 +381,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
       chooser: { label: "gene", options: genes, locks: ["gene", "genes"],
         value: (vs: View[]) => String(((vs[1] as unknown as { gene?: string }).gene) || genes[0]),
         // a new gene keeps the grid's selection (it is about classes, not this gene) and starts the table's own query over
-        apply: (vs: View[], g: string) => linkMutations([{ ...vs[0], genes: [g], codons: undefined, table: undefined, yMax: undefined } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0) },
+        apply: (vs: View[], g: string) => linkMutations([{ ...vs[0], genes: [g], codons: undefined, table: undefined, yMax: undefined } as View, { ...vs[1], gene: g, sort: undefined, search: undefined, filters: undefined } as View], 0),
+        empties: mutationsChipEmpties(genes) },
       link: linkMutations },
     ...(svHeld && data.svs ? [svTab(genes, queried)] : []),
     ...(expr && !multi ? [{ title: "Co-expression", views: [v("Co-expression with " + genes[0], { kind: "correlates", gene: genes[0], profileType: expr, cohorts: queried })] }] : []),

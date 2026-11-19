@@ -481,3 +481,195 @@ describe("clinical: q-values over every tested attribute, listed or not (allAttr
     assert.match(v.note!, /1 attribute is listed as not tested/);
   });
 });
+
+describe("clinical: an attribute stored at different levels across studies", () => {
+  // cBioPortal/cbioportal#12509: a patient-level value in one study beside a sample-level value in another would
+  // count patients in one place and samples in the other. Where the studies holding values disagree on `per`, the
+  // attribute is named and not tested. Rows A1–A11 of the spec table (A8, A10, A11 from its revision 2).
+  const levels = (patient: string, sample: string) =>
+    `the participating studies store it at different levels (patient in ${patient}; sample in ${sample}); its counts would mix patients with samples`;
+  const two = { A: ["s1", "s2"], B: ["s1", "s2"] };
+
+  test("A1: categorical, patient-level in s1 and sample-level in s2, both holding values → refused, outside q", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [cat("HISTOLOGY", { Adeno: 3, Squamous: 1 })], B: [cat("HISTOLOGY", { Adeno: 1, Squamous: 3 })] },
+      s2: { A: [cat("HISTOLOGY", { Adeno: 2, Squamous: 2 }, "sample")], B: [cat("HISTOLOGY", { Adeno: 1, Squamous: 4 }, "sample")] },
+    });
+    const v = await run(["HISTOLOGY"], c);
+    const [r] = rowsOf(v);
+    assert.equal(r.skipped, levels("s1", "s2"));
+    assert.equal(r.p, undefined);
+    assert.equal(r.q, undefined);
+    assert.deepEqual(r.cells, []);
+    assert.match(v.note!, /across the 0 tested attributes/);
+  });
+
+  test("A2: numeric, patient-level in s1 and sample-level in s2, both with n > 0 → refused", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [num("TOTAL_MUTATIONS", [1, 2, 3])], B: [num("TOTAL_MUTATIONS", [4, 5, 6])] },
+      s2: { A: [num("TOTAL_MUTATIONS", [2, 3], "sample")], B: [num("TOTAL_MUTATIONS", [7, 8], "sample")] },
+    });
+    const v = await run(["TOTAL_MUTATIONS"], c);
+    const [r] = rowsOf(v);
+    assert.equal(r.skipped, levels("s1", "s2"));
+    assert.equal(r.p, undefined);
+    assert.equal(r.q, undefined);
+    assert.deepEqual(r.cells, []);
+    assert.match(v.note!, /across the 0 tested attributes/);
+  });
+
+  test("A3: both studies patient-level → tested normally", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [cat("CT", { Lung: 3, Breast: 1 })], B: [cat("CT", { Lung: 1, Breast: 3 })] },
+      s2: { A: [cat("CT", { Lung: 2 })], B: [cat("CT", { Breast: 2 })] },
+    });
+    const [r] = rowsOf(await run(["CT"], c));
+    assert.equal(r.skipped, undefined);
+    assert.equal(r.test, "chi-squared");
+    assert.ok(r.p != null);
+    assert.equal(r.per, "patient");
+  });
+
+  test("A4: both sample-level, one cohort of s2 empty (the default per: patient, values []) → tested, per sample", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [cat("ST", { Primary: 3, Metastasis: 1 }, "sample")], B: [cat("ST", { Primary: 1, Metastasis: 3 }, "sample")] },
+      s2: { A: [cat("ST", { Primary: 2, Metastasis: 1 }, "sample")], B: [cat("ST", {})] },
+    });
+    const [r] = rowsOf(await run(["ST"], c));
+    assert.equal(r.skipped, undefined);
+    assert.ok(r.p != null);
+    assert.equal(r.per, "sample");
+  });
+
+  test("A5: patient-level values in s1; every answer of s2 is the empty default → only one level holds values, tested", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [cat("CT", { Lung: 3, Breast: 1 })], B: [cat("CT", { Lung: 1, Breast: 3 })] },
+      s2: { A: [cat("CT", {})], B: [cat("CT", {})] },
+    });
+    const [r] = rowsOf(await run(["CT"], c));
+    assert.equal(r.skipped, undefined);
+    assert.ok(r.p != null);
+  });
+
+  test("A6: kind and level both disagree → the type message wins", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [num("MIXED", [1, 2])], B: [num("MIXED", [3, 4])] },
+      s2: { A: [cat("MIXED", { a: 1, b: 1 }, "sample")], B: [cat("MIXED", { a: 2 }, "sample")] },
+    });
+    const [r] = rowsOf(await run(["MIXED"], c));
+    assert.equal(r.skipped, "the participating studies disagree on its type (num vs cat); comparing them would mean discarding one side's patients");
+    assert.equal(r.p, undefined);
+  });
+
+  test("A7: three studies, s1 and s3 patient-level, s2 sample-level → each level's studies listed, sorted", async () => {
+    const { c } = ctx({ A: ["s3", "s2", "s1"], B: ["s3", "s2", "s1"] }, {
+      s3: { A: [cat("HISTOLOGY", { x: 2 })], B: [cat("HISTOLOGY", { y: 2 })] },
+      s2: { A: [cat("HISTOLOGY", { x: 1, y: 1 }, "sample")], B: [cat("HISTOLOGY", { y: 3 }, "sample")] },
+      s1: { A: [cat("HISTOLOGY", { x: 3 })], B: [cat("HISTOLOGY", { x: 1, y: 2 })] },
+    });
+    const [r] = rowsOf(await run(["HISTOLOGY"], c));
+    assert.equal(r.skipped, levels("s1, s3", "s2"));
+    assert.deepEqual(r.cells, []);
+  });
+
+  test("A8: one study whose cohort A answer is per patient and cohort B answer per sample, both holding values → refused, the study named", async () => {
+    const { c } = ctx({ A: ["s1"], B: ["s1"] }, {
+      s1: { A: [cat("CT", { Lung: 3, Breast: 1 })], B: [cat("CT", { Lung: 1, Breast: 3 }, "sample")] },
+    });
+    const v = await run(["CT"], c);
+    const [r] = rowsOf(v);
+    assert.equal(r.skipped, "s1 stores it both per patient and per sample; its counts would mix patients with samples");
+    assert.equal(r.p, undefined);
+    assert.equal(r.q, undefined);
+    assert.deepEqual(r.cells, []);
+    assert.match(v.note!, /across the 0 tested attributes/);
+    // the same study at one level throughout is tested as before
+    const { c: plain } = ctx({ A: ["s1"], B: ["s1"] }, {
+      s1: { A: [cat("CT", { Lung: 3, Breast: 1 }, "sample")], B: [cat("CT", { Lung: 1, Breast: 3 }, "sample")] },
+    });
+    const [p] = rowsOf(await run(["CT"], plain));
+    assert.equal(p.skipped, undefined);
+    near(p.p, 0.1573);
+  });
+
+  test("A8b: a study holding both levels takes precedence over a disagreement between studies, and `stores` names several", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [cat("CT", { Lung: 3 })], B: [cat("CT", { Breast: 3 }, "sample")] },
+      s2: { A: [cat("CT", { Lung: 2 })], B: [cat("CT", { Breast: 2 }, "sample")] },
+    });
+    const [r] = rowsOf(await run(["CT"], c));
+    assert.equal(r.skipped, "s1, s2 store it both per patient and per sample; its counts would mix patients with samples");
+    const { c: one } = ctx(two, {
+      s1: { A: [cat("CT", { Lung: 3 })], B: [cat("CT", { Breast: 3 }, "sample")] },
+      s2: { A: [cat("CT", { Lung: 2 }, "sample")], B: [cat("CT", { Breast: 2 }, "sample")] },
+    });
+    const [o] = rowsOf(await run(["CT"], one));
+    assert.equal(o.skipped, "s1 stores it both per patient and per sample; its counts would mix patients with samples");
+  });
+
+  test("A9: a refused attribute beside a testable one — the testable one is tested, q over it alone", async () => {
+    // CT alone in s1/s2 at patient level: A Lung 3 / Breast 1 vs B 1 / 3 → p 0.1573, and q = p with one tested
+    const { c } = ctx(two, {
+      s1: { A: [cat("CT", { Lung: 3, Breast: 1 }), cat("HISTOLOGY", { x: 3 })], B: [cat("CT", { Lung: 1, Breast: 3 }), cat("HISTOLOGY", { y: 3 })] },
+      s2: { A: [cat("HISTOLOGY", { x: 1, y: 1 }, "sample")], B: [cat("HISTOLOGY", { y: 2 }, "sample")] },
+    });
+    const v = await run(["HISTOLOGY", "CT"], c);
+    const rows = rowsOf(v);
+    const ct = rows.find((r) => r.attribute === "CT")!;
+    const h = rows.find((r) => r.attribute === "HISTOLOGY")!;
+    assert.equal(h.skipped, levels("s1", "s2"));
+    assert.equal(h.q, undefined);
+    near(ct.p, 0.1573);
+    assert.equal(ct.q, ct.p, "one tested attribute: q is p");
+    assert.match(v.note!, /across the 1 tested attributes/);
+  });
+
+  test("A10: an empty default answer carries no level — refused by the value-holding ones; the row's per from the first value-holding answer", async () => {
+    // s1/A empty (default per: patient), s1/B per sample with values, s2/A and s2/B per patient with values
+    const { c } = ctx(two, {
+      s1: { A: [cat("HISTOLOGY", {})], B: [cat("HISTOLOGY", { x: 2, y: 1 }, "sample")] },
+      s2: { A: [cat("HISTOLOGY", { x: 1, y: 3 })], B: [cat("HISTOLOGY", { x: 3, y: 1 })] },
+    });
+    const [r] = rowsOf(await run(["HISTOLOGY"], c));
+    assert.equal(r.skipped, levels("s2", "s1"));
+    assert.equal(r.p, undefined);
+    assert.equal(r.per, "patient", "s2/A's level, the first answer holding values in view order");
+  });
+
+  test("A10 variant: s2 holding sample values instead → tested, per sample (never the empty answer's patient)", async () => {
+    const { c } = ctx(two, {
+      s1: { A: [cat("HISTOLOGY", {})], B: [cat("HISTOLOGY", { x: 2, y: 1 }, "sample")] },
+      s2: { A: [cat("HISTOLOGY", { x: 1, y: 3 }, "sample")], B: [cat("HISTOLOGY", { x: 3, y: 1 }, "sample")] },
+    });
+    const [r] = rowsOf(await run(["HISTOLOGY"], c));
+    assert.equal(r.skipped, undefined);
+    assert.ok(r.p != null);
+    assert.equal(r.per, "sample");
+  });
+
+  test("A11: allAttributes — a hidden attribute refused for levels is not a row, but the note names it with the reason", async () => {
+    // both studies declare OS_MONTHS, OS_STATUS (a survival pair: tested, not listed) and AGE
+    const { c } = ctx(two, {
+      s1: {
+        A: [num("OS_MONTHS", [1, 2, 3]), cat("OS_STATUS", { x: 2, y: 2 }), num("AGE", [1, 2, 3])],
+        B: [num("OS_MONTHS", [4, 5, 6]), cat("OS_STATUS", { x: 1, y: 3 }), num("AGE", [4, 5, 6])],
+      },
+      s2: {
+        A: [num("OS_MONTHS", [2, 3], "sample"), cat("OS_STATUS", { x: 1 }), num("AGE", [2, 3])],
+        B: [num("OS_MONTHS", [5, 7], "sample"), cat("OS_STATUS", { y: 1 }), num("AGE", [5, 7])],
+      },
+    });
+    for (const r of Object.values(c.resolvers as Record<string, any>)) {
+      r.viewAggregate = async () => [];
+      r.viewMeta = async () => [{ a: "OS_MONTHS", label: "Overall Survival (Months)" }, { a: "OS_STATUS", label: "Overall Survival Status" }, { a: "AGE", label: "Age" }];
+    }
+    const res = await runClinical({ kind: "clinical", allAttributes: true } as never, c);
+    const v = res instanceof Untimed ? res.result : res;
+    const rows = rowsOf(v);
+    assert.equal(rows.find((r) => r.attribute === "OS_MONTHS"), undefined, "a hidden attribute is never a row");
+    assert.deepEqual(rows.map((r) => r.attribute), ["AGE"]);
+    assert.ok(rows[0].p != null, "AGE is tested");
+    assert.match(v.note!, /OS_MONTHS/);
+    assert.ok(v.note!.includes(levels("s1", "s2")), v.note!);
+  });
+});

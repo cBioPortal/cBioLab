@@ -4,6 +4,7 @@
 // lib/table-query.ts (tables.ts), downloaded whole through POST /api/table naming the file.
 import type { ViewResult, TableRows } from "../../types.ts";
 import { parseOql, OQL_PROFILE } from "../../oql-parse.ts";
+import { defaultOqlSublabel } from "../../oql-match.ts";
 import type { OqlPins } from "../../oql.ts";
 import { MAX_GENE_SYMBOLS } from "../../gene-tracks.ts";
 import { hasViewAggregates } from "../../federation.ts";
@@ -14,7 +15,7 @@ import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { plural, refuse } from "../shared.ts";
 import { datafilesCountsSql, type DataType, type LinePlan } from "./sql.ts";
-import { STATUS_TABLES, everySample, lineColumns, matrixColumns, matrixRowSource, statusColumns, statusRowSource, type FileColumn, type MatrixFile, type StatusTable, type StudyPlan } from "./tables.ts";
+import { STATUS_TABLES, alterationColumns, everySample, lineColumns, matrixColumns, matrixRowSource, statusColumns, statusRowSource, type FileColumn, type MatrixFile, type StatusTable, type StudyPlan } from "./tables.ts";
 import type { DataFile, DatafilesResult, DatafilesView, LineFrequency } from "./types.ts";
 import { datafilesMethod } from "./method.ts";
 import { resolveDrivers } from "../../driver-settings.ts";
@@ -53,15 +54,23 @@ export function checkLines(oql: unknown): string | { line: string; gene: string;
   return out;
 }
 
-/** The files a cohort's studies can offer, from their profiles: which studies hold each one. */
-export function fileList(catalogs: Record<string, ProfileInfo[]>, studies: string[]): { id: string; name: string; description: string; studies: string[]; matrix: MatrixFile; portalFile: string }[] {
+type OfferedFile = { id: string; name: string; description: string; studies: string[]; matrix: MatrixFile; portalFile: string;
+  /** one of the query's selected profiles' files, which the portal lists before the sample lists */
+  selected?: true };
+
+/**
+ * The files a cohort's studies can offer, from their profiles: which studies hold each one. In the portal's
+ * order (DownloadTab render): copy number, mutations, structural variants, then `chosen` — the profiles the query
+ * selected for its EXP / PROT, in that order — all `selected`; then every other profile.
+ */
+export function fileList(catalogs: Record<string, ProfileInfo[]>, studies: string[], chosen: string[] = []): OfferedFile[] {
   const holding = (test: (p: ProfileInfo) => boolean) => studies.filter((st) => (catalogs[st] || []).some(test));
-  const out: { id: string; name: string; description: string; studies: string[]; matrix: MatrixFile; portalFile: string }[] = [];
+  const out: OfferedFile[] = [];
   const mut = holding((p) => p.type === "MUTATION_EXTENDED");
-  if (mut.length) out.push({ id: "mutations", name: "Mutations (OQL is not in effect)", studies: mut, matrix: { kind: "mutations" }, portalFile: "mutations.txt",
+  if (mut.length) out.push({ id: "mutations", name: "Mutations (OQL is not in effect)", studies: mut, matrix: { kind: "mutations" }, portalFile: "mutations.txt", selected: true,
     description: "per sample and gene: its mutations' protein changes, space-separated ([germline] marked); WT when profiled with none; NP when its panel did not cover the gene" });
   const sv = holding((p) => p.type === "STRUCTURAL_VARIANT");
-  if (sv.length) out.push({ id: "sv", name: "Structural Variants (OQL is not in effect)", studies: sv, matrix: { kind: "sv" }, portalFile: "structural_variants.txt",
+  if (sv.length) out.push({ id: "sv", name: "Structural Variants (OQL is not in effect)", studies: sv, matrix: { kind: "sv" }, portalFile: "structural_variants.txt", selected: true,
     description: "per sample and gene: its structural variants' event info, space-separated; NA when it has none; NP when its panel did not cover the gene" });
   const rank = (p: ProfileInfo) => { const i = PROFILE_ORDER.indexOf(p.type); return i < 0 ? PROFILE_ORDER.length : i; };
   const byOrder = (a: ProfileInfo, b: ProfileInfo) => rank(a) - rank(b) || a.order - b.order || a.profile.localeCompare(b.profile);
@@ -69,15 +78,17 @@ export function fileList(catalogs: Record<string, ProfileInfo[]>, studies: strin
   // the portal's cna.txt: each study's selected copy-number profile, its first discrete one, read study by study
   const cnaOf: Record<string, string> = {};
   for (const st of studies) { const p = (catalogs[st] || []).filter(isDiscrete).sort(byOrder)[0]; if (p) cnaOf[st] = p.profile; }
-  if (Object.keys(cnaOf).length) out.push({ id: "cna", name: "Copy-number Alterations (OQL is not in effect)", studies: Object.keys(cnaOf), matrix: { kind: "cna", profiles: cnaOf },
+  if (Object.keys(cnaOf).length) out.unshift({ id: "cna", name: "Copy-number Alterations (OQL is not in effect)", studies: Object.keys(cnaOf), matrix: { kind: "cna", profiles: cnaOf }, selected: true,
     portalFile: "cna.txt", description: "per sample and gene: its value in its study's discrete copy-number profile (" + [...new Set(Object.values(cnaOf))].join(", ") +
       "); NA when none is stored; NP when its panel did not cover the gene" });
   const selected = new Set(Object.values(cnaOf));
   const profiles = new Map<string, ProfileInfo>();
   for (const st of studies) for (const p of catalogs[st] || []) if (inGeneticAlterationDerived(p.type) && !selected.has(p.profile) && !profiles.has(p.profile)) profiles.set(p.profile, p);
-  for (const p of [...profiles.values()].sort(byOrder)) {
+  const isChosen = (p: ProfileInfo) => chosen.includes(p.profile);
+  const listed = [...profiles.values()].sort(byOrder);
+  for (const p of [...chosen.flatMap((c) => listed.filter((x) => x.profile === c)), ...listed.filter((x) => !isChosen(x))]) {
     const discrete = isDiscrete(p);
-    out.push({ id: "profile:" + p.profile, name: p.name || p.profile, studies: holding((x) => x.profile === p.profile), matrix: { kind: "profile", profile: p.profile, discrete },
+    out.push({ id: "profile:" + p.profile, ...(isChosen(p) ? { selected: true as const } : {}), name: p.name || p.profile, studies: holding((x) => x.profile === p.profile), matrix: { kind: "profile", profile: p.profile, discrete },
       portalFile: (p.name || p.profile) + ".txt",
       description: "per sample and gene: its value in " + p.profile + " (" + p.type.toLowerCase().replace(/_/g, " ") + ", " + p.datatype.toLowerCase() + ")" +
         (discrete ? "; NA when none is stored; NP when its panel did not cover the gene" : "; NA when none is stored") });
@@ -126,13 +137,18 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   const size = pageSize(view.rows);
   if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return no("rows (the page size of the case table) is 1 to " + TABLE_ROWS_MAX);
   const q = viewQuery(view);
-  const caseCols = statusColumns("cases", lines);
-  { const bad = checkQuery(q, caseCols); if (bad) return no(bad); }
 
   const { holders, excluded } = rowHolders(ctx);
   if (!holders.length) return no("no study here may disclose patients' samples (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   const catalogs: Record<string, ProfileInfo[]> = {}, profiles: Record<string, string[]> = {};
   await Promise.all(holders.map(async (st) => { const sp = await ctx.studyProfiles(st); catalogs[st] = sp.catalog || []; profiles[st] = sp.profiles; }));
+  // the case table's per-alteration columns: a bare line's commands are the default OQL of the studies' profiles, each study's in id order
+  const defaultCommands = defaultOqlSublabel(holders.flatMap((st) => catalogs[st]
+    .filter((p) => p.type === "MUTATION_EXTENDED" || p.type === "STRUCTURAL_VARIANT" || (p.type === "COPY_NUMBER_ALTERATION" && p.datatype.toUpperCase() === "DISCRETE"))
+    .sort((a, b) => (a.profile < b.profile ? -1 : a.profile > b.profile ? 1 : 0)))).replace(/^: /, "").split(" ").filter(Boolean);
+  const alts = alterationColumns(checked.map((l) => ({ gene: l.gene, specs: parseOql(l.line)[0].specs })), defaultCommands);
+  const caseCols = statusColumns("cases", lines, alts);
+  { const bad = checkQuery(q, caseCols); if (bad) return no(bad); }
   const plans: Record<string, StudyPlan> = {};
   for (const st of holders) {
     const held = heldTypes(catalogs[st]);
@@ -142,7 +158,7 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   }
   const planOf = (st: string) => plans[st];
   const unchecked = checked.filter((l) => l.specs.some((t) => t === "EXP" || t === "PROT")).map((l) => l.line);
-  const offered = fileList(catalogs, holders);
+  const offered = fileList(catalogs, holders, [pins.EXP, pins.PROT].filter((x): x is string => !!x));
   const table = ctx.table == null ? "cases" : ctx.table;
   const known = [...STATUS_TABLES, ...offered.map((f) => f.id)];
   if (!known.includes(table)) return no("table is one of " + known.join(", ") + " (the files these studies offer), or none for the case table");
@@ -150,12 +166,12 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   /** one table's rows (the page or values asked for) and its TableRows */
   const tableRows = async (id: string, tq: TableQuery, n: number): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
     const file = offered.find((f) => f.id === id);
-    const cols = file ? matrixColumns(genes) : statusColumns(id as StatusTable, lines);
-    const defs = cols.map((c) => c.id);
+    const cols = file ? matrixColumns(genes) : statusColumns(id as StatusTable, lines, id === "cases" ? alts : []);
+    const defs = cols.map((c) => c.id).filter((c) => !c.startsWith("alt_"));
     const shown = shownColumns(tq, cols, defs);
     // a gene-by-sample file lists every queried sample, as the portal's: NP in a study without its profile
     const r = await runRows(ctx, "datafiles:" + id, file && !everySample(file.matrix) ? file.studies : holders, tq, defs, shown, n,
-      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db, (p) => file.studies.includes(p.study)) : statusRowSource(id as StatusTable, parts, lines, planOf),
+      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db, (p) => file.studies.includes(p.study)) : statusRowSource(id as StatusTable, parts, lines, planOf, alts),
       ctx.values ? { column: ctx.values, numeric: false } : undefined);
     const lineIds = lineColumns(lines).map((c) => c.id);
     const reads = (x: Record<string, unknown>, c: FileColumn): Cell => {
@@ -165,6 +181,7 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
       if (c.id === "patient") return String(x.patient ?? "");
       if (c.id === "study") return String(x.study ?? "");
       if (c.id === "altered") return x.status === "altered" ? "1" : x.status === "unaltered" ? "0" : "NP";
+      if (c.id.startsWith("alt_")) return String(x["h" + alts.findIndex((a) => a.id === c.id)] ?? "");
       return String(x[(id === "matrix" ? "m" : "c") + lineIds.indexOf(c.id)] ?? "");
     };
     return { r, rows: { columns: cols, shown, defaults: defs, query: tq, rows: rowsOf(r, cols, reads), offset: r.offset, pageSize: n,
@@ -175,18 +192,21 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   const lineIds = lineColumns(lines).map((c) => c.id);
   const lineInfo = lines.map((l, k) => ({ ...l, column: lineIds[k] }));
   const empty = { samples: 0, altered: 0, unaltered: 0, unprofiled: 0 };
+  const file = (perStudy: Record<string, number>) => (f: OfferedFile): DataFile => {
+    const every = everySample(f.matrix), partial = f.studies.length < holders.length;
+    return { id: f.id, name: f.name, description: f.description + (every && partial ? "; NP throughout for a study without it" : ""),
+      group: "data" as const, portalFile: f.portalFile, rows: (every ? holders : f.studies).reduce((n, st) => n + (perStudy[st] || 0), 0),
+      ...(partial ? { studies: f.studies } : {}) };
+  };
+  // the portal's rows: the selected profiles' files, the sample lists, then the other profiles
   const files = (counts: DatafilesResult["counts"], perStudy: Record<string, number>): DataFile[] => [
-    ...offered.map((f) => {
-      const every = everySample(f.matrix), partial = f.studies.length < holders.length;
-      return { id: f.id, name: f.name, description: f.description + (every && partial ? "; NP throughout for a study without it" : ""),
-        group: "data" as const, portalFile: f.portalFile, rows: (every ? holders : f.studies).reduce((n, st) => n + (perStudy[st] || 0), 0),
-        ...(partial ? { studies: f.studies } : {}) };
-    }),
+    ...offered.filter((f) => f.selected).map(file(perStudy)),
     { id: "altered", name: "Altered samples", group: "list", rows: counts.altered, description: "the samples the query alters (any line), one per row" },
     { id: "unaltered", name: "Unaltered samples", group: "list", rows: counts.unaltered,
       description: "the samples no line alters that were profiled for every queried gene in every data type the query reads, one per row" },
     { id: "matrix", name: "Sample matrix: every sample, 1 = altered, 0 = unaltered, NP = not profiled", group: "list", rows: counts.samples,
       description: "per sample: whether the query alters it, and per line whether that line does" },
+    ...offered.filter((f) => !f.selected).map(file(perStudy)),
   ];
 
   try {

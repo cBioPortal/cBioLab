@@ -19,7 +19,7 @@ export function geneTableTitle(kind: GeneTableKind, profiled: number | undefined
 }
 
 /** the profile kinds a table's count is read from, the first that is not 0 winning */
-const PROFILE_KINDS: Record<GeneTableKind, string[]> = {
+export const PROFILE_KINDS: Record<GeneTableKind, string[]> = {
   mutated: ["mutations"],
   sv: ["fusion", "structural_variants"],
   cna: ["cna", "gistic", "cna_rae", "cna_consensus"]
@@ -156,9 +156,9 @@ export function panelNote(panel: string, genes: string[]): string | null {
 }
 
 /** the filter checking genes makes: union, one clause of a line per gene; intersection, a clause per gene */
-export function geneSelection(lines: string[], op: "union" | "intersection"): { kind: "oql"; q: string }[] {
+export function geneSelection(lines: string[], op: "union" | "intersection", chart: GeneTableKind): { kind: "oql"; q: string; chart: GeneTableKind }[] {
   if (!lines.length) return [];
-  return op === "union" ? [{ kind: "oql", q: lines.join("; ") }] : lines.map((q) => ({ kind: "oql", q }));
+  return op === "union" ? [{ kind: "oql", q: lines.join("; "), chart }] : lines.map((q) => ({ kind: "oql", q, chart }));
 }
 
 /** which of the table's lines the selection already filters on, in the filter's order */
@@ -236,4 +236,15 @@ export function withQValues(kind: GeneTableKind, rows: GeneTableRow[], mutsig: M
     const q = kind === "mutated" ? mutsig.get(r.gene) : gistic.get(r.gene + "|" + r.cna);
     return q == null ? r : { ...r, qValue: q };
   });
+}
+
+/**
+ * The draft without a gene table's own filter, as the portal resets a chart's filter when it is taken
+ * off the page (STV-STM-3): the OQL clauses that table wrote, which carry its name (`chart`). Typed
+ * OQL and a Gene status chart's clauses, the same text without the name, stay.
+ */
+export function withoutGeneTableClauses(all: unknown[], kind: GeneTableKind): unknown[] {
+  const mine = (c: unknown) => { const l = c as { kind?: string; chart?: unknown } | null;
+    return !!l && l.kind === "oql" && l.chart === kind; };
+  return all.filter((c) => !mine(c));
 }

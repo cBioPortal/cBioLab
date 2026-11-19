@@ -13,7 +13,7 @@ import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { ViewPageBody, TableBody } from "../../lib/api-schemas.ts";
 import { ChevronLeft, ChevronRight, Columns3, Copy, Download, X } from "lucide-react";
 import { copyText } from "./copy-text.ts";
-import { cutShort } from "../../lib/table-tsv.ts";
+import { copyTableKey, cutShort } from "../../lib/table-tsv.ts";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
@@ -30,7 +30,7 @@ const CHIP_X = "size-4 text-muted-foreground [&_svg:not([class*='size-'])]:size-
 
 const OP_LABELS: Record<TextFilterOp, string> = {
   contains: "contains", notContains: "does not contain", equals: "equals", notEquals: "does not equal",
-  startsWith: "begins with", endsWith: "ends with", regex: "matches regex",
+  startsWith: "begins with", notStartsWith: "does not begin with", endsWith: "ends with", notEndsWith: "does not end with", regex: "matches regex",
 };
 
 /** The query with nothing set dropped, so a cleared control leaves the spec as it was. */
@@ -412,13 +412,15 @@ export interface DataTableProps<V> {
   plain?: boolean;
   /** the rows are one cohort's: no cohort column, the study column alone when there are several studies */
   oneCohort?: boolean;
+  /** the study column's header (a page that names it as the portal does: "Cancer Study") */
+  studyHead?: string;
   /** the download: CSV of the rows kept (default), or the portal's table.tsv of every row in the current sort (the Mutations table's) */
   downloadFormat?: "csv" | "table-tsv";
   /** the download button in place of the CSV one: its label, tooltip and action */
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, pager = "pages", downloadFormat = "csv" }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, studyHead = "study", download: ownDownload, pager = "pages", downloadFormat = "csv" }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -468,9 +470,12 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   // the portal's Copy, in its two steps: a first click fetches the table.tsv text ("Copy Ready!"), a second copies
   // it within that click, which the browser's clipboard needs (a copy after a long fetch is refused)
   const [copyState, setCopyState] = useState<{ phase: "idle" } | { phase: "loading" } | { phase: "ready"; text: string } | { phase: "done" } | { phase: "failed"; why: string }>({ phase: "idle" });
-  // a fetch still running when the table changes (a sort, a filter) answers for the old table: its generation tells
+  // a fetch still running when the table changes (its document: a sort, a filter, a gene, a cohort, a driver
+  // setting; or its rows) answers for the old table: its generation tells. The same table answered again (a
+  // re-render, a page turn) keeps what was fetched.
   const copyGen = useRef(0);
-  useEffect(() => { copyGen.current++; setCopyState({ phase: "idle" }); }, [t]);
+  const copyKey = copyTableKey(t, { doc: docJson ? docJson() : "", view: vi, ...(table ? { table } : {}) });
+  useEffect(() => { copyGen.current++; setCopyState({ phase: "idle" }); }, [copyKey]);
   const fetchCopy = async () => {
     const g = ++copyGen.current;
     setCopyState({ phase: "loading" });
@@ -553,7 +558,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
           <table className="pb-table dt-table">
             <thead ref={head}><tr>
               {multi && !oneCohort && <th>cohort</th>}
-              {studyCol && <th>study</th>}
+              {studyCol && <th>{studyHead}</th>}
               {shownIdx.map((i) => {
                 const c = t.columns[i];
                 const sorted = q.sort && q.sort.column === c.id;

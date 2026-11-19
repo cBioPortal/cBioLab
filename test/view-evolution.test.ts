@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
 import { heatmapTsv, HEATMAP_FILE } from "../lib/views/evolution/download.ts";
-import { evolutionSvg, lineCells, cellText, portalCellTip, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { evolutionSvg, lineCells, cellText, portalCellTip, heatmapColumns, onlySelected, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
@@ -217,7 +217,7 @@ describe("evolution: the patient drawn", () => {
     const w = await run({ chart: "heatmap", logScale: true, dataRange: true }, one(study({ muts: [MUTS[2]] })));
     assert.deepEqual(evo(w).drawn, []);
     assert.equal(evo(w).noVaf, 1);
-    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false, transpose: false, cluster: true, mutationLabels: true, groupBy: null });
+    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false, transpose: false, cluster: true, mutationLabels: true, groupBy: null, showTimeline: false });
     assert.match(w.caveat!, /The heatmap has .*; it colours each sample's VAF/);
   });
 
@@ -1042,6 +1042,45 @@ describe("PTB-GE-LC-6: portalCellTip, the portal's Genomic Evolution tooltip", (
   for (const [name, c, want] of cases) test(name, () => assert.equal(tip(c), want));
 });
 
+describe("evolution: the heatmap's zoom (PTB-GE-HM-1, the portal's horizontal zoom: 20 px cells at 1)", () => {
+  const colWidths = (svg: string | null) => [...(svg || "").matchAll(/<g class="evo-row"[^>]*><rect [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1]));
+  test("unzoomed, the columns fit the card; zoomed, zoom × 20 px, never under the floor; a zoomed figure wider than the card keeps its width", async () => {
+    assert.equal(HEAT_CELL, 20);
+    const v = await run({ chart: "heatmap" }, one());
+    const cols = heatmapColumns(v as never, 800);
+    assert.deepEqual(cols, { fit: 20, floor: 12 }, "two mutations fit at the portal's 20 px; labelled, a column is at least a label's line high");
+    assert.deepEqual(colWidths(evolutionSvg(v as never, { width: 800 })), [20, 20]);
+    assert.deepEqual(colWidths(evolutionSvg(v as never, { width: 800, zoom: 0.7 })), [14, 14]);
+    assert.deepEqual(colWidths(evolutionSvg(v as never, { width: 800, zoom: 0.1 })), [12, 12], "not under the floor");
+    const wide = evolutionSvg(v as never, { width: 420, zoom: 30 })!;
+    assert.deepEqual(colWidths(wide), [600, 600]);
+    assert.match(wide, /min-width:\d+px/, "wider than the card: drawn at its width, the card scrolls");
+    assert.doesNotMatch(evolutionSvg(v as never, { width: 800 })!, /min-width/);
+    const t = await run({ chart: "heatmap", transpose: true }, one());
+    assert.equal(heatmapColumns(t as never, 800).floor, 14, "transposed, a column holds a sample's marker");
+    const rows = [...evolutionSvg(t as never, { width: 800, zoom: 1.5 })!.matchAll(/<g data-s="\d+"><title>[^<]*<\/title><rect [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1]));
+    assert.ok(rows.length > 0 && rows.every((w) => w === 29), "transposed, a sample's column is zoom × 20 px less the 1 px gap: " + rows);
+  });
+});
+
+describe("evolution: Show only selected mutations (PTB-GE-LC-2, the portal's VAFChartControls)", () => {
+  const keys = (svg: string | null) => [...(svg || "").matchAll(/class="evo-line" data-key="([^"]*)"/g)].map((m) => m[1].split("|").slice(0, 2).join(" "));
+  test("only the picked mutations are drawn; none picked, none drawn; the data range follows them", async () => {
+    const v = await run({ dataRange: true }, one());
+    const all = evo(v).drawn!, n = all.length;
+    const egfr = all.find((m) => m.gene === "EGFR")!.key, tp53 = all.find((m) => m.gene === "TP53")!.key;
+    assert.deepEqual(keys(evolutionSvg(v as never, { width: 800 })).sort(), ["EGFR L858R", "TP53 R273H"], "KRAS has no VAF to draw a line through");
+    const one1 = onlySelected(v as never, new Set([egfr]));
+    assert.deepEqual(keys(evolutionSvg(one1, { width: 800 })), ["EGFR L858R"]);
+    assert.deepEqual(keys(evolutionSvg(onlySelected(v as never, new Set([egfr, tp53])), { width: 800 })).sort(), ["EGFR L858R", "TP53 R273H"]);
+    assert.equal(evolutionSvg(onlySelected(v as never, new Set()), { width: 800 }), null, "an empty selection plots nothing");
+    assert.equal(evo(v).drawn!.length, n, "the result itself is left as it was");
+    const ticks = (svg: string | null) => [...(svg || "").matchAll(/>(0\.\d+)</g)].map((m) => Number(m[1]));
+    assert.ok(Math.max(...ticks(evolutionSvg(one1, { width: 800 }))) < Math.max(...ticks(evolutionSvg(v as never, { width: 800 }))),
+      "EGFR's VAFs (to 0.40) set the y range, not TP53's 0.50: " + ticks(evolutionSvg(one1, { width: 800 })) + " vs " + ticks(evolutionSvg(v as never, { width: 800 })));
+  });
+});
+
 describe("evolution: the heatmap's Data download (PTB-GE-HM-1, the portal's getDownloadData)", () => {
   const S = [{ id: "T1" }, { id: "T2" }, { id: "T3" }] as never[];
   const c = (status: string, vaf: number | null) => ({ status, vaf, alt: null, ref: null });
@@ -1062,5 +1101,32 @@ describe("evolution: the heatmap's Data download (PTB-GE-HM-1, the portal's getD
   test("an unrounded VAF is written as it is, as the portal writes its number", () => {
     const one = [{ key: "x", gene: "IDH1", proteinChange: "R132H", mutationType: "", cells: [{ status: "called", vaf: 0.6923, alt: 45, ref: 20 }] }] as never[];
     assert.equal(heatmapTsv(one, [{ id: "T1" }] as never[], false).split("\n")[1], "T1\tIDH1\tR132H\t0.6923076923076923", "45 / 65 from the reads, not the cell's 4 places");
+  });
+});
+
+describe("evolution: Show Timeline (PTB-GE-LC-1, the portal's genomicEvolutionSettings.showTimeline)", () => {
+  const ys = (svg: string, text: string) => [...svg.matchAll(new RegExp('<text x="([\\d.]+)"[^>]*>' + text + "</text>", "g"))].map((m) => Number(m[1]));
+  test("off by default; on, the line chart carries the patient's timeline, offered only with events, never on the heatmap", async () => {
+    const off = evo(await run({}, one()));
+    assert.equal(off.events, 3); assert.equal(off.timeline, undefined); assert.equal(off.display.showTimeline, false);
+    const on = evo(await run({ showTimeline: true }, one()));
+    assert.equal(on.display.showTimeline, true);
+    assert.deepEqual(on.timeline?.events.map((e) => e.start), [0, 300, 700]);
+    assert.equal(evo(await run({ showTimeline: true, chart: "heatmap" }, one())).timeline, undefined, "the heatmap has no timeline");
+    const none = evo(await run({ showTimeline: true, sequential: true }, one(study(), {}, { events: [] })));
+    assert.equal(none.events, 0); assert.equal(none.timeline, undefined, "no events, no timeline");
+    assert.equal((await run({ showTimeline: "yes" } as never, one())).error, "showTimeline is true or false");
+  });
+  test("drawn above the chart, the chart's time axis on the timeline's: each year's tick at the same x in both", async () => {
+    const v = await run({ showTimeline: true }, one());
+    const svg = evolutionSvg(v as never, { width: 900, theme: "light" })!;
+    assert.match(svg, />Specimen</, "the timeline's track");
+    const year = ys(svg, "1y");
+    assert.equal(year.length, 2, "the timeline's axis and the chart's: " + year);
+    assert.equal(year[0], year[1]);
+    const plain = evolutionSvg(await run({}, one()) as never, { width: 900, theme: "light" })!;
+    assert.doesNotMatch(plain, />Specimen</);
+    assert.notEqual(ys(plain, "1y")[0], year[1], "unaligned, the chart's own margin puts the year elsewhere");
+    assert.deepEqual(lintSvg(svg), [], "nothing overprinted or outside");
   });
 });

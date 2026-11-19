@@ -75,7 +75,7 @@ The spec's reference query adds `rna_seq_v2_mrna_median_Zscores` (525 altered); 
 | Q5 `KRAS: AMP MUT=G12D` | STM-2, MD-1 | 63 · 11% | 63 / 594 · 10.6% | 🟡 count ✅ |
 | Q5 TP53 | STM-2 | 315 · 53% | 315 · 53.0% | 🟡 |
 | Q1 case table, first rows | 3.4 | TCGA-3L-AA1B-01: — / G12D(Driver) / L597V(Driver) / — / R1450*(Driver), R876*(Driver) | — / G12D / L597V / — / R1450*, R876* | 🟡 same calls, no driver tag |
-| Q5 case table TCGA-5M-AATE-01 TP53 (Q1) | 3.4 | S127T(Driver), HOMDEL(Driver) | S127T, HOMDEL | 🟡 |
+| Q5 case table TCGA-5M-AATE-01 TP53 (Q1) | 3.4 | S127T(Driver), HOMDEL(Driver) | S127T (driver), HOMDEL (driver) | ✅ |
 | Q1 file rows | STM-4 | all 594 samples | 594 rows per file | ✅ |
 
 Data version: every count identical.
@@ -100,8 +100,8 @@ Data version: every count identical.
 | RDL-1.1 | ✅ | B | "Copy-number Alterations (OQL is not in effect)" → `cna.txt` / `cna_transposed.txt`, each study's own selected (first) discrete copy-number profile; every queried sample, NP throughout for a study without one |
 | RDL-1.2 | ✅ | B | "Mutations (OQL is not in effect)"; Tab Delimited → `mutations.txt`, Transposed → `mutations_transposed.txt` (coadread KRAS + TP53: 594 rows, "G12D", WT, NP); every queried sample, NP throughout for a study without a mutation profile |
 | RDL-1.3 | 🟡 | BC | "Structural Variants (OQL is not in effect)" → `structural_variants.txt` / `_transposed.txt`, events space-separated ✅; shown when the study holds an SV profile, not when any SV exists |
-| RDL-1.4 | 🟡 | B | Every mRNA profile offered by name; no "selected in the query" row (the query's mRNA choice does not change the list) |
-| RDL-1.5 | 🟡 | B | Same for protein |
+| RDL-1.4 | ✅ | B | Every mRNA profile offered by name; the one the query selected for EXP listed right after Structural Variants, before the lists, as the portal's selected row (#437) |
+| RDL-1.5 | ✅ | B | Same for protein (PROT) (#437) |
 | RDL-1.6 | 🟡 | B | "Altered samples" 485 rows: CSV, Copy, Open as cohort; no Download as `altered_samples.txt`, Query, Virtual Study |
 | RDL-1.7 | 🟡 | B | "Unaltered samples" 55 rows (see STM-1); same actions |
 | RDL-1.8 | 🟡 | B | "Sample matrix: … 1 = altered, 0 = unaltered, NP = not profiled": CSV only, no Copy |
@@ -120,16 +120,16 @@ Data version: every count identical.
 | RDL-2.3 | ✅ | C | Re-measured 2026-11-18 (was 🟡): a line nobody was profiled for reads "Not Profiled" in both columns, "N/P" in the file (`datafiles.tsx:170-171`, `frequency.ts` `frequencyTsv`) |
 | RDL-2.4 | ✅ | BC | Re-measured 2026-11-18 (was 🔶): a 200 px grey bar filled light green + getPercentage's text (`FrequencyBar`, `datafiles.tsx:27`); Q1 APC 396 67%, TP53 315 53%, KRAS 222 37%, BRAF 64 11%, NRAS 38 6% on both sides |
 | RDL-2.5 | ✅ | C | Re-measured 2026-11-18 (was 🔶): the file's Percent Samples Altered is `percentAltered`'s string (`portalPercentAltered`, `frequency.ts` `frequencyTsv`), "N/P" when unprofiled; the file has the portal's four columns |
-| RDL-2.6 | 🟡 | BC | Re-measured 2026-11-18 (was 🔶): Percent desc by altered/profiled ✅, header sorts ✅, 10 a page ✅, filter on gene (and line while shown) ✅, `gene_alteration_frequency.tsv` ✅ (Q1 order APC, TP53, KRAS, BRAF, NRAS as the portal); no "Columns" menu (an OQL Line toggle instead), no Copy |
+| RDL-2.6 | ✅ | BC | Percent desc by altered/profiled ✅, header sorts ✅, 10 a page ✅, filter on gene (and line while shown) ✅, `gene_alteration_frequency.tsv` ✅ (Q1 order APC, TP53, KRAS, BRAF, NRAS as the portal); a Columns menu (OQL Line hidden at first; ours adds Profiled) and Copy of the file's text (#442) |
 
 ### §3 Type of Genetic Alterations Across All Samples
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| RDL-3.1 | 🟡 | B | Study ID, Sample ID, Patient ID, Altered ✅; Altered 1 / 0 with tooltip "1 = Sample harbors alteration in one of the input genes" ✅, NP for a sample not profiled for every gene and type (the portal writes 0; invariant 7); no study / sample / patient links |
+| RDL-3.1 | ✅ | B | Study ID, Sample ID, Patient ID, Altered ✅; Altered 1 / 0 with tooltip "1 = Sample harbors alteration in one of the input genes" ✅, NP for a sample not profiled for every gene and type (the portal writes 0; invariant 7); the IDs link to the study summary, sample and patient pages in a new tab (#435) |
 | RDL-3.2 | 🟡 | B | One column per line; header = gene for a bare gene ✅, the OQL text for others ("KRAS: AMP MUT=G12D", legacy same without ";") ✅; merged tracks impossible (refused) |
-| RDL-3.3 | ❌ | C | No hidden per-alteration columns |
-| RDL-3.4 | 🟡 | B | Calls joined ", " ✅ incl. CNA ("S127T, HOMDEL") ✅; "no alteration"/"not profiled" ✅; no "(Driver)", no Germline badge |
+| RDL-3.3 | ✅ | C | Hidden per-alteration columns "<gene>: <command>", a bare line's from the default OQL, a later line's first; each the gene's calls of that kind, "not profiled" off the panel; AMP and HOMDEL both copy number, as legacy (`tables.ts` `alterationColumns`) (#435) |
+| RDL-3.4 | ✅ | B | Calls joined ", " incl. CNA; each followed by " [germline]" / " (driver)" as the portal writes a cell's text (Q1 TCGA-5M-AATE-01 TP53 "S127T (driver), HOMDEL (driver)"), drivers by the page's settings; "no alteration"/"not profiled" ✅; text, not the styled badge (#431) |
 | RDL-3.5 | 🟡 | B | Altered first ✅; 20 per page ✅; search, columns menu, CSV download (`/api/table`) always on, not `alterations_across_samples.tsv` |
 | RDL-3.6 | 🐞 ok | C | Regex filters validated (`table-query.ts:120`): bad input is refused, not thrown |
 

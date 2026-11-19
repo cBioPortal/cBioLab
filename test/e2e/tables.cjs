@@ -92,17 +92,26 @@ async function tables({ browser, ok, BASE }) {
       // Copy (MUT-TB-2): before the download, in two clicks, the same text as table.tsv on the clipboard, every row whatever the filter
       await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(BASE).origin });
       // the portal's two steps: the first click fetches every row ("Copy Ready!"), the second copies within its own click
-      await page.getByRole("button", { name: "Copy", exact: true }).first().click();
-      const ready = await page.getByRole("button", { name: "Copy Ready!" }).first().waitFor({ timeout: 60000 }).then(() => true, () => false);
-      ok("table: a first Copy click fetches the rows and offers \"Copy Ready!\"", ready);
+      // the table settles first (no "updating…"), so the click lands on the table the copy is for
+      await page.getByText("updating…").first().waitFor({ state: "hidden", timeout: 60000 }).catch(() => {});
+      const copyButton = page.getByRole("button", { name: /^Copy( Ready!|ing…)?$/ }).first();
+      const copyLabel = async () => ((await copyButton.innerText().catch(() => "")) || "").trim();
+      const statusText = async () => ((await page.getByRole("status").allInnerTexts().catch(() => [])) || []).join(" | ");
+      let ready = false;
+      for (let attempt = 0; attempt < 2 && !ready; attempt++) {
+        if (await copyLabel() === "Copy") await copyButton.click();
+        ready = await page.getByRole("button", { name: "Copy Ready!" }).first().waitFor({ timeout: 60000 }).then(() => true, () => false);
+      }
+      ok("table: a first Copy click fetches the rows and offers \"Copy Ready!\"", ready, ready ? "" : "button \"" + (await copyLabel()) + "\" · status " + JSON.stringify(await statusText()));
       if (ready) await page.getByRole("button", { name: "Copy Ready!" }).first().click();
       const copied = await page.getByRole("status").filter({ hasText: "Copied!" }).first().waitFor({ timeout: 60000 }).then(() => true, () => false);
+      const copyStatus = copied ? "" : " · status " + JSON.stringify(await statusText());
       const clip = copied ? await page.evaluate(() => navigator.clipboard.readText()) : "";
       const clipLines = clip.split(/\r?\n/);
       if (clipLines[clipLines.length - 1] === "") clipLines.pop();
       const same = clip === tsv;
       ok("table: Copy puts the table.tsv's text on the clipboard and says \"Copied!\"", copied && same,
-        (copied ? "Copied!" : "no Copied! status") + " · " + (same ? "identical to table.tsv" : (clipLines.length - 1) + " rows vs " + (lines.length - 1) + ", header " + (clipLines[0] === lines[0] ? "same" : JSON.stringify((clipLines[0] || "").slice(0, 60)))));
+        (copied ? "Copied!" : "no Copied! status" + copyStatus) + " · " + (same ? "identical to table.tsv" : (clipLines.length - 1) + " rows vs " + (lines.length - 1) + ", header " + (clipLines[0] === lines[0] ? "same" : JSON.stringify((clipLines[0] || "").slice(0, 60)))));
       // the Columns menu (MUT-TB-5, MUT-STM-15): the portal's two tabs, each "selected / total"; the Clinical tab lists
       // Name | Freq (the share of the queried samples with a value), sorted by Freq descending
       {

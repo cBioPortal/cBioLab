@@ -244,15 +244,8 @@ pre {
 /* Studies and data types are dense multi-column rows (see .sbrow/.dtrow's own
    grid-template-columns) that read as cramped at one tile's width. */
 .facetgrid > .card.wide { grid-column: span 2; }
-/* Explore's reading order: what the selection is (cancer type, then detailed), then what is altered
-   in it, then everything else; the two derived charts (survival, mutation count vs FGA) come after
-   the attribute tiles. Set here rather than by the order the page builds them in. */
-.facetgrid > [data-attr$="|CANCER_TYPE"] { order: -30; }
-.facetgrid > [data-attr$="|CANCER_TYPE_DETAILED"] { order: -29; }
-.facetgrid > [data-genetable="mutated"] { order: -20; }
-.facetgrid > [data-genetable="cna"] { order: -19; }
-.facetgrid > [data-genetable="sv"] { order: -18; }
-.facetgrid > .xc-card { order: 10; }
+/* Explore's card order is the portal's priorities (cardOrders, lib/study-view-config.ts), set by
+   app/lab/page.tsx as a style per card rather than by the order the page builds them in */
 @media (max-width: 620px) { .facetgrid > .card.wide { grid-column: span 1; } }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
@@ -585,6 +578,9 @@ main.analysis-main { max-width: min(132rem, 100%); }
   /* every value is present; the list scrolls rather than being trimmed */
   max-height: var(--vallist-h); overflow-y: auto; overscroll-behavior: contain;
 }
+/* checkbox · name · a second count in place of the bar · count · share */
+.vallist.withextra { --valrow-cols: calc(0.75rem + 2px) 1fr minmax(2.5rem, auto) minmax(2.5rem, auto) 3.25rem; }
+.vallist.withextra .valhead > span:nth-child(3) { text-align: right; }
 .vlistfoot { display: block; margin-top: var(--s1); }
 .valrow {
   /* name · a thin proportion rule · count · share — the bar is a hint at
@@ -692,6 +688,12 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .row.baseline { align-items: baseline; }
 .row.g5 { gap: 0.5rem; }
 .facettitle { font-size: var(--t-md); font-weight: 600; }
+/* a chart's title as the portal's (STS-HD-1): one line, centred, a long one cut with an ellipsis
+   (the whole of it is in the tooltip); padded on both sides alike so the chart menu, placed over
+   the card's corner, neither covers it nor pulls it off centre */
+.facetgrid > .card > .facettitle { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 1.75rem; }
+/* what the chart counts, on a line of its own under the title, so a long title never hides it */
+.facetgrid > .card > .facettitle > .meta { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- view-card tables (app/lab/kinds/<kind>.tsx) ---------------- */
 .vscroll { overflow-x: auto; }

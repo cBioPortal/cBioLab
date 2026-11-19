@@ -153,8 +153,8 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 | ONC-VI-1 | ✅ | B | "columns: patients/samples", default patient; in `?changes=` |
 | ONC-VI-2 | ✅ | B | "show unaltered patients" |
 | ONC-VI-3 | ✅ | BC | "whitespace between cells"; pad drawn only once a column is ≥6 px (legacy auto-off <2 px) |
-| ONC-VI-4 | 🟡 | C | Unchanged: engine has `display.clinicalLegends: all|none` (`oncoprint-assemble.ts:112`); no UI toggle in Display |
-| ONC-VI-5 | ❌ | C | Unchanged: no "only altered" legend option |
+| ONC-VI-4 | ✅ | C | Display › "show legends for clinical tracks", on by default; off drops the clinical keys, never the gene legend or a heatmap's (`display.clinicalLegends`, `OncoprintFigure.tsx` Legend, `oncoprint-svg.ts`) (#444) |
+| ONC-VI-5 | ✅ | C | Display › "only show clinical track legends for altered patients / samples", disabled while VI-4 is off; each key over the columns some gene row alters (`alteredColumns`, the portal's altered_uids) (#444) |
 | ONC-VI-6 | ✅ | BC | A row's OQL line in grey after its gene; Display › show OQL filters always offered, on by default only with OQL (`oncoprint.ts:523`); a single-gene row without OQL shows the default line, buildDefaultOQLProfile over the study's profiles in id order (`oql-match.ts:144`, `oncoprint.ts:453`, `oncoprint-assemble.ts:752`): coadread ": AMP HOMDEL MUT FUSION"; none on merged rows (#380) |
 | ONC-VI-7 | ✅ | BC | "white background (for print)" + legend caution |
 
@@ -194,11 +194,11 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 | ID | verdict | how | note |
 |---|---|---|---|
 | ONC-GL-1 | ✅ | C | `styleForDisplay` colour-by-type off → one green pair "Mutation"; annotate none → one colour per glyph |
-| ONC-GL-2 | 🟡 | C | Unchanged: Translation_Start_Site → Other (legacy Truncating) (`oncoprint-assemble.ts:28-37`) |
+| ONC-GL-2 | ✅ | C | A mutation's class as getOncoprintMutationType: "Promoter" change → promoter; listed missense / in-frame / splice keep theirs, unlisted → other; every other listed type (nonsense, frameshift, Translation_Start_Site, nonstop, Fusion) → Truncating (`oncoprint-assemble.ts` `mutClassBit`, oql-match `mutationClass`); msk_impact_2017 B2M no Other (#436) |
 | ONC-GL-3 | ✅ | C | One glyph per layer, legacy priority, driver before VUS; no per-count tiebreak, no germline stripe |
 | ONC-GL-4 | ✅ | C | MUT, AMP/HOMDEL (±2 only), FUSION drawn; a line's EXP / PROT as mRNA / protein high and low in the cells |
 | ONC-GL-5 | ✅ | BC | OncoKB, Cancer Hotspots (on by default) and the study's custom calls (#168, #211) |
-| ONC-GL-6 | 🟡 | B | Unchanged: lists only present glyphs; "Not profiled" always listed; no "No alterations" entry (legacy Q1 lists it) |
+| ONC-GL-6 | ✅ | B | Lists only present glyphs; then "No alterations" whenever a gene row is drawn and "Not profiled" only when one is not, last in that order (`geneLegend`, `glyphPresence`); coadread KRAS TP53 no Not profiled, msk_impact_2017 with NEGR1 both (#451) |
 
 Glyph table (colours, bands, z-order) matches legacy exactly for every row present; GAIN/HETLOSS and Germline rows are absent (see OQL coverage / germline gaps).
 

@@ -313,7 +313,8 @@ async function explore({ ok, BASE, page, browser }) {
     const counted = Number((await egfr.locator(".gnum").nth(1).innerText()).replace(/,/g, ""));
     await egfr.locator("[role=checkbox], input[type=checkbox]").first().click();
     await table.getByRole("button", { name: "Apply filter" }).click();
-    await page.waitForFunction(() => /EGFR: MUT_DRIVER/.test(document.querySelector(".exbar")?.textContent || "") &&
+    // the gene's pill, its OQL line in the tooltip (STV-FB-3 #9)
+    await page.waitForFunction(() => !!document.querySelector('.exbar [data-gene-pills] [data-tip="EGFR: MUT_DRIVER"]') &&
       /[\d,]+ patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
     const matched = Number((/([\d,]+) patients match/.exec(await page.locator(".exbar").innerText()) || [])[1]?.replace(/,/g, ""));
     drv = JSON.stringify({ before: before.slice(0, 5), after: after.slice(0, 5), url, counted, matched });
@@ -503,12 +504,18 @@ async function explore({ ok, BASE, page, browser }) {
     await card.locator(".dtrow", { has: page.locator(".gname", { hasText: /^mutations$/ }) }).first().click();
     const op = (await card.locator(".pickbar").innerText()).replace(/\s+/g, " ");
     await card.getByRole("button", { name: "Clear" }).click();
-    const ev = page.locator(".card", { has: page.locator("h2", { hasText: "Timeline events" }) });
+    // Timeline Events Availability is offered in Add chart, not shown by default (STS-OT-7)
+    const ev = page.locator("[data-special=events]");
+    const hiddenFirst = (await ev.count()) === 0;
+    await page.getByRole("button", { name: /Add chart/ }).first().click();
+    await page.getByRole("checkbox", { name: "chart Timeline Events Availability" }).click();
+    await page.keyboard.press("Escape");
+    await ev.locator(".valrow").first().waitFor({ timeout: 120000 });
     const evText = (await ev.innerText()).replace(/\s+/g, " ");
-    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, evText: evText.slice(0, 120) });
-    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && /\d+(\.\d)?%/.test(evText);
+    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, hiddenFirst, evText: evText.slice(0, 120) });
+    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && hiddenFirst && /\d+(\.\d)?%/.test(evText);
   } catch (e) { dtDetail = String(e.message).split("\n")[0]; }
-  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events their Freq", dtOk, dtDetail);
+  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events, added from Add chart, their Freq", dtOk, dtDetail);
 
   // Value lists as the portal's tables (STS-TBL-1…5): a # / Freq header; a list that scrolls has a
   // search box and Select all / Deselect all over the rows it shows; the rows the filter holds come first
@@ -539,12 +546,17 @@ async function explore({ ok, BASE, page, browser }) {
     }).length);
     await c2.getByRole("button", { name: "Select all" }).click();
     const checked = Number(((await c2.locator(".pickbar").innerText()).match(/(\d+) checked/) || [])[1]);
+    // Compare groups takes every value whatever is checked, as the portal's (STS-HD-7)
+    await c2.locator(".chartgear").click();
+    const menu = await page.getByRole("menuitem").allInnerTexts();
+    await page.keyboard.press("Escape");
+    const compareAll = menu.some((m) => /^Compare (top \d+ )?groups$/.test(m.trim())) && !menu.some((m) => /checked groups/.test(m));
     await c2.getByRole("button", { name: "Deselect all" }).click();
     const cleared = await c2.locator(".pickbar").count();
-    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checkable, checked, cleared });
-    vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0;
+    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checkable, checked, cleared, compareAll });
+    vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0 && compareAll;
   } catch (e) { vlDetail = String(e.message).split("\n")[0]; }
-  ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first", vlOk, vlDetail);
+  ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first; Compare takes every value", vlOk, vlDetail);
 
   // a histogram as the portal's bar chart (STS-BAR-2/3/5): a y axis of integer counts, and a drag
   // across bars selects them, the rest greyed; a click on a bar still adds it
@@ -569,6 +581,116 @@ async function explore({ ok, BASE, page, browser }) {
     barOk = yTicks.length >= 2 && yTicks.every((t) => /^[\d,]+$/.test(t)) && /^0011100*$/.test(states) && !!filters;
   } catch (e) { barDetail = String(e.message).split("\n")[0]; }
   ok("explore: a histogram has an integer y axis, and a drag across bars selects them, the others greyed", barOk, barDetail);
+
+  // Add chart's X vs Y tab (STV-AC-7): the portal's button for each kind of pair, and a density per
+  // numeric pair, drawn beside the default Mutation Count vs FGA chart (STS-SC-1)
+  let xyDetail = "", xyOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.locator("[data-chart=mutcount-fga] svg.xc-density").waitFor({ timeout: 240000 });
+    await page.getByRole("button", { name: /Add chart/ }).first().click();
+    await page.getByRole("tab", { name: "X vs Y" }).click();
+    const pick = async (which, name) => { await page.getByRole("combobox", { name: which }).click(); await page.getByRole("option", { name, exact: true }).click(); };
+    const button = async () => (await page.locator(".addchart button", { hasText: /Add|Please|chart with|categorical|violin/ }).last().innerText()).trim();
+    await pick("Select first clinical attribute", "Diagnosis Age"); await pick("Select second clinical attribute", "Sex");
+    const mixed = await button();
+    await pick("Select second clinical attribute", "Mutation Count");
+    const numeric = await button();
+    await page.locator(".addchart button", { hasText: "Add density plot" }).click();
+    await page.keyboard.press("Escape");
+    const card = page.locator("[data-chart=xvsy]");
+    await card.locator("svg.xc-density").waitFor({ timeout: 240000 });
+    const title = (await card.locator(".xc-title").innerText()).trim();
+    const both = await page.locator("[data-chart=mutcount-fga]").count();
+    // a drag on the added chart filters on both its attributes; Remove chart takes the chart and those filters
+    const fig = card.locator("svg.xc-density");
+    await card.scrollIntoViewIfNeeded();
+    const bb = await fig.boundingBox();
+    await page.mouse.move(bb.x + bb.width * 0.25, bb.y + bb.height * 0.3); await page.mouse.down();
+    await page.mouse.move(bb.x + bb.width * 0.6, bb.y + bb.height * 0.8, { steps: 10 }); await page.mouse.up();
+    await page.waitForFunction(() => /Diagnosis Age/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    const dragged = (await page.locator(".svpills").innerText()).replace(/\s+/g, " ");
+    await card.getByRole("button", { name: /actions for/ }).click();
+    await page.getByRole("menuitem", { name: "Remove chart" }).click();
+    await page.waitForFunction(() => !/Diagnosis Age|Mutation Count/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    const removed = await page.locator("[data-chart=xvsy]").count();
+    xyDetail = JSON.stringify({ mixed, numeric, title, both, dragged: dragged.slice(0, 120), removed });
+    xyOk = mixed === "Add violin/box plot table" && numeric === "Add density plot" && title === "Mutation Count vs Diagnosis Age" && both === 1
+      && /Diagnosis Age/.test(dragged) && /Mutation Count/.test(dragged) && removed === 0;
+  } catch (e) { xyDetail = String(e.message).split("\n")[0]; }
+  ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one; its drag filters, Remove chart clears them", xyOk, xyDetail);
+
+  // the generic-assay frequency table (STS-OT-5), shown by default for arm-level CNA: altered
+  // categories only, losses first, Freq of every selected sample; a row applied filters to its count
+  let ftDetail = "", ftOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const card = page.locator("[data-assayfreq=armlevel_cna]");
+    await card.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const title = (await card.locator(".facettitle").textContent()).trim();
+    const cats = await card.locator(".valrow").evaluateAll((rs) => rs.slice(0, 8).map((r) => r.querySelectorAll(".vn")[0]?.textContent));
+    const first = await card.locator(".valrow").first().evaluate((r) => ({ n: Number(r.querySelectorAll(".vn")[1].textContent.replace(/,/g, "")) }));
+    await card.locator(".valrow").first().click();
+    await card.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction(() => /[\d,]+ patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const matched = Number((/([\d,]+) patients match/.exec(await page.locator(".exbar").innerText()) || [])[1]?.replace(/,/g, ""));
+    ftDetail = JSON.stringify({ title: title.slice(0, 60), cats, first, matched });
+    ftOk = /^Frequency Table: /.test(title) && cats.length > 0 && cats.every((c) => !/^(Unchanged|Unknown)$/i.test(c)) && /loss/i.test(cats[0]) && first.n > 0 && matched > 0 && matched <= first.n;
+  } catch (e) { ftDetail = String(e.message).split("\n")[0]; }
+  ok("explore: the arm-level CNA frequency table shows altered categories, losses first, and a row filters to its cases", ftOk, ftDetail);
+
+  // the treatment tables (STS-OT-6), shown when the study has treatments: patients per agent, most
+  // first; a checked agent applied filters on it, and the sample table narrows with it
+  let txDetail = "", txOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const pt = page.locator("[data-treatments='patient']"), st = page.locator("[data-treatments='sample']");
+    await pt.locator(".valrow").first().waitFor({ timeout: 240000 });
+    await st.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const counts = (await pt.locator(".valrow .vn").allInnerTexts()).map((t) => Number(t.replace(/,/g, "")));
+    const ordered = counts.every((n, i) => i === 0 || counts[i - 1] >= n);
+    const pick = (await pt.locator(".valrow .vname").allInnerTexts())[0];
+    const before = (await st.locator(".facettitle").textContent()).trim();   // as the wait below reads it
+    await pt.locator(".valrow").first().click();
+    await pt.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction((a) => document.body.innerText.includes("treated with " + a), pick, { timeout: 240000 });
+    await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.textContent || "").trim() !== b, before, { timeout: 240000 });
+    const pinned = await pt.locator(".valrow.on .vname").allInnerTexts();
+    const after = (await st.locator(".facettitle").textContent()).trim();
+    txDetail = JSON.stringify({ rows: counts.length, pick, pinned, before, after });
+    txOk = counts.length > 1 && ordered && pinned.length === 1 && pinned[0] === pick && after !== before;
+  } catch (e) { txDetail = String(e.message).split("\n")[0]; }
+  ok("explore: the treatment tables count patients and samples per treatment, and a treatment applied filters on it", txOk, txDetail);
+
+  // a gene's Mutation Type Counts table (STS-OT-3), from Add chart: # Mut, #, Freq, most samples
+  // first; a checked type applied filters on it, and the table keeps counting without its own filter
+  let mtDetail = "", mtOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Add chart/ }).first().click({ timeout: 240000 });
+    await page.getByRole("tab", { name: "Gene status" }).click();
+    // the portal's gene tab: the mutation profile, "Mutation Type", the gene, Add Chart (STV-AC-5)
+    await page.getByRole("combobox", { name: /mutations by type/ }).click();
+    await page.getByRole("option", { name: "Mutation Type" }).click();
+    await page.getByPlaceholder("chart a gene (e.g. EGFR)").fill("KRAS");
+    await page.getByRole("button", { name: "Add Chart" }).click();
+    await page.keyboard.press("Escape");
+    const card = page.locator("[data-mutationtypes='KRAS']");
+    await card.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const header = (await card.locator(".valhead").innerText()).replace(/\s+/g, " ").trim();
+    const rows = await card.locator(".valrow").evaluateAll((rs) => rs.map((r) => [...r.querySelectorAll(".vname, .vn, .vpct")].map((c) => c.textContent)));
+    const num = (t) => Number(String(t).replace(/,/g, ""));
+    const ordered = rows.every(([, m, n], i) => num(m) >= num(n) && (i === 0 || num(rows[i - 1][2]) >= num(n)));
+    const pick = rows[rows.length - 1][0];
+    await card.locator(".valrow", { has: page.locator(".vname", { hasText: new RegExp("^" + pick + "$") }) }).click();
+    await card.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction((t) => document.body.innerText.includes("KRAS mutation type: " + t), pick, { timeout: 240000 });
+    await page.waitForFunction((t) => document.querySelector("[data-mutationtypes='KRAS'] .valrow.on .vname")?.textContent === t, pick, { timeout: 240000 });
+    const after = await card.locator(".valrow .vname").allInnerTexts();
+    mtDetail = JSON.stringify({ header, rows, pick, after });
+    mtOk = header === "# Mut # Freq" && rows.length > 1 && ordered && after[0] === pick && after.length === rows.length;
+  } catch (e) { mtDetail = String(e.message).split("\n")[0]; }
+  ok("explore: a gene's mutation-type table counts mutations and samples by type, and a type applied filters on it", mtOk, mtDetail);
 }
 
 module.exports = { explore };

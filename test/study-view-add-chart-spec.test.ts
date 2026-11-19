@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, type AddChartRow } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, geneTabView } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -200,4 +200,133 @@ test("AC10 uncounted: not disabled, sorted after every counted row (0% included)
   }
   assert.deepEqual(lines.slice(0, 2).map(l => l.key).sort(), ["h", "z"]);
   assert.deepEqual(lines.slice(2).map(l => l.key).sort(), ["u1", "u2"]);
+});
+
+// STS-OT-2, STS-OT-7: Case Lists and Timeline Events Availability are offered in Add chart, not shown by default
+test("the special tables: drawn when checked, or while the draft filters on what they list", () => {
+  const none = () => false, all = () => true;
+  const ev = { kind: "event", a: { eventType: "Treatment" }, rel: { type: "NONE" } };
+  const seq = { kind: "event", a: { eventType: "Treatment" }, b: { eventType: "Surgery" }, rel: { type: "BEFORE", maxDays: 30 } };
+  const cl = { kind: "caseList", id: "coadread_all" };
+  const cases: [string, (k: string) => boolean, unknown[], boolean, { events: boolean; caseLists: boolean }][] = [
+    ["by default neither", none, [], true, { events: false, caseLists: false }],
+    ["both checked", all, [], true, { events: true, caseLists: true }],
+    ["timeline events checked, but the selection has none", (k) => k === SPECIAL_CHART_KEYS.events, [], false, { events: false, caseLists: false }],
+    ["a case-list filter shows Case Lists, as the portal's initial filters do", none, [cl], true, { events: false, caseLists: true }],
+    ["an event-type filter keeps its table in view", none, [ev], true, { events: true, caseLists: false }],
+    ["a sequence of two events is not this table's filter", none, [seq], true, { events: false, caseLists: false }],
+  ];
+  for (const [name, checked, leaves, hasEvents, want] of cases) assert.deepEqual(specialChartsShown(checked, leaves, hasEvents), want, name);
+});
+
+// STV-AC-7: the X vs Y tab's button, as the portal's, case by case
+test("the X vs Y button: what it says for each pair, and whether it adds", () => {
+  const age = { attribute: "AGE", numeric: true }, mc = { attribute: "MUTATION_COUNT", numeric: true };
+  const sex = { attribute: "SEX", numeric: false }, race = { attribute: "RACE", numeric: false };
+  const existing = ["FRACTION_GENOME_ALTERED|MUTATION_COUNT"];
+  const cases: [typeof age | null, typeof age | null, string, boolean][] = [
+    [null, mc, "Add Chart", false],
+    [age, age, "Please choose two different attributes.", false],
+    [{ attribute: "FRACTION_GENOME_ALTERED", numeric: true }, mc, "A chart with these attributes already exists", false],
+    [mc, { attribute: "FRACTION_GENOME_ALTERED", numeric: true }, "A chart with these attributes already exists", false],   // either way round
+    [sex, race, "Can't add a chart with two categorical attributes (yet).", false],
+    [age, sex, "Add violin/box plot table", false],     // the portal's violin table: not drawn here yet, said so
+    [age, mc, "Add density plot", true],
+  ];
+  for (const [x, y, label, adds] of cases) { const b = xVsYButton(x, y, existing); assert.deepEqual([b.label, b.adds], [label, adds], label); }
+  assert.match(xVsYButton(age, sex, existing).tip!, /not drawn here yet/);
+});
+
+test("the X vs Y attributes: every clinical attribute but a survival one other than OS_STATUS", () => {
+  const attrs = ["AGE", "OS_MONTHS", "OS_STATUS", "PFS_STATUS", "DFS_MONTHS", "SEX"].map((attribute) => ({ attribute }));
+  assert.deepEqual(xVsYAttributes(attrs).map((a) => a.attribute), ["AGE", "OS_STATUS", "SEX"]);
+});
+
+// STV-AC-5: the gene tab, one chart per gene and profile
+test("the gene tab's profiles: mutations and discrete copy number, each with its profiled samples", () => {
+  const dt = [{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 534 },
+    { profile: "rna_seq_v2_mrna", label: "mRNA expression", alterationType: "MRNA_EXPRESSION", n: 592 },
+    // a continuous copy-number profile listed first: the chart reads the discrete one's levels
+    { profile: "linear_cna", label: "Capped relative linear copy-number values", alterationType: "COPY_NUMBER_ALTERATION", n: 592 },
+    { profile: "gistic", label: "Putative copy-number alterations from GISTIC", alterationType: "COPY_NUMBER_ALTERATION", n: 592 }];
+  assert.deepEqual(geneChartProfiles(dt), [{ kind: "mutation", label: "Mutations (534 samples)" }, { kind: "cna", label: "Putative copy-number alterations from GISTIC (592 samples)" }]);
+  assert.deepEqual(geneChartProfiles(dt.slice(1, 3)), [], "no mutation or discrete copy-number profile, nothing to chart a gene from");
+  // two studies, one's discrete copy number "gistic", the other's "cna": one option, their samples summed
+  const two = [{ profile: "gistic", label: "Putative copy-number alterations from GISTIC", alterationType: "COPY_NUMBER_ALTERATION", n: 300 },
+    { profile: "cna", label: "Copy-number alterations", alterationType: "COPY_NUMBER_ALTERATION", n: 292 }];
+  assert.deepEqual(geneChartProfiles(two), [{ kind: "cna", label: "Putative copy-number alterations from GISTIC (592 samples)" }]);
+  assert.deepEqual(geneChartProfiles([{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 1234 }]),
+    [{ kind: "mutation", label: "Mutations (1,234 samples)" }]);
+});
+
+test("the charts a gene list draws: one per gene and kind, and one per mutation-type table", () => {
+  assert.equal(geneChartCount({ genes: ["KRAS"], kinds: { KRAS: ["MUTATION", "CNA"] }, types: ["TP53"] }), 3);
+  assert.equal(geneChartCount({ genes: [], kinds: {}, types: [] }), 0);
+});
+
+test("only a change to the genes or the mutation-type tables asks Explore again; showing another kind of a counted gene does not", () => {
+  const mut = { genes: ["KRAS"], kinds: { KRAS: ["MUTATION" as const] }, types: [] };
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "KRAS", "CNA", true)), false);
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "EGFR", "CNA", true)), true);
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "KRAS", "types", true)), true);
+  assert.equal(geneChartsAsked(mut, geneChartsChanged(mut, "KRAS", "MUTATION", false)), true, "its last kind gone: the gene leaves the request");
+});
+
+test("a gene chart added and removed: each kind on its own, the gene counted while either status chart is shown", () => {
+  const empty = { genes: [], kinds: {}, types: [] };
+  const mut = geneChartsChanged(empty, "KRAS", "MUTATION", true);
+  assert.deepEqual(mut, { genes: ["KRAS"], kinds: { KRAS: ["MUTATION"] }, types: [] });
+  const both = geneChartsChanged(mut, "KRAS", "CNA", true);
+  assert.deepEqual(both.kinds, { KRAS: ["MUTATION", "CNA"] });
+  assert.deepEqual(geneChartsChanged(both, "KRAS", "MUTATION", false), { genes: ["KRAS"], kinds: { KRAS: ["CNA"] }, types: [] });
+  assert.deepEqual(geneChartsChanged(geneChartsChanged(both, "KRAS", "MUTATION", false), "KRAS", "CNA", false), empty);
+  assert.deepEqual(geneChartsChanged(mut, "KRAS", "types", true), { genes: ["KRAS"], kinds: { KRAS: ["MUTATION"] }, types: ["KRAS"] }, "mutation types apart");
+  const seven = ["A", "B", "C", "D", "E", "F", "G"].reduce((s, g) => geneChartsChanged(s, g, "CNA", true), empty as Parameters<typeof geneChartsChanged>[0]);
+  assert.deepEqual(seven.genes, ["B", "C", "D", "E", "F", "G"], "at most six genes, the earliest dropped");
+  assert.equal(seven.kinds.A, undefined);
+});
+
+// STV-AC-2, STV-AC-4: the Genomic tab's charts, as the portal lists them (coadread, seen)
+test("the Genomic tab: each chart the selection has data for, its Freq the samples with that data, by Freq then name", () => {
+  const clinical = [{ key: "sample|FRACTION_GENOME_ALTERED", name: "Fraction Genome Altered", samples: 583, attribute: "FRACTION_GENOME_ALTERED" },
+    { key: "sample|MUTATION_COUNT", name: "Mutation Count", samples: 534, attribute: "MUTATION_COUNT" }];
+  const lines = genomicChartLines({ mutated: 534, cna: 592, sv: 534 }, 594, { datatypes: true, density: true }, clinical);
+  // the portal's seen list: Data Types 100.0%, CNA Genes 99.7%, FGA 98.1%, Mutated Genes 89.9%, Mutation Count 89.9%, SV Genes 89.9%
+  assert.deepEqual(lines.map((l) => [l.name, Number.isNaN(l.freq) ? "—" : portalFreq(l.freq)]), [
+    ["Data Types", "100.0%"], ["CNA Genes", "99.7%"], ["Fraction Genome Altered", "98.1%"], ["Mutated Genes", "89.9%"], ["Mutation Count", "89.9%"],
+    ["Structural Variant Genes", "89.9%"], ["Mutation Count vs Fraction Genome Altered", "—"],
+  ]);
+  assert.equal(lines.find((l) => l.name === "Mutation Count")!.attribute, "MUTATION_COUNT", "a clinical row's filter is its attribute's");
+  // a table without its profile, and charts without data, are not offered
+  assert.deepEqual(genomicChartLines({ mutated: 10, cna: 0, sv: 0 }, 10, { datatypes: true, density: false }).map((l) => l.name), ["Data Types", "Mutated Genes"]);
+  assert.deepEqual(genomicChartLines({ mutated: 0, cna: 0, sv: 0 }, 0, { datatypes: false, density: false }), []);
+});
+
+// STV-AC-2: a tab per generic-assay type, named as the portal names it
+test("a generic-assay type's tab: the portal's configured text, else its words capitalised; one per type, by label", () => {
+  const cases: [string, string][] = [["ARMLEVEL_CNA", "Arm-level CNA"], ["METHYLATION", "Methylation"], ["MUTATIONAL_SIGNATURE", "Mutational Signature"],
+    ["TREATMENT_RESPONSE", "Treatment Response"], ["GENETIC_ANCESTRY", "Genetic Ancestry"], ["PHOSPHOSITE_QUANTIFICATION", "Phosphosite Quantification"], ["Lipidome", "Lipidome"]];
+  for (const [t, want] of cases) assert.equal(assayTabLabel(t), want, t);
+  // coadread, seen: Arm-level CNA · Genetic Ancestry · Methylation (two methylation profiles, one tab)
+  const coadread = [{ type: "GENERIC_ASSAY", assayType: "METHYLATION" }, { type: "GENERIC_ASSAY", assayType: "ARMLEVEL_CNA" },
+    { type: "GENERIC_ASSAY", assayType: "METHYLATION" }, { type: "GENERIC_ASSAY", assayType: "GENETIC_ANCESTRY" }, { type: "MRNA_EXPRESSION" }];
+  assert.deepEqual(assayTabs(coadread).map((t) => t.label), ["Arm-level CNA", "Genetic Ancestry", "Methylation"]);
+});
+
+// STV-AC-5: the gene tab's charted genes can always be removed (Reviewer, #459): tiles have no close of their own
+test("the gene tab: its chips, each with what it removes, show whatever the selection's profiles hold", () => {
+  const charts = { genes: ["KRAS"], kinds: { KRAS: ["MUTATION" as const, "CNA" as const] }, types: ["TP53"] };
+  const chips = [{ gene: "KRAS", kind: "MUTATION", text: "mutations" }, { gene: "KRAS", kind: "CNA", text: "copy number" }, { gene: "TP53", kind: "types", text: "mutation types" }];
+  // no selected sample profiled: no profile to pick, the note, and every chip
+  const none = geneTabView([{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 0 }], charts, "mutation", false);
+  assert.equal(none.current, null);
+  assert.match(none.note!, /No selected study has mutation or copy-number data/);
+  assert.deepEqual(none.chips, chips);
+  // with profiles: the picker, its kind, and the same chips
+  const dt = [{ profile: "mutations", label: "Mutations", alterationType: "MUTATION_EXTENDED", n: 534 },
+    { profile: "gistic", label: "Putative copy-number alterations from GISTIC", alterationType: "COPY_NUMBER_ALTERATION", n: 592 }];
+  const some = geneTabView(dt, charts, "cna", false);
+  assert.deepEqual([some.current?.kind, some.kind, some.note, some.chips], ["cna", "CNA", null, chips]);
+  assert.equal(geneTabView(dt, charts, "mutation", true).kind, "types", "Mutation Type");
+  assert.equal(geneTabView(dt.slice(1), charts, "mutation", false).current?.kind, "cna", "the profile asked for absent: the first offered");
 });

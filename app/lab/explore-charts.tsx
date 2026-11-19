@@ -1,23 +1,25 @@
 "use client";
-// Explore's two charts that are not one attribute's tally — the portal study view's survival curve
-// and its mutation count against fraction of genome altered — built from the analysis engine's own
-// views over the current selection, so their numbers are the same ones an analysis would report.
-// The density is a filter: drag a rectangle over it to add both axes' ranges to the selection.
+// Explore's charts that are not one attribute's tally — the portal study view's survival curve, its
+// mutation count against fraction of genome altered and the reader's other X vs Y density charts —
+// built from the analysis engine's own views over the current selection, so their numbers are the
+// same ones an analysis would report. A density is a filter: drag a rectangle over it to add both
+// axes' ranges to the selection.
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
 import { Choice } from "../_ui/choice.tsx";
 import { useWidth } from "./figure.tsx";
 import { linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight } from "../../lib/svg-kit.ts";
 import { fmtInt } from "../../lib/chart/format.ts";
-import type { CohortDef, View } from "../../lib/types.ts";
+import type { CohortDef } from "../../lib/types.ts";
 import type { PlotCell } from "../../lib/plot.ts";
 import { ChartMenu } from "./partitions.tsx";
-import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg, type Say } from "./chart-files.ts";
+import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg } from "./chart-files.ts";
 import { chartFileName } from "../../lib/study-view-download.ts";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
+import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import {
-  FGA, MUTATION_COUNT, correlationLines, densityAxes, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
-  densityTitle, densityView, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensitySettings
+  DEFAULT_DENSITY_PAIR, FGA, MUTATION_COUNT, correlationLines, densityAxes, densityPairKey, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
+  densityTitle, densityView, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensityPair, type DensitySettings
 } from "../../lib/study-view-density.ts";
 
 type Clause = Record<string, unknown>;
@@ -33,72 +35,60 @@ interface Props {
   /** the selection a chart's per-case file lists, as every Explore download reads it */
   selection: () => { def: CohortDef; study: string } | null;
   draft: Draft;
-  /** the attributes this study has, with the level each is recorded at */
-  attrs: { attribute: string; per?: string }[];
+  /** the attributes this study has, with the level each is recorded at and the name it is shown by */
+  attrs: { attribute: string; per?: string; displayName?: string }[];
   /** the endpoints the study can fit a survival curve on (OS, PFS, …); null while unknown */
   endpoints: string[] | null;
   addClauses: (clauses: Clause[]) => void;
   /** draws the survival curves the way the analysis page draws them */
   km: (curves: unknown[]) => React.ReactNode;
+  /** the reader's X vs Y density charts, added from Add chart (STV-AC-7) */
+  pairs?: DensityPair[];
+  onRemovePair?: (pair: DensityPair) => void;
+  /** the Mutation Count vs FGA density, unless unchecked in Add chart's Genomic tab */
+  density?: boolean;
 }
 
 type PlotData = { shape: string; n: number; extent?: { x0: number; x1: number; y0: number; y1: number }; grid?: [number, number];
   bins?: PlotCell[]; stats?: { pearson: number | null; spearman: number | null }; coverage?: { total: number; nx: number; ny: number } };
 
-export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km }: Props) {
-  const hasScatter = [MUTATION_COUNT, FGA].every((a) => attrs.some((x) => x.attribute === a));
-  // the reader's own menu settings, kept by this browser; read after mounting, so a server render never touches storage
-  const [dset, setDset] = useState<DensitySettings>({});
-  useEffect(() => { try { setDset(JSON.parse(localStorage.getItem(DENSITY_KEY) || "{}") || {}); } catch { /* the defaults */ } }, []);
-  const saveDensity = (v: DensitySettings) => {
-    setDset(v);
-    try { localStorage.setItem(DENSITY_KEY, JSON.stringify(v)); } catch { /* kept for this page only */ }
-  };
-  const axes = densityAxes(dset);
+export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km, density = true, pairs = [], onRemovePair }: Props) {
+  const has = (a: string) => attrs.some((x) => x.attribute === a);
+  const hasScatter = density && has(MUTATION_COUNT) && has(FGA);
+  const nameOf = (a: string) => attrs.find((x) => x.attribute === a)?.displayName || DENSITY_NAMES[a] || a;
   const [endpoint, setEndpoint] = useState<string>("OS");
   const ep = endpoints && endpoints.length ? (endpoints.includes(endpoint) ? endpoint : endpoints[0]) : null;
-  const [res, setRes] = useState<{ key: string; survival?: { curves?: unknown[]; error?: string }; plot?: { data?: PlotData; error?: string } } | null>(null);
+  const [res, setRes] = useState<{ key: string; curves?: unknown[]; error?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const want = useRef("");
-  const key = JSON.stringify([studies, draft, ep, hasScatter, axes]);
-  // the density figure as a file, set by the drawn chart; a save that fails says why under the chart
-  const densityFile = useRef<(() => string | null) | null>(null);
-  const [fileError, setFileError] = useState<{ chart: string; message: string } | null>(null);
-  /** a chart's file messages, under that chart; a finished download clears only its own */
-  const sayFor = (chart: string): Say => (update) => setFileError((cur) => {
-    const m = update(cur?.chart === chart ? cur.message : null);
-    return m == null ? (cur?.chart === chart ? null : cur) : { chart, message: m };
-  });
+  const key = JSON.stringify([studies, draft, ep]);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!studies.length || (!ep && !hasScatter)) return;
+    if (!studies.length || !ep) return;
     want.current = key;
     setLoading(true);
     const cohort: CohortDef = { ...(studies.length > 1 ? { studies } : {}), all: (draft ? draft.all : []) as CohortDef["all"] };
-    const views: View[] = [];
-    if (ep) views.push({ kind: "survival", endpoint: ep });
-    if (hasScatter) views.push(densityView(dset));
     // a superseded request is cancelled, so the server stops its queries instead of finishing them
     const ac = new AbortController();
-    api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views }, { signal: ac.signal })
+    api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views: [{ kind: "survival", endpoint: ep }] }, { signal: ac.signal })
       .then((r) => r.json())
       .then((j) => {
         if (want.current !== key) return;   // a newer selection was asked for meanwhile
-        if (j.error) { setRes({ key, ...(ep ? { survival: { error: j.error } } : {}), ...(hasScatter ? { plot: { error: j.error } } : {}) }); return; }
-        const vs: any[] = j.views || [];
-        const sv = ep ? vs[0] : null, pv = hasScatter ? vs[ep ? 1 : 0] : null;
-        setRes({ key,
-          ...(sv ? { survival: sv.error ? { error: sv.error } : { curves: sv.curves || [] } } : {}),
-          ...(pv ? { plot: pv.error ? { error: pv.error } : { data: pv.plot } } : {}) });
+        const sv = j.views?.[0];
+        setRes(j.error || !sv || sv.error ? { key, error: String(j.error || sv?.error || "the survival view returned nothing") } : { key, curves: sv.curves || [] });
       })
-      .catch((e) => { if (!ac.signal.aborted && want.current === key) setRes({ key, survival: { error: String(e) }, plot: { error: String(e) } }); })
+      .catch((e) => { if (!ac.signal.aborted && want.current === key) setRes({ key, error: String(e) }); })
       .finally(() => { if (!ac.signal.aborted && want.current === key) setLoading(false); });
     return () => ac.abort();
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!ep && !hasScatter) return null;
+  // the default Mutation Count vs FGA chart (unless unchecked), then the reader's X vs Y charts (STS-SC-1)
+  const shown: { pair: DensityPair; added: boolean }[] = [
+    ...(hasScatter ? [{ pair: DEFAULT_DENSITY_PAIR, added: false }] : []),
+    ...pairs.filter((p) => has(p.x) && has(p.y) && densityPairKey(p) !== densityPairKey(DEFAULT_DENSITY_PAIR)).map((pair) => ({ pair, added: true })),
+  ];
   const stale = loading || !res || res.key !== key;
-  const plot = res && res.plot && res.plot.data;
   return <>
     {ep && (
       <div className="card xc-card" data-chart="survival">
@@ -106,58 +96,108 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
           <span className="xc-title">{ep === "OS" ? "Overall survival" : ep + " survival"} of the selection</span>
           <ChartMenu label="the survival chart" actions={[{ label: "Download", title: "save this chart as a file",
             sub: [caseFileAction("Data", { kind: "survival", status: ep + "_STATUS", months: ep + "_MONTHS" }, chartFileName((ep === "OS" ? "Overall" : ep) + " survival", "data"),
-              selection, sayFor("survival")),
+              selection, (update) => setFileError((cur) => update(cur))),
             ...figureActions((ep === "OS" ? "Overall" : ep) + " survival", () => {
-              const curves = res?.survival?.curves;
-              return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" })) : null;
-            }, (message) => setFileError({ chart: "survival", message }))] }]} />
+              const curves = res?.curves;
+              return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" }, PORTAL_STUDY_VIEW_KM)) : null;
+            }, (message) => setFileError(message))] }]} />
           {endpoints && endpoints.length > 1 && (
             <Choice className="w-28" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
               options={endpoints.map((x) => [x, x] as const)} />
           )}
         </div>
         <div className="xc-body">
-          {res && res.survival && res.survival.curves && (res.survival.curves.length ? km(res.survival.curves) : <p className="note">no patient in the selection has a {ep} time and status</p>)}
-          {res && res.survival && res.survival.error && <p className="note">{res.survival.error}</p>}
-          {fileError?.chart === "survival" && <p className="note">{fileError.message}</p>}
+          {res && res.curves && (res.curves.length ? km(res.curves) : <p className="note">no patient in the selection has a {ep} time and status</p>)}
+          {res && res.error && <p className="note">{res.error}</p>}
+          {fileError && <p className="note">{fileError}</p>}
           {stale && <div className="xc-wait"><span className="spinner" /> {res ? "updating…" : "loading…"}</div>}
         </div>
       </div>
     )}
-    {hasScatter && (
-      <div className="card xc-card" data-chart="mutcount-fga">
-        <div className="xc-head">
-          <span className="xc-title">{densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute])}</span>
-          <span className="meta">{plot && plot.coverage && plot.coverage.total > plot.n
-            ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : ""}drag a box to filter</span>
-          <ChartMenu label="the density chart" actions={[
-            { label: "Swap Axes", title: "put " + DENSITY_NAMES[axes.y.attribute] + " along the bottom", onClick: () => saveDensity(swapDensity(dset)) },
-            ...(["x", "y"] as const).filter((k) => logOffered(axes[k].attribute)).map((k) => ({
-              label: "Log Scale " + k.toUpperCase(), checked: axes[k].log,
-              title: axes[k].log ? "draw " + DENSITY_NAMES[axes[k].attribute] + " on a linear scale" : "draw " + DENSITY_NAMES[axes[k].attribute] + " as ln(1 + count)",
-              onClick: () => saveDensity({ ...dset, [k + "Log"]: !axes[k].log }) })),
-            { label: "Download", title: "save this chart as a file",
-              sub: [caseFileAction("Data", { kind: "density", x: axes.x.attribute, y: axes.y.attribute },
-                chartFileName(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]), "data"),
-                selection, sayFor("density")),
-              ...figureActions(densityTitle(DENSITY_NAMES[axes.x.attribute], DENSITY_NAMES[axes.y.attribute]),
-                () => densityFile.current ? densityFile.current() : null, (message) => setFileError({ chart: "density", message }))] }]} />
-        </div>
-        <div className="xc-body">
-          {plot && plot.shape === "scatter" && !plot.grid && <p className="note">No data to plot.</p>}
-          {plot && plot.shape === "scatter" && plot.grid &&
-            <Density data={plot} axes={axes} figure={densityFile} onSelect={(box, span) => addClauses(densitySelection(box, dset, span))} />}
-          {fileError?.chart === "density" && <p className="note">{fileError.message}</p>}
-          {res && res.plot && res.plot.error && <p className="note">{res.plot.error}</p>}
-          {stale && <div className="xc-wait"><span className="spinner" /> {res ? "updating…" : "loading…"}</div>}
-        </div>
-      </div>
-    )}
+    {shown.map(({ pair, added }) => (
+      <DensityCard key={densityPairKey(pair)} pair={pair} added={added} studies={studies} draft={draft} selection={selection} addClauses={addClauses}
+        nameOf={nameOf} onRemove={added && onRemovePair ? () => onRemovePair(pair) : undefined} />
+    ))}
   </>;
 }
 
+/**
+ * One X vs Y density chart (STS-SC-1…6): its own settings (Swap Axes, Log Scale; the default
+ * chart's kept under its old key), its own request, its menu, and a drag box that filters on both.
+ */
+function DensityCard({ pair, added, studies, draft, selection, addClauses, nameOf, onRemove }: { pair: DensityPair; added: boolean; studies: string[];
+  draft: Draft; selection: Props["selection"]; addClauses: Props["addClauses"]; nameOf: (a: string) => string; onRemove?: () => void }) {
+  const storeKey = added ? DENSITY_KEY + "." + densityPairKey(pair) : DENSITY_KEY;
+  // the reader's own menu settings, kept by this browser; read after mounting, so a server render never touches storage
+  const [dset, setDset] = useState<DensitySettings>({});
+  useEffect(() => { try { setDset(JSON.parse(localStorage.getItem(storeKey) || "{}") || {}); } catch { /* the defaults */ } }, [storeKey]);
+  const saveDensity = (v: DensitySettings) => {
+    setDset(v);
+    try { localStorage.setItem(storeKey, JSON.stringify(v)); } catch { /* kept for this page only */ }
+  };
+  const axes = densityAxes(dset, pair);
+  const [res, setRes] = useState<{ key: string; data?: PlotData; error?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const want = useRef("");
+  const key = JSON.stringify([studies, draft, axes]);
+  // the density figure as a file, set by the drawn chart; a save that fails says why under the chart
+  const densityFile = useRef<(() => string | null) | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!studies.length) return;
+    want.current = key;
+    setLoading(true);
+    const cohort: CohortDef = { ...(studies.length > 1 ? { studies } : {}), all: (draft ? draft.all : []) as CohortDef["all"] };
+    const ac = new AbortController();
+    api.analysis({ study: studies[0], cohorts: { Selected: cohort }, views: [densityView(dset, pair)] }, { signal: ac.signal })
+      .then((r) => r.json())
+      .then((j) => {
+        if (want.current !== key) return;
+        const pv = j.views?.[0];
+        setRes(j.error || !pv || pv.error ? { key, error: String(j.error || pv?.error || "the density view returned nothing") } : { key, data: pv.plot });
+      })
+      .catch((e) => { if (!ac.signal.aborted && want.current === key) setRes({ key, error: String(e) }); })
+      .finally(() => { if (!ac.signal.aborted && want.current === key) setLoading(false); });
+    return () => ac.abort();
+  }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const stale = loading || !res || res.key !== key;
+  const plot = res?.data;
+  const title = densityTitle(nameOf(axes.x.attribute), nameOf(axes.y.attribute));
+  const names = { x: nameOf(axes.x.attribute), y: nameOf(axes.y.attribute) };
+  return (
+    <div className="card xc-card" data-chart={added ? "xvsy" : "mutcount-fga"} data-pair={densityPairKey(pair)}>
+      <div className="xc-head">
+        <span className="xc-title">{title}</span>
+        <span className="meta">{plot && plot.coverage && plot.coverage.total > plot.n
+          ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : ""}drag a box to filter</span>
+        <ChartMenu label={"the " + title + " chart"} actions={[
+          { label: "Swap Axes", title: "put " + names.y + " along the bottom", onClick: () => saveDensity(swapDensity(dset)) },
+          ...(["x", "y"] as const).filter((k) => logOffered(axes[k].attribute)).map((k) => ({
+            label: "Log Scale " + k.toUpperCase(), checked: axes[k].log,
+            title: axes[k].log ? "draw " + names[k] + " on a linear scale" : "draw " + names[k] + " as ln(1 + count)",
+            onClick: () => saveDensity({ ...dset, [k + "Log"]: !axes[k].log }) })),
+          { label: "Download", title: "save this chart as a file",
+            sub: [caseFileAction("Data", { kind: "density", x: axes.x.attribute, y: axes.y.attribute }, chartFileName(title, "data"),
+              selection, (update) => setFileError((cur) => update(cur))),
+            ...figureActions(title, () => densityFile.current ? densityFile.current() : null, (message) => setFileError(message))] },
+          ...(onRemove ? [{ label: "Remove chart", title: "stop drawing " + title, onClick: onRemove }] : [])]} />
+      </div>
+      <div className="xc-body">
+        {plot && plot.shape === "scatter" && !plot.grid && <p className="note">No data to plot.</p>}
+        {plot && plot.shape === "scatter" && plot.grid &&
+          <Density data={plot} axes={axes} names={names} figure={densityFile} onSelect={(box, span) => addClauses(densitySelection(box, dset, span, pair))} />}
+        {fileError && <p className="note">{fileError}</p>}
+        {res && res.error && <p className="note">{res.error}</p>}
+        {stale && <div className="xc-wait"><span className="spinner" /> {res ? "updating…" : "loading…"}</div>}
+      </div>
+    </div>
+  );
+}
+
 /** the portal's density: a dot per non-empty bin coloured by its count, the legend and coefficients beside it, a drag box to filter */
-function Density({ data, axes, figure, onSelect }: { data: PlotData; axes: { x: DensityAxis; y: DensityAxis };
+function Density({ data, axes, names, figure, onSelect }: { data: PlotData; axes: { x: DensityAxis; y: DensityAxis };
+  /** the axes' attributes' names, as the chart's title writes them */
+  names: { x: string; y: string };
   /** set to draw the chart as a file */
   figure: React.MutableRefObject<(() => string | null) | null>;
   onSelect: (box: { x0: number; x1: number; y0: number; y1: number }, span: { x: number; y: number }) => void }) {
@@ -169,7 +209,7 @@ function Density({ data, axes, figure, onSelect }: { data: PlotData; axes: { x: 
   const show = (v: number, log: boolean) => log ? lnFromEngine(v) : v;
   const e = { x0: show(data.extent!.x0, axes.x.log), x1: show(data.extent!.x1, axes.x.log),
     y0: show(data.extent!.y0, axes.y.log), y1: show(data.extent!.y1, axes.y.log) };
-  const xName = DENSITY_NAMES[axes.x.attribute], yName = DENSITY_NAMES[axes.y.attribute];
+  const xName = names.x, yName = names.y;
   const xTitle = densityAxisLabel(xName, axes.x.log), yTitle = densityAxisLabel(yName, axes.y.log);
   const ys0 = linear(e.y0, e.y1, 0, 1, { nice: false, count: 8 });
   const L = 6 + leftAxisWidth(ys0, yTitle), R = 8, T = 8, B = bottomAxisHeight(xTitle) + 2, PW = W - L - R, PH = H - T - B;

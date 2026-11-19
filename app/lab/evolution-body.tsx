@@ -6,12 +6,14 @@
 // (app/lab/patient-nav.tsx); the cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { evolutionSvg, evolutionKey, portalCellTip, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
+import { evolutionSvg, evolutionKey, heatmapColumns, onlySelected, portalCellTip, EVOLUTION_KEY_COLUMNS, HEAT_CELL } from "../../lib/views/evolution/figure.ts";
 import type { TableQuery } from "../../lib/types";
 import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../lib/views/evolution/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
+import { Slider } from "../_ui/slider";
+import { ZoomIn, ZoomOut } from "lucide-react";
 import { TB } from "../_ui/toolbar.ts";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { patientPatch } from "../../lib/views/evolution/groups.ts";
@@ -19,7 +21,7 @@ import { heatmapTsv, HEATMAP_FILE } from "../../lib/views/evolution/download.ts"
 import { saveText } from "../../lib/study-view-download.ts";
 import { ImageDownload } from "./image-download.tsx";
 
-type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; transpose?: boolean; cluster?: boolean; mutationLabels?: boolean; expandGaps?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
+type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; transpose?: boolean; cluster?: boolean; mutationLabels?: boolean; expandGaps?: boolean; showTimeline?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
 export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: {
   v: { evolution: EvolutionResult; caveat?: string } & Record<string, unknown>; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
@@ -38,7 +40,13 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     return () => ro.disconnect();
   }, []);
   const p = e.patient;
-  const svg = useMemo(() => evolutionSvg(v as never, { width, caption: false }), [v, width]);
+  const chart = spec.chart || "line";
+  // the line chart draws only the picked mutations (the portal's "Show only selected mutations", kept in the browser as the picks are)
+  const [onlyPicked, setOnlyPicked] = useState(false);
+  // the heatmap's zoom (the portal's horizontal zoom, kept in the browser): null fits the card
+  const [zoom, setZoom] = useState<number | null>(null);
+  const heatZoom = chart === "heatmap" ? zoom ?? undefined : undefined;
+  const cols = useMemo(() => chart === "heatmap" && p && e.drawn?.length ? heatmapColumns(v as never, width) : null, [chart, p, e.drawn, v, width]);
   // the mutation under the pointer, on a line, a heatmap row or a table row: the others are dimmed
   const [hot, setHot] = useState<string | null>(null);
   // the mutations clicked (a line, a heatmap row or a table row; a second click lets go): they stay picked out
@@ -46,6 +54,8 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
   const [pickedFor, setPickedFor] = useState(p ? p.study + ":" + p.id : "");
   if ((p ? p.study + ":" + p.id : "") !== pickedFor) { setPickedFor(p ? p.study + ":" + p.id : ""); setPicked(new Set()); }
   const toggle = (key: string) => setPicked((was) => { const n = new Set(was); if (!n.delete(key)) n.add(key); return n; });
+  const pickedOnly = onlyPicked && chart === "line";
+  const svg = useMemo(() => evolutionSvg((pickedOnly ? onlySelected(v as never, picked) : v) as never, { width, caption: false, zoom: heatZoom }), [v, width, pickedOnly, picked, heatZoom]);
   // the point under the pointer: its mutation, its sample, and where its tooltip points (in the figure's box)
   const [tip, setTip] = useState<{ key: string; s: number; x: number; y: number; below: number | null } | null>(null);
   const fig = useRef<HTMLDivElement>(null);
@@ -91,7 +101,6 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     const next = Object.fromEntries(Object.entries({ ...q, rows }).filter(([, x]) => x !== undefined));
     patch({ mutations: Object.keys(next).length ? next : undefined });
   };
-  const chart = spec.chart || "line";
   const noDayWhy = e.noDay?.length ? "no collection day is recorded for " + e.noDay.join(", ") + ", so the samples are drawn in sequence" : null;
 
   return (
@@ -136,12 +145,19 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               <label className="chk" data-tip="label each mutation GENE protein change">
                 <Checkbox checked={spec.mutationLabels !== false} onCheckedChange={(on) => patch({ mutationLabels: on === true ? undefined : false })} /> show mutation labels
               </label>
+              {cols && <HeatZoom fit={cols.fit / HEAT_CELL} min={cols.floor / HEAT_CELL} value={zoom} onChange={setZoom} />}
               <ImageDownload name={HEATMAP_FILE} formats={["svg", "png"]} label="download the heatmap" tip="download the heatmap as drawn, or its data: each sample's VAF of each mutation"
-                svg={() => evolutionSvg(v as never, { width, caption: false, theme: "light" })}
+                svg={() => evolutionSvg(v as never, { width, caption: false, theme: "light", zoom: heatZoom })}
                 extra={e.drawn?.length && p ? [{ label: "Data", save: () => saveText(HEATMAP_FILE + ".txt", heatmapTsv(e.drawn!, p.samples, e.display.transpose)) }] : undefined} />
             </div> : <div className="tbz">
               <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
                 <Checkbox checked={!!spec.sequential || !!e.noDay?.length} disabled={!!e.noDay?.length} onCheckedChange={(on) => patch({ sequential: (on === true) || undefined })} /> sequential
+              </label>
+              {e.events > 0 && <Button type="button" variant="outline" size="sm" className={TB} aria-pressed={!!spec.showTimeline}
+                data-tip={spec.showTimeline ? "hide the patient's timeline above the chart" : "show the patient's timeline above the chart, the samples under their days on it"}
+                onClick={() => patch({ showTimeline: spec.showTimeline ? undefined : true })}>{spec.showTimeline ? "Hide Timeline" : "Show Timeline"}</Button>}
+              <label className="chk" data-tip="draw only the mutations clicked (a line or a table row); with none clicked, none is drawn">
+                <Checkbox checked={onlyPicked} onCheckedChange={(on) => setOnlyPicked(on === true)} /> only selected
               </label>
               <label className="chk" data-tip="the y axis on a log scale; a VAF of 0 sits at its floor, 0.001">
                 <Checkbox checked={!!spec.logScale} onCheckedChange={(on) => patch({ logScale: (on === true) || undefined })} /> log scale
@@ -160,7 +176,8 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
         {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-static-element-interactions -- a pointer-only highlight (as the table's clickable rows are); it changes nothing the view shows or shares */}
         {p && (svg ? <div className="evo-fig-wrap"><div ref={fig} className="evo-fig" onMouseMove={overFigure} onClick={clickFigure} onMouseLeave={() => { setHot(null); setTip(null); }} dangerouslySetInnerHTML={{ __html: svg }} />
             {tip && tipped && p.samples[tip.s] && <EvolutionTip m={tipped} sample={p.samples[tip.s]} s={tip.s} x={tip.x} y={tip.below ?? tip.y} below={tip.below != null} />}</div>
-          : <p className="meta tl-empty">{e.undrawn ? "Not drawn: " + e.undrawn + "." : "No mutation the table keeps has an allele frequency to draw."}</p>)}
+          : <p className="meta tl-empty">{e.undrawn ? "Not drawn: " + e.undrawn + "." : pickedOnly && e.drawn?.length ? "No selected mutation to draw: click a table row with an allele frequency, or untick only selected."
+            : "No mutation the table keeps has an allele frequency to draw."}</p>)}
       </div>
       {p && <p className="note vfoot">The figure draws every mutation the table below keeps — filter or search it to follow only some. Hover a line, a heatmap row or a table row to pick out that mutation in both; click to keep it picked out.
         {picked.size > 0 && <> {picked.size.toLocaleString()} picked — <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setPicked(new Set())}>clear selection</Button></>}</p>}
@@ -224,6 +241,24 @@ function SampleMarks({ ids, samples }: { ids: string[]; samples: EvolutionSample
             <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m?.label || "?"}</text>
           </svg>);
       })}
+    </span>
+  );
+}
+
+/**
+ * The heatmap's zoom, the portal's (MutationOncoprint zoomControls): − narrows the columns by 0.7, +
+ * widens them by 1 / 0.7, the slider between the narrowest and the portal's 20 px (or the fit, if wider);
+ * `value` null is the fit to the card.
+ */
+function HeatZoom({ fit, min, value, onChange }: { fit: number; min: number; value: number | null; onChange: (z: number | null) => void }) {
+  const max = Math.max(1, fit), now = value ?? fit;
+  // back at the fit, the figure fits the card again rather than keeping a zoomed width
+  const clamp = (z: number) => { const c = Math.min(max, Math.max(min, z)); return Math.abs(c - fit) < 0.005 ? null : c; };
+  return (
+    <span className="tbfield" data-tip="zoom the heatmap's columns in or out; past the card's width it scrolls">
+      <Button type="button" variant="outline" size="sm" className={TB} aria-label="zoom out of the heatmap" disabled={now <= min} onClick={() => onChange(clamp(now * 0.7))}><ZoomOut /></Button>
+      <Slider aria-label="heatmap zoom" className="w-[90px]" min={min} max={max} step={0.01} value={[now]} onValueChange={(vs) => onChange(clamp(vs[0]))} />
+      <Button type="button" variant="outline" size="sm" className={TB} aria-label="zoom in to the heatmap" disabled={now >= max} onClick={() => onChange(clamp(now / 0.7))}><ZoomIn /></Button>
     </span>
   );
 }

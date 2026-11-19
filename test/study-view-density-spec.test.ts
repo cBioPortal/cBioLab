@@ -8,7 +8,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MUTATION_COUNT, FGA, DENSITY_GRID, densityAxes, swapDensity, logOffered, densityView, densityTitle,
-  densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection
+  densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection, densityPairKey, DEFAULT_DENSITY_PAIR,
+  densityBinEdges, withDensityBins, densityBinsAfterDrag, densityBinsWithout, xyChartRemoval,
 } from "../lib/study-view-density.ts";
 import { plotExtent } from "../lib/plot.ts";
 
@@ -351,4 +352,71 @@ test("D3 after Swap Axes: the same rule per attribute, in the order [x attribute
   ]);
   const [m] = densitySelection({ x0: 1.609, x1: 2.398, y0: 0.104, y1: 0.358 }, { swapped: true, xLog: true }, { x: 4.6, y: 1 });
   assert.deepEqual(m.range, { gte: 4, lte: 10 });
+});
+
+// STS-SC-1: an X vs Y chart for any pair; the default is Mutation Count against FGA
+test("a pair's chart: its axes, swapped, its own Log Scale rule, and one key whichever way round", () => {
+  const pair = { x: "AGE", y: MUTATION_COUNT };
+  assert.deepEqual(densityAxes({}, pair), { x: { attribute: "AGE", log: false }, y: { attribute: MUTATION_COUNT, log: false } });
+  assert.deepEqual(densityAxes({ swapped: true, xLog: true }, pair).x, { attribute: MUTATION_COUNT, log: true }, "only a mutation-count axis takes Log Scale");
+  assert.deepEqual(densityAxes({ yLog: true }, pair).y, { attribute: MUTATION_COUNT, log: true });
+  assert.deepEqual(densityAxes({ xLog: true }, pair).x.log, false, "AGE offers no Log Scale");
+  assert.equal(densityPairKey(pair), densityPairKey({ x: MUTATION_COUNT, y: "AGE" }));
+  assert.deepEqual(densityAxes({}), densityAxes({}, DEFAULT_DENSITY_PAIR), "the default chart is FGA along x, Mutation Count up y");
+  const v = densityView({}, pair) as unknown as { x: { attribute: string }; y: { attribute: string }; range: object };
+  assert.deepEqual([v.x.attribute, v.y.attribute, v.range], ["AGE", MUTATION_COUNT, { y: { min: 0 } }], "a mutation count from 0; AGE's range is the data's");
+});
+
+test("STS-SC-6: a drag box's ranges add their ends to the two bar charts as custom bins", async () => {
+  const { binsAfterEdit } = await import("../lib/study-view-bins.ts");
+  const clauses = [
+    { kind: "clinical" as const, attribute: "FRACTION_GENOME_ALTERED", range: { gte: 0.12, lte: 0.34 } },
+    { kind: "clinical" as const, attribute: "MUTATION_COUNT", range: { gte: 3, lte: 40 } },
+  ];
+  assert.deepEqual(densityBinEdges(clauses), [{ attribute: "FRACTION_GENOME_ALTERED", ends: [0.12, 0.34] }, { attribute: "MUTATION_COUNT", ends: [3, 40] }]);
+  // on Mutation Count's bars (≤20, 20-40, >40 …) the edges join the bars' own, as the pill edit's do
+  const bars = [{ special: "<=", end: 20, count: 5 }, { start: 20, end: 40, count: 3 }, { special: ">", start: 40, count: 2 }] as never;
+  assert.deepEqual(binsAfterEdit(undefined, bars, densityBinEdges(clauses)[1].ends), { bins: { method: "custom", edges: [3, 20, 40] } });
+});
+
+test("STS-SC-6: a drag's edges are a temporary set, laid over the reader's bins only while the draft holds that drag's range", () => {
+  const mc = { attribute: "MUTATION_COUNT", range: { gte: 271, lte: 5684 }, edges: [20, 40, 240, 271, 5684] };
+  const reader = { MUTATION_COUNT: { showNa: true }, AGE: { bins: { method: "median" as const } } };
+  const drag = { kind: "clinical", attribute: "MUTATION_COUNT", range: { gte: 271, lte: 5684 } };
+  const held = withDensityBins(reader, [mc], { all: [drag] });
+  assert.deepEqual(held.MUTATION_COUNT, { showNa: true, bins: { method: "custom", edges: [20, 40, 240, 271, 5684] } });
+  assert.deepEqual(held.AGE, reader.AGE, "another chart's bins are its own");
+  assert.deepEqual(reader.MUTATION_COUNT, { showNa: true }, "the reader's own bins are not changed");
+  // the filter removed, Clear All, or a bar selection replacing the chart's filter: the edges go with it
+  assert.deepEqual(withDensityBins(reader, [mc], { all: [] }).MUTATION_COUNT, { showNa: true });
+  assert.deepEqual(withDensityBins(reader, [mc], { all: [{ kind: "clinical", attribute: "MUTATION_COUNT", range: { gt: 20, lte: 40 } }] }).MUTATION_COUNT, { showNa: true });
+  assert.deepEqual(withDensityBins(reader, [mc], null).MUTATION_COUNT, { showNa: true });
+  // a chart the reader never set
+  assert.deepEqual(withDensityBins({}, [mc], { all: [drag] }).MUTATION_COUNT, { bins: { method: "custom", edges: [20, 40, 240, 271, 5684] } });
+});
+
+// STS-SC-6 with several density charts: the portal keeps the scatter-selection bins per attribute
+// (StudyViewPageStore._customBinsFromScatterPlotSelectionSet), so a drag on one chart replaces only
+// its own two attributes' edges, and removing a chart drops its attributes' edges with their filters
+test("a drag on one density chart replaces its attributes' temporary edges only; another chart's stay", () => {
+  const fga = { attribute: FGA, range: { gte: 0.1, lte: 0.3 }, edges: [0, 0.1, 0.3, 1] };
+  const mc = { attribute: MUTATION_COUNT, range: { gte: 3, lte: 40 }, edges: [3, 20, 40] };
+  const age = { attribute: "AGE", range: { gte: 50, lte: 60 }, edges: [40, 50, 60, 80] };
+  const mc2 = { attribute: MUTATION_COUNT, range: { gte: 5, lte: 9 }, edges: [5, 9, 20] };
+  // the default chart dragged, then Mutation Count vs Diagnosis Age
+  assert.deepEqual(densityBinsAfterDrag([fga, mc], [age, mc2]), [fga, age, mc2], "FGA's edges kept; Mutation Count's replaced");
+  assert.deepEqual(densityBinsAfterDrag([], [fga, mc]), [fga, mc]);
+  // Remove chart on Mutation Count vs Diagnosis Age: both its attributes' edges go
+  assert.deepEqual(densityBinsWithout([fga, age, mc2], ["AGE", MUTATION_COUNT]), [fga]);
+});
+
+test("Remove chart on an added density chart: the pair goes, with its two attributes' filters and temporary edges", () => {
+  const pair = { x: "AGE", y: MUTATION_COUNT }, other = { x: "AGE", y: FGA };
+  const bins = [{ attribute: FGA, range: { gte: 0.1, lte: 0.3 }, edges: [0, 0.1, 0.3, 1] },
+    { attribute: "AGE", range: { gte: 50, lte: 60 }, edges: [50, 60] }, { attribute: MUTATION_COUNT, range: { gte: 3, lte: 9 }, edges: [3, 9] }];
+  // asked for either way round, the same chart
+  const r = xyChartRemoval([pair, other], bins, { x: MUTATION_COUNT, y: "AGE" });
+  assert.deepEqual(r.pairs, [other]);
+  assert.deepEqual(r.bins, [bins[0]]);
+  assert.deepEqual(r.clear, ["AGE", MUTATION_COUNT], "the portal clears the filters on both attributes");
 });

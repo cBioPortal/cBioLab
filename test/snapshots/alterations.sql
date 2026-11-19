@@ -537,7 +537,7 @@ g AS (
          max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount
   FROM s GROUP BY k
 ),
-rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec) FROM g)
+rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec), '' AS genePanel, '' AS genePanelShown FROM g)
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 0 alterations: alterations:sv:rows · msk_chord_2024
@@ -566,7 +566,7 @@ g AS (
          max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount
   FROM s GROUP BY k
 ),
-rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec) FROM g)
+rows AS (SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec), '' AS genePanel, '' AS genePanelShown FROM g)
 SELECT * EXCEPT (k), count() OVER () AS total FROM rows
 WHERE 1
 ORDER BY gene1, so, gene2, gene1, gene2, pos1, pos2, class, eventInfo, k

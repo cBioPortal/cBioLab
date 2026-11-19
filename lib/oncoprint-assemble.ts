@@ -10,7 +10,7 @@ import { heatmapTrackLabel, assayTrackLabel, profiledTrackLabel, PROFILED_TYPES,
 import { normalizeGeneTracks, type GeneTrackSpec } from "./gene-tracks.ts";
 import { finiteNumber } from "./sql-number.ts";
 import { portalFixed } from "./chart/format.ts";
-import { eventWanted, oqlLevel, oqlSublabel } from "./oql-match.ts";
+import { eventWanted, mutationClass, oqlLevel, oqlSublabel } from "./oql-match.ts";
 import type { OqlSpec } from "./oql-parse.ts";
 import { STYLE, assayScale, stackCompare, encodeNumeric, staircaseRank, staircaseOptions, STAIRCASE_RADIX, naturalVector, compareVectors, naturalRanks } from "./oncoprint-style.ts";
 export { naturalVector, compareVectors };
@@ -32,16 +32,21 @@ export const THRESHOLD_BASE = -3;
 const missingRank = (cell: number): number => cell === HEAT_NULL ? 1 : 0;
 
 
-export function mutClassBit(mt: string | undefined): number {
-  if (!mt) return BITS.OTHER_MUT;
-  const t = mt.toLowerCase();
-  if (t.startsWith("missense")) return BITS.MISSENSE;
-  if (t.startsWith("nonsense") || t.startsWith("frame_shift") || t.startsWith("nonstop")) return BITS.TRUNCATING;
-  if (t.startsWith("in_frame")) return BITS.INFRAME;
-  if (t.startsWith("splice")) return BITS.SPLICE;
-  // the portal calls these promoter mutations; the warehouse spells them 5'Flank
-  if (t.startsWith("5'flank") || t.startsWith("5_flank") || t.includes("promoter")) return BITS.PROMOTER;
-  return BITS.OTHER_MUT;
+/**
+ * A mutation's glyph class, as the portal's (DataUtils getOncoprintMutationType): a protein change of "Promoter"
+ * is promoter; a missense, in-frame or splice type of the portal's list (mutationClass, its
+ * getSimplifiedMutationType) keeps its class and an unlisted type is other; every other listed type — nonsense,
+ * frameshift, nonstart, nonstop, Fusion — is truncating.
+ */
+export function mutClassBit(mt: string | undefined, mv?: string): number {
+  switch (mutationClass(mt, mv)) {
+    case "missense": return BITS.MISSENSE;
+    case "inframe": return BITS.INFRAME;
+    case "splice": return BITS.SPLICE;
+    case "promoter": return BITS.PROMOTER;
+    case "other": return BITS.OTHER_MUT;
+    default: return BITS.TRUNCATING;
+  }
 }
 
 /** One genomic event: a mutation (vt "mutation", mt = mutation type), a structural variant, or a CNA call. */
@@ -72,7 +77,7 @@ export function normalizeSort(sort: SortKeySpec[] | undefined): { track: string;
 const DISPLAY_KEYS = ["showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "showOql",
   "sortByMutationType", "sortByDrivers", "sortIgnoreVUS", "style", "colors"] as const;
 const GAP_MODES = ["none", "gaps", "pct", "pct-left"] as const;
-const LEGEND_MODES = ["all", "none"] as const;
+const LEGEND_MODES = ["all", "altered", "none"] as const;
 const ANNOTATE_MODES = ["oncokb", "none"] as const;
 
 /**
@@ -315,7 +320,7 @@ export function assembleContract(input: AssembleInput): Contract {
     if (!rows) continue;
     let bit = 0;
     const mut = r.vt === "mutation";
-    if (mut) bit = mutClassBit(r.mt);
+    if (mut) bit = mutClassBit(r.mt, r.mv);
     else if (r.vt === "structural_variant") bit = BITS.SV;
     else if (r.vt === "cna") bit = Number(r.cna) >= 2 ? BITS.AMP : (Number(r.cna) <= -2 ? BITS.HOMDEL : 0);
     if (!bit) continue;

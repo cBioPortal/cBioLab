@@ -4,7 +4,8 @@
 // whole through POST /api/table; the altered / unaltered lists copied or opened as a cohort in the
 // lab; the gene alteration frequencies; and the case table, on the shared table.
 import { useState } from "react";
-import { Copy, Download, ExternalLink } from "lucide-react";
+import { ChevronDown, Copy, Download, ExternalLink } from "lucide-react";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from "../../_ui/dropdown-menu";
 import { DataTable, specQuery } from "../../_table/DataTable.tsx";
 import { Button } from "../../_ui/button";
 import { FIELD, TB } from "../../_ui/toolbar.ts";
@@ -19,6 +20,8 @@ import { portalPercentage } from "../../../lib/chart/format.ts";
 import { frequencyFilter, frequencySort, frequencyTsv, type FrequencyColumn } from "../../../lib/views/datafiles/frequency.ts";
 import { Input } from "../../_ui/input";
 import { cn } from "../../../lib/cn";
+import { exploreHref } from "../../portal/query-editor.tsx";
+import { copyText } from "../../_table/copy-text.ts";
 
 /**
  * A line's altered share as the portal's frequency table draws it (FrequencyBar, barWidth 200): the
@@ -40,6 +43,12 @@ type Result = DrawnResultOf<"datafiles">["datafiles"];
 /** The document as it stands, for a file's request. */
 function readDoc(docJson: () => string): TableBody["doc"] | null {
   try { return JSON.parse(docJson()) as TableBody["doc"]; } catch { return null; }
+}
+
+/** a case table id as the portal links it (CaseAlterationTable): the study to its summary, a sample or patient to its page, each in a new tab */
+function IdLink({ id, value, study }: { id: "study" | "sample" | "patient"; value: string; study: string }) {
+  const href = id === "study" ? exploreHref(value) : "/portal/patient?" + new URLSearchParams({ study, [id]: value }).toString();
+  return <a className="whitespace-nowrap" href={href} target="_blank" rel="noreferrer">{value}</a>;
 }
 
 /** A sample list's ids, "<study>:<sample>", read from the file the download serves. */
@@ -80,7 +89,7 @@ function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJso
     try { setState(await act(await listIds(docJson, vi, f.id))); }
     catch (e) { setState("could not " + what + ": " + (e as Error).message); }
   };
-  const copy = () => withIds("copy", async (ids) => { await navigator.clipboard.writeText(ids.join("\n")); return ids.length.toLocaleString() + " sample ids copied"; });
+  const copy = () => withIds("copy", async (ids) => { await copyText(ids.join("\n")); return ids.length.toLocaleString() + " sample ids copied"; });
   const open = () => withIds("open", async (ids) => {
     const studies = [...new Set(ids.map((x) => x.slice(0, x.indexOf(":"))))];
     const name = f.name;
@@ -127,15 +136,23 @@ const FREQ_PAGE = 10;
 
 /**
  * The gene alteration frequency table as the portal's (GeneAlterationTable): sorted by Percent Samples Altered,
- * highest first, until a header is clicked; filtered on gene and OQL line; ten rows a page; the OQL Line column
- * hidden until asked for; its file the portal's gene_alteration_frequency.tsv, every row in the table's order.
+ * highest first, until a header is clicked; filtered on gene and OQL line; ten rows a page; a Columns menu, the OQL
+ * Line column hidden until ticked; its file the portal's gene_alteration_frequency.tsv, every row in the table's
+ * order, and Copy the same text.
  * Ours alone: the Profiled column, each line's denominator.
  */
+type FreqCol = "gene" | "line" | "altered" | "profiled" | "percent";
+const FREQ_COLS: [FreqCol, string][] = [["gene", "Gene Symbol"], ["line", "OQL Line"], ["altered", "Num Samples Altered"], ["profiled", "Profiled"],
+  ["percent", "Percent Samples Altered"]];
+
 function FrequencyTable({ rows }: { rows: Result["frequency"] }) {
   const [sort, setSort] = useState<{ column: FrequencyColumn; asc: boolean }>({ column: "percent", asc: false });
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(0);
-  const [showLine, setShowLine] = useState(false);
+  // the portal's Columns menu (GeneAlterationTable showColumnVisibility): the OQL Line hidden at first; ours adds Profiled
+  const [cols, setCols] = useState<Record<FreqCol, boolean>>({ gene: true, line: false, altered: true, profiled: true, percent: true });
+  const [copied, setCopied] = useState<string | null>(null);
+  const showLine = cols.line;
   const sorted = frequencySort(rows, sort.column, sort.asc);
   const shown = frequencyFilter(sorted, filter, showLine);
   const pages = Math.max(1, Math.ceil(shown.length / FREQ_PAGE));
@@ -153,7 +170,15 @@ function FrequencyTable({ rows }: { rows: Result["frequency"] }) {
         <h4 className="m-0 font-semibold">Gene alteration frequency</h4>
         <span className="text-sm text-muted-foreground">altered ÷ samples profiled for the gene</span>
         <span className="flex-1" />
-        <label className="chk text-sm"><input type="checkbox" checked={showLine} onChange={(e) => setShowLine(e.target.checked)} /> OQL Line column</label>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className={TB} data-tip="show or hide this table's columns">Columns <ChevronDown /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {FREQ_COLS.map(([k, name]) => <DropdownMenuCheckboxItem key={k} checked={cols[k]} onSelect={(e) => e.preventDefault()}
+              onCheckedChange={(on) => setCols({ ...cols, [k]: on === true })}>{name}</DropdownMenuCheckboxItem>)}
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Input type="search" className={cn(FIELD, "w-40")} value={filter} placeholder="search genes" aria-label="search the gene alteration frequency table"
           onChange={(e) => { setFilter(e.target.value); setPage(0); }} />
         <Button variant="outline" size="sm" className={TB} asChild>
@@ -161,14 +186,19 @@ function FrequencyTable({ rows }: { rows: Result["frequency"] }) {
             data-tip="every row of this table, in its order, as the portal's tab-separated file">
             <Download />TSV</a>
         </Button>
+        <Button variant="outline" size="sm" className={TB} data-tip="copy every row of this table, in its order, as the portal's Copy does: the same tab-separated text as the file"
+          onClick={() => { copyText(frequencyTsv(sorted)).then(() => setCopied(sorted.length + " rows copied"), (e) => setCopied("Could not copy: " + String((e as Error)?.message || e))); }}>
+          <Copy />Copy</Button>
+        {copied && <span className="text-sm text-muted-foreground" role="status">{copied}</span>}
       </div>
       <table className="text-md [&_td]:border-b [&_td]:py-1 [&_td]:pr-6 [&_th]:pr-6 [&_th]:text-left">
-        <thead><tr>{head("gene", "Gene Symbol")}{showLine && head("line", "OQL Line")}{head("altered", "Num Samples Altered", "text-right")}
-          <th className="text-right">Profiled</th>{head("percent", "Percent Samples Altered")}</tr></thead>
+        <thead><tr>{cols.gene && head("gene", "Gene Symbol")}{showLine && head("line", "OQL Line")}{cols.altered && head("altered", "Num Samples Altered", "text-right")}
+          {cols.profiled && <th className="text-right">Profiled</th>}{cols.percent && head("percent", "Percent Samples Altered")}</tr></thead>
         <tbody>{shown.slice(at * FREQ_PAGE, (at + 1) * FREQ_PAGE).map((f) => (
-          <tr key={f.line}><td className="font-medium">{f.gene}</td>{showLine && <td className="mono">{f.line}</td>}
-            <td className="tabular-nums text-right">{f.profiled ? f.altered.toLocaleString() : "Not Profiled"}</td><td className="tabular-nums text-right">{f.profiled.toLocaleString()}</td>
-            <td>{f.profiled ? <FrequencyBar altered={f.altered} profiled={f.profiled} /> : "Not Profiled"}</td></tr>))}
+          <tr key={f.line}>{cols.gene && <td className="font-medium">{f.gene}</td>}{showLine && <td className="mono">{f.line}</td>}
+            {cols.altered && <td className="tabular-nums text-right">{f.profiled ? f.altered.toLocaleString() : "Not Profiled"}</td>}
+            {cols.profiled && <td className="tabular-nums text-right">{f.profiled.toLocaleString()}</td>}
+            {cols.percent && <td>{f.profiled ? <FrequencyBar altered={f.altered} profiled={f.profiled} /> : "Not Profiled"}</td>}</tr>))}
         </tbody>
       </table>
       <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
@@ -204,7 +234,8 @@ function DatafilesBody({ d, spec, vi, updating, docJson, onQuery }: { d: Result;
       <section aria-label="type of genetic alterations across all samples">
         <h4 className="mb-2 font-semibold">Type of genetic alterations across all samples</h4>
         <DataTable t={d} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit="samples" onQuery={onQuery}
-          cell={(id, x) => id === "altered" ? <span className={x === "1" ? undefined : "text-muted-foreground"} data-tip={x === "NP" ? "not profiled for every queried gene and data type (the portal writes 0)" : "1 = Sample harbors alteration in one of the input genes"}>{x}</span>
+          cell={(id, x, row) => id === "study" || id === "sample" || id === "patient" ? <IdLink id={id} value={String(x)} study={row.study} />
+            : id === "altered" ? <span className={x === "1" ? undefined : "text-muted-foreground"} data-tip={x === "NP" ? "not profiled for every queried gene and data type (the portal writes 0)" : "1 = Sample harbors alteration in one of the input genes"}>{x}</span>
             : id !== "sample" && id !== "patient" && id !== "study" && (x === "no alteration" || x === "not profiled") ? <span className="text-muted-foreground">{x}</span> : undefined} />
       </section>
     </div>

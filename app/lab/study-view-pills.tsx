@@ -3,7 +3,7 @@
 // numeric intervals with editable ends; clauses of no clinical chart drawn as the generic pills.
 import { Fragment, useEffect, useState } from "react";
 import type { CohortDef } from "../../lib/types.ts";
-import { editInterval, filterGroups, intervalEnds, intervalText, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
+import { editInterval, filterGroups, geneTablePills, intervalEnds, intervalText, removeOqlLine, joinedByAnd, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
 import { ClausePill, CLINICAL_COLOR, type OnCustomData } from "./pills";
 
 type Result = { draft: CohortDef } | { why: string };
@@ -45,33 +45,54 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
   onRemoveClause: (i: number) => void;
   onCustomData?: OnCustomData;
 }) {
-  return (
-    <span className="svpills">
-      {filterGroups(draft, labelOf).map((g) => g.kind === "other"
-        ? <ClausePill key={g.clause} clause={draft.all![g.clause]} onRemove={() => onRemoveClause(g.clause)} onCustomData={onCustomData} />
-        : (
-          <span key={g.clause} className="svgroup" data-sv-chart={g.attribute}>
-            <span className="svname" data-tip={g.attribute}>{g.label}</span>
-            <span className="svop">:</span>
-            {g.pills.map((p, k) => (
-              <Fragment key={k}>
-                {k > 0 && <span className="svop">or</span>}
-                <span className="fpill svpill" style={{ borderLeftColor: CLINICAL_COLOR }} data-sv-pill={pillText(p)}>
-                  {p.kind === "interval"
-                    ? <IntervalBody iv={p.interval} name={g.label}
-                        edit={(end, raw) => {
-                          const r = editInterval(draft, g.clause, p.leaf, end, raw);
-                          if ("draft" in r) onIntervalEdited?.(g.attribute, intervalEnds(r.draft, g.clause, p.leaf));
-                          return apply(r);
-                        }} />
-                    : <span className="fval">{pillText(p)}</span>}
-                  <button className="fx" aria-label={"remove " + g.label + " " + pillText(p)}
-                    onClick={() => apply({ draft: removePill(draft, g.clause, p) })}>×</button>
-                </span>
-              </Fragment>
-            ))}
+  type ChartGroup = Extract<ReturnType<typeof filterGroups>[number], { kind: "chart" }>;
+  /** a clinical chart's pills: "<chart> : a or b" */
+  const chart = (g: ChartGroup) => (
+    <span key={g.clause} className="svgroup" data-sv-chart={g.attribute}>
+      <span className="svname" data-tip={g.attribute}>{g.label}</span>
+      <span className="svop">:</span>
+      {g.pills.map((p, k) => (
+        <Fragment key={k}>
+          {k > 0 && <span className="svop">or</span>}
+          <span className="fpill svpill" style={{ borderLeftColor: CLINICAL_COLOR }} data-sv-pill={pillText(p)}>
+            {p.kind === "interval"
+              ? <IntervalBody iv={p.interval} name={g.label}
+                  edit={(end, raw) => {
+                    const r = editInterval(draft, g.clause, p.leaf, end, raw);
+                    if ("draft" in r) onIntervalEdited?.(g.attribute, intervalEnds(r.draft, g.clause, p.leaf));
+                    return apply(r);
+                  }} />
+              : <span className="fval">{pillText(p)}</span>}
+            <button className="fx" aria-label={"remove " + g.label + " " + pillText(p)}
+              onClick={() => apply({ draft: removePill(draft, g.clause, p) })}>×</button>
           </span>
-        ))}
+        </Fragment>
+      ))}
     </span>
   );
+  /** any other clause: a gene table's selection as the portal draws it, a pill per gene coloured by alteration (STV-FB-3 #9); else the generic pill */
+  const other = (clause: number) => {
+    const genes = geneTablePills(draft.all![clause]);
+    if (!genes) return <ClausePill key={clause} portal clause={draft.all![clause]} onRemove={() => onRemoveClause(clause)} onCustomData={onCustomData} />;
+    return (
+      <span key={clause} className="fgroup" data-gene-pills>
+        {genes.length > 1 && <span className="fconn">(</span>}
+        {genes.map((p, k) => (
+          <Fragment key={p.line}>
+            {k > 0 && <span className="fconn">or</span>}
+            <span className="fpill" style={{ borderLeftColor: p.color }} data-tip={p.line}>
+              <span className="fval">{p.gene}</span>
+              <button className="fx" aria-label={"remove " + p.line} onClick={() => apply({ draft: removeOqlLine(draft, clause, p.line) })}>×</button>
+            </span>
+          </Fragment>
+        ))}
+        {genes.length > 1 && <span className="fconn">)</span>}
+      </span>
+    );
+  };
+  // two groups in a row from one chart are joined by "and" (STV-FB-2)
+  const groups = filterGroups(draft, labelOf), and = joinedByAnd(draft, groups);
+  return <span className="svpills">{groups.map((g, i) => g.kind === "other"
+    ? <Fragment key={g.clause}>{and[i] && <span className="svop">and</span>}{other(g.clause)}</Fragment>
+    : chart(g))}</span>;
 }

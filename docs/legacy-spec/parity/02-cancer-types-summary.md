@@ -130,13 +130,13 @@ Data version: every denominator and every altered count matches in all 65 group 
 |---|---|---|---|
 | CTS-CT-1 | 🟡 | B | "category" select: Cancer Study / Cancer Type / Cancer Type Detailed + every categorical sample attribute; kept in the document |
 | CTS-CT-2 | ✅ | BC | Unset, the portal default (`run.ts:295-303`): Q2 → Cancer Study (2 bars, study names), Q3 coadread → Cancer Type Detailed (Colon 139/378, Mucinous 27/61, Rectal 56/155), Q1 → Cancer Type; the select names it "portal default (Cancer Type)" |
-| CTS-CT-3 | 🟡 | BC | "Min. # Total Patients|Samples" text box, unset = 10, or 0 when no group has more than 10 (`run.ts:325`); groups below are hidden, as legacy (Q1: 40 of 58). No slider; scope shared across gene tabs (document, invariant 9), each tab working out its own default |
-| CTS-CT-4 | 🟡 | BC | "Min. % Altered Patients" / "Min. # Altered …" text box, default 0, inclusive (`run.ts:326`); no slider, no `ceil(max)` end label |
+| CTS-CT-3 | ✅ | BC | "Min. # Total Patients\|Samples" box and slider 0 … the largest profiled total drawn (`thresholds.ts`); unset = 10, or 0 when no group has more than 10 (`run.ts:325`); groups below are hidden (Q1: 40 of 58); scope shared across gene tabs (document, invariant 9), each tab working out its own default (#429) |
+| CTS-CT-4 | ✅ | BC | "Min. % Altered Patients" / "Min. # Altered …" box and slider 0 … the largest share / count drawn, end label `ceil(max)` + "%" (Q1 93%), default 0, inclusive (#429) |
 | CTS-CT-5 | ✅ | BC | "sort x-axis by: Y-Axis Values / Alphabetically" (`cancertypes.tsx:194-198`); Q1 alphabetical: Adrenocortical Carcinoma, Ampullary Cancer, Anal Cancer, as legacy |
 | CTS-CT-6 | ✅ | B | "Min. # Total Patients", "Min. % Altered Patients"; "Min. # Altered …" in count mode; "Samples" with count by samples (`cancertypes.tsx:146, 183`) |
-| CTS-CT-7 | 🟡 | C | Digits and "." only, applied on Enter, the altered box shows "0%", NaN → 0 / default (`cancertypes.tsx:48-51, 179-185`) ✅; the total box is not clamped to the max: 999999 hides every group ("No category passes the filters.") where legacy clamps to 1668 |
-| CTS-CT-8 | N/A | C | No sliders to time |
-| CTS-CT-9 | ❌ | B | No highlighted input |
+| CTS-CT-7 | ✅ | C | Digits and "." only, applied on Enter, the altered box shows "0%", NaN → 0 / default; Min. # Total over the largest drawn is set to it (Q1 by patients 999999 → 1567, by samples 1668) (#429) |
+| CTS-CT-8 | 🟡 | C | Both sliders apply when let go; the portal's Min. Altered applies while dragging (#429) |
+| CTS-CT-9 | ✅ | B | Box highlighted when its applied value is above 0, Min. # Total at its default of 10 (#429) |
 | CTS-CT-10 | ✅ | C | Category or count-by resets both thresholds, y-axis only Min. altered (`cancertypes.tsx:154, 165, 190`); sort and y-axis kept across a category change |
 
 ### §2 Controls — Occurrence
@@ -154,7 +154,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | ID | verdict | how | note |
 |---|---|---|---|
 | CTS-CH-1 | ✅ | B | "40 of 58 categories (Cancer Type) are shown based on filtering." above the chart at the default threshold (Q1), as legacy (`figure.ts:67-69`) |
-| CTS-CH-2 | 🟡 | BC | Vertical stacked bars ≤ 32 px, plot 240 px (legacy 20 px / 400); y titles identical; labels at 45° under the bars (legacy 50°); more groups than fit → figure grows and scrolls, no synced top scrollbar |
+| CTS-CH-2 | ✅ | BC | Vertical stacked bars 20 px wide, 8 px apart; plot 300 px, the tallest bar 280 (the portal's 400 px chart less its padding); y titles identical; labels at 50° from their start under the strip; more groups than fit → figure grows and scrolls, with a synced scrollbar on top (`figure.ts`, `figure.tsx` `topScroll`) (#434) |
 | CTS-CH-3 | 🟡 | BC | Stack bottom → top Multiple, Protein low/high, mRNA low/high, Deep Deletion, Amplification, SV, Mutation, Multiple `#666` (`figure.ts:18-21`, `common.ts:35`) ✅; no Gain / Shallow Deletion buckets: OQL GAIN / HETLOSS is refused ("only high-level CNA is stored") |
 | CTS-CH-4 | ✅ | B | Types present only; Mutation · Structural Variant · Amplification · Deep Deletion · Multiple Alterations (Q1), as legacy |
 | CTS-CH-5 | ✅ | BC | The profiled-data strip as the portal's: a row per data type the query reads (Structural variant / Mutation / CNA, and mRNA / Protein for an EXP / PROT line), "+" or "−" per group; on a gene tab for that gene's panels (msk_impact_2017 NEGR1: Colorectal 782 of 982 patients) |
@@ -194,7 +194,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-MD-8 | ✅ | BC | Denominator excludes cases whose panels lack the genes ✅ (all denominators identical); the strip shows "−" for a group with no case profiled for a type |
 | CTS-MD-9 | 🐞 ok | C | All groups filtered away: "No category passes the filters.", the controls stay |
 | CTS-MD-10 | ✅ | C | Grey tab label; "There are no alterations in this gene." in place of the bars; "No category passes the filters." first when every group is filtered away |
-| CTS-MD-11 | 🟡 | B | > 37 groups: figure widens and scrolls; no top scrollbar |
+| CTS-MD-11 | ✅ | B | Many groups: figure widens and scrolls, a synced scrollbar on top; ours whenever the bars don't fit the card, the portal's past 37 groups (#434) |
 | CTS-MD-12 | ❌ | C | No hide-download switch (no downloads either) (tracked: Data-governance switches) |
 
 §7 Persistence (no IDs): legacy persists nothing; cBioLab keeps category, count-by, measure, min group and y-axis in the document (`?changes=`) per invariant 9; the active gene pill stays in the browser.
@@ -204,8 +204,8 @@ Data version: every denominator and every altered count matches in all 65 group 
 | ID | verdict | how | note |
 |---|---|---|---|
 | CTS-STM-1 | ✅ | BC | Grouping by sample CANCER_TYPE / CANCER_TYPE_DETAILED / study; missing CANCER_TYPE → the study's type of cancer, else "Unknown"; missing detailed → cancer type (`sql.ts:238-258`), as legacy; a patient spanning groups counts in each. Q1 58/58 group keys and denominators identical |
-| CTS-STM-2 | 🟡 | BC | Q1 samples: 58 groups, Σ altered 6163, NSCLC 1237/1668, Breast 865/1337, CRC 932/1007 identical; types now de-duplicated by alteration type (`sql.ts:317-320`), but AMP in one gene + HOMDEL in another is always counted as Amplification, where legacy took whichever CNA came first (Deep Deletion in all 3 groups seen); no gain/hetloss buckets |
-| CTS-STM-3 | 🟡 | BC | Q1 patients 55/58 groups identical on all 7 counts, Σ altered 5900; the 3 others (GI Neuroendocrine 1, Germ Cell 1, Bone 1) put AMP + HOMDEL under Amplification, legacy under Deep Deletion; KRAS tab, Q2 and Q3 identical |
+| CTS-STM-2 | ✅ | BC | Q1 samples: 58 groups, Σ altered 6163, NSCLC 1237/1668, Breast 865/1337, CRC 932/1007 identical; types de-duplicated by alteration type, the kind the first the portal meets: samples by id, genes in query order (`sql.ts` `met`, `cna1`); no gain/hetloss buckets (#428) |
+| CTS-STM-3 | ✅ | BC | Q1 patients 58/58 groups identical on all 7 counts, Σ altered 5900 (GI Neuroendocrine, Germ Cell, Bone now Deep Deletion, as legacy); KRAS tab, Q2 and Q3 identical (#428) |
 | CTS-STM-4 | ✅ | BC | Profiled = panel lists the gene for mutation, CNA or SV (`sql.ts:47-52`); All = union over genes; every denominator identical |
 | CTS-STM-5 | ✅ | BC | Heights = count ÷ profiled × 100 or count ✅; popover % as lodash `_.round(x, 2)` (`portalRound2`: 92.77, 1.005 → 1.01) |
 | CTS-STM-6 | 🟡 | BC | Plotted iff profiled > 0, ≥ Min. # Total (default 10 / 0) and ≥ Min. altered, inclusive (`run.ts:322-331`): Q1 40 of 58, as legacy; no slider maxima |

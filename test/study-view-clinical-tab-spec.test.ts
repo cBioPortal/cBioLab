@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  CLINICAL_TAB_ROWS, clinicalCell, clinicalTabColumns, clinicalTabDoc, type TabChart,
+  CLINICAL_TAB_ROWS, clinicalCell, clinicalColumnTip, clinicalTabColumns, clinicalTabDoc, type TabChart,
 } from "../lib/study-view-clinical-tab.ts";
 import {
   CASE_FILE_COHORT, caseFileBreaks, caseFileDoc, caseFileFormat, caseFileHeader, caseFileLine, caseFileName,
@@ -180,4 +180,16 @@ test("CT13: an attribute charted at both levels is one column, where its first c
     { attribute: "LOW", name: "Low", priority: 0 },
   ];
   assert.deepEqual(clinicalTabColumns(charts), ["patient", "sample", "AGE", "SEX", "LOW"]);
+});
+
+// STV-CD-3: a column header's tooltip, as the portal's Clinical Data tab writes it
+test("a header's tooltip: name, description and attribute id, one a line, none repeated", () => {
+  const cases: [TabChart, string][] = [
+    [{ attribute: "AGE", name: "Diagnosis Age", priority: 9, description: "Age at which a condition or disease was first diagnosed." },
+      "Diagnosis Age\nAge at which a condition or disease was first diagnosed.\nAGE"],          // seen: coadread
+    [{ attribute: "CANCER_TYPE_DETAILED", name: "Cancer Type Detailed", priority: 2000, description: "Cancer Type Detailed" },
+      "Cancer Type Detailed\nCANCER_TYPE_DETAILED"],                                            // a description that repeats the name
+    [{ attribute: "SUBTYPE", name: "SUBTYPE", priority: 8 }, "SUBTYPE"],                       // no display name, no description
+  ];
+  for (const [c, want] of cases) assert.equal(clinicalColumnTip(c), want, c.attribute);
 });

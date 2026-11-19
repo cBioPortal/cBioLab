@@ -34,7 +34,7 @@ export function cancertypesMethod(t: CancertypesTrace): MethodRecord {
     detail: "The cancertypes queries above. Per group, for the genes together and for each gene: the " + t.unit + "s profiled for it, and of those the " + t.unit + "s with " +
       (t.oql ? "an alteration one of the query's OQL lines matches, each line under its gene (" + t.oql.join("; ") + ")"
         : t.measure === "driver" ? "an OncoKB driver (" + t.oncokbPin + ")" : "any mutation, amplification, deep deletion or structural variant") +
-      ", split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, shown as the amplification — or more than one); and the whole cohort's, each " + t.unit + " once." +
+      ", split by kind (one kind only — an amplification and a deep deletion are one copy-number kind, named by the first the portal meets, " + (t.unit === "patient" ? "the patient's samples by id and each sample's genes" : "the genes") + " in query order, as mRNA and protein high / low are — or more than one); and the whole cohort's, each " + t.unit + " once." +
       (t.unit === "patient" ? " A patient counts in each group one of their samples in the cohort is in, profiled if any of those samples is, altered if any is." : "") +
       " Per group and gene too, the " + t.unit + "s profiled for each alteration type (mutation, copy number, structural variant, and mRNA / protein for an EXP / PROT line): the gene on a sample's panel for a profile of that type; for the genes together, any of them. Counts only." + (FALLBACK[t.groupBy] || ""),
     scope: s.cohort + " · " + s.study, rowsOut: s.groups,

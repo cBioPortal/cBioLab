@@ -6,7 +6,7 @@ import { Fragment } from "react";
 import { isCustomAttr, attributeLabel } from "../../lib/custom-data-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { entityShortName } from "../../lib/profile-names.ts";
-import { DISCRETE_CNA_PROFILE, cnaLevelLabel } from "../../lib/gene-state-clauses.ts";
+import { DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE, cnaLevelLabel, mutationTypeLabel } from "../../lib/gene-state-clauses.ts";
 
 /** opens the uploaded data behind a clause (see custom-data-dialog.tsx) */
 export type OnCustomData = (attribute: string, leaf: any, negated: boolean) => void;
@@ -101,7 +101,10 @@ function leafText(leaf: any) {
   if (k === "split") return leaf.part + " half";
   if (k === "genomicData" && leaf.profileType === DISCRETE_CNA_PROFILE && !leaf.range)
     return `${leaf.gene} copy number: ` + (leaf.values || []).map(cnaLevelLabel).join(" or ");
+  if (k === "genomicData" && leaf.profileType === MUTATION_TYPE_PROFILE)
+    return `${leaf.gene} mutation type: ` + (leaf.values || []).map((v: unknown) => mutationTypeLabel(String(v))).join(" or ");
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
+  if (k === "treatment") return (leaf.time ? "sample " + (leaf.time === "Pre" ? "before" : "after") + " treatment: " : "treated with ") + (leaf.agents || []).join(" or ");
   if (k === "genericAssay") return entityShortName(String(leaf.entity), String(leaf.profileType)) + " " + (leaf.range
     ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ")
     : (leaf.values || []).join(" or "));
@@ -149,15 +152,18 @@ export function normalizeDef(def: any) {
 }
 
 /** one top-level clause: a pill, a NOT pill, or an OR group, with an × when it can be removed */
-export function ClausePill({ clause: c, onRemove, onCustomData }: { clause: any; onRemove?: () => void; onCustomData?: OnCustomData }) {
+/** `portal`: an OR group written as the Study View's filter bar writes it, "( a or b )" (STV-FB-2) */
+export function ClausePill({ clause: c, onRemove, onCustomData, portal }: { clause: any; onRemove?: () => void; onCustomData?: OnCustomData; portal?: boolean }) {
   if (c.any) return (
     <span className="fgroup">
+      {portal && <span className="fconn">(</span>}
       {c.any.map((l: any, j: any) => (
         <Fragment key={j}>
-          {j > 0 && <span className="fconn">OR</span>}
+          {j > 0 && <span className="fconn">{portal ? "or" : "OR"}</span>}
           <Pill leaf={l} onCustomData={onCustomData} />
         </Fragment>
       ))}
+      {portal && <span className="fconn">)</span>}
       {onRemove && <button className="fx" aria-label="remove group" onClick={onRemove}>×</button>}
     </span>
   );

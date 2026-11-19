@@ -4,8 +4,10 @@
  * (STV-FB-4). The settings are each reader's own, kept by the browser (app/lab/use-explore-state.ts);
  * the server bins by them (lib/data-binner.ts BinSettings).
  */
-import type { NumericBin } from "./types.ts";
+import type { Clause, NumericBin } from "./types.ts";
 import type { BinMethod, BinSettings } from "./data-binner.ts";
+import { withoutAttribute } from "./study-view-add-chart.ts";
+import { isCustomAttr } from "./custom-data-names.ts";
 
 export type { BinMethod, BinSettings };
 
@@ -32,6 +34,15 @@ export function looksLogarithmic(bins: NumericBin[] | undefined): boolean {
 
 /** Log Scale is offered while it is switched off, or while the bars are drawn on it (isLogScaleToggleVisible) */
 export const logScaleOffered = (bins: NumericBin[] | undefined, s: ChartBins | undefined): boolean => !!s?.disableLog || looksLogarithmic(bins);
+
+/**
+ * Log Scale switched on or off (STS-BAR-7, toggleLogScale in StudyViewPageStore.ts): the chart's
+ * settings flipped, and its filter cleared, since its ranges were the old bars'; a custom-data
+ * chart keeps its filter, as on the portal. `all` is the draft's top-level clauses.
+ */
+export function logScaleToggled(attribute: string, cur: ChartBins | undefined, all: Clause[]): { bins: ChartBins; all: Clause[] } {
+  return { bins: { ...cur, disableLog: !cur?.disableLog }, all: isCustomAttr(attribute) ? all : withoutAttribute(all, attribute) };
+}
 
 /** the bars' numeric edges, each once, in order: the Custom Bins box's starting text */
 export function binEdges(bins: NumericBin[] | undefined): number[] {

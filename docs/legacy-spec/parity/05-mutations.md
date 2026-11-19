@@ -119,7 +119,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | ID | verdict | how | note |
 |---|---|---|---|
 | MUT-GT-1 | ✅ | B | One chip per query gene, query order (KRAS NRAS BRAF TP53 APC) |
-| MUT-GT-2 | 🟡 | BC | Unchanged: symbol only ✅; nothing greys a gene with no mutations (`results-layout.ts`) |
+| MUT-GT-2 | ✅ | B | Symbol only; a gene with no mutation in the tab (its mutations and fusion rows, under the query's OQL where the tab follows it) greyed, still clickable (coadread_tcga_pub MYC, CDKN2A as cbioportal.org) (`mutationsChipEmpties`) (#425) |
 | MUT-GT-3 | 🟡 | B | Unchanged: first gene default ✅; active gene in the document, not `mutations_gene`; not shared with the SV tab |
 | MUT-GT-4 | 🔶 | C | Unchanged: switching gene clears sort, search, filters and codons (`results-layout.ts:328`) |
 
@@ -211,7 +211,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-33 | 🟡 | C | ClinVar column (#245); blank on Q1 |
 | MUT-COL-34 | 🟡 | C | dbSNP column (#245); blank on Q1 |
 | MUT-COL-35 | 🟡 | C | SIGNAL column (#245); blank on Q1 |
-| MUT-COL-36 | ❌ | C | Unchanged: no clinical attribute columns beyond Cancer Type |
+| MUT-COL-36 | 🟡 | B | A hidden column per attribute of the queried studies but CANCER_TYPE_DETAILED, MUTATION_COUNT (and CANCER_TYPE, our Cancer Type column), by display name, sample attributes by sample and patient by patient, NUMBER as numbers (coadread KRAS: 92 columns, as the portal) (#420); no header description, NA tip or 30-character cut; NUMBER attributes searched |
 | MUT-COL-37 | ❌ | C | Unchanged: no namespace columns |
 | MUT-COL-38 | ✅ | B | The portal's 8 by default: Sample ID, Cancer Type Detailed, Protein Change, Annotation, Mutation Type, Copy #, Allele Freq (T), # Mut in Sample |
 | MUT-COL-T1 | ✅ | B | Label mapping and colours (`lib/mutation-type.ts`) (#245) |
@@ -241,10 +241,10 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-TB-1 | 🟡 | B | "223 KRAS mutations", "59 of 223 KRAS mutations", with the ": includes N duplicate mutations in patients with multiple samples" suffix when N > 0; no "(page x of y)" |
-| MUT-TB-2 | 🟡 | B | Unchanged: search, columns, download CSV; no Copy |
+| MUT-TB-1 | 🟡 | B | "223 KRAS mutations (page 1 of 9)", "59 of 223 KRAS mutations", the duplicate suffix when N > 0 (#409); "KRAS mutations" where the portal writes "Mutations" |
+| MUT-TB-2 | 🟡 | B | Search, columns, [Copy] (the table.tsv's text, "Copied!") and download TSV (#413); the order is ours (search first), the portal's Copy · Download · Columns · search |
 | MUT-TB-3 | ✅ | B | Search "G12D" → table 59 of 223, the lollipop and badges 59 too (the hotspots view's `table`, `linkMutations`) |
-| MUT-TB-4 | 🔶 | B | Unchanged: numbered pages + per page |
+| MUT-TB-4 | ✅ | B | ‹ Show more › with Reset, 25 → 50 → 100 → 200, hidden at ≤ 25 rows, no per-page select (`lib/table-pager.ts`, ShowMorePager) (#409) |
 | MUT-TB-5 | 🟡 | B | Unchanged: one list "Columns (6 of 35)"; no Clinical tab, no Freq |
 | MUT-TB-6 | 🟡 | BC | Unchanged |
 | MUT-TB-7 | ❌ | B | Unchanged: no annotation filter |

@@ -6,6 +6,7 @@ import { interpolatePlasma } from "d3-scale-chromatic";
 import type { View } from "./types.ts";
 import { studentTP } from "./stats.ts";
 import { portalFixed, portalLocale, portalRange } from "./chart/format.ts";
+import type { ChartBins } from "./study-view-bins.ts";
 
 export const MUTATION_COUNT = "MUTATION_COUNT";
 export const FGA = "FRACTION_GENOME_ALTERED";
@@ -16,9 +17,16 @@ export const DENSITY_GRID: [number, number] = [44, 38];
 export interface DensitySettings { swapped?: boolean; xLog?: boolean; yLog?: boolean }
 export interface DensityAxis { attribute: string; log: boolean }
 
+/** an X vs Y chart's two attributes, x along the bottom before any swap (STS-SC-1) */
+export interface DensityPair { x: string; y: string }
+/** the default chart: Mutation Count (y) against Fraction Genome Altered (x) */
+export const DEFAULT_DENSITY_PAIR: DensityPair = { x: FGA, y: MUTATION_COUNT };
+/** the one chart a pair has, whichever way round it was asked for (the portal's `X-VS-Y-<sorted ids>`) */
+export const densityPairKey = (p: DensityPair): string => [p.x, p.y].sort().join("|");
+
 /** which attribute each axis holds and whether it is on Log Scale (only a mutation-count axis can be) */
-export function densityAxes(s: DensitySettings): { x: DensityAxis; y: DensityAxis } {
-  const [xa, ya] = s.swapped ? [MUTATION_COUNT, FGA] : [FGA, MUTATION_COUNT];
+export function densityAxes(s: DensitySettings, pair: DensityPair = DEFAULT_DENSITY_PAIR): { x: DensityAxis; y: DensityAxis } {
+  const [xa, ya] = s.swapped ? [pair.y, pair.x] : [pair.x, pair.y];
   return { x: { attribute: xa, log: !!s.xLog && logOffered(xa) }, y: { attribute: ya, log: !!s.yLog && logOffered(ya) } };
 }
 
@@ -40,8 +48,8 @@ function fixedRange(attribute: string): { min?: number; max?: number } | undefin
 }
 
 /** the plot view the chart asks the engine for */
-export function densityView(s: DensitySettings): View {
-  const { x, y } = densityAxes(s);
+export function densityView(s: DensitySettings, pair: DensityPair = DEFAULT_DENSITY_PAIR): View {
+  const { x, y } = densityAxes(s, pair);
   const rx = fixedRange(x.attribute), ry = fixedRange(y.attribute);
   return {
     kind: "plot", unit: "sample",
@@ -139,12 +147,63 @@ function axisRange(a: DensityAxis, v0: number, v1: number, span: number): RangeC
 }
 
 /**
+ * The edges a drag box's ranges add to their attributes' bar charts, as the portal adds them as
+ * custom bins (STS-SC-6, _customBinsFromScatterPlotSelectionSet): each range's two ends.
+ */
+export interface DensityBins { attribute: string; range: { gte: number; lte: number }; edges: number[] }
+
+/**
+ * The charts' bins with a density drag's edges laid over them, as the portal's separate, temporary
+ * set of scatter-selection bins (STS-SC-6): an attribute's bars take the drag's edges only while the
+ * draft still holds that drag's range on it, so removing the filter, Clear All, or a selection on the
+ * bars (which replaces the chart's filter) drops them. The reader's own bins are left as they are.
+ */
+export function withDensityBins(bins: Record<string, ChartBins>, density: DensityBins[], draft: { all?: unknown[] } | null | undefined): Record<string, ChartBins> {
+  const out: Record<string, ChartBins> = { ...bins };
+  for (const d of density) {
+    const held = (draft?.all || []).some((c) => {
+      const l = c as { kind?: string; attribute?: string; range?: { gte?: number; lte?: number } };
+      return !!l && l.kind === "clinical" && l.attribute === d.attribute && l.range?.gte === d.range.gte && l.range?.lte === d.range.lte;
+    });
+    if (held) out[d.attribute] = { ...bins[d.attribute], bins: { method: "custom", edges: d.edges } };
+  }
+  return out;
+}
+/**
+ * The temporary edges after a drag on one density chart (`next`, its two attributes'): they replace
+ * those attributes' own, and every other attribute's, another chart's, stay, as the portal keeps
+ * them per attribute (_customBinsFromScatterPlotSelectionSet).
+ */
+export function densityBinsAfterDrag(current: DensityBins[], next: DensityBins[]): DensityBins[] {
+  const mine = new Set(next.map((d) => d.attribute));
+  return [...current.filter((d) => !mine.has(d.attribute)), ...next];
+}
+
+/** the temporary edges without these attributes': a density chart removed takes its attributes' with it */
+export function densityBinsWithout(current: DensityBins[], attributes: string[]): DensityBins[] {
+  return current.filter((d) => !attributes.includes(d.attribute));
+}
+
+/**
+ * Remove chart on an X vs Y density chart, as the portal's: the pair goes (whichever way round it
+ * was asked for), and with it the filters on both its attributes (`clear`) and their temporary edges.
+ */
+export function xyChartRemoval(pairs: DensityPair[], bins: DensityBins[], pair: DensityPair): { pairs: DensityPair[]; bins: DensityBins[]; clear: string[] } {
+  const clear = [pair.x, pair.y].sort();
+  return { pairs: pairs.filter((p) => densityPairKey(p) !== densityPairKey(pair)), bins: densityBinsWithout(bins, clear), clear };
+}
+
+export function densityBinEdges(clauses: { attribute: string; range: { gte: number; lte: number } }[]): { attribute: string; ends: number[] }[] {
+  return clauses.map((c) => ({ attribute: c.attribute, ends: [c.range.gte, c.range.lte] }));
+}
+
+/**
  * The filter clauses a drag box makes: one range per attribute, whichever axis it is on. `box` is
  * in the axes' display units (ln(1 + count) on a Log Scale axis); `span` is each axis's length in
  * those units, for rounding a fraction to the axis's precision.
  */
 export function densitySelection(box: { x0: number; x1: number; y0: number; y1: number }, s: DensitySettings,
-  span: { x: number; y: number }): RangeClause[] {
-  const { x, y } = densityAxes(s);
+  span: { x: number; y: number }, pair: DensityPair = DEFAULT_DENSITY_PAIR): RangeClause[] {
+  const { x, y } = densityAxes(s, pair);
   return [axisRange(x, box.x0, box.x1, span.x), axisRange(y, box.y0, box.y1, span.y)];
 }

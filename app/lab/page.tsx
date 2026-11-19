@@ -4,6 +4,7 @@ import { currentLinkUrlMax, linkParams, writeSearch } from "../_links/link-state
 import { TAB_PARAM, readFilters, readTab, writeTab, type StudyViewTab } from "../../lib/study-view-url.ts";
 import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
+import { geneChartCount } from "../../lib/study-view-add-chart.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
@@ -33,8 +34,10 @@ import { useSaved, useSavedActions } from "../_saved/saved-context.tsx";
 import { ExamplesTab } from "./examples-tab.tsx";
 import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
+import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
-import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, AssayFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, AssayFreqTables, TreatmentTables, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { cardOrders } from "../../lib/study-view-config.ts";
 import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
@@ -430,7 +433,7 @@ export default function AnalysisPage() {
     } catch { return []; }
   });
   const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
-  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
+  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, mutationTypeCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();
   /** one of the reader's saved cohorts open in Explore to change its filters; false while their list has not arrived */
@@ -485,8 +488,8 @@ export default function AnalysisPage() {
   // the tabs' props, kept while the selection and the charts stay the same
   const tabSelection = useMemo(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; },
     [explore, studyKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- barDef reads the applied draft, which changes with explore
-  const chartList = explore ? (visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number }[])
-    .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0 })) : [];
+  const chartList = explore ? (visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number; description?: string }[])
+    .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0, ...(c.description ? { description: c.description } : {}) })) : [];
   const chartListKey = JSON.stringify(chartList);
   const tabCharts = useMemo(() => chartList, [chartListKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on its own JSON
   useSavedActions({ openDoc: openDocument, openShared, showClauseData, onDataChanged: () => fetchExplore(), editCohort: editSavedCohort, studies: () => exStudies });
@@ -628,7 +631,10 @@ export default function AnalysisPage() {
                 return shown < all && <span className="meta" data-charted={shown + "/" + all}>
                   {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
               })()}
-              {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
+              {(() => {
+                const n = geneChartCount({ genes: geneCharts, kinds: exploreState.geneKinds, types: mutationTypeCharts });
+                return n > 0 && <span className="meta">{n} gene chart{n === 1 ? "" : "s"}</span>;
+              })()}
               {(() => {
                 // drivers only where every selected study has OncoKB calls here; the server refuses the rest too
                 const without = exStudies.filter((id) => studies.find((x) => x.id === id)?.oncokb === false);
@@ -649,6 +655,8 @@ export default function AnalysisPage() {
             </div>
           )}
           {explore && explore.draftCount !== 0 && <>
+            {/* every card's place by the portal's priorities, clinical and other kinds together (STS-LY-3) */}
+            <style>{cardOrders(explore.clinical || []).map((c) => ".facetgrid > " + c.selector + " { order: " + c.order + "; }").join("\n")}</style>
             <div className="facetgrid">
               <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} selection={() => tabSelection} draft={parseDraft()}
                 attrs={explore.clinical || []}
@@ -658,16 +666,20 @@ export default function AnalysisPage() {
                   const eps = [...names].filter((a) => /_MONTHS$/.test(a) && names.has(a.replace(/_MONTHS$/, "_STATUS"))).map((a) => a.replace(/_MONTHS$/, ""));
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
                 })()}
-                addClauses={addClauses} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width })} deps={[curves]} />} />
+                addClauses={exploreState.addDensitySelection} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />}
+                density={exploreState.chartChecked("genomic|density")} pairs={exploreState.xyCharts} onRemovePair={exploreState.removeXyChart} />
               <ClinicalFacets ctx={exploreCtx} />
               {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
                   gene per alteration type, the same tile shape a clinical attribute gets,
                   so a chart you configured actually reaches this grid rather than only
                   living inside the dialog that configured it. */}
               <GeneFacets ctx={exploreCtx} />
+              <MutationTypeFacets ctx={exploreCtx} />
               <AssayFacets ctx={exploreCtx} />
+              <AssayFreqTables ctx={exploreCtx} />
+              <TreatmentTables ctx={exploreCtx} />
               <StudyBreakdown ctx={exploreCtx} />
-              <DataTypes ctx={exploreCtx} />
+              {exploreState.chartChecked("genomic|datatypes") && <DataTypes ctx={exploreCtx} />}
               <AlteredGenes ctx={exploreCtx} />
               <EventsAndCaseLists ctx={exploreCtx} />
             </div>

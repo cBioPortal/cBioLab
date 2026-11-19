@@ -1,5 +1,5 @@
 // The evolution view's spec and result, added to lib/types.ts's maps by the declaration at the end.
-import type { TableRows, TimelineResult } from "../../types.ts";
+import type { PatientTimeline, TableRows, TimelineResult } from "../../types.ts";
 import type { TableQuery } from "../../table-query.ts";
 import type { AxisTick } from "../../timeline-tracks.ts";
 
@@ -43,6 +43,11 @@ export interface EvolutionView extends TableQuery {
   cluster?: boolean;
   /** the heatmap labels each mutation "GENE pChange" (default true) */
   mutationLabels?: boolean;
+  /**
+   * the patient's timeline drawn above the line chart, sharing its time axis (default false), as the
+   * portal's Show Timeline; offered only for a patient with clinical events (the result's `events`)
+   */
+  showTimeline?: boolean;
   /** the line chart's time axis draws every year, rather than cutting runs of four or more years with no event (default false), as the timeline's expandGaps */
   expandGaps?: boolean;
   /**
@@ -103,6 +108,10 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   heatmapOrder?: { mutations: number[]; samples: number[] };
   /** placed by day: the patient's timeline axis, a tick a year from the first to the last of all the patient's events, empty stretches of four or more years cut, as the portal's line chart shares the timeline's axis */
   axis?: AxisTick[];
+  /** how many clinical events the patient's timeline holds: the line chart offers Show Timeline only when there are any */
+  events: number;
+  /** with showTimeline, on the line chart, for a patient with events: the patient's timeline, drawn above the chart */
+  timeline?: PatientTimeline;
   /** the attributes the line chart can be grouped by: the patient's samples' own clinical attributes, id and display name */
   groupOptions?: { id: string; name: string }[];
   /** the samples' groups when grouped: in order of a value's first sample; samples without a value last, unlabelled ("") */
@@ -110,7 +119,7 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   /** why the chart is not grouped though groupBy was asked for, or why the attributes to group by could not be listed */
   ungrouped?: string;
   /** the display as drawn, from the spec */
-  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean; /** the Group by attribute applied, or null when the chart is not grouped */ groupBy: string | null };
+  display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean; /** the Group by attribute applied, or null when the chart is not grouped */ groupBy: string | null; showTimeline: boolean };
 }
 
 declare module "../../types.ts" {

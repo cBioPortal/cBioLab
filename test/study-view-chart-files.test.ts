@@ -7,6 +7,7 @@ import { pieFigureSvg } from "../lib/study-view-figures.ts";
 import { survivalSvg } from "../lib/views/survival/figure.ts";
 import { textWidth, FS } from "../lib/svg-kit.ts";
 import type { KmCurve } from "../lib/types.ts";
+import { PORTAL_STUDY_VIEW_KM, SERIES } from "../lib/chart/style.ts";
 
 test("pdfFonts: the root's children are wrapped in a group naming the embedded font, the root kept", () => {
   const out = pdfFonts('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text x="0" y="5">a</text></svg>');
@@ -44,4 +45,15 @@ test("pie figure: each share is of every case, NA included, as the chart's", () 
   const svg = pieFigureSvg("Sex", [{ value: "Female", count: 3, color: "#111111" }, { value: "NA", count: 1, color: "#cccccc" }]);
   assert.match(svg, />Female: 3 \(75\.0%\)</);
   assert.match(svg, />NA: 1 \(25\.0%\)</);
+});
+
+test("STS-KM-2: the Study View's curve in the portal's #2986E2, its risk-table key too; other views keep the series colours", () => {
+  const atRisk = [10, 8, 6];
+  const curve: KmCurve = { cohort: "Selected", points: [{ t: 0, s: 1 } as never, { t: 2, s: 0.5 } as never], median: 2, n: 10, events: 5, atRisk, tLast: 2 };
+  const strokes = (svg: string) => [...svg.matchAll(/stroke="(#[0-9A-Fa-f]{6})" stroke-width="2"/g)].map((m) => m[1]);
+  const sv = survivalSvg({ kind: "survival", curves: [curve] } as never, { width: 480, theme: "light" }, PORTAL_STUDY_VIEW_KM);
+  assert.equal(PORTAL_STUDY_VIEW_KM, "#2986E2");
+  assert.ok(strokes(sv).length >= 2 && strokes(sv).every((c) => c === "#2986E2"), "the curve and its risk-table key: " + strokes(sv).join(","));
+  const plain = survivalSvg({ kind: "survival", curves: [curve] } as never, { width: 480, theme: "light" });
+  assert.ok(strokes(plain).every((c) => c === SERIES[0]));
 });

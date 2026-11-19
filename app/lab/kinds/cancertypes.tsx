@@ -22,6 +22,9 @@ import { cn } from "../../../lib/cn.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../../_ui/tooltip.tsx";
 import { cancertypesTip } from "../../../lib/views/cancertypes/tip.ts";
 import { exploreHref } from "../../portal/query-editor.tsx";
+import { Slider } from "../../_ui/slider";
+import type { CancertypesResult } from "../../../lib/views/cancertypes/types.ts";
+import { alteredEndLabel, clampMinTotal, thresholdEnds, thresholdHighlight } from "../../../lib/views/cancertypes/thresholds.ts";
 
 /**
  * A bar's popover, the portal's (CancerSummaryChart): its group, "Gene altered in P% of N patients" and the
@@ -61,6 +64,27 @@ function Pills({ items, on, set, muted, unprofiled }: { items: string[]; on: str
     </Tabs>
   );
 }
+
+/**
+ * A threshold's slider, the portal's beside its box: 0 to the largest value drawn, both ends labelled. It moves
+ * the box's number while dragged and applies it when let go.
+ */
+function ThresholdSlider({ label, end, endLabel, value, disabled, onDrag, onCommit }: {
+  label: string; end: number; endLabel: string; value: number; disabled: boolean; onDrag: (v: number | null) => void; onCommit: (v: number) => void;
+}) {
+  const none = end <= 0;
+  return (
+    <span className="inline-flex items-center gap-1 text-sm text-muted-foreground" data-tip={none ? "no category is drawn, so there is nothing to slide over" : label + ": 0 to " + endLabel + ", the largest of the categories drawn"}>
+      0
+      <Slider aria-label={label} className="w-[90px] [&_[data-slot=slider-track]]:bg-border" min={0} max={none ? 1 : end} step={1} disabled={disabled || none} value={[Math.min(value, end)]}
+        onValueChange={(vs) => onDrag(vs[0])} onValueCommit={(vs) => { onDrag(null); onCommit(vs[0]); }} />
+      {endLabel}
+    </span>
+  );
+}
+
+/** the portal's highlightInput, on a box whose applied value is above 0 */
+const HIGHLIGHT = "[&_input]:border-primary [&_input]:ring-[3px] [&_input]:ring-primary/30";
 
 // ---- Cancer Types Summary: "All Queried Genes" and one tab per gene, a bar chart per cohort ----
 
@@ -114,7 +138,7 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
     const same = hover.tip && el && hover.tip.panel === panel && hover.tip.key === key;
     hover.move(same ? hover.tip : el && b ? { panel, key, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom } } : null, e.clientX, e.clientY);
   };
-  // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls
+  // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls, with the portal's scrollbar on top too
   const draw = (i: number) => (width: number) => {
     const c = cancertypesPanelSvg(r, i, { width, gene: gene === ALL ? null : gene, title: r.panels.length > 1 || gene !== ALL, popover: true });
     return frame(c.width, c.height, c.body, palette("auto").bg, c.grown, "Cancer types summary — " + r.panels[i].cohort);
@@ -126,7 +150,7 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
       {r.panels.map((_, i) => <div key={i}>
         <Downloads r={r} panel={i} gene={gene === ALL ? null : gene} />
         <div onPointerMove={onMove(i)} onPointerDown={onMove(i)} onPointerLeave={(e) => hover.move(null, e.clientX, e.clientY)}>
-          <DrawAtWidth draw={draw(i)} deps={[r, gene]} />
+          <DrawAtWidth draw={draw(i)} deps={[r, gene]} topScroll />
         </div>
       </div>)}
       {hover.tip && <BarPopover r={r} panel={hover.tip.panel} gene={gene === ALL ? null : gene} groupKey={hover.tip.key} at={hover.tip.at} live={hover.live} />}
@@ -147,6 +171,14 @@ function Controls({ c }: { c: KindCardCtx }) {
   // a commit that leaves the document as it was still resets the boxes to what is applied
   const [commits, setCommits] = useState(0);
   const commit = (p: Record<string, unknown>) => { setCommits((n) => n + 1); patch(p); };
+  const r: CancertypesResult | undefined = c.v?.cancertypes;
+  const ends = r ? thresholdEnds(r) : null;
+  const lit = r ? thresholdHighlight(r, spec) : { total: false, altered: false };
+  const [dragTotal, setDragTotal] = useState<number | null>(null);
+  const [dragAltered, setDragAltered] = useState<number | null>(null);
+  const appliedTotal = spec.minSamples ?? (r ? Math.max(0, ...r.panels.map((p) => p.minSamples)) : 0);
+  const totalText = dragTotal != null ? String(dragTotal) : spec.minSamples == null ? "" : String(spec.minSamples);
+  const alteredText = String(dragAltered ?? spec.minAltered ?? 0) + (freq ? "%" : "");
   return (
     <div className="viewtb">
       <div className="tbz"><span className="tbl">data</span>
@@ -173,17 +205,22 @@ function Controls({ c }: { c: KindCardCtx }) {
         </label>
       </div>
       <div className="tbz"><span className="tbl">filter</span>
-        <label className="tbfield" data-tip={"the portal's Min. # Total: a category is shown only with at least this many profiled " + units + "; empty, the portal's default: 10, or 0 when no category of the chart has more than 10. Applies on Enter"}>
+        <label className={cn("tbfield", lit.total && HIGHLIGHT)} data-tip={"the portal's Min. # Total: a category is shown only with at least this many profiled " + units + "; empty, the portal's default: 10, or 0 when no category of the chart has more than 10. Applies on Enter; more than the largest category drawn is set to it"}>
           Min. # Total {Units}
           {/* unset, each panel and gene tab works out its own default, so the box names none */}
-          <DraftInput key={"total" + commits} value={spec.minSamples == null ? "" : String(spec.minSamples)} placeholder="default" disabled={busy} width="4.5rem" title={"Min. # Total " + Units}
-            onCommit={(t) => { const n = thresholdOf(t); commit({ minSamples: n === null ? undefined : Math.ceil(n) }); }} />
+          <DraftInput key={"total" + commits} value={totalText} placeholder="default" disabled={busy} width="4.5rem" title={"Min. # Total " + Units}
+            onCommit={(t) => { const n = thresholdOf(t); commit({ minSamples: n === null ? undefined : Math.ceil(ends ? clampMinTotal(n, ends.total) : n) }); }} />
         </label>
-        <label className="tbfield" data-tip={(freq ? "the portal's Min. % Altered: a category is shown only with at least this share of its profiled " : "the portal's Min. # Altered: a category is shown only with at least this many altered ") + units + ". Applies on Enter"}>
+        {ends && <ThresholdSlider label={"Min. # Total " + Units} end={ends.total} endLabel={String(ends.total)} value={dragTotal ?? appliedTotal} disabled={busy}
+          onDrag={setDragTotal} onCommit={(n) => { if (n !== appliedTotal) commit({ minSamples: n }); }} />}
+        <label className={cn("tbfield", lit.altered && HIGHLIGHT)} data-tip={(freq ? "the portal's Min. % Altered: a category is shown only with at least this share of its profiled " : "the portal's Min. # Altered: a category is shown only with at least this many altered ") + units + ". Applies on Enter"}>
           {freq ? "Min. % Altered " : "Min. # Altered "}{Units}
-          <DraftInput key={"altered" + commits} value={String(spec.minAltered ?? 0) + (freq ? "%" : "")} disabled={busy} width="4.5rem" title={(freq ? "Min. % Altered " : "Min. # Altered ") + Units}
+          <DraftInput key={"altered" + commits} value={alteredText} disabled={busy} width="4.5rem" title={(freq ? "Min. % Altered " : "Min. # Altered ") + Units}
             onCommit={(t) => { const n = thresholdOf(t); commit({ minAltered: n ? n : undefined }); }} />
         </label>
+        {ends && <ThresholdSlider label={(freq ? "Min. % Altered " : "Min. # Altered ") + Units} end={ends.altered} endLabel={alteredEndLabel(ends.altered, r?.show ?? "frequency")}
+          value={dragAltered ?? spec.minAltered ?? 0} disabled={busy}
+          onDrag={setDragAltered} onCommit={(n) => { if (n !== (spec.minAltered ?? 0)) commit({ minAltered: n ? n : undefined }); }} />}
       </div>
       <div className="tbz"><span className="tbl">view</span>
         <label className="tbfield" data-tip="the y axis: each group's altered share, or its altered count">

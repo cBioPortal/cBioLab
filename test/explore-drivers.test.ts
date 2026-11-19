@@ -98,7 +98,7 @@ describe("Explore", () => {
     const r = await buildExplore({ study: STUDY, oncokbPin: "v7.5", geneCharts: ["KRAS"] });
     assert.equal(r.drivers, undefined);
     assert.deepEqual((r.geneFacets || []).flatMap((f) => f.states.map((s) => s.label)),
-      ["Mutated", "Not mutated", "Not profiled", "Amplified", "Gained", "Diploid", "Heterozygously deleted", "Homozygously deleted", "Not profiled"]);
+      ["Mutated", "Not Mutated", "Not Profiled", "Amplified", "Gained", "Diploid", "Heterozygously deleted", "Homozygously deleted", "Not profiled"]);
     assert.ok(sent.every((q) => !/annotation\.oncokb/.test(q)));
   });
 });

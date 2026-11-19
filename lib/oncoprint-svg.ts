@@ -2,7 +2,7 @@
 // Zero data logic and zero style of its own: cells come from the contract, level of detail
 // from lib/oncoprint-lod.ts, every colour, band and label from lib/oncoprint-style.ts.
 import type { Contract, Track } from "./types.ts";
-import { thresholdColor, stackColor, heatColor, barBand, cellLayers, clinicalLegend, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackSublabelText, fitSublabel, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
+import { thresholdColor, stackColor, heatColor, barBand, cellLayers, clinicalLegend, alteredColumns, emptyClinicalKey, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackSublabelText, fitSublabel, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 import { textWidth } from "./chart/text.ts";
 
@@ -28,12 +28,13 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   const P = S.palette, G = S.geometry;
   const { rowH: ROW_H, rowGap: ROW_GAP, gutter: GUTTER, groupGap: GROUP_GAP, header: HEADER_H } = G;
   const nTracks = contract.tracks.length;
-  const catTracks = contract.display?.clinicalLegends === "none" ? [] : contract.tracks.filter((t) =>
-    (t.kind === "clinical" && ((t.categories && t.categories.length) || t.numeric || t.stack)) || t.kind === "heatmap");
+  // "none" drops the clinical tracks' keys (the portal's "Show legends for clinical tracks"), never a heatmap's
+  const keyColumns = contract.display?.clinicalLegends === "altered" ? alteredColumns(contract.tracks) : undefined;
+  const catTracks = contract.tracks.filter((t) => (t.kind === "clinical" && contract.display?.clinicalLegends !== "none" &&
+    ((t.categories && t.categories.length) || t.numeric || t.stack) && !emptyClinicalKey(t, keyColumns)) || t.kind === "heatmap");
   // gene legend, wrapped to the available width; each row is 16 px
   // only the alterations these cells actually carry
   const items: { label: string; color: string; kind: string }[] = geneLegend(S, glyphPresence(contract.tracks as { kind: string; cells: ArrayLike<number> }[], S));
-  if (contract.tracks.some((t) => t.kind === "derivedEvent")) items.splice(items.length - 1, 0, { label: "Derived event", color: P.derived, kind: "swatch" });
   const itemW = (label: string): number => 14 + label.length * 6.2 + 16;
   const legendRows: typeof items[] = [[]];
   { let lx = GUTTER; for (const it of items) { if (lx + itemW(it.label) > width - 8 && legendRows[legendRows.length - 1].length) { legendRows.push([]); lx = GUTTER; } legendRows[legendRows.length - 1].push(it); lx += itemW(it.label); } }
@@ -139,6 +140,8 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       } else if (it.kind === "outline") {
         parts.push(rect(lx, ly - 9, 10, 10, S.palette.unaltered));
         parts.push(`<rect x="${lx + 1}" y="${ly - 8}" width="8" height="8" fill="none" stroke="${it.color}" stroke-width="2"/>`);
+      } else if (it.kind === "unaltered") {
+        parts.push(`<rect x="${lx + 0.5}" y="${ly - 8.5}" width="9" height="9" fill="${it.color}" stroke="${S.glyph.notProfiled.stripe.color}" stroke-width="1"/>`);
       } else parts.push(rect(lx, ly - 9, 10, 10, it.color));
       parts.push(`<text x="${lx + 14}" y="${ly}" fill="${P.muted}">${esc(it.label)}</text>`);
       lx += itemW(it.label);
@@ -158,7 +161,8 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   // wrap rather than run off the edge: annotation notes name every unsynced study and get long
   const perLine = Math.max(20, Math.floor((width - GUTTER - 8) / 6.2));
   for (const line of wrap(caption, perLine)) { ly += 16; parts.push(`<text x="${GUTTER}" y="${ly}" fill="${P.muted}">${esc(line)}</text>`); }
-  // category key per clinical track (colors reference the same categorical cycle as the cells)
+  // category key per clinical track (colors reference the same categorical cycle as the cells); "altered": the values
+  // of the columns some gene row alters only, the portal's "only show clinical track legends for altered" (altered_uids)
   let cy = ly;
   for (const t of catTracks) {
     cy += 16;
@@ -197,7 +201,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       }
       continue;
     }
-    const key = clinicalLegend(t, S, colors);
+    const key = clinicalLegend(t, S, colors, keyColumns);
     if (key.kind !== "categories") continue;
     for (const e of key.entries) {
       const name = e.label.length > 20 ? e.label.slice(0, 19) + "…" : e.label;

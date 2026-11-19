@@ -80,14 +80,15 @@ function cellOf(tsv: string, type: string, name: string, col: string): string {
 }
 
 const GENETIC = ["CNA", "MUTATIONS", "MRNA", "PROTEIN", "STRUCTURAL_VARIANT"];
-const mut = (pid: string, mt: string, driver = false, gene = "TP53"): Ev => ({ pid, gene, vt: "mutation", mt, driver });
+// a promoter mutation as the warehouse stores one: type 5'Flank, protein change "Promoter" (the portal reads the change)
+const mut = (pid: string, mt: string, driver = false, gene = "TP53"): Ev => ({ pid, gene, vt: "mutation", mt, ...(mt === PROMOTER ? { mv: "Promoter" } : {}), driver });
 const cna = (pid: string, v: number, driver = false, gene = "TP53"): Ev => ({ pid, gene, vt: "cna", cna: v, driver });
 const sv = (pid: string, driver = false, gene = "TP53"): Ev => ({ pid, gene, vt: "structural_variant", driver });
 const values = (o: Record<string, string>) => new Map(Object.entries(o));
 const hmValues = (gene: string, o: Record<string, number>) => new Map(Object.entries(o).map(([p, v]): [string, number] => [p + "|" + gene, v]));
 
 const MISSENSE = "Missense_Mutation", TRUNC = "Nonsense_Mutation", INFRAME = "In_Frame_Del", SPLICE = "Splice_Site",
-  PROMOTER = "Promoter", OTHER = "Translation_Start_Site";
+  PROMOTER = "5'Flank", OTHER = "Targeted_Region";
 
 // ---- T1-T4: the layout -------------------------------------------------------------------------
 

@@ -218,6 +218,71 @@ describe("a clinical attribute", () => {
   });
 });
 
+describe("a clinical attribute stored at different levels across the cohort's studies (spec D1–D4)", () => {
+  // cohort “Both” spans st1 and st2. Each study's metadata declares the attribute with its level
+  // (patient_attribute), and its value counts come back at that level; a study with no rows answers the
+  // empty default. Whatever level a study answers at, only the studies holding values may disagree.
+  const meta = (dt: Record<string, string>, patientLevel: Record<string, 0 | 1>) =>
+    on(/upper\(cam\.datatype\) AS dt/, (q) => {
+      const st = /'st2'/.test(q) ? "st2" : "st1";
+      return Object.keys(dt).filter((a) => q.includes("'" + a + "'"))
+        .map((a) => ({ a, dt: dt[a], pa: patientLevel[st], patient_attribute: patientLevel[st] }));
+    });
+  /** rows[study] = that study's value counts, each at its own `per` */
+  const byStudy = (rows: Record<string, Row[]>) =>
+    on(/AS per, attribute_value AS v/, (q) => (/'st2'/.test(q) ? rows.st2 : rows.st1).filter((r) => q.includes("'" + r.a + "'")));
+  const both = (attribute: string) => proposePartition({ doc, cohort: "Both", attribute } as never);
+
+  test("D1: patient-level values in st1, sample-level values in st2 → refused, the levels and studies named", async () => {
+    meta({ SUBTYPE: "STRING" }, { st1: 1, st2: 0 });
+    byStudy({
+      st1: [{ a: "SUBTYPE", per: "patient", v: "LumA", n: 40 }, { a: "SUBTYPE", per: "patient", v: "LumB", n: 30 }],
+      st2: [{ a: "SUBTYPE", per: "sample", v: "LumA", n: 20 }, { a: "SUBTYPE", per: "sample", v: "LumB", n: 25 }],
+    });
+    await assert.rejects(both("SUBTYPE"), (e: Error) => {
+      assert.ok(e.message.includes("'SUBTYPE' across “Both”'s studies: the participating studies store it at different levels " +
+        "(patient in st1; sample in st2); its counts would mix patients with samples"), e.message);
+      return true;
+    });
+  });
+
+  test("D2: sample-level values in st1, st2 holding none (the empty default) → not refused; st1's values make the arms", async () => {
+    meta({ SUBTYPE: "STRING" }, { st1: 0, st2: 1 });
+    byStudy({
+      st1: [{ a: "SUBTYPE", per: "sample", v: "LumA", n: 50 }, { a: "SUBTYPE", per: "sample", v: "LumB", n: 30 }, { a: "SUBTYPE", per: "sample", v: "Her2", n: 3 }],
+      st2: [],
+    });
+    const r = await both("SUBTYPE");
+    assert.deepEqual(r.def.arms.map((a) => (a.where as { values: string[] }).values), [["LumA"], ["LumB"]]);
+    assert.equal(r.note, "1 value with fewer patients go to Other: Her2");
+  });
+
+  test("D3: both patient-level → merged by value across the studies, as before", async () => {
+    meta({ SUBTYPE: "STRING" }, { st1: 1, st2: 1 });
+    byStudy({
+      st1: [{ a: "SUBTYPE", per: "patient", v: "LumA", n: 6 }, { a: "SUBTYPE", per: "patient", v: "LumB", n: 30 }],
+      st2: [{ a: "SUBTYPE", per: "patient", v: "LumA", n: 6 }, { a: "SUBTYPE", per: "patient", v: "Basal", n: 3 }],
+    });
+    const r = await both("SUBTYPE");
+    // LumA: 6 + 6 = 12 earns an arm neither study's 6 would; Basal's 3 goes to Other
+    assert.deepEqual(r.def.arms.map((a) => (a.where as { values: string[] }).values).sort(), [["LumA"], ["LumB"]]);
+    assert.equal(r.note, "1 value with fewer patients go to Other: Basal");
+  });
+
+  test("D4: type and level both disagree → the type message, checked first", async () => {
+    // st1: AGE a patient-level number; st2: a sample-level string
+    on(/upper\(cam\.datatype\) AS dt/, (q) => /'st1'/.test(q)
+      ? [{ a: "AGE", dt: "NUMBER", pa: 1, patient_attribute: 1 }] : [{ a: "AGE", dt: "STRING", pa: 0, patient_attribute: 0 }]);
+    on(/AS per, attribute_value AS v/, (q) => /'st2'/.test(q) ? [{ a: "AGE", per: "sample", v: "60", n: 20 }] : []);
+    on(/sum\(x \* x\) AS sxx/, (q) => /'st1'/.test(q) ? [{ a: "AGE", per: "patient", n: 20, sx: 1200, sxx: 80000, mn: 40, mx: 80 }] : []);
+    await assert.rejects(both("AGE"), (e: Error) => {
+      assert.match(e.message, /declared inconsistently/);
+      assert.doesNotMatch(e.message, /different levels/);
+      return true;
+    });
+  });
+});
+
 describe("a generic-assay entity", () => {
   test("a malformed profile or entity is refused before any query", async () => {
     await assert.rejects(propose({ assay: { profileType: "x;y", entity: "SBS1" } }), /name a generic-assay profile and one of its entities/);

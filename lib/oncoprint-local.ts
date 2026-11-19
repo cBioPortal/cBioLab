@@ -39,7 +39,8 @@ const TYPE_MAP: Record<string, Partial<LocalEvent>> = {
   INFRAME: { vt: "mutation", mt: "In_Frame_Del" },
   TRUNC: { vt: "mutation", mt: "Nonsense_Mutation" },
   SPLICE: { vt: "mutation", mt: "Splice_Site" },
-  PROMOTER: { vt: "mutation", mt: "Other" },
+  // as the warehouse stores a promoter call, which the portal reads by its protein change
+  PROMOTER: { vt: "mutation", mt: "5'Flank", mv: "Promoter" },
   OTHER: { vt: "mutation", mt: "Other" },
   FUSION: { vt: "structural_variant" },
   AMP: { vt: "cna", cna: 2 }, GAIN: { vt: "cna", cna: 1 }, HETLOSS: { vt: "cna", cna: -1 }, HOMDEL: { vt: "cna", cna: -2 }
@@ -59,7 +60,7 @@ export function eventsFromTable(rows: Table): LocalEvent[] {
     if (type.endsWith("_DRIVER")) { driver = true; type = type.slice(0, -7); }
     const m = TYPE_MAP[type];
     if (!m) throw new Error("events: unknown type '" + type + "' for " + pid + "/" + gene + " (accepted: " + Object.keys(TYPE_MAP).join(", ") + ", optional _DRIVER suffix)");
-    out.push({ pid, gene, vt: m.vt!, mt: m.mt, cna: m.cna, mv: r.alteration ?? r.Alteration, driver, ...(germ ? { germ: true } : {}) });
+    out.push({ pid, gene, vt: m.vt!, mt: m.mt, cna: m.cna, mv: m.mv ?? r.alteration ?? r.Alteration, driver, ...(germ ? { germ: true } : {}) });
   }
   return out;
 }
