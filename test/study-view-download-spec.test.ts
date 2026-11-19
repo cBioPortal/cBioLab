@@ -4,12 +4,11 @@
 // Covered elsewhere, not here (UI wiring):
 //   SD1  the Download submenu is the chart menu's last item, entries in order
 //   SD12 a chart under its own filter downloads the counts it shows
-//   SD14 gene-state charts write the state as the chart names it
 // SD8 and SD11 are produced upstream (the NA category and the per-study sums arrive in `counts`);
 // the tests below check how summaryDataTsv writes them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chartFileName, summaryDataTsv, summaryCut, type CategoryCount } from "../lib/study-view-download.ts";
+import { chartFileName, summaryDataTsv, summaryCut, geneStateCode, type CategoryCount } from "../lib/study-view-download.ts";
 
 const HEADER_SAMPLES = "Category\tNumber of samples\tPercentage of samples";
 const HEADER_PATIENTS = "Category\tNumber of patients\tPercentage of patients";
@@ -233,4 +232,24 @@ test("SD13: when cut, a sentence naming how many it holds of how many", () => {
   assert.ok(hasNumber(s!, 1234), s!);
   const t = summaryCut(199, 200);
   assert.ok(t && hasNumber(t, 199) && hasNumber(t, 200), String(t));
+});
+
+// SD14 (the user's answer, 2026-11-19): a gene-state chart's Summary Data writes the portal's backend
+// codes, byte for byte, as /api/mutation-data-counts and /api/genomic-data-counts give them
+// (coadread KRAS: MUTATED 218, NOT_MUTATED 316, NOT_PROFILED 60; -1 67, -2 1, 0 390, 1 128, 2 6, NA 2)
+test("SD14: a gene-state chart's categories are the portal's codes", () => {
+  const cases: [Parameters<typeof geneStateCode>[0], string, string][] = [
+    ["MUTATION", "altered", "MUTATED"], ["MUTATION", "unaltered", "NOT_MUTATED"], ["MUTATION", "notProfiled", "NOT_PROFILED"],
+    ["CNA", "amp", "2"], ["CNA", "gain", "1"], ["CNA", "diploid", "0"], ["CNA", "hetloss", "-1"], ["CNA", "del", "-2"], ["CNA", "notProfiled", "NA"],
+  ];
+  for (const [type, state, code] of cases) assert.equal(geneStateCode(type, state, false, "label"), code, type + " " + state);
+  // OncoKB drivers only has no portal chart: its states keep the names on screen
+  assert.equal(geneStateCode("MUTATION", "altered", true, "Driver mutation"), "Driver mutation");
+  assert.equal(geneStateCode("CNA", "amp", true, "Driver amplification"), "Driver amplification");
+});
+
+test("SD14: coadread KRAS copy number's file, row for row as the portal's (NA last)", () => {
+  const counts = [["amp", 6], ["gain", 128], ["diploid", 390], ["hetloss", 67], ["del", 1], ["notProfiled", 2]] as const;
+  const tsv = summaryDataTsv(counts.map(([st, n]) => c(geneStateCode("CNA", st, false, ""), n)), "sample");
+  assert.equal(tsv, [HEADER_SAMPLES, "0\t390\t65.7%", "1\t128\t21.5%", "-1\t67\t11.3%", "2\t6\t1.0%", "-2\t1\t0.2%", "NA\t2\t0.3%"].join("\n"));
 });

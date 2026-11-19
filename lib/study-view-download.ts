@@ -27,6 +27,20 @@ export function summaryDataTsv(counts: CategoryCount[], unit: DownloadUnit): str
   ].join("\n");
 }
 
+const MUTATION_CODES: Record<string, string> = { altered: "MUTATED", unaltered: "NOT_MUTATED", notProfiled: "NOT_PROFILED" };
+const CNA_CODES: Record<string, string> = { amp: "2", gain: "1", diploid: "0", hetloss: "-1", del: "-2", notProfiled: "NA" };
+
+/**
+ * A gene-state chart's Summary Data category (SD14): the portal's backend code, byte for byte
+ * (/api/mutation-data-counts' MUTATED, NOT_MUTATED, NOT_PROFILED; /api/genomic-data-counts' discrete
+ * level, NA when not profiled), as its file writes them though its screen shows names. Under OncoKB
+ * drivers only, a chart the portal does not have, a state keeps the name it is shown by (`label`).
+ */
+export function geneStateCode(type: "MUTATION" | "CNA", state: string, drivers: boolean, label: string): string {
+  if (drivers) return label;
+  return (type === "CNA" ? CNA_CODES : MUTATION_CODES)[state] ?? label;
+}
+
 /** why Summary Data can't be offered: the chart holds only its most frequent values; null when it holds them all */
 export function summaryCut(shown: number, distinct: number | undefined): string | null {
   if (distinct == null || shown >= distinct) return null;
