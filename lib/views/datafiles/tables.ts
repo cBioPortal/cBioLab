@@ -33,15 +33,18 @@ export function statusColumns(t: StatusTable, lines: { line: string; gene: strin
 }
 export const STATUS_DEFAULTS = (t: StatusTable, lines: { line: string; gene: string }[]) => statusColumns(t, lines).map((c) => c.id);
 
-/** The parts' samples with their status per line: `ev<k>` (events matched, '' when none), `pa<k>` / `pf<k>` (profiled in any / every type). */
-function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan): { ctes: string; union: string; n: number } {
+/**
+ * The parts' samples with their status per line: `ev<k>` (events matched, '' when none; with `notes`, each with
+ * its germline / driver note), `pa<k>` / `pf<k>` (profiled in any / every type).
+ */
+function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan, notes: boolean): { ctes: string; union: string; n: number } {
   let n = 0;
   const ctes: string[] = [], selects: string[] = [];
   parts.forEach((p, i) => {
     const { lines, opts } = plan(p.study);
     n = lines.length;
     const pre = "d" + i;
-    ctes.push("c" + i + " AS (" + p.cohortSql + "),\n" + lineCtes(pre, "c" + i, lines, opts));
+    ctes.push("c" + i + " AS (" + p.cohortSql + "),\n" + lineCtes(pre, "c" + i, lines, opts, { notes }));
     selects.push(
       "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord, s.pid AS patient, s.sid AS sid" +
       lines.map((l, k) => {
@@ -63,7 +66,7 @@ function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan): { c
  */
 export function statusRowSource(t: StatusTable, parts: TablePart[], lines: { line: string; gene: string }[], plan: (study: string) => StudyPlan): RowSource {
   if (!parts.length) throw new Error("statusRowSource needs at least one part");
-  const { ctes, union, n } = statusRows(parts, plan);
+  const { ctes, union, n } = statusRows(parts, plan, t === "cases");
   const ks = Array.from({ length: n }, (_, k) => k);
   const status = "multiIf(" + ks.map((k) => "ev" + k + " != ''").join(" OR ") + ", 'altered', " + ks.map((k) => "pf" + k).join(" AND ") + ", 'unaltered', 'not profiled')";
   const derived = ks.map((k) => ",\n    multiIf(ev" + k + " != '', ev" + k + ", pa" + k + ", 'no alteration', 'not profiled') AS c" + k +

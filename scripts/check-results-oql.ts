@@ -583,6 +583,50 @@ async function dlAltered(tag: string, line: string, extra: Partial<StudyOpts> & 
   }
 }
 
+// L5: the case table's cells, as the portal's text of them (CaseAlterationTable mutationMapper / cnaMapper, forDownload):
+// a mutation "<change> [germline] (driver)", a copy-number call "<AMP|HOMDEL> (driver)" — germline when its status holds
+// "germline" (isNotGermlineMutation, GERMLINE_REGEXP), driver the page's putativeDriver; a structural variant or an
+// EXP / PROT call never. From data_mutations.txt, data_cna.txt, peer-oncokb.tsv, peer-hotspots.tsv:
+//   PIK3CA: E545K (OncoKB) on FX-P02-T1; E110del and H1047R (hotspots) on FX-P29-T1.
+//   EGFR on FX-P44-T1: L858R (Germline status, OncoKB), L861Q and S768I (germline), A289V, C797S, V769M (somatic), G719A (NA), and a
+//   Splice_Region with no protein change (MUTATED), none of those in OncoKB; its EGFR-SEPT14 fusion is not a mutation.
+//   PTEN D92N on FX-P15-T1, status Germline_LOH. CDKN2A HOMDEL on FX-P05-T1 (OncoKB DELETION); EGFR AMP on FX-P23-T1.
+/** each sample's cell for the one line, lineCtes with the case table's notes */
+async function dlCells(tag: string, line: string, extra: Partial<StudyOpts> & Record<string, unknown>, notes = true): Promise<Record<string, string> | null> {
+  const cohort = compileCohortDef(null, { study: STUDY, db: conn!.db });
+  const gene = line.split(":")[0].trim().toUpperCase();
+  const o = { study: STUDY, db: conn!.db, pin: ONCOKB, profiles: ["mutations", "cna", "structural_variants"], ...extra } as StudyOpts;
+  try {
+    const sql = "WITH cohort AS (" + cohort + "),\n" + lineCtes("d", "cohort", [{ line, gene, types: ["MUTATION"] }], o, { notes }) + "\nSELECT sid, ev FROM d_e0 ORDER BY sid";
+    return Object.fromEntries((await chQuery<Row>(sql, conn!)).data.map((r) => [String(r.sid), String(r.ev)]));
+  } catch (e) {
+    ok(tag + " runs", false, (e as Error).message.slice(0, 300));
+    return null;
+  }
+}
+{
+  const OFF: DriverSettings = { oncokb: false, hotspots: false, custom: false, tiers: [] };
+  const cases: [string, string, Record<string, unknown>, Record<string, string>, boolean?][] = [
+    ["L5 OncoKB or a hotspot", "PIK3CA: MUT", { drivers: {}, hotspotPins: HOTSPOT_PINS },
+      { "FX-P02-T1": "E545K (driver)", "FX-P29-T1": "E110del (driver), H1047R (driver)" }],
+    ["L5 no drivers: OncoKB at the pin alone", "PIK3CA: MUT", {}, { "FX-P02-T1": "E545K (driver)", "FX-P29-T1": "E110del, H1047R" }],
+    ["L5 every source off: no driver", "PIK3CA: MUT", { drivers: OFF, hotspotPins: HOTSPOT_PINS }, { "FX-P02-T1": "E545K", "FX-P29-T1": "E110del, H1047R" }],
+    ["L5 germline, and germline and driver", "EGFR: MUT", { drivers: {}, hotspotPins: HOTSPOT_PINS },
+      { "FX-P44-T1": "A289V, C797S, G719A, L858R [germline] (driver), L861Q [germline], MUTATED, S768I [germline], V769M" }],
+    ["L5 a status containing germline", "PTEN: MUT", {}, { "FX-P15-T1": "D92N [germline]" }],
+    ["L5 copy number", "CDKN2A: HOMDEL", { drivers: {} }, { "FX-P05-T1": "HOMDEL (driver)" }],
+    ["L5 copy number", "EGFR: AMP", {}, { "FX-P23-T1": "AMP (driver)" }],
+    ["L5 without notes (the lists, the matrix, the counts): the calls alone", "EGFR: MUT", { drivers: {}, hotspotPins: HOTSPOT_PINS },
+      { "FX-P44-T1": "A289V, C797S, G719A, L858R, L861Q, MUTATED, S768I, V769M" }, false],
+  ];
+  for (const [tag, line, extra, want, notes] of cases) {
+    const got = await dlCells(tag, line, extra, notes ?? true);
+    if (!got) continue;
+    for (const [sid, cell] of Object.entries(want))
+      ok("Download " + tag + " [" + line + "] " + sid + ": " + JSON.stringify(cell), got[sid] === cell, "ours " + JSON.stringify(got[sid]));
+  }
+}
+
 // ==== Mutations: oqlMutationFilterSql (U*, PR 9 of the OQL series) ===============================
 // Legacy: cbioportal-frontend cd8c6df src/pages/resultsView/ResultsViewPageStore.ts 3644-3680 — with useOql and mutation
 // OQL in the query, the tab's mutations of a gene are those some line of that gene wants (src/shared/lib/oql/oqlfilter.ts
