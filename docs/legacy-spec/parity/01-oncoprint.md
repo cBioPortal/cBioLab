@@ -134,7 +134,7 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 |---|---|---|---|
 | ONC-SO-1 | ✅ | BC | Staircase menu: mutation type, driver, ignore VUS, each enabled only where the portal's is (#195) |
 | ONC-SO-2 | ✅ | B | "patient id" / "sample id" option |
-| ONC-SO-3 | ❌ | C | No case-list order; the portal offers it only for a query naming sample ids, which no Results query here can yet (tracked) |
+| ONC-SO-3 | ✅ | C | Sort › "case list order", enabled with a User-defined Case List: typed order, kept by the stored set; a patient at its first listed sample; disabled otherwise, as the portal's (`lib/oncoprint-case-list.ts`, sort key `caseList`) (#468) |
 | ONC-SO-4 | ✅ | BC | Was 🔶: the sort select shows "sorted by heatmap clustering order" as a disabled entry, only with a heatmap row, selected while clustered (`OncoprintFigure.tsx:858-861`) (#278); Q1 + mRNA-z, Cluster on TP53 mRNA-z: select reads it |
 | ONC-SO-5 | ✅ | C | Choosing another primary key replaces the cluster key |
 
@@ -287,7 +287,7 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 | ONC-STM-1 | ✅ | BC | Counts as before; labels as the portal's (KRAS 222/594 "37%", Q2 header 6,208 (60%)) (#192). Ours alone: the driver % beside it |
 | ONC-STM-2 | ✅ | B | 485 (82%), 6,208 (60%) + 6,494 (59%) samples, 775 (46%), 344 (58%), as legacy (#192) |
 | ONC-STM-3 | 🐞 ok | C | Per-segment altered ÷ profiled; no profiled → "N/P", not "NaN%" (`canvas.ts:88-92`). Note: counts any cell code > 0, so mRNA/protein overlay bits would count as altered |
-| ONC-STM-4 | 🟡 | B | Q1, 2026-11-18: every attribute's Freq as the portal's, patient-level ones now over samples (#264). Mutation spectrum: ours 89.9 %, the portal's 99.7 %: ours counts the samples in the mutation profile's `sample_profile` rows (534 of 594; `app/portal/study-known.ts:92`, `lib/explore.ts:1474-1481`), the portal its sequenced case list |
+| ONC-STM-4 | ✅ | B | Q1, 2026-11-18: every attribute's Freq as the portal's, patient-level ones over samples (#264). Mutation spectrum: ours 89.9 %, the portal's 99.7 %; recorded as Ours alone by the user's decision (2026-11-19): the portal's `sample_derived.sequenced` matches bare sample ids across studies' `_sequenced` lists, ours counts the samples the study's mutation profile holds |
 | ONC-STM-5 | ✅ | C | Patient NUMBER mean, MUTATION_COUNT max, ranges as the portal's (#198) |
 | ONC-STM-6 | ✅ | C | Spectrum shares per substitution (#199) |
 | ONC-STM-7 | ✅ | C | z clamp ±3, methylation [0, 1], VAF max, patient max |x|, GA pivot (#200) |

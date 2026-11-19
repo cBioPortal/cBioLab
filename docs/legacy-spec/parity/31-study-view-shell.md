@@ -126,8 +126,8 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-FB-2 | ✅ | B | Clinical pills "<chart> : a or b", no word between charts; generic OR groups "( a or b )" and two groups of one chart joined by "and" (`joinedByAnd`, `lib/study-view-pills.ts`); a gene-table Union is one OQL clause, its pill text under STV-FB-3 |
 | STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene-table selections a pill per gene coloured by alteration (`geneTablePills`); gene-chart, GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
 | STV-FB-3a | ❌ | C | No survival-attribute pills (no survival filter) |
-| STV-FB-3b | 🔶 | C | A density drag adds two visible range pills (`explore-charts.tsx:149`); legacy shows no pill beyond the chart's own |
-| STV-FB-4 | 🟡 | B | "50 < x ≤ 60", "a ≤ x ≤ b", "> a", "≤ b", one value; ends edited in place (start > end swaps, start = end and empty refused), and an edit makes custom bins on the chart (#203). Separate ranges are separate pills (portal: one merged interval) |
+| STV-FB-3b | ✅ | C | A density drag's ranges have no pill while their chart is drawn, as legacy; the chart shows them (its box, "selected: …") and resets them; a second drag replaces the first (`densityHeld`, `withDensityDrag`); with the chart not drawn they are ordinary range pills |
+| STV-FB-4 | ✅ | B | "50 < x ≤ 60", "a ≤ x ≤ b", "> a", "≤ b", one value; ends edited in place (start > end swaps, start = end and empty refused), and an edit makes custom bins on the chart (#203). Several ranges one pill, the first range's start to the last's end, as the portal (an edit makes it that one interval) |
 | STV-FB-5 | ✅ | B | "Clear All Filters" removes every clause (keeps studies) |
 | STV-FB-6 | ❌ | C | No manual mode / Submit (filters apply at once) |
 | STV-FB-7 | ❌ | B | No bookmark icon; the header's Copy link carries the filters instead |

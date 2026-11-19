@@ -109,9 +109,9 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PTB-GE-1 | 🟡 | B | Line chart \| Heatmap, table below ✅; choice in the document (invariant 9); no unprofiled alert |
+| PTB-GE-1 | 🟡 | B | Line chart \| Heatmap, table below ✅; choice in the document (invariant 9); unprofiled alert ✅ (PTB-GE-3) |
 | PTB-GE-2 | ✅ | BC | Every mutation of the table's query with a VAF; uncalled included as its own state; key gene + protein change + event (`figure.ts:7`) |
-| PTB-GE-3 | ❌ | C | No alert; NP shown only as dashed line / NA cell |
+| PTB-GE-3 | ✅ | BC | "Sample(s) ⟨markers⟩ not profiled for mutations" above the chart, the samples outside the mutation profile in the patient's order, none when all are in it (`notProfiledForMutations`, `lib/views/evolution/figure.ts`); NP also drawn as dashed line / NA cell (all_phase2_target_2018_pub TARGET-10-PAPLDL: -04, as the portal's gene-panel data; lgg_ucsf_2014 P04: none) |
 | PTB-GE-4 | ✅ | C | Hover highlights line, row, table row; click toggles kept picks (local) |
 | PTB-GE-LC-1 | ✅ | B | Show Timeline / Hide Timeline, offered only with clinical events ✅; shown, the patient's timeline above the line chart, the chart's time axis spanning the timeline's plot so each sample sits under its day ✅ (lgg_ucsf_2014 P04: both axes' "1y" at 403 px); in the document (`showTimeline`), as the portal's URL setting; default hidden ✅ |
 | PTB-GE-LC-2 | ✅ | B | sequential (disabled + reason when days missing), log scale, y axis to data range, Group by (None + the samples' clinical attributes) ✅ (in document); "only selected" draws only the clicked mutations, none with nothing clicked, the data range following them (`onlySelected`, `lib/views/evolution/figure.ts`; local, as the portal's) ✅ (lgg_ucsf_2014 P04: 58 lines, 0, 2 picked → 2) |
@@ -195,7 +195,7 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 | PTB-MD-2 | ✅ | B | No GE tab (TCGA-A6-2671); Samples table one row ✅ |
 | PTB-MD-3 | ✅ | B | No GE tab: prad_mskcc_2017 P-0000964 (2 samples, 10 mutations, none with allele counts on the portal's API) |
 | PTB-MD-4 | ✅ | C | `noDay` forces sequential; checkbox disabled with the reason (not hidden) |
-| PTB-MD-5 | 🟡 | C | NA cells ✅, dashed line across NP ✅; no alert |
+| PTB-MD-5 | 🟡 | C | NA cells ✅, dashed line across NP ✅; alert on Genomic Evolution ✅, on Pathways not yet |
 | PTB-MD-6 | ✅ | C | Spectrum, count line, %/# and reference need counts (`signatures-body.tsx:71,119`) |
 | PTB-MD-7 | ✅ | B | No pvalue profile → nothing bold, "no p-values recorded" |
 | PTB-MD-8 | ✅ | C | Reference only for SBS/DBS/ID (`reference.ts:31`) |
