@@ -164,6 +164,8 @@ export function buildTracks(events: PatientEvent[]): TlTrack[] {
 
 /** A root track's label: its event type as spelled most often, upper-cased (PAT-TL-TR-1: "SPECIMEN", "LAB_TEST"). */
 export const rootLabel = (type: string): string => type.toUpperCase();
+/** A track's label as the figure shows it: underscores dropped, as the portal's TrackHeader getTrackLabel shows every track ("LABTEST"). */
+export const trackLabel = (t: Pick<TlTrack, "label">): string => t.label.replace(/_/g, "");
 
 /** Every item under a track, its own and its descendants' — what a collapsed track shows. */
 export function allItems(t: TlTrack): TlItem[] {

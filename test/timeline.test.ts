@@ -2,7 +2,7 @@
 // patient-view timeline — and the figure's promises about what it draws (lib/timeline-svg.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildTracks, trackSortKey, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
+import { buildTracks, trackSortKey, trackLabel, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
 import { linePoints, rowAt, timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
 import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
@@ -32,6 +32,12 @@ describe("timeline tracks: cBioPortal's grouping", () => {
   test("event types in the portal's order, folded by case (lib/event-names.ts)", () => {
     // PAT-TL-TR-1: a root track is its event type upper-cased, as the portal's (eventType.toUpperCase())
     assert.deepEqual(tracks.map((t) => t.label), ["SAMPLE ACQUISITION", "SURGERY", "STATUS", "TREATMENT", "LAB_TEST"]);
+    // shown as the portal's TrackHeader shows every track (getTrackLabel): underscores dropped
+    assert.deepEqual(tracks.map(trackLabel), ["SAMPLE ACQUISITION", "SURGERY", "STATUS", "TREATMENT", "LABTEST"]);
+    assert.equal(trackLabel({ label: "Radiation_Therapy" }), "RadiationTherapy", "sub-tracks too");
+    const svg = timelineSvg({ study: "s", patient: "P-1", events: EVENTS, samples: [], source: { label: "local", remote: false } }, { width: 900 }).svg;
+    assert.match(svg, />LABTEST</);
+    assert.doesNotMatch(svg, />LAB_TEST</);
     // TREATMENT and Treatment are one track
     assert.equal(tracks.find((t) => t.uid === "treatment")!.children.flatMap((c) => c.children.length ? c.children : [c]).length, 4);
   });

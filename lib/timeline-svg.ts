@@ -5,7 +5,7 @@
 // lib/view-svg.ts for the MCP figure, so both are the same drawing.
 import { esc, frame, caption, palette, label, textWidth, textOn, fmtNum, r1, FS, SW, type SvgOpts } from "./svg-kit.ts";
 import {
-  buildTracks, flattenTracks, axisTicks, dayScale, sampleMarks, numericResult, attr, formatDays, axisMarks,
+  buildTracks, flattenTracks, trackLabel, axisTicks, dayScale, sampleMarks, numericResult, attr, formatDays, axisMarks,
   COLOR_KEY, SHAPE_KEY, POINT_COLOR, type TlItem, type TlTrack, type SampleMark,
 } from "./timeline-tracks.ts";
 import type { PatientEvent, PatientTimeline } from "./types.ts";
@@ -109,7 +109,7 @@ export function linePoints(items: readonly TlItem[], events: readonly PatientEve
   for (const it of items) (byDay.get(it.start) || byDay.set(it.start, []).get(it.start)!).push(it);
   return [...byDay.entries()].sort((a, b) => a[0] - b[0]).map(([start, g]) => {
     const vs = g.map((it) => ({ it, v: numericResult(events[it.i])! }));
-    const top = vs.reduce((m, x) => x.v.v > m.v.v ? x : m);
+    const top = vs.reduce((m, x) => x.v.v > m.v.v ? x : m, vs[0]);
     return { start, v: top.v, at: top.it.i, ix: g.map((it) => it.i) };
   });
 }
@@ -136,7 +136,7 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   const marks = sampleMarks(t.samples, ev);
 
   // the header column: as wide as its labels (and a line chart's value ticks) need, within bounds
-  const headText = (r: (typeof flat)[number]) => (r.track.children.length ? (r.collapsed ? "▸ " : "▾ ") : "") + r.track.label;
+  const headText = (r: (typeof flat)[number]) => (r.track.children.length ? (r.collapsed ? "▸ " : "▾ ") : "") + trackLabel(r.track);
   const lineRange = (items: TlItem[]) => {
     const vals = items.map((it) => numericResult(ev[it.i])!.v);
     let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -192,7 +192,7 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
     const x0 = 5 + tr.depth * INDENT;
     const room = HW - x0 - (tr.draw === "line" && !r.collapsed ? tickRoom : 0) - 6;
     parts.push(`<g${o.interactive && hasKids ? ` class="tl-h" data-uid="${esc(tr.uid)}" style="cursor:pointer"` : ""}>` +
-      `<title>${esc(tr.label)}</title>` +
+      `<title>${esc(trackLabel(tr))}</title>` +
       label(x0, cy + FS.body * 0.35, headText(r), { size: FS.body, fill: pal.ink, weight: tr.depth === 0 ? 600 : 400, maxW: room })
         .replace(/<title>.*?<\/title>/, "") + `</g>`);
     parts.push(`<line x1="0" x2="${W}" y1="${r.y + r.h - 0.5}" y2="${r.y + r.h - 0.5}" stroke="${pal.line}" stroke-width="${SW.hair}" opacity="0.6"/>`);
