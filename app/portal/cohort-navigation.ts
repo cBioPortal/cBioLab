@@ -16,7 +16,11 @@ export type PatientKey = { study: string; id: string };
  * `link` is a stored link holding exactly the cohort, which the page's own links carry (?s=)
  * instead of a ?cohort= too long for the address bar.
  */
-export interface CohortNavigation { def: CohortDef; order: TableQuery; link?: string }
+export interface CohortNavigation {
+  def: CohortDef; order: TableQuery; link?: string;
+  /** with no sort, step in the order the cohort's patient list names its patients (a #navCaseIds link's), not by patient id */
+  listed?: boolean;
+}
 
 /**
  * The navigation a page's parameters carry (`q`, a stored link's put back). `link` is the stored
@@ -27,16 +31,17 @@ export function readNavigation(q: URLSearchParams, link?: { id: string; params: 
   if (!raw) return { nav: null, error: null };
   const def = decodeParam<CohortDef>(raw);
   if (!def || typeof def !== "object" || Array.isArray(def)) return { nav: null, error: "this link's cohort cannot be read" };
-  const order = decodeParam<TableQuery>(q.get("order")) || {};
+  const read = decodeParam<TableQuery & { listed?: boolean }>(q.get("order")) || {};
+  const { listed, ...order } = typeof read === "object" ? read : {};
   const holdsCohort = !!link && link.params.cohort === raw && Object.keys(link.params).every((k) => k === "cohort");
-  return { nav: { def, order: typeof order === "object" ? order : {}, ...(holdsCohort ? { link: link!.id } : {}) }, error: null };
+  return { nav: { def, order, ...(holdsCohort ? { link: link!.id } : {}), ...(listed === true ? { listed: true } : {}) }, error: null };
 }
 
 /**
  * A cbioportal.org link's cohort: the hash `#navCaseIds=<study>:<patient>,…` its study view and
  * results pages hand the patient page (PAT-URL-4), as a cohort of those patients. An id without its
  * study is refused: the portal itself cannot read one (parseCohortIds, PAT-URL-6). The patients are
- * stepped through in the cohort list's order, not the link's.
+ * stepped through in the link's order, as the portal steps through them (`listed`), until a sort is chosen.
  */
 export function navigationFromHash(hash: string): { nav: CohortNavigation | null; error: string | null } {
   // an unreadable list leaves the page showing its patient, without the pager, and says why (`error`)
@@ -47,7 +52,7 @@ export function navigationFromHash(hash: string): { nav: CohortNavigation | null
   if (!ids.length || bad.length) return { nav: null, error: "this link's patients (#navCaseIds) must each be study:patient; " + (bad.length ? "not " + bad.slice(0, 3).join(", ") : "it names none") };
   const studies = [...new Set(ids.map((x) => x.split(":")[0]))];
   const def: CohortDef = { ...(studies.length === 1 ? { study: studies[0] } : { studies }), all: [{ kind: "patientList", ids }] };
-  return { nav: { def, order: {} }, error: null };
+  return { nav: { def, order: {}, listed: true }, error: null };
 }
 
 /**
@@ -60,7 +65,7 @@ export function excludePatient(nav: CohortNavigation, at: PatientKey): CohortNav
   const last = all[all.length - 1] as { not?: { kind?: string; ids?: string[]; set?: string } } | undefined;
   if (last?.not?.kind === "patientList" && Array.isArray(last.not.ids) && !last.not.set) all[all.length - 1] = { not: { kind: "patientList", ids: [...last.not.ids.filter((x) => x !== id), id] } };
   else all.push({ not: { kind: "patientList", ids: [id] } });
-  return { def: { ...nav.def, all }, order: nav.order };
+  return { def: { ...nav.def, all }, order: nav.order, ...(nav.listed ? { listed: true } : {}) };
 }
 
 /** the parts of a cohort's definition the Study View's filters carry: its studies and its clauses */
@@ -82,8 +87,8 @@ export function studyViewParams(nav: CohortNavigation): { params: Record<string,
 /** The URL parameters that carry a navigation: what every link the page makes keeps. */
 export function navigationParams(nav: CohortNavigation | null): Record<string, string> {
   if (!nav) return {};
-  const order = { search: nav.order.search, filters: nav.order.filters, sort: nav.order.sort };
-  const hasOrder = !!(order.search || order.filters && Object.keys(order.filters).length || order.sort);
+  const order = { search: nav.order.search, filters: nav.order.filters, sort: nav.order.sort, ...(nav.listed ? { listed: true } : {}) };
+  const hasOrder = !!(order.search || order.filters && Object.keys(order.filters).length || order.sort || nav.listed);
   return { ...(nav.link ? { s: nav.link } : { cohort: encodeParam(nav.def) }), ...(hasOrder ? { order: encodeParam(order) } : {}) };
 }
 
@@ -104,6 +109,7 @@ export function listDoc(nav: CohortNavigation, opts: { rows: number; at?: Patien
   return {
     study: studyOf(nav.def), cohorts: { [NAV_COHORT]: nav.def },
     views: [{ kind: "table", unit: "patient", cohorts: [NAV_COHORT], rows: opts.rows, ...(opts.columns ? { columns: opts.columns } : {}),
-      ...(search ? { search } : {}), ...(filters ? { filters } : {}), ...(sort ? { sort } : {}), ...(opts.at ? { patient: opts.at } : {}) } as unknown as View],
+      ...(search ? { search } : {}), ...(filters ? { filters } : {}), ...(sort ? { sort } : {}), ...(nav.listed && !sort ? { order: "listed" } : {}),
+      ...(opts.at ? { patient: opts.at } : {}) } as unknown as View],
   };
 }

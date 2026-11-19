@@ -13,6 +13,13 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
   { const e = overLimit("a table view", 6, vNames.length); if (e) return refuse("table", ctx, e.replace("at most 6", "at most 6 cohorts")); }
   const unit: "sample" | "patient" = view.unit === "patient" ? "patient" : "sample";
   if (view.transpose != null && typeof view.transpose !== "boolean") return refuse("table", ctx, "transpose is true (a row per attribute, a column per patient or sample) or false");
+  if (view.order != null && view.order !== "listed") return refuse("table", ctx, "order is \"listed\" (with no sort, the cohort's patient list's order) or absent");
+  // the order the cohort's patient list names its patients: its first patientList clause's ids, cohort by cohort
+  const listed = view.order === "listed" ? vNames.flatMap((cn) => {
+    const clause = (ctx.doc.cohorts[cn]?.all || []).find((c) => (c as { kind?: string }).kind === "patientList") as { ids?: string[] } | undefined;
+    return clause?.ids || [];
+  }) : [];
+  const byList = listed.length > 0;
   const show = view.rows == null ? 25 : Math.floor(Number(view.rows));
   if (!(show >= 1 && show <= TABLE_ROWS_MAX)) return refuse("table", ctx, "rows (the page size) is 1 to " + TABLE_ROWS_MAX);
   const q = viewQuery(view);
@@ -54,7 +61,7 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
 
   let r: Rows;
   const source = (parts: Parameters<typeof clinicalRowSource>[0], reads: string[] | "all") => (db: string) =>
-    clinicalRowSource(parts, db, unit, reads === "all" ? held : held.filter((c) => reads.includes(c.id)));
+    clinicalRowSource(parts, db, unit, reads === "all" ? held : held.filter((c) => reads.includes(c.id)), byList ? listed : undefined);
   const locate = named && !ctx.page && !ctx.values ? { study: named.study, patient: named.id } : undefined;
   try {
     r = await runRows(ctx, "table", holders, q, defaults, shownColumns(q, known, defaults), show, source,
@@ -79,13 +86,13 @@ export async function runTable(view: TableView, ctx: ViewRun): Promise<ViewResul
   return {
     kind: "table", cohorts: vNames,
     table,
-    method: tableMethod({ unit, cohorts: vNames, columns: held.length, query: q, queryText: describeQuery(q, columns), sortName: q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null,
+    method: tableMethod({ unit, cohorts: vNames, columns: held.length, query: q, queryText: describeQuery(q, columns), sortName: q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, listed: byList,
       shown: rows.length, lists: r.lists, excluded, instances: r.groups }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "One row per " + one + (unit === "sample" ? " of each cohort's patients, carrying its patient's attributes too" : "") +
       ", with " + plural(held.length, "attribute") + " as each study recorded them" + (held.length < usable.length ? " (of " + usable.length + "; name others in columns)" : "") +
       " — vocabularies are not harmonized across studies. " +
-      tableTail(r, q, columns, one, "by patient and sample id", excluded, vNames.length > 1)
+      tableTail(r, q, columns, one, byList ? "in the order the cohort's patient list names them, then by patient and sample id" : "by patient and sample id", excluded, vNames.length > 1)
   };
 }
