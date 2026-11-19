@@ -17,6 +17,7 @@ import { PUTATIVE_DRIVER, type ResolvedDrivers } from "./driver-settings.ts";
 import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
 import { mutationTypeColumn } from "./mutation-type.ts";
+import { chromosomeSortSql, proteinChangeSortSql } from "./mutation-sort.ts";
 import { finiteSql } from "./sql-number.ts";
 import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
@@ -118,7 +119,9 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     case "studyOfOrigin": return { ...c, text: str("studyName") };
     // spelled as the table shows it, so search and the value list match what is on screen
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: MUTATION_ANNOTATION_ORDER };
-    case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
+    // the portal's sort values (MUT-STM-9): position, then the letters' character codes; chromosome as a number, X 23, Y 24
+    case "proteinChange": return { ...c, text: str("proteinChange"), order: proteinChangeSortSql("proteinChange") };
+    case "chr": return { ...c, text: str("chr"), order: chromosomeSortSql("chr") };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
     // as the screen and the download show it (the rows' vafText), so a search finds the shown number
