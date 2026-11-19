@@ -79,10 +79,15 @@ vk0 AS (SELECT s.sid AS sid,
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
     WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
       AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
-ct0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+ct0 AS (SELECT s.sid AS sid,
+    if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+      WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
+  FROM (SELECT DISTINCT sid FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) AS s
+  LEFT JOIN (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+      anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'CANCER_TYPE_DETAILED'
-    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid),
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+      AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
 mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
@@ -118,7 +123,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
+         m.pid AS patient, m.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, m.proteinChange AS proteinChange,
          if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
          if(m.germ, '', if(tt.found = 1, tt.resistance_level, ann.resistance_level)) AS resistanceLevel, if(m.germ, '', if(tt.found = 1, tt.diagnostic_level, ann.diagnostic_level)) AS diagnosticLevel, if(m.germ, '', if(tt.found = 1, tt.prognostic_level, ann.prognostic_level)) AS prognosticLevel,
          toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
@@ -157,7 +162,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
+         v.pid AS patient, v.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
          if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level,
          if(vp.found = 1, vp.resistance_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.resistance_level, va1.resistance_level)) AS resistanceLevel, if(vp.found = 1, vp.diagnostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.diagnostic_level, va1.diagnostic_level)) AS diagnosticLevel, if(vp.found = 1, vp.prognostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.prognostic_level, va1.prognostic_level)) AS prognosticLevel,
          toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
@@ -262,10 +267,15 @@ vk0 AS (SELECT s.sid AS sid,
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
     WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
       AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
-ct0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+ct0 AS (SELECT s.sid AS sid,
+    if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+      WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
+  FROM (SELECT DISTINCT sid FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) AS s
+  LEFT JOIN (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+      anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'CANCER_TYPE_DETAILED'
-    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid),
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+      AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
 mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
@@ -301,7 +311,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
+         m.pid AS patient, m.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, m.proteinChange AS proteinChange,
          if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
          if(m.germ, '', if(tt.found = 1, tt.resistance_level, ann.resistance_level)) AS resistanceLevel, if(m.germ, '', if(tt.found = 1, tt.diagnostic_level, ann.diagnostic_level)) AS diagnosticLevel, if(m.germ, '', if(tt.found = 1, tt.prognostic_level, ann.prognostic_level)) AS prognosticLevel,
          toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
@@ -340,7 +350,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
+         v.pid AS patient, v.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
          if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level,
          if(vp.found = 1, vp.resistance_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.resistance_level, va1.resistance_level)) AS resistanceLevel, if(vp.found = 1, vp.diagnostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.diagnostic_level, va1.diagnostic_level)) AS diagnosticLevel, if(vp.found = 1, vp.prognostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.prognostic_level, va1.prognostic_level)) AS prognosticLevel,
          toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
@@ -448,10 +458,15 @@ vk0 AS (SELECT s.sid AS sid,
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
     WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
       AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
-ct0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+ct0 AS (SELECT s.sid AS sid,
+    if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+      WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
+  FROM (SELECT DISTINCT sid FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) AS s
+  LEFT JOIN (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+      anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'CANCER_TYPE_DETAILED'
-    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid),
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+      AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
 mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
@@ -487,7 +502,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
+         m.pid AS patient, m.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, m.proteinChange AS proteinChange,
          if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
          if(m.germ, '', if(tt.found = 1, tt.resistance_level, ann.resistance_level)) AS resistanceLevel, if(m.germ, '', if(tt.found = 1, tt.diagnostic_level, ann.diagnostic_level)) AS diagnosticLevel, if(m.germ, '', if(tt.found = 1, tt.prognostic_level, ann.prognostic_level)) AS prognosticLevel,
          toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
@@ -526,7 +541,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
+         v.pid AS patient, v.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
          if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level,
          if(vp.found = 1, vp.resistance_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.resistance_level, va1.resistance_level)) AS resistanceLevel, if(vp.found = 1, vp.diagnostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.diagnostic_level, va1.diagnostic_level)) AS diagnosticLevel, if(vp.found = 1, vp.prognostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.prognostic_level, va1.prognostic_level)) AS prognosticLevel,
          toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,
@@ -631,10 +646,15 @@ vk0 AS (SELECT s.sid AS sid,
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
     WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
       AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
-ct0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+ct0 AS (SELECT s.sid AS sid,
+    if(ifNull(k.sid, '') = '', (SELECT t.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.type_of_cancer t ON t.type_of_cancer_id = cs.type_of_cancer_id
+      WHERE cs.cancer_study_identifier = 'msk_chord_2024'), if(ifNull(k.nd, 0) > 0, k.d, '')) AS tumorType
+  FROM (SELECT DISTINCT sid FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) AS s
+  LEFT JOIN (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, countIf(attribute_name = 'CANCER_TYPE_DETAILED') AS nd,
+      anyIf(attribute_value, attribute_name = 'CANCER_TYPE_DETAILED') AS d FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
-  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'CANCER_TYPE_DETAILED'
-    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid),
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CANCER_TYPE', 'CANCER_TYPE_DETAILED')
+      AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0)) GROUP BY sid) AS k ON k.sid = s.sid),
 mc0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, any(attribute_value) AS v FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name = 'MUTATION_COUNT'
@@ -670,7 +690,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,
+         m.pid AS patient, m.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, m.proteinChange AS proteinChange,
          if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,
          if(m.germ, '', if(tt.found = 1, tt.resistance_level, ann.resistance_level)) AS resistanceLevel, if(m.germ, '', if(tt.found = 1, tt.diagnostic_level, ann.diagnostic_level)) AS diagnosticLevel, if(m.germ, '', if(tt.found = 1, tt.prognostic_level, ann.prognostic_level)) AS prognosticLevel,
          toUInt8((NOT m.germ AND if(tt.found = 1, tt.driver, ifNull(ann.driver, 0))) OR (ifNull(m.chr, '') != '' AND ifNull(m.start, 0) != 0 AND ifNull(m.end, 0) != 0 AND ifNull(m.ref, '') != '' AND ifNull(m.var, '') != '' AND if(positionCaseInsensitive(ifNull(m.mutationType, ''), 'splice') > 0, arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'splice') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots')), arrayExists(h -> positionCaseInsensitive(JSONExtractString(h, 'type'), 'single') > 0 OR positionCaseInsensitive(JSONExtractString(h, 'type'), 'indel') > 0, JSONExtractArrayRaw(ifNull(g.gd, ''), 'hotspots'))))) AS drv,
@@ -709,7 +729,7 @@ rows AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
-         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
+         v.pid AS patient, v.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, multiIf(v.gene1 != '' AND v.gene2 != '' AND v.gene1 != v.gene2, concat(v.gene1, '-', v.gene2, ' Fusion'), v.gene1 != '' AND v.gene2 != '', concat(v.gene1, ' intragenic'), v.gene1 != '' OR v.gene2 != '', concat(if(v.gene1 != '', v.gene1, v.gene2), if((upper(ifNull(v.class, '')) = 'INTERGENIC' OR (upper(ifNull(v.class, '')) IN ('', 'UNKNOWN', 'NA') AND upper(ifNull(v.eventInfo, '')) = concat(upper(if(v.gene1 != '', v.gene1, v.gene2)), '-INTERGENIC'))), ' intergenic', ' intragenic')), 'undefined intragenic') AS proteinChange,
          if(vp.found = 1, vp.oncogenicity, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.oncogenicity, va1.oncogenicity)) AS oncogenicity, if(vp.found = 1, vp.level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.level, va1.level)) AS level,
          if(vp.found = 1, vp.resistance_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.resistance_level, va1.resistance_level)) AS resistanceLevel, if(vp.found = 1, vp.diagnostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.diagnostic_level, va1.diagnostic_level)) AS diagnosticLevel, if(vp.found = 1, vp.prognostic_level, if(va2.oncogenicity != '' AND (va1.oncogenicity = '' OR va2.driver > va1.driver), va2.prognostic_level, va1.prognostic_level)) AS prognosticLevel,
          toUInt8(if(vn.found = 1, vn.driver, greatest(va1.driver, va2.driver))) AS drv,

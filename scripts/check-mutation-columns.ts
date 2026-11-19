@@ -36,6 +36,8 @@
  *   S3 sorted by Chromosome in the table: PTEN's rows are all on 10 (the importer stores the file's
  *      "chr10" as "10"), so they tie and the tiebreak (sample id) orders them, both ways. No fixture
  *      gene's table spans chromosomes whose text and number orders differ, so the key itself is S1's.
+ *   CTD Cancer Type Detailed: the sample's CANCER_TYPE_DETAILED; the study's cancer type for a sample with neither
+ *      type attribute (FX-P41), none for one with CANCER_TYPE alone (FX-P42) (generateUniqueSampleKeyToTumorTypeMap).
  *   DF the defaults a view naming no columns gets (MUT-COL-5/18/27): Copy # when the study has a
  *      COPY_NUMBER_ALTERATION / DISCRETE profile (meta_cna.txt), Allele Freq (T) when some row of the gene has a
  *      non-zero t_alt_count / (t_alt_count + t_ref_count), Cancer Type Detailed when the gene's rows hold more than
@@ -503,6 +505,17 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
     const pass = r.length > 1 && chrs.every((c) => c === "10") && sids.includes("FX-P29-T1") && sids.every((s, i) => i === 0 || sids[i - 1] <= s);
     ok(`S3 PTEN sorted by Chromosome ${desc ? "descending" : "ascending"}: every row on 10 (FX-P29's "chr10" too), so the rows are in sample id order`,
       pass, JSON.stringify(r.map((x) => x.sample + " " + String(v(x, "chr")))));
+  }
+}
+
+{
+  // CTD Cancer Type Detailed as the portal's tumour-type map (StoreUtils generateUniqueSampleKeyToTumorTypeMap): the sample's
+  // CANCER_TYPE_DETAILED; with neither type attribute (FX-P41) the study's cancer type; with CANCER_TYPE alone (FX-P42) none
+  const r = await table("EGFR");
+  if (typeof r === "string") ok("CTD EGFR table", false, r);
+  else for (const [sid, want] of [["FX-P41-T1", "non-small cell lung cancer"], ["FX-P42-T1", ""]] as const) {
+    const got = r.filter((x) => x.sample === sid).map((x) => String(v(x, "cancerType") ?? ""));
+    ok("CTD " + sid + " EGFR L858R: Cancer Type Detailed " + JSON.stringify(want), got.length === 1 && got[0] === want, JSON.stringify(got));
   }
 }
 

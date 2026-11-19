@@ -53,6 +53,8 @@ const OTHER = "fixture-older";
 /** every sample of the fixture study (data_clinical_sample.txt): the somatic frequency's denominator */
 const STUDY_SAMPLES = 59;
 const LUAD = "Lung Adenocarcinoma", LUSC = "Lung Squamous Cell Carcinoma";
+// the fixture study's cancer type (type_of_cancer nsclc), as its database names it
+const NSCLC = "non-small cell lung cancer";
 
 // Genome Nexus's stored release is read at the fixture's pin (no record matches a fusion); the
 // protein (length, domains) is asked of an address that refuses at once, so nothing leaves the machine
@@ -107,8 +109,8 @@ const FUSIONS: Fusion[] = [
   ["FX-P45-T1", "EML4-ALK Fusion", LUAD, "Oncogenic · Level 2", "Fusion · Driver", "FUSION", "2", 42522656, "SOMATIC",
     "P1 X2 the pair's no-tumour-type row (Oncogenic); X3 its Lung Adenocarcinoma row"],
   ["FX-P46-T1", "EML4-ALK Fusion", LUAD, "Oncogenic · Level 2", "Fusion · Driver", "FUSION", "2", 42522656, "SOMATIC", "W8 the same fusion in another patient"],
-  ["FX-P47-T1", "EML4-ALK Fusion", "", "Likely Oncogenic · Level 3A", "Fusion · Driver", "FUSION", "2", 42522656, "SOMATIC",
-    "A7 both cancer-type values blank: the study's cancer type's row for the cell; X2 still the no-tumour-type row"],
+  ["FX-P47-T1", "EML4-ALK Fusion", NSCLC, "Likely Oncogenic · Level 3A", "Fusion · Driver", "FUSION", "2", 42522656, "SOMATIC",
+    "A7 both cancer-type values blank: the study's cancer type's row for the cell, and the study's cancer type as its Cancer Type Detailed (generateUniqueSampleKeyToTumorTypeMap); X2 still the no-tumour-type row"],
   ["FX-P48-T1", "EML4-ALK Fusion", "", "Oncogenic · Level 4", "Fusion · Driver", "FUSION", "2", 42522656, "SOMATIC", "A7 CANCER_TYPE only: the no-tumour-type row for the cell too"],
   ["FX-P49-T1", "EML4-ALK Fusion", LUAD, "Oncogenic · Level 2", "Fusion · Driver", "FUSION", "2", 42522656, "SOMATIC", "W8 one patient's first sample"],
   ["FX-P49-T2", "EML4-ALK Fusion", LUSC, "Likely Neutral", "Fusion · Driver", "FUSION", "2", 42522656, "SOMATIC",
