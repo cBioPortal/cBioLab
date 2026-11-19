@@ -3,7 +3,7 @@
 // numeric intervals with editable ends; clauses of no clinical chart drawn as the generic pills.
 import { Fragment, useEffect, useState } from "react";
 import type { CohortDef } from "../../lib/types.ts";
-import { editInterval, filterGroups, geneTablePills, removeGeneState, removeMutationType, intervalEnds, intervalText, removeOqlLine, joinedByAnd, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
+import { editInterval, filterGroups, geneTablePills, removeGeneState, removeMutationType, intervalEnds, intervalText, removeOqlLine, joinedByAnd, removePill, type AssayChartOf, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
 import { ClausePill, CLINICAL_COLOR, type OnCustomData } from "./pills";
 
 type Result = { draft: CohortDef } | { why: string };
@@ -35,7 +35,7 @@ function IntervalBody({ iv, name, edit }: { iv: Interval; name: string; edit: (e
 
 const pillText = (p: SvPill) => p.kind === "na" ? "NA" : p.kind === "value" ? String(p.value) : intervalText(p.interval);
 
-export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited, onRemoveClause, onCustomData, drawnDensity }: {
+export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited, onRemoveClause, onCustomData, drawnDensity, assayChartOf }: {
   draft: CohortDef;
   labelOf: (attribute: string) => string | undefined;
   /** applies an edited draft, or says why it can't be; false when refused */
@@ -46,6 +46,8 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
   onCustomData?: OnCustomData;
   /** the density charts drawn, whose drags' ranges have no pill (STV-FB-3b) */
   drawnDensity?: ReadonlySet<string>;
+  /** names a generic-assay filter by its chart or frequency table (STV-FB-3 #13, #14) */
+  assayChartOf?: AssayChartOf;
 }) {
   type ChartGroup = Extract<ReturnType<typeof filterGroups>[number], { kind: "chart" }>;
   /** a clinical chart's pills: "<chart> : a or b" */
@@ -90,6 +92,26 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
       ))}
     </span>
   );
+  type AssayGroup = Extract<ReturnType<typeof filterGroups>[number], { kind: "assay" }>;
+  /** a generic-assay chart's or frequency table's filter: a row, value or interval per pill (STV-FB-3 #13, #14) */
+  const assay = (g: AssayGroup) => (
+    <span key={g.clause} className="svgroup" data-sv-assay={g.label}>
+      <span className="svname">{g.label}</span>
+      <span className="svop">:</span>
+      {g.pills.map(({ pill: p, text }, k) => (
+        <Fragment key={k}>
+          {k > 0 && <span className="svop">or</span>}
+          <span className="fpill svpill" data-sv-pill={text}>
+            {p.kind === "interval"
+              ? <IntervalBody iv={p.interval} name={g.label} edit={(end, raw) => apply(editInterval(draft, g.clause, p.leaf, end, raw))} />
+              : <span className="fval">{text}</span>}
+            <button className="fx" aria-label={"remove " + g.label + " " + text}
+              onClick={() => apply({ draft: removePill(draft, g.clause, p) })}>×</button>
+          </span>
+        </Fragment>
+      ))}
+    </span>
+  );
   /** any other clause: a gene table's selection as the portal draws it, a pill per gene coloured by alteration (STV-FB-3 #9); else the generic pill */
   const other = (clause: number) => {
     const genes = geneTablePills(draft.all![clause]);
@@ -111,9 +133,9 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
     );
   };
   // two groups in a row from one chart are joined by "and" (STV-FB-2)
-  const groups = filterGroups(draft, labelOf, drawnDensity), and = joinedByAnd(draft, groups);
+  const groups = filterGroups(draft, labelOf, drawnDensity, assayChartOf), and = joinedByAnd(draft, groups);
   // a density drag's ranges have no pill (STV-FB-3b): its chart shows them and resets them
   return <span className="svpills">{groups.map((g, i) => g.kind === "hidden" ? null : g.kind === "other"
     ? <Fragment key={g.clause}>{and[i] && <span className="svop">and</span>}{other(g.clause)}</Fragment>
-    : g.kind === "gene" ? gene(g) : chart(g))}</span>;
+    : g.kind === "gene" ? gene(g) : g.kind === "assay" ? <Fragment key={g.clause}>{and[i] && <span className="svop">and</span>}{assay(g)}</Fragment> : chart(g))}</span>;
 }

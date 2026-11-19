@@ -235,3 +235,65 @@ test("a pill's chart name: the answer's, else the kept vocabulary's, else none (
   assert.equal(name("SEX"), undefined);
   assert.equal(name("TMB"), undefined);
 });
+
+// STV-FB-3 #13 and #14: a generic-assay frequency table's rows and a generic-assay chart's values or
+// interval, named by the chart, each removable, an interval editable
+describe("generic-assay pills", () => {
+  const sig = "mutational_signature_contribution_SBS";
+  const charts = (profileType: string, entity: string | null) => profileType === sig
+    ? entity === "mutational_signature_contribution_SBS1" ? { label: "SBS1: Mutational signature contribution", freq: false } : { label: "Frequency Table: Mutational signature", freq: true }
+    : undefined;
+  const table = { any: [
+    { kind: "genericAssay", profileType: sig, entity: "mutational_signature_contribution_SBS2", values: ["high"] },
+    { kind: "genericAssay", profileType: sig, entity: "mutational_signature_contribution_SBS13", values: ["high", "low"] },
+  ] };
+  const bar = { kind: "genericAssay", profileType: sig, entity: "mutational_signature_contribution_SBS1", range: { gt: 0.1, lte: 0.2 } };
+  const draft = { all: [table, bar] } as unknown as CohortDef;
+
+  test("a frequency table's rows: a pill per checked row, named by its entity as the table names it, under the table's name", () => {
+    const named = (p: string, e: string | null) => ({ ...charts(p, e)!, entityName: (x: string) => x.endsWith("SBS2") ? "Signature 2" : undefined });
+    const [n] = filterGroups(draft, () => undefined, new Set(), named);
+    assert.ok(n.kind === "assay");
+    assert.deepEqual(n.pills.map((p) => p.text), ["Signature 2 high", "SBS13 high", "SBS13 low"]);
+    const [g] = filterGroups(draft, () => undefined, new Set(), charts);
+    assert.equal(g.kind, "assay");
+    assert.ok(g.kind === "assay");
+    assert.equal(g.label, "Frequency Table: Mutational signature");
+    assert.deepEqual(g.pills.map((p) => p.text), ["SBS2 high", "SBS13 high", "SBS13 low"]);
+  });
+
+  test("a numeric chart's bar: an interval pill under the chart's name, editable", () => {
+    const g = filterGroups(draft, () => undefined, new Set(), charts)[1];
+    assert.ok(g.kind === "assay");
+    assert.equal(g.label, "SBS1: Mutational signature contribution");
+    assert.deepEqual(g.pills.map((p) => p.text), ["0.1 < x ≤ 0.2"]);
+    const r = editInterval(draft, 1, 0, "hi", "0.3");
+    assert.ok("draft" in r);
+    assert.deepEqual(r.draft.all![1], { kind: "genericAssay", profileType: sig, entity: "mutational_signature_contribution_SBS1", range: { gt: 0.1, lte: 0.3 } });
+  });
+
+  test("a row's × leaves the other rows; an entity's last row takes its leaf; a chart's last pill its filter", () => {
+    const g = filterGroups(draft, () => undefined, new Set(), charts)[0];
+    assert.ok(g.kind === "assay");
+    const low = g.pills.find((p) => p.text === "SBS13 low")!.pill;
+    assert.deepEqual(removePill(draft, 0, low).all![0], { any: [table.any[0], { ...table.any[1], values: ["high"] }] });
+    const sbs2 = g.pills.find((p) => p.text === "SBS2 high")!.pill;
+    assert.deepEqual(removePill(draft, 0, sbs2).all![0], table.any[1]);
+    const b = filterGroups(draft, () => undefined, new Set(), charts)[1];
+    assert.ok(b.kind === "assay");
+    assert.deepEqual(removePill(draft, 1, b.pills[0].pill).all, [table]);
+  });
+
+  test("a categorical chart's values read as they are; an entity drawn nowhere is named by its id and profile", () => {
+    const cat = { kind: "genericAssay", profileType: "armlevel_cna", entity: "1p", values: ["Loss", "Gain"] };
+    const [g] = filterGroups({ all: [cat] } as unknown as CohortDef, () => undefined, new Set(), charts);
+    assert.ok(g.kind === "assay");
+    assert.equal(g.label, "1p (armlevel_cna)");
+    assert.deepEqual(g.pills.map((p) => p.text), ["Loss", "Gain"]);
+  });
+
+  test("two filters from one generic-assay chart in a row are joined by \"and\"", () => {
+    const two = { all: [bar, { ...bar, range: { gt: 0.5 } }, table] } as unknown as CohortDef;
+    assert.deepEqual(joinedByAnd(two, filterGroups(two, () => undefined, new Set(), charts)), [false, true, false]);
+  });
+});
