@@ -36,7 +36,8 @@ export function ClinicalDataTab({ selection, studies, charts, active = true }: C
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!doc || !active || res?.doc === docText) return;
+    // read once per document; a failed read is tried again when the tab is shown again
+    if (!doc || !active || (res?.doc === docText && res.failed !== docText)) return;
     const ac = new AbortController();
     api.analysis(doc, { signal: ac.signal })
       .then((r) => r.json())

@@ -29,7 +29,8 @@ export function CnSegmentsTab({ selection, selected, active = true }: CnSegments
   const [res, setRes] = useState<{ doc: string; v?: ViewResult; error?: string } | null>(null);
 
   useEffect(() => {
-    if (!doc || !active || res?.doc === docText) return;
+    // read once per document; a failed read is tried again when the tab is shown again
+    if (!doc || !active || (res?.doc === docText && !res.error)) return;
     const ac = new AbortController();
     api.analysis(doc, { signal: ac.signal })
       .then((r) => r.json())
@@ -44,7 +45,8 @@ export function CnSegmentsTab({ selection, selected, active = true }: CnSegments
 
   if (!selection) return <div className="card"><p className="note">Select a study first.</p></div>;
   const busy = !!doc && (!res || res.doc !== docText);
-  const v = res?.v;
+  // with nothing to read (0 selected samples, or past the limit), no earlier selection's figure
+  const v = doc ? res?.v : undefined;
   const segmented = !busy && v?.kind === "segments" && v.segments ? v.segments.segmented : null;
   const spec = doc?.views?.[0] as unknown as Record<string, unknown> | undefined;
   const c = spec ? {

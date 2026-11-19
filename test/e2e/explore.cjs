@@ -427,14 +427,25 @@ async function explore({ ok, BASE, page }) {
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.locator("[data-test=cn-segments-info]").waitFor({ timeout: 240000 });
     const reloaded = await active();
-    await page.goto(BASE + "/lab?tab=explore&study=" + ST + "&filterAttributeId=AGE&filterValues=150-200&svtab=cnSegments", { waitUntil: "domcontentloaded" });
+    // the tab open on a selection with segments, then the same page's filter narrowed to nobody: the
+    // 0-sample line alone, nothing left of the earlier figure
+    await page.goto(BASE + "/lab?tab=explore&study=" + ST + "&filterAttributeId=AGE&filterValues=50-60&svtab=cnSegments", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => /^Segmented copy-number data for the selected [1-9]/.test(document.querySelector("[data-test=cn-segments-info]")?.textContent || "")
+      && !!document.querySelector("[data-test=cn-segments-info]")?.closest("section")?.querySelector(".vfoot"), null, { timeout: 240000 });
+    const age = (await page.locator(".svgroup[data-sv-chart='AGE'] .svname").innerText()).trim();
+    const hi = page.getByRole("textbox", { name: age + " end" });
+    await hi.fill("200"); await hi.press("Enter");
+    const lo = page.getByRole("textbox", { name: age + " start" });
+    await lo.fill("150"); await lo.press("Enter");
     await page.waitForFunction(() => /\b0 patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
     const info = await page.locator("[data-test=cn-segments-info]").innerText({ timeout: 60000 });
+    const cn = page.locator("section.viewcard", { has: page.locator("[data-test=cn-segments-info]") });
+    const stale = await cn.locator(".vfoot, svg").count();
     const names = (await tabs.locator("[role=tab]").allInnerTexts()).map((x) => x.trim());
-    tabDetail = JSON.stringify({ opened, all, shown, onSummary, back, onCn, reloaded, names, info });
+    tabDetail = JSON.stringify({ opened, all, shown, onSummary, back, onCn, reloaded, names, info, stale });
     tabOk = opened === "Clinical Data" && !!shown && onSummary === null && back.search === "Female" && back.shown === shown &&
       onCn === "cnSegments" && reloaded === "CN Segments" && names.join("|") === "Summary|CN Segments" &&
-      info === "No segmented copy-number data for the selected 0 samples.";
+      info === "No segmented copy-number data for the selected 0 samples." && stale === 0;
   } catch (e) { tabDetail = String(e.message).split("\n")[0]; }
   ok("explore: the tab is in the URL, keeps its search across a switch, and CN Segments stays at 0 samples", tabOk, tabDetail);
 }
