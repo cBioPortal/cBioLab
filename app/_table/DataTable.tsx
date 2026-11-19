@@ -30,7 +30,7 @@ const CHIP_X = "size-4 text-muted-foreground [&_svg:not([class*='size-'])]:size-
 
 const OP_LABELS: Record<TextFilterOp, string> = {
   contains: "contains", notContains: "does not contain", equals: "equals", notEquals: "does not equal",
-  startsWith: "begins with", endsWith: "ends with", regex: "matches regex",
+  startsWith: "begins with", notStartsWith: "does not begin with", endsWith: "ends with", notEndsWith: "does not end with", regex: "matches regex",
 };
 
 /** The query with nothing set dropped, so a cleared control leaves the spec as it was. */
