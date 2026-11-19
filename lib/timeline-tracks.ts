@@ -119,14 +119,15 @@ function reroot(t: TlTrack, parentUid: string, depth: number): TlTrack {
   return { ...t, uid, depth, children: t.children.map((c) => reroot(c, uid, depth + 1)) };
 }
 
-const firstStart = (t: TlTrack): number => {
-  let m = Infinity;
-  for (const it of t.items) m = Math.min(m, it.start);
-  for (const c of t.children) m = Math.min(m, firstStart(c));
-  return m;
-};
+/**
+ * A sub-track's place among its siblings, as the portal's sortNestedTracks takes it: the start of its
+ * own first event, or 0 for a track whose events are all in its sub-tracks (the portal's parent
+ * tracks hold none). Ties keep the order the values first occur in the patient's events.
+ */
+export const trackSortKey = (t: Pick<TlTrack, "items">): number => t.items.length ? t.items[0].start : 0;
 function sortChildren(t: TlTrack): TlTrack {
-  t.children.sort((a, b) => firstStart(a) - firstStart(b) || a.label.localeCompare(b.label));
+  // a stable sort: equal keys stay in first-occurrence order
+  t.children.sort((a, b) => trackSortKey(a) - trackSortKey(b));
   t.children.forEach(sortChildren);
   return t;
 }

@@ -2,7 +2,7 @@
 // patient-view timeline — and the figure's promises about what it draws (lib/timeline-svg.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
+import { buildTracks, trackSortKey, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
 import { rowAt, timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
 import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
@@ -38,10 +38,12 @@ describe("timeline tracks: cBioPortal's grouping", () => {
   test("treatment nests by type → subtype → agent; a lone Other is absorbed into its parent", () => {
     const tx = tracks.find((t) => t.uid === "treatment")!;
     // no TREATMENT_TYPE anywhere: the single Other level vanishes, and subtypes sit directly under Treatment
-    assert.deepEqual(tx.children.map((c) => c.label), ["Chemo", "Radiation Therapy", "Immuno"], "sorted by first start");
+    // PAT-TL-TR-2, the portal's sortNestedTracks: a track's own first event's start, 0 for one whose events are all in
+    // sub-tracks (Chemo, Immuno), ties in first-occurrence order; Radiation Therapy absorbed its Other, so starts at 33
+    assert.deepEqual(tx.children.map((c) => c.label), ["Chemo", "Immuno", "Radiation Therapy"], "sorted as the portal's");
     assert.deepEqual(tx.children[0].children.map((c) => c.uid), ["treatment.Chemo.METHOTREXATE", "treatment.Chemo.CISPLATIN"]);
     // Radiation has no AGENT: its own Other child is absorbed, so its events sit on it
-    const rt = tx.children[1];
+    const rt = tx.children.find((c) => c.label === "Radiation Therapy")!;
     assert.equal(rt.children.length, 0);
     assert.equal(rt.items.length, 1);
   });
@@ -464,4 +466,17 @@ test("PAT-TL-TR-5 rowAt: the row the pointer is on, by the figure's own rows; it
   assert.equal(rowAt(layout, r[r.length - 1].y + r[r.length - 1].h / 2), r.length - 1);
   assert.equal(rowAt(layout, r[0].y - 1), null, "the axis above the rows");
   assert.equal(rowAt(layout, r[r.length - 1].y + r[r.length - 1].h + 1), null, "below the last row");
+});
+
+test("PAT-TL-TR-2 trackSortKey: lgg_ucsf_2014 P04's Radiation Therapy before Medical Therapy, both parents (key 0), in the order the events list them", () => {
+  // the portal's API lists P04's day-488 events Radiation Therapy (XRT) first, then Medical Therapy (TMZ), and so does the timeline query (start, id)
+  const p04 = [
+    ev("Treatment", 488, { TREATMENT_TYPE: "Radiation Therapy", SUBTYPE: "XRT" }, 530),
+    ev("Treatment", 488, { TREATMENT_TYPE: "Medical Therapy", SUBTYPE: "Chemotherapy", AGENT: "TMZ" }, 700),
+    ev("Treatment", 1111, { TREATMENT_TYPE: "Medical Therapy", SUBTYPE: "Chemotherapy", AGENT: "TMZ" }, 1300),
+  ];
+  const tx = buildTracks(p04)[0];
+  assert.deepEqual(tx.children.map((c) => c.label), ["Radiation Therapy", "Medical Therapy"]);
+  assert.deepEqual(tx.children.map(trackSortKey), [0, 0], "both hold their events in sub-tracks");
+  assert.equal(trackSortKey({ items: [{ i: 0, start: -40, end: -40 }, { i: 1, start: -90, end: -90 }] }), -40, "the first event as listed, not the earliest");
 });
