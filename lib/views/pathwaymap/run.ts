@@ -123,6 +123,7 @@ export async function runPathwayMap(view: PathwayMapView, ctx: ViewRun): Promise
       (vNames.length > 1 ? "With several cohorts a gene's frequency weight is its highest across them. " : "") +
       "Pathway diagrams: PathwayMapper (i-Vis at Bilkent), " + PATHWAYS.length + " pathways from TCGA publications." +
       (multi ? " Counts are summed across " + vStudies.length + " studies; overlap is not deduplicated." : "") +
+      (np && !("error" in np) && np.note ? " " + np.note : "") +
       (view.patient && !np ? " Which of " + view.patient.id + "'s samples were profiled is not shown: " + view.patient.study + " does not disclose a patient's samples here." : ""),
   };
   return problem ? { ...result, error: problem } : result;

@@ -291,6 +291,9 @@ describe("pathwaymap: the Pathways tab's not-profiled alert (PTB-PW-1, PatientVi
     assert.deepEqual(np.samples.map((m) => [m.id, m.label]), [["T1", "1"], ["T2", "2"], ["T3", "3"]]);
     assert.deepEqual(np.alerts, [{ what: "mutations", samples: ["T2"] }]);
     assert.equal(r.participation!.requiresPatientLevel, true, "naming samples is patient-level");
+    // no timeline here, so the samples are numbered by type and id: the caveat says so, as the header's numbering would
+    assert.match((np as { note?: string }).note || "", /numbered by sample type and id/);
+    assert.match(r.caveat!, /P1's samples are numbered by sample type and id, not collection day/);
     assert.match(kindText(pathwaymapKind, r).join("\n"), /\n {2}Sample T2 not profiled for mutations$/);
   });
   test("without patient, or from an aggregate-only participant, no alert; the latter says so", async () => {

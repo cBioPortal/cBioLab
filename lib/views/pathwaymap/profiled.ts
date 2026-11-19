@@ -14,7 +14,9 @@ export const PATHWAY_ALERT_PROFILES = [["mutations", "mutations"], ["cna", "copy
 
 export interface PathwayMapAlert { what: string; samples: string[] }
 /** The alert's samples and lines, or why the view names no such patient (never shown as "every sample profiled"). */
-export type PathwayMapNotProfiled = { samples: SampleMark[]; alerts: PathwayMapAlert[] } | { error: string };
+export type PathwayMapNotProfiled = { samples: SampleMark[]; alerts: PathwayMapAlert[];
+  /** why the samples are numbered by type and id rather than collection day (the timeline could not be read), as the header numbers them */
+  note?: string } | { error: string };
 
 /**
  * A line per profile the study holds with samples outside it: those samples in the page's order. A
@@ -50,5 +52,5 @@ export async function pathwayNotProfiled(ctx: ViewRun, pt: { study: string; id: 
   if (!inCohort.rows.length) return { error: pt.id + " is not one of " + cohort + "'s patients" };
   const samples = all.rows.map((x) => ({ id: String(x.sid), type: String(x.type ?? "") }));
   const marks = [...sampleMarks(samples, ev.events).values()].filter((m) => samples.some((s) => s.id === m.id));
-  return { samples: marks, alerts: pathwayAlerts(marks, profiled.rows) };
+  return { samples: marks, alerts: pathwayAlerts(marks, profiled.rows), ...(ev.note && marks.length > 1 ? { note: ev.note } : {}) };
 }

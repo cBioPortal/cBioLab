@@ -16,4 +16,8 @@ export const mutants: Mutant[] = [
     effect: "A pathwaymap naming a patient outside its cohort gives that patient's samples an alert, as if they were the cohort's.",
     find: "if (!inCohort.rows.length) return",
     replace: "if (inCohort.rows.length < 0) return" },
+  { id: "pathways-alert-numbering-unsaid", layer: "counts", guard: "unit", file: "lib/views/pathwaymap/profiled.ts",
+    effect: "With no timeline the Pathways alert numbers samples by type and id, unlike a header that reads collection days, and nothing says so.",
+    find: "...(ev.note && marks.length > 1 ? { note: ev.note } : {})",
+    replace: "...({})" },
 ];
