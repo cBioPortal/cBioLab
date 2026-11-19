@@ -124,7 +124,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 |---|---|---|---|
 | STV-FB-1 | 🟡 | B | A pill per value or range with its × ✅; cBioLab's own pill style kept on purpose (not the portal's blue); no pending style (no manual mode, STV-FB-6) |
 | STV-FB-2 | ✅ | B | Clinical pills "<chart> : a or b", no word between charts; generic OR groups "( a or b )" and two groups of one chart joined by "and" (`joinedByAnd`, `lib/study-view-pills.ts`); a gene-table Union is one OQL clause, its pill text under STV-FB-3 |
-| STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene-table selections a pill per gene coloured by alteration (`geneTablePills`); gene-chart, GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
+| STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene-table selections a pill per gene coloured by alteration (`geneTablePills`); gene-chart and mutation-type filters "<chart> : <state> or <state>", each removable (`geneStatesFilter`); GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
 | STV-FB-3a | ❌ | C | No survival-attribute pills (no survival filter) |
 | STV-FB-3b | ✅ | C | A density drag's ranges have no pill while their chart is drawn, as legacy; the chart shows them (its box, "selected: …") and resets them; a second drag replaces the first (`densityHeld`, `withDensityDrag`); with the chart not drawn they are ordinary range pills |
 | STV-FB-4 | ✅ | B | "50 < x ≤ 60", "a ≤ x ≤ b", "> a", "≤ b", one value; ends edited in place (start > end swaps, start = end and empty refused), and an edit makes custom bins on the chart (#203). Several ranges one pill, the first range's start to the last's end, as the portal (an edit makes it that one interval) |
@@ -167,7 +167,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-AC-4 | ✅ | B | Clinical Freq for brca_tcga_pan_can_atlas_2018: all 60 attributes as the portal's API gives them; filtered to Sex = Male, the 3 the portal greys out. Genomic Freq for coadread: Data Types 100.0 %, CNA Genes 99.7 %, FGA 98.1 %, Mutated Genes / Mutation Count / SV Genes 89.9 %, the portal's list and order |
 | STV-AC-5 | 🟡 | B | Gene status: a profile select with profiled samples ("Mutations (534 samples)"), for mutations Mutated vs Wild Type or Mutation Type, one chart per gene and profile (≤6 genes; `geneChartsChanged`); one option per kind (mutations; discrete copy number, its kinds summed across studies), so a selection holding two discrete copy-number profiles cannot pick between them, and one whose discrete profile has another id is not offered copy number; no gene sets or chart-type radios; continuous profiles not offered |
 | STV-AC-6 | 🟡 | B | "Custom data" button / tab: upload and manage datasets, charted as facets; sign-in rules differ |
-| STV-AC-7 | 🟡 | B | The X vs Y tab: two attribute selects (survival but OS_STATUS left out) and the portal's button for each pair (`xVsYButton`); two numeric add a density chart; numeric × categorical refused, the violin table not drawn yet |
+| STV-AC-7 | ✅ | B | The X vs Y tab: two attribute selects (survival but OS_STATUS left out) and the portal's button for each pair (`xVsYButton`); two numeric add a density chart, numeric × categorical a violin table (`ViolinCard`) |
 | STV-AC-8 | 🟡 | C | A tab per generic-assay type, named as the portal's (`assayTabLabel`; coadread Arm-level CNA · Genetic Ancestry · Methylation), each a profile select of that type + entity search, one chart per entity (`AssayChartPicker`); no "Frequency Table" row |
 
 ### §7 Groups
@@ -213,13 +213,13 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-CD-2 | N/A | C | No row limit: the table pages in the database (`lib/study-view-clinical-tab.ts:28-32`; [clinical-tab-cases](clinical-tab-cases.md) CT9), so the product limit and its message do not apply. Not a legacy bug, so N/A rather than 🐞 ok |
 | STV-CD-3 | ✅ | BC | Patient ID and Sample ID (links), then each visible clinical-attribute chart by priority then name ([clinical-tab-cases](clinical-tab-cases.md) CT2, CT5); each header's tooltip name, description and attribute id (`clinicalColumnTip`); several studies: a "Cancer Study" column (first, where the portal has it third) |
 | STV-CD-4 | ✅ | BC | Grey "—" (tooltip "No data available"), http(s) values as links ([clinical-tab-cases](clinical-tab-cases.md) CT3, CT4) |
-| STV-CD-5 | 🟡 | B | ↓ "N results" and 20 rows a page with the shared pager ✅ ([clinical-tab-cases](clinical-tab-cases.md) CT6); no "Show more", no max height of 100vh − 220px |
+| STV-CD-5 | ✅ | B | "N results" and 20 rows a page ([clinical-tab-cases](clinical-tab-cases.md) CT6) with the portal's previous · Show more · next; the table scrolls within 100vh − 220px |
 | STV-CD-6 | ✅ | B | Search and sort in the database over every row; ⚠ no 500-row cap or its message ([clinical-tab-cases](clinical-tab-cases.md) CT7) |
 | STV-CD-7 | ✅ | B | Download `<study>_clinical_data.tsv` of the columns shown, every row the search keeps, the portal's table layout (CRLF, empty for missing); ⚠ without the 500-row cap ([clinical-tab-cases](clinical-tab-cases.md) CT10–CT12) |
 | STV-CD-8 | ✅ | B | brca_tcga_pan_can_atlas_2018: "1,084 results", Patient ID, Sample ID, Cancer Type Detailed, Mutation Count, Fraction Genome Altered, Diagnosis Age, MSI MANTIS Score, MSIsensor Score, Overall Survival Status, Sex, Ethnicity Category, Race Category, Subtype, Tumor Type, … — the order the spec saw |
-| STV-CD-9 | ❌ | C | ↓ No Columns menu: Add chart sits in the Summary block, hidden on this tab (`app/lab/page.tsx:572, 584`), and the table is drawn `plain`, with no menu of its own |
+| STV-CD-9 | ✅ | C | A Columns menu on the tab: the chart menu's Clinical · Genomic · X vs Y tabs (`columnsMenuTabs`); a column is a chart shown |
 | STV-CN-1 | ✅ | B | The portal's info line: "Segmented copy-number data for the selected N samples." ("sample" for one), "No segmented …" once read and empty, and the >20000 refusal with nothing read ([study-cn-segments-cases](study-cn-segments-cases.md) CI1–CI6). brca_tcga_pan_can_atlas_2018: "…for the selected 1084 samples." |
-| STV-CN-2 | ❌ | C | No .seg download (tracked under Per-sample CN segments) |
+| STV-CN-2 | ❌ | C | No .seg download (tracked under Per-sample CN segments); deferred (#492): it needs a per-case segments file route (sample ids with each segment), which the table route's row sources do not serve today; tracked with Results' CN Segments download (CF3) |
 | STV-CN-3 | 🟡 | C | The `segments` view over the selection: igv.js, one segment track, the study's reference genome (CF1). Its gaps are the Results tab's (Per-sample CN segments): 300 rows by default, track height, igv chrome |
 | STV-PL-1 | 🟡 | C | No Plots tab; Analysis `plot` view over the explored cohort via Analyze |
 | STV-RS-1 | ❌ | C | (tracked) Files & Links |
@@ -266,7 +266,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-MD-10 | N/A | C | No session service concept |
 | STV-MD-11 | ❌ | C | No download-hide switch (tracked: Data-governance switches) |
 | STV-MD-12 | ✅ | C | Patients and samples counted separately (`uniqExact` each, `explore.ts:1030`) |
-| STV-MD-13 | 🟡 | C | ↑ The Clinical Data tab exists; its Columns menu does not (CD-9), and there is no Custom Selection to keep |
+| STV-MD-13 | ✅ | C | The Clinical Data tab with its Columns menu (CD-9); no Custom Selection (out of this lane) |
 | STV-MD-14 | 🟡 | C | ↓ The CN Segments tab hides Add chart, as the portal's ✅; no Plots, Files & Links or Similarity Maps tabs, and no Custom Selection to keep |
 
 ### §15 Statistics & methods

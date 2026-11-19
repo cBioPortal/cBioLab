@@ -124,16 +124,16 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 | PTB-GE-HM-2 | ✅ | C | Default a row per sample, a column per mutation, as legacy; Transpose gives a row per mutation; no-VAF mutations dropped ✅ |
 | PTB-GE-HM-3 | 🟡 | C | The legacy VAF ramp yellow→teal `rgb(241,242,181)`→`rgb(19,80,88)` ✅ (STYLE.ramps.vaf); grey = profiled not found ✅, NA glyph ✅; ours adds a called-no-counts glyph and an uncalled dot |
 | PTB-GE-HM-4 | ✅ | C | Clustered by default with the oncoprint heatmap clustering (both axes); Cluster off: samples in collection order, mutations by name in either orientation (legacy MutationOncoprint mutationWithIdOrder) |
-| PTB-GE-TB-1 | 🔶 | B | Columns Samples · Gene · Protein Change · Mutation Type · VAF by sample · Max VAF (6/13); 25 rows; no "Show only selected" (filter the table instead) |
+| PTB-GE-TB-1 | 🔶 | B | Columns Samples · Gene · Protein Change · Mutation Type · VAF by sample · Max VAF (6/13); 10 rows ✅; "Show only selected mutations" above the table ✅: only the picked mutations in the table's order, every row with none picked, picks not highlighted while filtering, kept in the browser as the picks are (`lib/views/evolution/table.ts`; lgg_ucsf_2014 P04: 2 picks across pages → "2 of 80 Mutations"); no Annotation, Allele Freq bars or Cohort column |
 
 ### §2 Pathways
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PTB-PW-1 | 🟡 | B | Own PathwayMapper-data renderer (no lazy chunk) + canonical-pathways bars below; no unprofiled alert |
+| PTB-PW-1 | 🟡 | B | Own PathwayMapper-data renderer (no lazy chunk) + canonical-pathways bars below; unprofiled alert ✅: "Sample(s) ⟨markers⟩ not profiled for mutations / copy number alterations" above the diagram, a line per profile the study holds (`lib/views/pathwaymap/profiled.ts`; all_phase2_target_2018_pub TARGET-10-PAPLDL: -04 mutations, -03 copy number, as the portal's gene-panel data); not in sample mode |
 | PTB-PW-2 | 🟡 | BC | Genes altered in the patient (mutation, AMP/HOMDEL, **and SV**); nodes coloured by altered % (TP53 100 %), not per-sample mini tracks |
-| PTB-PW-3 | 🔶 | B | "rank by match count", "weight by altered %", "PanCanAtlas pathways only" shown; legacy shows only the TCGA checkbox; no "Perform layout" |
-| PTB-PW-4 | 🔶 | B | Columns pathway · score · genes matched; legacy Pathway name · Pathway altered (bold Yes/No) · Genes matched; P1 first row Cell Cycle vs TP53; no copy/download (tracked) |
+| PTB-PW-3 | 🟡 | B | Patient page: only "PanCanAtlas pathways only", ranking by match count, as the portal's patient mode ✅ (lgg_ucsf_2014 P04); the analysis page keeps rank by / weight by altered %; no "Perform layout" |
+| PTB-PW-4 | 🟡 | B | Patient page: Pathway name · Pathway altered (bold Yes / No = score > 0) · Genes matched ✅, altered first (lgg_ucsf_2014 P04: Cell Cycle, TP53 Yes; eight No) (`pathwayAltered`, `lib/views/pathwaymap/rank.ts`); names not truncated to 20 characters; no page of 10, copy or download (tracked) |
 
 ### §3 Clinical Data
 
@@ -141,7 +141,7 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 |---|---|---|---|
 | PTB-CD-1 | ✅ | B | "Patient" and "Samples" tables as the portal's, and the Timeline Data tables under them (#316) ✅ |
 | PTB-CD-2 | 🟡 | B | Attribute \| Value, priority then name, every attribute with a value, a filter box ✅ (lgg P04: Overall Survival Status 1:DECEASED, Diagnosis Age 22, Number of Samples 4, OS 61, Sex Male — the portal API's five); non-integer numbers to one decimal (`lib/views/table/transpose.ts`, TCGA-A6-2671 OS_MONTHS 43.8 = portal) ✅; no panel links, no copy/download |
-| PTB-CD-3 | 🟡 | B | Attribute × sample, a sample's own attributes, n/a where missing, raw values ✅ (P04: P04_Pri … P04_Rec3); samples in id order, not the collection-day order; no column sorts (the portal sorts Attribute) |
+| PTB-CD-3 | 🟡 | B | Attribute × sample, a sample's own attributes, n/a where missing, raw values ✅ (P04: P04_Pri … P04_Rec3); samples in the page's sample order, the header's markers ✅ (prad_mskcc_2017 P-0001684: T02 Primary, then T01 Metastasis); no column sorts (the portal sorts Attribute) |
 | PTB-CD-4 | 🟡 | B | Timeline Data: a table per event type, START_DATE · STOP_DATE · EVENT_TYPE · each attribute key in first-seen order, PATIENT_ID and STYLE_* left out, days as recorded, each sortable (as text) and filterable ✅ (lgg P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows — the portal API's counts); laid out as its own card under the two tables |
 
 ### §4 Mutational Signatures
@@ -195,7 +195,7 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 | PTB-MD-2 | ✅ | B | No GE tab (TCGA-A6-2671); Samples table one row ✅ |
 | PTB-MD-3 | ✅ | B | No GE tab: prad_mskcc_2017 P-0000964 (2 samples, 10 mutations, none with allele counts on the portal's API) |
 | PTB-MD-4 | ✅ | C | `noDay` forces sequential; checkbox disabled with the reason (not hidden) |
-| PTB-MD-5 | 🟡 | C | NA cells ✅, dashed line across NP ✅; alert on Genomic Evolution ✅, on Pathways not yet |
+| PTB-MD-5 | ✅ | BC | NA cells ✅, dashed line across NP ✅; the alert on Genomic Evolution (#477) and Pathways ✅ (patient mode) |
 | PTB-MD-6 | ✅ | C | Spectrum, count line, %/# and reference need counts (`signatures-body.tsx:71,119`) |
 | PTB-MD-7 | ✅ | B | No pvalue profile → nothing bold, "no p-values recorded" |
 | PTB-MD-8 | ✅ | C | Reference only for SBS/DBS/ID (`reference.ts:31`) |
