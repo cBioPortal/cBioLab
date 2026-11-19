@@ -59,7 +59,7 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
     // each mutation's allele frequency across the patient's samples, offered as the portal offers it: more than one sample in view and a mutation with a VAF
     ...(q.sample || !data.held.includes("MUTATION") || !((data.samples ?? 0) > 1) || data.vaf !== true ? [] : [{ title: "Genomic Evolution", views: [v("Genomic evolution", { kind: "evolution" })] }]),
     // the portal's PathwayMapper tab: the pathway holding most of the patient's altered genes, then the canonical ten as bars
-    ...(genomic ? [{ title: "Pathways", views: [v("Pathway diagram", { kind: "pathwaymap" }), v("Canonical pathways", { kind: "pathways", measure: "any" })] }] : []),
+    ...(genomic ? [{ title: "Pathways", views: [v("Pathway diagram", { kind: "pathwaymap", ...(q.patient ? { patient: { study: q.study, id: q.patient } } : {}) }), v("Canonical pathways", { kind: "pathways", measure: "any" })] }] : []),
     { title: "Clinical Data", views: [
       // as the portal lists them: Attribute | Value, and an attribute per row with a column per sample (PTB-CD-2, PTB-CD-3)
       v("Patient", { kind: "table", unit: "patient", transpose: true }),

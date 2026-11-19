@@ -14,6 +14,8 @@ import { lintSvg } from "../lib/chart/lint.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation } from "../lib/types.ts";
 import type { PathwayMapResult } from "../lib/views/pathwaymap/types.ts";
+import { pathwayAlerts } from "../lib/views/pathwaymap/profiled.ts";
+import type { SampleMark } from "../lib/timeline-tracks.ts";
 import { PRIMARY } from "../lib/ch.ts";
 import { kindText } from "./support/kind-text.ts";
 
@@ -244,5 +246,69 @@ describe("pathwaymap: the figure", () => {
     assert.match(out[0], /PathwayMapper pathway RTK-RAS \(best-ranked; ranked by count, TCGA PanCanAtlas pathways; query KRAS NRAS TP53\)/);
     assert.match(out[0], /RTK-RAS 2 \(KRAS,NRAS\)/);
     assert.match(out[0], /KRAS A 30%/);
+  });
+});
+
+describe("pathwaymap: the Pathways tab's not-profiled alert (PTB-PW-1, PatientViewPathwayMapper's SampleNotProfiledAlert)", () => {
+  const mk = (id: string, label: string): SampleMark => ({ id, label, color: "#000", type: "" });
+  const M = [mk("S1", "1"), mk("S2", "2"), mk("S3", "3")];
+  const row = (sid: string, mutations: number, cna: number) => ({ sid, mutations, cna, sv: -1 });
+  // the rule's cases: mutations then copy number, in the portal's order; samples in the page's order; a profile the study
+  // lacks has no line; one holding every sample has none; a sample the profiling rows leave out is outside
+  const cases: [string, Record<string, unknown>[], { what: string; samples: string[] }[]][] = [
+    ["every sample in both profiles", [row("S1", 1, 1), row("S2", 1, 1), row("S3", 1, 1)], []],
+    ["one sample outside the mutation profile", [row("S1", 1, 1), row("S2", 0, 1), row("S3", 1, 1)], [{ what: "mutations", samples: ["S2"] }]],
+    ["outside both, in the page's order", [row("S3", 0, 0), row("S1", 0, 1), row("S2", 1, 1)],
+      [{ what: "mutations", samples: ["S1", "S3"] }, { what: "copy number alterations", samples: ["S3"] }]],
+    ["no copy-number profile in the study: no copy-number line", [row("S1", 1, -1), row("S2", 0, -1), row("S3", 1, -1)], [{ what: "mutations", samples: ["S2"] }]],
+    ["no mutation profile: no mutation line", [row("S1", -1, 0), row("S2", -1, 1), row("S3", -1, 1)], [{ what: "copy number alterations", samples: ["S1"] }]],
+    ["a sample the rows leave out is outside", [row("S1", 1, 1), row("S2", 1, 1)], [{ what: "mutations", samples: ["S3"] }, { what: "copy number alterations", samples: ["S3"] }]],
+    ["no rows: nothing to say", [], []],
+  ];
+  for (const [name, rows, want] of cases) test(name, () => assert.deepEqual(pathwayAlerts(M, rows), want));
+
+  // a patient-level participant whose patient P1 has three samples: T2 outside the mutation profile, no copy-number profile
+  const PROFILED = [row("T1", 1, -1), row("T2", 0, -1), row("T3", 1, -1)];
+  function local(opts: { inCohort?: boolean; fail?: string } = {}) {
+    return {
+      ...participant("s1", S1),
+      cohortSql: () => "SELECT 1",
+      async rowsPage(label: string, source: (db: string) => { with?: string }) {
+        if (opts.fail) throw new Error(opts.fail);
+        if (label === "pathwaymap:profiled") return { rows: PROFILED };
+        const cohortOnly = /ck AS \(/.test(source("db").with || "");
+        if (cohortOnly && opts.inCohort === false) return { rows: [] };
+        return { rows: [{ sid: "T3", type: "Recurrence" }, { sid: "T1", type: "Primary" }, { sid: "T2", type: "Metastasis" }] };
+      },
+    };
+  }
+  const one = (r: unknown) => ctx({ A: cohort({ s1: 1 }) }, { s1: r });
+  const P1 = { patient: { study: "s1", id: "P1" } };
+  test("with patient: the result names the patient's samples outside a profile, numbered as the page numbers them", async () => {
+    const r = await run({ genes: ["KRAS"], ...P1 }, one(local()));
+    assert.equal(r.error, undefined);
+    const np = pmOf(r).notProfiled as { samples: SampleMark[]; alerts: unknown[] };
+    assert.deepEqual(np.samples.map((m) => [m.id, m.label]), [["T1", "1"], ["T2", "2"], ["T3", "3"]]);
+    assert.deepEqual(np.alerts, [{ what: "mutations", samples: ["T2"] }]);
+    assert.equal(r.participation!.requiresPatientLevel, true, "naming samples is patient-level");
+    assert.match(kindText(pathwaymapKind, r).join("\n"), /\n {2}Sample T2 not profiled for mutations$/);
+  });
+  test("without patient, or from an aggregate-only participant, no alert; the latter says so", async () => {
+    const plain = await run({ genes: ["KRAS"] }, one(local()));
+    assert.equal(pmOf(plain).notProfiled, undefined);
+    assert.equal(plain.participation!.requiresPatientLevel, false);
+    const agg = { ...local(), instance: { id: "s1", mode: "aggregate", label: "s1", conn: PRIMARY } };
+    const r = await run({ genes: ["KRAS"], ...P1 }, one(agg));
+    assert.equal(pmOf(r).notProfiled, undefined);
+    assert.match(r.caveat!, /Which of P1's samples were profiled is not shown: s1 does not disclose/);
+  });
+  test("a patient outside the cohort is said so, never read as every sample profiled; a failed read throws", async () => {
+    const r = await run({ genes: ["KRAS"], ...P1 }, one(local({ inCohort: false })));
+    assert.deepEqual(pmOf(r).notProfiled, { error: "P1 is not one of A's patients" });
+    await assert.rejects(run({ genes: ["KRAS"], ...P1 }, one(local({ fail: "warehouse down" }))), /warehouse down/);
+  });
+  test("refusals: patient's shape, and a study the cohorts do not span", async () => {
+    assert.match((await run({ genes: ["KRAS"], patient: "P1" }, one(local()))).error!, /patient is \{study, id\}/);
+    assert.match((await run({ genes: ["KRAS"], patient: { study: "s9", id: "P1" } }, one(local()))).error!, /s9, which this view's cohorts do not span \(s1\)/);
   });
 });
