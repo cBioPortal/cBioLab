@@ -18,4 +18,10 @@ export const mutants: Mutant[] = [
     effect: "The sample table sorts rows by their own count, so a treatment's Post row lands far from its Pre row, unlike the portal's table.",
     find: "return [...rows].sort((a, b) => top.get(b.agent)! - top.get(a.agent)! ||",
     replace: "return [...rows].sort((a, b) => b.n - a.n ||" },
+  { id: "treatment-intersection-as-union", layer: "cohorts", guard: "unit", file: "lib/treatment-tables.ts",
+    effect: "Intersection on a treatment table keeps the cases with any checked treatment, as Union does, not those with every one.",
+    find: "if (op === \"intersection\" && keys.length > 1) {", replace: "if (op === \"intersection\" && keys.length > 1 && false) {" },
+  { id: "treatment-data-file-without-time", layer: "counts", guard: "unit", file: "lib/treatment-tables.ts",
+    effect: "The sample table's Data file leaves out the Pre/Post column, so a treatment's two rows read as duplicates.",
+    find: ": [r.agent, String(r.time ?? \"\"), String(r.n)])", replace: ": [r.agent, String(r.n)])" },
 ];

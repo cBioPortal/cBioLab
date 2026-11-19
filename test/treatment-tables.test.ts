@@ -4,7 +4,7 @@
 // what a row counts is checked against data by scripts/check-treatments.ts.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../lib/treatment-tables.ts";
+import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause, treatmentTableTsv, TREATMENT_TABLE_DESCRIPTIONS } from "../lib/treatment-tables.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 
 describe("the clause a table's checked rows add", () => {
@@ -69,4 +69,25 @@ describe("the treatment clause compiled", () => {
     assert.throws(() => one({ agents: ["X"], time: "During" }), /time is "Pre" or "Post" \(got "During"\)/);
     assert.throws(() => one({ agents: Array.from({ length: 51 }, (_, i) => "A" + i) }), /treatment clause: at most 50 values; this lists 51/);
   });
+});
+
+// STS-OT-6: Intersection, as on the gene tables (STS-GT-9): one clause per checked row, every one must hold
+test("Intersection: a clause per checked row; Union (the default) one clause of them all", () => {
+  assert.deepEqual(treatmentClause("patient", ["Fluorouracil", "Leucovorin"], "intersection"), { clauses: [
+    { kind: "treatment", agents: ["Fluorouracil"], ifHeld: true }, { kind: "treatment", agents: ["Leucovorin"], ifHeld: true },
+  ] });
+  assert.deepEqual(treatmentClause("sample", [sampleTreatmentKey("Fluorouracil", "Pre"), sampleTreatmentKey("Leucovorin", "Post")], "intersection"), { clauses: [
+    { kind: "treatment", agents: ["Fluorouracil"], time: "Pre", ifHeld: true }, { kind: "treatment", agents: ["Leucovorin"], time: "Post", ifHeld: true },
+  ] });
+  assert.deepEqual(treatmentClause("patient", ["Fluorouracil", "Leucovorin"]), treatmentClause("patient", ["Fluorouracil", "Leucovorin"], "union"));
+  assert.deepEqual(treatmentClause("patient", ["A"], "intersection"), treatmentClause("patient", ["A"], "union"), "one row is the same either way");
+});
+
+// STS-OT-6 download (StudyViewUtils getPatientTreatmentDownloadData / getSampleTreatmentDownloadData): "Data"
+test("the tables' Data files, tab-separated, as the portal writes them", () => {
+  assert.equal(treatmentTableTsv("patient", [{ agent: "Fluorouracil", n: 166 }, { agent: "Leucovorin", n: 146 }]), "Treatment\t#\nFluorouracil\t166\nLeucovorin\t146");
+  assert.equal(treatmentTableTsv("sample", [{ agent: "Fluorouracil", time: "Pre", n: 155 }, { agent: "Fluorouracil", time: "Post", n: 1 }]),
+    "Treatment\tPre/Post\t#\nFluorouracil\tPre\t155\nFluorouracil\tPost\t1");
+  assert.equal(TREATMENT_TABLE_DESCRIPTIONS.patient, "List of treatments and the corresponding number of patients treated");
+  assert.equal(TREATMENT_TABLE_DESCRIPTIONS.sample, "List of treatments and the corresponding number of samples acquired before treatment or after/on treatment");
 });

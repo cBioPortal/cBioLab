@@ -119,7 +119,7 @@ function SearchField({ onSearch }: { onSearch: (q: string) => void }) {
  * pinned first. A list that scrolls gets the portal's search box and Select all / Deselect all over
  * the rows it shows (lib/value-list.ts).
  */
-export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPct, unit = "cases", cut, extra }: {
+export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPct, unit = "cases", cut, extra, children }: {
   rows: ValueRow[]; onApply: (keys: string[]) => void; why?: (keys: string[]) => string | null; hint?: string;
   /** how a share (0–100) is written */
   pct?: (pct: number) => string;
@@ -131,6 +131,8 @@ export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPc
   cut?: { shown: number; of: number };
   /** a count column before "#" in place of the bar (a mutation-type table's "# Mut"): its header and that header's tooltip */
   extra?: { head: string; tip: string };
+  /** a choice of how the checked rows apply (Union / Intersection), beside the button */
+  children?: React.ReactNode;
 }) {
   const own = usePicks();
   const picks = shared ?? own;
@@ -166,6 +168,6 @@ export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPc
     </div>}
     {searchable && search.trim() && cut && <p className="note flush mt-1">The search covers the {cut.shown.toLocaleString()} most frequent of the {cut.of.toLocaleString()} values.</p>}
     {searchable && search.trim() && !shown.length && <p className="note flush mt-1">No value {cut ? "among these " : ""}matches “{search.trim()}”.</p>}
-    <PickBar picks={picks} hint={hint} why={why ? why(live) : null} onApply={() => onApply(live)} />
+    <PickBar picks={picks} hint={hint} why={why ? why(live) : null} onApply={() => onApply(live)}>{children}</PickBar>
   </>;
 }

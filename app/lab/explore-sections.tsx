@@ -32,7 +32,7 @@ import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } 
 import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { DEFAULT_DENSITY_PAIR, densityChartName, densityChartsShown, densityPairKey } from "../../lib/study-view-density.ts";
 import { ALTERED_ONLY_TYPES, ASSAY_FREQ_TABLE_LIMIT, freqRowKey, freqTableClause, freqTableRows } from "../../lib/assay-frequency-table.ts";
-import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
+import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause, treatmentTableTsv, TREATMENT_TABLE_DESCRIPTIONS } from "../../lib/treatment-tables.ts";
 import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
@@ -54,7 +54,7 @@ import { QueryGenesDialog, studiesProblem } from "../portal/query-editor.tsx";
 import { resultsMaxStudies } from "../../lib/results-settings.ts";
 import { usePublicEnv } from "../_env/public-env-context.tsx";
 import { EntityField } from "./entity-field.tsx";
-import { PickBar, PickRow, ValueList, VirtualRows, usePicks } from "./pick-list.tsx";
+import { PickBar, PickRow, ValueList, VirtualRows, usePicks, type ValueRow } from "./pick-list.tsx";
 import { plottableProfiles, profileUse } from "../../lib/profile-catalog.ts";
 import { entityShortName } from "../../lib/profile-names.ts";
 
@@ -1351,38 +1351,61 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
 
 /**
  * the portal's treatment tables (STS-OT-6), when a selected study has treatments: patients per
- * agent, and samples per agent taken before or after it; the checked rows filter (Union)
+ * agent, and samples per agent taken before or after it; the checked rows filter, Union or
+ * Intersection; each with its ⓘ and Download ▸ Data
  */
 export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
-  const { addClauses, parseDraft } = ctx;
   const t = ctx.explore!.treatments;
   if (!t) return null;
-  const draft = parseDraft();
   const leftOut = t.leftOut && <p className="note flush mt-1" data-leftout>
     Not counted: {t.leftOut.join(", ")}, held by a peer whose federation API has no treatment counts.
   </p>;
-  const table = (level: "patient" | "sample", title: string, meta: string, unit: string, rows: { key: string; name: string; n: number; title: string; extra?: string }[]) => {
-    const on = new Set(appliedTreatmentKeys(draft, level));
-    return (
-      <div className="card" data-treatments={level}>
-        <div className="facettitle">{title}<span className="meta">{meta}</span></div>
-        {leftOut}
-        {rows.length ? <ValueList unit={unit} hint={level === "patient" ? "keep the patients treated with any checked treatment" : "keep the samples taken before or after any checked treatment"}
-          extra={level === "sample" ? { head: "Pre / Post", tip: "taken before (Pre) or after (Post) the patient's first treatment with it" } : undefined}
-          rows={rows.map((r) => ({ ...r, on: on.has(r.key) }))}
-          why={(keys) => { const r = treatmentClause(level, keys); return "why" in r ? r.why : null; }}
-          onApply={(keys) => { const r = treatmentClause(level, keys); if ("clauses" in r) addClauses(r.clauses); }} />
-          : !t.leftOut && <p className="note flush mt-1">No {level === "patient" ? "treated patient" : "sample with a time and a treated patient"} in the selection.</p>}
-      </div>
-    );
-  };
+  const samples = sampleTreatmentOrder(t.samples);
   return <>
-    {table("patient", "Treatment per Patient", fmtInt(t.totalPatients) + " patients treated", "patients treated",
-      t.patients.map((r) => ({ key: r.agent, name: r.agent, n: r.n, title: r.agent + " — " + fmtInt(r.n) + " patients treated" })))}
-    {table("sample", "Treatment per Sample (pre/post)", fmtInt(t.totalSamples) + " samples with a time", "samples acquired before treatment or after/on treatment",
-      sampleTreatmentOrder(t.samples).map((r) => ({ key: sampleTreatmentKey(r.agent, r.time), name: r.agent, extra: r.time, n: r.n,
-        title: r.agent + " — " + fmtInt(r.n) + " samples taken " + (r.time === "Pre" ? "before" : "after") + " the first treatment with it" })))}
+    <TreatmentTable ctx={ctx} level="patient" title="Treatment per Patient" meta={fmtInt(t.totalPatients) + " patients treated"} unit="patients treated"
+      leftOut={leftOut} empty={!t.leftOut} tsv={() => treatmentTableTsv("patient", t.patients)}
+      rows={t.patients.map((r) => ({ key: r.agent, name: r.agent, n: r.n, title: r.agent + " — " + fmtInt(r.n) + " patients treated" }))} />
+    <TreatmentTable ctx={ctx} level="sample" title="Treatment per Sample (pre/post)" meta={fmtInt(t.totalSamples) + " samples with a time"}
+      unit="samples acquired before treatment or after/on treatment" leftOut={leftOut} empty={!t.leftOut} tsv={() => treatmentTableTsv("sample", samples)}
+      rows={samples.map((r) => ({ key: sampleTreatmentKey(r.agent, r.time), name: r.agent, extra: r.time, n: r.n,
+        title: r.agent + " — " + fmtInt(r.n) + " samples taken " + (r.time === "Pre" ? "before" : "after") + " the first treatment with it" }))} />
   </>;
+}
+
+function TreatmentTable({ ctx, level, title, meta, unit, rows, leftOut, empty, tsv }: { ctx: ExploreCtx; level: "patient" | "sample"; title: string; meta: string;
+  unit: string; rows: ValueRow[]; leftOut: React.ReactNode; empty: boolean; tsv: () => string }) {
+  const { addClauses, parseDraft, setExMsg } = ctx;
+  const draft = parseDraft();
+  const on = new Set(appliedTreatmentKeys(draft, level));
+  const picks = usePicks();
+  const [op, setOp] = useState<GeneOp>("union");
+  const n = picks.picked.length;
+  // Intersection adds a filter per checked row, within the selection's limit (STS-GT-9)
+  const refusal = op === "intersection" && n > 1 ? intersectionRefusal((draft?.all || []).length, n, "treatment") : null;
+  const clause = (keys: string[]) => treatmentClause(level, keys, n > 1 ? op : "union");
+  const file = chartFileName(title, "data");
+  return (
+    <div className="card" data-treatments={level}>
+      <div className="facettitle">
+        <span>{title} <span className="meta" data-tip={TREATMENT_TABLE_DESCRIPTIONS[level]} aria-label={TREATMENT_TABLE_DESCRIPTIONS[level]}>ⓘ</span></span>
+        <span className="meta">{meta}</span>
+        <ChartMenu label={title} actions={[{ label: "Download", title: "save this table as a file", sub: [
+          { label: "Data", title: "each row with its count, as " + file, onClick: () => { try { saveText(file, tsv()); } catch (e) { setExMsg(String(e)); } } }] }]} />
+      </div>
+      {leftOut}
+      {rows.length ? <ValueList picks={picks} unit={unit} hint={level === "patient" ? "keep the patients treated with " + (op === "intersection" && n > 1 ? "every" : "any") + " checked treatment"
+          : "keep the samples taken before or after " + (op === "intersection" && n > 1 ? "every" : "any") + " checked treatment"}
+        extra={level === "sample" ? { head: "Pre / Post", tip: "taken before (Pre) or after (Post) the patient's first treatment with it" } : undefined}
+        rows={rows.map((r) => ({ ...r, on: on.has(r.key) }))}
+        why={(keys) => { if (refusal) return refusal; const r = clause(keys); return "why" in r ? r.why : null; }}
+        onApply={(keys) => { const r = clause(keys); if ("clauses" in r) addClauses(r.clauses); }}>
+        {n > 1 && <Choice value={op} onChange={(v) => setOp(v as GeneOp)} className="geneop"
+          title="Union keeps the cases with any of the checked treatments; Intersection, those with every one"
+          options={[["union", "Union"], ["intersection", "Intersection"]]} />}
+      </ValueList>
+        : empty && <p className="note flush mt-1">No {level === "patient" ? "treated patient" : "sample with a time and a treated patient"} in the selection.</p>}
+    </div>
+  );
 }
 
 /**

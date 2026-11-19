@@ -21,9 +21,15 @@ function parseSampleKey(key: string): { agent: string; time: TreatmentTime } | n
  * The clause a table adds for its checked rows (Union, the portal's default: any of them), or why
  * it cannot. Patient rows are agents; sample rows are agent and time, one leaf per time.
  */
-export function treatmentClause(level: "patient" | "sample", keys: string[]): { clauses: unknown[] } | { why: string } {
+export function treatmentClause(level: "patient" | "sample", keys: string[], op: "union" | "intersection" = "union"): { clauses: unknown[] } | { why: string } {
   if (!keys.length) return { why: "no treatment is checked" };
   if (keys.some((k) => !k || /^::(Pre|Post)$/.test(k))) return { why: "a treatment with no name cannot be filtered on" };
+  // Intersection, as on the gene tables (STS-GT-9): each checked row its own clause, every one must hold
+  if (op === "intersection" && keys.length > 1) {
+    const one = keys.map((k) => treatmentClause(level, [k]));
+    const bad = one.find((r): r is { why: string } => "why" in r);
+    return bad ?? { clauses: one.flatMap((r) => (r as { clauses: unknown[] }).clauses) };
+  }
   if (level === "patient") {
     const refusal = limitRefusal(keys.length, CLINICAL_VALUES_LIMIT, "treatments");
     return refusal ? { why: refusal } : { clauses: [{ kind: "treatment", agents: keys, ifHeld: true }] };
@@ -67,4 +73,16 @@ export function sampleTreatmentOrder<T extends { agent: string; time: TreatmentT
   for (const r of rows) top.set(r.agent, Math.max(top.get(r.agent) ?? 0, r.n));
   return [...rows].sort((a, b) => top.get(b.agent)! - top.get(a.agent)! || (a.agent < b.agent ? -1 : a.agent > b.agent ? 1 : 0) ||
     (a.time === b.time ? 0 : a.time === "Pre" ? -1 : 1));
+}
+
+/** each table's ⓘ, as the portal's chart description (StudyViewUtils' chart metas) */
+export const TREATMENT_TABLE_DESCRIPTIONS = {
+  patient: "List of treatments and the corresponding number of patients treated",
+  sample: "List of treatments and the corresponding number of samples acquired before treatment or after/on treatment",
+} as const;
+
+/** a table's Download ▸ Data, as the portal writes it (getPatientTreatmentDownloadData / getSampleTreatmentDownloadData): its rows in the order shown */
+export function treatmentTableTsv(level: "patient" | "sample", rows: { agent: string; time?: TreatmentTime; n: number }[]): string {
+  const head = level === "patient" ? ["Treatment", "#"] : ["Treatment", "Pre/Post", "#"];
+  return [head, ...rows.map((r) => level === "patient" ? [r.agent, String(r.n)] : [r.agent, String(r.time ?? ""), String(r.n)])].map((l) => l.join("\t")).join("\n");
 }
