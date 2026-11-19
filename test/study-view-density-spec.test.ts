@@ -8,7 +8,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   MUTATION_COUNT, FGA, DENSITY_GRID, densityAxes, swapDensity, logOffered, densityView, densityTitle,
-  densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection,
+  densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection, densityPairKey, DEFAULT_DENSITY_PAIR,
   densityBinEdges, withDensityBins,
 } from "../lib/study-view-density.ts";
 import { plotExtent } from "../lib/plot.ts";
@@ -352,6 +352,19 @@ test("D3 after Swap Axes: the same rule per attribute, in the order [x attribute
   ]);
   const [m] = densitySelection({ x0: 1.609, x1: 2.398, y0: 0.104, y1: 0.358 }, { swapped: true, xLog: true }, { x: 4.6, y: 1 });
   assert.deepEqual(m.range, { gte: 4, lte: 10 });
+});
+
+// STS-SC-1: an X vs Y chart for any pair; the default is Mutation Count against FGA
+test("a pair's chart: its axes, swapped, its own Log Scale rule, and one key whichever way round", () => {
+  const pair = { x: "AGE", y: MUTATION_COUNT };
+  assert.deepEqual(densityAxes({}, pair), { x: { attribute: "AGE", log: false }, y: { attribute: MUTATION_COUNT, log: false } });
+  assert.deepEqual(densityAxes({ swapped: true, xLog: true }, pair).x, { attribute: MUTATION_COUNT, log: true }, "only a mutation-count axis takes Log Scale");
+  assert.deepEqual(densityAxes({ yLog: true }, pair).y, { attribute: MUTATION_COUNT, log: true });
+  assert.deepEqual(densityAxes({ xLog: true }, pair).x.log, false, "AGE offers no Log Scale");
+  assert.equal(densityPairKey(pair), densityPairKey({ x: MUTATION_COUNT, y: "AGE" }));
+  assert.deepEqual(densityAxes({}), densityAxes({}, DEFAULT_DENSITY_PAIR), "the default chart is FGA along x, Mutation Count up y");
+  const v = densityView({}, pair) as unknown as { x: { attribute: string }; y: { attribute: string }; range: object };
+  assert.deepEqual([v.x.attribute, v.y.attribute, v.range], ["AGE", MUTATION_COUNT, { y: { min: 0 } }], "a mutation count from 0; AGE's range is the data's");
 });
 
 test("STS-SC-6: a drag box's ranges add their ends to the two bar charts as custom bins", async () => {

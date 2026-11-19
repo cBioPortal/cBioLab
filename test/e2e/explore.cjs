@@ -582,6 +582,31 @@ async function explore({ ok, BASE, page, browser }) {
   } catch (e) { barDetail = String(e.message).split("\n")[0]; }
   ok("explore: a histogram has an integer y axis, and a drag across bars selects them, the others greyed", barOk, barDetail);
 
+  // Add chart's X vs Y tab (STV-AC-7): the portal's button for each kind of pair, and a density per
+  // numeric pair, drawn beside the default Mutation Count vs FGA chart (STS-SC-1)
+  let xyDetail = "", xyOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.locator("[data-chart=mutcount-fga] svg.xc-density").waitFor({ timeout: 240000 });
+    await page.getByRole("button", { name: /Add chart/ }).first().click();
+    await page.getByRole("tab", { name: "X vs Y" }).click();
+    const pick = async (which, name) => { await page.getByRole("combobox", { name: which }).click(); await page.getByRole("option", { name, exact: true }).click(); };
+    const button = async () => (await page.locator(".addchart button", { hasText: /Add|Please|chart with|categorical|violin/ }).last().innerText()).trim();
+    await pick("Select first clinical attribute", "Diagnosis Age"); await pick("Select second clinical attribute", "Sex");
+    const mixed = await button();
+    await pick("Select second clinical attribute", "Mutation Count");
+    const numeric = await button();
+    await page.locator(".addchart button", { hasText: "Add density plot" }).click();
+    await page.keyboard.press("Escape");
+    const card = page.locator("[data-chart=xvsy]");
+    await card.locator("svg.xc-density").waitFor({ timeout: 240000 });
+    const title = (await card.locator(".xc-title").innerText()).trim();
+    const both = await page.locator("[data-chart=mutcount-fga]").count();
+    xyDetail = JSON.stringify({ mixed, numeric, title, both });
+    xyOk = mixed === "Add violin/box plot table" && numeric === "Add density plot" && title === "Mutation Count vs Diagnosis Age" && both === 1;
+  } catch (e) { xyDetail = String(e.message).split("\n")[0]; }
+  ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one", xyOk, xyDetail);
+
   // the treatment tables (STS-OT-6), shown when the study has treatments: patients per agent, most
   // first; a checked agent applied filters on it, and the sample table narrows with it
   let txDetail = "", txOk = false;

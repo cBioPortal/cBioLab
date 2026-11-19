@@ -64,6 +64,26 @@ export function specialChartsShown(checked: (key: string) => boolean, leaves: un
   };
 }
 
+/**
+ * The X vs Y tab's button (STV-AC-7), as the portal's: what it says and whether it adds. Two
+ * numeric attributes make a density plot; a numeric and a categorical one the portal's violin table,
+ * which Explore does not draw yet, so it is refused saying so.
+ */
+export function xVsYButton(x: { attribute: string; numeric: boolean } | null, y: { attribute: string; numeric: boolean } | null, existing: string[]):
+  { label: string; adds: boolean; tip?: string } {
+  if (!x || !y) return { label: "Add Chart", adds: false };
+  if (x.attribute === y.attribute) return { label: "Please choose two different attributes.", adds: false };
+  if (existing.includes([x.attribute, y.attribute].sort().join("|"))) return { label: "A chart with these attributes already exists", adds: false };
+  if (!x.numeric && !y.numeric) return { label: "Can't add a chart with two categorical attributes (yet).", adds: false };
+  if (x.numeric !== y.numeric) return { label: "Add violin/box plot table", adds: false, tip: "a numeric attribute against a categorical one is the portal's violin table, not drawn here yet" };
+  return { label: "Add density plot", adds: true };
+}
+
+/** the X vs Y tab's attributes: every clinical attribute but a survival one other than OS_STATUS, as the portal lists them */
+export function xVsYAttributes<T extends { attribute: string }>(attrs: T[]): T[] {
+  return attrs.filter((a) => !/_(MONTHS|STATUS)$/.test(a.attribute) || a.attribute === "OS_STATUS");
+}
+
 /** the Genomic tab's charts (STV-AC-2): drawn by default, each a checkbox in Add chart that hides or shows it */
 export const GENOMIC_CHARTS = [
   { key: "genomic|mutated", name: "Mutated Genes", table: "mutated" as const },

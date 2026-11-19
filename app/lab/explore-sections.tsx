@@ -21,7 +21,7 @@ import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../..
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
-import { addChartLines, assayTabs, bulkButtons, genomicChartLines, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -29,6 +29,7 @@ import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
+import { DEFAULT_DENSITY_PAIR, densityPairKey } from "../../lib/study-view-density.ts";
 import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
 import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
@@ -312,7 +313,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             {/* a tab per generic-assay type, as the portal's (STV-AC-2) */}
             {([["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"],
               ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
-              ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
+              ["derived", "Derived timeline filters"], ["custom", "Custom data"], ["xvsy", "X vs Y"]] as const).map(([t, label]) =>
               <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
@@ -485,6 +486,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         )}
         {chartTab === "genomic" && <GenomicCharts ctx={ctx} />}
         {chartTab.startsWith("assay:") && <AssayChartPicker ctx={ctx} assayType={chartTab.slice("assay:".length)} />}
+        {chartTab === "xvsy" && <XvsYPicker ctx={ctx} />}
         {chartTab === "derived" && (explore.events.length === 0 ? (
           <p className="note mt-0 mb-3">This study has no clinical timeline events to derive a filter from.</p>
         ) : (() => {
@@ -1060,6 +1062,31 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
         </div>}
         {binsOpen && c.kind === "num" && <CustomBinsDialog label={c.displayName || c.attribute} bars={c.bins} current={binSet}
           onApply={(b) => setChartBins(c.attribute, { ...binSet, bins: b })} onClose={() => setBinsOpen(false)} />}
+    </div>
+  );
+}
+
+/** the Add chart dialog's X vs Y tab (STV-AC-7): two clinical attributes, and the portal's button for the pair */
+function XvsYPicker({ ctx }: { ctx: ExploreCtx }) {
+  const { xyCharts, addXyChart } = ctx;
+  const attrs = xVsYAttributes(ctx.explore!.clinical || []).map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, numeric: c.kind === "num" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const [x, setX] = useState(""), [y, setY] = useState("");
+  const [added, setAdded] = useState<string | null>(null);
+  const ax = attrs.find((a) => a.attribute === x) ?? null, ay = attrs.find((a) => a.attribute === y) ?? null;
+  // the default chart counts as existing, as on the portal
+  const existing = [...xyCharts.map(densityPairKey), densityPairKey(DEFAULT_DENSITY_PAIR)];
+  const button = xVsYButton(ax, ay, existing);
+  const options = [["", "—"] as const, ...attrs.map((a) => [a.attribute, a.name] as const)];
+  return (
+    <div>
+      <div className="row baseline g5 flex-wrap">
+        <Choice className="w-64" value={x} onChange={setX} title="Select first clinical attribute" options={options} />
+        <Choice className="w-64" value={y} onChange={setY} title="Select second clinical attribute" options={options} />
+        <Button variant="outline" size="sm" disabled={!button.adds} data-tip={button.tip}
+          onClick={() => { addXyChart({ x, y }); setAdded((ay?.name || y) + " vs " + (ax?.name || x) + " added."); setX(""); setY(""); }}>{button.label}</Button>
+      </div>
+      {added && <p className="note flush mt-1.5">{added}</p>}
     </div>
   );
 }

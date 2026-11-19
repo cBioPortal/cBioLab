@@ -17,9 +17,16 @@ export const DENSITY_GRID: [number, number] = [44, 38];
 export interface DensitySettings { swapped?: boolean; xLog?: boolean; yLog?: boolean }
 export interface DensityAxis { attribute: string; log: boolean }
 
+/** an X vs Y chart's two attributes, x along the bottom before any swap (STS-SC-1) */
+export interface DensityPair { x: string; y: string }
+/** the default chart: Mutation Count (y) against Fraction Genome Altered (x) */
+export const DEFAULT_DENSITY_PAIR: DensityPair = { x: FGA, y: MUTATION_COUNT };
+/** the one chart a pair has, whichever way round it was asked for (the portal's `X-VS-Y-<sorted ids>`) */
+export const densityPairKey = (p: DensityPair): string => [p.x, p.y].sort().join("|");
+
 /** which attribute each axis holds and whether it is on Log Scale (only a mutation-count axis can be) */
-export function densityAxes(s: DensitySettings): { x: DensityAxis; y: DensityAxis } {
-  const [xa, ya] = s.swapped ? [MUTATION_COUNT, FGA] : [FGA, MUTATION_COUNT];
+export function densityAxes(s: DensitySettings, pair: DensityPair = DEFAULT_DENSITY_PAIR): { x: DensityAxis; y: DensityAxis } {
+  const [xa, ya] = s.swapped ? [pair.y, pair.x] : [pair.x, pair.y];
   return { x: { attribute: xa, log: !!s.xLog && logOffered(xa) }, y: { attribute: ya, log: !!s.yLog && logOffered(ya) } };
 }
 
@@ -41,8 +48,8 @@ function fixedRange(attribute: string): { min?: number; max?: number } | undefin
 }
 
 /** the plot view the chart asks the engine for */
-export function densityView(s: DensitySettings): View {
-  const { x, y } = densityAxes(s);
+export function densityView(s: DensitySettings, pair: DensityPair = DEFAULT_DENSITY_PAIR): View {
+  const { x, y } = densityAxes(s, pair);
   const rx = fixedRange(x.attribute), ry = fixedRange(y.attribute);
   return {
     kind: "plot", unit: "sample",
@@ -172,7 +179,7 @@ export function densityBinEdges(clauses: { attribute: string; range: { gte: numb
  * those units, for rounding a fraction to the axis's precision.
  */
 export function densitySelection(box: { x0: number; x1: number; y0: number; y1: number }, s: DensitySettings,
-  span: { x: number; y: number }): RangeClause[] {
-  const { x, y } = densityAxes(s);
+  span: { x: number; y: number }, pair: DensityPair = DEFAULT_DENSITY_PAIR): RangeClause[] {
+  const { x, y } = densityAxes(s, pair);
   return [axisRange(x, box.x0, box.x1, span.x), axisRange(y, box.y0, box.y1, span.y)];
 }
