@@ -63,3 +63,22 @@ export function specialChartsShown(checked: (key: string) => boolean, leaves: un
     caseLists: checked(SPECIAL_CHART_KEYS.caseLists) || kind("caseList"),
   };
 }
+
+/** the display text the portal's server config gives a few generic-assay types (`generic_assay_display_text`) */
+const ASSAY_TAB_TEXT: Record<string, string> = {
+  TREATMENT_RESPONSE: "Treatment Response", MUTATIONAL_SIGNATURE: "Mutational Signature", ARMLEVEL_CNA: "Arm-level CNA", METHYLATION: "Methylation",
+};
+
+/**
+ * A generic-assay type's Add chart tab (STV-AC-2, `deriveDisplayTextFromGenericAssayType`): the
+ * configured text, else the type's words capitalised ("GENETIC_ANCESTRY" → "Genetic Ancestry").
+ */
+export function assayTabLabel(type: string): string {
+  return ASSAY_TAB_TEXT[type] ?? type.split("_").filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+}
+
+/** one Add chart tab per generic-assay type the selected studies hold, by label (seen coadread: Arm-level CNA · Genetic Ancestry · Methylation) */
+export function assayTabs(profiles: { type: string; assayType?: string }[]): { type: string; label: string }[] {
+  const types = [...new Set(profiles.filter((p) => p.type === "GENERIC_ASSAY" && p.assayType).map((p) => p.assayType!))];
+  return types.map((type) => ({ type, label: assayTabLabel(type) })).sort((a, b) => a.label.localeCompare(b.label));
+}
