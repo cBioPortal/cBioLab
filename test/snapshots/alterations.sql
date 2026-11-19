@@ -37,7 +37,7 @@ miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
   FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled, '' AS genePanel, '' AS genePanelShown,
          g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf
   FROM g
@@ -71,7 +71,7 @@ miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
   FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled, '' AS genePanel, '' AS genePanelShown,
          g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf
   FROM g
@@ -154,7 +154,7 @@ miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
   FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled, '' AS genePanel, '' AS genePanelShown,
          g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf
   FROM g
@@ -197,7 +197,7 @@ miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
   FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled, '' AS genePanel, '' AS genePanelShown,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
@@ -246,7 +246,7 @@ miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
   FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled, '' AS genePanel, '' AS genePanelShown,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
@@ -296,7 +296,7 @@ miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,
   FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Prostate' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0024249' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
-         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled,
+         toUInt8(ifNull(miss.n, 0) = 0) AS inAll, miss.np AS notProfiled, '' AS genePanel, '' AS genePanelShown,
          g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
