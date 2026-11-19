@@ -10,3 +10,19 @@ export function SampleMarker({ mark, className = "mr-1 shrink-0" }: { mark: Pick
     </svg>
   );
 }
+
+/**
+ * The portal's "Sample(s) ⟨markers⟩ not profiled for …" alert (SampleNotProfiledAlert): each sample
+ * outside the profile by its marker, named in its tip. `period` ends the sentence, as the Patient
+ * tables do when some samples are profiled.
+ */
+export function NotProfiledNote({ marks, what, period = false }: { marks: (Pick<SampleMark, "label" | "color"> & { id: string; type?: string | null })[]; what: string; period?: boolean }) {
+  if (!marks.length) return null;
+  return (
+    <p className="note flex flex-wrap items-center gap-1" role="status" data-test="partialProfileAlert">
+      Sample{marks.length === 1 ? "" : "s"} {marks.map((m) => <span key={m.id} role="img" aria-label={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
+        <SampleMarker mark={m} className="" />
+      </span>)} not profiled for {what}{period ? "." : ""}
+    </p>
+  );
+}

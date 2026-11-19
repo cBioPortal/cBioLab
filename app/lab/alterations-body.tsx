@@ -21,7 +21,7 @@ import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 import { VafPlotHead } from "./vaf-plot-head";
-import { SampleMarker } from "../portal/sample-marker";
+import { NotProfiledNote } from "../portal/sample-marker";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
 
@@ -140,11 +140,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
         const none = pr != null && outside.length === marks.size;
         return (
           <section key={key} className="alt-table" aria-label={name}>
-            {outside.length > 0 && <p className="note flex flex-wrap items-center gap-1" role="status">
-              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} role="img" aria-label={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
-                <SampleMarker mark={m} className="" />
-              </span>)} not profiled for {what}{none ? "" : "."}
-            </p>}
+            <NotProfiledNote marks={outside} what={what} period={!none} />
             {!none && <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
               onQuery={(q) => setQuery(key, q)}
               {...(key === "sv" ? {} : {

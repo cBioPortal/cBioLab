@@ -6,7 +6,7 @@
 // (app/lab/patient-nav.tsx); the cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { evolutionSvg, evolutionKey, heatmapColumns, onlySelected, portalCellTip, EVOLUTION_KEY_COLUMNS, HEAT_CELL } from "../../lib/views/evolution/figure.ts";
+import { evolutionSvg, evolutionKey, heatmapColumns, onlySelected, portalCellTip, notProfiledForMutations, EVOLUTION_KEY_COLUMNS, HEAT_CELL } from "../../lib/views/evolution/figure.ts";
 import type { TableQuery } from "../../lib/types";
 import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../lib/views/evolution/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
@@ -20,6 +20,7 @@ import { patientPatch } from "../../lib/views/evolution/groups.ts";
 import { heatmapTsv, HEATMAP_FILE } from "../../lib/views/evolution/download.ts";
 import { saveText } from "../../lib/study-view-download.ts";
 import { ImageDownload } from "./image-download.tsx";
+import { NotProfiledNote } from "../portal/sample-marker";
 
 type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; transpose?: boolean; cluster?: boolean; mutationLabels?: boolean; expandGaps?: boolean; showTimeline?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
@@ -172,6 +173,7 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
           </div>
         </div>
       ) : <p className="meta">No patient to draw: the cohort has no patient with two or more samples and allele counts.</p>}
+      {p && <NotProfiledNote marks={notProfiledForMutations(p.samples)} what="mutations" />}
       <div ref={box} className={"tl-fig" + (updating ? " stale" : "")}>
         {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-static-element-interactions -- a pointer-only highlight (as the table's clickable rows are); it changes nothing the view shows or shares */}
         {p && (svg ? <div className="evo-fig-wrap"><div ref={fig} className="evo-fig" onMouseMove={overFigure} onClick={clickFigure} onMouseLeave={() => { setHot(null); setTip(null); }} dangerouslySetInnerHTML={{ __html: svg }} />

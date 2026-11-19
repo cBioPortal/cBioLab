@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
 import { heatmapTsv, HEATMAP_FILE } from "../lib/views/evolution/download.ts";
-import { evolutionSvg, lineCells, cellText, portalCellTip, heatmapColumns, onlySelected, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { evolutionSvg, lineCells, cellText, portalCellTip, notProfiledForMutations, heatmapColumns, onlySelected, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
@@ -179,6 +179,12 @@ describe("evolution: what it refuses", () => {
 });
 
 describe("evolution: the patient drawn", () => {
+  test("PTB-GE-3 the not-profiled alert: the samples without a mutation panel, in the patient's order; none when all have one (all_phase2_target_2018_pub TARGET-10-PAPLDL: -04)", () => {
+    const s = (id: string, panel: string | null): EvolutionSample => ({ id, type: "", label: id, color: "#000", day: null, panel });
+    assert.deepEqual(notProfiledForMutations([s("TARGET-10-PAPLDL-03", "WES"), s("TARGET-10-PAPLDL-04", null), s("TARGET-10-PAPLDL-09", "WES")]).map((x) => x.id), ["TARGET-10-PAPLDL-04"]);
+    assert.deepEqual(notProfiledForMutations([s("b", null), s("a", null)]).map((x) => x.id), ["b", "a"]);
+    assert.deepEqual(notProfiledForMutations([s("a", "IMPACT341"), s("b", "WES")]), []);
+  });
   test("the list holds drawable patients only; the first is drawn with its samples in collection order, days and panels", async () => {
     const v = await run({}, one());
     assert.equal(v.error, undefined, String(v.error));
@@ -193,6 +199,7 @@ describe("evolution: the patient drawn", () => {
     assert.equal(e.mutations!.total, 3);
     assert.deepEqual(e.position, { index: 0, prev: null, next: null });
     assert.match(v.caveat!, /^P1: 3 samples in collection order, placed by the day each was collected/);
+    assert.deepEqual(notProfiledForMutations(e.patient!.samples).map((s) => s.id), ["T3"], "PTB-GE-3: the alert names the sample outside the mutation profile, alone");
     assert.match(v.caveat!, /3 mutations; 2 are drawn — 1 mutation with no allele counts in any sample is listed but not drawn\./);
     assert.match(v.caveat!, /or the sample was not sequenced for mutations \(T3\) — never 0 \(1 such cell here\)/);
     assert.ok(v.method && v.method.steps.length === 3);
