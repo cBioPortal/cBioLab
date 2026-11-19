@@ -27,6 +27,15 @@
  *   N1-N5 Allele Freq (T) and the read counts as the portal writes them (MUT-STM-5/6): the vaf text is ''
  *      for none, 4 decimals below 0.01, else 2 with trailing zeros; the vaf value is that same text
  *      (null for none); altCount / refCount null when 0 or less.
+ *   S1 the Protein Change and Chromosome sort keys (MUT-STM-9, lib/mutation-sort.ts proteinChangeSortSql /
+ *      chromosomeSortSql) run in ClickHouse over literal inputs give the portal's values
+ *      (ProteinChangeUtils calcProteinChangeSortValue; ChromosomeColumnFormatter extractSortValue).
+ *   S2 sorted by Protein Change: by position, then the letters' character codes (KRAS G12C < G12D < G12V
+ *      < G13D < Q61H, PTEN D92N < R130G < R130Q < X200_splice, EGFR in full); descending is the
+ *      reverse, a change with no number (MUTATED) last both ways.
+ *   S3 sorted by Chromosome in the table: PTEN's rows are all on 10 (the importer stores the file's
+ *      "chr10" as "10"), so they tie and the tiebreak (sample id) orders them, both ways. No fixture
+ *      gene's table spans chromosomes whose text and number orders differ, so the key itself is S1's.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
@@ -35,6 +44,8 @@ import { chQueryRows, connById } from "../lib/ch.ts";
 import { PatientLevelResolver } from "../lib/federation.ts";
 import * as mutationTable from "../lib/mutation-table.ts";
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS } from "../lib/mutation-table.ts";
+import { chromosomeSortSql, proteinChangeSortSql } from "../lib/mutation-sort.ts";
+import { sq } from "../lib/compiler.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
 import type { ViewRun } from "../lib/views/run.ts";
 import type { CohortDef } from "../lib/types.ts";
@@ -382,6 +393,78 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
 }
 // N3-N5: every tumor row of the fixture has both counts > 0 (t_alt_count 19..317, t_ref_count 96..639); zero,
 // negative and missing counts are checked in test/mutation-number-format.test.ts
+
+// ---- S1-S3: the Protein Change and Chromosome sort keys (MUT-STM-9) -----------------------------
+
+{
+  // S1 each key's SQL over literal inputs; the values are the legacy functions' outputs, written down by hand
+  const PC: [string | null, number | null][] = [
+    ["V600E", 600.8669], ["V600K", 600.8675], ["A600T", 600.6584], ["V601A", 601.8665], ["V600", 600.86],
+    ["G12_G13insX", 12.7195], ["X37_splice", 37.8895], ["*123", 123], ["", null], [null, null], ["Fusion", null],
+    ["TMPRSS2-ERG Fusion", 2.8345], ["EGFR-SEPT14 Fusion", 14.8432], ["R130G", 130.8271], ["R130Q", 130.8281],
+    ["p.V600E", 600.8669], ["M1?", 1.7763], ["E746_A750del", 746.6995], ["SP10fs", 10.80102], ["SP3", 3], ["1234", 1234],
+    ["G12C", 12.7167], ["G12D", 12.7168], ["G12V", 12.7186], ["G13D", 13.7168], ["Q61H", 61.8172],
+  ];
+  const CHR: [string | null, number | null][] = [
+    ["17", 17], ["chr10", 10], ["X", 23], ["x", 23], ["chrX", 23], ["Y", 24], ["chrY", 24], ["XY", 23],
+    ["MT", -1], ["M", -1], ["Un", -1], ["", null], [null, null], ["1_KI270706v1_random", 1], ["23", 23],
+    ["1", 1], ["2", 2], ["10", 10],
+  ];
+  // ClickHouse's decimal parse can land one ulp from JavaScript's parseFloat (relative 2e-16 over the
+  // warehouse's 936,457 protein changes, none of them reordered), so a value is matched within 1e-12
+  const same = (g: number | null, w: number | null) => g === w || (g != null && w != null && Math.abs(g - w) <= 1e-12 * Math.abs(w));
+  const evalKey = async (name: string, expr: (x: string) => string, cases: [string | null, number | null][]) => {
+    let got: (number | null)[] | string;
+    try {
+      const sql = "SELECT i, toString(" + expr("x") + ") AS k FROM (SELECT arrayJoin(arrayEnumerate(xs)) AS i, xs[i] AS x FROM (SELECT CAST([" +
+        cases.map(([x]) => x === null ? "NULL" : sq(x)).join(", ") + "] AS Array(Nullable(String))) AS xs)) ORDER BY i";
+      const res = await chQueryRows(sql, conn);
+      got = res.rows.map((r) => r[1] == null ? null : Number(r[1]));
+    } catch (e) { got = "threw: " + String((e as Error).message).slice(0, 200); }
+    const bad = typeof got === "string" ? [got] :
+      cases.flatMap(([x, w], i) => same((got as (number | null)[])[i], w) ? [] : [JSON.stringify(x) + " → " + String((got as (number | null)[])[i]) + " (expected " + String(w) + ")"]);
+    ok(`S1 ${name} over ${cases.length} literal inputs gives the portal's sort values`, bad.length === 0, bad.join("; "));
+  };
+  await evalKey("proteinChangeSortSql", proteinChangeSortSql, PC);
+  await evalKey("chromosomeSortSql", chromosomeSortSql, CHR);
+}
+{
+  // S2 sorted by Protein Change. KRAS and PTEN: the changes in order, each change's rows together.
+  // EGFR: every row of data_mutations.txt (HGVSp_Short without "p.", a blank one stored MUTATED), by the
+  // legacy value: SP3 3, SP4 4, SP7 7, SP10fs 10.80102, SP11 11.8, SP12 12.8, EGFR-SEPT14 14.84,
+  // A289V 289.6586, G719A 719.7165, E746_A750del 746.6995 (×4), S768I 768.8373, V769M 769.8677,
+  // T790M 790.8477, C797S 797.6783, L858R 858.7682 (×12), L861Q 861.7681, MUTATED null (last)
+  const runs = (xs: (Value | undefined)[]) => xs.filter((x, i) => i === 0 || x !== xs[i - 1]);
+  const NULLS = ["MUTATED"];
+  const EGFR = ["SP3", "SP4", "SP7", "SP10fs", "SP11", "SP12", "EGFR-SEPT14", "A289V", "G719A",
+    ...Array(4).fill("E746_A750del"), "S768I", "V769M", "T790M", "C797S", ...Array(12).fill("L858R"), "L861Q", "MUTATED"];
+  const WANT_PC: [string, string[], boolean, string][] = [
+    ["KRAS", ["G12C", "G12D", "G12V", "G13D", "Q61H"], false, "the G12 rows by their letter, not tied on the codon"],
+    ["PTEN", ["D92N", "R130G", "R130Q", "X200_splice"], false, "R130G before R130Q by the letter"],
+    ["EGFR", EGFR, true, "every row, MUTATED (no number) last"],
+  ];
+  for (const [gene, want, full, why] of WANT_PC) {
+    for (const desc of [false, true]) {
+      const got = await sorted(gene, "proteinChange", desc);
+      const head = want.filter((x) => !NULLS.includes(x)), tail = want.filter((x) => NULLS.includes(x));
+      const exp = [...(desc ? [...head].reverse() : head), ...tail];
+      const seen = typeof got === "string" ? got : JSON.stringify(full ? got : runs(got));
+      ok(`S2 ${gene} sorted by Protein Change ${desc ? "descending" : "ascending"}: ${full ? "" : "the changes "}${JSON.stringify(full ? exp : runs(exp))} (${why})`,
+        seen === JSON.stringify(full ? exp : runs(exp)), seen);
+    }
+  }
+}
+{
+  // S3 PTEN's rows all sort as 10 (FX-P29's "chr10" is stored as "10"), so the tiebreak (sample id) orders them both ways
+  for (const desc of [false, true]) {
+    const r = await table("PTEN", { sort: { column: "chr", ...(desc ? { desc: true } : {}) } });
+    if (typeof r === "string") { ok(`S3 PTEN sorted by Chromosome ${desc ? "descending" : "ascending"}`, false, r); continue; }
+    const chrs = r.map((x) => v(x, "chr")), sids = r.map((x) => x.sample);
+    const pass = r.length > 1 && chrs.every((c) => c === "10") && sids.includes("FX-P29-T1") && sids.every((s, i) => i === 0 || sids[i - 1] <= s);
+    ok(`S3 PTEN sorted by Chromosome ${desc ? "descending" : "ascending"}: every row on 10 (FX-P29's "chr10" too), so the rows are in sample id order`,
+      pass, JSON.stringify(r.map((x) => x.sample + " " + String(v(x, "chr")))));
+  }
+}
 
 console.log(`\n${checks - failures}/${checks} mutation column checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
