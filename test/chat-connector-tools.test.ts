@@ -8,13 +8,15 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { connectConnectors, refusal, resultText, MAX_RESULT_CHARS } from "../lib/chat-connector-tools.ts";
-import type { Connector } from "../lib/chat-connectors.ts";
+import { MAX_TOOLS, type Connector } from "../lib/chat-connectors.ts";
 
 let server: http.Server, base = "";
 const seen: { auth: string | undefined; tool?: string }[] = [];
 const stubs = { slow: false, gets: 0 };
+const listRequests: { path: string; cursor?: string }[] = [];
 
 before(async () => {
   const handle = async (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -31,6 +33,20 @@ before(async () => {
     });
     mcp.registerTool("fail", { description: "Always reports an error", inputSchema: {} }, async () => ({ isError: true, content: [{ type: "text", text: "the server said no" }] }));
     mcp.registerTool("hidden", { description: "Not offered", inputSchema: {} }, async () => ({ content: [{ type: "text", text: "x" }] }));
+    if (req.url === "/paged" || req.url === "/many-tools") {
+      const path = req.url;
+      const names = path === "/paged" ? ["echo", "fail", "hidden"] : Array.from({ length: MAX_TOOLS + 1 }, (_, i) => "tool" + i);
+      const pageSize = path === "/paged" ? 1 : MAX_TOOLS;
+      mcp.server.setRequestHandler(ListToolsRequestSchema, ({ params }) => {
+        listRequests.push({ path, ...(params?.cursor ? { cursor: params.cursor } : {}) });
+        const start = Number(params?.cursor ?? 0);
+        const next = start + pageSize;
+        return {
+          tools: names.slice(start, next).map((name) => ({ name, inputSchema: { type: "object" as const } })),
+          ...(next < names.length ? { nextCursor: String(next) } : {})
+        };
+      });
+    }
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
     res.on("close", () => { void transport.close(); void mcp.close(); });
     await mcp.connect(transport);
@@ -67,6 +83,36 @@ describe("connector tools", () => {
     assert.equal(await run(c.tools["a__echo"], { text: "hi" }), "echo: hi");
     await assert.rejects(run(c.tools["a__fail"], {}), /the server said no/);
     await c.close();
+  });
+  test("tool discovery follows every cursor and offers tools from later pages", async () => {
+    listRequests.length = 0;
+    const c = await connectConnectors([{ id: "a" }], [reg({ id: "a", path: "/paged", tools: undefined })]);
+    try {
+      assert.deepEqual(Object.keys(c.tools).sort(), ["a__echo", "a__fail", "a__hidden"]);
+      assert.deepEqual(listRequests, [{ path: "/paged" }, { path: "/paged", cursor: "1" }, { path: "/paged", cursor: "2" }]);
+      assert.equal(await run(c.tools["a__echo"], { text: "hi" }), "echo: hi");
+    } finally { await c.close(); }
+  });
+  test("an allow-list can select a tool on a later page", async () => {
+    const c = await connectConnectors([{ id: "a" }], [reg({ id: "a", path: "/paged", tools: ["hidden"] })]);
+    try {
+      assert.deepEqual(Object.keys(c.tools), ["a__hidden"]);
+      assert.deepEqual(c.status, [{ id: "a", ok: true, tools: 1 }]);
+    } finally { await c.close(); }
+  });
+  test("the tool limit applies across pages after filtering the allow-list", async () => {
+    const r = reg({ id: "a", path: "/many-tools", tools: undefined });
+    const tooMany = await connectConnectors([{ id: "a" }], [r]);
+    try {
+      assert.equal(tooMany.status[0].ok, false);
+      assert.match(tooMany.status[0].reason || "", new RegExp(`over the ${MAX_TOOLS}`));
+      assert.deepEqual(tooMany.tools, {});
+    } finally { await tooMany.close(); }
+    const allowed = await connectConnectors([{ id: "a" }], [{ ...r, tools: ["tool" + MAX_TOOLS] }]);
+    try {
+      assert.deepEqual(Object.keys(allowed.tools), ["a__tool" + MAX_TOOLS]);
+      assert.equal(allowed.status[0].ok, true);
+    } finally { await allowed.close(); }
   });
   test("a request cannot name an address: an id the registry lacks is reported, not fetched", async () => {
     const c = await connectConnectors([{ id: "http://evil.example/mcp" }], [reg({ id: "a", path: "/ok" })]);

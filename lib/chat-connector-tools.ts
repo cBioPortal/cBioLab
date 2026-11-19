@@ -98,7 +98,13 @@ export async function connectConnectors(asked: Requested[], registry: Connector[
       const transport = new StreamableHTTPClientTransport(new URL(c.url), { fetch: noPushStream, requestInit: a.token ? { headers: tokenHeader(c, a.token) } : {} });
       await client.connect(transport, { timeout: connectMs });
       clients.push(client);
-      const listed = (await client.listTools(undefined, { timeout: connectMs })).tools;
+      const listed: Awaited<ReturnType<Client["listTools"]>>["tools"] = [];
+      let cursor: string | undefined;
+      do {
+        const page = await client.listTools(cursor === undefined ? undefined : { cursor }, { timeout: connectMs });
+        listed.push(...page.tools);
+        cursor = page.nextCursor;
+      } while (cursor !== undefined);
       const offered = c.tools ? listed.filter((t) => c.tools!.includes(t.name)) : listed;
       if (offered.length > MAX_TOOLS) throw new Error(`it has ${offered.length} tools, over the ${MAX_TOOLS} one request may carry; list the ones to offer in the connector's "tools"`);
       const made: ToolSet = {};
