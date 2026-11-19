@@ -139,3 +139,12 @@ export function msaUrls(msa: string): { view: string; download: string } {
   const file = "https://genome-nexus-static-data.s3.us-east-1.amazonaws.com/mutationassessor-v4-multiple-sequence-alignment-files-uncompressed/" + msa + ".fa";
   return { view: "https://projects.sanderlab.org/av/?url=" + file, download: file };
 }
+
+/**
+ * The tooltip of an Allele Freq (T) cell with no frequency (none, 0, or a count missing): the portal's
+ * TableCellStatusIndicator NA, which has no text, only this tip (TumorAlleleFreqColumnFormatter
+ * renderFunction); null for a cell that has a frequency.
+ */
+export function vafEmptyTip(value: unknown): string | null {
+  return value == null || value === "" ? "Data not available." : null;
+}

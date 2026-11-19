@@ -36,20 +36,26 @@
  *   S3 sorted by Chromosome in the table: PTEN's rows are all on 10 (the importer stores the file's
  *      "chr10" as "10"), so they tie and the tiebreak (sample id) orders them, both ways. No fixture
  *      gene's table spans chromosomes whose text and number orders differ, so the key itself is S1's.
+ *   DF the defaults a view naming no columns gets (MUT-COL-5/18/27): Copy # when the study has a
+ *      COPY_NUMBER_ALTERATION / DISCRETE profile (meta_cna.txt), Allele Freq (T) when some row of the gene has a
+ *      non-zero t_alt_count / (t_alt_count + t_ref_count), Cancer Type Detailed when the gene's rows hold more than
+ *      one distinct non-empty CANCER_TYPE_DETAILED (ResultsViewMutationTable 195-210). The catalog is read live
+ *      from genetic_profile, as lib/analysis.ts studyProfiles reads it, and every run here is given it.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { chQueryRows, connById } from "../lib/ch.ts";
+import { sq } from "../lib/compiler.ts";
 import { PatientLevelResolver } from "../lib/federation.ts";
 import * as mutationTable from "../lib/mutation-table.ts";
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS } from "../lib/mutation-table.ts";
 import { chromosomeSortSql, proteinChangeSortSql } from "../lib/mutation-sort.ts";
-import { sq } from "../lib/compiler.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
 import type { ViewRun } from "../lib/views/run.ts";
 import type { CohortDef } from "../lib/types.ts";
 import type { ColumnFilter } from "../lib/table-query.ts";
+import type { ProfileInfo } from "../lib/profile-catalog.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 /** meta_study.txt's name */
@@ -72,6 +78,15 @@ const ok = (name: string, pass: boolean, detail = "") => {
 const conn = connById("b");
 if (!conn) { console.log("FAIL connection b is not configured (npm run peer-db prints its CLICKHOUSE2_* lines)"); process.exit(1); }
 
+/** the study's profile catalog, from genetic_profile as lib/analysis.ts studyProfiles reads it */
+const catalog: ProfileInfo[] | string = await chQueryRows(
+  "SELECT replaceOne(gp.stable_id, concat(cs.cancer_study_identifier, '_'), '') AS profile, gp.genetic_alteration_type AS type, gp.datatype AS datatype, gp.name AS name,\n" +
+  "       toInt32OrZero(ifNull(toString(gp.sort_order), '')) AS ord\n" +
+  "FROM " + conn.db + ".genetic_profile gp JOIN " + conn.db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id\n" +
+  "WHERE cs.cancer_study_identifier = " + sq(STUDY), conn)
+  .then((r) => r.rows.map(([profile, type, datatype, name, ord]) => ({ profile: String(profile), type: String(type), datatype: String(datatype), name: String(name), order: Number(ord) || 0 })))
+  .catch((e: Error) => "threw: " + String(e.message).slice(0, 200));
+
 const resolver = new PatientLevelResolver(STUDY, { oncokbPin: null }, { id: conn.id, mode: "patient-level", label: "fixture", conn });
 const WHOLE: CohortDef = { all: [] };
 const ctxFor = (values?: string): ViewRun => ({
@@ -80,7 +95,7 @@ const ctxFor = (values?: string): ViewRun => ({
   resolvers: { [STUDY]: resolver },
   vNames: ["c"], vStudies: [STUDY],
   participationFor: () => ({}),
-  pin: null, studyProfiles: async () => ({ profiles: [], gaProfiles: [] }),
+  pin: null, studyProfiles: async () => ({ profiles: [], gaProfiles: [], ...(typeof catalog === "string" ? {} : { catalog }) }),
   ...(values ? { values } : {})
 } as unknown as ViewRun);
 
@@ -171,6 +186,31 @@ ok("O5 the existing columns keep their order (Protein Position and Alteration wh
   const shown = typeof res === "string" ? null : res.mutations!.shown;
   ok("Y9 a view naming no columns shows none of the new ones but copyNumber", !!shown && NEW_IDS.every((i) => i === "copyNumber" || !shown.includes(i)), typeof res === "string" ? res : JSON.stringify(shown));
   ok("Y9 a view naming no columns shows copyNumber (MUT-COL-38)", !!shown && shown.includes("copyNumber"), typeof res === "string" ? res : JSON.stringify(shown));
+}
+
+// ---- DF: the data-dependent defaults ---------------------------------------------------------
+
+{
+  // meta_cna.txt: genetic_alteration_type COPY_NUMBER_ALTERATION, datatype DISCRETE, stable_id cna
+  ok("DF the fixture's catalog holds its COPY_NUMBER_ALTERATION / DISCRETE profile (meta_cna.txt)",
+    typeof catalog !== "string" && catalog.some((p) => p.type === "COPY_NUMBER_ALTERATION" && p.datatype === "DISCRETE"),
+    typeof catalog === "string" ? catalog : JSON.stringify(catalog.map((p) => p.profile + ":" + p.type + "/" + p.datatype)));
+  const DF: [string, string[], string][] = [
+    ["RET", ["sample", "proteinChange", "annotation", "mutationType", "copyNumber", "mutCount"],
+      "RET's one row is the KIF5B-RET fusion in FX-P52-T1 (data_sv.txt, no mutation rows): no allele counts, so no frequency → no vaf; " +
+      "one CANCER_TYPE_DETAILED (Lung Adenocarcinoma) → no cancerType; the DISCRETE profile → copyNumber"],
+    ["CDKN2A", ["sample", "proteinChange", "annotation", "mutationType", "copyNumber", "vaf", "mutCount"],
+      "CDKN2A's 4 mutation rows (FX-P19, P22, P27, P29), all Lung Adenocarcinoma, no fusion → no cancerType; t_alt_count 253/358 etc. → vaf"],
+    ["TP53", MUTATION_DEFAULT_COLUMNS,
+      "TP53's rows hold Lung Adenocarcinoma and Lung Squamous Cell Carcinoma, non-zero frequencies (FX-P01-T1 R273H 79/601) → all eight"],
+  ];
+  for (const [gene, want, why] of DF) {
+    const res = await run(gene);
+    const got = typeof res === "string" ? res : (res.mutations as { defaults?: string[] }).defaults;
+    ok(`DF ${gene} defaults ${want.join(",")} (${why})`, JSON.stringify(got) === JSON.stringify(want), JSON.stringify(got));
+    const shown = typeof res === "string" ? res : res.mutations!.shown;
+    ok(`DF ${gene} a view naming no columns shows those defaults`, JSON.stringify(shown) === JSON.stringify(want), JSON.stringify(shown));
+  }
 }
 
 // ---- each column's values, row by row ----------------------------------------------------------
