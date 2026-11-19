@@ -503,12 +503,18 @@ async function explore({ ok, BASE, page, browser }) {
     await card.locator(".dtrow", { has: page.locator(".gname", { hasText: /^mutations$/ }) }).first().click();
     const op = (await card.locator(".pickbar").innerText()).replace(/\s+/g, " ");
     await card.getByRole("button", { name: "Clear" }).click();
-    const ev = page.locator(".card", { has: page.locator("h2", { hasText: "Timeline events" }) });
+    // Timeline Events Availability is offered in Add chart, not shown by default (STS-OT-7)
+    const ev = page.locator("[data-special=events]");
+    const hiddenFirst = (await ev.count()) === 0;
+    await page.getByRole("button", { name: /Add chart/ }).first().click();
+    await page.getByRole("checkbox", { name: "chart Timeline Events Availability" }).click();
+    await page.keyboard.press("Escape");
+    await ev.locator(".valrow").first().waitFor({ timeout: 120000 });
     const evText = (await ev.innerText()).replace(/\s+/g, " ");
-    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, evText: evText.slice(0, 120) });
-    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && /\d+(\.\d)?%/.test(evText);
+    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, hiddenFirst, evText: evText.slice(0, 120) });
+    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && hiddenFirst && /\d+(\.\d)?%/.test(evText);
   } catch (e) { dtDetail = String(e.message).split("\n")[0]; }
-  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events their Freq", dtOk, dtDetail);
+  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events, added from Add chart, their Freq", dtOk, dtDetail);
 
   // Value lists as the portal's tables (STS-TBL-1…5): a # / Freq header; a list that scrolls has a
   // search box and Select all / Deselect all over the rows it shows; the rows the filter holds come first
