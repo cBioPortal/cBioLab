@@ -533,6 +533,23 @@
     },
     "unknown": "#EE4B2B"
   },
+  "mrnaBar": {
+    "line": "gray",
+    "low": "blue",
+    "mid": "gray",
+    "high": "red",
+    "lowBelow": 25,
+    "highAbove": 75,
+    "width": 30,
+    "radius": 3,
+    "lineY": 8,
+    "lineWidth": 2,
+    "svgHeight": 12,
+    "textGap": 3,
+    "textWidth": 30,
+    "textBaseline": 11,
+    "fontSize": 10
+  },
   "cohortBar": {
     "background": "#ccc",
     "gene": "lightgreen",
