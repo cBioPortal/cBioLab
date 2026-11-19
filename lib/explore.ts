@@ -5,10 +5,11 @@ import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, stu
 import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, discreteCnaProfileSql, type DerivedMetric } from "./cohort2.ts";
 import { CNA_LEVELS, DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
+import { SAMPLE_TIME_EVENTS, TREATMENT_EVENT } from "./treatment-tables.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, DerivedFacet, DerivedRequest, AssayFacet, TreatmentFacets } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
 import { dataBins, recountBins, type BinInput, type BinSettings } from "./data-binner.ts";
@@ -1829,6 +1830,75 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
 export const ASSAY_CHART_LIMIT = 6;
 /** a categorical entity's values shown, most common first */
 const ASSAY_VALUE_LIMIT = 30;
+
+/**
+ * cBioPortal's treatment tables (STS-OT-6) over the selected studies: patients per agent, and
+ * samples per agent and time, under every filter, their own included, as the portal counts them
+ * (its patientTreatmentFilters narrow the patient table too). Null when no selected study has a
+ * treatment. As the portal's `/api/treatments/{patient,sample}-counts/fetch?tier=Agent`: a patient
+ * counts once under each agent of its Treatment events; a sample is "Pre" an agent when its time
+ * (the start of its Sample Acquisition or Specimen event) is on or before the patient's first
+ * treatment with it, else "Post"; a sample without such an event is in neither, and an event naming
+ * a sample the study does not hold is ignored.
+ *
+ * Each statement groups the events by patient and counts from those groups, so none projects a
+ * patient or sample id, not even in a subquery.
+ */
+export async function buildTreatmentFacets(o: {
+  studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null;
+  profilesByStudy: Map<string, { profiles?: string[]; gaProfiles?: string[] }>;
+  connByStudy?: Map<string, ChConn>;
+  /** selected studies with treatments these tables cannot count (a peer's), named on them */
+  leftOut?: string[];
+}): Promise<TreatmentFacets | null> {
+  const leftOut = o.leftOut && o.leftOut.length ? { leftOut: o.leftOut } : {};
+  if (!o.studies.length) return o.leftOut?.length ? { patients: [], samples: [], totalPatients: 0, totalSamples: 0, ...leftOut } : null;
+  const ctx: DefCtx = { oncokbPin: o.oncokbPin, profilesByStudy: o.profilesByStudy };
+  const treatment = "lower(event_type) = " + sq(TREATMENT_EVENT) + " AND key = 'AGENT'";
+  const sampleTime = "lower(event_type) IN (" + SAMPLE_TIME_EVENTS.map(sq).join(",") + ") AND key = 'SAMPLE_ID'";
+  const groups = byConnection(o.studies, o.connByStudy);
+  const parts = await ensureChContext(() => Promise.all(groups.map(async (g) => {
+    const events = g.conn.db + ".clinical_event_data_derived";
+    const set = cohortSet(g.studies, g.conn.db, o.draft, ctx);
+    const inPatients = set.patients ? " AND patient_unique_id IN " + set.patients : "";
+    // only the study's own samples: an event may name one it does not hold, which the portal leaves out
+    const inSamples = " AND concat(cancer_study_identifier, '_', value) IN " +
+      (set.samples || "(SELECT sample_unique_id FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + ")");
+    return Promise.all([
+      chQuery<ChRow>("SELECT value AS agent, uniqExact(patient_unique_id) AS n FROM " + events + "\n" +
+        "WHERE " + studyIn(g.studies) + " AND " + treatment + inPatients + "\nGROUP BY agent WITH TOTALS", g.conn),
+      // per patient: each agent's first start, each sample's time; then every (agent, sample) pair
+      chQuery<ChRow>("SELECT tx.1 AS agent, if(sa.2 <= tx.2, 'Pre', 'Post') AS time, uniqExact(sa.1) AS n\n" +
+        "FROM (SELECT arrayMap(a -> (a, arrayMin(arrayMap(x -> x.2, arrayFilter(x -> x.1 = a, t)))), arrayDistinct(arrayMap(x -> x.1, t))) AS txs,\n" +
+        "             arrayMap(i -> (i, arrayMin(arrayMap(x -> x.2, arrayFilter(x -> x.1 = i, s)))), arrayDistinct(arrayMap(x -> x.1, s))) AS sas\n" +
+        "      FROM (SELECT groupArrayIf((value, start_date), " + treatment + ") AS t,\n" +
+        "                   groupArrayIf((concat(cancer_study_identifier, '_', value), start_date), " + sampleTime + inSamples + ") AS s\n" +
+        "            FROM " + events + " WHERE " + studyIn(g.studies) + " GROUP BY patient_unique_id)\n" +
+        "      WHERE length(t) > 0 AND length(s) > 0)\n" +
+        "ARRAY JOIN txs AS tx\nARRAY JOIN sas AS sa\n" +
+        "GROUP BY agent, time WITH TOTALS", g.conn),
+    ]);
+  })));
+  const patients = new Map<string, number>(), samples = new Map<string, { agent: string; time: "Pre" | "Post"; n: number }>();
+  let totalPatients = 0, totalSamples = 0;
+  // the studies' patients and samples are disjoint, so the counts add
+  for (const [p, sm] of parts) {
+    for (const r of p.data) patients.set(String(r.agent), (patients.get(String(r.agent)) || 0) + Number(r.n));
+    for (const r of sm.data) {
+      const key = String(r.agent) + "::" + String(r.time), was = samples.get(key);
+      samples.set(key, { agent: String(r.agent), time: r.time === "Pre" ? "Pre" : "Post", n: (was?.n || 0) + Number(r.n) });
+    }
+    totalPatients += Number((p as { totals?: ChRow }).totals?.n || 0);
+    totalSamples += Number((sm as { totals?: ChRow }).totals?.n || 0);
+  }
+  if (!patients.size && !samples.size && !o.leftOut?.length) return null;
+  return {
+    // the portal's default order: # descending
+    patients: [...patients].map(([agent, n]) => ({ agent, n })).sort((a, b) => b.n - a.n || (a.agent < b.agent ? -1 : 1)),
+    samples: [...samples.values()],
+    totalPatients, totalSamples, ...leftOut,
+  };
+}
 
 /** a genericAssay clause on this entity, possibly negated: what the chart itself adds */
 function isAssayClauseFor(c: unknown, profileType: string, entity: string): boolean {

@@ -194,6 +194,16 @@ export interface GenericAssayLeaf {
 export interface ProteinPositionLeaf {
   kind: "proteinPosition"; gene: string; range: ClinicalRange;
 }
+/**
+ * Treated with any of `agents` (a Treatment event's AGENT, as the study wrote it): the patients, or
+ * with `time` the samples taken before ("Pre") or after ("Post") the patient's first treatment with
+ * one of them, as cBioPortal's treatment tables select them (STS-OT-6).
+ */
+export interface TreatmentLeaf {
+  kind: "treatment"; agents: string[]; time?: "Pre" | "Post";
+  /** a study with no treatment by one of the agents matches nobody rather than refusing (a clause over several studies) */
+  ifHeld?: true;
+}
 /** deprecated alias, translated to OQL internally */
 export interface AlterationLeaf {
   kind: "alteration"; gene: string;
@@ -243,7 +253,7 @@ export interface DerivedLeaf {
 export type Leaf =
   | OqlLeaf | ClinicalLeaf | EventLeaf | SampleListLeaf | PatientListLeaf | ProfiledLeaf
   | CaseListLeaf | GenomicDataLeaf | GenericAssayLeaf | AlterationLeaf | DerivedLeaf
-  | ProteinPositionLeaf | SplitLeaf | UploadLeaf
+  | ProteinPositionLeaf | SplitLeaf | UploadLeaf | TreatmentLeaf
   /** back-compat: the flat v1 event shape, accepted without a `kind` */
   | EventLeafFields;
 
@@ -985,6 +995,21 @@ export type ClinicalFacet =
  * genericAssay clause keeps a patient with any sample in range), so a patient whose samples fall
  * in two bars is in both. Over the selected studies that hold the profile (`studies`).
  */
+/**
+ * cBioPortal's "Treatment per Patient" and "Treatment per Sample (pre/post)" tables (STS-OT-6),
+ * over the selection, their own filters included, as the portal's. A patient is counted under each agent of a
+ * Treatment event; a sample under an agent as "Pre" when it was taken on or before the patient's
+ * first treatment with it, else "Post", its time from a Sample Acquisition or Specimen event.
+ */
+export interface TreatmentFacets {
+  patients: { agent: string; n: number }[];
+  samples: { agent: string; time: "Pre" | "Post"; n: number }[];
+  /** patients with a treatment, and samples with a time and a treated patient */
+  totalPatients: number; totalSamples: number;
+  /** selected studies with treatments not counted here (a peer's, whose federation API has no treatment counts) */
+  leftOut?: string[];
+}
+
 export interface AssayFacet {
   profileType: string; entity: string;
   /** the entity's display name, where the study gives one */
@@ -1122,6 +1147,8 @@ export interface ExploreResult {
   geneFacets?: GeneStateFacet[];
   /** one entity of a generic-assay profile per chart the reader asked for (AssayFacet) */
   assayFacets?: AssayFacet[];
+  /** the portal's treatment tables (TreatmentFacets), when a selected study has treatments */
+  treatments?: TreatmentFacets;
   /** portal-equivalent gene tables (samples, panel-aware denominators) */
   mutatedGenes?: GeneTableRow[];
   cnaGenes?: GeneTableRow[];
