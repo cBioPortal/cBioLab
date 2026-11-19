@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, geneTabView, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, geneTabView } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -217,6 +217,29 @@ test("the special tables: drawn when checked, or while the draft filters on what
     ["a sequence of two events is not this table's filter", none, [seq], true, { events: false, caseLists: false }],
   ];
   for (const [name, checked, leaves, hasEvents, want] of cases) assert.deepEqual(specialChartsShown(checked, leaves, hasEvents), want, name);
+});
+
+// STV-AC-7: the X vs Y tab's button, as the portal's, case by case
+test("the X vs Y button: what it says for each pair, and whether it adds", () => {
+  const age = { attribute: "AGE", numeric: true }, mc = { attribute: "MUTATION_COUNT", numeric: true };
+  const sex = { attribute: "SEX", numeric: false }, race = { attribute: "RACE", numeric: false };
+  const existing = ["FRACTION_GENOME_ALTERED|MUTATION_COUNT"];
+  const cases: [typeof age | null, typeof age | null, string, boolean][] = [
+    [null, mc, "Add Chart", false],
+    [age, age, "Please choose two different attributes.", false],
+    [{ attribute: "FRACTION_GENOME_ALTERED", numeric: true }, mc, "A chart with these attributes already exists", false],
+    [mc, { attribute: "FRACTION_GENOME_ALTERED", numeric: true }, "A chart with these attributes already exists", false],   // either way round
+    [sex, race, "Can't add a chart with two categorical attributes (yet).", false],
+    [age, sex, "Add violin/box plot table", false],     // the portal's violin table: not drawn here yet, said so
+    [age, mc, "Add density plot", true],
+  ];
+  for (const [x, y, label, adds] of cases) { const b = xVsYButton(x, y, existing); assert.deepEqual([b.label, b.adds], [label, adds], label); }
+  assert.match(xVsYButton(age, sex, existing).tip!, /not drawn here yet/);
+});
+
+test("the X vs Y attributes: every clinical attribute but a survival one other than OS_STATUS", () => {
+  const attrs = ["AGE", "OS_MONTHS", "OS_STATUS", "PFS_STATUS", "DFS_MONTHS", "SEX"].map((attribute) => ({ attribute }));
+  assert.deepEqual(xVsYAttributes(attrs).map((a) => a.attribute), ["AGE", "OS_STATUS", "SEX"]);
 });
 
 // STV-AC-5: the gene tab, one chart per gene and profile

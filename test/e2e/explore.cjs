@@ -582,6 +582,44 @@ async function explore({ ok, BASE, page, browser }) {
   } catch (e) { barDetail = String(e.message).split("\n")[0]; }
   ok("explore: a histogram has an integer y axis, and a drag across bars selects them, the others greyed", barOk, barDetail);
 
+  // Add chart's X vs Y tab (STV-AC-7): the portal's button for each kind of pair, and a density per
+  // numeric pair, drawn beside the default Mutation Count vs FGA chart (STS-SC-1)
+  let xyDetail = "", xyOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.locator("[data-chart=mutcount-fga] svg.xc-density").waitFor({ timeout: 240000 });
+    await page.getByRole("button", { name: /Add chart/ }).first().click();
+    await page.getByRole("tab", { name: "X vs Y" }).click();
+    const pick = async (which, name) => { await page.getByRole("combobox", { name: which }).click(); await page.getByRole("option", { name, exact: true }).click(); };
+    const button = async () => (await page.locator(".addchart button", { hasText: /Add|Please|chart with|categorical|violin/ }).last().innerText()).trim();
+    await pick("Select first clinical attribute", "Diagnosis Age"); await pick("Select second clinical attribute", "Sex");
+    const mixed = await button();
+    await pick("Select second clinical attribute", "Mutation Count");
+    const numeric = await button();
+    await page.locator(".addchart button", { hasText: "Add density plot" }).click();
+    await page.keyboard.press("Escape");
+    const card = page.locator("[data-chart=xvsy]");
+    await card.locator("svg.xc-density").waitFor({ timeout: 240000 });
+    const title = (await card.locator(".xc-title").innerText()).trim();
+    const both = await page.locator("[data-chart=mutcount-fga]").count();
+    // a drag on the added chart filters on both its attributes; Remove chart takes the chart and those filters
+    const fig = card.locator("svg.xc-density");
+    await card.scrollIntoViewIfNeeded();
+    const bb = await fig.boundingBox();
+    await page.mouse.move(bb.x + bb.width * 0.25, bb.y + bb.height * 0.3); await page.mouse.down();
+    await page.mouse.move(bb.x + bb.width * 0.6, bb.y + bb.height * 0.8, { steps: 10 }); await page.mouse.up();
+    await page.waitForFunction(() => /Diagnosis Age/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    const dragged = (await page.locator(".svpills").innerText()).replace(/\s+/g, " ");
+    await card.getByRole("button", { name: /actions for/ }).click();
+    await page.getByRole("menuitem", { name: "Remove chart" }).click();
+    await page.waitForFunction(() => !/Diagnosis Age|Mutation Count/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    const removed = await page.locator("[data-chart=xvsy]").count();
+    xyDetail = JSON.stringify({ mixed, numeric, title, both, dragged: dragged.slice(0, 120), removed });
+    xyOk = mixed === "Add violin/box plot table" && numeric === "Add density plot" && title === "Mutation Count vs Diagnosis Age" && both === 1
+      && /Diagnosis Age/.test(dragged) && /Mutation Count/.test(dragged) && removed === 0;
+  } catch (e) { xyDetail = String(e.message).split("\n")[0]; }
+  ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one; its drag filters, Remove chart clears them", xyOk, xyDetail);
+
   // the generic-assay frequency table (STS-OT-5), shown by default for arm-level CNA: altered
   // categories only, losses first, Freq of every selected sample; a row applied filters to its count
   let ftDetail = "", ftOk = false;
