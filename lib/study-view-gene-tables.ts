@@ -59,6 +59,15 @@ function freqOf(r: GeneTableRow): number | null {
   return r.profiled > 0 ? (r.alteredOnPanel ?? r.altered) / r.profiled : null;
 }
 
+/**
+ * A gene's Freq as the portal's table writes it, from the unrounded frequency (`getFrequencyStr`):
+ * "<0.1%" below a tenth, "100.0%" at 100, "NA" with no sample profiled.
+ */
+export function geneFreqText(r: GeneTableRow): string {
+  const f = freqOf(r);
+  return f == null ? "NA" : portalFreq(f * 100);
+}
+
 /** the rows sorted by a column, ties in the rows' own order; a row without a frequency last either way */
 export function sortGeneRows<T extends GeneTableRow>(rows: T[], sort: GeneSort): T[] {
   const sign = sort.desc ? -1 : 1;
@@ -105,7 +114,7 @@ export function geneTableTsv(kind: GeneTableKind, rows: GeneTableRow[]): string 
   const header = kind === "mutated" ? ["Gene", "MutSig(Q-value)", "# Mut", "#", "Profiled Samples", "Freq"]
     : kind === "sv" ? ["Gene", "# Structural Variant", "#", "Profiled Samples", "Freq"]
     : ["Gene", "Gistic(Q-value)", "Cytoband", "CNA", "Profiled Samples", "#", "Freq"];
-  const freq = (r: GeneTableRow) => { const f = freqOf(r); return f == null ? "NA" : portalFreq(f * 100); };
+  const freq = geneFreqText;
   const q = (r: GeneTableRow) => r.qValue == null ? "" : portalQValue(r.qValue);
   const line = (r: GeneTableRow): (string | number)[] =>
     kind === "mutated" ? [r.gene, q(r), r.events, r.altered, r.profiled, freq(r)]
