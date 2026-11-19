@@ -73,7 +73,7 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
   /** any other clause: a gene table's selection as the portal draws it, a pill per gene coloured by alteration (STV-FB-3 #9); else the generic pill */
   const other = (clause: number) => {
     const genes = geneTablePills(draft.all![clause]);
-    if (!genes) return <ClausePill key={clause} clause={draft.all![clause]} onRemove={() => onRemoveClause(clause)} onCustomData={onCustomData} />;
+    if (!genes) return <ClausePill key={clause} portal clause={draft.all![clause]} onRemove={() => onRemoveClause(clause)} onCustomData={onCustomData} />;
     return (
       <span key={clause} className="fgroup" data-gene-pills>
         {genes.length > 1 && <span className="fconn">(</span>}
