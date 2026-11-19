@@ -134,3 +134,28 @@ export function intervalEnds(draft: CohortDef, clause: number, leaf: number): nu
   if (!iv) return [];
   return iv.kind === "point" ? [iv.value] : [iv.lo, iv.hi].filter((x): x is number => x != null);
 }
+
+/** which chart a generic clause comes from, as far as its leaves say: their kind, and the gene or entity of a genomic one */
+function chartOfClause(c: unknown): string {
+  const x = c as { any?: unknown[]; not?: unknown };
+  const l = (Array.isArray(x?.any) ? x.any[0] : x?.not ?? c) as { kind?: string; gene?: string; profileType?: string; entity?: string; time?: string } | undefined;
+  if (!l) return "";
+  if (l.kind === "genomicData") return "genomicData|" + l.gene + "|" + l.profileType;
+  if (l.kind === "genericAssay") return "genericAssay|" + l.profileType + "|" + l.entity;
+  if (l.kind === "treatment") return "treatment|" + (l.time ? "sample" : "patient");
+  return String(l.kind ?? "event");
+}
+
+/**
+ * The words between the filter bar's groups (STV-FB-2): two generic groups in a row from the same
+ * chart (two gene-table selections, two case-list selections) are joined by "and", as the portal
+ * writes "( APC or TP53 ) and ( KRAS )"; a clinical chart's pill, or a group from another chart,
+ * gets no word. One entry per group: whether "and" goes before it.
+ */
+export function joinedByAnd(draft: CohortDef | null | undefined, groups: SvGroup[]): boolean[] {
+  const all = draft?.all || [];
+  return groups.map((g, i) => {
+    const prev = groups[i - 1];
+    return i > 0 && g.kind === "other" && prev.kind === "other" && chartOfClause(all[g.clause]) === chartOfClause(all[prev.clause]);
+  });
+}

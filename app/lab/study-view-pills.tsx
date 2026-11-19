@@ -3,7 +3,7 @@
 // numeric intervals with editable ends; clauses of no clinical chart drawn as the generic pills.
 import { Fragment, useEffect, useState } from "react";
 import type { CohortDef } from "../../lib/types.ts";
-import { editInterval, filterGroups, intervalEnds, intervalText, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
+import { editInterval, filterGroups, intervalEnds, joinedByAnd, intervalText, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
 import { ClausePill, CLINICAL_COLOR, type OnCustomData } from "./pills";
 
 type Result = { draft: CohortDef } | { why: string };
@@ -45,10 +45,14 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
   onRemoveClause: (i: number) => void;
   onCustomData?: OnCustomData;
 }) {
+  const groups = filterGroups(draft, labelOf), and = joinedByAnd(draft, groups);
   return (
     <span className="svpills">
-      {filterGroups(draft, labelOf).map((g) => g.kind === "other"
-        ? <ClausePill key={g.clause} clause={draft.all![g.clause]} onRemove={() => onRemoveClause(g.clause)} onCustomData={onCustomData} />
+      {groups.map((g, i) => g.kind === "other"
+        ? <Fragment key={g.clause}>
+            {and[i] && <span className="svop">and</span>}
+            <ClausePill clause={draft.all![g.clause]} onRemove={() => onRemoveClause(g.clause)} onCustomData={onCustomData} portal />
+          </Fragment>
         : (
           <span key={g.clause} className="svgroup" data-sv-chart={g.attribute}>
             <span className="svname" data-tip={g.attribute}>{g.label}</span>
