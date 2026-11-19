@@ -540,7 +540,7 @@ export interface IncidenceCurve {
 export interface TableRows<V> {
   /** every column the table holds, in download order; each row's values align with these */
   /** `unsorted`: a column the portal does not sort by, drawn without a sort control; `firstSort`: its first click's direction (lib/table-sort.ts) */
-  columns: { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc" }[];
+  columns: { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc"; group?: "clinical"; freq?: number }[];
   /** the ids shown, in order, and those shown when the query names none */
   shown: string[]; defaults: string[];
   /** the view's search, filters and sort as applied (columns as given) */

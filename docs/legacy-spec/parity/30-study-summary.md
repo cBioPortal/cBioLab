@@ -206,7 +206,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-OT-2 | ✅ | BC | Every case list, by kind across studies, counted in samples, Freq of the selected samples; coadread's 14 lists match cbioportal.org's counts ([empty-caselists-cases](empty-caselists-cases.md) CL1–CL10). Shown when added in Add chart or while a case list is filtered on, as the portal (`specialChartsShown`) |
 | STS-OT-3 | ✅ | C | Add chart → Gene status → Add mutation types: Mutation Type · # Mut · # · Freq (÷ selected samples), as the portal's counts (msk_impact_2017 TP53, all 8 types); Apply filters on the checked types (`genomicData` MUTATION_TYPE; TP53 Nonsense or Splice Site 993, the portal's) |
 | STS-OT-4 | ❌ | C | No variant-annotations table |
-| STS-OT-5 | ❌ | B | No GA frequency table; Add chart › Generic assays charts one entity at a time (see GS-5/6) |
+| STS-OT-5 | ✅ | B | "Frequency Table: <profile>" per binary or categorical GA profile, shown by default (at most 4, the rest named); Entity · Category · # · Freq of every selected case of the profile's unit, as the portal's counts (coadread 115, luad 117 arm-level rows); altered only for arm-level CNA / LOH until the filter icon; selection a genericAssay leaf per entity (`buildAssayFreqTables`); every selected peer study named, not counted; no Add chart row |
 | STS-OT-6 | 🟡 | B | Treatment per Patient and per Sample (pre/post), equal to the portal's counts (coadread, msk_chord_2024, luad, and others; first-start Pre/Post rule); Union filter (`treatment` clause); no Intersection, Compare, ⓘ, download, Groups / Target tiers |
 | STS-OT-7 | ✅ | B | "Timeline Events Availability", patients per event type (592 / 588 / 214, = the portal API) with Freq ÷ selected patients (99.7 % / 99.0 % / 36.0 %); offered in Add chart only, as the portal (`specialChartsShown`) |
 
@@ -214,7 +214,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-SC-1 | 🟡 | BC | Fixed "Mutation count vs fraction genome altered" card when both attributes exist; no other X vs Y |
+| STS-SC-1 | ✅ | BC | The default "Mutation Count vs Fraction Genome Altered" card when both attributes exist (hidden when unchecked in the Genomic tab); any other numeric pair from Add chart › X vs Y, "<Y> vs <X>", one per pair (`DensityCard`, `densityPairKey`) |
 | STS-SC-2 | ✅ | B | 44×38 bins cut as the portal cuts them (FGA 0–1, MC from 0), a plasma dot per bin, the "# samples" legend; the middle label is the count at the middle of the bar (⚠ C6, [density-cases](density-cases.md)) |
 | STS-SC-3 | ✅ | BC | Pearson and Spearman with p, as the portal writes them; shown whenever n > 2 (⚠ S9) |
 | STS-SC-4 | ✅ | B | "Number of Samples", the x range to 2 places, the y range as formatRange |
@@ -292,7 +292,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-MD-2 | 🟡 | B | Multi: Studies breakdown, merged facets with "*" on partial attributes, panel-aware Freq ✅ (TP53 41.3 %); header "(overlap not deduplicated)" (invariant 3) |
 | STS-MD-3 | ✅ | C | Freq = on-panel altered ÷ samples profiled for that gene + WES (`explore.ts:597-602`, invariant 7) |
 | STS-MD-4 | ✅ | B | Patient attributes count patients ("Diagnosis Age · 592 patients", bar tip "patients") |
-| STS-MD-5 | ✅ | BC | An attribute patient-level in one selected study and sample-level in another is read per sample in every study (`conflictingLevels`, `withSampleLevel` in `lib/custom-data.ts`) and charted once: blca_tcga + ampca_bcm_2016 GRADE as the portal (389 / 90 / 59 / 21 / 5 / 2, NA 7) |
+| STS-MD-5 | ✅ | BC | An attribute patient-level in one selected study and sample-level in another is read per sample in every study (`conflictingLevels`, `withSampleLevel` in `lib/custom-data.ts`) and charted once: blca_tcga + ampca_bcm_2016 GRADE as the portal (389 / 90 / 59 / 21 / 5 / 2, NA 7); filtered selections are counted per selected sample, never every sample of a selected patient (cBioPortal/cbioportal#12509): `npm run check:conflicting-levels` (nsclc_tracerx_2017 CRUK0030-R1 + luad_cas_2020 LUAD_01 HISTOLOGY 1 / 1, where the portal reads 4) |
 | STS-MD-6 | ✅ | BC | Categorical and numeric charts both exclude their own filter (#188) |
 | STS-MD-7 | ✅ | C | ≤10 distinct values → one bar per value (`DISTINCT_VALUE_THRESHOLD`) |
 | STS-MD-8 | ✅ | B | Log bins chosen automatically (Days to Birth); the Log Scale item switches them off |

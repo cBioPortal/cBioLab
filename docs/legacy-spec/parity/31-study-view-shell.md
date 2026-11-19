@@ -124,7 +124,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 |---|---|---|---|
 | STV-FB-1 | 🟡 | B | A pill per value or range with its × ✅; cBioLab's own pill style kept on purpose (not the portal's blue); no pending style (no manual mode, STV-FB-6) |
 | STV-FB-2 | ✅ | B | Clinical pills "<chart> : a or b", no word between charts; generic OR groups "( a or b )" and two groups of one chart joined by "and" (`joinedByAnd`, `lib/study-view-pills.ts`); a gene-table Union is one OQL clause, its pill text under STV-FB-3 |
-| STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene, GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
+| STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene-table selections a pill per gene coloured by alteration (`geneTablePills`); gene-chart, GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
 | STV-FB-3a | ❌ | C | No survival-attribute pills (no survival filter) |
 | STV-FB-3b | 🔶 | C | A density drag adds two visible range pills (`explore-charts.tsx:149`); legacy shows no pill beyond the chart's own |
 | STV-FB-4 | 🟡 | B | "50 < x ≤ 60", "a ≤ x ≤ b", "> a", "≤ b", one value; ends edited in place (start > end swaps, start = end and empty refused), and an edit makes custom bins on the chart (#203). Separate ranges are separate pills (portal: one merged interval) |
@@ -165,9 +165,9 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-AC-2 | 🟡 | B | Tabs Clinical · Genomic · Gene status · a tab per generic-assay type (#456) · Derived timeline filters · Custom data; the Genomic tab's charts each shown unless unchecked (`genomicChartLines`); Mutation Count and FGA listed in the Clinical tab too (the portal: Genomic only); no X vs Y, Variant Annotations |
 | STV-AC-3 | 🟡 | B | Checkbox · Attribute · **Freq** ("% samples with data") · Type · Level, ordered by Freq then name; a 0% row is greyed and cannot be checked; "Select all (N)" / "Deselect all" as the portal shows them; unchecking a chart clears its filter ([add-chart-cases](add-chart-cases.md) AC1–AC8). No info banner |
 | STV-AC-4 | ✅ | B | Clinical Freq for brca_tcga_pan_can_atlas_2018: all 60 attributes as the portal's API gives them; filtered to Sex = Male, the 3 the portal greys out. Genomic Freq for coadread: Data Types 100.0 %, CNA Genes 99.7 %, FGA 98.1 %, Mutated Genes / Mutation Count / SV Genes 89.9 %, the portal's list and order |
-| STV-AC-5 | 🟡 | B | Gene status: type a gene → mutation + CNA charts (≤6 genes); no profile select, gene sets, chart-type radios |
+| STV-AC-5 | 🟡 | B | Gene status: a profile select with profiled samples ("Mutations (534 samples)"), for mutations Mutated vs Wild Type or Mutation Type, one chart per gene and profile (≤6 genes; `geneChartsChanged`); one option per kind (mutations; discrete copy number, its kinds summed across studies), so a selection holding two discrete copy-number profiles cannot pick between them, and one whose discrete profile has another id is not offered copy number; no gene sets or chart-type radios; continuous profiles not offered |
 | STV-AC-6 | 🟡 | B | "Custom data" button / tab: upload and manage datasets, charted as facets; sign-in rules differ |
-| STV-AC-7 | ❌ | B | No X vs Y |
+| STV-AC-7 | 🟡 | B | The X vs Y tab: two attribute selects (survival but OS_STATUS left out) and the portal's button for each pair (`xVsYButton`); two numeric add a density chart; numeric × categorical refused, the violin table not drawn yet |
 | STV-AC-8 | 🟡 | C | A tab per generic-assay type, named as the portal's (`assayTabLabel`; coadread Arm-level CNA · Genetic Ancestry · Methylation), each a profile select of that type + entity search, one chart per entity (`AssayChartPicker`); no "Frequency Table" row |
 
 ### §7 Groups

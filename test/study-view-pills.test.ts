@@ -2,7 +2,7 @@
 // chart (STV-FB-3), the interval text (STV-FB-4), its editable ends, and each pill's ×.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill, geneTablePills, removeOqlLine, joinedByAnd } from "../lib/study-view-pills.ts";
+import { ALL_LEAVES, editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill, geneTablePills, removeOqlLine, joinedByAnd } from "../lib/study-view-pills.ts";
 import { naClause } from "../lib/explore-selection.ts";
 import type { ClinicalLeaf, CohortDef } from "../lib/types.ts";
 
@@ -36,9 +36,10 @@ describe("groups (STV-FB-3)", () => {
   test("each chart's filter is named by the chart, in the draft's order", () => {
     assert.deepEqual(g.map((x) => x.kind === "chart" ? x.label : x.kind), ["Race Category", "Diagnosis Age", "other", "Sex"]);
   });
-  test("a value list is a pill per value; OR'd ranges a pill per range", () => {
+  test("a value list is a pill per value; OR'd ranges one pill, the first range's start to the last's end, as the portal writes it", () => {
     assert.deepEqual(g[0].kind === "chart" && g[0].pills.map((p) => p.kind === "value" && p.value), ["White", "Asian"]);
-    assert.deepEqual(g[1].kind === "chart" && g[1].pills.map((p) => p.kind === "interval" && intervalText(p.interval)), ["50 < x ≤ 55", "70 < x ≤ 75"]);
+    // STV-FB-4 (intervalFiltersDisplayValue), the user's answer of 2026-11-19: one pill, though it reads wider than the filter
+    assert.deepEqual(g[1].kind === "chart" && g[1].pills.map((p) => p.kind === "interval" && [p.leaf, intervalText(p.interval)]), [[ALL_LEAVES, "50 < x ≤ 75"]]);
   });
   test("NA is the chart's one pill", () => assert.deepEqual(g[3].kind === "chart" && g[3].pills, [{ kind: "na" }]));
   test("an attribute with no chart name keeps its id", () => {
@@ -56,6 +57,30 @@ test("a density drag's ranges have no pill, as the portal's (STV-FB-3b); the sam
   const [g, h] = filterGroups({ all: [drag, age({ gte: 50, lte: 60 })] }, labelOf);
   assert.equal(g.kind, "hidden");
   assert.equal(h.kind, "chart");
+});
+
+describe("several ranges of one chart, one pill (STV-FB-4)", () => {
+  const d: CohortDef = { all: [sex, { any: [age({ gt: 70, lte: 75 }), age({ gt: 50, lte: 55 })] }] };
+  test("the pill runs from the lowest start to the highest end, each end's own bound kept", () => {
+    const [, g] = filterGroups(d, labelOf);
+    assert.deepEqual(g.kind === "chart" && g.pills.map((p) => p.kind === "interval" && intervalText(p.interval)), ["50 < x ≤ 75"]);
+    const open = filterGroups({ all: [{ any: [age({ lte: 35 }), age({ gte: 60, lte: 65 }), { kind: "clinical", attribute: "AGE", op: "=", value: 80 } as ClinicalLeaf] }] }, labelOf)[0];
+    assert.deepEqual(open.kind === "chart" && open.pills.map((p) => p.kind === "interval" && intervalText(p.interval)), ["≤ 80"], "an open start stays open; a point is its own end");
+  });
+  test("its × removes the chart's whole filter", () => {
+    assert.deepEqual(removePill(d, 1, { kind: "interval", leaf: ALL_LEAVES, interval: { kind: "range", lo: 50, loIn: false, hi: 75, hiIn: true } }).all, [sex]);
+  });
+  test("an edited end makes the filter that one interval, as the portal's edit does", () => {
+    const r = editInterval(d, 1, ALL_LEAVES, "hi", "60");
+    assert.ok("draft" in r);
+    assert.deepEqual(r.draft.all, [sex, age({ gt: 50, lte: 60 })]);
+    assert.deepEqual(intervalEnds(r.draft, 1, ALL_LEAVES), [50, 60], "the edited filter's ends, for the chart's custom bins");
+    assert.deepEqual(intervalEnds(d, 1, ALL_LEAVES), [50, 75]);
+  });
+  test("ranges mixed with a value list keep a pill each", () => {
+    const mixed = filterGroups({ all: [{ any: [age({ gt: 50, lte: 55 }), { kind: "clinical", attribute: "AGE", values: ["unknown"] } as ClinicalLeaf] }] }, labelOf)[0];
+    assert.equal(mixed.kind === "chart" && mixed.pills.length, 2);
+  });
 });
 
 describe("a pill's ×", () => {

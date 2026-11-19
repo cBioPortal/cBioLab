@@ -7,7 +7,9 @@ import { BUILD_COMMIT } from "../../build-info.ts";
  * driverSourceText); without, the rule is OncoKB at the pin or a Cancer Hotspot.
  */
 export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin: string | null; variantPins: string; queryText: string; sortName: string | null; desc: boolean; shown: number;
-  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; drivers?: string; duplicates?: number; kept?: { samples: number; patients: number } }): MethodRecord {
+  lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number; drivers?: string; duplicates?: number; kept?: { samples: number; patients: number };
+  /** the Columns menu's Freq: how many clinical-tab columns it was computed for */
+  freqColumns?: number }): MethodRecord {
   const steps = tableSteps({ label: "mutations", what: t.gene + " mutation calls", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
     source: "every called " + t.gene + " mutation in each cohort's samples (uncalled calls left out), with the sample's CANCER_TYPE_DETAILED and MUTATION_COUNT where recorded" +
       (t.oncokbPin ? " and the OncoKB " + t.oncokbPin + " call for its protein change" : "") +
@@ -21,8 +23,11 @@ export function mutationsMethod(t: { gene: string; cohorts: string[]; oncokbPin:
       "its protein change built from its genes (\"A-B Fusion\", or \"A intragenic\" / \"A intergenic\"), type Fusion, site 1's chromosome and position, the variant class as its variant type" +
       (t.oncokbPin ? ", OncoKB " + t.oncokbPin + "'s call for the pair in the sample's tumour type as its annotation and the pair's call with no tumour type as its driver status (each the partners' gene-level Fusion calls where the pair has none stored)" : "") + "." +
       (t.duplicates !== undefined ? " Duplicates (" + t.duplicates + "): the rows grouped by study, patient and protein change, the count of rows beyond the first in each group, over every row whatever the search and filters (the portal's MutationUtils countDuplicateMutations, which keys on the patient id alone)." : "") +
-      (t.kept ? " Of the rows the query keeps: " + t.kept.samples + " distinct samples and " + t.kept.patients + " distinct patients, counted per study and summed (the portal's reset panel)." : ""),
+      (t.kept ? " Of the rows the query keeps: " + t.kept.samples + " distinct samples and " + t.kept.patients + " distinct patients, counted per study and summed (the portal's reset panel)." : "") +
+      (t.freqColumns ? " Columns menu Freq, for " + t.freqColumns + " clinical-tab columns: 100 × the queried samples with a value of the attribute (a sample attribute by the sample; a patient attribute by every sample of a patient that has one, each study at the level it records the attribute) ÷ every queried sample, both counted per study and summed, not averaged (the portal's clinicalAttributeIdToAvailableFrequency); Study of Origin is 100." : ""),
     order: (t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + ", missing last" : "by the portal\'s annotation value (OncoKB\'s oncogenicity, then its highest sensitive, resistance, diagnostic and prognostic levels, then a Cancer Hotspot), then by codon") + ", then sample" });
   return { steps, implementation: { functions: ["mutationRowSource", "pageSql", "countsSql"], file: "lib/mutation-table.ts, lib/table-query.ts", commit: BUILD_COMMIT },
-    verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
+    verification: t.freqColumns
+      ? "A listing; the one number it derives is the Columns menu's Freq, a count ÷ a count from the mutations:clinical-freq queries, so there is no script — the queries are the numbers."
+      : "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
 }

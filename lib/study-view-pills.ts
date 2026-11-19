@@ -1,7 +1,8 @@
 /**
  * Explore's filter bar as the Study View draws it (STV-FB-1…5): each chart's filter is
- * "<chart name> : <pill> or <pill>", a value per pill for a categorical chart and an interval per
- * pill for a numeric one ("50 < x ≤ 55", its ends editable). Clauses that belong to no clinical
+ * "<chart name> : <pill> or <pill>", a value per pill for a categorical chart and an interval for a
+ * numeric one ("50 < x ≤ 55", its ends editable); several ranges of one chart are one pill, from
+ * the first range's start to the last's end, as the portal writes them. Clauses that belong to no clinical
  * chart (genes, case lists, timelines, …) are left to the generic pills.
  */
 import type { ClinicalLeaf, CohortDef } from "./types.ts";
@@ -14,6 +15,9 @@ type Clause = NonNullable<CohortDef["all"]>[number];
 export type Interval =
   | { kind: "point"; value: number }
   | { kind: "range"; lo?: number; loIn: boolean; hi?: number; hiIn: boolean };
+
+/** an interval pill that stands for every range of its chart's filter (STV-FB-4) */
+export const ALL_LEAVES = -1;
 
 export type SvPill =
   | { kind: "value"; leaf: number; value: string | number }
@@ -47,6 +51,25 @@ export function intervalText(iv: Interval): string {
   return hiS + " " + iv.hi;
 }
 
+/**
+ * Several ranges of one chart as the portal writes them (STV-FB-4, intervalFiltersDisplayValue):
+ * one interval from the lowest start to the highest end, each end keeping its own bound (open when
+ * any range is open there), though it reads wider than the filter when the ranges have gaps.
+ */
+function mergedInterval(ivs: Interval[]): Interval {
+  const ends = ivs.map((iv) => iv.kind === "point" ? { lo: iv.value, loIn: true, hi: iv.value, hiIn: true } : iv);
+  const lows = ends.filter((e) => e.lo != null), highs = ends.filter((e) => e.hi != null);
+  const lo = lows.length === ends.length ? Math.min(...lows.map((e) => e.lo!)) : undefined;
+  const hi = highs.length === ends.length ? Math.max(...highs.map((e) => e.hi!)) : undefined;
+  return { kind: "range", lo, loIn: lo != null && lows.some((e) => e.lo === lo && e.loIn), hi, hiIn: hi != null && highs.some((e) => e.hi === hi && e.hiIn) };
+}
+
+/** a chart's ranges, when its filter is two or more of them and nothing else */
+function rangesOf(leaves: ClinicalLeaf[]): Interval[] | null {
+  const ivs = leaves.map(leafInterval);
+  return ivs.length > 1 && ivs.every((iv): iv is Interval => iv != null) ? ivs : null;
+}
+
 /** the filter bar's groups, in the draft's clause order; `labelOf` names a chart by its attribute */
 export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attribute: string) => string | undefined): SvGroup[] {
   return (draft?.all || []).map((c, i): SvGroup => {
@@ -56,6 +79,8 @@ export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attr
     const attribute = clauseAttribute(c);
     const leaves = attribute ? chartLeaves(c, attribute) : null;
     if (!attribute || !leaves) return { kind: "other", clause: i };
+    const ranges = rangesOf(leaves);
+    if (ranges) return { kind: "chart", clause: i, attribute, label: labelOf(attribute) || attribute, pills: [{ kind: "interval", leaf: ALL_LEAVES, interval: mergedInterval(ranges) }] };
     const pills: SvPill[] = [];
     leaves.forEach((l, j) => {
       const iv = leafInterval(l);
@@ -87,7 +112,7 @@ function withLeaves(draft: CohortDef, i: number, leaves: ClinicalLeaf[]): Cohort
 export function removePill(draft: CohortDef, clause: number, pill: SvPill): CohortDef {
   const c = draft.all?.[clause];
   if (!c) return draft;
-  if (pill.kind === "na") return withLeaves(draft, clause, []);
+  if (pill.kind === "na" || (pill.kind === "interval" && pill.leaf === ALL_LEAVES)) return withLeaves(draft, clause, []);
   const leaves = leavesOf(c);
   const l = leaves[pill.leaf];
   if (pill.kind === "value" && l && Array.isArray(l.values)) {
@@ -106,8 +131,10 @@ export function removePill(draft: CohortDef, clause: number, pill: SvPill): Coho
 export function editInterval(draft: CohortDef, clause: number, leaf: number, end: "lo" | "hi" | "point", raw: string): { draft: CohortDef } | { why: string } {
   const c = draft.all?.[clause];
   const leaves = c ? leavesOf(c) : [];
-  const l = leaves[leaf];
-  const iv = l && leafInterval(l);
+  // the one pill of several ranges: an edit makes the filter that one interval, as the portal's
+  const all = leaf === ALL_LEAVES ? rangesOf(leaves) : null;
+  const l = all ? leaves[0] : leaves[leaf];
+  const iv = all ? mergedInterval(all) : l && leafInterval(l);
   if (!iv) return { why: "that filter has no interval to edit" };
   const t = raw.trim();
   const v = Number(t);
@@ -127,14 +154,16 @@ export function editInterval(draft: CohortDef, clause: number, leaf: number, end
     if (hi != null) range[hiIn ? "lte" : "lt"] = hi;
     next = { kind: "clinical", attribute: l.attribute, range };
   }
-  return { draft: withLeaves(draft, clause, leaves.map((x, j) => j === leaf ? next : x)) };
+  return { draft: withLeaves(draft, clause, all ? [next] : leaves.map((x, j) => j === leaf ? next : x)) };
 }
 
 /** the numbers an interval pill's leaf now holds: its ends, or its one value */
 export function intervalEnds(draft: CohortDef, clause: number, leaf: number): number[] {
   const c = draft.all?.[clause];
-  const l = c ? leavesOf(c)[leaf] : undefined;
-  const iv = l && leafInterval(l);
+  const all = c && leaf === ALL_LEAVES ? rangesOf(leavesOf(c)) : null;
+  // after an edit the one pill's filter is a single interval, read as itself
+  const l = c && !all ? leavesOf(c)[leaf === ALL_LEAVES ? 0 : leaf] : undefined;
+  const iv = all ? mergedInterval(all) : l && leafInterval(l);
   if (!iv) return [];
   return iv.kind === "point" ? [iv.value] : [iv.lo, iv.hi].filter((x): x is number => x != null);
 }

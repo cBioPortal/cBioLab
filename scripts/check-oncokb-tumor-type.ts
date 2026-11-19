@@ -23,6 +23,8 @@
 import { chQuery, connById } from "../lib/ch.ts";
 import { tumorTypeKeySpace } from "../packages/annotation-sync/src/sources/oncokb-tumor-type.ts";
 import { mutationRowSource } from "../lib/mutation-table.ts";
+import { biomarkerKeySpace, oncokbTumorTypeSource } from "../packages/annotation-sync/src/sources/oncokb-tumor-type.ts";
+import { biomarkerCallsSql, biomarkerTumorType, studyCancerTypeSql } from "../lib/biomarkers.ts";
 
 const STUDY = "cbiolab_peer_fixture";
 /** peer-db.ts stores the tumour-type and gene-level OncoKB rows under this version (and the app's pin) */
@@ -158,6 +160,60 @@ compare(await tableRows(OTHER), [
 const none = await tableRows(null);
 ok("with no pin no row has an OncoKB call", none.length === rows.length && none.every((r) => r.oncogenicity === "" && r.level === "" && Number(r.drv) === 0),
   none.filter((r) => r.oncogenicity !== "").map((r) => r.sid + " " + r.proteinChange).join("; "));
+
+// ---- TMB-H / MSI-H (PAT-STM-9) ----------------------------------------------------------------
+// The fixture declares no TMB or MSI attribute, so the key space runs over its clinical table plus
+// these rows (sample, attribute, value), by the portal's rules (cbioportal-frontend StoreUtils.ts
+// getSampleClinicalDataMapByThreshold / ByKeywords, getSampleTumorTypeMap, tumorTypeResolver;
+// PatientViewPageStore.ts otherBiomarkerQueries). Ids are the case table's (B*).
+/** [case, the rows added (sample, attribute, value), the keys they give (biomarker|tumour type)] — each case run alone */
+const CASES: [string, [string, string, string][], string[]][] = [
+  ["B1 the preferred attribute, above 10", [["FX-P01-T1", "CVR_TMB_SCORE", "12"]], [`TMB-H|${LUAD}`]],
+  ["B2 the other attribute, at 10: the threshold is inclusive", [["FX-P02-T1", "TMB_NONSYNONYMOUS", "10"]], [`TMB-H|${LUAD}`]],
+  ["B3 the preferred one below, the other above: qualifies", [["FX-P03-T1", "CVR_TMB_SCORE", "9.9"], ["FX-P03-T1", "TMB_NONSYNONYMOUS", "15"]], [`TMB-H|${LUAD}`]],
+  ["B4 below 10", [["FX-P05-T1", "CVR_TMB_SCORE", "9.99"]], []],
+  ["B5 not a number", [["FX-P06-T1", "TMB_NONSYNONYMOUS", "high"]], []],
+  ["B6 MSI_TYPE Instable", [["FX-P07-T1", "MSI_TYPE", "Instable"]], [`MSI-H|${LUAD}`]],
+  ["B7 Stable, and instable in another case: not the keyword", [["FX-P08-T1", "MSI_TYPE", "Stable"], ["FX-P09-T1", "MSI_TYPE", "instable"]], []],
+  ["B8 both biomarkers on one sample", [["FX-P10-T1", "MSI_TYPE", "Instable"], ["FX-P10-T1", "CVR_TMB_SCORE", "40"]], [`MSI-H|${LUAD}`, `TMB-H|${LUAD}`]],
+  ["T1 no cancer type: the study's", [["FX-P41-T1", "CVR_TMB_SCORE", "30"]], [`TMB-H|${NSCLC}`]],
+  ["T2 CANCER_TYPE alone is the tumour type", [["FX-P42-T1", "MSI_TYPE", "Instable"]], ["MSI-H|Lung Cancer"]],
+  ["T3 the patient's first sample's detailed type (FX-P43-T1's) for the patient view, its own for its sample view",
+    [["FX-P43-T2", "TMB_NONSYNONYMOUS", "20"]], [`TMB-H|${LUAD}`, `TMB-H|${LUSC}`]],
+  ["T3b the first sample qualifying: one key, both views asking at its own type", [["FX-P43-T1", "TMB_NONSYNONYMOUS", "20"]], [`TMB-H|${LUAD}`]]
+];
+const withRows = (added: [string, string, string][]) => "(SELECT sample_unique_id, patient_unique_id, cancer_study_identifier, attribute_name, attribute_value, type FROM " + db + ".clinical_data_derived" +
+  " UNION ALL SELECT * FROM values('sample_unique_id String, patient_unique_id String, cancer_study_identifier String, attribute_name String, attribute_value String, type String', " +
+  added.map(([sm, a, v]) => `('${STUDY}_${sm}', '${STUDY}_${sm.replace(/-T\d$/, "")}', '${STUDY}', '${a}', '${v}', 'sample')`).join(", ") + "))";
+const bkeys: Key[] = [];
+for (const [name, added, want] of CASES) {
+  const got = (await chQuery<Key>(biomarkerKeySpace(db, STUDY, withRows(added)), conn)).data;
+  bkeys.push(...got);
+  const seenB = got.map((r) => [r.alteration, r.tumor_type].join("|")).sort();
+  ok(name, JSON.stringify(seenB) === JSON.stringify([...want].sort()), seenB.join("; ") || "no key");
+}
+ok("a biomarker key is filed under Other Biomarkers with no mutation type, Entrez id or position",
+  bkeys.every((r) => r.alteration_type === "MUTATION" && r.hugo_gene_symbol === "Other Biomarkers" && r.consequence === "" && r.entrez_gene_id === "" && r.protein_start === ""), JSON.stringify(bkeys[0]));
+const whole = (await chQuery<{ n: string }>("SELECT count() AS n FROM (" + oncokbTumorTypeSource.keySpace(db, STUDY) + ")", conn)).data[0];
+ok("the sync's key space is the mutations' keys and the biomarkers' (none here) together", Number(whole?.n) === keys.length, JSON.stringify(whole) + " vs " + keys.length);
+ok("the fixture's own clinical data, with no TMB or MSI attribute, gives no biomarker key", (await chQuery(biomarkerKeySpace(db, STUDY), conn)).data.length === 0);
+ok("T3 the header asks FX-P43 (both samples) at FX-P43-T1's detailed type, and FX-P43-T2 alone at its own",
+  biomarkerTumorType([{ id: "FX-P43-T2", attrs: { CANCER_TYPE_DETAILED: LUSC } }, { id: "FX-P43-T1", attrs: { CANCER_TYPE_DETAILED: LUAD } }]) === LUAD &&
+  biomarkerTumorType([{ id: "FX-P43-T2", attrs: { CANCER_TYPE_DETAILED: LUSC } }]) === LUSC);
+
+const studyType = (await chQuery<{ name: string }>(studyCancerTypeSql(db, STUDY), conn)).data;
+ok("T1 the study's cancer type, asked with when no sample names one", studyType.length === 1 && studyType[0].name === NSCLC, JSON.stringify(studyType));
+type Call = Record<string, string>;
+const callsAt = async (pin: string, tt: string, alts: ("MSI-H" | "TMB-H")[]) => (await chQuery<Call>(biomarkerCallsSql(pin, tt, alts), conn)).data;
+const luad = await callsAt(PIN, LUAD, ["MSI-H", "TMB-H"]);
+ok("R1 both calls at Lung Adenocarcinoma, by biomarker, with their level and summary (tumour type's, else the variant's)",
+  JSON.stringify(luad.map((c) => [c.alteration, c.tumorType, c.oncogenicity, c.sensitive, c.summary])) ===
+  JSON.stringify([["MSI-H", LUAD, "Unknown", "LEVEL_1", "fixture: MSI-H"], ["TMB-H", LUAD, "Unknown", "LEVEL_1", "fixture: TMB-H in Lung Adenocarcinoma"]]), JSON.stringify(luad));
+ok("R2 only the biomarkers asked for", (await callsAt(PIN, LUAD, ["TMB-H"])).map((c) => c.alteration).join() === "TMB-H");
+ok("R3 a call at another tumour type is not read", (await callsAt(PIN, LUSC, ["TMB-H"])).length === 0);
+ok("R4 a call stored at another release only is not read at the pin, and is at its own",
+  (await callsAt(PIN, LUSC, ["MSI-H"])).length === 0 && (await callsAt(OTHER, LUSC, ["MSI-H"])).length === 1);
+ok("R5 a mutation's row (EGFR) is never read as a biomarker", (await callsAt(PIN, LUAD, [])).length === 0);
 
 console.log(`\n${checks - failures}/${checks} OncoKB tumour-type checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }
