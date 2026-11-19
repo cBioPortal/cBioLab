@@ -2,7 +2,7 @@
 // chart (STV-FB-3), the interval text (STV-FB-4), its editable ends, and each pill's ×.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill } from "../lib/study-view-pills.ts";
+import { editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill, joinedByAnd } from "../lib/study-view-pills.ts";
 import { naClause } from "../lib/explore-selection.ts";
 import type { ClinicalLeaf, CohortDef } from "../lib/types.ts";
 
@@ -108,4 +108,20 @@ describe("an interval's numbers after an edit", () => {
     assert.deepEqual(intervalEnds(d, 0, 0), []);
     assert.deepEqual(intervalEnds(d, 9, 0), []);
   });
+});
+
+// STV-FB-2: the words between the bar's groups, as the portal's GroupLogic writes them
+test("two generic groups in a row from the same chart are joined by \"and\"; a clinical chart's pill or another chart's group by nothing", () => {
+  const draft = { all: [
+    { any: [{ kind: "oql", q: "APC: MUT" }, { kind: "oql", q: "TP53: MUT" }] },    // a gene-table selection
+    { kind: "oql", q: "KRAS: MUT" },                                                 // another one: "and"
+    { kind: "clinical", attribute: "SEX", op: "=", value: "Female" },                // a clinical pill: no word
+    { kind: "caseList", id: "coadread_all" },                                        // another chart: no word
+    { kind: "caseList", id: "coadread_cna" },                                        // the same chart: "and"
+    { kind: "treatment", agents: ["A"] },                                            // treatments per patient
+    { kind: "treatment", agents: ["B"], time: "Pre" },                               // per sample: another table
+  ] } as unknown as CohortDef;
+  const groups = filterGroups(draft, () => undefined);
+  assert.deepEqual(joinedByAnd(draft, groups), [false, true, false, false, true, false, false]);
+  assert.deepEqual(joinedByAnd(null, []), []);
 });
