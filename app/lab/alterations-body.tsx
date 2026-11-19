@@ -20,6 +20,8 @@ import { useGenePanelDialog } from "./gene-panel-dialog.tsx";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
+import { VafPlotHead } from "./vaf-plot-head";
+import { SampleMarker } from "../portal/sample-marker";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
 
@@ -139,8 +141,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
         return (
           <section key={key} className="alt-table" aria-label={name}>
             {outside.length > 0 && <p className="note flex flex-wrap items-center gap-1" role="status">
-              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
-                <svg width="14" height="14" aria-label={m.id}><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
+              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} role="img" aria-label={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
+                <SampleMarker mark={m} className="" />
               </span>)} not profiled for {what}{none ? "" : "."}
             </p>}
             {!none && <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
@@ -156,7 +158,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : id === "mrna" ? Math.round(x) + "%" : x.toLocaleString()}
               colHead={(id) => id === "gene" && (key === "mutations" || key === "cna") && marks.size > 1 && a.mixedPanels?.[key]
                 ? <GenesProfiledMenu table={key} value={(spec.genesProfiled as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
-                    onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} /> : null}
+                    onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} />
+                : id === "vaf" && key === "mutations" ? <VafPlotHead vafs={a.vafs} marks={marks} /> : null}
               cell={(id, x, row) => id === "samples" ? sampleCell(x, row)
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />

@@ -218,20 +218,11 @@ export interface PanelCoverage {
 const NO_COVERAGE: PanelCoverage = { genes: "any", inAll: false };
 
 /**
- * One patient's mutations, one row per variant however many of the patient's samples carry it (the
- * portal's patient table): the samples listed, the highest allele frequency among them with that
- * sample's reads, the gene's deep copy-number calls in the patient's samples (Copy #), and the share
- * of the study's samples profiled for the gene with any mutation in it (Cohort %; blank for a mutation
- * with no keyword, which the portal's variant counts do not answer). Uncalled calls are
- * left out, as the portal leaves them out. With no sort, a gene's rows sit together — genes with a
- * driver first, then by name — and within a gene by the first sample carrying the row (`order`, the
- * patient's sample order), then codon.
+ * One patient's called mutations (`m`, one record each) and their rows as the Mutations table merges them
+ * (`g`, one per variant, with the samples carrying it and each sample's reads in `order`): CTEs ending in a comma.
  */
-export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE, mrna: MrnaRank | null = null): RowSource {
-  const covered = cover.inAll || cover.genes === "all" || !!cover.panels;
-  const pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
-  return {
-    with: "WITH " + cohortCte(p, samples) + "m AS (\n" +
+function patientMutationsCte(p: TablePart, patient: string, db: string, order: string[], samples: AlterationSamples): string {
+  return cohortCte(p, samples) + "m AS (\n" +
       "  SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
       "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon, ifNull(keyword, '') AS kw,\n" +
       "         if(tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f\n" +
@@ -246,7 +237,24 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "         groupArrayIf(tuple(sid, ac, rc), f IS NOT NULL) AS rs,\n" +
       "         arraySort(x -> " + ordinalOf(order, "x.1") + ", " + firstPerSample("rs") + ") AS reads\n" +
       "  FROM m GROUP BY gene, proteinChange, mutationType, variantType, chr, start, end, ref, var\n" +
-      "),\n" +
+      "),\n";
+}
+
+/**
+ * One patient's mutations, one row per variant however many of the patient's samples carry it (the
+ * portal's patient table): the samples listed, the highest allele frequency among them with that
+ * sample's reads, the gene's deep copy-number calls in the patient's samples (Copy #), and the share
+ * of the study's samples profiled for the gene with any mutation in it (Cohort %; blank for a mutation
+ * with no keyword, which the portal's variant counts do not answer). Uncalled calls are
+ * left out, as the portal leaves them out. With no sort, a gene's rows sit together — genes with a
+ * driver first, then by name — and within a gene by the first sample carrying the row (`order`, the
+ * patient's sample order), then codon.
+ */
+export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE, mrna: MrnaRank | null = null): RowSource {
+  const covered = cover.inAll || cover.genes === "all" || !!cover.panels;
+  const pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
+  return {
+    with: "WITH " + patientMutationsCte(p, patient, db, order, samples) +
       (pin ? oncokbCte(pin, "MUTATION", "SELECT gene FROM g") : "") +
       "cn AS (SELECT hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(if(cna_alteration > 0, 'AMP', 'HOMDEL'))), ', ') AS copy\n" +
       "  FROM " + db + ".genomic_event_derived WHERE " + genomicStudySql(p.study) + " AND patient_unique_id = " + uid + "\n" +
@@ -278,6 +286,28 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
     select: "* EXCEPT (vafs)",
     defaultOrder: "gdrv DESC, gene, so, pos ASC NULLS LAST",
     tiebreak: "gene, chr, start, end, ref, var, proteinChange, mutationType",
+  };
+}
+
+/** The VAF plot's columns: a sample of the patient's, and its mutations' allele frequencies. */
+const VAF_PLOT_COLUMNS: QueryColumn[] = [text("sid", "Sample ID"), text("vafs", "Allele frequencies")];
+
+/**
+ * The patient's VAF plot (PAT-STM-7, the portal's computeMutationFrequencyBySample over the Mutations
+ * table's rows): for each sample in view with reads, alt / (alt + ref) of every mutation row it carries
+ * with allele counts, ascending — the rows the table lists under the genes-profiled choice (`genes`:
+ * "all" keeps a row only when every sample in view was profiled for its gene), whatever its search,
+ * filters or page. One row per sample.
+ */
+export function patientVafSource(p: TablePart, patient: string, db: string, order: string[], samples: AlterationSamples = "patient", genes: GenesProfiled = "any"): RowSource {
+  return {
+    with: "WITH " + patientMutationsCte(p, patient, db, order, samples) + (genes === "all" ? missCte(p, patient, db, "MUTATION_EXTENDED", samples) : "") +
+      "rows AS (SELECT x.1 AS sid, arraySort(groupArray(x.2 / (x.2 + x.3))) AS vafs FROM g ARRAY JOIN reads AS x" +
+      (genes === "all" ? " LEFT JOIN miss ON miss.gene = g.gene WHERE ifNull(miss.n, 0) = 0" : "") + " GROUP BY sid)\n",
+    columns: VAF_PLOT_COLUMNS,
+    select: "sid, vafs",
+    defaultOrder: "sid",
+    tiebreak: "sid",
   };
 }
 

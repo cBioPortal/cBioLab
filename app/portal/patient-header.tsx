@@ -9,7 +9,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api } from "../lab/api.ts";
 import { Button } from "../_ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "../_ui/popover";
+import { HoverPopover } from "../_ui/hover-popover";
+import { SampleMarker } from "./sample-marker";
 import { sampleMarks, type SampleMark } from "../../lib/timeline-tracks.ts";
 import { portalClinicalValue } from "../../lib/chart/format.ts";
 import type { PatientEvent, PatientSample } from "../../lib/types";
@@ -81,34 +82,16 @@ function InlineAttrs({ attrs }: { attrs: Attrs }) {
 
 /** An id that lists every attribute while hovered or focused, as the portal's tooltip does. */
 function HoverCard({ title, fields, children }: { title: string; fields: Field[]; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <span className="inline-flex items-center" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
-          onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}>{children}</span>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="max-h-[400px] w-auto max-w-[600px] overflow-auto p-3" onOpenAutoFocus={(e) => e.preventDefault()}
-        onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-        <div className="mb-1.5 font-mono text-sm font-semibold">{title}</div>
-        <table className="text-sm"><tbody>
-          {fields.map((f) => <tr key={f.id}><th className="pr-3 text-left align-top font-medium text-muted-foreground" data-tip={f.id}>{f.name}</th><td>{portalClinicalValue(f.value)}</td></tr>)}
-        </tbody></table>
-      </PopoverContent>
-    </Popover>
+    <HoverPopover trigger={children} className="max-h-[400px] w-auto max-w-[600px] overflow-auto p-3">
+      <div className="mb-1.5 font-mono text-sm font-semibold">{title}</div>
+      <table className="text-sm"><tbody>
+        {fields.map((f) => <tr key={f.id}><th className="pr-3 text-left align-top font-medium text-muted-foreground" data-tip={f.id}>{f.name}</th><td>{portalClinicalValue(f.value)}</td></tr>)}
+      </tbody></table>
+    </HoverPopover>
   );
 }
 
-/** A sample's marker: its number in the patient's sample order, in its type's colour. */
-export function SampleMarker({ mark }: { mark: SampleMark | undefined }) {
-  if (!mark) return null;
-  return (
-    <svg width="14" height="14" aria-hidden="true" className="mr-1 shrink-0">
-      <circle cx="7" cy="7" r="7" fill={mark.color} />
-      <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{mark.label}</text>
-    </svg>
-  );
-}
 
 export function PatientHeader({ record, sample, hrefFor }: {
   record: PatientRecord;
