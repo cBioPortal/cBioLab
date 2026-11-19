@@ -653,7 +653,7 @@ describe("one study", () => {
       assert.deepEqual(genes, ["EGFR", "KRAS", "A", "B", "C", "D"], "upper-cased, de-duplicated, malformed dropped, at most six");
       const mut = r.geneFacets!.find((f) => f.gene === "EGFR" && f.type === "MUTATION")!;
       assert.deepEqual([mut.total, mut.profiled, mut.alteredUnprofiled], [120, 90, 2]);
-      assert.deepEqual(mut.states.map((s) => [s.label, s.n]), [["Mutated", 10], ["Not mutated", 80], ["Not profiled", 30]]);
+      assert.deepEqual(mut.states.map((s) => [s.label, s.n]), [["Mutated", 10], ["Not Mutated", 80], ["Not Profiled", 30]]);
       const cna = r.geneFacets!.find((f) => f.gene === "EGFR" && f.type === "CNA")!;
       assert.equal(cna.overlap, undefined, "one value per sample: the levels partition the cohort");
       assert.equal(cna.profiled, 102, "samples with a value in the profile");
@@ -684,7 +684,7 @@ describe("one study", () => {
       const r = await buildExplore({ study: S, skipBins: true, skipGenes: true, geneCharts: ["EGFR"], drivers: true, oncokbPin: "v7.5" });
       assert.equal(r.drivers, "v7.5");
       assert.deepEqual(r.geneFacets!.flatMap((f) => f.states.map((s) => s.label)),
-        ["Driver mutation", "No driver mutation", "Not profiled", "Driver amplification", "Driver deletion", "No driver call", "Not profiled"]);
+        ["Driver mutation", "No driver mutation", "Not Profiled", "Driver amplification", "Driver deletion", "No driver call", "Not profiled"]);
       for (const q of sent.filter((x) => /AS all_altered|cna_alteration AS c/.test(x))) assert.match(q, /oncokb_version = 'v7\.5'/);
     });
 

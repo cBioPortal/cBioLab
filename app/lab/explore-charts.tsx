@@ -15,6 +15,7 @@ import { ChartMenu } from "./partitions.tsx";
 import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg, type Say } from "./chart-files.ts";
 import { chartFileName } from "../../lib/study-view-download.ts";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
+import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import {
   FGA, MUTATION_COUNT, correlationLines, densityAxes, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
   densityTitle, densityView, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensitySettings
@@ -109,7 +110,7 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
               selection, sayFor("survival")),
             ...figureActions((ep === "OS" ? "Overall" : ep) + " survival", () => {
               const curves = res?.survival?.curves;
-              return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" })) : null;
+              return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" }, PORTAL_STUDY_VIEW_KM)) : null;
             }, (message) => setFileError({ chart: "survival", message }))] }]} />
           {endpoints && endpoints.length > 1 && (
             <Choice className="w-28" title="the outcome the curve follows" value={ep} onChange={setEndpoint}

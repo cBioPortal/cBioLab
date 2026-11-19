@@ -868,8 +868,8 @@ async function geneStateFacets(opts: {
         ...(orphan ? { alteredUnprofiled: orphan } : {}),
         states: [
           { state: "altered", label: driver ? "Driver mutation" : "Mutated", n: altered },
-          { state: "unaltered", label: driver ? "No driver mutation" : "Not mutated", n: Math.max(0, profiled - altered) },
-          { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
+          { state: "unaltered", label: driver ? "No driver mutation" : "Not Mutated", n: Math.max(0, profiled - altered) },
+          { state: "notProfiled", label: "Not Profiled", n: Math.max(0, total - profiled) }
         ]
       };
     })(),
