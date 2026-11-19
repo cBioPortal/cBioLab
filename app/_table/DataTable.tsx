@@ -18,6 +18,7 @@ import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
+import { headerSort, type SortableColumn } from "../../lib/table-sort.ts";
 
 /** a page number in the pager, filled while it is the page shown */
 const PAGE = "min-w-ctl justify-center aria-[current=page]:border-primary aria-[current=page]:bg-primary aria-[current=page]:text-primary-foreground";
@@ -396,10 +397,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     if (f) filters[id] = f; else delete filters[id];
     set({ filters });
   };
-  const sortBy = (c: { id: string; numeric: boolean }) => {
-    const on = q.sort && q.sort.column === c.id;
-    set({ sort: on ? { column: c.id, ...(q.sort!.desc ? {} : { desc: true }) } : { column: c.id, ...(c.numeric ? { desc: true } : {}) } });
-  };
+  const sortBy = (c: SortableColumn) => set({ sort: headerSort(q.sort, c) });
   // the columns as the document asks for them; the result's own until it says otherwise
   const known = (id: string) => t.columns.some((c) => c.id === id);
   const shownIds = q.columns && q.columns.some(known) ? q.columns.filter(known) : !q.columns && t.query.columns ? (t.defaults || t.shown) : t.shown;
