@@ -6,7 +6,7 @@ import type { Clause, CohortDef, Leaf, View } from "../../lib/types.ts";
 import type { SelectedProfile } from "../../lib/query-options.ts";
 import { parseOql, OQL_PROFILE } from "../../lib/oql-parse.ts";
 import { hasOql, oqlHasMutationOql, oqlSublabel, oqlTrackName } from "../../lib/oql-match.ts";
-import { ALTERATION_CELLS, cellLabel, lollipopNarrowing, pruneCodons } from "../../lib/lollipop.ts";
+import { ALTERATION_CELLS, STATUS_COLUMN, cellLabel, lollipopNarrowing, pruneCodons } from "../../lib/lollipop.ts";
 import type { TableQuery } from "../../lib/table-query.ts";
 import { arrange, type PageLayout, type TabBanner } from "./page-doc.ts";
 import { compactDrivers, driversOf, withDrivers, type DriverSettings } from "../../lib/driver-settings.ts";
@@ -183,7 +183,7 @@ const pinsOf = (q: ResultsQuery) => ({ ...(q.exp ? { exp: q.exp } : {}), ...(q.p
  * only the mutations the table keeps, as the portal's filtered data (MUT-FM-1).
  */
 export function linkMutations(vs: View[], changed: number): View[] {
-  const [lp, tb] = vs as unknown as [{ hide?: string[]; genes?: string[]; codons?: Record<string, number[]>; table?: unknown } & View,
+  const [lp, tb] = vs as unknown as [{ hide?: string[]; genes?: string[]; codons?: Record<string, number[]>; table?: { gene?: string; filters?: Record<string, unknown> } } & View,
     { gene?: string; filters?: Record<string, unknown>; search?: string; columns?: string[] } & View];
   const gene = tb.gene || (lp.genes || [])[0] || "";
   if (changed === 0) {
@@ -194,6 +194,9 @@ export function linkMutations(vs: View[], changed: number): View[] {
     else delete filters.alteration;
     if (picked.length) filters.proteinPos = { values: picked.map(String) };
     else delete filters.proteinPos;
+    // the Somatic / Germline badges write their filter into the lollipop's table query; the table takes it
+    const status = lp.table && lp.table.gene === gene ? (lp.table.filters || {})[STATUS_COLUMN] : undefined;
+    if (status) filters[STATUS_COLUMN] = status; else delete filters[STATUS_COLUMN];
     return [lp, { ...tb, filters: Object.keys(filters).length ? filters : undefined } as View];
   }
   let next = lp;

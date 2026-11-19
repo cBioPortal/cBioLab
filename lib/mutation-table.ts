@@ -98,6 +98,31 @@ export const VAF_TEXT = "if(vaf IS NULL, '', if(vaf < 0.01, toDecimalString(vaf,
 /** Shown unless the view names its columns: the portal's own default set. */
 export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "copyNumber", "vaf", "mutCount"];
 
+/** What decides three of the default columns, over the table's every row (not its search or filters); undefined where unknown */
+export interface MutationDefaultFacts {
+  /** a queried study has a discrete copy-number profile (ResultsViewPageStore studyToMolecularProfileDiscreteCna) */
+  discreteCna?: boolean;
+  /** some row has a non-zero tumour allele frequency */
+  nonZeroVaf?: boolean;
+  /** distinct non-empty Cancer Type Detailed values */
+  cancerTypes?: number;
+}
+
+/**
+ * The default columns as the portal's table picks them from its data (ResultsViewMutationTable,
+ * MutationTable): Copy # when a queried study has a discrete CNA profile (DiscreteCNAColumnFormatter
+ * isVisible), Allele Freq (T) when a row has a non-zero frequency (TumorAlleleFreqColumnFormatter
+ * isVisible), Cancer Type Detailed when the rows hold more than one (CancerTypeColumnFormatter
+ * isVisible). A fact not known keeps its column.
+ */
+export function mutationDefaultColumns(f: MutationDefaultFacts): string[] {
+  const drop = new Set<string>();
+  if (f.discreteCna === false) drop.add("copyNumber");
+  if (f.nonZeroVaf === false) drop.add("vaf");
+  if (f.cancerTypes !== undefined && f.cancerTypes <= 1) drop.add("cancerType");
+  return MUTATION_DEFAULT_COLUMNS.filter((id) => !drop.has(id));
+}
+
 /**
  * The lollipop grid's cell a mutation falls in, spelled as the grid labels it ("Missense · Driver"):
  * its protein impact class (the lollipop's own mapping, lib/lollipop.ts) and driver status — every

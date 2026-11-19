@@ -36,6 +36,8 @@ export interface StudyProfiles {
   profiles: string[]; gaProfiles: string[];
   /** every profile as the study describes it (genetic_profile), for what a plot axis may read */
   catalog: ProfileInfo[];
+  /** set when the study's peer did not answer: its lists are empty because they are unknown, not because it holds none */
+  unanswered?: true;
 }
 /**
  * Each study's profiles, many studies at once (studyProfiles is the list of one), rather than
@@ -56,7 +58,7 @@ export async function studyProfilesMany(studies: string[]): Promise<Map<string, 
   const peerAsks = todo.map(async (s, i) => {
     const peer = peers[i];
     if (!peer) return;
-    const out = await remoteProfiles(s, peer.url).catch(() => ({ profiles: [], gaProfiles: [], catalog: [] }));
+    const out: StudyProfiles = await remoteProfiles(s, peer.url).catch(() => ({ profiles: [], gaProfiles: [], catalog: [], unanswered: true as const }));
     fromPeers.set(s, out);
     if (out.catalog.length) _profileCache.set(s, out);
   });

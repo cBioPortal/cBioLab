@@ -1162,16 +1162,34 @@ const PROFILED_TYPE: Record<string, "MUTATION" | "CNA" | "SV"> = {
   MUTATION_EXTENDED: "MUTATION", COPY_NUMBER_ALTERATION: "CNA", STRUCTURAL_VARIANT: "SV"
 };
 
+/** where the browser keeps the Data types table's Union / Intersection choice */
+const DATA_TYPES_OP_KEY = "cbiolab.explore.dataTypesOp";
+
 export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
-  const { addClause, parseDraft } = ctx;
+  const { addClause, addClauses, parseDraft } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
-  const rows = explore.dataTypes || [];
+  // the portal's default for this table is Intersection: a sample with every checked kind of data
+  const [op, setOp] = useState<GeneOp>("intersection");
+  useEffect(() => {
+    try { if (localStorage.getItem(DATA_TYPES_OP_KEY) === "union") setOp("union"); } catch { /* the default stands */ }
+  }, []);
+  const chooseOp = (v: GeneOp) => {
+    setOp(v);
+    try { localStorage.setItem(DATA_TYPES_OP_KEY, v); } catch { /* kept for this page only */ }
+  };
+  // as the portal sorts it: by Freq, the share of the selected samples, highest first
+  const rows = [...(explore.dataTypes || [])].sort((a, b) => b.n - a.n);
   if (!rows.length) return null;
   const d = parseDraft();
   const selected = (t: string) => !!(d && d.all.some((cl: any) => cl.kind === "profiled" && cl.type === t));
   const max = Math.max(...rows.map((x) => x.n), 1);
+  const samples = explore.totals?.samples ?? 0;
   const typeOf = new Map(rows.map((dt) => [dt.profile, PROFILED_TYPE[dt.alterationType]]));
+  const types = (profiles: string[]) => [...new Set(profiles.map((p) => typeOf.get(p)).filter(Boolean))] as string[];
+  const n = types(picks.picked).length;
+  const filters = (d?.all || []).length;
+  const refusal = op === "intersection" && n > 1 ? intersectionRefusal(filters, n, "kind of data") : null;
   return (
     <div className="card wide">
       <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
@@ -1184,16 +1202,22 @@ export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
               <span className="gname">{dt.profile}</span>
               <span className="meta dtlabel">{dt.label}</span>
               <span className="gbar"><i style={{ width: Math.max(2, Math.round(100 * dt.n / max)) + "%" }} /></span>
-              <span className="gcount">{dt.n.toLocaleString()}</span>
+              <span className="gcount" data-tip="Number of samples">{dt.n.toLocaleString()}</span>
+              <span className="gcount meta" data-tip={"of the " + samples.toLocaleString() + " selected samples"}>{portalFreq(samples ? 100 * dt.n / samples : NaN)}</span>
             </PickRow>
           );
         }}
       </VirtualRows>
-      <PickBar picks={picks} hint="keep the samples with any of the checked kinds of data"
+      <PickBar picks={picks} why={refusal} hint={"keep the samples with " + (op === "union" || n < 2 ? "any" : "every one") + " of the checked kinds of data"}
         onApply={(profiles) => {
-          const leaves = [...new Set(profiles.map((p) => typeOf.get(p)).filter(Boolean))].map((type) => ({ kind: "profiled", type }));
-          if (leaves.length) addClause(leaves.length === 1 ? leaves[0] : { any: leaves });
-        }} />
+          const leaves = types(profiles).map((type) => ({ kind: "profiled", type }));
+          if (leaves.length > 1 && op === "intersection") addClauses(leaves);
+          else if (leaves.length) addClause(leaves.length === 1 ? leaves[0] : { any: leaves });
+        }}>
+        {n > 1 && <Choice value={op} onChange={(v) => chooseOp(v as GeneOp)} className="geneop"
+          title="Intersection keeps the samples with every checked kind of data; Union, those with any of them"
+          options={[["intersection", "Intersection"], ["union", "Union"]]} />}
+      </PickBar>
     </div>
   );
 }
@@ -1365,9 +1389,9 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
       <h2>Timeline events</h2>
       {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
       {explore.events.length > 0 && (
-        <ValueList hint="keep the patients with any of the checked events"
-          rows={explore.events.map((e) => ({ key: e.type, name: "has " + e.type, n: e.n, on: eventOn(e.type),
-            title: "has " + e.type + " — " + e.n.toLocaleString() + " patients" }))}
+        <ValueList hint="keep the patients with any of the checked events" pct={portalFreq}
+          rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
+            title: e.n.toLocaleString() + " of " + (explore.totals?.patients ?? 0).toLocaleString() + " selected patients with a " + e.type + " event" }))}
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
       )}
     </div>

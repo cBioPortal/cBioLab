@@ -180,6 +180,22 @@ describe("table: rows per sample (the default)", () => {
     assert.match(v.caveat!, /Showing 3 of 4 samples: rows ST contains “Pri”\. Sorted by Age \(highest first\), missing values last,/);
   });
 
+  test("PAT-URL-4: order \"listed\" orders the rows by the cohort's patient list (a #navCaseIds link's order), and says so", async () => {
+    const res = local("db1", META, PATIENT_ROWS);
+    let order = "";
+    const rowsPage = res.rowsPage;
+    res.rowsPage = (l: string, source: (db: string) => unknown, ...rest: [TableQuery, string[], number, number]) =>
+      rowsPage(l, (db) => { const src = source(db) as { defaultOrder: string }; order = src.defaultOrder; return src; }, ...rest);
+    const c = ctx({ A: cohort({ s1: 2 }) }, { s1: res });
+    (c.doc.cohorts as Record<string, unknown>).A = { study: "s1", all: [{ kind: "patientList", ids: ["s1:P2", "s1:P1"] }] };
+    const v = await run({ unit: "patient", order: "listed" }, c);
+    assert.match(order, /^if\(indexOf\(\['s1:P2', 's1:P1'\], concat\(study, ':', patient\)\) = 0, 3, /);
+    assert.match(JSON.stringify(v.method), /in the order the cohort's patient list names them/);
+    assert.match(v.caveat!, /in the order the cohort's patient list names them/);
+    await run({ unit: "patient" }, c);
+    assert.equal(order, "patient, sample", "without it, by id");
+    assert.match((await run({ order: "AGE" } as never, c)).error!, /order is "listed"/);
+  });
   test("a page asked for returns the table alone: no method, no caveat", async () => {
     const v = await run({}, one(SAMPLE_ROWS, { page: { offset: 1, limit: 1 } }));
     assert.deepEqual(tableOf(v).rows.map((r) => r.sample), ["S1b"]);
