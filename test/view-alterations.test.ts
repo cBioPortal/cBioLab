@@ -455,6 +455,11 @@ describe("not-profiled samples (PAT-GP-2)", () => {
     assert.match(sql, /miss AS \(SELECT gene, length\(np\) AS n, np FROM/);
     assert.deepEqual(m.rows[0].detail?.notProfiled, ["S1b"]);
   });
+  test("PAT-GP-2: the Gene panel column shown asks for coverage, even with one sample in view", async () => {
+    const { sql } = await asked({ samples: "cohort", mutations: { columns: ["gene", "genePanel"] } });
+    assert.match(sql, /AS genePanel/);
+    assert.match(sql, /miss AS \(SELECT gene/);
+  });
   test("one sample in view: no coverage asked, nothing in the detail", async () => {
     const { sql, m } = await asked({ samples: "cohort" }, [{ ...MUT[0], notProfiled: [] }]);
     assert.doesNotMatch(sql, /miss AS/);

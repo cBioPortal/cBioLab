@@ -16,6 +16,7 @@ import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./pati
 import type { AlterationsResult, AlleleReads, CohortCount } from "../../lib/views/alterations/types";
 import { cohortBar, cohortTooltip } from "../../lib/views/alterations/cohort-cell.ts";
 import { STYLE } from "../../lib/oncoprint-style.ts";
+import { useGenePanelDialog } from "./gene-panel-dialog.tsx";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
@@ -42,6 +43,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
 }) {
   const [listOpen, setListOpen] = useState(false);
   const p = a.patient;
+  // the portal's gene panel window, which every gene-panel link opens (PAT-GP-3, PAT-GP-4)
+  const panels = useGenePanelDialog(p?.study || "");
   // numbered on the server as the header numbers them (collection day, type, id)
   const allMarks = useMemo(() => new Map((p?.samples || []).map((m) => [m.id, m])), [p]);
   // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
@@ -157,6 +160,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
+                : id === "genePanel" ? <PanelLinks text={String(x || "")} open={(panel) => void panels.open(panel)} />
                 : id === "freq" && (key === "mutations" || key === "cna") ? <CohortCell row={row} gene={String(row.values[t.columns.findIndex((c) => c.id === "gene")] ?? "")}
                     cna={key === "cna" ? String(row.values[t.columns.findIndex((c) => c.id === "cna")] ?? "") : undefined} shown={x != null} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
@@ -165,6 +169,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : undefined} />}
           </section>);
       })}
+      {panels.node}
       {listOpen && (
         <PatientsDialog title={"Patients of " + (a.lists[0]?.cohort ?? "the cohort")} onClose={() => setListOpen(false)}>
           {(close) => (
@@ -177,6 +182,16 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
       )}
     </div>
   );
+}
+
+/**
+ * The Gene panel cell (PanelColumnFormatter GenePanelLinks): each sample's panel id, a link opening the
+ * gene panel window; "N/A" (a sample with no panel) plain.
+ */
+function PanelLinks({ text, open }: { text: string; open: (panel: string) => void }) {
+  const ids = text ? text.split(", ") : [];
+  return <span>{ids.map((id, i) => <span key={i}>{i > 0 && ", "}{id === "N/A" ? id
+    : <button type="button" className="linkish" data-tip={"the genes of " + id} onClick={() => open(id)}>{id}</button>}</span>)}</span>;
 }
 
 /**

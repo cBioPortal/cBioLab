@@ -24,18 +24,20 @@ const number = (id: string, name: string, expr = id): QueryColumn => ({ id, name
 const annotation: QueryColumn = { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: "drv",
   text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))" };
 const samples = text("samples", "Samples");
+/** the panels of the row's samples, as the portal's Gene panel column lists them (PanelColumnFormatter): hidden by default */
+const genePanel = text("genePanel", "Gene panel");
 /** the share of the study's samples profiled for the gene that carry the same kind of alteration in it, in percent, unrounded: the page writes it as the portal does, and filters and sorts what it rounds */
 const freq = number("freq", "Cohort %");
 
 export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   mutations: [
-    samples, text("gene", "Gene"), { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, annotation,
+    samples, text("gene", "Gene"), genePanel, { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, annotation,
     { id: "mutationType", name: "Mutation Type", numeric: false, ...mutationTypeColumn("mutationType") },
     number("vaf", "Allele Freq"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"), text("copy", "Copy #"), freq,
     text("variantType", "Variant Type"), text("chr", "Chromosome"), number("start", "Start Pos"), number("end", "End Pos"),
     text("ref", "Ref"), text("var", "Var"), text("status", "MS"), number("inAll", "Profiled in all samples"),
   ],
-  cna: [samples, text("gene", "Gene"), text("cna", "CNA"), annotation, text("cytoband", "Cytoband"), freq, number("inAll", "Profiled in all samples")],
+  cna: [samples, text("gene", "Gene"), genePanel, text("cna", "CNA"), annotation, text("cytoband", "Cytoband"), freq, number("inAll", "Profiled in all samples")],
   sv: [
     samples, text("gene1", "Gene 1"), text("gene2", "Gene 2"),
     // the portal's s / g badge, not sorted (StructuralVariantTableWrapper: MutationStatus, sortBy a constant)
@@ -148,9 +150,23 @@ function missCte(p: TablePart, patient: string, db: string, alterationType: stri
     "pan AS (SELECT DISTINCT sample_unique_id AS su, gene_panel_id AS panel FROM " + db + ".sample_to_gene_panel_derived\n" +
     "  WHERE cancer_study_identifier = " + st + " AND alteration_type = " + sq(alterationType) + " AND sample_unique_id IN (SELECT su FROM vs)),\n" +
     "cov AS (SELECT DISTINCT pg.gene AS gene, pan.su AS su FROM pan JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = pan.panel WHERE pg.gene IN (SELECT gene FROM g)),\n" +
+    // each sample's panel for the type, by sample id; WES (the portal's "no panel") is left out
+    "spn AS (SELECT CAST((groupArray(replaceOne(su, " + pre + ", '')), groupArray(panel)), 'Map(String, String)') AS m FROM pan WHERE panel != 'WES'),\n" +
     "miss AS (SELECT gene, length(np) AS n, np FROM (SELECT gg.gene AS gene,\n" +
     "  arraySort(groupArrayIf(replaceOne(vs.su, " + pre + ", ''), vs.su NOT IN (SELECT su FROM pan WHERE panel = 'WES') AND (gg.gene, vs.su) NOT IN (SELECT gene, su FROM cov))) AS np\n" +
     "  FROM (SELECT DISTINCT gene FROM g) AS gg CROSS JOIN vs GROUP BY gg.gene)),\n";
+}
+
+/**
+ * A row's Gene panel cell (PanelColumnFormatter getGenePanelIds): in the patient's sample order, the
+ * panel of each sample in view that carries the row or was not profiled for its gene ("N/A" for a
+ * sample with no panel, as the portal's whole-exome samples); a sample profiled for the gene that does
+ * not carry the row is left out. Needs the panel coverage (missCte); without it, empty.
+ */
+function genePanelSql(covered: boolean, order: string[]): string {
+  if (!covered) return "''";
+  return "arrayStringConcat(arrayMap(s -> if(mapContains(spn.m, s), spn.m[s], 'N/A'), arrayFilter(s -> has(splitByString(', ', g.samples), s) OR has(miss.np, s), " +
+    "CAST([" + order.map(sq).join(", ") + "] AS Array(String)))), ', ')";
 }
 
 /**
@@ -206,7 +222,7 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       (covered ? missCte(p, patient, db, "MUTATION_EXTENDED", samples) : "") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
-      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll, " + (covered ? "miss.np" : "CAST([] AS Array(String))") + " AS notProfiled,\n" +
+      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll, " + (covered ? "miss.np" : "CAST([] AS Array(String))") + " AS notProfiled, " + genePanelSql(covered, order) + " AS genePanel,\n" +
       "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
       // what the Cohort cell draws and says: samples with a mutation in the gene, with the row's keyword, out of those profiled
       "         toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,\n" +
@@ -216,7 +232,7 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "         g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos\n" +
       "  FROM g\n" +
       (pin ? "  LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange\n" : "") +
-      "  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw " + (covered ? "LEFT JOIN miss ON miss.gene = g.gene" : "") + "\n" +
+      "  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw " + (covered ? "LEFT JOIN miss ON miss.gene = g.gene CROSS JOIN spn" : "") + "\n" +
       ")" + (cover.genes === "all" ? " WHERE inAll = 1" : "") + ")\n",
     columns: ALTERATION_COLUMNS.mutations.map((c) => c.id === "vaf" ? { ...c, sort: vafSort(order.length) } : c),
     select: "* EXCEPT (vafs)",
@@ -249,12 +265,12 @@ export function patientCnaSource(p: TablePart, patient: string, db: string, pin:
       (covered ? missCte(p, patient, db, "COPY_NUMBER_ALTERATION", samples) : "") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, if(g.alt > 0, 'AMP', 'HOMDEL') AS cna, " + annSelect(pin) + ",\n" +
-      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll, " + (covered ? "miss.np" : "CAST([] AS Array(String))") + " AS notProfiled,\n" +
+      "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll, " + (covered ? "miss.np" : "CAST([] AS Array(String))") + " AS notProfiled, " + genePanelSql(covered, order) + " AS genePanel,\n" +
       "         g.cytoband AS cytoband, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
       "         toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(fp.n, 0)) AS cohortOf\n" +
       "  FROM g\n" +
       (pin ? "  LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = if(g.alt > 0, 'AMPLIFICATION', 'DELETION')\n" : "") +
-      "  LEFT JOIN fa ON fa.gene = g.gene AND fa.alt = g.alt LEFT JOIN fp ON fp.gene = g.gene " + (covered ? "LEFT JOIN miss ON miss.gene = g.gene" : "") + "\n" +
+      "  LEFT JOIN fa ON fa.gene = g.gene AND fa.alt = g.alt LEFT JOIN fp ON fp.gene = g.gene " + (covered ? "LEFT JOIN miss ON miss.gene = g.gene CROSS JOIN spn" : "") + "\n" +
       ")" + (cover.genes === "all" ? " WHERE inAll = 1" : "") + ")\n",
     columns: ALTERATION_COLUMNS.cna,
     select: "*",

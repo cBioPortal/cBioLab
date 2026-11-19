@@ -173,8 +173,8 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
   /** genesProfiled "all" needs each sample's panels, which a peer does not send: refused for a peer's patient, never ignored */
   const peerRefusal = (pt: { study: string; id: string }) => genes === "all" && peerOf(ctx.resolvers[pt.study])
     ? no("genesProfiled \"all\" is not available for " + pt.id + ", whose tables come from " + ctx.resolvers[pt.study].instance.label + " via federation; set it to \"any\"") : null;
-  /** whether a table's query reads the inAll column (shows, filters, sorts or lists its values), so each row's panel coverage must be worked out */
-  const asksInAll = (tq: TableQuery) => !!(tq.columns?.includes("inAll") || tq.filters?.inAll || tq.sort?.column === "inAll" || ctx.values === "inAll");
+  /** whether a table's query reads the inAll or Gene panel column (shows, filters, sorts or lists its values), so each row's panel coverage must be worked out */
+  const asksInAll = (tq: TableQuery) => ["inAll", "genePanel"].some((c) => tq.columns?.includes(c) || tq.filters?.[c] || tq.sort?.column === c || ctx.values === c);
   /** one of the patient's tables, for the page (or values) the request asks of it */
   const tableRows = async (t: AlterationTable, pt: { study: string; id: string }, order: string[], inView: number): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = alterationDefaults(t, inView);
