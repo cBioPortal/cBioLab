@@ -292,6 +292,10 @@ const MATERIALIZED_SETTING = "\nSETTINGS enable_materialized_cte = 1";
  * (and as logged) in any client. `body` is the rest of one top-level SELECT and must not end with
  * its own SETTINGS or FORMAT. Whether a connection may be sent one is materializedCteSupported's answer.
  */
+/** what ends a statement holding a materialized subquery (cte): the setting that turns them on; nothing when not `materialized` */
+export function materializedSetting(materialized: boolean): string {
+  return materialized ? MATERIALIZED_SETTING : "";
+}
 export function withStatement(ctes: WithCte[], body: string, materialized: boolean): string {
   return "WITH " + ctes.map(([name, sql, mode]) => cte(name, sql, materialized && mode !== "inline")).join(",\n     ") + "\n" +
     body + (materialized ? MATERIALIZED_SETTING : "");

@@ -8,6 +8,7 @@ import { driverJoin, ALTERED_COND } from "../../federation.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
 import { oqlEventsSql, parseOql, expressionProfileFor, type OqlPins, type OqlDriverOpts } from "../../oql.ts";
 import { finiteSql } from "../../sql-number.ts";
+import { cte, materializedSetting } from "../../ch.ts";
 
 /** the query's lines, one gene each: what is altered is what they match (the portal's OQL-filtered data) */
 export interface CancertypesOql extends OqlDriverOpts { lines: string[]; profiles?: string[]; pins?: OqlPins }
@@ -79,15 +80,14 @@ function groupSql(db: string, study: string, attribute: string | null): string {
  * portal's isSampleProfiledInMultiple. Counts only.
  */
 export function cancerTypesSql(cohortSql: string, study: string, db: string, genes: string[], attribute: string | null,
-  pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample", oql?: CancertypesOql): AggregateSql {
+  pin: string | null, measure: "driver" | "any", unit: "sample" | "patient" = "sample", oql?: CancertypesOql, materialized = false): AggregateSql {
   const geneList = genes.map(sq).join(",");
   const drv = measure === "driver" && pin;
   return aggregateSql((
     "WITH cohort AS (" + cohortSql + "),\n" +
-    "samp AS (\n" +
+    cte("samp", "\n" +
     "  SELECT sample_unique_id AS suid, patient_unique_id AS puid FROM " + db + ".sample_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n" +
-    "),\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND " + inCohortSamples(bareSampleId("sample_unique_id", study)) + "\n", materialized) + ",\n" +
     "grp AS (" + groupSql(db, study, attribute) + "),\n" +
     "alt AS (\n" +
     (oql ? oqlAltSql(oql, study, db, pin) + "\n),\n" : "") +
@@ -109,20 +109,18 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     "    AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')" +
     (oql ? oqlLevelCoverageSql(oql, study, db) : "") + "\n" +
     "),\n" +
-    "sg AS (\n" +
+    cte("sg", "\n" +
     "  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types, groupUniqArray(cov.pt) AS pts,\n" +
     "         groupUniqArrayIf((cov.suid, indexOf([" + geneList + "], cov.gene), alt.t), alt.t NOT IN ('', 'mutation', 'sv')) AS met\n" +
-    "  FROM cov LEFT JOIN alt ON alt.suid = cov.suid AND alt.gene = cov.gene GROUP BY suid, gene\n" +
-    "),\n" +
+    "  FROM cov LEFT JOIN alt ON alt.suid = cov.suid AND alt.gene = cov.gene GROUP BY suid, gene\n", materialized) + ",\n" +
     "sg2 AS (SELECT suid, gene, types, pts, met FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,\n" +
     "        arrayDistinct(arrayFlatten(groupArray(pts))) AS pts, arrayFlatten(groupArray(met)) AS met FROM sg GROUP BY suid),\n" +
-    "u AS (\n" +
+    cte("u", "\n" +
     "  SELECT " + (unit === "patient" ? "samp.puid" : "sg2.suid") + " AS k, ifNull(grp.g, '') AS g, min(ifNull(grp.label, '')) AS label, sg2.gene AS gene,\n" +
     "         arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types, arrayDistinct(arrayFlatten(groupArray(sg2.pts))) AS pts,\n" +
     "         arrayDistinct(arrayFlatten(groupArray(sg2.met))) AS met\n" +
     "  FROM sg2 JOIN samp ON samp.suid = sg2.suid LEFT JOIN grp ON grp.suid = sg2.suid\n" +
-    "  GROUP BY k, g, gene\n" +
-    "),\n" +
+    "  GROUP BY k, g, gene\n", materialized) + ",\n" +
     // the whole cohort, each unit once however many groups it is in: grp '' is reserved for it below
     "uall AS (SELECT k, '\\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,\n" +
     "         arrayDistinct(arrayFlatten(groupArray(pts))) AS pts, arrayDistinct(arrayFlatten(groupArray(met))) AS met FROM u GROUP BY k, gene),\n" +
@@ -144,7 +142,7 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     // the units profiled for each alteration type (the portal's profiled-data strip)
     "       countIf(has(pts, 'mut')) AS pmut, countIf(has(pts, 'cna')) AS pcna, countIf(has(pts, 'sv')) AS psv,\n" +
     "       countIf(has(pts, 'mrna')) AS pmrna, countIf(has(pts, 'prot')) AS pprot\n" +
-    "FROM uk GROUP BY grp, gene"
+    "FROM uk GROUP BY grp, gene" + materializedSetting(materialized)
   ));
 }
 

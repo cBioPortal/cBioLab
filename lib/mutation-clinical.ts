@@ -7,7 +7,9 @@ import { finiteSql } from "./sql-number.ts";
 import type { QueryColumn } from "./table-query.ts";
 
 /** an attribute as a column: its id (the column's id, as the portal's), display name, whose it is and its type; its description, the header's tooltip */
-export interface ClinicalColumn { id: string; name: string; per: "patient" | "sample"; numeric: boolean; description?: string }
+export interface ClinicalColumn { id: string; name: string; per: "patient" | "sample"; numeric: boolean; description?: string;
+  /** an attribute whose datatype is not STRING: the table's search passes over it, as the portal's (ClinicalAttributeColumnFormatter.filter) */
+  unsearched?: true }
 
 /**
  * Attributes the table already shows as columns of its own, so not repeated: Cancer Type Detailed and
@@ -28,15 +30,19 @@ export function clinicalColumns(perStudy: Record<string, unknown>[][], taken: Re
     const id = String(m.id ?? "");
     if (!id || CLINICAL_SKIP.has(id) || taken.has(id) || out.some((c) => c.id === id)) continue;
     const description = String(m.description ?? "").trim();
-    out.push({ id, name: String(m.name || id), per: Number(m.patient) === 1 ? "patient" : "sample", numeric: String(m.datatype ?? "").toUpperCase() === "NUMBER", ...(description ? { description } : {}) });
+    out.push({ id, name: String(m.name || id), per: Number(m.patient) === 1 ? "patient" : "sample", numeric: String(m.datatype ?? "").toUpperCase() === "NUMBER", ...(description ? { description } : {}),
+      ...(String(m.datatype ?? "").toUpperCase() !== "STRING" ? { unsearched: true as const } : {}) });
   }
   return out;
 }
 
-/** how the table reads a clinical column off its rows: the value as text ('' for none), a NUMBER attribute also as a number */
+/**
+ * how the table reads a clinical column off its rows: the value as text ('' for none), a NUMBER attribute also as a
+ * number; a column the search passes over (not STRING) searched as '', which no search text matches
+ */
 export function clinicalQueryColumn(c: ClinicalColumn): QueryColumn {
   const text = "ifNull(" + (c.per === "patient" ? CLIN_PATIENT : CLIN_SAMPLE) + "[" + sq(c.id) + "], '')";
-  return { id: c.id, name: c.name, numeric: c.numeric, text, ...(c.numeric ? { num: finiteSql("nullIf(" + text + ", '')") } : {}) };
+  return { id: c.id, name: c.name, numeric: c.numeric, text, ...(c.numeric ? { num: finiteSql("nullIf(" + text + ", '')") } : {}), ...(c.unsearched ? { search: "''" } : {}) };
 }
 
 /** a row's value of a clinical column, from the maps the row source selected: a number for a NUMBER attribute, else the text; null for none */

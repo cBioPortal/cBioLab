@@ -133,3 +133,8 @@ test("PTB-PW-1: the Pathways diagram names the patient, for the portal's not-pro
   assert.deepEqual(view(patientLayout(q, { profileCatalog: [], held: ["MUTATION"] })), { kind: "pathwaymap", patient: { study: "s", id: "P1" }, cohorts: ["Patient"] });
   assert.deepEqual(view(patientLayout({ study: "s", sample: "S1" }, { profileCatalog: [], held: ["MUTATION"] })), { kind: "pathwaymap", cohorts: ["Sample"] });
 });
+
+test("PTB-GE-TB-1: the Genomic Evolution table pages 10 rows, as the portal's patient mutation table", () => {
+  const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION"], samples: 2, vaf: true });
+  assert.deepEqual(l.doc.views![l.names.indexOf("Genomic Evolution › Genomic evolution")], { kind: "evolution", mutations: { rows: 10 }, cohorts: ["Patient"] });
+});

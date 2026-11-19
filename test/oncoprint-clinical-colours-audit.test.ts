@@ -10,7 +10,7 @@
 // the server SVG (contractToSvg) and the browser canvas (draw).
 import test from "node:test";
 import assert from "node:assert/strict";
-import { STYLE, clinicalColor, reservedColor, trackCategoryColor, resolveStyle, barBand, encodeNumeric } from "../lib/oncoprint-style.ts";
+import { STYLE, clinicalColor, reservedColor, trackCategoryColor, resolveStyle, barBand, encodeNumeric, truncateLabel } from "../lib/oncoprint-style.ts";
 import { assembleContract, normalizeDisplay, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import { draw, fitZoom, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
@@ -433,7 +433,7 @@ test("38: PROFILED_IN: 'Yes' is #1b9e77, the NA label is 'No' — engine and SVG
   const t = c.tracks.find((x) => (x as { profiledFor?: string }).profiledFor)!;
   assert.ok(t, "a Profiled for row");
   assert.equal(trackCategoryColor(t as Parameters<typeof trackCategoryColor>[0], 0).toLowerCase(), YES);
-  const leg = svgLegend(contractToSvg(c, 1200), t.label.length > 16 ? t.label.slice(0, 16) + "…" : t.label);
+  const leg = svgLegend(contractToSvg(c, 1200), truncateLabel(t.label));
   assert.deepEqual(leg.map(([l]) => l), ["Yes", "No"]);
   assert.equal(leg[0][1], YES);
 });
