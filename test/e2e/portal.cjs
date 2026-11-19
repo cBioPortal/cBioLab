@@ -5,9 +5,13 @@ async function portal({ browser, ok, BASE }) {
   // and the pager asks the server where the shown patient falls.
   {
     const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
-    const page = await ctx.newPage();
+    const lab = await ctx.newPage();
+    // the patient view, once View patients opens it in its own window
+    let page = lab;
     const errors = [];
-    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    ctx.on("page", (p) => p.on("pageerror", e => errors.push("pageerror: " + e.message)));
+    lab.on("pageerror", e => errors.push("pageerror: " + e.message));
+    let stayed = false;
     const at = async (n) => page.waitForFunction((n) => document.querySelector(".cohort-nav input")?.value === n, n, { timeout: 120000 });
     const of = async () => Number(((await page.locator(".cohort-nav").innerText()).match(/([\d,]+) patients/) || [])[1]?.replace(/,/g, ""));
     try {
@@ -16,8 +20,10 @@ async function portal({ browser, ok, BASE }) {
       await page.getByLabel("search studies").fill("coadread_tcga_pub");
       await page.getByRole("button", { name: "explore coadread_tcga_pub", exact: true }).click();
       await page.waitForFunction(() => { const b = document.querySelector("button.viewpatients"); return b && !b.disabled; }, null, { timeout: 120000 });
-      await page.locator("button.viewpatients").click();
+      const [popup] = await Promise.all([page.waitForEvent("popup", { timeout: 60000 }), page.locator("button.viewpatients").click()]);
+      page = popup;
       await page.waitForURL(/\/portal\/patient\?.*patient=/, { timeout: 120000 });
+      stayed = /\/lab\?/.test(lab.url());
       await at("1");
       const first = new URL(page.url()).searchParams, total = await of();
       await page.getByRole("link", { name: "next patient" }).click();
@@ -26,11 +32,11 @@ async function portal({ browser, ok, BASE }) {
       await page.getByRole("button", { name: "last patient" }).click();
       await at(String(total));
       const last = new URL(page.url()).searchParams;
-      ok("explore: View patients opens the cohort's first patient, and steps to the next and the last",
-        first.get("cohort") && first.get("study") === "coadread_tcga_pub" && total === 276 && second.get("patient") !== first.get("patient") && last.get("cohort") === first.get("cohort"),
-        first.get("patient") + " → " + second.get("patient") + " → " + last.get("patient") + " of " + total);
+      ok("explore: View patients opens the cohort's first patient in a new window, and steps to the next and the last",
+        stayed && first.get("cohort") && first.get("study") === "coadread_tcga_pub" && total === 276 && second.get("patient") !== first.get("patient") && last.get("cohort") === first.get("cohort"),
+        (stayed ? "" : "Explore navigated away; ") + first.get("patient") + " → " + second.get("patient") + " → " + last.get("patient") + " of " + total);
     } catch (e) {
-      ok("explore: View patients opens the cohort's first patient, and steps to the next and the last", false, String(e.message).split("\n")[0].slice(0, 200));
+      ok("explore: View patients opens the cohort's first patient in a new window, and steps to the next and the last", false, String(e.message).split("\n")[0].slice(0, 200));
     }
     // the portal's "N patients" (PAT-NAV-3): the Study View over the cohort, in a new window
     try {
