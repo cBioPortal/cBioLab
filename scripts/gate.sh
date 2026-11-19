@@ -137,6 +137,7 @@ warehouse_checks() (
   phase "Results tabs' OQL"         && npm run check:results-oql 2>&1 | summary grep -E "^FAIL|results OQL checks passed|FAILED"
   phase "study view density"         && npm run check:density 2>&1 | summary grep -E "^FAIL|all passed|failure"
   phase "study view case lists"      && npm run check:case-lists 2>&1 | summary grep -E "^FAIL|all passed|failure"
+  phase "study view conflicting levels" && npm run check:conflicting-levels 2>&1 | summary grep -E "^FAIL|all conflicting-level checks passed|FAILED"
   phase "study view chart freq"      && npm run check:chart-freq 2>&1 | summary grep -E "^FAIL|all passed|failure"
   phase "study view gene panels"     && npm run check:gene-panels 2>&1 | summary grep -E "^FAIL|all .*passed|failure"
   phase "comparison alteration types" && npm run check:enrichment-events 2>&1 | summary grep -E "^FAIL|enrichment event checks"

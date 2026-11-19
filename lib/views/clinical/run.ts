@@ -81,7 +81,19 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
         skipped: "the participating studies disagree on its type (" + kinds.join(" vs ") + "); comparing them would mean discarding one side's patients" });
       continue;
     }
-    const kind = kinds[0], per = all[0].per;
+    // A study storing it per patient counts patients and one storing it per sample counts samples;
+    // pooled, a cell would add the two. Only answers holding values say which level they read: an
+    // empty categorical answer carries the default level, not the study's.
+    const studiesAt = (lvl: string) => [...new Set(vNames.flatMap((n) => cohorts[n].studies
+      .filter((st) => { const x = pick(n, st); return !!x && x.per === lvl && (x.kind === "cat" ? !!x.values?.length : !!x.n); })))].sort();
+    const atPatient = studiesAt("patient"), atSample = studiesAt("sample");
+    if (vStudies.length > 1 && atPatient.length && atSample.length) {
+      rows.push({ attribute, per: all[0].per, kind: kinds[0], cells: [],
+        skipped: "the participating studies store it at different levels (patient in " + atPatient.join(", ") + "; sample in " +
+          atSample.join(", ") + "); its counts would mix patients with samples" });
+      continue;
+    }
+    const kind = kinds[0], per = atSample.length ? "sample" as const : atPatient.length ? "patient" as const : all[0].per;
     if (kind === "cat") {
       const cells = vNames.map((n) => {
         const merged = new Map<string, number>();
@@ -203,7 +215,7 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
         "), but each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR are not listed, as on cBioPortal" +
         (listed.unlisted.length ? "; " + listed.unlisted.join(", ") + " could not list its attributes, so only those the others declare are asked of it" : "") + "." : "") +
       (untested ? " " + untested + " attribute" + (untested === 1 ? " is" : "s are") + " listed as not tested, each with its reason (a test needs two values and two groups holding any), and left out of the q-values." : "") +
-      (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
+      (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently, or store at different levels (per patient in one, per sample in another), is refused rather than merged." :
         rank ? " Numeric attributes also show median/IQR, from the same distributions." :
         " Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a" +
         " Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) —" +
