@@ -2,8 +2,9 @@
 import type { ViewResult } from "../../types.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
 import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
-import { MUTATION_COLUMNS, mutationRowSource, alterationOf, mutationDefaultColumns, type TablePart } from "../../mutation-table.ts";
-import { mutationDefaultFacts } from "../mutation-defaults.ts";
+import { MUTATION_COLUMNS, mutationRowSource, alterationOf, mutationDefaultColumns, type MutationColumn, type TablePart } from "../../mutation-table.ts";
+import { mutationClinicalColumns, mutationDefaultFacts } from "../mutation-defaults.ts";
+import { clinicalValue } from "../../mutation-clinical.ts";
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows, keyOnFirstRun } from "../rows.ts";
@@ -81,35 +82,37 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   const size = view.rows == null ? 25 : Math.floor(Number(view.rows));
   if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return refuse("mutations", ctx, "rows (the page size) is 1 to " + TABLE_ROWS_MAX);
   const q = viewQuery(view);
-  const bad = checkQuery(q, MUTATION_COLUMNS);
-  if (bad) return refuse("mutations", ctx, bad);
 
   const { holders, excluded } = rowHolders(ctx);
-  const [pins, unannotated] = await Promise.all([variantPins(), studiesWithoutVariantAnnotation(holders)]);
+  const [pins, unannotated, clinical] = await Promise.all([variantPins(), studiesWithoutVariantAnnotation(holders), mutationClinicalColumns(ctx, holders)]);
+  // the portal's columns, then one per clinical attribute the studies record (MUT-COL-36), hidden by default
+  const columns: MutationColumn[] = [...MUTATION_COLUMNS, ...clinical.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, firstSort: "asc" as const }))];
+  const bad = checkQuery(q, columns);
+  if (bad) return refuse("mutations", ctx, bad);
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
-  const source = (parts: TablePart[]) => (db: string) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers));
+  const source = (parts: TablePart[]) => (db: string) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers, clinical));
   let r: Rows, defaults: string[];
   try {
     defaults = mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, source));
-    r = await runRows(ctx, "mutations", holders, q, defaults, shownColumns(q, MUTATION_COLUMNS, defaults), size, source,
-      ctx.values ? { column: ctx.values, numeric: !!MUTATION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
+    r = await runRows(ctx, "mutations", holders, q, defaults, shownColumns(q, columns, defaults), size, source,
+      ctx.values ? { column: ctx.values, numeric: !!columns.find((c) => c.id === ctx.values)?.numeric } : undefined);
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   const rows = r.rows.map((x) => {
     const detail = mutationDetail(x, x.build == null ? undefined : String(x.build));
     return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
-      values: MUTATION_COLUMNS.map((c) => mutationValue(x, c.id, drivers ? true : pin)), ...(detail ? { detail } : {}) };
+      values: [...MUTATION_COLUMNS.map((c) => mutationValue(x, c.id, drivers ? true : pin)), ...clinical.map((c) => clinicalValue(x, c))], ...(detail ? { detail } : {}) };
   });
   const gn = describePins(pins);
-  const shown = shownColumns(q, MUTATION_COLUMNS, defaults);
-  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns: MUTATION_COLUMNS, shown, defaults, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
+  const shown = shownColumns(q, columns, defaults);
+  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns, shown, defaults, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
     ...(unannotated.length ? { unannotated } : {}),
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (ctx.page || ctx.values) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };
   return {
     kind: "mutations", cohorts: vNames, mutations,
-    method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, variantPins: gn, queryText: describeQuery(q, MUTATION_COLUMNS),
+    method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, variantPins: gn, queryText: describeQuery(q, columns),
       ...(drivers ? { drivers: driverSourceText(drivers, pin ? "OncoKB " + pin : null, gn ? "a Cancer Hotspot of its kind in the stored " + gn + " annotation" : null) } : {}),
-      sortName: q.sort ? MUTATION_COLUMNS.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
+      sortName: q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
       shown: rows.length, lists: r.lists, excluded, instances: r.groups, ...(r.duplicates !== undefined ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}) }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
@@ -122,6 +125,6 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
         (unannotated.length ? "Not yet annotated, so blank in those columns: " + (unannotated.length <= 3 ? unannotated.join(", ") : unannotated.length + " studies") + ". " : "")
         : "No Genome Nexus release is stored here, so HGVSc, Functional Impact, gnomAD, ClinVar, dbSNP and SIGNAL are empty. ") +
       "Allele frequency is variant reads over variant + reference reads; # Mut in Sample is the study's own MUTATION_COUNT, blank where it records none. " +
-      tableTail(r, q, MUTATION_COLUMNS, "mutation", "by the portal\'s annotation value (OncoKB\'s oncogenicity, then its highest sensitive, resistance, diagnostic and prognostic levels, then a Cancer Hotspot), then by codon", excluded, vNames.length > 1)
+      tableTail(r, q, columns, "mutation", "by the portal\'s annotation value (OncoKB\'s oncogenicity, then its highest sensitive, resistance, diagnostic and prognostic levels, then a Cancer Hotspot), then by codon", excluded, vNames.length > 1)
   };
 }

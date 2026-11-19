@@ -97,6 +97,7 @@ import { onSettingsChange, refreshSettings, setting } from "./settings.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
 import { MUTATION_COLUMNS, mutationRowKeysSql, rowKeySql } from "./mutation-table.ts";
+import type { ClinicalColumn } from "./mutation-clinical.ts";
 import { annotatingSql, offeredSources, unannotatedOrSql } from "./driver-sql.ts";
 import { entrezOf, fusionProteinChangeSql, siteKey, svCallCtes, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 import { variantPins, type VariantPins } from "./variant-annotation.ts";
@@ -462,7 +463,9 @@ export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
  * which the portal's lollipop and badges follow (MUT-FM-1); the table's Alteration and Protein Position
  * filters, the grid's and the plot's own selection, are not applied to them.
  */
-export interface LollipopRows extends Pick<TableQuery, "search" | "filters" | "columns"> { gene: string }
+export interface LollipopRows extends Pick<TableQuery, "search" | "filters" | "columns"> { gene: string;
+  /** the table's clinical-attribute columns the query may name (MUT-COL-36), as the mutations view read them */
+  clinical?: ClinicalColumn[] }
 /** each gene's mutation filter under the query's lines, where one applies */
 export function mutationFilters(oql: LollipopOql, genes: string[], o: { study: string; db: string; oncokbPin: string | null; hotspotPins: VariantPins | null }): MutationFilters {
   const out: MutationFilters = {};
@@ -1764,10 +1767,10 @@ abstract class BaseResolver implements AggregateCapable {
       if (!isPatientLevel(this as unknown as Resolver))
         throw new Error(this.study + " is not patient-level here, so its lollipop cannot be narrowed by the mutation table's search or filters");
       if (!genes.includes(rows.gene)) throw new Error("the table's gene " + rows.gene + " is not among the lollipop's genes (" + genes.join(", ") + ")");
-      const bad = checkQuery(rows, MUTATION_COLUMNS); if (bad) throw new Error("rows: " + bad);
+      const bad = checkQuery(rows, [...MUTATION_COLUMNS, ...(rows.clinical || [])]); if (bad) throw new Error("rows: " + bad);
     }
     const rowKeys = rows
-      ? { gene: rows.gene, keys: mutationRowKeysSql({ cohort: "", study: this.study, cohortSql: cohort }, db, rows.gene, pin, hotspotPins, oql, rows) } : undefined;
+      ? { gene: rows.gene, keys: mutationRowKeysSql({ cohort: "", study: this.study, cohortSql: cohort }, db, rows.gene, pin, hotspotPins, oql, rows, rows.clinical) } : undefined;
     const [c, t, tot, cs, gc] = await Promise.all([
       this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),
       this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),

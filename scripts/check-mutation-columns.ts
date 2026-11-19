@@ -43,6 +43,10 @@
  *      non-zero t_alt_count / (t_alt_count + t_ref_count), Cancer Type Detailed when the gene's rows hold more than
  *      one distinct non-empty CANCER_TYPE_DETAILED (ResultsViewMutationTable 195-210). The catalog is read live
  *      from genetic_profile, as lib/analysis.ts studyProfiles reads it, and every run here is given it.
+ *   L1 the clinical-attribute columns (MUT-COL-36): KRAS filtered by a patient STRING attribute (SEX in
+ *      ["Female"], data_clinical_patient.txt) and a sample NUMBER range (FRACTION_GENOME_ALTERED 0.2 to 0.5,
+ *      data_clinical_sample.txt) keeps exactly the rows worked out below; the hotspots view given the same
+ *      table query tallies the same number of mutations.
  *
  * Run: node --env-file=.env.local scripts/check-mutation-columns.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
@@ -54,6 +58,8 @@ import * as mutationTable from "../lib/mutation-table.ts";
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS } from "../lib/mutation-table.ts";
 import { chromosomeSortSql, proteinChangeSortSql } from "../lib/mutation-sort.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
+import { runHotspots } from "../lib/views/hotspots/run.ts";
+import type { HotspotGene } from "../lib/views/hotspots/types.ts";
 import type { ViewRun } from "../lib/views/run.ts";
 import type { CohortDef } from "../lib/types.ts";
 import type { ColumnFilter } from "../lib/table-query.ts";
@@ -104,7 +110,7 @@ const ctxFor = (values?: string): ViewRun => ({
 type Value = string | number | null;
 type TableRow = { sample: string; values: Value[] };
 type Query = { columns?: string[]; search?: string; filters?: Record<string, ColumnFilter>; sort?: { column: string; desc?: boolean } };
-type Result = { mutations?: { rows: TableRow[]; shown?: string[]; values?: { values?: { value: string; n: number }[] } }; error?: string };
+type Result = { mutations?: { rows: TableRow[]; columns?: { id: string }[]; shown?: string[]; values?: { values?: { value: string; n: number }[] } }; error?: string };
 
 const col = (id: string) => MUTATION_COLUMNS.findIndex((c) => c.id === id);
 const v = (r: TableRow, id: string): Value | undefined => (col(id) < 0 ? undefined : r.values[col(id)]);
@@ -517,6 +523,47 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
     const got = r.filter((x) => x.sample === sid).map((x) => String(v(x, "cancerType") ?? ""));
     ok("CTD " + sid + " EGFR L858R: Cancer Type Detailed " + JSON.stringify(want), got.length === 1 && got[0] === want, JSON.stringify(got));
   }
+}
+
+{
+  // L1 KRAS's 24 rows (data_mutations.txt lines 2-71, every one SOMATIC Missense_Mutation) filtered by
+  // SEX = Female (data_clinical_patient.txt) and 0.2 <= FRACTION_GENOME_ALTERED <= 0.5 (data_clinical_sample.txt):
+  //   female KRAS patients: FX-P02 (patient line 7), P04 (9), P05 (10), P06 (11), P08 (13), P10 (15), P12 (17),
+  //   P14 (19), P15 (20), P16 (21), P18 (23), P20 (25); their samples' FGA:
+  //     kept    FX-P02-T2 0.322 (sample line 9; mutation line 6, G12D)   FX-P04-T1 0.207 (12; 14, G13D)
+  //             FX-P04-T2 0.246 (13; 15, G13D)                            FX-P10-T1 0.438 (19; 31, G12C)
+  //             FX-P12-T1 0.246 (21; 46, G12D)                            FX-P16-T1 0.326 (25; 57, G12C)
+  //             FX-P20-T1 0.375 (29; 71, Q61H)
+  //     dropped FX-P02-T1 0.104, P05-T1 0.579, P06-T1 0.172, P08-T1 0.129, P14-T1 0.589, P15-T1 0.516, P18-T1 0.127
+  //   a male patient's sample in range is dropped by SEX alone: FX-P01-T1 (Male, 0.354; mutation line 2, G12C)
+  // 7 rows; 6 (patient, change) pairs (FX-P04's two samples carry the same G13D)
+  const L1_ROWS = ["FX-P02-T2 G12D", "FX-P04-T1 G13D", "FX-P04-T2 G13D", "FX-P10-T1 G12C", "FX-P12-T1 G12D", "FX-P16-T1 G12C", "FX-P20-T1 Q61H"];
+  const L1_FGA: Record<string, number> = { "FX-P02-T2": 0.322, "FX-P04-T1": 0.207, "FX-P04-T2": 0.246, "FX-P10-T1": 0.438, "FX-P12-T1": 0.246, "FX-P16-T1": 0.326, "FX-P20-T1": 0.375 };
+  const filters: Record<string, ColumnFilter> = { SEX: { values: ["Female"] }, FRACTION_GENOME_ALTERED: { min: 0.2, max: 0.5 } };
+  const res = await run("KRAS", { columns: ["sample", "proteinChange", "SEX", "FRACTION_GENOME_ALTERED"], filters });
+  if (typeof res === "string") ok("L1 KRAS filtered by SEX and FRACTION_GENOME_ALTERED", false, res);
+  else {
+    const m = res.mutations!;
+    const ids = (m.columns || []).map((c) => c.id);
+    ok("L1 the table has the SEX and FRACTION_GENOME_ALTERED columns, after the built-in ones",
+      ids.indexOf("SEX") >= MUTATION_COLUMNS.length && ids.indexOf("FRACTION_GENOME_ALTERED") >= MUTATION_COLUMNS.length, JSON.stringify(ids.slice(MUTATION_COLUMNS.length)));
+    const at = (r: TableRow, id: string) => r.values[ids.indexOf(id)];
+    const got = m.rows.map((r) => r.sample + " " + String(v(r, "proteinChange"))).sort();
+    ok("L1 KRAS with SEX = Female and FRACTION_GENOME_ALTERED 0.2-0.5 keeps exactly " + JSON.stringify(L1_ROWS), JSON.stringify(got) === JSON.stringify(L1_ROWS), JSON.stringify(got));
+    const bad = m.rows.flatMap((r) => at(r, "SEX") === "Female" && at(r, "FRACTION_GENOME_ALTERED") === L1_FGA[r.sample] ? [] :
+      [r.sample + " SEX " + show(at(r, "SEX")) + " FGA " + show(at(r, "FRACTION_GENOME_ALTERED"))]);
+    ok("L1 each kept row's SEX is Female (its patient's) and its FRACTION_GENOME_ALTERED its sample's, as a number", bad.length === 0, bad.join("; "));
+  }
+  let tally: string;
+  try {
+    const hr = await runHotspots({ kind: "hotspots", genes: ["KRAS"], cohorts: ["c"], table: { gene: "KRAS", filters } } as never, ctxFor()) as { hotspots?: HotspotGene[]; error?: string };
+    const g = hr.hotspots?.find((h) => h.gene === "KRAS");
+    tally = !g ? "refused: " + String(hr.error || JSON.stringify(hr).slice(0, 200))
+      : String(Object.values(g.tally).reduce((n, t) => n + t.driver + t.vus, 0)) + " (missense " + g.tally.missense.driver + "/" + g.tally.missense.vus + "), pairs " + g.mutations;
+  } catch (e) { tally = "threw: " + String((e as Error).message).slice(0, 200); }
+  ok("L1 the hotspots view with the same table query tallies the same 7 mutations, all missense, over 6 (patient, change) pairs",
+    tally.startsWith("7 (missense ") && tally.endsWith(", pairs 6") && /missense (\d+)\/(\d+)/.test(tally) &&
+    tally.match(/missense (\d+)\/(\d+)/)!.slice(1).reduce((n, x) => n + Number(x), 0) === 7, tally);
 }
 
 console.log(`\n${checks - failures}/${checks} mutation column checks passed`);
