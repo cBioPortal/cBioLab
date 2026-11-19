@@ -1,7 +1,7 @@
 // Table views (app/_table/DataTable.tsx on lib/table-query.ts).
 async function tables({ browser, ok, BASE }) {
   // Table views (app/_table/DataTable.tsx on lib/table-query.ts): search, a column's value
-  // filter, a header sort and the CSV download, on the Results page's mutation table. Each one
+  // filter, a header sort and the table.tsv download, on the Results page's mutation table. Each one
   // re-runs the view in the database, so a check is a count the server agreed to, not a DOM trick.
   {
     const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
@@ -78,12 +78,17 @@ async function tables({ browser, ok, BASE }) {
       await settle();
       const nums = await lastColumn();
       ok("table: a second click sorts it highest first", nums.length > 2 && nums.every((x, i) => i === 0 || nums[i - 1] >= x), nums.slice(0, 5).join(" "));
-      // the download: every kept row, every column, as CSV, from the same document
-      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120000 }).catch(() => null), page.locator("form[action='/api/table'] button").first().click()]);
-      const csv = dl ? require("fs").readFileSync(await dl.path(), "utf8") : "";
-      const lines = csv.trim().split(/\r?\n/);
-      ok("table: the CSV holds every kept row with every column", lines[0].startsWith("cohort,study,gene,studyOfOrigin,cancerTypeAll,sample,cancerType,proteinChange") && lines.length - 1 === picked.kept,
-        (dl ? dl.suggestedFilename() : "no download") + " · " + (lines.length - 1) + " rows, header " + lines[0].slice(0, 60));
+      // the download: the portal's table.tsv (MUT-TB-8), every row whatever the filter, the columns by name, CRLF
+      const button = page.locator("form[action='/api/table'] button").first();
+      const label = (await button.innerText()).trim();
+      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120000 }).catch(() => null), button.click()]);
+      const tsv = dl ? require("fs").readFileSync(await dl.path(), "utf8") : "";
+      const lines = tsv.split("\r\n");
+      const crlf = tsv.endsWith("\r\n") && !/[^\r]\n/.test(tsv);
+      if (lines[lines.length - 1] === "") lines.pop();
+      ok("table: the download reads \"download TSV (" + picked.all + ")\" while the table is filtered", picked.kept < picked.all && label === "download TSV (" + picked.all + ")", label);
+      ok("table: the table.tsv holds every row, the columns by name, CRLF line ends", !!dl && dl.suggestedFilename() === "table.tsv" && lines[0].startsWith("Gene\tStudy of Origin\tCancer Type\tSample ID") && crlf && lines.length - 1 === picked.all,
+        (dl ? dl.suggestedFilename() : "no download") + " · " + (lines.length - 1) + " rows of " + picked.all + ", crlf " + crlf + ", header " + JSON.stringify(lines[0] ? lines[0].slice(0, 60) : ""));
     } catch (e) {
       ok("table: the mutation table's controls", false, String(e.message).split("\n")[0].slice(0, 200));
     }
