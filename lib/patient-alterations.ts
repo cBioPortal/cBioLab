@@ -3,6 +3,7 @@
 // choose from. Every row names a patient, so — like the mutation table — the queries live here,
 // outside lib/federation*.ts's aggregate builders, and run only through PatientLevelResolver's
 // rows* methods: a participant that may not disclose a patient has no such method.
+import { finiteSql } from "./sql-number.ts";
 import { mutationStudySql, sq, genomicStudySql } from "./compiler.ts";
 import type { QueryColumn, RowSource } from "./table-query.ts";
 import type { TablePart } from "./mutation-table.ts";
@@ -31,7 +32,7 @@ export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   mutations: [
     samples, text("gene", "Gene"), { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, annotation,
     { id: "mutationType", name: "Mutation Type", numeric: false, ...mutationTypeColumn("mutationType") },
-    number("vaf", "Allele Freq"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"), text("copy", "Copy #"), freq,
+    number("vaf", "Allele Freq"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"), text("copy", "Copy #"), number("mrna", "mRNA Expr."), freq,
     text("variantType", "Variant Type"), text("chr", "Chromosome"), number("start", "Start Pos"), number("end", "End Pos"),
     text("ref", "Ref"), text("var", "Var"), text("status", "MS"), number("inAll", "Profiled in all samples"),
   ],
@@ -50,7 +51,7 @@ export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
 
 /** Shown unless the view names its columns: the portal's own default set for each table, in its order (PAT-MT-2). */
 export const ALTERATION_DEFAULT_COLUMNS: Record<AlterationTable, string[]> = {
-  mutations: ["samples", "gene", "proteinChange", "annotation", "mutationType", "vaf", "copy", "freq"],
+  mutations: ["samples", "gene", "proteinChange", "annotation", "mutationType", "vaf", "copy", "mrna", "freq"],
   cna: ["samples", "gene", "cna", "annotation", "cytoband", "freq"],
   sv: ["samples", "gene1", "gene2", "status", "class", "eventInfo", "connectionType"],
 };
@@ -58,11 +59,27 @@ export const ALTERATION_DEFAULT_COLUMNS: Record<AlterationTable, string[]> = {
 /**
  * A table's default columns with `inView` of the patient's samples in view, as the portal's patient
  * view decides them: Samples only with two or more (PAT-MT-2, PAT-CNA-4, PAT-SV-3); a mutation's
- * Copy # only with one (PAT-MT-2: one sample's call, where several would disagree).
+ * Copy # only with one (PAT-MT-2: one sample's call, where several would disagree); mRNA Expr. only
+ * with one and an mRNA z-score profile to rank it in (`mrna`, PAT-MT-5).
  */
-export function alterationDefaults(t: AlterationTable, inView: number): string[] {
-  return ALTERATION_DEFAULT_COLUMNS[t].filter((c) => !(c === "samples" && inView < 2) && !(t === "mutations" && c === "copy" && inView > 1));
+export function alterationDefaults(t: AlterationTable, inView: number, mrna = false): string[] {
+  return ALTERATION_DEFAULT_COLUMNS[t].filter((c) => !(c === "samples" && inView < 2) && !(t === "mutations" && c === "copy" && inView > 1) &&
+    !(t === "mutations" && c === "mrna" && !(inView === 1 && mrna)));
 }
+
+/**
+ * The mRNA z-score profile the mutation table's mRNA Expr. column ranks a gene in, as the portal picks
+ * it (PatientViewPageStore mrnaRankMolecularProfileId): the first of the study's profiles, in id order,
+ * whose id matches /^.+rna_seq.*_zscores$/i; null when none does. `profiles` are the ids without the
+ * study prefix.
+ */
+export function mrnaRankProfile(study: string, profiles: string[]): string | null {
+  const ids = profiles.map((p) => study + "_" + p).filter((id) => /^.+rna_seq.*_zscores$/i.test(id)).sort();
+  return ids.length ? ids[0].slice(study.length + 1) : null;
+}
+
+/** The one sample in view whose mRNA level the mutation table ranks, and the profile it ranks it in. */
+export interface MrnaRank { profile: string; sample: string }
 
 /** The patient list's columns: how much of each table a patient has, so a list can be sorted by it. */
 export const ALTERATION_PATIENT_COLUMNS: QueryColumn[] = [
@@ -91,6 +108,19 @@ function profiledCte(name: string, db: string, study: string, alterationType: st
   return name + " AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM " + db + ".sample_to_gene_panel_derived sp\n" +
     "  JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (" + genesFrom + ")\n" +
     "  WHERE sp.cancer_study_identifier = " + sq(study) + " AND sp.alteration_type = " + sq(alterationType) + " GROUP BY gene),\n";
+}
+
+/**
+ * The sample's mRNA level of each of the table's genes, ranked among every sample's value of the gene
+ * in the profile, as the portal's mrna-percentile (MrnaPercentileServiceImpl): rank with ties at the
+ * highest (the values at or below the sample's), percentile = rank / n × 100 to 2 places, half up.
+ * Missing and non-numeric values are left out.
+ */
+function mrnaCte(db: string, study: string, m: MrnaRank): string {
+  return "mv AS (SELECT hugo_gene_symbol AS gene, sample_unique_id AS s, " + finiteSql("alteration_value") + " AS z FROM " + db + ".genetic_alteration_derived\n" +
+    "  WHERE cancer_study_identifier = " + sq(study) + " AND profile_type = " + sq(m.profile) + " AND hugo_gene_symbol IN (SELECT gene FROM g) AND z IS NOT NULL),\n" +
+    "mr AS (SELECT me.gene AS gene, any(me.z) AS z, toFloat64(round(toDecimal64(100 * countIf(mv.z <= me.z), 6) / count(), 2)) AS pct\n" +
+    "  FROM (SELECT gene, any(z) AS z FROM mv WHERE s = " + sq(study + "_" + m.sample) + " GROUP BY gene) AS me JOIN mv ON mv.gene = me.gene GROUP BY me.gene),\n";
 }
 
 /** OncoKB's calls at `pin` for one alteration type and the genes `genesFrom` names. */
@@ -169,7 +199,7 @@ const NO_COVERAGE: PanelCoverage = { genes: "any", inAll: false };
  * driver first, then by name — and within a gene by the first sample carrying the row (`order`, the
  * patient's sample order), then codon.
  */
-export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE): RowSource {
+export function patientMutationsSource(p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE, mrna: MrnaRank | null = null): RowSource {
   const covered = cover.inAll || cover.genes === "all";
   const pre = sq(p.study + "_"), uid = sq(p.study + "_" + patient);
   return {
@@ -197,18 +227,19 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "  WHERE " + genomicStudySql(p.study) + " AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'\n" +
       "    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),\n" +
       profiledCte("fp", db, p.study, "MUTATION_EXTENDED", "SELECT gene FROM g") +
+      (mrna ? mrnaCte(db, p.study, mrna) : "") +
       (covered ? missCte(p, patient, db, "MUTATION_EXTENDED", samples) : "") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
       "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll,\n" +
-      "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
+      "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, " + (mrna ? "if(mr.gene != '', mr.pct, NULL) AS mrna, if(mr.gene != '', mr.z, NULL) AS mrnaZ" : "CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ") + ", if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
       // the value the cell shows, filters and searches, to 4 places (the page writes it as the portal does)
       "         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,\n" +
       "         " + vafVector(order, "arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)") + " AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,\n" +
       "         g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos\n" +
       "  FROM g\n" +
       (pin ? "  LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange\n" : "") +
-      "  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene " + (covered ? "LEFT JOIN miss ON miss.gene = g.gene" : "") + "\n" +
+      "  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene " + (mrna ? "LEFT JOIN mr ON mr.gene = g.gene " : "") + (covered ? "LEFT JOIN miss ON miss.gene = g.gene" : "") + "\n" +
       ")" + (cover.genes === "all" ? " WHERE inAll = 1" : "") + ")\n",
     columns: ALTERATION_COLUMNS.mutations.map((c) => c.id === "vaf" ? { ...c, sort: vafSort(order.length) } : c),
     select: "* EXCEPT (vafs)",
@@ -368,8 +399,8 @@ export function patientSamplesSource(p: TablePart, patient: string, db: string, 
 }
 
 /** A table's row source for one patient of `p`'s study. */
-export function alterationSource(table: AlterationTable, p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE): RowSource {
-  return table === "mutations" ? patientMutationsSource(p, patient, db, pin, order, samples, cover) : table === "cna" ? patientCnaSource(p, patient, db, pin, order, samples, cover) : patientSvSource(p, patient, db, order, samples);
+export function alterationSource(table: AlterationTable, p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE, mrna: MrnaRank | null = null): RowSource {
+  return table === "mutations" ? patientMutationsSource(p, patient, db, pin, order, samples, cover, mrna) : table === "cna" ? patientCnaSource(p, patient, db, pin, order, samples, cover) : patientSvSource(p, patient, db, order, samples);
 }
 
 /**

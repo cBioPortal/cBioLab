@@ -15,6 +15,7 @@ import { MutationTypeCell } from "./mutation-cells.tsx";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult, AlleleReads } from "../../lib/views/alterations/types";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
+import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
@@ -138,7 +139,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 },
                 selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
               })}
-              num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : x.toLocaleString()}
+              num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : id === "mrna" ? Math.round(x) + "%" : x.toLocaleString()}
               colHead={(id) => id === "gene" && (key === "mutations" || key === "cna") && marks.size > 1 && a.mixedPanels?.[key]
                 ? <GenesProfiledMenu table={key} value={(spec.genesProfiled as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
                     onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} /> : null}
@@ -146,6 +147,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
+                : id === "mrna" && key === "mutations" ? <MrnaCell percentile={x == null ? null : Number(x)} z={row.detail?.mrnaZ as number | undefined} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "status" && key === "sv" ? <SvStatus value={String(x || "")} />
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>
@@ -163,6 +165,24 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
         </PatientsDialog>
       )}
     </div>
+  );
+}
+
+/**
+ * The mRNA Expr. cell as the portal's (MrnaExprColumnFormatter): a grey line with a dot at the gene's
+ * mRNA percentile in the sample, blue when low, red when high, the percent beside it and the z-score
+ * on hover; nothing drawn where the gene has no mRNA value, with the portal's words on hover.
+ */
+function MrnaCell({ percentile, z }: { percentile: number | null; z?: number }) {
+  const tip = mrnaTooltip(percentile, z);
+  if (percentile == null) return <span className="alt-mrna-na" data-tip={tip}>&nbsp;</span>;
+  const d = mrnaDot(percentile);
+  return (
+    <svg width={d.width} height={d.height} data-tip={tip} role="img" aria-label={tip.replace(/\n/g, "; ")}>
+      <text x={d.textX} y={d.textY} fontSize={d.fontSize} fill="currentColor">{d.text}</text>
+      <line x1={0} y1={d.lineY} x2={d.lineWidth} y2={d.lineY} stroke={d.line} strokeWidth={d.lineStroke} />
+      <circle cx={d.cx} cy={d.lineY} r={d.r} fill={d.fill} />
+    </svg>
   );
 }
 

@@ -410,7 +410,7 @@ miss AS (SELECT gg.gene AS gene, countIf(vs.su NOT IN (SELECT su FROM pan WHERE 
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, '' AS oncogenicity, '' AS level, toUInt8(0) AS drv,
          toUInt8(ifNull(miss.n, 0) = 0) AS inAll,
-         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
+         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
          CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)).2, ['P-0000012-T02-IM3', 'P-0000012-T03-IM3']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
@@ -449,7 +449,7 @@ fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          CAST(NULL AS Nullable(UInt8)) AS inAll,
-         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
+         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
          CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)).2, ['P-0000012-T02-IM3', 'P-0000012-T03-IM3']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos
@@ -489,7 +489,7 @@ fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot
 rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (
   SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv,
          CAST(NULL AS Nullable(UInt8)) AS inAll,
-         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
+         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ, if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,
          round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,
          CAST(arrayMap(s -> arrayFirst(x -> x.1 = s, arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)).2, ['P-0000012-T02-IM3', 'P-0000012-T03-IM3']) AS Array(Nullable(Float64))) AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,
          g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos

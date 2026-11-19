@@ -155,6 +155,10 @@ export const STYLE = {
     } as Record<string, string>,
     unknown: "#EE4B2B"
   },
+  // the Patient mutation table's mRNA Expr. cell, the portal's (MrnaExprColumnFormatter): a grey line
+  // with a dot at the percentile, blue below `lowBelow`, red above `highAbove`, grey between
+  mrnaBar: { line: "gray", low: "blue", mid: "gray", high: "red", lowBelow: 25, highAbove: 75, width: 30, radius: 3, lineY: 8, lineWidth: 2,
+    svgHeight: 12, textGap: 3, textWidth: 30, textBaseline: 11, fontSize: 10 },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,

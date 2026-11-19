@@ -434,6 +434,42 @@ describe("allele frequency and per-sample reads", () => {
   });
 });
 
+describe("mRNA Expr. (PAT-MT-5)", () => {
+  const PROFILES = { profiles: ["mutations", "rna_seq_v2_mrna", "rna_seq_v2_mrna_median_Zscores"], gaProfiles: [] };
+  /** the mutations table's SQL as the run asks it, with the result */
+  const asked = async (view: Partial<AlterationsView>, extra: Partial<ViewRun>, mut: Row[] = MUT) => {
+    let sql = "";
+    const base = study({ mut });
+    const t: Tables = (table, src) => { if (table === "alterations:mutations") sql = src.with; return base(table, src); };
+    const r = await run(view, one(t, extra));
+    return { sql, m: alt(r).tables.mutations!, said: JSON.stringify(r.method) + " " + (r.caveat ?? "") };
+  };
+  test("one sample in view and a z-score profile: ranked in that profile for that sample, shown by default, the z-score in the row's detail", async () => {
+    const { sql, m } = await asked({ samples: "cohort" }, { studyProfiles: async () => PROFILES }, [{ ...MUT[0], mrna: 90.03, mrnaZ: 1.161 }]);
+    assert.match(sql, /profile_type = 'rna_seq_v2_mrna_median_Zscores'/);
+    assert.match(sql, /WHERE s = 's1_S1a'/);
+    assert.ok(m.shown.includes("mrna"), m.shown.join(","));
+    assert.equal(m.rows[0].values[m.columns.findIndex((c) => c.id === "mrna")], 90.03);
+    assert.equal(m.rows[0].detail?.mrnaZ, 1.161);
+  });
+  test("invariant 12: the method record and the caveat say how mRNA Expr. is ranked, only when it is", async () => {
+    const { said } = await asked({ samples: "cohort" }, { studyProfiles: async () => PROFILES });
+    assert.match(said, /mRNA Expr\. \(one sample in view\): the gene's percentile in that sample within the study's rna_seq_v2_mrna_median_Zscores profile/);
+    assert.match(said, /ties at the highest rank/);
+    assert.match(said, /mRNA Expr\. is the gene's percentile in S1a among every sample's value of it in rna_seq_v2_mrna_median_Zscores/);
+    assert.doesNotMatch((await asked({}, { studyProfiles: async () => PROFILES })).said, /mRNA Expr/);
+  });
+  test("two samples in view, or no z-score profile: not ranked, not shown", async () => {
+    const two = await asked({}, { studyProfiles: async () => PROFILES });
+    assert.doesNotMatch(two.sql, /genetic_alteration_derived/);
+    assert.ok(!two.m.shown.includes("mrna"));
+    const none = await asked({ samples: "cohort" }, {});
+    assert.doesNotMatch(none.sql, /genetic_alteration_derived/);
+    assert.ok(!none.m.shown.includes("mrna"));
+    assert.equal(none.m.rows[0].detail?.mrnaZ, undefined);
+  });
+});
+
 describe("vafSort", () => {
   test("S1 PAT-STM-1: samples' VAFs compared one by one in sample order, null last either way", () => {
     assert.equal(vafSort(2)("DESC"), "isNull(vafs[1]) ASC, vafs[1] DESC, isNull(vafs[2]) ASC, vafs[2] DESC");
