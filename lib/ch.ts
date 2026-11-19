@@ -311,6 +311,8 @@ export function setChTransport(t: ChTransport | null): void { transport = t; }
 
 /** how long a connection's answer is kept before it is asked again: its server can be upgraded, rolled back or re-pointed */
 export const CTE_CHECK_TTL_MS = 10 * 60 * 1000;
+/** how long the check may take, waiting its turn included; one that takes longer counts as no and is cancelled */
+export const CTE_CHECK_TIMEOUT_MS = 5000;
 const cteSupport = new Map<string, { at: number; known: Promise<boolean> }>();
 /** the check: the setting itself, which fails where the server does not know it or this user may not set it */
 export const CTE_CHECK_SQL = "SELECT 1 AS ok" + MATERIALIZED_SETTING;
@@ -319,9 +321,10 @@ export const CTE_CHECK_SQL = "SELECT 1 AS ok" + MATERIALIZED_SETTING;
  * runs `SETTINGS enable_materialized_cte = 1` for this user. That fails on a server too old to
  * know the setting, and where a settings profile, readonly=1 or allow_feature_tier stops this user
  * changing it (the setting is experimental). Asked once per connection and kept for
- * CTE_CHECK_TTL_MS; a check that fails is kept as no for as long. The check runs outside the
- * request that asked: it is not cancelled with that request, and its failure is not one of that
- * request's failed queries (withoutFailedQueries). CLICKHOUSE_MATERIALIZED_CTE=0 turns it off and
+ * CTE_CHECK_TTL_MS; a check that fails, or has no answer within CTE_CHECK_TIMEOUT_MS, is kept as
+ * no for as long, with one warning naming the connection. The check runs outside the request that
+ * asked: it is not cancelled with that request, and its failure is not one of that request's
+ * failed queries (withoutFailedQueries). CLICKHOUSE_MATERIALIZED_CTE=0 turns it off and
  * =1 on without asking. With a transport set (recorded answers) nothing is asked and the
  * statements are the plain ones, whatever CLICKHOUSE_MATERIALIZED_CTE says.
  */
@@ -334,8 +337,21 @@ export function materializedCteSupported(conn: ChConn): Promise<boolean> {
   const key = conn.id + "\u0000" + conn.url + "\u0000" + conn.db;
   const now = Date.now(), had = cteSupport.get(key);
   if (had && now - had.at < CTE_CHECK_TTL_MS) return had.known;
-  const known = failedStore.exit(() => ctxStore.exit(() => chQuery<{ ok: number }>(CTE_CHECK_SQL, conn)))
-    .then((r) => Number(r.data[0]?.ok) === 1, () => false);
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(new Error("no answer within " + CTE_CHECK_TIMEOUT_MS + "ms")), CTE_CHECK_TIMEOUT_MS);
+  timer.unref?.();
+  const timedOut = new Promise<never>((_, reject) => stop.signal.addEventListener("abort", () => reject(stop.signal.reason), { once: true }));
+  const asked = failedStore.exit(() => ctxStore.run({ signal: stop.signal, externals: new Map() }, () => chQuery<{ ok: number }>(CTE_CHECK_SQL, conn)));
+  const known = Promise.race([asked, timedOut])
+    .then((r) => Number(r.data[0]?.ok) === 1)
+    .then((ok) => {
+      if (!ok) console.warn("[ch] " + conn.id + ": materialized CTEs off for " + CTE_CHECK_TTL_MS / 60_000 + " minutes: the check did not answer 1");
+      return ok;
+    }, (e) => {
+      console.warn("[ch] " + conn.id + ": materialized CTEs off for " + CTE_CHECK_TTL_MS / 60_000 + " minutes: " + String((e as Error)?.message || e).slice(0, 300));
+      return false;
+    })
+    .finally(() => clearTimeout(timer));
   cteSupport.set(key, { at: now, known });
   return known;
 }
