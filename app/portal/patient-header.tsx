@@ -18,7 +18,11 @@ import { cleanAndDerive, inlineAttributes, liftCommon, type Attrs } from "./pati
 /** an attribute's id and display name, and its value */
 type Field = { id: string; name: string; value: string };
 interface SampleRecord { id: string; fields: Field[] }
-export interface PatientRecord { id: string; fields: Field[]; samples: SampleRecord[]; marks: Map<string, SampleMark> }
+export interface PatientRecord {
+  id: string; fields: Field[]; samples: SampleRecord[]; marks: Map<string, SampleMark>;
+  /** the patient's clinical events on the timeline; null when the timeline could not be read */
+  events: number | null;
+}
 
 const HEADER_COHORT = "Header";
 const ROWS_MAX = 1000;
@@ -57,7 +61,7 @@ export function usePatientRecord(study: string, patient: string | null): { recor
         const tl = !tv?.error ? tv?.timeline?.patient as { samples: PatientSample[]; events: PatientEvent[] } | undefined : undefined;
         const typed = samples.map((s) => ({ id: s.id, type: s.fields.find((f) => f.id === "SAMPLE_TYPE")?.value || "" }));
         setOut({ record: { id: patient, fields: fieldsOf(pt, prow, new Set(["patient", "samples"])), samples,
-          marks: sampleMarks(tl?.samples.length ? tl.samples : typed, tl?.events || []) }, error: null });
+          marks: sampleMarks(tl?.samples.length ? tl.samples : typed, tl?.events || []), events: tl ? tl.events.length : null }, error: null });
       })
       .catch((e) => { if (live) setOut({ record: null, error: String(e) }); });
     return () => { live = false; };

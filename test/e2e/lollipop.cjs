@@ -97,6 +97,29 @@ async function lollipop({ browser, ok, BASE }) {
         ok("E2 lollipop download: " + ext.toUpperCase() + " is named <GENE>_lollipop." + ext + " and is a " + ext.toUpperCase() + " file",
           /^[A-Z0-9-]+_lollipop\./.test(name) && name.endsWith("_lollipop." + ext) && magic[ext](body), name + ", " + body.length + " bytes, starts " + JSON.stringify(body.subarray(0, 8).toString("latin1")));
       }
+      // Hovering a stem (MUT-LP-11): the table's rows at that codon are marked dt-hot, as the portal marks
+      // them highlighted; leaving the heads clears the mark, and the page does not jump.
+      const atCodon = (codon) => page.evaluate((n) => {
+        const heads = [...document.querySelectorAll(".dt-table thead th")].map((th) => th.textContent.trim());
+        const ci = heads.findIndex((h) => /^Protein Change/.test(h));
+        const at = (tr) => { const m = /(\d+)/.exec(tr.children[ci] ? tr.children[ci].textContent : ""); return !!m && Number(m[1]) === n; };
+        const rows = [...document.querySelectorAll(".dt-table tbody tr")];
+        return { col: ci, rows: rows.filter(at).length, hot: rows.filter((tr) => tr.classList.contains("dt-hot")).length, hotAt: rows.filter((tr) => tr.classList.contains("dt-hot") && at(tr)).length };
+      }, codon);
+      // a stem with rows on the table's current page (the table pages; the busiest codon may not be on it)
+      const counts = await Promise.all(stems.map(async (st) => ({ codon: st.codon, rows: (await atCodon(st.codon)).rows })));
+      const hc = counts.sort((x, y) => y.rows - x.rows)[0].codon;
+      const head = await page.locator(`.lp-plot g[data-codon="${hc}"] circle.lollipop-head`).first().boundingBox();
+      const y0 = await page.evaluate(() => window.scrollY);
+      await page.mouse.move(head.x + head.width / 2, head.y + head.height / 2);
+      await page.waitForTimeout(300);
+      const hv = await atCodon(hc), y1 = await page.evaluate(() => window.scrollY);
+      ok("lollipop: hovering a stem marks the table's rows at that codon, and only those", hv.col >= 0 && hv.rows > 0 && hv.hot === hv.rows && hv.hotAt === hv.hot && y1 === y0,
+        "codon " + hc + ": " + JSON.stringify(hv) + ", scrollY " + y0 + " -> " + y1);
+      await page.mouse.move(away.x, away.y);
+      await page.waitForTimeout(300);
+      const lv = await atCodon(hc), y2 = await page.evaluate(() => window.scrollY);
+      ok("lollipop: moving off the stems clears the marked rows, without a page jump", lv.hot === 0 && y2 === y0, JSON.stringify(lv) + ", scrollY " + y0 + " -> " + y2);
     } catch (e) {
       ok("lollipop: the alteration grid", false, String(e.message).split("\n")[0].slice(0, 200));
     }

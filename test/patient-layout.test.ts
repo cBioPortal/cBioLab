@@ -19,6 +19,15 @@ test("before the profiles are known, every tab but Mutational Signatures is laid
   first.names.forEach((n, i) => assert.deepEqual(full.doc.views![full.names.indexOf(n)], first.doc.views![i], n));
 });
 
+test("PAT-SUM layout: no timeline on the Summary for a patient with no clinical event (msk_impact_2017 P-0000004); laid out while the count is unknown", () => {
+  const names = (events?: number | null) => patientLayout(q, { profileCatalog: [], held: ["MUTATION"], events }).names.filter((n) => n.startsWith("Summary"));
+  assert.deepEqual(names(0), ["Summary › Genomic overview", "Summary › Genomic alterations"]);
+  assert.deepEqual(names(15)[0], "Summary › Clinical timeline");
+  assert.deepEqual(names(undefined)[0], "Summary › Clinical timeline");
+  assert.deepEqual(names(null)[0], "Summary › Clinical timeline", "a timeline that could not be read is laid out, to say why");
+  assert.ok(patientLayout(q, { profileCatalog: [], held: ["MUTATION"], events: 0 }).names.includes("Clinical Data › Timeline Data"), "the Clinical Data tab keeps its Timeline Data");
+});
+
 test("the Summary's views are the timeline, the genomic overview and the alterations", () => {
   const l = patientLayout(q, { profileCatalog: [], held: ["MUTATION", "CNA"], partial: true });
   assert.deepEqual(l.names.filter((n) => n.startsWith("Summary")), ["Summary › Clinical timeline", "Summary › Genomic overview", "Summary › Genomic alterations"]);

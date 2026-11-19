@@ -17,7 +17,7 @@ for (const k of ["CLICKHOUSE2_URL", "ONCOKB_PIN", "FEDERATION_PEERS", "CH_RUN_CA
 
 const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
-const { numericBinEdges, mergeExplore, buildExplore, buildExploreFederated, buildAssayFacets, ASSAY_CHART_LIMIT } = await import("../lib/explore.ts");
+const { numericBinEdges, mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -810,6 +810,18 @@ describe("several studies", () => {
   };
   const profiles = new Map([["st1", { profiles: ["mutations"], gaProfiles: [] }], ["st2", { profiles: ["mutations"], gaProfiles: [] }]]);
   const connByStudy = new Map([["st2", SECOND]]);
+
+  test("STS-MD-5: an attribute patient-level in one study and sample-level in another is read per sample everywhere", async () => {
+    on(/groupUniqArray\(lower\(toString\(cam\.patient_attribute\)\)\) AS lv/, (q) => /cbio_b\./.test(q)
+      ? [{ a: "GRADE", lv: ["0"] }, { a: "SEX", lv: ["1"] }] : [{ a: "GRADE", lv: ["1"] }, { a: "SEX", lv: ["true"] }]);
+    assert.deepEqual(await conflictingLevels(["st1", "st2"], connByStudy), ["GRADE"], "SEX is patient-level in both");
+    assert.deepEqual(await conflictingLevels(["st1"], connByStudy), [], "one study has nothing to reconcile");
+    twoConnAnswers();
+    await buildExploreFederated({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy, attributes: ["GRADE", "SEX"] });
+    const lifted = sent.filter((q) => /attribute_name IN \('GRADE'\)\)/.test(q));
+    assert.ok(lifted.some((q) => /AS numratio/.test(q)), "the facets read GRADE per sample");
+    assert.ok(lifted.some((q) => /cbio_b\./.test(q)) && lifted.some((q) => /cbio_a\./.test(q)), "on every connection");
+  });
 
   test("each connection is asked once for all its studies, and the parts merge by name", async () => {
     twoConnAnswers();

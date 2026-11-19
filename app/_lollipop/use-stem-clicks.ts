@@ -28,7 +28,9 @@ function headAt(svg: SVGSVGElement, e: MouseEvent): Head | null {
   return best;
 }
 
-export function useStemClicks(ref: RefObject<HTMLElement | null>, on: { pick: (codon: number, multi: boolean) => void; clear: () => void }) {
+export function useStemClicks(ref: RefObject<HTMLElement | null>, on: { pick: (codon: number, multi: boolean) => void; clear: () => void;
+  /** the head under the pointer changed (null: none), for the table that highlights that codon's rows */
+  hover?: (codon: number | null) => void }) {
   // the latest handlers, so the listeners are added once rather than on every render
   const latest = useRef(on);
   useEffect(() => { latest.current = on; });
@@ -37,7 +39,7 @@ export function useStemClicks(ref: RefObject<HTMLElement | null>, on: { pick: (c
     if (!el) return;
     let hovered: { circle: SVGCircleElement; r: string } | null = null;
     const unhover = () => {
-      if (hovered) hovered.circle.setAttribute("r", hovered.r);
+      if (hovered) { hovered.circle.setAttribute("r", hovered.r); latest.current.hover?.(null); }
       hovered = null;
       el.style.cursor = "";
     };
@@ -49,6 +51,7 @@ export function useStemClicks(ref: RefObject<HTMLElement | null>, on: { pick: (c
       unhover();
       if (!h) return;
       hovered = { circle: h.circle, r: h.circle.getAttribute("r") || "2.8" };
+      latest.current.hover?.(h.codon);
       if (Number(hovered.r) < Number(HOVER_R)) h.circle.setAttribute("r", HOVER_R);
       el.style.cursor = "pointer";
     };
