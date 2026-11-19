@@ -45,3 +45,21 @@ function onlyAbout(c: Clause, attribute: string): boolean {
 export function withoutAttribute(all: Clause[], attribute: string): Clause[] {
   return all.filter((c) => !onlyAbout(c, attribute));
 }
+
+/** the tables the portal offers in Add chart rather than showing by default (STS-OT-2, STS-OT-7): their checkbox keys */
+export const SPECIAL_CHART_KEYS = { events: "special|events", caseLists: "special|caselists" } as const;
+
+/**
+ * Whether Timeline Events Availability and Case Lists are drawn: when checked in Add chart, or while
+ * the draft filters on what they list (the portal shows Case Lists when the filters hold one).
+ * Timeline events only where the selection has some. `leaves` are the draft's top-level leaves,
+ * an `any` clause's alternatives each.
+ */
+export function specialChartsShown(checked: (key: string) => boolean, leaves: unknown[], hasEvents: boolean): { events: boolean; caseLists: boolean } {
+  const kind = (k: string) => leaves.some((l) => !!l && (l as { kind?: string }).kind === k);
+  const eventFilter = leaves.some((l) => { const e = l as { kind?: string; rel?: { type?: string } } | null; return !!e && e.kind === "event" && e.rel?.type === "NONE"; });
+  return {
+    events: hasEvents && (checked(SPECIAL_CHART_KEYS.events) || eventFilter),
+    caseLists: checked(SPECIAL_CHART_KEYS.caseLists) || kind("caseList"),
+  };
+}
