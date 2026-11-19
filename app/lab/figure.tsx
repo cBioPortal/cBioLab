@@ -35,6 +35,8 @@ export function useWidth(min = MIN_FIGURE_W) {
 export function SvgAtWidth({ svg, className = "viewfig", topScroll }: { svg: string; className?: string; topScroll?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const top = useRef<HTMLDivElement>(null);
+  // the top bar moves the figure only while the pointer holds it (the portal's ScrollWrapper), so the two never echo each other
+  const held = useRef(false);
   const [more, setMore] = useState(false);
   const [wider, setWider] = useState(false);
   const w = Number(/viewBox="0 0 ([\d.]+) /.exec(svg)?.[1]) || undefined;
@@ -52,10 +54,16 @@ export function SvgAtWidth({ svg, className = "viewfig", topScroll }: { svg: str
     ro.observe(el);
     return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
   }, [svg]);
-  const fromTop = () => { const t = top.current, el = box.current; if (t && el && el.scrollLeft !== t.scrollLeft) el.scrollLeft = t.scrollLeft; };
+  const fromTop = () => { const t = top.current, el = box.current; if (held.current && t && el) el.scrollLeft = t.scrollLeft; };
+  const hold = (on: boolean) => () => { held.current = on; };
+  useLayoutEffect(() => {
+    const release = () => { held.current = false; };
+    window.addEventListener("pointerup", release);
+    return () => window.removeEventListener("pointerup", release);
+  }, []);
   return (
     <div className={className + " figbox"} data-more={more || undefined}>
-      {topScroll && wider && <div ref={top} className="overflow-x-auto overflow-y-hidden" onScroll={fromTop} aria-hidden><div style={{ width: w, height: 1 }} /></div>}
+      {topScroll && wider && <div ref={top} className="overflow-x-auto overflow-y-hidden" onScroll={fromTop} onPointerDown={hold(true)} onPointerCancel={hold(false)} aria-hidden><div style={{ width: w, height: 1 }} /></div>}
       <div ref={box} className="figscroll">
         {/* the renderer escapes every label it writes (lib/chart/esc.ts) */}
         <div style={{ width: w }} dangerouslySetInnerHTML={{ __html: svg }} />

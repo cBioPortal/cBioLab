@@ -42,11 +42,16 @@ test("CS2: bars 8 px apart: their left edges 28 apart", () => {
   for (let i = 1; i < b.length; i++) assert.equal(Math.round((b[i].x - b[i - 1].x) * 10) / 10, 28);
 });
 
-test("CS3: the tallest bar is 280 px, half the value half the height", () => {
-  const b = bars(cancertypesPanelSvg(result([grp("A", 100, 80), grp("B", 100, 40)]), 0, { width: 860 }).body);
-  assert.equal(b[0].h, 280);
-  assert.equal(b[1].h, 140);
-  assert.equal(b[0].y + b[0].h, b[1].y + b[1].h, "one base");
+test("CS3: the tallest bar is 280 px whatever its value, half the value half the height", () => {
+  // the portal sets no y domain: its largest value sits 20 px under the plot's top, never rounded up to a tick
+  for (const [top, half] of [[80, 40], [73, 36.5], [7, 3.5]]) {
+    const b = bars(cancertypesPanelSvg(result([grp("A", 1000, top * 10), grp("B", 1000, half * 10)]), 0, { width: 860 }).body);
+    assert.equal(b[0].h, 280, top + "% max");
+    assert.equal(b[1].h, 140, top + "% max: half");
+    assert.equal(b[0].y + b[0].h, b[1].y + b[1].h, "one base");
+  }
+  const counts = bars(cancertypesPanelSvg({ ...result([grp("A", 1000, 437), grp("B", 1000, 12)]), show: "count" }, 0, { width: 860 }).body);
+  assert.equal(counts[0].h, 280, "count mode: 437");
 });
 
 test("CS4: group labels turned 50°, hanging from their start", () => {

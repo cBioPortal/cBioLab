@@ -102,7 +102,8 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
 
   let W = Math.max(360, o.width || 860);
   const T = (o.title === false ? 10 : 34) + (alert ? 18 : 0);
-  const ys = linear(0, freq ? Math.min(100, top) : top, T + PLOT_H, T + TOP_PAD);
+  // no rounding of the top: the portal sets no y domain, so its largest value is always TOP_PAD under the plot's top
+  const ys = linear(0, freq ? Math.min(100, top) : top, T + PLOT_H, T + TOP_PAD, { nice: false });
   const yFmt = freq ? (v: number) => fmtNum(v) + "%" : (v: number) => fmtInt(v);
   const markW = Math.max(0, ...strip.map((row) => textWidth(row.label, FS.small) + 6));
   const L = PAD + Math.max(leftAxisWidth(ys, yTitle, yFmt), markW) + 4;
