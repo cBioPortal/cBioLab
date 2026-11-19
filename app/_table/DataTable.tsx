@@ -385,13 +385,15 @@ export interface DataTableProps<V> {
   plain?: boolean;
   /** the rows are one cohort's: no cohort column, the study column alone when there are several studies */
   oneCohort?: boolean;
+  /** the study column's header (a page that names it as the portal does: "Cancer Study") */
+  studyHead?: string;
   /** the download: CSV of the rows kept (default), or the portal's table.tsv of every row in the current sort (the Mutations table's) */
   downloadFormat?: "csv" | "table-tsv";
   /** the download button in place of the CSV one: its label, tooltip and action */
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, pager = "pages", downloadFormat = "csv" }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, studyHead = "study", download: ownDownload, pager = "pages", downloadFormat = "csv" }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -526,7 +528,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
           <table className="pb-table dt-table">
             <thead ref={head}><tr>
               {multi && !oneCohort && <th>cohort</th>}
-              {studyCol && <th>study</th>}
+              {studyCol && <th>{studyHead}</th>}
               {shownIdx.map((i) => {
                 const c = t.columns[i];
                 const sorted = q.sort && q.sort.column === c.id;

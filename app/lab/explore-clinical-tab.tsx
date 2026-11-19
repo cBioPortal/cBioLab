@@ -8,7 +8,7 @@ import { DataTable } from "../_table/DataTable.tsx";
 import { patientHref, sampleHref } from "../portal/cohort-navigation.ts";
 import { api } from "./api.ts";
 import { runCaseFile } from "./chart-files.ts";
-import { clinicalCell, clinicalTabColumns, clinicalTabDoc, type TabChart } from "../../lib/study-view-clinical-tab.ts";
+import { clinicalCell, clinicalColumnTip, clinicalTabColumns, clinicalTabDoc, type TabChart } from "../../lib/study-view-clinical-tab.ts";
 import { caseFileName, type CaseFile } from "../../lib/study-view-case-files.ts";
 import type { TableQuery } from "../../lib/table-query.ts";
 import type { TableResult } from "../../lib/views/table/types.ts";
@@ -70,7 +70,9 @@ export function ClinicalDataTab({ selection, studies, charts, active = true }: C
   return (
     <div className="card" data-tab="clinical-data">
       {res.failed === docText && <p className="note">Could not update the clinical data: {res.error}</p>}
-      <DataTable t={res.table} query={{ ...query, columns }} updating={updating} vi={0} docJson={() => res.doc} unit="results" plain oneCohort
+      {/* each attribute's header tooltip as the portal's: name, description, attribute id (STV-CD-3) */}
+      <DataTable t={{ ...res.table, columns: res.table.columns.map((c) => { const ch = charts.find((x) => x.attribute === c.id); return ch ? { ...c, tip: clinicalColumnTip(ch) } : c; }) }}
+        query={{ ...query, columns }} updating={updating} vi={0} docJson={() => res.doc} unit="results" plain oneCohort studyHead="Cancer Study"
         onQuery={(q) => setQuery({ ...(q.search ? { search: q.search } : {}), ...(q.sort ? { sort: q.sort } : {}) })}
         download={{ label: saving ? "preparing…" : "Download", disabled: saving,
           tip: "every row the search keeps, the columns shown, as " + fileName, onClick: download }}

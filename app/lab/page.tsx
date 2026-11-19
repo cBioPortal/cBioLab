@@ -486,8 +486,8 @@ export default function AnalysisPage() {
   // the tabs' props, kept while the selection and the charts stay the same
   const tabSelection = useMemo(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; },
     [explore, studyKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- barDef reads the applied draft, which changes with explore
-  const chartList = explore ? (visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number }[])
-    .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0 })) : [];
+  const chartList = explore ? (visibleClinical(explore.clinical || []) as { attribute: string; displayName?: string; priority?: number; description?: string }[])
+    .map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, priority: Number(c.priority) || 0, ...(c.description ? { description: c.description } : {}) })) : [];
   const chartListKey = JSON.stringify(chartList);
   const tabCharts = useMemo(() => chartList, [chartListKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on its own JSON
   useSavedActions({ openDoc: openDocument, openShared, showClauseData, onDataChanged: () => fetchExplore(), editCohort: editSavedCohort, studies: () => exStudies });
