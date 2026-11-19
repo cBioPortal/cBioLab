@@ -701,16 +701,14 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   const set = (p: Partial<FigureDisplay>) => onDisplay({ ...display, ...p });
   /**
    * How many viewing options are away from their default. The display button wears the count so
-   * folding them behind it never hides the fact that one of them is on.
+   * folding them behind it never hides the fact that one of them is on. Show OQL filters is left
+   * out: what it changes is in the figure itself, the grey line after each row's name.
    */
-  // the query's own default for Show OQL filters: on when some row has OQL
-  const queryHasOql = !!data && data.tracks.some((t) => t.sublabel);
   const offDefaults = (Number(display.showUnaltered !== DEFAULT_FIGURE_DISPLAY.showUnaltered) +
     Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
     Number(display.colorByGermline !== DEFAULT_FIGURE_DISPLAY.colorByGermline) +
-    Number(!!display.whiteBackground) + Number(display.gaps !== "none") +
-    Number(display.showOql !== undefined && display.showOql !== queryHasOql)) || 0;
+    Number(!!display.whiteBackground) + Number(display.gaps !== "none")) || 0;
   // the staircase switches, as the portal's Sort menu offers them: Mutation Type needs colour by
   // type, Driver an annotation, Ignore VUS the driver switch and VUS not already hidden
   const staircaseOff = Number(!display.sortByMutationType) + Number(!display.sortByDrivers) + Number(display.sortIgnoreVUS);

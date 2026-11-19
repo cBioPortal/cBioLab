@@ -32,4 +32,11 @@ export const mutants: Mutant[] = [
     effect: "A row without OQL shows nothing after its label with Show OQL filters on, where the portal shows the default line.",
     find: ": input.defaultOql && gt.members.length === 1 ? { defaultSublabel: input.defaultOql } : {}),",
     replace: ": {}),"},
+  { id: "onc-show-oql-rewritten-query",
+    layer: "counts",
+    guard: "unit",
+    file: "app/portal/results-layout.ts",
+    effect: "A query whose bare genes the profiles wrote out starts with Show OQL filters on, where the portal reads the typed query and starts it off.",
+    find: "...(q.typedOql !== undefined ? { display: { showOql: q.typedOql } } : {}), cohorts: queried }",
+    replace: "cohorts: queried }" },
 ];

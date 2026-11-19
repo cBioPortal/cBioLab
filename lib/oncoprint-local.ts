@@ -148,6 +148,6 @@ export function localInput(o: LocalOptions): AssembleInput {
   return {
     genes: geneList, groups, studies: [o.study || "local"], events, coverage,
     isDriver: (r) => !!(r as LocalEvent).driver, annotationSource: o.annotationSource || "driver flags from the input",
-    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display, o.drivers), unit: o.unit
+    clinical, heatmap: [], derived: [], sort: parseSort(o.sort), lineGap: 90, display: normalizeDisplay(o.display, o.drivers, false), unit: o.unit
   };
 }

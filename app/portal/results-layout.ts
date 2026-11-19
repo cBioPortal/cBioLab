@@ -31,6 +31,12 @@ export interface ResultsQuery {
   ifHeld?: boolean;
   /** the profiles the query page selected (the portal's selectedMolecularProfiles), when its options say; every alteration data type held otherwise */
   selected?: SelectedProfile[];
+  /**
+   * whether the query as typed has OQL, before the profiles wrote its bare genes out
+   * (lib/query-options.ts resolveQuery): the oncoprint's Show OQL filters starts on only then,
+   * as the portal's queryContainsOql reads the typed query
+   */
+  typedOql?: boolean;
 }
 
 /** What the queried studies hold, as far as the page's tabs need it. */
@@ -297,6 +303,11 @@ const cnSegmentsTab = (genes: string[], queried: string[]) => ({
  * The Oncoprint tab's rows: each line of the query its own row, in order, as the portal's oncoprint
  * draws them (OncoprintUtils makeGeneticTrackWith), a gene without OQL bare.
  */
+/** whether any of the query's entries carries OQL (the portal's doesQueryContainOQL) */
+export function entriesHaveOql(entries: string[]): boolean {
+  return entries.some((x) => { try { return parseOql(x).some((e) => hasOql(e.specs)); } catch { return false; } });
+}
+
 export function oncoprintRows(entries: string[]): string[] {
   return entries.flatMap((x) => parseOql(x)).map(({ gene, specs }) =>
     specs.some((sp) => sp.type === "ANY" && !sp.driver) ? gene : gene + oqlSublabel(specs));
@@ -318,7 +329,7 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
   // the Mutations tab follows the query's lines where they narrow mutations, and its Driver/VUS split the
   // page's driver settings, with or without DRIVER in the query, as the portal's
   const mutOql = { oql: q.entries, drivers: {} };
-  const queryHasOql = q.entries.some((x) => { try { return parseOql(x).some((e) => hasOql(e.specs)); } catch { return false; } });
+  const queryHasOql = entriesHaveOql(q.entries);
   // Mutual Exclusivity's tracks are the query's lines, named as the portal names them (2 or more to pair)
   const meTracks = new Set(q.entries.map((x) => { try { return oqlTrackName(x); } catch { return x; } })).size;
   const left = [
@@ -337,7 +348,8 @@ export function resultsLayout(q: ResultsQuery, data: ResultsData): PageLayout {
     q.selected && !q.selected.length ? "The selected profiles name none Unaltered can check, so it checks the " + selectionWords({ ...q, selected: undefined }, data.held) + " data instead" : null,
   ].filter(Boolean) as string[];
   return arrange({ study: q.studies[0], cohorts }, [
-    { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), ...pinsOf(q), cohorts: queried })] },
+    { title: "Oncoprint", views: [v("Oncoprint", { kind: "oncoprint", genes: oncoprintRows(q.entries), ...pinsOf(q),
+      ...(q.typedOql !== undefined ? { display: { showOql: q.typedOql } } : {}), cohorts: queried })] },
     { title: "Cancer Types Summary", views: [v("Cancer types summary", { kind: "cancertypes", genes, oql: q.entries, ...pinsOf(q),
       ...(asksDriver(q.entries.join("; ")) ? { drivers: {} } : {}), cohorts: queried })] },
     ...(meTracks >= 2 ? [{ title: "Mutual Exclusivity", views: [v("Mutual exclusivity", { kind: "cooccurrence", genes, oql: q.entries, ...pinsOf(q),
