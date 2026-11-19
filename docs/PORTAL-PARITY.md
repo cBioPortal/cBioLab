@@ -372,7 +372,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [x] The profiled strip: "+" and "−" rows for every data type, with hover counts (ours rows only where a group lacks a type) (CTS-CH-5, CTS-CH-6, CTS-MD-8) (#335)
   - [x] The "Show Genomic Alteration Types" toggle (CTS-OC-3) (#338)
   - [x] A gene with no alterations: grey tab label, "There are no alterations in this gene." (CTS-GT-4, CTS-MD-10) (#339)
-  - [ ] Re-measure 2026-11-18, still different:
+  - [x] Re-measure 2026-11-18, still different (all fixed):
     - [x] An amplification in one gene and a deep deletion in another count as Amplification; the portal counts whichever CNA it meets first, Deep Deletion in all 3 msk_impact_2017 `TP53 KRAS PIK3CA` groups that differ (GI Neuroendocrine, Germ Cell, Bone: one patient each) (CTS-STM-2, CTS-STM-3) (#428)
     - [x] The Min. # Total box is not clamped to the largest group: 999999 hides every category, the portal sets it to the max (1668); no slider beside either box, no highlighted box when a threshold is above 0 (CTS-CT-3, CTS-CT-4, CTS-CT-7, CTS-CT-9, CTS-STM-6) (#429)
       - Ours alone: the sliders' ends are over every chart and gene tab drawn, since the boxes are shared; both apply when let go (the portal's Min. Altered applies while dragging)
