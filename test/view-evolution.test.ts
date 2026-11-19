@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
 import { heatmapTsv, HEATMAP_FILE } from "../lib/views/evolution/download.ts";
-import { evolutionSvg, lineCells, cellText, portalCellTip, onlySelected, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { evolutionSvg, lineCells, cellText, portalCellTip, heatmapColumns, onlySelected, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
@@ -1040,6 +1040,27 @@ describe("PTB-GE-LC-6: portalCellTip, the portal's Genomic Evolution tooltip", (
     ["T8 not profiled", cell("np"), "P04_Rec1 is not sequenced for TP53 mutations."],
   ];
   for (const [name, c, want] of cases) test(name, () => assert.equal(tip(c), want));
+});
+
+describe("evolution: the heatmap's zoom (PTB-GE-HM-1, the portal's horizontal zoom: 20 px cells at 1)", () => {
+  const colWidths = (svg: string | null) => [...(svg || "").matchAll(/<g class="evo-row"[^>]*><rect [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1]));
+  test("unzoomed, the columns fit the card; zoomed, zoom × 20 px, never under the floor; a zoomed figure wider than the card keeps its width", async () => {
+    assert.equal(HEAT_CELL, 20);
+    const v = await run({ chart: "heatmap" }, one());
+    const cols = heatmapColumns(v as never, 800);
+    assert.deepEqual(cols, { fit: 20, floor: 12 }, "two mutations fit at the portal's 20 px; labelled, a column is at least a label's line high");
+    assert.deepEqual(colWidths(evolutionSvg(v as never, { width: 800 })), [20, 20]);
+    assert.deepEqual(colWidths(evolutionSvg(v as never, { width: 800, zoom: 0.7 })), [14, 14]);
+    assert.deepEqual(colWidths(evolutionSvg(v as never, { width: 800, zoom: 0.1 })), [12, 12], "not under the floor");
+    const wide = evolutionSvg(v as never, { width: 420, zoom: 30 })!;
+    assert.deepEqual(colWidths(wide), [600, 600]);
+    assert.match(wide, /min-width:\d+px/, "wider than the card: drawn at its width, the card scrolls");
+    assert.doesNotMatch(evolutionSvg(v as never, { width: 800 })!, /min-width/);
+    const t = await run({ chart: "heatmap", transpose: true }, one());
+    assert.equal(heatmapColumns(t as never, 800).floor, 14, "transposed, a column holds a sample's marker");
+    const rows = [...evolutionSvg(t as never, { width: 800, zoom: 1.5 })!.matchAll(/<g data-s="\d+"><title>[^<]*<\/title><rect [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1]));
+    assert.ok(rows.length > 0 && rows.every((w) => w === 29), "transposed, a sample's column is zoom × 20 px less the 1 px gap: " + rows);
+  });
 });
 
 describe("evolution: Show only selected mutations (PTB-GE-LC-2, the portal's VAFChartControls)", () => {
