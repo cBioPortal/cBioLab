@@ -155,6 +155,10 @@ export const STYLE = {
     } as Record<string, string>,
     unknown: "#EE4B2B"
   },
+  // the Patient tables' Cohort cell, the portal's FrequencyBar (shared/components/cohort/FrequencyBar.tsx):
+  // a grey bar, the gene's share over it, a mutation's keyword share darker still; copy number red or blue
+  cohortBar: { background: "#ccc", gene: "lightgreen", keyword: "green", amp: "red", del: "blue", width: 30, height: 8, top: 2, svgHeight: 12,
+    textMargin: 6, textWidth: 35, textBaseline: 9.5, fontSize: 10 },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,
@@ -461,11 +465,12 @@ export function truncateLabel(label: string, S: Style = STYLE): string {
  * still ends in a closing bracket rather than losing it to the ellipsis.
  */
 /**
- * A row's sublabel as the gutter prints it, when the display shows OQL: past 18 characters, its
- * first 15 and "..." (oncoprintlabelview shortenLabelIfNecessary, getMaximumLabelLength).
+ * A row's sublabel as the gutter prints it, when the display shows OQL (its own line, else the
+ * query's default line): past 18 characters, its first 15 and "..." (oncoprintlabelview
+ * shortenLabelIfNecessary, getMaximumLabelLength).
  */
-export function trackSublabelText(track: { sublabel?: string }, display?: { showOql?: boolean } | null): string {
-  const s = track.sublabel || "";
+export function trackSublabelText(track: { sublabel?: string; defaultSublabel?: string }, display?: { showOql?: boolean } | null): string {
+  const s = track.sublabel || track.defaultSublabel || "";
   if (!s || display?.showOql === false) return "";
   return s.length > 18 ? s.slice(0, 15) + "..." : s;
 }

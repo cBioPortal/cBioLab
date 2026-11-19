@@ -100,7 +100,7 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 | ID | verdict | how | note |
 |---|---|---|---|
 | PTB-TAB-1 | 🟡 | B | `?tab=<Title>` keeps the query; unknown → Summary ✅; not a path segment |
-| PTB-TAB-2 | 🟡 | B | Summary · Genomic Evolution · Pathways · Clinical Data · Files & Links · Mutational Signatures, the legacy order ✅; GE on >1 sample and a called mutation with VAF > 0 (the evolution view's patient list) ✅, uncalled reads not counted toward the gate; Files & Links always shown (a placeholder), not only with resource data; no Pathology / Tissue / Matched Trials / mRNA / Plots / resource / custom tabs |
+| PTB-TAB-2 | 🟡 | B | Summary · Genomic Evolution · Pathways · Clinical Data · Mutational Signatures, the legacy order ✅; GE on >1 sample and a called mutation with VAF > 0 in a called or uncalled record (legacy mergeMutationsIncludingUncalled; `lib/views/evolution/sql.ts:52-60`) ✅, drawable lists identical on glioma_msk_2018 36 / lgg_ucsf_2014 23 / msk_impact_2017 545; no Files & Links (no study holds resource data; `app/portal/patient-layout.ts:67`) ✅; Pathways hidden with no genomic data; no Pathology / Tissue / Matched Trials / mRNA / Plots / resource / custom tabs |
 | PTB-TAB-3 | ✅ | B | No Clinical Trials tab |
 | PTB-TAB-4 | N/A | — | Observation about the public build; requirement is TAB-2 #5 |
 | PTB-TAB-5 | 🟡 | C | Line tabs + "Open in cBioPortal"; no pagination, no help widget, no closable resource tabs |
@@ -140,7 +140,7 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 | ID | verdict | how | note |
 |---|---|---|---|
 | PTB-CD-1 | ✅ | B | "Patient" and "Samples" tables as the portal's, and the Timeline Data tables under them (#316) ✅ |
-| PTB-CD-2 | 🟡 | B | Attribute \| Value, priority then name, every attribute with a value, a filter box ✅ (lgg P04: Overall Survival Status 1:DECEASED, Diagnosis Age 22, Number of Samples 4, OS 61, Sex Male — the portal API's five); no 1-decimal format yet (PTB-STM-11, with #290), no panel links, no copy/download |
+| PTB-CD-2 | 🟡 | B | Attribute \| Value, priority then name, every attribute with a value, a filter box ✅ (lgg P04: Overall Survival Status 1:DECEASED, Diagnosis Age 22, Number of Samples 4, OS 61, Sex Male — the portal API's five); non-integer numbers to one decimal (`lib/views/table/transpose.ts`, TCGA-A6-2671 OS_MONTHS 43.8 = portal) ✅; no panel links, no copy/download |
 | PTB-CD-3 | 🟡 | B | Attribute × sample, a sample's own attributes, n/a where missing, raw values ✅ (P04: P04_Pri … P04_Rec3); samples in id order, not the collection-day order; no column sorts (the portal sorts Attribute) |
 | PTB-CD-4 | 🟡 | B | Timeline Data: a table per event type, START_DATE · STOP_DATE · EVENT_TYPE · each attribute key in first-seen order, PATIENT_ID and STYLE_* left out, days as recorded, each sortable (as text) and filterable ✅ (lgg P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows — the portal API's counts); laid out as its own card under the two tables |
 
@@ -220,7 +220,7 @@ Re-measured 2026-11-18: 2 is down to Files & Links on every patient; 1 to the 1-
 | PTB-STM-8 | ✅ | C | COSMIC v3.3, key = first word of NAME |
 | PTB-STM-9 | N/A | — | Unused store quirks |
 | PTB-STM-10 | 🟡 | B | Match count, TCGA-only ✅, same scores; shown as number; ties broken differently |
-| PTB-STM-11 | 🔶 | B | Raw values in both tables; no toFixed(1) on the patient table |
+| PTB-STM-11 | ✅ | B | Patient table non-integer numerics to one decimal, "< 0.1" when it rounds to 0 (`lib/views/table/transpose.ts`, portalClinicalValue); samples table raw. TCGA-A6-2671: OS_MONTHS/DSS_MONTHS 43.75842457 → 43.8, PFS_MONTHS 17.58884834 → 17.6, WEIGHT 67.2, as the portal; FGA 0.4881 raw in the samples table |
 | PTB-STM-12 | ❌ | C | No mRNA tab (tracked) |
 
 ---

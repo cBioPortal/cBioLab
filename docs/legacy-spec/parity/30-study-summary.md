@@ -76,7 +76,7 @@ Re-score of 2026-11-16: the rows PRs #203, #222, #257, #260, #261 and #266 had a
 | 10 | **Survival**: one chart with an endpoint picker instead of one KM tile per endpoint; numbers match | KM-1 | kept on purpose (decided 2026-11-13) |
 | 11 | **Density**: x = log10(MC+1), y = FGA (legacy x = FGA, y = MC, linear); 48×32 grid (legacy 44×38); no Pearson/Spearman text, no Swap Axes / Log menu, tooltip "n samples" only | SC-2…5, STM-15 | fixed (#222) |
 | 12 | **Chart chrome**: no drag, resize, ✕ delete (hide via Add chart), ↶ reset (remove pill instead), ⓘ overlay (title tooltip only) | LY-1…6, HD-2…4 | decided against (2026-11-13): fixed layout |
-| 13 | **Gene CNA chart**: Amplified / Deleted / Diploid / Not profiled; GAIN and HETLOSS fold into Diploid (KRAS: 585 vs legacy 390 + 128 + 67) | GS-3 | (tracked) OQL coverage: "only high-level ±2 calls are loaded" |
+| 13 | **Gene CNA chart**: the discrete profile's five levels and Not profiled, as the portal (KRAS 6 / 128 / 390 / 67 / 1 / NA 2); drawn as a list without the CNA colours | GS-3 | fixed (#378) |
 | 14 | **Empty selection**: facets still drawn (filtered attribute only), "0 patients match"; no "filtered out all the samples" message | LY-11, MD-14 | fixed (#260) |
 | 15 | **Case lists** limited to 10 (`LIMIT 10 BY s`): coad, read, protein_quantification, methylation_hm450 missing; counted in patients, not samples | OT-2 | fixed (#260) |
 
@@ -96,7 +96,7 @@ Re-score of 2026-11-16: the rows PRs #203, #222, #257, #260, #261 and #266 had a
 | Mutated / CNA / SV genes, every row (# altered, # events, profiled) | STM-13 | Q1 18,275 / 23,770 / 810; Q2 16,678 / 17,395 / 361; Q4 18,669 mutated | identical, 0 rows differ | ✅ |
 | Data types (16), case lists (14), event types (3), Q1 and Q2 | STM-14 | e.g. mutations 534 / 255; all 594; STATUS 592 / 280 | identical | ✅ |
 | KRAS mutation chart Q1 | GS-1 | 218 / 316 / 60 | 218 / 316 / 60 | ✅ |
-| KRAS CNA chart Q1 (2026-11-11) | GS-3 | AMP 6, HOMDEL 1, GAIN 128, HETLOSS 67, Diploid 390, NA 2 | Amplified 6, Deleted 1, Diploid 585, Not profiled 2 | 🔶 |
+| KRAS CNA chart Q1 (2026-11-19) | GS-3 | AMP 6, HOMDEL 1, GAIN 128, HETLOSS 67, Diploid 390, NA 2 | Amplified 6, Gained 128, Diploid 390, Heterozygously deleted 67, Homozygously deleted 1, Not profiled 2 | ✅ |
 | OS KM Q1 | STM-18 | n 590, 120 events, median 81.37 mo | "median 81.37 (62.79 - NA) mo · n = 590 · 120 events" | ✅ |
 | Density Q1 | STM-15 | n 523, Pearson −0.3317, Spearman −0.3487 | "523 of 594 samples have both", Pearson −0.3317, Spearman −0.3487 | ✅ |
 | Treatment per patient (2026-11-11) | OT-6 | 214 patients, per-drug rows | none (only "has Treatment" 214) | ❌ |
@@ -248,7 +248,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 |---|---|---|---|
 | STS-GS-1 | 🟡 | B | ↓ "KRAS: somatic mutations" Mutated / Not mutated / Not profiled = 218 / 316 / 60 (= legacy) ✅; drawn as a list without the portal's colours (#1b9e77 / #d95f02 / #D3D3D3), labels lower-case "Not mutated" (`lib/explore.ts:876-878`) |
 | STS-GS-2 | ❌ | C | No mutation-type option |
-| STS-GS-3 | 🔶 | B | Amplified / Deleted / Diploid / Not profiled; no GAIN/HETLOSS (tracked: OQL coverage, only ±2 loaded) |
+| STS-GS-3 | 🟡 | B | ↓ "KRAS: copy-number alterations" Amplified / Gained / Diploid / Heterozygously deleted / Homozygously deleted / Not profiled = 6 / 128 / 390 / 67 / 1 / 2 (= legacy `/api/genomic-data-counts/fetch`) ✅, a click a `genomicData` clause on the discrete profile's values (`lib/explore.ts`, `lib/gene-state-clauses.ts`); drawn as a list without the portal's CNA colours |
 | STS-GS-4 | ❌ | C | No continuous-profile gene bar |
 | STS-GS-5 | 🟡 | C | Generic assays › one entity → histogram (`buildAssayFacets`), bins from `numericBinEdges`, ≤6 charts |
 | STS-GS-6 | 🟡 | C | Categorical GA entity → value list (top 30) |
@@ -336,7 +336,6 @@ Fixed since the first audit (#188): two bars of one histogram ANDing to nothing;
 
 Found on 2026-11-18 (master `bc53b944`):
 - **Numeric charts past the 14th get no bars, silently.** `NUM_HISTOGRAM_LIMIT = 14` (`lib/explore.ts:25, 326, 1003`): asking `/api/explore` for coadread's 19 numeric attributes returns bins for 14; PFS_MONTHS, RAGNUM_HYPOXIA_SCORE, TMB_NONSYNONYMOUS, TBL_SCORE and WINTER_HYPOXIA_SCORE come back with none, and the page says nothing about the limit (STS-BAR-1).
-- **"Diploid" on a gene's CNA chart is everything profiled that is not ±2** (`lib/explore.ts:917-920`), so GAIN and HETLOSS samples are labelled Diploid (KRAS: 585, the portal's Diploid 390), and the "unaltered" clause selects them (STS-GS-3; invariant 1).
 - **The CNA chart's overlap note says "patients"** ("N patients are counted in both Amplified and Deleted", `app/lab/explore-sections.tsx:1104-1108`), but `overlap` is counted in samples (`uniqExact(sample_unique_id)`, `lib/explore.ts:887`) (STS-GS-3).
 - **A generic-assay chart's bar and value tooltips always say "patients"** (`app/lab/explore-sections.tsx:1054, 1066`) though a sample-level profile is counted in samples (`lib/explore.ts:1838`); the card's meta line gets it right (STS-GS-5, STS-GS-6).
 - **Gene-table Freq is rounded on the server, then formatted as cBioLab's own percentages** (`lib/explore.ts:661, 1710`; `fmtPct`, `app/lab/explore-sections.tsx:1321`): a gene altered in under 0.05 % of profiled samples shows "0%" (the portal "<0.1%"), and 100 % shows "100%" (the portal "100.0%"). The download writes `portalFreq` (STS-GT-5).

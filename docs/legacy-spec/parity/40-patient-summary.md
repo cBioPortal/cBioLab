@@ -157,7 +157,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| PAT-TAB | 🟡 | B | Re-measured 2026-11-18 (was 🔶): P1 Summary · Genomic Evolution · Pathways · Clinical Data · Files & Links, the portal's order; GE only with >1 sample and a VAF (gone on P3/P4); no Clinical Trials. Still: Files & Links a "not built yet" card on every patient (portal: only with resource data); Pathways hidden with no genomic data; no Pathology Report, Tissue Image, mRNA, Plots, resource or custom tabs (detail in 41-patient-tabs) |
+| PAT-TAB | 🟡 | B | Re-measured 2026-11-18 (was 🔶): P1 Summary · Genomic Evolution · Pathways · Clinical Data, the portal's order; GE only with >1 sample and a VAF, uncalled records counted as legacy (gone on P3/P4); no Clinical Trials; no Files & Links without resource data, as the portal. Still: Pathways hidden with no genomic data; no Pathology Report, Tissue Image, mRNA, Plots, resource or custom tabs (detail in 41-patient-tabs) |
 
 ### §2 Summary layout
 

@@ -364,6 +364,17 @@ async function explore({ ok, BASE, page }) {
   } catch (e) { pillDetail = String(e.message).split("\n")[0]; }
   ok("explore: filter pills are named by chart, an interval's end is edited in place, and × removes the filter", pillOk, pillDetail);
 
+  // View patients, the portal's "View selected cases": disabled, saying why, when the filters leave no patient (STV-AB-2)
+  let vpDetail = "", vpOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018&filterAttributeId=AGE&filterValues=150-200", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => /\b0 patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const vp = page.locator("button.viewpatients");
+    vpDetail = JSON.stringify({ disabled: await vp.isDisabled(), tip: await vp.getAttribute("data-tip") });
+    vpOk = await vp.isDisabled() && (await vp.getAttribute("data-tip")) === "no patient matches your filters";
+  } catch (e) { vpDetail = String(e.message).split("\n")[0]; }
+  ok("explore: View patients is disabled, saying why, when no patient matches the filters", vpOk, vpDetail);
+
   // A histogram's menu (lib/study-view-bins.ts): Custom Bins' median split draws two bars, kept by
   // this browser across a reload; an empty Custom box is the default bars again; Show NA adds a bar.
   let binDetail = "", binOk = false;

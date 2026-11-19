@@ -142,3 +142,9 @@ test("the gutter's \"<1%\" and \"N/P\" are escaped and drawn in the SVG (ONC-LY-
   assert.match(svg, />&lt;1%\*?<\/text>/);
   assert.match(svg, />N\/P<\/text>/);
 });
+
+test("local tables take no OQL, so Show OQL filters starts off; a set value is kept (ONC-VI-6)", () => {
+  assert.equal(fixture().display.showOql, false);
+  const on = assembleContract(localInput({ events: parseTsv(readFileSync(FIX + "events.tsv", "utf8")), display: { showOql: true } }));
+  assert.equal(on.display.showOql, true);
+});

@@ -150,7 +150,7 @@ def resolve_drivers(d: dict[str, Any] | None) -> dict[str, Any]:
             "hideVus": annotated and boolean("hideVus", False), "hideGermline": boolean("hideGermline", False)}
 
 
-def normalize_display(d: dict[str, Any] | None, drivers: dict[str, Any] | None = None) -> dict[str, Any]:
+def normalize_display(d: dict[str, Any] | None, drivers: dict[str, Any] | None = None, show_oql_default: bool = True) -> dict[str, Any]:
     """Viewing options with defaults filled in (port of normalizeDisplay in lib/oncoprint-assemble.ts).
 
     The view's driver settings are resolved here too; display.annotate "none" and display.hideVUS
@@ -205,7 +205,7 @@ def normalize_display(d: dict[str, Any] | None, drivers: dict[str, Any] | None =
         "hideGermline": resolved["hideGermline"],
         "drivers": resolved,
         "whiteBackground": boolean("whiteBackground", False),
-        "showOql": boolean("showOql", True),
+        "showOql": boolean("showOql", show_oql_default),
     }
     # the staircase switches, echoed only when off the portal's defaults
     if not boolean("sortByMutationType", True):
@@ -252,4 +252,4 @@ def local_input(events: Table, clinical: Table | None = None, coverage: Table | 
         groups = [{"name": "all", "pids": pids}]
     return dict(genes=gene_list, groups=groups, studies=[study or "local"], events=ev, coverage=cov,
                 is_driver=lambda r: bool(r.get("driver")), annotation_source=annotation_source or "driver flags from the input",
-                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90, display=normalize_display(display, drivers), unit=unit)
+                clinical=clin, heatmap=[], derived=[], sort=parse_sort(sort), line_gap=90, display=normalize_display(display, drivers, False), unit=unit)

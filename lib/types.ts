@@ -898,6 +898,8 @@ export interface Track {
   profileKind?: string;
   /** a gene row's OQL line less the gene (": AMP MUT=G12D"), drawn after its label */
   sublabel?: string;
+  /** a single-gene row without OQL: the query's default line (": AMP HOMDEL MUT FUSION"), drawn in its place */
+  defaultSublabel?: string;
   /** a gene row's name where its label is not unique: its line ("KRAS: AMP"), what track edits name it by */
   key?: string;
 }

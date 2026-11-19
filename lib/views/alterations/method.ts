@@ -20,7 +20,9 @@ export function alterationsMethod(t: { cohorts: string[]; oncokbPin: string | nu
       "(variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). " +
       "Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. " +
       (t.genesProfiled === "all" ? "The Mutations and CNA tables keep only rows whose gene every sample in view was profiled for (a panel of the sample's for that data holds the gene, or it is whole-exome/genome); rows off a sample's panel are left out. " : "") +
-      "Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call" +
+      "Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; blank for a mutation with no keyword (in-frame indels, splice region), as the portal's variant counts. " +
+      "A mutation's Cohort cell also gives its keyword's share (IDH1 R132 missense, APC truncating; the darker part of the bar and the tooltip's \"out of which N (x%) have … mutations\"): " +
+      "the study's samples with a called mutation carrying the row's keyword, over the same denominator, the samples profiled for the gene" +
       (t.oncokbPin ? "; the annotation is the OncoKB " + t.oncokbPin + " call for the protein change, or for AMPLIFICATION / DELETION" : "") + ".",
     params: t.tables.map((x) => [x.name, (x.queryText ? x.total.toLocaleString("en-US") + " of " : "") + x.all.toLocaleString("en-US") + " rows" + (x.queryText ? " (kept: " + x.queryText + ")" : "")] as [string, string]),
   });
