@@ -60,7 +60,9 @@ const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map
   const cohort = cohortOf(x);
   // the samples in view not profiled for the row's gene (PAT-GP-2): the Samples cell's grey pills
   const notProfiled = Array.isArray(x.notProfiled) && x.notProfiled.length ? (x.notProfiled as unknown[]).map(String) : null;
-  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}), ...(notProfiled ? { notProfiled } : {}), ...(mrnaZ != null && Number.isFinite(mrnaZ) ? { mrnaZ } : {}) };
+  // the Gene panel cell's list (with the unprofiled samples' panels), where it differs from the column's value
+  const genePanelShown = x.genePanelShown && x.genePanelShown !== x.genePanel ? String(x.genePanelShown) : null;
+  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}), ...(notProfiled ? { notProfiled } : {}), ...(genePanelShown ? { genePanelShown } : {}), ...(mrnaZ != null && Number.isFinite(mrnaZ) ? { mrnaZ } : {}) };
   return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
     values: cols.map((c) => cellOf(x, c)), ...(Object.keys(detail).length ? { detail } : {}) };
 });
@@ -174,8 +176,12 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
   /** genesProfiled "all" needs each sample's panels, which a peer does not send: refused for a peer's patient, never ignored */
   const peerRefusal = (pt: { study: string; id: string }) => genes === "all" && peerOf(ctx.resolvers[pt.study])
     ? no("genesProfiled \"all\" is not available for " + pt.id + ", whose tables come from " + ctx.resolvers[pt.study].instance.label + " via federation; set it to \"any\"") : null;
-  /** whether a table's query reads the inAll column (shows, filters, sorts or lists its values), so each row's panel coverage must be worked out */
-  const asksInAll = (tq: TableQuery) => !!(tq.columns?.includes("inAll") || tq.filters?.inAll || tq.sort?.column === "inAll" || ctx.values === "inAll");
+  /** whether a table's query reads a column (shows, filters, sorts or lists its values) */
+  const asks = (tq: TableQuery, c: string) => !!(tq.columns?.includes(c) || tq.filters?.[c] || tq.sort?.column === c || ctx.values === c);
+  /** whether a table's query reads the inAll column, so each row's panel coverage must be worked out */
+  const asksInAll = (tq: TableQuery) => asks(tq, "inAll");
+  /** whether the Gene panel column's values are needed: asked for, or a page read whole (the download, which writes every column) */
+  const asksPanels = (tq: TableQuery) => asks(tq, "genePanel") || !!ctx.page;
   /**
    * the mutation table's mRNA Expr. ranking: with one sample in view and an mRNA z-score profile in its
    * study, that sample and profile (PAT-MT-5); a peer's patient is not asked (null)
@@ -190,7 +196,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const mrna = t === "mutations" ? rank : null;
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = alterationDefaults(t, inView.length, !!mrna);
     const r = await runRows(ctx, "alterations:" + t, [pt.study], tqq, defs, shownColumns(tqq, cols, defs), size,
-      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, { genes, inAll: asksInAll(tqq) || (inView.length > 1 && t !== "sv") }, mrna),
+      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, { genes, inAll: asksInAll(tqq) || (inView.length > 1 && t !== "sv"), panels: t !== "sv" && asksPanels(tqq) }, mrna),
       ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined,
       remote(("alterations:" + t) as PeerTable, { patient: pt.id, order }));
     const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, ...(c.unsorted ? { unsorted: true } : {}) }));

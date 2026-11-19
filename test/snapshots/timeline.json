@@ -1469,6 +1469,11 @@
                 "numeric": false
               },
               {
+                "id": "genePanel",
+                "name": "Gene panel",
+                "numeric": false
+              },
+              {
                 "id": "proteinChange",
                 "name": "Protein Change",
                 "numeric": false
@@ -1582,6 +1587,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "ATRX",
+                  "",
                   "K983*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1625,6 +1631,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "BLM",
+                  "",
                   "A363fs",
                   "Likely Oncogenic",
                   "FS del",
@@ -1668,6 +1675,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FBXW7",
+                  "",
                   "G61*",
                   "Likely Oncogenic · Level 3A",
                   "Nonsense",
@@ -1711,6 +1719,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FBXW7",
+                  "",
                   "X413_splice",
                   "Likely Oncogenic · Level 3A",
                   "Splice",
@@ -1754,6 +1763,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "MAP3K1",
+                  "",
                   "E302*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1797,6 +1807,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "MAP3K1",
+                  "",
                   "X696_splice",
                   "Likely Oncogenic",
                   "Splice",
@@ -1840,6 +1851,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRD",
+                  "",
                   "E915*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1883,6 +1895,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRD",
+                  "",
                   "P1338T",
                   "Unknown",
                   "Missense",
@@ -1926,6 +1939,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRT",
+                  "",
                   "G969V",
                   "Unknown",
                   "Missense",
@@ -1969,6 +1983,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRT",
+                  "",
                   "X1053_splice",
                   "Likely Oncogenic",
                   "Splice",
@@ -2012,6 +2027,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "SMARCA4",
+                  "",
                   "E1211*",
                   "Likely Oncogenic · Level 3A",
                   "Nonsense",
@@ -2055,6 +2071,7 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "TP53",
+                  "",
                   "T256P",
                   "Likely Oncogenic",
                   "Missense",
@@ -2098,6 +2115,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "TP53",
+                  "",
                   "P67Qfs*56",
                   "Likely Oncogenic",
                   "FS del",
@@ -2141,6 +2159,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "ATR",
+                  "",
                   "R2431M",
                   "Unknown",
                   "Missense",
@@ -2184,6 +2203,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "AXIN2",
+                  "",
                   "I375M",
                   "Unknown",
                   "Missense",
@@ -2227,6 +2247,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "BRIP1",
+                  "",
                   "D393V",
                   "Unknown",
                   "Missense",
@@ -2270,6 +2291,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CCNE1",
+                  "",
                   "A47V",
                   "Unknown",
                   "Missense",
@@ -2313,6 +2335,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CREBBP",
+                  "",
                   "M2161I",
                   "Unknown",
                   "Missense",
@@ -2356,6 +2379,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "DOT1L",
+                  "",
                   "W305C",
                   "Unknown",
                   "Missense",
@@ -2399,6 +2423,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FLT4",
+                  "",
                   "S293R",
                   "Unknown",
                   "Missense",
@@ -2436,7 +2461,7 @@
               },
               {
                 "…": "5 more",
-                "sha256": "5914b524e70f7f6b"
+                "sha256": "5adde494eb68e1d2"
               }
             ],
             "offset": 0,
@@ -2462,6 +2487,11 @@
               {
                 "id": "gene",
                 "name": "Gene",
+                "numeric": false
+              },
+              {
+                "id": "genePanel",
+                "name": "Gene panel",
                 "numeric": false
               },
               {
@@ -2516,6 +2546,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CDK4",
+                  "",
                   "AMP",
                   "Oncogenic · Level 4",
                   "12q14.1",
@@ -2537,6 +2568,7 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "MCL1",
+                  "",
                   "AMP",
                   "Oncogenic",
                   "1q21.2",
@@ -2558,6 +2590,7 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "RIT1",
+                  "",
                   "AMP",
                   "Unknown",
                   "1q22",
