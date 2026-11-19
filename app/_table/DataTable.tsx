@@ -11,7 +11,8 @@ import type { ColumnFilter, ColumnValues, TableQuery, TableRows, TextFilterOp } 
 import { api } from "../lab/api.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { ViewPageBody, TableBody } from "../../lib/api-schemas.ts";
-import { ChevronLeft, ChevronRight, Columns3, Download, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Columns3, Copy, Download, X } from "lucide-react";
+import { copyText } from "./copy-text.ts";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
@@ -414,6 +415,20 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     if (x == null || x === "") return "";
     return typeof x === "number" ? (num ? num(c.id, x) : x.toLocaleString()) : String(x);
   };
+  // the portal's Copy: the same table.tsv text, to the clipboard, then "Copied!"
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = async () => {
+    setCopied("copying…");
+    try {
+      const doc = JSON.parse(docJson ? docJson() : "");
+      const r = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
+        body: await api.tablePayload({ doc: doc as TableBody["doc"], view: vi, ...(table ? { table } : {}), format: "table-tsv" }) });
+      const text = await r.text();
+      if (!r.ok) throw new Error(text.trim());
+      await copyText(text);
+      setCopied("Copied!");
+    } catch (e) { setCopied("could not copy: " + String((e as Error)?.message || e)); }
+  };
   const download = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = e.currentTarget;
@@ -445,13 +460,19 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         {ownDownload ? <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !t.total || ownDownload.disabled}
           data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download" : ownDownload.tip}
           onClick={ownDownload.onClick}><Download />{ownDownload.label}</Button> :
-        <form method="post" action="/api/table" target="_blank" onSubmit={download}>
+        <>{downloadFormat === "table-tsv" && <>
+          <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !docJson || !t.total}
+            data-tip={updating ? "waiting for the table to update, so the copy matches it" : "copy every row, as the download writes it, to the clipboard"}
+            onClick={() => void copy()} onBlur={() => setCopied(null)}><Copy />Copy</Button>
+          {copied && <span className="meta" role="status">{copied}</span>}
+        </>}
+                <form method="post" action="/api/table" target="_blank" onSubmit={download}>
           <input type="hidden" name="payload" />
           <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
             data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
               : downloadFormat === "table-tsv" ? "every row, whatever the search and filters, in the table's order, with all " + t.columns.length + " columns, as tab-separated text (the portal's table.tsv)"
               : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />{downloadFormat === "table-tsv" ? "download TSV (" + t.all.toLocaleString() + ")" : "download CSV (" + t.total.toLocaleString() + ")"}</Button>
-        </form>}
+        </form></>}
       </div>
       {(filters.length > 0 || (q.search || "").trim()) && (
         <div className="dt-chips">
