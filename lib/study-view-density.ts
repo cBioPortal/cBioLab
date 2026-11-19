@@ -139,6 +139,14 @@ function axisRange(a: DensityAxis, v0: number, v1: number, span: number): RangeC
 }
 
 /**
+ * The edges a drag box's ranges add to their attributes' bar charts, as the portal adds them as
+ * custom bins (STS-SC-6, _customBinsFromScatterPlotSelectionSet): each range's two ends.
+ */
+export function densityBinEdges(clauses: { attribute: string; range: { gte: number; lte: number } }[]): { attribute: string; ends: number[] }[] {
+  return clauses.map((c) => ({ attribute: c.attribute, ends: [c.range.gte, c.range.lte] }));
+}
+
+/**
  * The filter clauses a drag box makes: one range per attribute, whichever axis it is on. `box` is
  * in the axes' display units (ln(1 + count) on a Log Scale axis); `span` is each axis's length in
  * those units, for rounding a fraction to the axis's precision.
