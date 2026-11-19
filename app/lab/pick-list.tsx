@@ -97,6 +97,8 @@ export function PickBar({ picks, onApply, why, action = "Apply filter", hint, ch
 const VALROW_H = 25;
 
 export type ValueRow = { key: string; name: string; n: number; total?: number; on?: boolean; muted?: boolean; disabled?: boolean; title: string;
+  /** the value of the list's `extra` column */
+  extra?: number;
   /** a row that cannot join others in one filter (NA), left out of Select all */
   solo?: boolean };
 
@@ -117,7 +119,7 @@ function SearchField({ onSearch }: { onSearch: (q: string) => void }) {
  * pinned first. A list that scrolls gets the portal's search box and Select all / Deselect all over
  * the rows it shows (lib/value-list.ts).
  */
-export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPct, unit = "cases", cut }: {
+export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPct, unit = "cases", cut, extra }: {
   rows: ValueRow[]; onApply: (keys: string[]) => void; why?: (keys: string[]) => string | null; hint?: string;
   /** how a share (0–100) is written */
   pct?: (pct: number) => string;
@@ -127,6 +129,8 @@ export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPc
   unit?: string;
   /** when the list holds only the most frequent values: how many it holds, of how many */
   cut?: { shown: number; of: number };
+  /** a count column before "#" in place of the bar (a mutation-type table's "# Mut"): its header and that header's tooltip */
+  extra?: { head: string; tip: string };
 }) {
   const own = usePicks();
   const picks = shared ?? own;
@@ -141,12 +145,13 @@ export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPc
   const live = picks.picked.filter((k) => keys.has(k));
   const max = Math.max(...rows.map((r) => r.n), 1);
   return <>
-    <VirtualRows items={shown} rowKey={(r) => r.key} estimate={VALROW_H} className="vallist"
-      header={<div className="valhead" aria-hidden="true"><span /><span /><span /><span data-tip={"Number of " + unit}>#</span><span>{rows.some((r) => r.total) ? "Freq" : ""}</span></div>}>
+    <VirtualRows items={shown} rowKey={(r) => r.key} estimate={VALROW_H} className={"vallist" + (extra ? " withextra" : "")}
+      header={<div className="valhead" aria-hidden="true"><span /><span />{extra ? <span data-tip={extra.tip}>{extra.head}</span> : <span />}<span data-tip={"Number of " + unit}>#</span><span>{rows.some((r) => r.total) ? "Freq" : ""}</span></div>}>
       {(r) => (
         <PickRow className="valrow" picks={picks} k={r.key} on={r.on} applied={r.on} disabled={r.disabled} title={r.title} label={r.name}>
           <span className="vname" style={r.muted ? { color: "var(--muted)" } : undefined}>{r.name}</span>
-          <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * r.n / max)) + "%" }} /></span>
+          {extra ? <span className="vn">{(r.extra ?? 0).toLocaleString()}</span>
+            : <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * r.n / max)) + "%" }} /></span>}
           <span className="vn">{r.n.toLocaleString()}</span>
           <span className="vpct">{r.share}</span>
         </PickRow>

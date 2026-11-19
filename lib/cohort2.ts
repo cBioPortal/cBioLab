@@ -27,7 +27,7 @@ import { activeCustomData, clinicalTable } from "./custom-data.ts";
 import { UPLOAD_DATASET_RE, customAttr } from "./custom-data-names.ts";
 import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import { lockClause } from "./cohort-lock.ts";
-import { DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
+import { DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE } from "./gene-state-clauses.ts";
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT } from "./filter-limits.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
@@ -425,6 +425,7 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
   const gene = String(leaf.gene || "").toUpperCase().trim();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("genomicData clause: bad gene");
   const pt = String(leaf.profileType || "");
+  if (pt === MUTATION_TYPE_PROFILE) return mutationTypeLeafSql(gene, leaf, ctx);
   const discrete = pt === DISCRETE_CNA_PROFILE;
   if (leaf.ifHeld != null && (leaf.ifHeld !== true || !discrete))
     throw new Error("genomicData clause: `ifHeld: true` goes with profileType '" + DISCRETE_CNA_PROFILE + "'");
@@ -448,6 +449,23 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
     "  WHERE ga.cancer_study_identifier = " + sq(ctx.study) + "\n" +
     "    AND ga.hugo_gene_symbol = " + sq(gene) + " AND ga.profile_type = " + (discrete ? discreteCnaProfileSql(ctx.study, dbOf(ctx)) : sq(pt)) + "\n" +
     "    AND " + conds.join(" AND ") + profileCheck);
+}
+
+/**
+ * The samples with a mutation of `gene` of any of the listed types, every mutation the study's
+ * profile holds counted as the portal's Mutation Type Counts table counts it (uncalled and
+ * off-panel ones included).
+ */
+function mutationTypeLeafSql(gene: string, leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
+  if (leaf.range != null || leaf.ifHeld != null)
+    throw new Error("genomicData clause: profileType '" + MUTATION_TYPE_PROFILE + "' takes values[] (mutation types such as Missense_Mutation) only");
+  if (!Array.isArray(leaf.values) || !leaf.values.length)
+    throw new Error("genomicData clause: profileType '" + MUTATION_TYPE_PROFILE + "' needs values[], the mutation types");
+  tooManyValues("genomicData clause on " + gene, leaf.values.length, ASSAY_VALUES_LIMIT);
+  return ofSamples("SELECT DISTINCT " + PID("sample_unique_id", ctx.study) + " AS sid\n" +
+    "  FROM " + dbOf(ctx) + ".genomic_event_derived\n" +
+    "  WHERE " + genomicStudySql(ctx.study) + " AND variant_type = 'mutation'\n" +
+    "    AND hugo_gene_symbol = " + sq(gene) + " AND mutation_type IN (" + leaf.values.map((v) => sq(String(v))).join(",") + ")");
 }
 
 function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): LeafIds {

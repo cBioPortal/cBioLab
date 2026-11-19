@@ -5,7 +5,8 @@
 // Whether each clause selects what its state counts is checked live by scripts/check-gene-facets.ts.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { CNA_LEVELS, DISCRETE_CNA_PROFILE, cnaLevelLabel, driverOql, geneStatesClauses } from "../lib/gene-state-clauses.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE, appliedMutationTypes, cnaLevelLabel, driverOql, geneStatesClauses, mutationTypeLabel, mutationTypesClause } from "../lib/gene-state-clauses.ts";
+import { compileCohortDef } from "../lib/cohort2.ts";
 
 const cna = (values: string[]) => ({ kind: "genomicData", gene: "KRAS", profileType: DISCRETE_CNA_PROFILE, values, ifHeld: true });
 
@@ -68,5 +69,45 @@ describe("driver calls", () => {
   test("each call gets _DRIVER", () => {
     assert.equal(driverOql("AMP HOMDEL"), "AMP_DRIVER HOMDEL_DRIVER");
     assert.equal(driverOql("MUT"), "MUT_DRIVER");
+  });
+});
+
+// The Mutation Type Counts table (STS-OT-3): a click filters on the mutation types of the gene, as the
+// portal's mutationDataFilters {categorization: MUTATION_TYPE, values}.
+describe("a gene's mutation types", () => {
+  test("labelled as the portal labels them", () => {
+    assert.deepEqual(["In_Frame_Ins", "Missense_Mutation", "Splice_Site", "5'Flank"].map(mutationTypeLabel),
+      ["In Frame Ins", "Missense Mutation", "Splice Site", "5'Flank"]);
+  });
+
+  test("the checked types are one clause; none, or more than one clause holds, is refused by name", () => {
+    assert.deepEqual(mutationTypesClause("KRAS", ["Missense_Mutation", "Nonsense_Mutation"]),
+      { clauses: [{ kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Missense_Mutation", "Nonsense_Mutation"] }] });
+    assert.deepEqual(mutationTypesClause("KRAS", []), { why: "no mutation type is checked" });
+    const many = Array.from({ length: 21 }, (_, i) => "T" + i);
+    assert.deepEqual(mutationTypesClause("KRAS", many), { why: "one filter holds at most 20 mutation types; 21 are checked" });
+  });
+
+  test("the applied rows: the types the draft's clauses on this gene hold, and no other gene's", () => {
+    const def = { all: [
+      { kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Missense_Mutation"] },
+      { kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Nonsense_Mutation", "Missense_Mutation"] },
+      { kind: "genomicData", gene: "TP53", profileType: MUTATION_TYPE_PROFILE, values: ["Splice_Site"] },
+      cna(["2"]),
+    ] };
+    assert.deepEqual(appliedMutationTypes(def, "KRAS"), ["Missense_Mutation", "Nonsense_Mutation"]);
+    assert.deepEqual(appliedMutationTypes(null, "KRAS"), []);
+  });
+
+  test("the clause compiles to the samples with a mutation of the gene of any of the types, every mutation counted", () => {
+    const ctx = { study: "coadread", db: "cbio", profiles: ["gistic"] };
+    const sql = compileCohortDef({ all: [{ kind: "genomicData", gene: "kras", profileType: MUTATION_TYPE_PROFILE, values: ["Missense_Mutation", "In_Frame_Ins"] }] } as never, ctx);
+    assert.match(sql, /FROM cbio\.genomic_event_derived/);
+    assert.match(sql, /variant_type = 'mutation'\s+AND hugo_gene_symbol = 'KRAS' AND mutation_type IN \('Missense_Mutation','In_Frame_Ins'\)/);
+    assert.doesNotMatch(sql, /mutation_status/, "uncalled mutations too, as the portal's filter (glioma_msk_2018 ABL1: 6 samples)");
+    const bad = (leaf: object) => () => compileCohortDef({ all: [{ kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, ...leaf }] } as never, ctx);
+    assert.throws(bad({}), /profileType 'MUTATION_TYPE' needs values\[\]/);
+    assert.throws(bad({ values: ["Missense_Mutation"], range: { gt: 1 } }), /takes values\[\] \(mutation types such as Missense_Mutation\) only/);
+    assert.throws(bad({ values: Array.from({ length: 21 }, (_, i) => "T" + i) }), /genomicData clause on KRAS: at most 20 values; this lists 21/);
   });
 });

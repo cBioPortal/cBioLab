@@ -1,5 +1,5 @@
 import { parseBody, ExploreRequest } from "../../../lib/api-schemas.ts";
-import { buildExplore, buildExploreFederated, buildAssayFacets } from "../../../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets, buildMutationTypeFacets } from "../../../lib/explore.ts";
 import { ENTITY_RE } from "../../../lib/generic-assay.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
@@ -125,6 +125,10 @@ async function exploreFor(body: any) {
     ? await buildAssayFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy,
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
+  // a peer's studies are not counted here: their federation API has no mutation-type counts
+  const mutationTypeFacets = body.mutationTypeCharts && body.mutationTypeCharts.length
+    ? await buildMutationTypeFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, genes: body.mutationTypeCharts })
+    : undefined;
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}) };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...(mutationTypeFacets ? { mutationTypeFacets } : {}) };
 }

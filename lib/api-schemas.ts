@@ -59,6 +59,8 @@ export const ExploreRequest = z.object({
   attributes: z.array(z.string()).optional(),
   geneCharts: z.array(z.string()).optional(),
   /** generic-assay entities to chart, one each */
+  /** genes to chart as the portal's Mutation Type Counts table, one each */
+  mutationTypeCharts: z.array(z.string()).max(6).optional(),
   assayCharts: z.array(z.object({ profileType: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/), entity: z.string().max(120) })).max(6).optional(),
   derived: z.array(z.object({ metric: z.string(), eventType: z.string().optional(), lineGap: z.number().optional() })).optional(),
   /** one study only: what describes the selection, its clinical attributes (kind, coverage, metadata), totals and data types; no value lists, histograms, naCount, gene tables, events or case lists (ExploreArgs.attributesOnly). Ignored for several studies or a remote peer's */

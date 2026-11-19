@@ -20,7 +20,7 @@ const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
 const { dataBins } = await import("../lib/data-binner.ts");
 const CG29 = JSON.parse(readFileSync(new URL("./fixtures/assay-bins-brca-cg00000029.json", import.meta.url), "utf8")) as { values: string[]; portalBins: unknown[] };
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
-const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT } = await import("../lib/explore.ts");
+const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildMutationTypeFacets } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -1068,5 +1068,55 @@ describe("review of #276 (multi-study Freq): one attribute charted as different 
   test("when either study lacks samples, the merged facet has none", () => {
     assert.equal(grade([num(30), cat()])[0].samples, undefined);
     assert.equal(grade([num(), cat(12)])[0].samples, undefined);
+  });
+});
+
+// ---- a gene's Mutation Type Counts table (STS-OT-3) -----------------------------------------
+describe("mutation-type tables", () => {
+  const profiles = new Map([["st1", { profiles: ["mutations"] }], ["st2", { profiles: ["mutations"] }]]);
+  // cbioportal.org, msk_impact_2017 TP53: /api/mutation-data-counts/fetch?categorization=MUTATION_TYPE, label · count (# Mut) · uniqueCount (#)
+  const PORTAL_TP53: [string, string, number, number][] = [
+    ["Frame_Shift_Del", "Frame Shift Del", 517, 510], ["Frame_Shift_Ins", "Frame Shift Ins", 157, 157],
+    ["In_Frame_Del", "In Frame Del", 91, 91], ["In_Frame_Ins", "In Frame Ins", 25, 25],
+    ["Missense_Mutation", "Missense Mutation", 3154, 2967], ["Nonsense_Mutation", "Nonsense Mutation", 683, 674],
+    ["Nonstop_Mutation", "Nonstop Mutation", 2, 2], ["Splice_Site", "Splice Site", 325, 324],
+  ];
+
+  test("each type's mutations and samples as the portal's, its label, most samples first; Freq over the selected samples", async () => {
+    on(/FROM cbio_a\.sample_derived/, [{ n: 10945 }]);
+    on(/GROUP BY t/, PORTAL_TP53.map(([t, , m, n]) => ({ t, m, n })));
+    const [f] = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, genes: ["tp53"] });
+    assert.equal(f.gene, "TP53");
+    assert.equal(f.total, 10945);
+    assert.deepEqual(f.rows.map((r) => [r.type, r.label, r.mutations, r.samples]),
+      [...PORTAL_TP53].sort((a, b) => b[3] - a[3]));
+    assert.equal(f.disjunctive, undefined);
+    const q = sent.find((s) => /GROUP BY t/.test(s))!;
+    assert.match(q, /variant_type = 'mutation' AND hugo_gene_symbol = 'TP53'/);
+    assert.doesNotMatch(q, /mutation_status|driver/, "every mutation, uncalled ones and passengers included, as the portal counts");
+  });
+
+  test("studies on two connections add up, type by type", async () => {
+    on(/sample_derived/, (q) => [{ n: /cbio_b\./.test(q) ? 50 : 100 }]);
+    on(/GROUP BY t/, (q) => /cbio_b\./.test(q) ? [{ t: "Missense_Mutation", m: 4, n: 3 }] : [{ t: "Missense_Mutation", m: 10, n: 8 }, { t: "Splice_Site", m: 1, n: 1 }]);
+    const [f] = await buildMutationTypeFacets({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy: new Map([["st2", SECOND]]), genes: ["KRAS"] });
+    assert.equal(f.total, 150);
+    assert.deepEqual(f.rows.map((r) => [r.type, r.mutations, r.samples]), [["Missense_Mutation", 14, 11], ["Splice_Site", 1, 1]]);
+  });
+
+  test("the table is counted without its own filter, and with every other one", async () => {
+    const draft = { all: [
+      { kind: "genomicData", gene: "TP53", profileType: "MUTATION_TYPE", values: ["Nonsense_Mutation"] },
+      { kind: "genomicData", gene: "KRAS", profileType: "MUTATION_TYPE", values: ["Missense_Mutation"] },
+    ] } as never;
+    const [tp53, kras] = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, draft, genes: ["TP53", "KRAS"] });
+    assert.equal(tp53.disjunctive, true);
+    assert.equal(kras.disjunctive, true);
+    // the table's own count reads the gene on the line it filters mutations by; a filter's subquery on its own line
+    const count = (gene: string) => sent.find((s) => /GROUP BY t/.test(s) && s.includes("variant_type = 'mutation' AND hugo_gene_symbol = '" + gene + "'"))!;
+    assert.match(count("TP53"), /mutation_type IN \('Missense_Mutation'\)/, "KRAS's filter narrows TP53's table");
+    assert.doesNotMatch(count("TP53"), /'Nonsense_Mutation'/, "TP53's own filter does not");
+    assert.match(count("KRAS"), /mutation_type IN \('Nonsense_Mutation'\)/);
+    assert.doesNotMatch(count("KRAS"), /'Missense_Mutation'/);
   });
 });

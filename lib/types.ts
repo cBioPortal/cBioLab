@@ -985,6 +985,20 @@ export type ClinicalFacet =
  * genericAssay clause keeps a patient with any sample in range), so a patient whose samples fall
  * in two bars is in both. Over the selected studies that hold the profile (`studies`).
  */
+/**
+ * The portal's Mutation Type Counts table for one gene (STS-OT-3): per mutation type, its mutations
+ * (`mutations`, the portal's # Mut) and the samples holding one (`samples`, its #), over the
+ * selection without this table's own filter. Freq is `samples` ÷ `total`, the selected samples.
+ */
+export interface MutationTypeFacet {
+  gene: string;
+  /** samples in the selection the table is counted over */
+  total: number;
+  rows: { type: string; label: string; mutations: number; samples: number }[];
+  /** the draft holds this table's own filter, left out of these counts */
+  disjunctive?: true;
+}
+
 export interface AssayFacet {
   profileType: string; entity: string;
   /** the entity's display name, where the study gives one */
@@ -1122,6 +1136,8 @@ export interface ExploreResult {
   geneFacets?: GeneStateFacet[];
   /** one entity of a generic-assay profile per chart the reader asked for (AssayFacet) */
   assayFacets?: AssayFacet[];
+  /** one gene's mutations by type per table the reader asked for (MutationTypeFacet) */
+  mutationTypeFacets?: MutationTypeFacet[];
   /** portal-equivalent gene tables (samples, panel-aware denominators) */
   mutatedGenes?: GeneTableRow[];
   cnaGenes?: GeneTableRow[];
