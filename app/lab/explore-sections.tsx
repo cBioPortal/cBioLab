@@ -22,7 +22,7 @@ import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
-import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
+import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
@@ -1131,16 +1131,17 @@ export function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
   const explore = ctx.explore!;
   const picks = usePicks();
   const rows = explore.studyBreakdown || [];
-  if (!rows.length) return null;
-  const total = rows.reduce((n, r) => n + r.n, 0) || 1;
+  // the portal's Cancer Studies chart: samples per study, for more than one study only
   const many = exStudies.length > 1;
+  if (!rows.length || !many) return null;
+  const total = rows.reduce((n, r) => n + r.n, 0) || 1;
   return (
     <div className="card wide">
-      <h2>Studies <span className="plain">— how {explore.draftCount != null ? "the draft" : "the selection"} breaks down{many ? " across the " + exStudies.length + " selected studies" : ""}</span></h2>
+      <h2>Cancer Studies <span className="plain">— {explore.draftCount != null ? "the draft's" : "the selection's"} samples across the {exStudies.length} selected studies</span></h2>
       <VirtualRows items={rows} rowKey={(r) => r.study} estimate={26} className="sbrows">
         {(r) => (
-          <PickRow className="sbrow" picks={picks} k={r.study} label={r.study} disabled={!many}
-            title={(r.instance !== "a" ? r.instanceLabel + " · " : "") + (many ? r.study : "the only study selected")}>
+          <PickRow className="sbrow" picks={picks} k={r.study} label={r.study}
+            title={(r.instance !== "a" ? r.instanceLabel + " · " : "") + r.study + " — " + r.n.toLocaleString() + " samples"}>
             <span className="mono">{r.study}</span>
             <span className="meta inst">{r.instance !== "a" ? "⧉ " + r.instanceLabel : ""}</span>
             <span className="bar"><i style={{ width: Math.max(1, Math.round(100 * r.n / total)) + "%" }} /></span>
@@ -1151,9 +1152,9 @@ export function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
       </VirtualRows>
       <PickBar picks={picks} action="Explore only these" hint="narrow Explore to the checked studies"
         onApply={(ids) => setExploreStudies(ids)} />
-      {many && <p className="note mt-1.5">
-        Patients are counted per study; a person enrolled in two studies counts in both (overlap is not deduplicated).
-      </p>}
+      <p className="note mt-1.5">
+        Samples are counted per study; a sample listed in two studies counts in both (overlap is not deduplicated).
+      </p>
     </div>
   );
 }
@@ -1323,7 +1324,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
                 " of them by a call their panel does not cover (off-panel): counted here, as cBioPortal's \"#\" does, but not in the frequency" : "")}>
                 {g.altered.toLocaleString()}
               </span>
-              {freqTips.cell(g, g.freqPct != null ? fmtPct(g.freqPct) : "—")}
+              {freqTips.cell(g, geneFreqText(g))}
             </PickRow>
           );
         }}
