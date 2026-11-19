@@ -283,8 +283,9 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
               const names = new Map<string, string>();
               for (const f of explore?.clinical || []) if (f.displayName && !names.has(f.attribute)) names.set(f.attribute, f.displayName);
               // a density drag's ranges have no pill only while its chart is drawn to show them (STV-FB-3b)
-              const drawn = new Set(densityChartsShown((explore?.clinical || []).map((c) => c.attribute), ctx.chartChecked("genomic|density"), ctx.xyCharts)
-                .map((d) => densityChartName(d.pair)));
+              // with no sample left the page draws no chart, so every drag's ranges are pills again
+              const drawn = new Set(explore?.draftCount === 0 ? [] : densityChartsShown((explore?.clinical || []).map((c) => c.attribute),
+                ctx.chartChecked("genomic|density"), ctx.xyCharts).map((d) => densityChartName(d.pair)));
               return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay} onIntervalEdited={ctx.addBinEdges}
                 onRemoveClause={removeDraftClause} onCustomData={showClauseData()} drawnDensity={drawn} />;
             })()}
