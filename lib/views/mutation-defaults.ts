@@ -3,6 +3,7 @@
 // of that table narrows over the same columns.
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationDefaultColumns, mutationRowSource, type MutationDefaultFacts, type TablePart } from "../mutation-table.ts";
 import { clinicalColumns, type ClinicalColumn } from "../mutation-clinical.ts";
+import { clinicalFreq, clinicalFreqSql } from "../mutation-clinical-freq.ts";
 import { tableAttributesSql, TABLE_COLUMNS_MAX } from "../clinical-table.ts";
 import type { ViewResolver } from "./shared.ts";
 import type { RowSource } from "../table-query.ts";
@@ -52,4 +53,27 @@ export async function mutationClinicalColumns(ctx: ViewRun, holders: string[]): 
     return typeof r.viewMeta === "function" ? r.viewMeta("table:attributes", tableAttributesSql) : Promise.resolve([]);
   }));
   return clinicalColumns(perStudy, new Set(MUTATION_COLUMNS.map((c) => c.id))).slice(0, TABLE_COLUMNS_MAX);
+}
+
+/** the table's own columns the portal lists in its Columns menu's Clinical tab, with the attribute each one's Freq counts (null: every sample) */
+export const CLINICAL_TAB_BUILTINS: ReadonlyMap<string, string | null> = new Map([
+  ["studyOfOrigin", null], ["cancerTypeAll", "CANCER_TYPE"], ["cancerType", "CANCER_TYPE_DETAILED"], ["mutCount", "MUTATION_COUNT"],
+]);
+
+/**
+ * The Columns menu's Freq (MUT-STM-15) for the Clinical tab's columns, by column id: 100 × the queried samples
+ * with a value ÷ the queried samples, over every cohort and study that may list rows (lib/mutation-clinical-freq.ts).
+ */
+export async function mutationClinicalFreq(ctx: ViewRun, holders: string[], clinical: ClinicalColumn[]): Promise<Record<string, number>> {
+  const attrs = [...clinical.map((c) => c.id), ...[...CLINICAL_TAB_BUILTINS.values()].filter((a): a is string => !!a)];
+  const asks: Promise<Record<string, unknown>[]>[] = [];
+  for (const cn of ctx.vNames) for (const st of ctx.cohorts[cn].studies.filter((s) => holders.includes(s))) {
+    const r = ctx.resolvers[st] as Partial<ViewResolver>;
+    if (typeof r.viewAggregate === "function") asks.push(r.viewAggregate("mutations:clinical-freq", ctx.doc.cohorts[cn], (c, s, d) => clinicalFreqSql(c, s, d, attrs)));
+  }
+  const byAttr = clinicalFreq(await Promise.all(asks), attrs);
+  return Object.fromEntries([
+    ...clinical.map((c) => [c.id, byAttr[c.id] ?? 0] as const),
+    ...[...CLINICAL_TAB_BUILTINS].map(([col, attr]) => [col, attr ? byAttr[attr] ?? 0 : 100] as const),
+  ]);
 }

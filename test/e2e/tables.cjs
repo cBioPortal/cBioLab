@@ -112,6 +112,33 @@ async function tables({ browser, ok, BASE }) {
       const same = clip === tsv;
       ok("table: Copy puts the table.tsv's text on the clipboard and says \"Copied!\"", copied && same,
         (copied ? "Copied!" : "no Copied! status" + copyStatus) + " · " + (same ? "identical to table.tsv" : (clipLines.length - 1) + " rows vs " + (lines.length - 1) + ", header " + (clipLines[0] === lines[0] ? "same" : JSON.stringify((clipLines[0] || "").slice(0, 60)))));
+      // the Columns menu (MUT-TB-5, MUT-STM-15): the portal's two tabs, each "selected / total"; the Clinical tab lists
+      // Name | Freq (the share of the queried samples with a value), sorted by Freq descending
+      {
+        await page.getByRole("button", { name: /^columns \(/ }).first().click();
+        const tabs = page.locator("[role=tablist][aria-label='column groups'] [role=tab]");
+        await tabs.first().waitFor({ timeout: 60000 });
+        const tabText = (await tabs.allInnerTexts()).map((x) => x.replace(/\s+/g, " ").trim());
+        ok("table: the Columns menu has the tabs \"Mutations n / m\" and \"Clinical n / m\"",
+          tabText.length === 2 && /^Mutations \d+ \/ \d+$/.test(tabText[0]) && /^Clinical \d+ \/ \d+$/.test(tabText[1]), JSON.stringify(tabText));
+        await tabs.filter({ hasText: /^Clinical/ }).click();
+        const list = page.locator(".dt-filter label:has([role=checkbox])");
+        await list.first().waitFor({ timeout: 60000 });
+        const rows = await list.evaluateAll((ls) => ls.map((l) => { const s = l.querySelectorAll("span"); return { name: s[0]?.textContent || "", freq: s[s.length - 1]?.textContent || "", on: l.querySelector("[role=checkbox]")?.getAttribute("aria-checked") === "true" }; }));
+        const pct = (f) => f === "<0.1%" ? 0.05 : parseFloat(f);
+        const sorted = rows.every((r, i) => i === 0 || pct(rows[i - 1].freq) >= pct(r.freq));
+        ok("table: the Clinical tab lists rows with a Freq ending in \"%\", sorted by Freq descending",
+          rows.length > 3 && rows.every((r) => /%$/.test(r.freq)) && sorted, rows.length + " rows: " + rows.slice(0, 4).map((r) => r.name + " " + r.freq).join(", ") + (sorted ? "" : " (unsorted)"));
+        const pick = rows.find((r) => !r.on && pct(r.freq) > 0 && r.name === "Sex") || rows.find((r) => !r.on && pct(r.freq) > 0);
+        if (!pick) ok("table: showing a clinical attribute adds its column", false, "no hidden clinical row with a Freq above 0");
+        else {
+          await list.filter({ has: page.locator("span", { hasText: new RegExp("^" + pick.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$") }) }).first().locator("[role=checkbox]").click();
+          await settle();
+          await page.keyboard.press("Escape");
+          const heads = (await page.locator(".dt-table thead th").allInnerTexts()).map((x) => x.trim());
+          ok("table: showing the clinical attribute \"" + pick.name + "\" adds its column header to the table", heads.some((h) => h === pick.name || h.startsWith(pick.name)), JSON.stringify(heads));
+        }
+      }
     } catch (e) {
       ok("table: the mutation table's controls", false, String(e.message).split("\n")[0].slice(0, 200));
     }
