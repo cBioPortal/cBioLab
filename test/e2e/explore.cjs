@@ -553,6 +553,8 @@ async function explore({ ok, BASE, page, browser }) {
     await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
     const chart = page.locator("[data-attr='patient|AGE']");
     await chart.locator(".hbar[data-bar]").nth(5).waitFor({ timeout: 240000 });
+    // the mouse reaches only what is on screen: the chart may sit below the fold
+    await chart.scrollIntoViewIfNeeded();
     const yTicks = await chart.locator(".histo-y span").allInnerTexts();
     const bars = chart.locator(".hbar[data-bar]");
     const at = async (i) => { const b = await bars.nth(i).boundingBox(); return [b.x + b.width / 2, b.y + b.height - 4]; };
