@@ -6,7 +6,7 @@ import { Children, cloneElement, isValidElement, useEffect, useMemo, useRef, use
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
 import CustomBinsDialog from "./custom-bins-dialog";
-import { binsAfterEdit, logScaleOffered, looksLogarithmic, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
+import { logScaleOffered, looksLogarithmic, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
 import { ANALYSIS_MAX_COHORTS, armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
@@ -239,7 +239,7 @@ function StudyActions({ id, ctx, onQuery }: { id: string; ctx: ExploreCtx; onQue
 }
 
 export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
-  const { addMode, applyOrSay, chartBins, setChartBins, clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
+  const { addMode, applyOrSay, clearDraft, confirmSave, exMsg, exStudies, explore, exploreBusy, openSaveDialog, parseDraft, removeDraftClause, saveDraftAsFeature, confirmSaveFeature, saving, setSaving, savingFeature, setSavingFeature, showClauseData } = ctx;
   return <>
     {(() => {
       const d = parseDraft();
@@ -280,11 +280,7 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
               if (!dr) return null;
               const names = new Map<string, string>();
               for (const f of explore?.clinical || []) if (f.displayName && !names.has(f.attribute)) names.set(f.attribute, f.displayName);
-              const edited = (attribute: string, ends: number[]) => {
-                const f = explore?.clinical.find((x) => x.attribute === attribute && x.kind === "num");
-                if (f?.kind === "num" && f.bins && !oneValueBars(f.bins)) setChartBins(attribute, binsAfterEdit(chartBins(attribute), f.bins, ends), false);
-              };
-              return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay} onIntervalEdited={edited}
+              return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay} onIntervalEdited={ctx.addBinEdges}
                 onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />;
             })()}
           </div>
