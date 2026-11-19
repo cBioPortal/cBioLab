@@ -15,7 +15,7 @@ import {
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
 import { patientSampleEvents, plural, refuse } from "../shared.ts";
-import type { AlterationsView, AlterationsResult, AlleleReads } from "./types.ts";
+import type { AlterationsView, AlterationsResult, AlleleReads, CohortCount } from "./types.ts";
 import { alterationsMethod } from "./method.ts";
 
 type Cell = string | number | null;
@@ -41,14 +41,23 @@ function readsOf(x: unknown): AlleleReads[] | undefined {
   return x.map((t) => ({ sample: String(t[0]), alt: Number(t[1]), ref: Number(t[2]) }));
 }
 
+/** A row's Cohort counts, when its table reads them: what the Cohort cell draws and its tooltip says. */
+function cohortOf(x: Record<string, unknown>): CohortCount | undefined {
+  if (x.cohortOf == null) return undefined;
+  const kw = String(x.keyword ?? "");
+  return { n: Number(x.cohortN ?? 0), of: Number(x.cohortOf), ...(kw ? { keyword: kw, keywordN: Number(x.cohortKwN ?? 0) } : {}) };
+}
+
 /**
  * A page of rows as the result carries them, aligned with `cols`; a mutation row's detail holds its
- * per-sample reads and its stored type (the cell shows the portal's label).
+ * per-sample reads and its stored type (the cell shows the portal's label); a mutation or copy-number
+ * row's, its Cohort counts.
  */
 const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map((x) => {
   const reads = readsOf(x.reads);
   const typed = cols.some((c) => c.id === "mutationType");
-  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}) };
+  const cohort = cohortOf(x);
+  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}) };
   return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
     values: cols.map((c) => cellOf(x, c)), ...(Object.keys(detail).length ? { detail } : {}) };
 });
@@ -244,7 +253,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
         "Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them" +
         (tables.mutations?.shown.includes("copy") ? "; Copy # on a mutation is the gene's deep calls anywhere in " + (scope === "cohort" ? "the cohort's samples of the patient. " : "the patient. ") : ". ") +
         (want && inCohort ? "Only " + plural(inCohort.length, "sample") + " of " + want.id + "'s " + (smp?.samples.length ?? 0) + " " + (inCohort.length === 1 ? "is" : "are") + " in the cohort, and the tables read only " + (inCohort.length === 1 ? "it" : "those") + " (samples: \"cohort\"); each keeps its number among all the patient's samples. " : "") +
-        "Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it (blank for a mutation with no keyword, as the portal's), or with the same copy-number call. " +
+        "Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it (blank for a mutation with no keyword, as the portal's), or with the same copy-number call; a mutation's cell also gives the share, over the same samples, with its keyword (APC truncating). " +
         (want && peerOf(ctx.resolvers[want.study]) ? want.id + "'s tables come from " + ctx.resolvers[want.study].instance.label + " via federation, computed in its database. " : "") +
         (shownPin ? "Annotation is OncoKB " + shownPin + " (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. " : "No OncoKB version is pinned here, so the annotation columns are empty. ") +
         (viaPeer.length ? "Patients of " + viaPeer.join(", ") + " come from " + [...new Set(viaPeer.map((st) => ctx.resolvers[st].instance.label))].join(", ") +

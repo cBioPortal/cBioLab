@@ -54,6 +54,11 @@ describe("the alterations view's tables", () => {
     assert.match(sql, /ifNull\(keyword, ''\) AS kw/);
     assert.match(sql, /max\(kw\) AS kw/);
     assert.match(sql, /if\(g\.kw != '' AND ifNull\(fp\.n, 0\) > 0, 100 \* ifNull\(fa\.n, 0\) \/ fp\.n, NULL\) AS freq/);
+    // what the Cohort cell draws: the gene's count, the keyword's, over the samples profiled
+    assert.match(sql, /kc AS \(SELECT keyword AS kw, uniqExact\(sampleId\) AS n FROM db\.mutation_derived\n {2}WHERE .*molecularProfileId NOT LIKE '%uncalled%' AND keyword IN \(SELECT kw FROM g WHERE kw != ''\) GROUP BY kw\)/);
+    assert.match(sql, /toUInt64\(ifNull\(fa\.n, 0\)\) AS cohortN, toUInt64\(ifNull\(kc\.n, 0\)\) AS cohortKwN, toUInt64\(ifNull\(fp\.n, 0\)\) AS cohortOf, g\.kw AS keyword/);
+    assert.match(sql, /LEFT JOIN kc ON kc\.kw = g\.kw/);
+    assert.match(alterationSource("cna", part, "P-1", "db", null, []).with, /toUInt64\(ifNull\(fa\.n, 0\)\) AS cohortN, toUInt64\(ifNull\(fp\.n, 0\)\) AS cohortOf/);
     // the denominator stays the samples profiled for the gene (invariant 7)
     assert.match(sql, /fp AS \(SELECT pg\.gene AS gene/);
   });
