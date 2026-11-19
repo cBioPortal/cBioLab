@@ -13,4 +13,7 @@ export const mutants: Mutant[] = [
   { id: "value-list-select-all-checks-na", layer: "cohorts", guard: "unit", file: "lib/value-list.ts",
     effect: "Select all on a list with an NA row checks NA too, which cannot join other values, so its Apply filter stays disabled.",
     find: "const checkable = shown.filter((r) => !r.on && !r.disabled && !r.solo)", replace: "const checkable = shown.filter((r) => !r.on && !r.disabled)" },
+  { id: "filter-limit-off-by-one", layer: "cohorts", guard: "unit", file: "lib/filter-limits.ts",
+    effect: "A selection one past a filter's limit (9 case lists, 51 values) is applied, and the compiler rejects it or cuts it short without a word.",
+    find: "return n > limit ?", replace: "return n > limit + 1 ?" },
 ];
