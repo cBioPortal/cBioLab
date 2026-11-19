@@ -22,7 +22,7 @@ import { toggleBin, selectBins, toggleNa, toggleValue } from "../../lib/explore-
 import { defaultChartKeys } from "../../lib/study-view-config.ts";
 import { FILTERS_PARAM, writeFilters } from "../../lib/study-view-url.ts";
 import { binsAfterEdit, logScaleToggled, oneValueBars, serverBins, type ChartBins } from "../../lib/study-view-bins.ts";
-import { densityBinEdges } from "../../lib/study-view-density.ts";
+import { densityBinEdges, withDensityBins, type DensityBins } from "../../lib/study-view-density.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { encodeParam } from "../portal/page-doc.ts";
 import { currentLinkUrlMax, linkParams, linkTo, writeSearch } from "../_links/link-state.ts";
@@ -158,6 +158,8 @@ export function useExploreState(page: ExplorePage) {
    * first needed, so a page drawn on the server never touches storage.
    */
   const binStore = useRef<Record<string, Record<string, ChartBins>> | null>(null);
+  /** a density drag's edges on the Mutation Count and FGA bars: kept for the page only, never with the reader's bins (STS-SC-6) */
+  const densityBins = useRef<DensityBins[]>([]);
   const [, setBinsVersion] = useState(0);
   const binsOf = (studies: string[]): Record<string, ChartBins> => {
     if (!binStore.current) {
@@ -479,7 +481,7 @@ export function useExploreState(page: ExplorePage) {
       derived: exDerivedRef.current,
       uploads: customDataKey(),
       drivers: driversRef.current,
-      bins: serverBins(binsOf(studies)),
+      bins: serverBins(withDensityBins(binsOf(studies), densityBins.current, draftOverride !== undefined ? draftOverride : parseDraft())),
     }, !(attrsOverride ?? []).length && !(attrCoverage > 0));
   };
 
@@ -594,7 +596,15 @@ export function useExploreState(page: ExplorePage) {
   };
   /** a density drag's two ranges (STS-SC-6): their ends become custom bins of the two bar charts, then the filters apply */
   const addDensitySelection = (clauses: any[]) => {
-    for (const e of densityBinEdges(clauses)) addBinEdges(e.attribute, e.ends);
+    // a temporary set, not the reader's Custom Bins: each drag replaces it, and it lasts while its filters do
+    densityBins.current = densityBinEdges(clauses).flatMap((e) => {
+      const f = explore?.clinical.find((x) => x.attribute === e.attribute && x.kind === "num");
+      if (f?.kind !== "num" || !f.bins || oneValueBars(f.bins)) return [];
+      const c = clauses.find((x) => x.attribute === e.attribute);
+      // the bars' own edges and the drag's ends, as binsAfterEdit lays them (always custom)
+      const { edges } = binsAfterEdit(undefined, f.bins, e.ends).bins as { method: "custom"; edges: number[] };
+      return [{ attribute: e.attribute, range: c.range, edges }];
+    });
     addClauses(clauses);
   };
   const addClauses = (clauses: any[]) => {

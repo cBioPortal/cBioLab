@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import {
   MUTATION_COUNT, FGA, DENSITY_GRID, densityAxes, swapDensity, logOffered, densityView, densityTitle,
   densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection,
-  densityBinEdges,
+  densityBinEdges, withDensityBins,
 } from "../lib/study-view-density.ts";
 import { plotExtent } from "../lib/plot.ts";
 
@@ -364,4 +364,20 @@ test("STS-SC-6: a drag box's ranges add their ends to the two bar charts as cust
   // on Mutation Count's bars (≤20, 20-40, >40 …) the edges join the bars' own, as the pill edit's do
   const bars = [{ special: "<=", end: 20, count: 5 }, { start: 20, end: 40, count: 3 }, { special: ">", start: 40, count: 2 }] as never;
   assert.deepEqual(binsAfterEdit(undefined, bars, densityBinEdges(clauses)[1].ends), { bins: { method: "custom", edges: [3, 20, 40] } });
+});
+
+test("STS-SC-6: a drag's edges are a temporary set, laid over the reader's bins only while the draft holds that drag's range", () => {
+  const mc = { attribute: "MUTATION_COUNT", range: { gte: 271, lte: 5684 }, edges: [20, 40, 240, 271, 5684] };
+  const reader = { MUTATION_COUNT: { showNa: true }, AGE: { bins: { method: "median" as const } } };
+  const drag = { kind: "clinical", attribute: "MUTATION_COUNT", range: { gte: 271, lte: 5684 } };
+  const held = withDensityBins(reader, [mc], { all: [drag] });
+  assert.deepEqual(held.MUTATION_COUNT, { showNa: true, bins: { method: "custom", edges: [20, 40, 240, 271, 5684] } });
+  assert.deepEqual(held.AGE, reader.AGE, "another chart's bins are its own");
+  assert.deepEqual(reader.MUTATION_COUNT, { showNa: true }, "the reader's own bins are not changed");
+  // the filter removed, Clear All, or a bar selection replacing the chart's filter: the edges go with it
+  assert.deepEqual(withDensityBins(reader, [mc], { all: [] }).MUTATION_COUNT, { showNa: true });
+  assert.deepEqual(withDensityBins(reader, [mc], { all: [{ kind: "clinical", attribute: "MUTATION_COUNT", range: { gt: 20, lte: 40 } }] }).MUTATION_COUNT, { showNa: true });
+  assert.deepEqual(withDensityBins(reader, [mc], null).MUTATION_COUNT, { showNa: true });
+  // a chart the reader never set
+  assert.deepEqual(withDensityBins({}, [mc], { all: [drag] }).MUTATION_COUNT, { bins: { method: "custom", edges: [20, 40, 240, 271, 5684] } });
 });
