@@ -68,7 +68,7 @@ export const MUTATION_COLUMNS: MutationColumn[] = ([
   { id: "hgvsg", name: "HGVSg", numeric: false, tip: "Genomic change in HGVS notation (HGVSg). Click a value to view it in Genome Nexus." },
   // the rest from Genome Nexus, read from the offline store at its pin (lib/variant-annotation.ts)
   { id: "hgvsc", name: "HGVSc", numeric: false, tip: "Coding DNA change in HGVS notation (HGVSc) for the selected transcript" },
-  { id: "status", name: "MS", numeric: false },
+  { id: "status", name: "MS", numeric: false, tip: "Mutation Status" },
   { id: "validationStatus", name: "VS", numeric: false, tip: "Validation Status (VS): whether the mutation was confirmed by an independent validation experiment. V (Valid): Confirmed by an independent validation method. W (Wildtype): Validation found the wildtype allele. U (Unknown): Not validated, or validation status unknown." },
   { id: "center", name: "Center", numeric: false, tip: "Center that sequenced or called the mutation" },
   { id: "gnomad", name: "gnomAD", numeric: true,
@@ -97,6 +97,31 @@ export const VAF_TEXT = "if(vaf IS NULL, '', if(vaf < 0.01, toDecimalString(vaf,
 
 /** Shown unless the view names its columns: the portal's own default set. */
 export const MUTATION_DEFAULT_COLUMNS = ["sample", "cancerType", "proteinChange", "annotation", "mutationType", "copyNumber", "vaf", "mutCount"];
+
+/** What decides three of the default columns, over the table's every row (not its search or filters); undefined where unknown */
+export interface MutationDefaultFacts {
+  /** a queried study has a discrete copy-number profile (ResultsViewPageStore studyToMolecularProfileDiscreteCna) */
+  discreteCna?: boolean;
+  /** some row has a non-zero tumour allele frequency */
+  nonZeroVaf?: boolean;
+  /** distinct non-empty Cancer Type Detailed values */
+  cancerTypes?: number;
+}
+
+/**
+ * The default columns as the portal's table picks them from its data (ResultsViewMutationTable,
+ * MutationTable): Copy # when a queried study has a discrete CNA profile (DiscreteCNAColumnFormatter
+ * isVisible), Allele Freq (T) when a row has a non-zero frequency (TumorAlleleFreqColumnFormatter
+ * isVisible), Cancer Type Detailed when the rows hold more than one (CancerTypeColumnFormatter
+ * isVisible). A fact not known keeps its column.
+ */
+export function mutationDefaultColumns(f: MutationDefaultFacts): string[] {
+  const drop = new Set<string>();
+  if (f.discreteCna === false) drop.add("copyNumber");
+  if (f.nonZeroVaf === false) drop.add("vaf");
+  if (f.cancerTypes !== undefined && f.cancerTypes <= 1) drop.add("cancerType");
+  return MUTATION_DEFAULT_COLUMNS.filter((id) => !drop.has(id));
+}
 
 /**
  * The lollipop grid's cell a mutation falls in, spelled as the grid labels it ("Missense · Driver"):
@@ -195,7 +220,8 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n" +
     "),\n" +
     fusionCtes(p, i, db, gene, pin) +
-    attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
+    // Cancer Type Detailed as the portal's table reads it: the sample's tumour type, the study's for a sample with neither type attribute
+    sampleTumorTypeCte("ct" + i, p.study, db, "SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n" +
     attr("CANCER_TYPE", "cta" + i) + ",\n" +
     copyNumberCte(p, i, db) + ",\n" +
@@ -209,7 +235,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
-    "         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
+    "         m.pid AS patient, m.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, m.proteinChange AS proteinChange,\n" +
     // a germline mutation has no protein-change call: the portal asks OncoKB about it by HGVSc
     // (StoreUtils queryOncoKbData), which this store does not hold
     (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n" +
@@ -308,7 +334,7 @@ function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: stri
   return "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
-    "         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
+    "         v.pid AS patient, v.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
     // in the mutation rows' column order (the UNION ALL matches by position)
     (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level,\n" +
         "         " + svCellSql("resistance_level", "vp", "va1", "va2") + " AS resistanceLevel, " + svCellSql("diagnostic_level", "vp", "va1", "va2") + " AS diagnosticLevel, " +

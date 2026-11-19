@@ -8,20 +8,12 @@ import { CNA_LEVELS, DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, NumericBin, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, DerivedFacet, DerivedRequest, AssayFacet } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
 import { dataBins, recountBins, type BinInput, type BinSettings } from "./data-binner.ts";
-import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
+import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor, withSampleLevel } from "./custom-data.ts";
 
-/**
- * cBioPortal's linear bin intervals (LinearDataBinner). The binner picks the
- * smallest interval that divides the range into at most ~20 bins.
- */
-const BIN_INTERVALS = [0.001, 0.002, 0.0025, 0.005, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5,
-  1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
-const BIN_INTERVALS_DISCRETE = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
-const TARGET_BINS = 20;
 /** values returned per categorical facet (a pie shows a few; a ranked list more) */
 /**
  * Safety bound on values per facet, NOT a display choice — the UI scrolls, so
@@ -133,35 +125,6 @@ async function resolveCohort(
     return { set: studySet(study, "(" + dsql + ")"), count: Number(c.data[0].n), sampleCount: Number(c.data[0].ns) };
   }
   return { set: studySet(study, table), rows, count: new Set(rows.map((x) => x[0])).size, sampleCount: rows.length };
-}
-
-/**
- * Bin edges for a numeric attribute, reproducing the portal's algorithm:
- * IQR-based outlier bounds clamped to the data range, a "nice" interval, and
- * edges anchored to multiples of it. Returns the interior edges; anything
- * below the first or above the last becomes a "<=" / ">" outlier bar.
- */
-export function numericBinEdges(
-  dataMin: number, dataMax: number, q1: number, q3: number, allIntegers: boolean
-): { edges: number[]; interval: number } {
-  if (!(dataMax > dataMin)) return { edges: [], interval: 0 };
-  const iqr = q3 - q1;
-  const lowerOutlier = Math.max(dataMin, q1 - 1.5 * iqr);
-  const upperOutlier = Math.min(dataMax, q3 + 1.5 * iqr);
-  const min = Math.max(dataMin, lowerOutlier), max = Math.min(dataMax, upperOutlier);
-  const list = allIntegers ? BIN_INTERVALS_DISCRETE : BIN_INTERVALS;
-  const interval = list.find((i) => (max - min) / i <= TARGET_BINS) ?? list[list.length - 1];
-  let start = min + interval - (min % interval);
-  if (start - interval > lowerOutlier) start -= interval;
-  const end = (max + interval < upperOutlier) ? max : max - interval;
-  const edges: number[] = [];
-  // guard against pathological ranges producing thousands of bars
-  // each edge is start + k·interval, rounded, so float error never accumulates past `end`
-  const round = (x: number) => Math.round(x * 1e6) / 1e6;
-  for (let k = 0, d = round(start); d <= round(end) && edges.length <= TARGET_BINS + 4; d = round(start + ++k * interval)) {
-    edges.push(d);
-  }
-  return { edges, interval };
 }
 
 /** how many genes may carry their own alteration facet at once */
@@ -997,7 +960,29 @@ export interface ExploreFederatedArgs {
 
 /** One context for the whole federated request, so pass 2 can still see pass 1's cohorts. */
 export function buildExploreFederated(args: ExploreFederatedArgs): Promise<ExploreResult> {
-  return ensureChContext(() => buildExploreFederatedInner(args));
+  return ensureChContext(async () => withSampleLevel(await conflictingLevels(args.studies, args.connByStudy), () => buildExploreFederatedInner(args)));
+}
+
+/**
+ * The attributes stored per patient in some of these studies and per sample in others: the portal
+ * charts such an attribute once, counted per sample, a patient's value for each of its samples
+ * (STS-MD-5). Read from every connection's attribute metadata.
+ */
+export async function conflictingLevels(studies: string[], connByStudy?: Map<string, ChConn>): Promise<string[]> {
+  if (studies.length < 2) return [];
+  const levels = new Map<string, Set<string>>();
+  await Promise.all(byConnection(studies, connByStudy).map(async (g) => {
+    const r = await chQuery<ChRow>("SELECT cam.attr_id AS a, groupUniqArray(lower(toString(cam.patient_attribute))) AS lv\n" +
+      "FROM " + clinicalMetaTable(g.conn.db) + " cam\n" +
+      "JOIN " + g.conn.db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+      "WHERE cs.cancer_study_identifier IN (" + g.studies.map(sq).join(", ") + ")\nGROUP BY a", g.conn);
+    for (const x of r.data) {
+      const set = levels.get(String(x.a)) || new Set<string>();
+      for (const v of (x.lv as unknown as string[] | undefined) || []) set.add(["1", "true"].includes(v) ? "patient" : "sample");
+      levels.set(String(x.a), set);
+    }
+  }));
+  return [...levels].filter(([, l]) => l.size > 1).map(([a]) => a).sort();
 }
 
 async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived, drivers, bins: binSettings }: ExploreFederatedArgs): Promise<ExploreResult> {
@@ -1885,7 +1870,7 @@ export async function buildAssayFacets(o: {
         "       (SELECT any(datatype)" + from(g) + ") AS dt,\n" +
         "       (SELECT max(ifNull(patient_level, 0))" + from(g) + ") AS pl,\n" +
         "       uniqExact(patient_unique_id) AS nnum_p, uniqExact(sample_unique_id) AS nnum_s, min(v) AS mn, max(v) AS mx,\n" +
-        "       quantile(0.25)(v) AS q1, quantile(0.5)(v) AS q2, quantile(0.75)(v) AS q3, count() AS nv, min(v = floor(v)) AS allints\n" +
+        "       quantile(0.5)(v) AS q2, count() AS nv\n" +
         from(g) + " AND v IS NOT NULL", g.conn)),
     ]);
     const st = stats.map((r) => r.data[0] || {});
@@ -1911,26 +1896,16 @@ export async function buildAssayFacets(o: {
     const measured = st.reduce((n, r) => n + Number(r["nnum" + sfx] || 0), 0);
     const live = st.filter((r) => Number(r.nv) > 0);
     if (!live.length) return { ...base, measured };
-    // min and max pool exactly; quartiles do not, so they are weighted by size
+    // min and max pool exactly; the median does not, so it is weighted by size
     const nv = live.reduce((n, r) => n + Number(r.nv), 0);
     const wavg = (k: string) => live.reduce((a, r) => a + Number(r[k]) * Number(r.nv), 0) / nv;
     const min = Math.min(...live.map((r) => Number(r.mn))), max = Math.max(...live.map((r) => Number(r.mx)));
-    const allInts = live.every((r) => Number(r.allints) === 1);
-    // a zero-inflated entity (most signatures) has no spread between its quartiles: bin its whole range
-    let { edges, interval } = numericBinEdges(min, max, wavg("q1"), wavg("q3"), allInts);
-    if (edges.length < 2) ({ edges, interval } = numericBinEdges(min, max, min, max, allInts));
     const out = { ...base, measured, min, max, median: wavg("q2") };
-    if (edges.length < 2) return out;
-    const lastEdge = edges[edges.length - 1] + interval;
-    const binned = await Promise.all(groups.map((g) => chQuery<ChRow>(num +
-      "SELECT multiIf(v <= " + edges[0] + ", -1, v > " + lastEdge + ", -2, toInt32(ceil((v - " + edges[0] + ") / " + interval + ")) - 1) AS b,\n" +
-      "       uniqExact(" + id + ") AS n" + from(g) + " AND v IS NOT NULL\nGROUP BY b", g.conn)));
-    const count = (b: number) => binned.reduce((n, r) => n + Number(r.data.find((x) => Number(x.b) === b)?.n || 0), 0);
-    // portal bins are (start, end]: a value on an edge belongs to the lower bar
-    const bins: NumericBin[] = [];
-    if (count(-1)) bins.push({ special: "<=", end: edges[0], count: count(-1) });
-    edges.forEach((e, i) => bins.push({ start: e, end: Math.round((e + interval) * 1e6) / 1e6, count: count(i) }));
-    if (count(-2)) bins.push({ special: ">", start: lastEdge, count: count(-2) });
+    // the bars as the portal draws them: its DataBinner over the entity's values (STS-BAR-1)
+    const counted = await Promise.all(groups.map((g) => chQuery<ChRow>(num +
+      "SELECT trimBoth(value) AS raw, uniqExact(" + id + ") AS n" + from(g) + " AND v IS NOT NULL\nGROUP BY raw", g.conn)));
+    const bins = dataBins(counted.flatMap((r) => r.data.map((x) => ({ value: String(x.raw), count: Number(x.n) }))));
+    if (bins.length < 2) return out;
     return { ...out, bins };
   })));
 }

@@ -5,11 +5,14 @@ import { DataTable, specQuery } from "../../_table/DataTable.tsx";
 import { portalDuplicatesNote } from "../../../lib/chart/format.ts";
 import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
+import { useStemHover } from "../../_lollipop/stem-hover.ts";
+import { rowAtStem } from "../../../lib/lollipop.ts";
+import { vafEmptyTip } from "../../../lib/mutation-cell-text.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
   validationStatusCell, exonCell, VALIDATION_STATUS_STYLE } from "../../../lib/mutation-type.ts";
-import { ClinvarCell, DbsnpCell, FunctionalImpactCell, MutationTypeCell, FunctionalImpactHead, GnomadCell, HgvscCell, HgvsgCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
+import { ClinvarCell, DbsnpCell, FunctionalImpactCell, MutationStatusCell, MutationTypeCell, FunctionalImpactHead, GnomadCell, HgvscCell, HgvsgCell, ProteinChangeCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
 
 // ---- Mutations: one gene's mutation table, on the shared table (app/_table/DataTable.tsx) ---------
 
@@ -17,11 +20,18 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
   onQuery: (q: TableQuery) => void }) {
   const t = v.mutations;
   const tips = useCellTips();
+  // the row's mutation status, which its Protein Change cell tags as germline
+  const statusAt = t.columns.findIndex((c) => c.id === "status");
+  // the lollipop's stem under the pointer: its codon's rows are highlighted, as on the portal's table
+  const hover = useStemHover();
+  const posAt = t.columns.findIndex((c) => c.id === "proteinPos");
   return (
     <div className="pb">
       {tips.node}
       <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} countNote={portalDuplicatesNote(t.duplicates, "mutation", "mutations")} {...(t.kept ? { kept: t.kept } : {})} onQuery={onQuery}
+        downloadFormat="table-tsv"
         num={(id, x) => id === "vafNormal" ? String(x) : x.toLocaleString()}
+        hot={hover && posAt >= 0 ? (r) => rowAtStem(hover, t.gene, r.values[posAt]) : undefined}
         colHead={(id) => id === "functionalImpact" ? <FunctionalImpactHead show={tips.show} /> : null}
         cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
           : id === "hgvsg" ? <HgvsgCell hgvsg={String(x ?? "")} detail={r.detail} show={tips.show} />
@@ -32,8 +42,12 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
           : id === "dbsnp" ? <DbsnpCell rsid={String(x ?? "")} detail={r.detail} />
           : id === "functionalImpact" ? <FunctionalImpactCell detail={r.detail} show={tips.show} />
           : id === "mutationType" ? <MutationTypeCell raw={x == null ? "" : String(x)} />
+          : id === "proteinChange" ? <ProteinChangeCell change={String(x ?? "")} status={statusAt >= 0 ? String(r.values[statusAt] ?? "") : ""} />
+          : id === "status" ? <MutationStatusCell raw={String(x ?? "")} />
           : id === "variantType" && x ? <span className="font-semibold" style={{ color: variantTypeColor(String(x)) }} data-tip={variantTypeTip(String(x)) ?? undefined}>{String(x)}</span>
           : id === "copyNumber" ? <CopyNumberCell label={String(x ?? "")} />
+          // the portal's TableCellStatusIndicator NA: no text, its tooltip (TumorAlleleFreqColumnFormatter renderFunction)
+          : id === "vaf" && vafEmptyTip(x) ? <span className="text-[var(--muted)]" data-tip={vafEmptyTip(x)!}>{"\u00a0"}</span>
           : id === "validationStatus" && x ? <ValidationStatus raw={String(x)} />
           : id === "exon" ? <span>{exonCell(String(x ?? ""))}</span>
           // as on the portal's table, a sample id opens that sample's page, in a new tab so the table keeps its place

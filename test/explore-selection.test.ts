@@ -3,7 +3,7 @@
 // (STS-PIE-6), and other charts' clauses are left alone.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { binSelected, binsToLeaves, chartSelection, naClause, naSelected, toggleBin, toggleNa, toggleValue, ANY_LEAF_LIMIT } from "../lib/explore-selection.ts";
+import { assayBinText, assayBinWhere, binSelected, binsToLeaves, chartSelection, naClause, naSelected, toggleBin, toggleNa, toggleValue, ANY_LEAF_LIMIT } from "../lib/explore-selection.ts";
 import type { CohortDef, NumericBin } from "../lib/types.ts";
 
 // AGE as coadread draws it: ≤35, then 5-year bars to 90, then >90
@@ -109,5 +109,19 @@ describe("the NA slice", () => {
     assert.ok("why" in toggleNa(withValue, "RACE"));
     assert.ok("why" in toggleValue({ all: [naClause("RACE")] }, "RACE", "White"));
     assert.ok("draft" in toggleNa({ all: [sex] }, "RACE"), "another chart's values are no obstacle");
+  });
+});
+
+describe("a generic-assay bar as a filter and a label (STS-BAR-5)", () => {
+  const cases: [string, NumericBin, unknown, string][] = [
+    ["one value (start = end): equal to it, as a number", { start: 4, end: 4, count: 3 }, { range: { gte: 4, lte: 4 } }, "4"],
+    ["an interval (start, end]", { start: 0.4, end: 0.42, count: 11 }, { range: { gt: 0.4, lte: 0.42 } }, "0.4–0.42"],
+    ["the low outlier bar", { special: "<=", end: 0.06, count: 17 }, { range: { lte: 0.06 } }, "≤0.06"],
+    ["the high outlier bar", { special: ">", start: 0.44, count: 49 }, { range: { gt: 0.44 } }, ">0.44"],
+    ["a word", { value: "Unknown", count: 2 } as NumericBin, { values: ["Unknown"] }, "Unknown"],
+  ];
+  for (const [name, b, where, text] of cases) test(name, () => {
+    assert.deepEqual(assayBinWhere(b), where);
+    assert.equal(assayBinText(b), text);
   });
 });

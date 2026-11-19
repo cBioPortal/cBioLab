@@ -109,6 +109,20 @@ export function geneHeaderTips(kind: GeneTableKind): Partial<Record<GeneSortColu
 
 const CALL: Record<number, string> = { 2: "AMP", [-2]: "HOMDEL" };
 
+/**
+ * Whether a row matches the table's search, as the portal's: a case-insensitive substring of any
+ * column as shown — gene, # Mut / # SV, #, Freq, and on the CNA table its cytoband and AMP / HOMDEL
+ * (STS-GT-10; the portal's Freq search, which reads the fraction unscaled, is not copied).
+ */
+export function geneRowMatches(kind: GeneTableKind, r: GeneTableRow, search: string): boolean {
+  const needle = search.trim().toUpperCase();
+  if (!needle) return true;
+  const cells = kind === "cna"
+    ? [r.gene, r.cytoband || "", CALL[r.cna ?? 0] || "", String(r.altered), geneFreqText(r)]
+    : [r.gene, String(r.events), String(r.altered), geneFreqText(r)];
+  return cells.some((c) => c.toUpperCase().includes(needle));
+}
+
 /** the table's Data file: every row in the rows' own order */
 export function geneTableTsv(kind: GeneTableKind, rows: GeneTableRow[]): string {
   const header = kind === "mutated" ? ["Gene", "MutSig(Q-value)", "# Mut", "#", "Profiled Samples", "Freq"]
@@ -161,11 +175,11 @@ export function appliedLines(clauses: unknown[], lines: string[]): string[] {
 /** the most filters a selection holds (lib/cohort2.ts) */
 const MAX_FILTERS = 8;
 
-/** why Intersection can't be offered: one filter per gene would take the selection past its limit */
-export function intersectionRefusal(filters: number, genes: number): string | null {
-  const after = filters + genes;
+/** why Intersection can't be offered: one filter per checked row (a gene, a kind of data) would take the selection past its limit */
+export function intersectionRefusal(filters: number, rows: number, row = "gene"): string | null {
+  const after = filters + rows;
   if (after <= MAX_FILTERS) return null;
-  return "Intersection adds a filter per gene, which would make " + after + " filters; a selection holds at most " + MAX_FILTERS + " (Union adds one)";
+  return "Intersection adds a filter per " + row + ", which would make " + after + " filters; a selection holds at most " + MAX_FILTERS + " (Union adds one)";
 }
 
 /** a gene toggled in the genes queued for a query, with the message the portal shows */

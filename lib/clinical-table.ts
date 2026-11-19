@@ -68,6 +68,12 @@ function allRows(parts: TablePart[], db: string, unit: "sample" | "patient", col
   return "WITH " + ctes.join("") + "rows AS (\n" + rows.join("  UNION ALL\n") + ")\n";
 }
 
+/** a row's place in `listed` ("study:patient" ids), from 1; a patient the list does not name after every one it does */
+const listedOrder = (listed: string[]) => {
+  const at = "indexOf([" + listed.map(sq).join(", ") + "], concat(study, ':', patient))";
+  return "if(" + at + " = 0, " + (listed.length + 1) + ", " + at + ")";
+};
+
 /** The table's own columns, before the attributes: who each row is. */
 export function idColumns(unit: "sample" | "patient"): QueryColumn[] {
   return [
@@ -83,9 +89,10 @@ export function idColumns(unit: "sample" | "patient"): QueryColumn[] {
  * every requested attribute's value as a map — a sample row carries its patient's attributes too,
  * as the portal's table does — for lib/table-query.ts to search, filter, sort and page in the
  * database, so the order is global and any page is one query however deep. With no sort, rows go
- * by patient and sample id, then document order. All parts must live in the database this runs in.
+ * by patient and sample id, then document order — or, given `listed` ("study:patient" ids), in that
+ * list's order first, patients it does not name last. All parts must live in the database this runs in.
  */
-export function clinicalRowSource(parts: TablePart[], db: string, unit: "sample" | "patient", columns: TableColumn[]): RowSource {
+export function clinicalRowSource(parts: TablePart[], db: string, unit: "sample" | "patient", columns: TableColumn[], listed?: string[]): RowSource {
   if (!parts.length) throw new Error("clinicalRowSource needs at least one part");
   const attr = (c: TableColumn): QueryColumn => {
     const v = "m[" + sq(c.id) + "]";
@@ -95,7 +102,7 @@ export function clinicalRowSource(parts: TablePart[], db: string, unit: "sample"
     with: allRows(parts, db, unit, columns),
     columns: [...idColumns(unit), ...columns.map(attr)],
     select: "cohort, study, patient, sample, samples, m",
-    defaultOrder: "patient, sample",
+    defaultOrder: (listed?.length ? listedOrder(listed) + ", " : "") + "patient, sample",
     tiebreak: "patient, sample, ord",
   };
 }
