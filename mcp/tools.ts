@@ -7,7 +7,8 @@ import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import { viewToSvg, viewTitle } from "../lib/view-svg.ts";
 import sharp from "sharp";
 import { ensureFonts } from "../lib/fonts.ts";
-import { renderDslMarkdown, viewsSummary } from "../lib/dsl-reference.ts";
+import { viewsSummary } from "../lib/dsl-reference.ts";
+import { dslForAgents } from "../lib/dsl-agent.ts";
 import { analysisText } from "../lib/result-text.ts";
 import {
   createCampaign, getCampaign, addHypotheses, lockCampaign, runCampaign, checkFeasibility, reportText
@@ -79,9 +80,13 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
 
   server.tool(
     "describe_dsl",
-    "The complete, generated reference for the cbio-lab DSL: the Analysis document (cohorts + views), every clause kind (OQL, clinical, timeline events, case lists, continuous genomic data, ...), cross-study federation semantics, the OncoprintSpec, and runnable examples. Read this before composing documents by hand; it is generated from the same source as the docs and the in-app chat grammar, and its examples are CI-executed against the live compiler.",
-    {},
-    async () => ({ content: [{ type: "text", text: renderDslMarkdown() }] })
+    "The cbio-lab DSL reference, generated from the same source as the docs and the in-app assistant: by default the compact grammar of the Analysis document (cohorts + views, every clause and view kind) and a numbered index of the worked examples, whose documents are CI-executed against the live compiler. Pass `example: N` for one example's full document — adapting the nearest example is the quickest way to a correct document — `search` to filter the example index, or `full: true` for the complete reference (about 250,000 characters). Read this before composing documents by hand.",
+    {
+      example: z.number().int().min(1).nullish().describe("One worked example's full document, by its number in the index"),
+      search: z.string().max(200).nullish().describe("Filter the example index: words that must all appear (title, view kinds, topics, studies)"),
+      full: z.boolean().nullish().describe("The complete reference, about 250,000 characters; only when the grammar leaves a question open")
+    },
+    async (args: { example?: number | null; search?: string | null; full?: boolean | null }) => text(dslForAgents(args))
   );
 
   server.tool(
@@ -136,19 +141,20 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
   server.tool(
     "describe_study",
     "Get the study's queryable vocabulary: timeline event types with patient counts, their attribute keys and common values, the synthetic 'Treatment line (derived)' event type, and study-level caveats. Call this once before composing cohort queries.",
-    {},
-    async () => {
-      const sqls = catalogSqls(DB, STUDY);
+    { study: z.string().max(200).nullish().describe(`Study id (default ${STUDY}, the study this server is configured for)`) },
+    async ({ study: requested }: { study?: string | null }) => {
+      const study = requested || STUDY;
+      const sqls = catalogSqls(DB, study);
       // a study that is not there is refused by name, not described as one with no events
       if (Number((await chQuery(sqls.studyCheck)).data[0]?.n) !== 1)
-        throw new Error(`unknown study '${STUDY}': describe_study describes the study this server is configured for (STUDY_ID), and the warehouse does not hold it`);
+        throw new Error(`unknown study '${study}': the warehouse does not hold it`);
       const [tRes, vRes] = [await chQuery(sqls.types), await chQuery(sqls.values)];
       const values: Record<string, Record<string, string[]>> = {};
       vRes.data.forEach((r) => { (values[r.t] = values[r.t] || {}); (values[r.t][r.k] = values[r.t][r.k] || []).push(r.v); });
-      const lc = lineCatalogSqls(DB, STUDY);
+      const lc = lineCatalogSqls(DB, study);
       const combos = (await chQuery(lc.combos)).data.map((r) => r.combo);
       const lines: string[] = [];
-      lines.push(`Study: ${STUDY} (unit of counting: patient). Portal: ${PORTAL}/study/summary?id=${STUDY}`);
+      lines.push(`Study: ${study} (unit of counting: patient). Portal: ${PORTAL}/study/summary?id=${study}`);
       lines.push("\nEvent types (patients | events):");
       for (const t of tRes.data) {
         lines.push(`- ${t.t}: ${Number(t.n_pat).toLocaleString()} pts | ${Number(t.n_ev).toLocaleString()} events`);
@@ -211,6 +217,7 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
     "Render an oncoprint image for gene alterations across a cohort (or across column groups defined by two cohorts). Columns are patients, staircase-sorted; cells show mutations by class, high-level CNA (amp/deep-deletion only), and structural variants; striped cells mean the gene was NOT on that patient's sequencing panel (distinct from unaltered); per-track frequencies use panel-aware denominators. Returns a PNG plus the track statistics.",
     {
       genes: z.array(z.string()).min(1).max(12).describe("Gene symbols for tracks, e.g. ['TP53','KRAS','MSH3']"),
+      study: z.string().max(200).nullish().describe(`Study id whose patients are the columns (default ${STUDY}); the timeline cohort fields below assume a study with clinical timelines`),
       cohort: z.object(zCohortDsl).nullish().describe("Cohort for the columns; omit for all patients (ignored when groups given)"),
       groups: z.array(z.object({ name: z.string().max(60), dsl: z.object(zCohortDsl) })).max(4).nullish()
         .describe("Optional column groups, each its own cohort DSL — e.g. progressors vs non-progressors side by side"),
@@ -224,8 +231,9 @@ export function registerTools(server: any, engine: ToolEngine = DIRECT): void {
       heatmap: z.array(z.object({ profileType: z.string().max(120), genes: z.array(z.string()).max(12).nullish(), entities: z.array(z.string()).max(12).nullish() })).max(4).nullish()
         .describe("Continuous molecular-profile heatmap tracks (portal-style), e.g. [{profileType:'mrna_median_Zscores'}] — one row per gene (defaults to the gene tracks), patient value = mean across samples; z-score profiles use a fixed diverging +-3 blue-white-red ramp; unknown profiles error listing what the study has; profileType 'VAF' is a synthetic profile rendering mutation variant-allele fraction from loaded alt/ref counts; a numeric generic-assay profile (mutational signatures, methylation, …) takes entities:[...] (its entity ids) in place of genes")
     },
-    async ({ genes, cohort, groups, derivedEventTracks, clinical, heatmap, sort, patientList }: any) => {
+    async ({ genes, study, cohort, groups, derivedEventTracks, clinical, heatmap, sort, patientList }: any) => {
       const spec: OncoprintSpec = {
+        ...(study ? { study } : {}),
         genes,
         clinical: clinical || [],
         ...(heatmap && heatmap.length ? { heatmap } : {}),

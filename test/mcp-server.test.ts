@@ -16,7 +16,7 @@ const freePort = () => new Promise<number>((resolve, reject) => {
 const express = (await import("express")).default as unknown as { application: { listen: (...a: unknown[]) => Server } };
 const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
 const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
-const { renderDslMarkdown } = await import("../lib/dsl-reference.ts");
+const { dslForAgents } = await import("../lib/dsl-agent.ts");
 
 let server: Server;
 let base: string;
@@ -74,7 +74,7 @@ describe("mcp/server.ts", () => {
       for (const n of ["describe_dsl", "run_analysis", "describe_study", "query_cohort", "derive_treatment_lines", "render_oncoprint", "campaign_create", "campaign_run"])
         assert.ok(names.includes(n), "serves " + n);
       const r = await client.callTool({ name: "describe_dsl", arguments: {} }) as { content: { type: string; text: string }[] };
-      assert.equal(r.content[0].text, renderDslMarkdown());
+      assert.equal(r.content[0].text, dslForAgents());
       const bad = await client.callTool({ name: "derive_treatment_lines", arguments: { gap: 0 } }) as { isError?: boolean };
       assert.equal(bad.isError, true, "a schema violation is an error result, and the server keeps serving");
       assert.ok((await client.listTools()).tools.length >= 12);
