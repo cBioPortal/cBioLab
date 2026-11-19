@@ -334,3 +334,10 @@ export function portalLogTick(v: number): string {
   if (Math.abs(e - k) > 1e-9) return "";
   return (v < 0 ? "−" : "") + "10" + String(k).split("").map((c) => SUPERSCRIPT[c]).join("");
 }
+
+/**
+ * The Study View's selection as cbioportal.org writes it (`StudyResultsSummary`, STV-AB-1):
+ * "Selected: 23 patients | 61 samples", the "Selected:" only while the charts are filtered.
+ */
+export const portalSelectedInfo = (patients: number, samples: number, filtered: boolean): string =>
+  (filtered ? "Selected: " : "") + patients.toLocaleString("en-US") + " patients | " + samples.toLocaleString("en-US") + " samples";

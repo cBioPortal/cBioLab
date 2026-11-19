@@ -6,6 +6,7 @@ import { interpolatePlasma } from "d3-scale-chromatic";
 import type { View } from "./types.ts";
 import { studentTP } from "./stats.ts";
 import { portalFixed, portalLocale, portalRange } from "./chart/format.ts";
+import type { ChartBins } from "./study-view-bins.ts";
 
 export const MUTATION_COUNT = "MUTATION_COUNT";
 export const FGA = "FRACTION_GENOME_ALTERED";
@@ -136,6 +137,33 @@ function axisRange(a: DensityAxis, v0: number, v1: number, span: number): RangeC
   const d = Math.max(0, 2 - Math.floor(Math.log10(Math.max(1e-9, span))));
   const round = (v: number) => Number(portalFixed(v, d));
   return { kind: "clinical", attribute: a.attribute, range: { gte: round(v0), lte: round(v1) } };
+}
+
+/**
+ * The edges a drag box's ranges add to their attributes' bar charts, as the portal adds them as
+ * custom bins (STS-SC-6, _customBinsFromScatterPlotSelectionSet): each range's two ends.
+ */
+export interface DensityBins { attribute: string; range: { gte: number; lte: number }; edges: number[] }
+
+/**
+ * The charts' bins with a density drag's edges laid over them, as the portal's separate, temporary
+ * set of scatter-selection bins (STS-SC-6): an attribute's bars take the drag's edges only while the
+ * draft still holds that drag's range on it, so removing the filter, Clear All, or a selection on the
+ * bars (which replaces the chart's filter) drops them. The reader's own bins are left as they are.
+ */
+export function withDensityBins(bins: Record<string, ChartBins>, density: DensityBins[], draft: { all?: unknown[] } | null | undefined): Record<string, ChartBins> {
+  const out: Record<string, ChartBins> = { ...bins };
+  for (const d of density) {
+    const held = (draft?.all || []).some((c) => {
+      const l = c as { kind?: string; attribute?: string; range?: { gte?: number; lte?: number } };
+      return !!l && l.kind === "clinical" && l.attribute === d.attribute && l.range?.gte === d.range.gte && l.range?.lte === d.range.lte;
+    });
+    if (held) out[d.attribute] = { ...bins[d.attribute], bins: { method: "custom", edges: d.edges } };
+  }
+  return out;
+}
+export function densityBinEdges(clauses: { attribute: string; range: { gte: number; lte: number } }[]): { attribute: string; ends: number[] }[] {
+  return clauses.map((c) => ({ attribute: c.attribute, ends: [c.range.gte, c.range.lte] }));
 }
 
 /**
