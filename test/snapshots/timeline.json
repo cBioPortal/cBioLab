@@ -2636,6 +2636,11 @@
                 "numeric": false
               },
               {
+                "id": "genePanel",
+                "name": "Gene panel",
+                "numeric": false
+              },
+              {
                 "id": "status",
                 "name": "Status",
                 "numeric": false,
@@ -2717,9 +2722,8 @@
                 "numeric": false
               },
               {
-                "id": "comments",
-                "name": "Comments",
-                "numeric": false
+                "…": "1 more",
+                "sha256": "71adfe3f3c816775"
               }
             ],
             "shown": [

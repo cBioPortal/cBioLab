@@ -51,6 +51,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
   legacy: { page: LegacyPage; held: Record<string, PortalHold> | null };
 }) {
   const [state, setState] = useState<Record<string, ViewState>>({});
+  // the chooser's options with nothing to show, greyed (the Mutations tab's gene chips, MUT-GT-2), keyed by the request that found them
+  const [greyed, setGreyed] = useState<{ sent: string; options: string[] } | null>(null);
   const gen = useRef<Record<string, number>>({});
   // which header menus are open, kept outside the cards so a re-render does not close them
   const menus = useRef(new Map<string, boolean>());
@@ -99,6 +101,19 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
     onDoc({ ...doc, views: views.map((v, j) => { const m = idx.indexOf(j); return m >= 0 ? mine[m] : v; }) });
   };
   const chooser = tab && !sub ? tab.chooser : undefined;
+  // the chooser's own check, beside the tab's views: one request over every option, its answer only greys chips
+  const emptySlice = chooser?.empties && idx.length ? { ...tabSlice(doc, [idx[0]]), views: [chooser.empties.view(idx.map((i) => views[i]))] } : null;
+  const emptySent = emptySlice ? JSON.stringify(emptySlice) : "";
+  useEffect(() => {
+    if (!emptySlice || !chooser?.empties) return;
+    const ctl = new AbortController();
+    api.analysis(emptySlice, { signal: ctl.signal })
+      .then((r) => r.json())
+      .then((j) => { const v = j?.views?.[0]; if (!j.error && v && !v.error) setGreyed({ sent: emptySent, options: chooser.empties!.empty(v) }); })
+      .catch(() => { /* no answer: no chip greyed, as before */ });
+    return () => ctl.abort();
+  }, [emptySent]);   // eslint-disable-line react-hooks/exhaustive-deps -- the request, by value
+  const grey = new Set(greyed && greyed.sent === emptySent ? greyed.options : []);
   const chooseFrom = (o: string) => {
     const next = chooser!.apply(idx.map((i) => views[i]), o);
     onDoc({ ...doc, views: views.map((v, j) => { const k = idx.indexOf(j); return k >= 0 ? next[k] : v; }) });
@@ -149,7 +164,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
             <div className="tbz"><span className="tbl">{chooser.label}</span>
               <Tabs value={chooser.value(idx.map((i) => views[i]))} onValueChange={chooseFrom}>
                 <TabsList aria-label={chooser.label} className={SEG_TABS}>
-                  {chooser.options.map((o) => <TabsTrigger key={o} value={o} className={cn(SEG_TAB, "font-mono")}>{o}</TabsTrigger>)}
+                  {chooser.options.map((o) => <TabsTrigger key={o} value={o} className={cn(SEG_TAB, "font-mono", grey.has(o) && "text-[#bbb]")}
+                    data-tip={grey.has(o) ? "no " + o + " mutations in this query" : undefined} data-empty={grey.has(o) ? "1" : undefined}>{o}</TabsTrigger>)}
                 </TabsList>
               </Tabs>
             </div>

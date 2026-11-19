@@ -15,6 +15,11 @@
  *      another position, chromosome or class is another (the fixture holds no A–B / B–A pair)
  *   F  a merged row's fields are one record's (Gene 1 and Gene 2 never both the same partner)
  *   L  the patient list's Structural Variants count is the table's rows (FX-P49: 1, though 2 records)
+ *   N  the Gene panel column (hidden by default; StructuralVariantTableWrapper genePanelProps): each sample
+ *      carrying the row, its structural-variant panel, site 1's gene deciding whether it was profiled; the
+ *      fixture's SV profile is whole-exome (no panel, data_gene_panel_matrix.txt's WGS), written N/A: FX-P49's
+ *      fusion "N/A, N/A"; FX-P50's MET event with no site 1 gene "N/A" (whole exome profiles every gene);
+ *      left blank unless the column is asked for. Panel names are checked on the warehouse against the portal
  *   S  Status is the stored SV status (the page draws s / g): FX-P51's BRCA2 deletion GERMLINE,
  *      its RB1 deletion SOMATIC; a sort by Status is refused (the portal does not sort it)
  *
@@ -59,6 +64,22 @@ async function svRows(patient: string, q: TableQuery = {}): Promise<Row[] | stri
     if (!t) return "refused: " + String(r.error);
     return t.rows.map((x) => Object.fromEntries(t.columns.map((c, i) => [c.id, x.values[i]])));
   } catch (e) { return "threw: " + String((e as Error).message).slice(0, 300); }
+}
+
+// ---- N: the Gene panel column ------------------------------------------------------------------
+{
+  const asked = async (patient: string, columns: string[]) => {
+    const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: patient }, sv: { columns, rows: 100 } }, ctx) as { alterations?: AlterationsResult; error?: string };
+    const t = r.alterations?.tables.sv;
+    return t ? t.rows.map((x) => Object.fromEntries(t.columns.map((c, i) => [c.id, x.values[i]]))) : "refused: " + String(r.error);
+  };
+  const p49 = await asked("FX-P49", ["gene1", "gene2", "genePanel"]);
+  ok("N FX-P49's fusion, in both samples: \"N/A, N/A\"", typeof p49 !== "string" && p49.length === 1 && p49[0].genePanel === "N/A, N/A", JSON.stringify(p49));
+  const p50 = await asked("FX-P50", ["gene1", "gene2", "genePanel"]);
+  const met = typeof p50 === "string" ? undefined : p50.find((x) => x.gene1 === "" && x.gene2 === "MET");
+  ok("N FX-P50's MET event with no site 1 gene: \"N/A\"", met?.genePanel === "N/A", JSON.stringify(met ?? p50));
+  const plain = await asked("FX-P49", ["gene1", "gene2"]);
+  ok("N not asked for, not worked out: blank", typeof plain !== "string" && plain[0]?.genePanel === "", JSON.stringify(plain));
 }
 
 // ---- M, F: FX-P49's fusion in two samples -----------------------------------------------------
