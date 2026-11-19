@@ -22,22 +22,30 @@ def _round(x: float) -> int:
     return int(math.floor(x + 0.5))
 
 
-def mut_class_bit(mt: str | None) -> int:
-    if not mt:
-        return BITS["OTHER_MUT"]
-    t = mt.lower()
-    if t.startswith("missense"):
-        return BITS["MISSENSE"]
-    if t.startswith(("nonsense", "frame_shift", "nonstop")):
-        return BITS["TRUNCATING"]
-    if t.startswith("in_frame"):
-        return BITS["INFRAME"]
-    if t.startswith("splice"):
-        return BITS["SPLICE"]
-    # the portal calls these promoter mutations; the warehouse spells them 5'Flank
-    if t.startswith(("5'flank", "5_flank")) or "promoter" in t:
+# a mutation type's class as the portal's getSimplifiedMutationType reads it (lib/oql-match.ts PORTAL_TYPE_CLASS)
+_PORTAL_TYPE_CLASS = {
+    "missense": ("missense_mutation", "missense", "missense_variant"),
+    "frameshift": ("frame_shift_ins", "frame_shift_del", "frameshift", "frameshift_deletion", "frameshift_insertion",
+                   "de_novo_start_outofframe", "frameshift_variant"),
+    "nonsense": ("nonsense_mutation", "nonsense", "stopgain_snv"),
+    "splice": ("splice_site", "splice", "splice site", "splicing", "splice_site_snp", "splice_site_del", "splice_site_indel",
+               "splice_region"),
+    "nonstart": ("translation_start_site", "start_codon_snp", "start_codon_del"),
+    "nonstop": ("nonstop_mutation",),
+    "inframe": ("in_frame_del", "in_frame_ins", "in_frame_deletion", "in_frame_insertion", "indel", "nonframeshift_deletion",
+                "nonframeshift", "nonframeshift insertion", "nonframeshift_insertion"),
+}
+_CLASS_OF = {t: cls for cls, types in _PORTAL_TYPE_CLASS.items() for t in types}
+
+
+def mut_class_bit(mt: str | None, mv: str | None = None) -> int:
+    """A mutation's glyph class, as the TypeScript mutClassBit (the portal's getOncoprintMutationType)."""
+    t = (mt or "").lower()
+    if t != "fusion" and (mv or "").lower() == "promoter":
         return BITS["PROMOTER"]
-    return BITS["OTHER_MUT"]
+    cls = "none" if t == "fusion" else _CLASS_OF.get(t, "other")
+    return {"missense": BITS["MISSENSE"], "inframe": BITS["INFRAME"], "splice": BITS["SPLICE"],
+            "other": BITS["OTHER_MUT"]}.get(cls, BITS["TRUNCATING"])
 
 
 _DECIMAL = re.compile(r"^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$")
@@ -126,7 +134,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             continue
         bit = 0
         if r["vt"] == "mutation":
-            bit = mut_class_bit(r.get("mt"))
+            bit = mut_class_bit(r.get("mt"), r.get("mv"))
         elif r["vt"] == "structural_variant":
             bit = BITS["SV"]
         elif r["vt"] == "cna":

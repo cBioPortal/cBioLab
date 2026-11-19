@@ -91,7 +91,8 @@ const each = (name: string, fn: (sort: (c: Case, keys?: Key[]) => string[]) => v
 const tie = (...ls: string[]) => [...ls].sort().reverse();
 
 // event builders, pid as a letter
-const mut = (pid: string, mt: string, driver = false, germ = false, gene = "TP53"): Ev => ({ pid, gene, vt: "mutation", mt, driver, germ });
+// a promoter mutation as the warehouse stores one: type 5'Flank, protein change "Promoter" (the portal reads the change)
+const mut = (pid: string, mt: string, driver = false, germ = false, gene = "TP53"): Ev => ({ pid, gene, vt: "mutation", mt, ...(mt === "5'Flank" ? { mv: "Promoter" } : {}), driver, germ });
 const cna = (pid: string, v: number, driver = false, gene = "TP53"): Ev => ({ pid, gene, vt: "cna", cna: v, driver });
 const sv = (pid: string, driver = false, gene = "TP53"): Ev => ({ pid, gene, vt: "structural_variant", driver });
 const TRUNC = "Nonsense_Mutation", SPLICE = "Splice_Site", INFRAME = "In_Frame_Del", PROMOTER = "5'Flank", MISSENSE = "Missense_Mutation", OTHER = "Targeted_Region";

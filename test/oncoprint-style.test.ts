@@ -66,7 +66,7 @@ test("the assembler: a driver mutation of any class outranks every VUS one, SV a
 test("promoter mutations are their own class, between in-frame and missense", () => {
   const p = cellLayers(B.PROMOTER | B.MISSENSE | B.MUT_DRIVER, STYLE);
   assert.equal(p[1].color, "#00b7ce", "promoter outranks missense");
-  assert.equal(mutClassBit("5'Flank"), B.PROMOTER);
+  assert.equal(mutClassBit("5'Flank", "Promoter"), B.PROMOTER, "by its protein change, as the warehouse stores TERT promoter calls");
   assert.equal(mutClassBit("Missense_Mutation"), B.MISSENSE);
   assert.equal(mutClassBit("Splice_Region"), B.SPLICE);
 });

@@ -32,15 +32,16 @@ AGE = {f"N{i:02d}": str(i * 10 + 3) for i in range(12)}
 
 
 def mut(pid, mt, driver=False, gene="TP53", germ=False):
-    return {"pid": pid, "gene": gene, "vt": "mutation", "mt": mt, "driver": driver, "germ": germ}
+    # a promoter mutation as the warehouse stores one: type 5'Flank, protein change "Promoter" (the portal reads the change)
+    return {"pid": pid, "gene": gene, "vt": "mutation", "mt": mt, **({"mv": "Promoter"} if mt == "5'Flank" else {}), "driver": driver, "germ": germ}
 
 
 EVENTS = [
     mut("A", "Missense_Mutation", True),
     mut("B", "Nonsense_Mutation", False), mut("B", "Missense_Mutation", False),  # T8: truncating wins
     mut("C", "Nonsense_Mutation", False), mut("C", "Missense_Mutation", True),   # T7: the driver wins
-    mut("D", "Splice_Site", False), mut("E", "Promoter", True), mut("F", "Missense_Mutation", False, germ=True),
-    mut("G", "Translation_Start_Site", True),
+    mut("D", "Splice_Site", False), mut("E", "5'Flank", True), mut("F", "Missense_Mutation", False, germ=True),
+    mut("G", "Targeted_Region", True),
     {"pid": "A", "gene": "TP53", "vt": "cna", "cna": 2, "driver": True},
     {"pid": "B", "gene": "TP53", "vt": "cna", "cna": -2, "driver": False},
     {"pid": "C", "gene": "KRAS", "vt": "cna", "cna": 2, "driver": False},
