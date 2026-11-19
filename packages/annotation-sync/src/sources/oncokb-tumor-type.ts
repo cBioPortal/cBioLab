@@ -8,6 +8,10 @@
 // CANCER_TYPE_DETAILED (a blank value is none, as the portal's API never returns one) takes its study's cancer type; a sample with CANCER_TYPE alone has none ('',
 // sent as null). Only genes OncoKB curates are asked about; any other gene's keys are stored
 // unasked, with an empty oncogenicity, so the sync does not pick them up again.
+//
+// The same table holds the patient header's TMB-H and MSI-H calls (PatientViewPageStore
+// otherBiomarkerQueries), under gene "Other Biomarkers": a key per biomarker a sample qualifies for
+// and tumour type the header asks it with (biomarkerKeySpace), asked by Hugo symbol.
 import type { Row } from "@cbiolab/clickhouse";
 import { sq } from "@cbiolab/clickhouse";
 import type { AnnotationSource } from "../source.ts";
@@ -50,6 +54,45 @@ export function tumorTypeKeySpace(portalDb: string, study: string | null): strin
     ") GROUP BY hugo_gene_symbol, alteration, consequence, tumor_type"
   );
 }
+
+/** the gene OncoKB files TMB-H and MSI-H under (oncokb-frontend-commons OTHER_BIOMARKER_HUGO_SYMBOL) */
+export const OTHER_BIOMARKERS = "Other Biomarkers";
+
+/**
+ * The header's biomarker keys, one row per (biomarker, tumour type), in tumorTypeKeySpace's columns.
+ * A sample qualifies for TMB-H when CVR_TMB_SCORE or TMB_NONSYNONYMOUS is a finite number ≥ 10, for
+ * MSI-H when MSI_TYPE is "Instable" (StoreUtils getSampleClinicalDataMapByThreshold / ByKeywords).
+ * The portal asks with one tumour type for every sample shown: the first CANCER_TYPE_DETAILED among
+ * them, else the first CANCER_TYPE, else the study's (getSampleTumorTypeMap, tumorTypeResolver), and
+ * "first" is taken by sample id. The patient view shows all the patient's samples, a sample view
+ * that one alone, so each qualifying sample gives a key at both. `clinical` is the clinical table,
+ * for a check that adds rows of its own.
+ */
+export function biomarkerKeySpace(portalDb: string, study: string | null, clinical = portalDb + ".clinical_data_derived"): string {
+  const rows = "(SELECT sample_unique_id AS s, patient_unique_id AS p, cancer_study_identifier AS study, attribute_name AS a, attribute_value AS v FROM " +
+    clinical + " WHERE type = 'sample' AND notEmpty(attribute_value)" + only(study, "cancer_study_identifier") + ")";
+  const num = "ifNull(toFloat64OrNull(trimBoth(v)), nan)";
+  const marks = "arrayFilter(m -> m != '', [if(countIf(a = 'MSI_TYPE' AND v = 'Instable') > 0, 'MSI-H', ''), " +
+    "if(countIf(a IN ('CVR_TMB_SCORE', 'TMB_NONSYNONYMOUS') AND isFinite(" + num + ") AND " + num + " >= 10) > 0, 'TMB-H', '')])";
+  const resolve = (t: string) => "if(" + t + ".d != '', " + t + ".d, if(" + t + ".c != '', " + t + ".c, ifNull(st.name, '')))";
+  return (
+    "SELECT 'MUTATION' AS alteration_type, " + sq(OTHER_BIOMARKERS) + " AS hugo_gene_symbol, alteration, '' AS consequence, tumor_type, " +
+    "'' AS entrez_gene_id, '' AS protein_start, '' AS protein_end FROM (" +
+    "SELECT arrayJoin(x.marks) AS alteration, arrayJoin([" + resolve("x") + ", " + resolve("y") + "]) AS tumor_type FROM (" +
+    "SELECT s, any(p) AS p, any(study) AS study, anyIf(v, a = 'CANCER_TYPE_DETAILED') AS d, anyIf(v, a = 'CANCER_TYPE') AS c, " + marks + " AS marks" +
+    " FROM " + rows + " GROUP BY s HAVING notEmpty(marks)) x" +
+    " LEFT JOIN (SELECT p, argMinIf(v, s, a = 'CANCER_TYPE_DETAILED') AS d, argMinIf(v, s, a = 'CANCER_TYPE') AS c FROM " + rows + " GROUP BY p) y ON y.p = x.p" +
+    " LEFT JOIN (" + studyTumorTypesSql(portalDb) + ") st ON st.study = x.study" +
+    ") GROUP BY alteration, tumor_type"
+  );
+}
+
+/** The portal's query for a biomarker key (PatientViewPageStore getOtherBiomarkerQueries): by Hugo symbol, the tumour type absent when none. */
+export function biomarkerQuery(k: Row) {
+  return { alteration: String(k.alteration), gene: { hugoSymbol: OTHER_BIOMARKERS }, tumorType: String(k.tumor_type) || undefined };
+}
+
+const isBiomarker = (k: Row) => String(k.hugo_gene_symbol) === OTHER_BIOMARKERS;
 
 let curated: Promise<Set<number>> | null = null;
 /** The Entrez ids of the genes OncoKB curates (its cancer gene list's `oncokbAnnotated`), asked once per process. */
@@ -123,15 +166,16 @@ export const oncokbTumorTypeSource: AnnotationSource = {
       "api_version LowCardinality(String), resolved_at DateTime DEFAULT now()) ENGINE = ReplacingMergeTree(resolved_at) " +
       "PARTITION BY oncokb_version ORDER BY (oncokb_version, alteration_type, hugo_gene_symbol, alteration, consequence, tumor_type)"
   ],
-  keySpace: tumorTypeKeySpace,
+  keySpace: (portalDb: string, study: string | null) => tumorTypeKeySpace(portalDb, study) + " UNION ALL " + biomarkerKeySpace(portalDb, study),
   release: () => oncokbSource.release(),
 
   async annotate(keys: Row[]): Promise<Row[]> {
     const genes = await curatedGenes();
-    const ask = keys.filter((k) => genes.has(Number(k.entrez_gene_id)));
-    const rows = keys.filter((k) => !genes.has(Number(k.entrez_gene_id))).map(uncuratedRow);
+    const asked = (k: Row) => isBiomarker(k) || genes.has(Number(k.entrez_gene_id));
+    const ask = keys.filter(asked);
+    const rows = keys.filter((k) => !asked(k)).map(uncuratedRow);
     if (ask.length) {
-      const out = await oncokbFetch("/annotate/mutations/byProteinChange", ask.map(proteinChangeQuery)) as Annotation[];
+      const out = await oncokbFetch("/annotate/mutations/byProteinChange", ask.map((k) => isBiomarker(k) ? biomarkerQuery(k) : proteinChangeQuery(k))) as Annotation[];
       if (!Array.isArray(out) || out.length !== ask.length) throw new Error("OncoKB answered " + (Array.isArray(out) ? out.length : "no list") + " for " + ask.length + " queries");
       ask.forEach((k, i) => rows.push(storeRow(k, out[i])));
     }
