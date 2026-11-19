@@ -1566,7 +1566,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         const how = op === "union" || n < 2 ? "any of" : "every one of";
         return (
           <PickBar picks={picks} why={refusal} hint={"keep the samples " + (drivers ? "with an OncoKB driver call in" : "altered in") + " " + how + " the checked genes"}
-            onApply={(keys) => addClauses(geneSelection(keys.map((k) => meta.oql(byKey.get(k))), n > 1 ? op : "union"))}>
+            onApply={(keys) => addClauses(geneSelection(keys.map((k) => meta.oql(byKey.get(k))), n > 1 ? op : "union", kind))}>
             {n > 1 && <Choice value={op} onChange={(v) => chooseOp(v as GeneOp)} className="geneop"
               title="Union keeps the samples altered in any of the checked genes; Intersection, those altered in every one"
               options={[["union", "Union"], ["intersection", "Intersection"]]} />}

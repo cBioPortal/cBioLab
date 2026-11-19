@@ -616,25 +616,25 @@ test("GP2: no panels, or no panels field, gives \"Gene panels: none\"", () => {
 // ---- GU1–GU2. Union / Intersection (STS-GT-9; MultiSelectionTable.tsx) ----
 
 test("GU1: union of several lines is one OQL clause, the lines joined by \"; \"", () => {
-  assert.deepEqual(geneSelection(["TP53: MUT", "KRAS: MUT", "EGFR: MUT"], "union"),
-    [{ kind: "oql", q: "TP53: MUT; KRAS: MUT; EGFR: MUT" }]);
-  assert.deepEqual(geneSelection(["MYC: AMP", "CDKN2A: HOMDEL"], "union"),
-    [{ kind: "oql", q: "MYC: AMP; CDKN2A: HOMDEL" }]);
+  assert.deepEqual(geneSelection(["TP53: MUT", "KRAS: MUT", "EGFR: MUT"], "union", "mutated"),
+    [{ kind: "oql", q: "TP53: MUT; KRAS: MUT; EGFR: MUT", chart: "mutated" }]);
+  assert.deepEqual(geneSelection(["MYC: AMP", "CDKN2A: HOMDEL"], "union", "cna"),
+    [{ kind: "oql", q: "MYC: AMP; CDKN2A: HOMDEL", chart: "cna" }]);
 });
 
 test("GU2: intersection is one OQL clause per line, in the given order", () => {
-  assert.deepEqual(geneSelection(["TP53: MUT", "KRAS: MUT", "EGFR: MUT"], "intersection"), [
-    { kind: "oql", q: "TP53: MUT" }, { kind: "oql", q: "KRAS: MUT" }, { kind: "oql", q: "EGFR: MUT" },
+  assert.deepEqual(geneSelection(["TP53: MUT", "KRAS: MUT", "EGFR: MUT"], "intersection", "mutated"), [
+    { kind: "oql", q: "TP53: MUT", chart: "mutated" }, { kind: "oql", q: "KRAS: MUT", chart: "mutated" }, { kind: "oql", q: "EGFR: MUT", chart: "mutated" },
   ]);
 });
 
 test("GU1/GU2: one line is the same single clause either way", () => {
   for (const op of ["union", "intersection"] as const)
-    assert.deepEqual(geneSelection(["MYC: AMP"], op), [{ kind: "oql", q: "MYC: AMP" }], op);
+    assert.deepEqual(geneSelection(["MYC: AMP"], op, "cna"), [{ kind: "oql", q: "MYC: AMP", chart: "cna" }], op);
 });
 
 test("GU1/GU2: no lines, no clauses (never an empty query)", () => {
-  for (const op of ["union", "intersection"] as const) assert.deepEqual(geneSelection([], op), [], op);
+  for (const op of ["union", "intersection"] as const) assert.deepEqual(geneSelection([], op, "mutated"), [], op);
 });
 
 // ---- GU4. Applied rows (STS-GT-9: pinned, checked, disabled, in the filter's order) ----
@@ -802,17 +802,27 @@ test("GT-10: the Freq searched is the percentage shown, not the fraction (the po
   assert.equal(geneRowMatches("mutated", r("A", 1, 1, 4), "0.25"), false);
 });
 
-// STV-STM-3: a gene table taken off the page takes its own filter with it
+// STV-STM-3: a gene table taken off the page takes its own filter with it, and only that: the
+// clauses it wrote carry its name (`chart`), since a Gene status chart writes the same OQL text
+// beside its "profiled" clause (lib/gene-state-clauses.ts)
 test("unchecking a gene table drops the clauses it wrote, every other clause kept", () => {
   const all = [
-    { kind: "oql", q: "APC: MUT; TP53: MUT" },      // the mutated table's Union
-    { kind: "oql", q: "KRAS: AMP" },                // the CNA table's
-    { kind: "oql", q: "EGFR: MUT_DRIVER" },         // the mutated table's, under drivers only
-    { kind: "oql", q: "KRAS: MUT=G12C" },           // typed OQL
-    { kind: "oql", q: "BRAF: MUT; KRAS: AMP" },     // a mix: not one table's
+    { kind: "oql", q: "APC: MUT; TP53: MUT", chart: "mutated" },   // the mutated table's Union
+    { kind: "oql", q: "KRAS: AMP", chart: "cna" },                 // the CNA table's
+    { kind: "oql", q: "EGFR: MUT_DRIVER", chart: "mutated" },      // the mutated table's, under drivers only
+    { kind: "oql", q: "KRAS: MUT=G12C" },                          // typed OQL
+    { kind: "profiled", type: "MUTATION", gene: "KRAS" },          // a Gene status chart's Mutated: both its clauses stay
+    { kind: "oql", q: "KRAS: MUT" },
+    { kind: "oql", q: "MYC: AMP" },                                // the same text as a table's, not written by one
     { kind: "clinical", attribute: "SEX", op: "=", value: "Female" },
   ];
-  assert.deepEqual(withoutGeneTableClauses(all, "mutated"), [all[1], all[3], all[4], all[5]]);
-  assert.deepEqual(withoutGeneTableClauses(all, "cna"), [all[0], all[2], all[3], all[4], all[5]]);
+  assert.deepEqual(withoutGeneTableClauses(all, "mutated"), [all[1], all[3], all[4], all[5], all[6], all[7]]);
+  assert.deepEqual(withoutGeneTableClauses(all, "cna"), [all[0], all[2], all[3], all[4], all[5], all[6], all[7]]);
   assert.deepEqual(withoutGeneTableClauses(all, "sv"), all);
+});
+
+test("a gene table's clauses name the table that wrote them", () => {
+  assert.deepEqual(geneSelection(["APC: MUT", "TP53: MUT"], "union", "mutated"), [{ kind: "oql", q: "APC: MUT; TP53: MUT", chart: "mutated" }]);
+  assert.deepEqual(geneSelection(["MYC: AMP", "CDKN2A: HOMDEL"], "intersection", "cna"),
+    [{ kind: "oql", q: "MYC: AMP", chart: "cna" }, { kind: "oql", q: "CDKN2A: HOMDEL", chart: "cna" }]);
 });

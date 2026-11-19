@@ -156,9 +156,9 @@ export function panelNote(panel: string, genes: string[]): string | null {
 }
 
 /** the filter checking genes makes: union, one clause of a line per gene; intersection, a clause per gene */
-export function geneSelection(lines: string[], op: "union" | "intersection"): { kind: "oql"; q: string }[] {
+export function geneSelection(lines: string[], op: "union" | "intersection", chart: GeneTableKind): { kind: "oql"; q: string; chart: GeneTableKind }[] {
   if (!lines.length) return [];
-  return op === "union" ? [{ kind: "oql", q: lines.join("; ") }] : lines.map((q) => ({ kind: "oql", q }));
+  return op === "union" ? [{ kind: "oql", q: lines.join("; "), chart }] : lines.map((q) => ({ kind: "oql", q, chart }));
 }
 
 /** which of the table's lines the selection already filters on, in the filter's order */
@@ -238,22 +238,13 @@ export function withQValues(kind: GeneTableKind, rows: GeneTableRow[], mutsig: M
   });
 }
 
-/** the alteration a gene table's lines name (lib/study-view-gene-tables.ts geneSelection) */
-const TABLE_LINE: Record<GeneTableKind, RegExp> = {
-  mutated: /^[A-Za-z0-9][A-Za-z0-9.-]*:\s*MUT(_DRIVER)?$/,
-  cna: /^[A-Za-z0-9][A-Za-z0-9.-]*:\s*(AMP|HOMDEL)(_DRIVER)?$/,
-  sv: /^[A-Za-z0-9][A-Za-z0-9.-]*:\s*FUSION(_DRIVER)?$/,
-};
-
 /**
  * The draft without a gene table's own filter, as the portal resets a chart's filter when it is taken
- * off the page (STV-STM-3): the OQL clauses every line of which that table writes. Typed OQL, or a
- * clause mixing tables, stays.
+ * off the page (STV-STM-3): the OQL clauses that table wrote, which carry its name (`chart`). Typed
+ * OQL and a Gene status chart's clauses, the same text without the name, stay.
  */
 export function withoutGeneTableClauses(all: unknown[], kind: GeneTableKind): unknown[] {
-  const mine = (c: unknown) => { const l = c as { kind?: string; q?: unknown } | null;
-    if (!l || l.kind !== "oql" || typeof l.q !== "string") return false;
-    const lines = l.q.split(";").map((x) => x.trim()).filter(Boolean);
-    return lines.length > 0 && lines.every((x) => TABLE_LINE[kind].test(x)); };
+  const mine = (c: unknown) => { const l = c as { kind?: string; chart?: unknown } | null;
+    return !!l && l.kind === "oql" && l.chart === kind; };
   return all.filter((c) => !mine(c));
 }
