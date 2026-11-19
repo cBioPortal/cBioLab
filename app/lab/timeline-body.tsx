@@ -37,7 +37,8 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   const [width, setWidth] = useState(1000);
   // the portal's event tooltip (TimelineTrack, TimelineStore): shown on hover, gone 100 ms after the pointer
   // leaves unless pinned by a click; one event at a time when several share the mark, paged
-  const [tip, setTip] = useState<{ x: number; y: number; ev: number[]; pinned: boolean; page: number } | null>(null);
+  // `line`: the mark is a line chart's day, its events simultaneous values of which the highest is plotted
+  const [tip, setTip] = useState<{ x: number; y: number; ev: number[]; pinned: boolean; page: number; line?: boolean } | null>(null);
   const linger = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdTip = () => { if (linger.current) { clearTimeout(linger.current); linger.current = null; } };
   const dropTip = () => { holdTip(); linger.current = setTimeout(() => setTip((t) => t && !t.pinned ? null : t), 100); };
@@ -108,6 +109,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
     const m = (e.target as Element).closest?.(".tl-m") as SVGGElement | null;
     return m?.dataset.ev ? m.dataset.ev : null;
   };
+  const onLine = (e: React.MouseEvent) => !!((e.target as Element).closest?.(".tl-m") as SVGGElement | null)?.dataset.line;
   const onClick = (e: React.MouseEvent) => {
     // the click that ends a drag to zoom is not a click on what it ends over
     if (dragged.current) { dragged.current = false; return; }
@@ -117,7 +119,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
     const ev = marked(e);
     if (!ev) return;
     holdTip();
-    setTip((t) => t && t.pinned && t.ev.join(",") === ev ? { ...t, pinned: false } : { x: e.clientX, y: e.clientY, ev: ev.split(",").map(Number), pinned: true, page: t && t.ev.join(",") === ev ? t.page : 0 });
+    setTip((t) => t && t.pinned && t.ev.join(",") === ev ? { ...t, pinned: false } : { x: e.clientX, y: e.clientY, ev: ev.split(",").map(Number), pinned: true, page: t && t.ev.join(",") === ev ? t.page : 0, line: onLine(e) });
   };
   const onMove = (e: React.MouseEvent) => {
     const at = figX(e);
@@ -129,7 +131,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
     const ev = marked(e);
     if (!ev) { if (tip) dropTip(); return; }
     holdTip();
-    setTip((t) => ({ x: e.clientX, y: e.clientY, ev: ev.split(",").map(Number), pinned: false, page: t && t.ev.join(",") === ev ? t.page : 0 }));
+    setTip((t) => ({ x: e.clientX, y: e.clientY, ev: ev.split(",").map(Number), pinned: false, page: t && t.ev.join(",") === ev ? t.page : 0, line: onLine(e) }));
   };
   const isSel = (row: { study: string; patient: string }) => p != null && row.study === p.study && row.patient === p.patient;
 
@@ -180,7 +182,7 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
           <div className="tl-cursor" aria-hidden="true" style={{ left: cursor, height: drawn.layout.height }} />}
         {drag && drawn && Math.abs(drag.x1 - drag.x0) > 0 &&
           <div className="tl-drag" aria-hidden="true" style={{ left: Math.min(drag.x0, drag.x1), width: Math.abs(drag.x1 - drag.x0), height: drawn.layout.height }} />}
-        {tip && p && <EventTip x={tip.x} y={tip.y} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} sampleAttrs={p.sampleAttrs} page={tip.page} pinned={tip.pinned}
+        {tip && p && <EventTip x={tip.x} y={tip.y} line={!!tip.line} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} sampleAttrs={p.sampleAttrs} page={tip.page} pinned={tip.pinned}
           onPage={(n) => setTip((t) => t && { ...t, page: n })} onClose={() => setTip(null)} onHold={holdTip} onLeave={() => { if (!tip.pinned) dropTip(); }} />}
       </div>
       {p && drawn && <p className="note vfoot">{timelineSummary(p, drawn.layout, !!spec.expandGaps)} Click a track with ▾ to fold its sub-tracks into one row.</p>}
@@ -203,8 +205,10 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
  * with several events on the mark, "‹ i of n events ›" pages through them (the keys do too). Pinned, it
  * stays until clicked again, Esc, or a close; hovered, the pointer may move onto it.
  */
-function EventTip({ x, y, events, marks, sampleAttrs, page, pinned, onPage, onClose, onHold, onLeave }: {
-  x: number; y: number; events: PatientEvent[]; marks: Map<string, { label: string; color: string }>; page: number; pinned: boolean;
+function EventTip({ x, y, line, events, marks, sampleAttrs, page, pinned, onPage, onClose, onHold, onLeave }: {
+  x: number; y: number; events: PatientEvent[];
+  /** a line chart's day: the portal notes that the highest of its values is the one plotted */
+  line: boolean; marks: Map<string, { label: string; color: string }>; page: number; pinned: boolean;
   /** each sample's own clinical attributes, which a sample row's tooltip lists */
   sampleAttrs?: Record<string, [string, string][]>;
   onPage: (n: number) => void; onClose: () => void; onHold: () => void; onLeave: () => void;
@@ -225,6 +229,7 @@ function EventTip({ x, y, events, marks, sampleAttrs, page, pinned, onPage, onCl
           </span>}
           {pinned && <button type="button" className="px-1" aria-label="close the tooltip" onClick={onClose}>×</button>}
         </div>
+        {line && n > 1 && <div><i>Plotted y value is the max of simultaneous events.</i></div>}
         {sid && SAMPLE_TRACK.test(canonicalEventName(e.type)) ? <SampleRows e={e} sid={sid} own={sampleAttrs?.[sid] || []} /> : <table><tbody>
           {e.attrs.filter(([a]) => !/^STYLE_/i.test(a)).map(([a, v], j) => <tr key={j}><th>{a.replace(/_/g, " ")}</th><td>{v}</td></tr>)}
           <tr><th>{e.end != null && e.end > e.start ? "START" : "DATE"}</th><td>{formatDays(e.start)} <span className="dim">(day {e.start})</span></td></tr>

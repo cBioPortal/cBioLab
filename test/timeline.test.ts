@@ -3,7 +3,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { buildTracks, trackSortKey, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
-import { rowAt, timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
+import { linePoints, rowAt, timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
 import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
@@ -479,4 +479,15 @@ test("PAT-TL-TR-2 trackSortKey: lgg_ucsf_2014 P04's Radiation Therapy before Med
   assert.deepEqual(tx.children.map((c) => c.label), ["Radiation Therapy", "Medical Therapy"]);
   assert.deepEqual(tx.children.map(trackSortKey), [0, 0], "both hold their events in sub-tracks");
   assert.equal(trackSortKey({ items: [{ i: 0, start: -40, end: -40 }, { i: 1, start: -90, end: -90 }] }), -40, "the first event as listed, not the earliest");
+});
+
+test("PAT-TL-TT-4 linePoints: a line chart plots one point a day, the highest of its values, its mark carrying every event of the day", () => {
+  const evs = [ev("Lab_Test", 10, { TEST: "CEA", RESULT: "1.8" }), ev("Lab_Test", 10, { TEST: "CEA", RESULT: "3.2" }), ev("Lab_Test", 5, { TEST: "CEA", RESULT: "<0.5" }),
+    ev("Lab_Test", 20, { TEST: "CEA", RESULT: "2" }), ev("Lab_Test", 20, { TEST: "CEA", RESULT: "2" })];
+  const items = evs.map((e, i) => ({ i, start: e.start, end: e.start }));
+  const pts = linePoints(items, evs);
+  assert.deepEqual(pts.map((p) => [p.start, p.v.v, p.v.censored, p.at, p.ix]), [[5, 0.5, true, 2, [2]], [10, 3.2, false, 1, [0, 1]], [20, 2, false, 3, [3, 4]]]);
+  const svg = timelineSvg({ study: "s", patient: "P-1", events: evs, samples: [], source: { label: "local", remote: false } }, { width: 900, interactive: true }).svg;
+  assert.equal((svg.match(/data-line="1"/g) || []).length, 3, "three days, three marks");
+  assert.match(svg, /data-ev="0,1" data-line="1"/);
 });

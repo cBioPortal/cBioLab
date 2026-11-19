@@ -1,4 +1,4 @@
-// Planted bugs: the timeline's root track labels, sub-track order and hovered row (PAT-TL-TR-1, PAT-TL-TR-2, PAT-TL-TR-5). How they are planted and run: scripts/check-mutants.ts.
+// Planted bugs: the timeline's root track labels, sub-track order, hovered row and line-chart days (PAT-TL-TR-1, PAT-TL-TR-2, PAT-TL-TR-5, PAT-TL-TT-4). How they are planted and run: scripts/check-mutants.ts.
 import type { GuardCommands, Mutant } from "../types.ts";
 
 export const guards: GuardCommands = {};
@@ -16,4 +16,8 @@ export const mutants: Mutant[] = [
     effect: "A sub-track whose events are all in its own sub-tracks sorts after its siblings, where the portal sorts it at 0, before every track starting after diagnosis.",
     find: "t.items.length ? t.items[0].start : 0;",
     replace: "t.items.length ? t.items[0].start : Infinity;" },
+  { id: "timeline-line-first-of-day", layer: "counts", guard: "unit", file: "lib/timeline-svg.ts",
+    effect: "A lab line chart plots the first of a day's values, where the portal plots the highest.",
+    find: "vs.reduce((m, x) => x.v.v > m.v.v ? x : m)",
+    replace: "vs.reduce((m) => m)" },
 ];
