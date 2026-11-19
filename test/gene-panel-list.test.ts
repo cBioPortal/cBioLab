@@ -2,7 +2,7 @@
 // layout of the genes down columns (genesDividedToColumns / genesDividedToRows).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { filterPanelGenes, panelGeneRows, panelGenesTsv } from "../lib/gene-panel-list.ts";
+import { filterPanelGenes, genePanelLinks, panelGeneRows, panelGenesTsv, GENE_PANEL_ATTRIBUTE } from "../lib/gene-panel-list.ts";
 
 const g = (n: number) => Array.from({ length: n }, (_, i) => "G" + (i + 1));
 
@@ -26,4 +26,12 @@ test("PAT-GP-3: the genes go down 3 columns as the portal's: equal chunks when t
 
 test("PAT-GP-3: the download is a Genes header and a symbol a line", () => {
   assert.equal(panelGenesTsv(["ABL1", "TP53"]), "Genes\nABL1\nTP53\n");
+});
+
+test("PAT-GP-4: a Gene Panel value's names link to their panels, by first word; N/A and WXS are text", () => {
+  assert.deepEqual(genePanelLinks("IMPACT468"), [{ text: "IMPACT468", panel: "IMPACT468" }]);
+  assert.deepEqual(genePanelLinks("TESTPANEL1 (mut), TESTPANEL2 (cna)"), [{ text: "TESTPANEL1 (mut)", panel: "TESTPANEL1" }, { text: "TESTPANEL2 (cna)", panel: "TESTPANEL2" }]);
+  assert.deepEqual(genePanelLinks("N/A (mut), WXS"), [{ text: "N/A (mut)", panel: null }, { text: "WXS", panel: null }]);
+  assert.deepEqual(genePanelLinks(""), []);
+  assert.equal(GENE_PANEL_ATTRIBUTE, "Gene Panel");
 });

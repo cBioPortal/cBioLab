@@ -15,6 +15,8 @@ import { sampleMarks, type SampleMark } from "../../lib/timeline-tracks.ts";
 import { portalClinicalValue } from "../../lib/chart/format.ts";
 import type { PatientEvent, PatientSample } from "../../lib/types";
 import { cleanAndDerive, inlineAttributes, liftCommon, type Attrs } from "./patient-attrs.ts";
+import { GenePanelValue, useGenePanelDialog } from "../lab/gene-panel-dialog.tsx";
+import { GENE_PANEL_ATTRIBUTE } from "../../lib/gene-panel-list.ts";
 
 /** an attribute's id and display name, and its value */
 type Field = { id: string; name: string; value: string };
@@ -81,20 +83,25 @@ function InlineAttrs({ attrs }: { attrs: Attrs }) {
 }
 
 /** An id that lists every attribute while hovered or focused, as the portal's tooltip does. */
-function HoverCard({ title, fields, children }: { title: string; fields: Field[]; children: React.ReactNode }) {
+function HoverCard({ title, fields, children, openPanel }: { title: string; fields: Field[]; children: React.ReactNode; openPanel?: (panel: string) => void }) {
   return (
     <HoverPopover trigger={children} className="max-h-[400px] w-auto max-w-[600px] overflow-auto p-3">
-      <div className="mb-1.5 font-mono text-sm font-semibold">{title}</div>
-      <table className="text-sm"><tbody>
-        {fields.map((f) => <tr key={f.id}><th className="pr-3 text-left align-top font-medium text-muted-foreground" data-tip={f.id}>{f.name}</th><td>{portalClinicalValue(f.value)}</td></tr>)}
-      </tbody></table>
+      {(close) => <>
+        <div className="mb-1.5 font-mono text-sm font-semibold">{title}</div>
+        <table className="text-sm"><tbody>
+          {fields.map((f) => <tr key={f.id}><th className="pr-3 text-left align-top font-medium text-muted-foreground" data-tip={f.id}>{f.name}</th><td>{f.name === GENE_PANEL_ATTRIBUTE && openPanel
+            ? <GenePanelValue value={f.value} open={(p) => { close(); openPanel(p); }} /> : portalClinicalValue(f.value)}</td></tr>)}
+        </tbody></table>
+      </>}
     </HoverPopover>
   );
 }
 
 
-export function PatientHeader({ record, sample, hrefFor }: {
+export function PatientHeader({ record, study, sample, hrefFor }: {
   record: PatientRecord;
+  /** the patient's study, which holds the gene panels its samples' "Gene Panel" values name */
+  study: string;
   /** the sample the page shows, in the sample view; null in the patient view */
   sample: string | null;
   /** the page's link for the patient view (no sample) or a sample's view */
@@ -107,8 +114,10 @@ export function PatientHeader({ record, sample, hrefFor }: {
   // the patient's attributes and those every sample shares, as the portal joins them
   const patientAttrs = useMemo(() => ({ ...cleanAndDerive(attrsOf(record.fields)), ...common }), [record, common]);
   const order = (id: string) => Number(record.marks.get(id)?.label ?? Infinity);
+  // the gene panel window a sample's "Gene Panel" value opens (PAT-GP-4)
+  const panels = useGenePanelDialog(study);
   const shown = samples.filter((s) => !sample || s.id === sample).sort((a, b) => order(a.id) - order(b.id));
-  return (
+  return (<>
     <table data-tw className="patient-header mt-3 border-separate border-spacing-x-0 border-spacing-y-1 text-md">
       <tbody>
         <tr>
@@ -125,7 +134,7 @@ export function PatientHeader({ record, sample, hrefFor }: {
           <td>
             {shown.map((s) => (
               <div key={s.id} className="patient-sample flex flex-wrap items-center">
-                <HoverCard title={s.id} fields={s.fields}>
+                <HoverCard title={s.id} fields={s.fields} openPanel={(p) => void panels.open(p)}>
                   <SampleMarker mark={record.marks.get(s.id)} />
                   <Link href={hrefFor({ sample: s.id })} className="font-mono text-primary hover:underline">
                     {s.attrs.SAMPLE_DISPLAY_NAME ? s.attrs.SAMPLE_DISPLAY_NAME + " (" + s.id + ")" : s.id}
@@ -144,7 +153,8 @@ export function PatientHeader({ record, sample, hrefFor }: {
         </tr>
       </tbody>
     </table>
-  );
+    {panels.node}
+  </>);
 }
 
 export { HEADER_COHORT };
