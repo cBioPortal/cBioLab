@@ -29,14 +29,15 @@ const profiledName = (p: string, gene: string, type: DataType) => p + "_prof_" +
  * the cohort (`cohort`, columns pid, sid) the line alters, with the events it matched (`ev`, kinds in
  * order, comma-separated) — and one `<p>_prof_<gene>_<type>` per gene and data type the lines read:
  * the study's samples profiled for that gene in that type, by their panels (profiledCasesSql, the
- * profiled clause's rule).
+ * profiled clause's rule). With `notes` (the case table), each event is followed by its note, as the
+ * portal's text of a cell: " [germline]", " (driver)" (oqlEventsSql).
  */
-export function lineCtes(p: string, cohort: string, lines: LinePlan[], o: StudyOpts): string {
+export function lineCtes(p: string, cohort: string, lines: LinePlan[], o: StudyOpts, { notes = false }: { notes?: boolean } = {}): string {
   const out: string[] = [];
   lines.forEach((l, k) => {
     out.push(p + "_e" + k + " AS (\n" +
-      "  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, ev)))), ', ') AS ev\n" +
-      "  FROM (" + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, pins: o.pins, study: o.study, db: o.db,
+      "  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, " + (notes ? "concat(ev, note)" : "ev") + ")))), ', ') AS ev\n" +
+      "  FROM (" + oqlEventsSql(l.line, { oncokbPin: o.pin, profiles: o.profiles, pins: o.pins, study: o.study, db: o.db, notes,
         ...(o.drivers !== undefined ? { drivers: o.drivers, hotspotPins: o.hotspotPins } : {}) }) + ")\n" +
       "  WHERE sid IN (SELECT sid FROM " + cohort + ")\n" +
       "  GROUP BY sid)");
