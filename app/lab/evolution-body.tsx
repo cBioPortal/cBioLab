@@ -15,6 +15,9 @@ import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { patientPatch } from "../../lib/views/evolution/groups.ts";
+import { heatmapTsv, HEATMAP_FILE } from "../../lib/views/evolution/download.ts";
+import { saveText } from "../../lib/study-view-download.ts";
+import { ImageDownload } from "./image-download.tsx";
 
 type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; transpose?: boolean; cluster?: boolean; mutationLabels?: boolean; expandGaps?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
@@ -133,6 +136,9 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               <label className="chk" data-tip="label each mutation GENE protein change">
                 <Checkbox checked={spec.mutationLabels !== false} onCheckedChange={(on) => patch({ mutationLabels: on === true ? undefined : false })} /> show mutation labels
               </label>
+              <ImageDownload name={HEATMAP_FILE} formats={["svg", "png"]} label="download the heatmap" tip="download the heatmap as drawn, or its data: each sample's VAF of each mutation"
+                svg={() => evolutionSvg(v as never, { width, caption: false, theme: "light" })}
+                extra={e.drawn?.length && p ? [{ label: "Data", save: () => saveText(HEATMAP_FILE + ".txt", heatmapTsv(e.drawn!, p.samples, e.display.transpose)) }] : undefined} />
             </div> : <div className="tbz">
               <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
                 <Checkbox checked={!!spec.sequential || !!e.noDay?.length} disabled={!!e.noDay?.length} onCheckedChange={(on) => patch({ sequential: (on === true) || undefined })} /> sequential
