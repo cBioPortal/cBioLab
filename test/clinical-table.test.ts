@@ -19,6 +19,14 @@ describe("clinicalRowSource", () => {
     assert.match(pageSql(src, { sort: { column: "TYPE" } }, defaults, 10, 0), /ORDER BY \(m\['TYPE'\] = ''\) ASC, m\['TYPE'\] ASC, patient, sample, ord/);
     assert.match(pageSql(src, {}, defaults, 10, 0), /ORDER BY patient, sample, patient, sample, ord/);
   });
+  test("PAT-URL-4: listed ids order the rows with no sort, patients the list does not name last, then by id; a sort replaces it", () => {
+    const src = clinicalRowSource([part("a", "s")], "db", "patient", cols, ["s:P9", "s:P1", "s:P5"]);
+    const at = "indexOf(['s:P9', 's:P1', 's:P5'], concat(study, ':', patient))";
+    assert.ok(pageSql(src, {}, defaults, 10, 0).includes("ORDER BY if(" + at + " = 0, 4, " + at + "), patient, sample, patient, sample, ord"));
+    assert.match(pageSql(src, { sort: { column: "AGE" } }, defaults, 10, 0), /ORDER BY .* ASC NULLS LAST, patient, sample, ord\n/);
+    assert.equal(clinicalRowSource([part("a", "s")], "db", "patient", cols, []).defaultOrder, "patient, sample");
+    assert.ok(clinicalRowSource([part("a", "s")], "db", "patient", cols, ["s:it's"]).defaultOrder.includes("['s:it\\'s']"), "ids reach SQL only through sq()");
+  });
   test("several cohorts and studies are one UNION ALL, each row labelled, sorted once", () => {
     const sql = pageSql(clinicalRowSource([part("A", "s1"), part("B", "s2")], "db", "sample", cols), {}, defaults, 25, 0);
     assert.equal((sql.match(/UNION ALL/g) || []).length, 1);

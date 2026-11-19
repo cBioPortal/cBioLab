@@ -57,7 +57,7 @@ const A = { kind: "clinical", attribute: "SEX", values: ["Female"] } as NonNulla
 describe("navigation from a legacy #navCaseIds hash", () => {
   test("H1: study-qualified ids become one patient list over that study", () => {
     assert.deepEqual(navigationFromHash("#navCaseIds=s1:P1,s1:P2"), {
-      nav: { def: { study: "s1", all: [{ kind: "patientList", ids: ["s1:P1", "s1:P2"] }] }, order: {} },
+      nav: { def: { study: "s1", all: [{ kind: "patientList", ids: ["s1:P1", "s1:P2"] }] }, order: {}, listed: true },
       error: null,
     });
   });
@@ -67,6 +67,19 @@ describe("navigation from a legacy #navCaseIds hash", () => {
     assert.deepEqual(nav!.def.studies, ["s1", "s2"]);
     assert.equal(nav!.def.study, undefined);
     assert.deepEqual(nav!.def.all, [{ kind: "patientList", ids: ["s1:P1", "s2:P9"] }]);
+  });
+  test("PAT-URL-4: a #navCaseIds cohort is stepped through in the link's order, kept through every link the page makes, until a sort is chosen", () => {
+    const { nav } = navigationFromHash("#navCaseIds=s1:P9,s1:P1,s1:P5");
+    const view = listDoc(nav!, { rows: 1 }).views![0] as unknown as { order?: string; sort?: unknown };
+    assert.equal(view.order, "listed");
+    const back = readNavigation(new URL("http://h" + patientHref({ study: "s1", id: "P1" }, nav)).searchParams).nav!;
+    assert.equal(back.listed, true, "the next patient's link keeps the link's order");
+    assert.deepEqual(back.order, {}, "listed is not a query of the list's");
+    assert.equal((listDoc(back, { rows: 1 }).views![0] as unknown as { order?: string }).order, "listed");
+    assert.equal(excludePatient(nav!, { study: "s1", id: "P1" }).listed, true, "⊖ keeps it");
+    const sorted = { ...nav!, order: { sort: { column: "AGE" } } };
+    assert.equal((listDoc(sorted, { rows: 1 }).views![0] as unknown as { order?: string }).order, undefined, "a sort replaces it");
+    assert.equal((listDoc({ def, order: {} }, { rows: 1 }).views![0] as unknown as { order?: string }).order, undefined, "a cohort from ?cohort= keeps the patient-id order");
   });
   test("H3: no navCaseIds is not a navigation and not an error", () => {
     assert.deepEqual(navigationFromHash(""), { nav: null, error: null });
