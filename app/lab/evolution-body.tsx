@@ -21,7 +21,7 @@ import { heatmapTsv, HEATMAP_FILE } from "../../lib/views/evolution/download.ts"
 import { saveText } from "../../lib/study-view-download.ts";
 import { ImageDownload } from "./image-download.tsx";
 
-type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; transpose?: boolean; cluster?: boolean; mutationLabels?: boolean; expandGaps?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
+type Spec = { patient?: PatientKey; chart?: "line" | "heatmap"; sequential?: boolean; logScale?: boolean; dataRange?: boolean; transpose?: boolean; cluster?: boolean; mutationLabels?: boolean; expandGaps?: boolean; showTimeline?: boolean; groupBy?: string; mutations?: Record<string, unknown> } & Record<string, unknown>;
 
 export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: {
   v: { evolution: EvolutionResult; caveat?: string } & Record<string, unknown>; spec: Spec; vi: number; updating: boolean; docJson?: () => string; patch: (p: Record<string, unknown>) => void;
@@ -153,6 +153,9 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
                 <Checkbox checked={!!spec.sequential || !!e.noDay?.length} disabled={!!e.noDay?.length} onCheckedChange={(on) => patch({ sequential: (on === true) || undefined })} /> sequential
               </label>
+              {e.events > 0 && <Button type="button" variant="outline" size="sm" className={TB} aria-pressed={!!spec.showTimeline}
+                data-tip={spec.showTimeline ? "hide the patient's timeline above the chart" : "show the patient's timeline above the chart, the samples under their days on it"}
+                onClick={() => patch({ showTimeline: spec.showTimeline ? undefined : true })}>{spec.showTimeline ? "Hide Timeline" : "Show Timeline"}</Button>}
               <label className="chk" data-tip="draw only the mutations clicked (a line or a table row); with none clicked, none is drawn">
                 <Checkbox checked={onlyPicked} onCheckedChange={(on) => setOnlyPicked(on === true)} /> only selected
               </label>
