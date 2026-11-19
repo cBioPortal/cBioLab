@@ -80,10 +80,96 @@ async function lollipop({ browser, ok, BASE }) {
       const s3 = await selected(), t3 = await tableCount();
       ok("lollipop: a click on the plot away from any stem clears the selection", s3 === 0 && t3.kept === t0.kept,
         "selected " + s3 + ", table " + JSON.stringify(t3) + " (all " + t0.kept + "), under the click: " + under + ", plot " + JSON.stringify(plot));
+
+      // E2 (MUT-LP-4): the download menu offers SVG, PNG and PDF, in that order, each named <GENE>_lollipop.<ext>.
+      const dlButton = page.getByRole("button", { name: "download the mutation diagram" }).first();
+      await dlButton.click();
+      const items = (await page.getByRole("menuitem").allInnerTexts()).map((t) => t.trim());
+      ok("E2 lollipop download: the menu offers SVG, PNG and PDF, in that order", JSON.stringify(items) === JSON.stringify(["SVG", "PNG", "PDF"]), JSON.stringify(items));
+      const magic = { svg: (b) => b.toString("utf8").trimStart().startsWith("<svg"), png: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), pdf: (b) => b.subarray(0, 4).toString("latin1") === "%PDF" };
+      for (const ext of ["svg", "png", "pdf"]) {
+        // a chosen entry closes the menu (with a fade-out), so each format reopens it
+        if (ext !== "svg") { await page.getByRole("menuitem").first().waitFor({ state: "detached", timeout: 10000 }); await dlButton.click(); }
+        const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 60000 }).catch(() => null), page.getByRole("menuitem", { name: ext.toUpperCase(), exact: true }).click()]);
+        const name = dl ? dl.suggestedFilename() : "(no download)";
+        let body = Buffer.alloc(0);
+        if (dl) { const fp = await dl.path(); body = fp ? require("fs").readFileSync(fp) : body; }
+        ok("E2 lollipop download: " + ext.toUpperCase() + " is named <GENE>_lollipop." + ext + " and is a " + ext.toUpperCase() + " file",
+          /^[A-Z0-9-]+_lollipop\./.test(name) && name.endsWith("_lollipop." + ext) && magic[ext](body), name + ", " + body.length + " bytes, starts " + JSON.stringify(body.subarray(0, 8).toString("latin1")));
+      }
+      // Hovering a stem (MUT-LP-11): the table's rows at that codon are marked dt-hot, as the portal marks
+      // them highlighted; leaving the heads clears the mark, and the page does not jump.
+      const atCodon = (codon) => page.evaluate((n) => {
+        const heads = [...document.querySelectorAll(".dt-table thead th")].map((th) => th.textContent.trim());
+        const ci = heads.findIndex((h) => /^Protein Change/.test(h));
+        const at = (tr) => { const m = /(\d+)/.exec(tr.children[ci] ? tr.children[ci].textContent : ""); return !!m && Number(m[1]) === n; };
+        const rows = [...document.querySelectorAll(".dt-table tbody tr")];
+        return { col: ci, rows: rows.filter(at).length, hot: rows.filter((tr) => tr.classList.contains("dt-hot")).length, hotAt: rows.filter((tr) => tr.classList.contains("dt-hot") && at(tr)).length };
+      }, codon);
+      // a stem with rows on the table's current page (the table pages; the busiest codon may not be on it)
+      const counts = await Promise.all(stems.map(async (st) => ({ codon: st.codon, rows: (await atCodon(st.codon)).rows })));
+      const hc = counts.sort((x, y) => y.rows - x.rows)[0].codon;
+      const head = await page.locator(`.lp-plot g[data-codon="${hc}"] circle.lollipop-head`).first().boundingBox();
+      const y0 = await page.evaluate(() => window.scrollY);
+      await page.mouse.move(head.x + head.width / 2, head.y + head.height / 2);
+      await page.waitForTimeout(300);
+      const hv = await atCodon(hc), y1 = await page.evaluate(() => window.scrollY);
+      ok("lollipop: hovering a stem marks the table's rows at that codon, and only those", hv.col >= 0 && hv.rows > 0 && hv.hot === hv.rows && hv.hotAt === hv.hot && y1 === y0,
+        "codon " + hc + ": " + JSON.stringify(hv) + ", scrollY " + y0 + " -> " + y1);
+      await page.mouse.move(away.x, away.y);
+      await page.waitForTimeout(300);
+      const lv = await atCodon(hc), y2 = await page.evaluate(() => window.scrollY);
+      ok("lollipop: moving off the stems clears the marked rows, without a page jump", lv.hot === 0 && y2 === y0, JSON.stringify(lv) + ", scrollY " + y0 + " -> " + y2);
     } catch (e) {
       ok("lollipop: the alteration grid", false, String(e.message).split("\n")[0].slice(0, 200));
     }
     ok("lollipop: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
+
+  // The Somatic / Germline badges (MUT-HD-3, MUT-FM-2; spec E1): with germline mutations in the gene the
+  // two rates are buttons that filter the table on its status column, as legacy's MutationStatusBadgeSelector.
+  // cbioportal.org's API gives ov_tcga_pub 37 BRCA1 mutations, 26 Germline and 11 Somatic. The rates are
+  // computed before any of the tab's filters, so their text never changes with the badges.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/portal/results?study=ov_tcga_pub&genes=BRCA1&tab=Mutations", { waitUntil: "domcontentloaded" });
+      await page.locator(".lp-status").first().waitFor({ timeout: 240000 });
+      await page.locator(".dt-title").first().waitFor({ timeout: 240000 });
+      const settle = async () => {
+        await page.waitForTimeout(300);
+        await page.waitForFunction(() => !document.querySelector(".dt-wait") && !document.querySelector(".dt-bar .waiting"), null, { timeout: 120000 });
+        await page.waitForTimeout(200);
+      };
+      await settle();
+      const title = async () => (await page.locator(".dt-title").first().innerText()).replace(/\s+/g, " ");
+      const badge = (name) => page.locator(".lp-status").filter({ hasText: name }).first();
+      const rates = () => page.locator(".lp-status").evaluateAll((bs) => bs.map((b) => b.textContent.replace(/\s+/g, " ").trim()));
+      const pressed = () => page.locator(".lp-status").evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-pressed")).join(","));
+      const r0 = await rates();
+      ok("E1 badges: two .lp-status buttons, Somatic and Germline, both pressed",
+        r0.length === 2 && /Somatic/.test(r0[0]) && /Germline/.test(r0[1]) && await pressed() === "true,true", JSON.stringify(r0) + " " + await pressed());
+      const steps = [
+        ["Somatic off: the table keeps the 26 germline mutations", "Somatic", /^26 of 37 BRCA1 mutations/, "false,true"],
+        ["Germline off too: no mutation kept", "Germline", /^0 of 37 BRCA1 mutations/, "false,false"],
+        ["Somatic on: the 11 somatic mutations", "Somatic", /^11 of 37 BRCA1 mutations/, "true,false"],
+        ["both on: every mutation, no filter", "Germline", /^37 BRCA1 mutations/, "true,true"],
+      ];
+      for (const [label, name, want, press] of steps) {
+        await badge(name).click();
+        await settle();
+        const t = await title(), p = await pressed(), r = await rates();
+        ok("E1 badges: " + label + ", the rates' text unchanged", want.test(t) && p === press && JSON.stringify(r) === JSON.stringify(r0),
+          JSON.stringify(t) + " pressed " + p + " rates " + JSON.stringify(r));
+      }
+    } catch (e) {
+      ok("E1 badges: the Somatic / Germline badges", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("E1 badges: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
 }

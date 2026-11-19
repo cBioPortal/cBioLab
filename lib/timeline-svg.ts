@@ -21,6 +21,11 @@ export interface TimelineSvgOpts extends SvgOpts {
   expandGaps?: boolean;
   /** mark events and headers with data- attributes, for the card's tooltips and toggles */
   interactive?: boolean;
+  /**
+   * the stretch of the plot to draw across its whole width, as fractions [from, to] of the unzoomed
+   * plot (the portal's drag to zoom, PAT-TL-ZM-3); marks outside it are clipped
+   */
+  zoom?: readonly [number, number];
 }
 
 function colorOf(e: PatientEvent): string {
@@ -90,6 +95,8 @@ export interface TimelineLayout {
   cutYears: number;
   censored: number;
   width: number; height: number;
+  /** the plot's left edge and width in the figure: where a drag to zoom is read */
+  plot: { x: number; width: number };
 }
 
 /**
@@ -122,7 +129,8 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   const HW = Math.round(Math.min(W * HEADER_SHARE, Math.max(HEADER_MIN, labelsW + tickRoom + 8)));
   const PW = W - HW - PAD_R;
   const { x: dx } = dayScale(ticks, PW);
-  const X = (d: number) => HW + dx(d);
+  const z = o.zoom && o.zoom[1] > o.zoom[0] ? o.zoom : null;
+  const X = z ? (d: number) => HW + (dx(d) / PW - z[0]) / (z[1] - z[0]) * PW : (d: number) => HW + dx(d);
   let y = AXIS_H, censored = 0;
   const rows = flat.map((r) => {
     const h = r.track.draw === "line" && !r.collapsed ? LINE_H : TRACK_H;
@@ -132,22 +140,26 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   });
   const H = y + 6;
   const parts: string[] = [];
+  // the axis marks and the events: clipped to the plot when zoomed, so the header column stays clear
+  const plot: string[] = z ? [] : parts;
 
   parts.push(`<line x1="${HW}" y1="${AXIS_H - 0.5}" x2="${HW + PW}" y2="${AXIS_H - 0.5}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
   // the axis: a year line and label at each year start; a cut as a squiggle with a guide down the
   // plot; the months inside a wide year as short ticks, some labelled (axisMarks, shared)
   for (const m of axisMarks(ticks, X, HW, W - 2, (t) => textWidth(t, FS.small))) {
+    // zoomed, a mark outside the stretch shown is left out (its label would be held at the plot's edge)
+    if (z && (m.x < HW - 0.5 || m.x > HW + PW + 0.5)) continue;
     if (m.kind === "cut")
-      parts.push(`<g transform="translate(${m.x.toFixed(1)} 0)"><title>${m.years} years with no events, cut</title>` +
+      plot.push(`<g transform="translate(${m.x.toFixed(1)} 0)"><title>${m.years} years with no events, cut</title>` +
         `<path d="M-6 ${AXIS_H - 9} q3 -6 6 0 t6 0" fill="none" stroke="${pal.muted}" stroke-width="1.2"/>` +
         `<line x1="0" x2="0" y1="${AXIS_H}" y2="${H - 4}" stroke="${pal.muted}" stroke-width="${SW.hair}" stroke-dasharray="2 3"/></g>`);
     else if (m.kind === "year") {
       const xx = m.x.toFixed(1);
-      parts.push(`<line x1="${xx}" x2="${xx}" y1="${AXIS_H - 4}" y2="${H - 4}" stroke="${m.day === 0 ? pal.muted : pal.line}" stroke-width="${SW.hair}"/>`);
-      if (m.label) parts.push(label(m.label.x, AXIS_H - 8, m.label.text, { size: FS.small, fill: pal.muted, anchor: "middle" }));
+      plot.push(`<line x1="${xx}" x2="${xx}" y1="${AXIS_H - 4}" y2="${H - 4}" stroke="${m.day === 0 ? pal.muted : pal.line}" stroke-width="${SW.hair}"/>`);
+      if (m.label) plot.push(label(m.label.x, AXIS_H - 8, m.label.text, { size: FS.small, fill: pal.muted, anchor: "middle" }));
     } else {
-      parts.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${AXIS_H - 3}" y2="${AXIS_H}" stroke="${pal.muted}" stroke-width="${SW.hair}"/>`);
-      if (m.label) parts.push(label(m.x, AXIS_H - 8, m.label, { size: FS.small, fill: pal.muted, anchor: "middle" }));
+      plot.push(`<line x1="${r1(m.x)}" x2="${r1(m.x)}" y1="${AXIS_H - 3}" y2="${AXIS_H}" stroke="${pal.muted}" stroke-width="${SW.hair}"/>`);
+      if (m.label) plot.push(label(m.x, AXIS_H - 8, m.label, { size: FS.small, fill: pal.muted, anchor: "middle" }));
     }
   }
 
@@ -172,11 +184,11 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
         parts.push(label(HW - 8, yy(v) + FS.small * 0.35, fmtNum(v), { size: FS.small, fill: pal.muted, anchor: "end" }) +
           `<line x1="${HW - 5}" x2="${HW}" y1="${yy(v)}" y2="${yy(v)}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
       }
-      parts.push(`<polyline fill="none" stroke="${pal.muted}" stroke-width="${SW.line}" points="${pts.map((p) => X(p.it.start).toFixed(1) + "," + yy(p.v.v).toFixed(1)).join(" ")}"/>`);
+      plot.push(`<polyline fill="none" stroke="${pal.muted}" stroke-width="${SW.line}" points="${pts.map((p) => X(p.it.start).toFixed(1) + "," + yy(p.v.v).toFixed(1)).join(" ")}"/>`);
       for (const p of pts) {
         const c = colorOf(ev[p.it.i]);
         if (p.v.censored) censored++;
-        parts.push(`<g${tag([p.it.i])} transform="translate(${X(p.it.start).toFixed(1)} 0)">` +
+        plot.push(`<g${tag([p.it.i])} transform="translate(${X(p.it.start).toFixed(1)} 0)">` +
           (p.v.censored ? `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="${pal.bg}" stroke="${c}" stroke-width="1.5"/>` : `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="${c}"/>`) + `</g>`);
       }
       continue;
@@ -185,7 +197,7 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
     if (tr.draw === "samples") {
       for (const g of groupBy(r.items, (it) => String(it.start))) {
         const ms = [...new Set(g.map((it) => attr(ev[it.i], "SAMPLE_ID")).filter(Boolean) as string[])].map((id) => marks.get(id)).filter(Boolean) as SampleMark[];
-        parts.push(`<g${tag(g.map((it) => it.i))} transform="translate(${X(g[0].start).toFixed(1)} 0)">` +
+        plot.push(`<g${tag(g.map((it) => it.i))} transform="translate(${X(g[0].start).toFixed(1)} 0)">` +
           (ms.length ? sampleMarker(ms, cy, pal) : `<circle cx="0" cy="${cy}" r="${R}" fill="${POINT_COLOR}"/>`) + `</g>`);
       }
       continue;
@@ -201,15 +213,17 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
       const fits = (from: number) => x0 + from + 2 + textWidth(String(g.length), FS.small) + 2 <= next;
       if (g[0].end > g[0].start) {
         const w = Math.max(X(g[0].end) - x0, 2 * R);
-        parts.push(`<g${tag(g.map((it) => it.i))} transform="translate(${x0.toFixed(1)} 0)"><rect x="0" y="${cy - 2.5}" width="${w.toFixed(1)}" height="5" rx="2" ry="2" fill="${colorOf(e0)}"/>` +
+        plot.push(`<g${tag(g.map((it) => it.i))} transform="translate(${x0.toFixed(1)} 0)"><rect x="0" y="${cy - 2.5}" width="${w.toFixed(1)}" height="5" rx="2" ry="2" fill="${colorOf(e0)}"/>` +
           (g.length > 1 && fits(w) ? label(w + 2, cy + FS.small * 0.35, g.length, { size: FS.small, fill: pal.muted }) : "") + `</g>`);
       } else {
-        parts.push(`<g${tag(g.map((it) => it.i))} transform="translate(${x0.toFixed(1)} 0)">` +
+        plot.push(`<g${tag(g.map((it) => it.i))} transform="translate(${x0.toFixed(1)} 0)">` +
           (g.length > 1 ? stack(g.map((it) => colorOf(ev[it.i])), cy, g.length, pal, fits(4.5)) : shape(e0, cy, colorOf(e0), pal)) + `</g>`);
       }
     });
   }
 
+  if (z) parts.push(`<defs><clipPath id="tl-zoom-clip"><rect x="${HW}" y="0" width="${PW + PAD_R}" height="${H}"/></clipPath></defs>` +
+    `<g clip-path="url(#tl-zoom-clip)">${plot.join("")}</g>`);
   let total = H;
   if (captionText) {
     const cap = caption(captionText, W, H, pal.muted);
@@ -218,8 +232,24 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   }
   return {
     svg: frame(W, total, parts.join(""), pal.bg, false, o.interactive ? undefined : "Timeline of " + t.patient),
-    layout: { tracks, rows, cutYears, censored, width: W, height: total },
+    layout: { tracks, rows, cutYears, censored, width: W, height: total, plot: { x: HW, width: PW } },
   };
+}
+
+/** the least drag that zooms, in px (the portal's TimelineStore: more than 10) */
+export const ZOOM_MIN_DRAG = 10;
+
+/**
+ * The zoom a drag from x0 to x1 (px in the figure) makes over a plot at `plot`, already zoomed to
+ * `current` (fractions of the unzoomed plot, or null): the dragged stretch as fractions of the
+ * unzoomed plot, within it; null for a drag of 10 px or less, which is a click (PAT-TL-ZM-3).
+ */
+export function zoomFromDrag(x0: number, x1: number, plot: { x: number; width: number }, current: readonly [number, number] | null): [number, number] | null {
+  if (Math.abs(x1 - x0) <= ZOOM_MIN_DRAG || plot.width <= 0) return null;
+  const [a, b] = current || [0, 1];
+  const at = (x: number) => a + Math.min(1, Math.max(0, (x - plot.x) / plot.width)) * (b - a);
+  const lo = at(Math.min(x0, x1)), hi = at(Math.max(x0, x1));
+  return hi > lo ? [lo, hi] : null;
 }
 
 /** What the figure shows, in words — its caption, and the card's foot. */

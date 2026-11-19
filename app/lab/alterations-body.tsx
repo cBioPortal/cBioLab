@@ -30,11 +30,11 @@ const NOT_PROFILED_FOR: Record<"mutations" | "cna" | "sv", string> = { mutations
 const NOT_PROFILED = "This gene was not profiled for this sample (absent from gene panel)";
 const PILL = STYLE.notProfiledPill;
 
-/** The three tables, in the portal's order: the spec's key, and its name — its count line reads "7 Mutations", as the portal's does. */
+/** The three tables, in the portal's order (Mutations, Structural Variants, Copy Number Alterations): the spec's key, and its name — its count line reads "7 Mutations", as the portal's does. */
 const TABLES = [
   { key: "mutations", name: "Mutations" },
-  { key: "cna", name: "Copy Number Alterations" },
   { key: "sv", name: "Structural Variants" },
+  { key: "cna", name: "Copy Number Alterations" },
 ] as const;
 
 export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }: {

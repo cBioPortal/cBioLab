@@ -136,8 +136,8 @@ export const TableRequest = z.object({
   doc: z.union([DocEnvelope, z.string()]),
   view: z.number().int().min(0),
   table: z.string().max(120).optional(),
-  /** csv (default); or, for a Download-tab gene-by-sample file, the portal's Tab Delimited Format or Transposed Matrix */
-  format: z.enum(["csv", "tsv", "tsv-transposed"]).optional(),
+  /** csv (default); for a Download-tab gene-by-sample file, the portal's Tab Delimited Format or Transposed Matrix; for the mutation table, the portal's table.tsv of every row (lib/table-tsv.ts) */
+  format: z.enum(["csv", "tsv", "tsv-transposed", "table-tsv"]).optional(),
   /**
    * write the shown columns as a cBioPortal Study View file (lib/study-view-case-files.ts): TSV,
    * the study column under this header, attributes headed by their names or ids, a missing value NA

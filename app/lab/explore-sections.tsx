@@ -22,9 +22,9 @@ import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
-import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
+import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
-import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
+import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
@@ -182,7 +182,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               <Dna />Query genes…{queuedGenes.length ? " (" + queuedGenes.length + ")" : ""}
             </Button>}
             {!addMode && <Button variant="outline" className="viewpatients" disabled={!!viewWhy} onClick={() => void viewPatients()}
-              data-tip={viewWhy || "open the Patient page on the first of " + (parseDraft() ? "the patients your filters select" : "the selected studies' patients") +
+              data-tip={viewWhy || "open the Patient page in a new window on the first of " + (parseDraft() ? "the patients your filters select" : "the selected studies' patients") +
                 ", and step through the rest"}>
               <Users />View patients
             </Button>}
@@ -1031,9 +1031,8 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   const chart: ChartKey = { kind: "assay", profileType: f.profileType, entity: f.entity };
   const short = f.name || entityShortName(f.entity, f.profileType);
   const valueArm = (v: string) => ({ name: armLabel(v), where: { ...base, values: [v] } as Leaf });
-  const binRange = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? { lte: b.end } : b.special === ">" ? { gt: b.start } : { gt: b.start, lte: b.end };
-  const binText = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!) + "–" + fmtNum(b.end!);
-  const binArms = (f.bins || []).filter((b) => b.count > 0).map((b) => ({ name: armLabel(short + " " + binText(b)), where: { ...base, range: binRange(b) } as Leaf }));
+  const binText = assayBinText;
+  const binArms = (f.bins || []).filter((b) => b.count > 0).map((b) => ({ name: armLabel(short + " " + binText(b)), where: { ...base, ...assayBinWhere(b) } as Leaf }));
   return (
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
@@ -1059,7 +1058,6 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
       )}
       {f.kind === "num" && f.bins && f.bins.length > 1 && (() => {
         const maxN = Math.max(...f.bins.map((b) => b.count), 1);
-        const range = binRange;
         const label = binText;
         const tick = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!);
         return (
@@ -1067,7 +1065,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
             {f.bins.map((b, i) => (
               <button key={i} className="hbar" disabled={!clickable}
                 data-tip={label(b) + " · " + fmtInt(b.count) + " " + noun + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
-                onClick={() => addClause({ ...base, range: range(b) })}>
+                onClick={() => addClause({ ...base, ...assayBinWhere(b) })}>
                 <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
               </button>
             ))}
@@ -1164,16 +1162,34 @@ const PROFILED_TYPE: Record<string, "MUTATION" | "CNA" | "SV"> = {
   MUTATION_EXTENDED: "MUTATION", COPY_NUMBER_ALTERATION: "CNA", STRUCTURAL_VARIANT: "SV"
 };
 
+/** where the browser keeps the Data types table's Union / Intersection choice */
+const DATA_TYPES_OP_KEY = "cbiolab.explore.dataTypesOp";
+
 export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
-  const { addClause, parseDraft } = ctx;
+  const { addClause, addClauses, parseDraft } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
-  const rows = explore.dataTypes || [];
+  // the portal's default for this table is Intersection: a sample with every checked kind of data
+  const [op, setOp] = useState<GeneOp>("intersection");
+  useEffect(() => {
+    try { if (localStorage.getItem(DATA_TYPES_OP_KEY) === "union") setOp("union"); } catch { /* the default stands */ }
+  }, []);
+  const chooseOp = (v: GeneOp) => {
+    setOp(v);
+    try { localStorage.setItem(DATA_TYPES_OP_KEY, v); } catch { /* kept for this page only */ }
+  };
+  // as the portal sorts it: by Freq, the share of the selected samples, highest first
+  const rows = [...(explore.dataTypes || [])].sort((a, b) => b.n - a.n);
   if (!rows.length) return null;
   const d = parseDraft();
   const selected = (t: string) => !!(d && d.all.some((cl: any) => cl.kind === "profiled" && cl.type === t));
   const max = Math.max(...rows.map((x) => x.n), 1);
+  const samples = explore.totals?.samples ?? 0;
   const typeOf = new Map(rows.map((dt) => [dt.profile, PROFILED_TYPE[dt.alterationType]]));
+  const types = (profiles: string[]) => [...new Set(profiles.map((p) => typeOf.get(p)).filter(Boolean))] as string[];
+  const n = types(picks.picked).length;
+  const filters = (d?.all || []).length;
+  const refusal = op === "intersection" && n > 1 ? intersectionRefusal(filters, n, "kind of data") : null;
   return (
     <div className="card wide">
       <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
@@ -1186,16 +1202,22 @@ export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
               <span className="gname">{dt.profile}</span>
               <span className="meta dtlabel">{dt.label}</span>
               <span className="gbar"><i style={{ width: Math.max(2, Math.round(100 * dt.n / max)) + "%" }} /></span>
-              <span className="gcount">{dt.n.toLocaleString()}</span>
+              <span className="gcount" data-tip="Number of samples">{dt.n.toLocaleString()}</span>
+              <span className="gcount meta" data-tip={"of the " + samples.toLocaleString() + " selected samples"}>{portalFreq(samples ? 100 * dt.n / samples : NaN)}</span>
             </PickRow>
           );
         }}
       </VirtualRows>
-      <PickBar picks={picks} hint="keep the samples with any of the checked kinds of data"
+      <PickBar picks={picks} why={refusal} hint={"keep the samples with " + (op === "union" || n < 2 ? "any" : "every one") + " of the checked kinds of data"}
         onApply={(profiles) => {
-          const leaves = [...new Set(profiles.map((p) => typeOf.get(p)).filter(Boolean))].map((type) => ({ kind: "profiled", type }));
-          if (leaves.length) addClause(leaves.length === 1 ? leaves[0] : { any: leaves });
-        }} />
+          const leaves = types(profiles).map((type) => ({ kind: "profiled", type }));
+          if (leaves.length > 1 && op === "intersection") addClauses(leaves);
+          else if (leaves.length) addClause(leaves.length === 1 ? leaves[0] : { any: leaves });
+        }}>
+        {n > 1 && <Choice value={op} onChange={(v) => chooseOp(v as GeneOp)} className="geneop"
+          title="Intersection keeps the samples with every checked kind of data; Union, those with any of them"
+          options={[["intersection", "Intersection"], ["union", "Union"]]} />}
+      </PickBar>
     </div>
   );
 }
@@ -1241,8 +1263,8 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   const draftClauses = (parseDraft()?.all || []) as unknown[];
   const sorted = useMemo(() => {
     const loaded = meta.rows || [];
-    return sortGeneRows(needle ? loaded.filter((g: any) => g.gene.toUpperCase().includes(needle)) : loaded, sort);
-  }, [meta.rows, needle, sort]);
+    return sortGeneRows(needle ? loaded.filter((g: any) => geneRowMatches(kind, g, needle)) : loaded, sort);
+  }, [meta.rows, needle, sort, kind]);
   // the genes the selection already filters on in this table come first, as the portal pins them
   const applied = appliedLines(draftClauses, sorted.map((g: any) => meta.oql(g)));
   const appliedSet = new Set(applied);
@@ -1264,8 +1286,8 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         <h2 className="flush">{title}</h2>
         {drivers && <span className="meta" data-tip={"counting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered"}>OncoKB drivers</span>}
         <span className="spacer" />
-        <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="find gene" value={geneFilter[kind] || ""}
-          data-tip={"show the genes whose symbol contains this, of all " + all.length.toLocaleString()}
+        <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="search" aria-label={"search " + name} value={geneFilter[kind] || ""}
+          data-tip={"show the rows with this in any column (gene, " + (kind === "cna" ? "cytoband, CNA" : kind === "sv" ? "# SV" : "# Mut") + ", #, Freq), of all " + all.length.toLocaleString()}
           onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
         {(() => {
           const chart: ChartKey = { kind: "genes", specs: (kind === "mutated" ? ["MUT"] : kind === "cna" ? ["AMP", "HOMDEL"] : ["FUSION"]).map((c) => ": " + callOql(c)) };
@@ -1367,9 +1389,9 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
       <h2>Timeline events</h2>
       {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
       {explore.events.length > 0 && (
-        <ValueList hint="keep the patients with any of the checked events"
-          rows={explore.events.map((e) => ({ key: e.type, name: "has " + e.type, n: e.n, on: eventOn(e.type),
-            title: "has " + e.type + " — " + e.n.toLocaleString() + " patients" }))}
+        <ValueList hint="keep the patients with any of the checked events" pct={portalFreq}
+          rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
+            title: e.n.toLocaleString() + " of " + (explore.totals?.patients ?? 0).toLocaleString() + " selected patients with a " + e.type + " event" }))}
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
       )}
     </div>

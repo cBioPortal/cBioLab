@@ -2,6 +2,7 @@ import { parseBody, TableRequest } from "../../../lib/api-schemas.ts";
 import { runAnalysis } from "../../../lib/analysis.ts";
 import { PAGED_KINDS, TABLE_CHUNK, pagedTable } from "../../../lib/views/rows.ts";
 import { csvField, describeQuery } from "../../../lib/table-query.ts";
+import { TABLE_TSV_NAME, everyRowQuery, tsvLine } from "../../../lib/table-tsv.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { isDrawn, type AnalysisDoc, type TableRows, type ViewResult } from "../../../lib/types.ts";
 import { TABLE_COLUMNS_MAX } from "../../../lib/clinical-table.ts";
@@ -32,7 +33,9 @@ export async function POST(req: Request) {
     const vi = body.view as number;
     const view = doc && Array.isArray(doc.views) ? doc.views[vi] : null;
     if (!view || !PAGED_KINDS.includes(view.kind)) throw new Error("view " + body.view + " is not a table view");
-    doc = { ...doc, views: [view] };
+    if (body.format === "table-tsv" && view.kind !== "mutations") throw new Error("the portal's table.tsv is the mutation table's download");
+    // the portal's table.tsv holds every row: the view's search and filters are dropped, its sort kept
+    doc = { ...doc, views: [body.format === "table-tsv" ? everyRowQuery(view as typeof view & { search?: string; filters?: Record<string, unknown> }) : view] };
   } catch (e) {
     return new Response("cannot download: " + String((e as Error)?.message || e) + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   }
@@ -43,6 +46,11 @@ export async function POST(req: Request) {
   const t = pagedTable(v, table);
   if (!t || !isDrawn(v)) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
   if (body.format === "tsv" || body.format === "tsv-transposed") return portalFile(v, t, table, body.format === "tsv-transposed", run, doc);
+  if (body.format === "table-tsv") return new Response(pageStream(t.total, (offset) => run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table })), table, {
+    head: () => tsvLine(t.columns.map((c) => c.name)),
+    rows: (p) => p.rows.map((row) => tsvLine(row.values)).join(""),
+    cut: (why) => tsvLine(["# DOWNLOAD INCOMPLETE: " + why]),
+  }), { headers: { "content-type": "text/tab-separated-values; charset=utf-8", "content-disposition": "attachment; filename=\"" + TABLE_TSV_NAME + "\"" } });
   if (body.caseFile) return caseFileResponse(t, body.caseFile as CaseFileFormat, (offset) => run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table })), table);
   const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   // the header row comes first, so the file opens as a table anywhere; what the query kept and who

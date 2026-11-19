@@ -6,6 +6,7 @@
 // answers each statement by what it reads.
 import { test, describe, beforeEach, after } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 process.env.CLICKHOUSE_URL = "http://primary.invalid";
 process.env.CLICKHOUSE_DB = "cbio_a";
@@ -16,8 +17,10 @@ process.env.EXPLORE_COHORT_EXTERNAL_LIMIT = "3";
 for (const k of ["CLICKHOUSE2_URL", "ONCOKB_PIN", "FEDERATION_PEERS", "CH_RUN_CACHE"]) delete process.env[k];
 
 const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
+const { dataBins } = await import("../lib/data-binner.ts");
+const CG29 = JSON.parse(readFileSync(new URL("./fixtures/assay-bins-brca-cg00000029.json", import.meta.url), "utf8")) as { values: string[]; portalBins: unknown[] };
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
-const { numericBinEdges, mergeExplore, buildExplore, buildExploreFederated, buildAssayFacets, ASSAY_CHART_LIMIT } = await import("../lib/explore.ts");
+const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -41,37 +44,6 @@ const on = (re: RegExp, rows: Row[] | ((q: string) => Row[])) => { answers.push(
 const fail = (re: RegExp) => on(re, () => { throw new Error("no such table"); });
 
 const SECOND: ChConn = { id: "b", url: "http://second.invalid", user: "u", password: "p", db: "cbio_b", label: "second" } as ChConn;
-
-describe("numeric bin edges (the portal's LinearDataBinner)", () => {
-  test("a range with no width has no bins", () => {
-    assert.deepEqual(numericBinEdges(5, 5, 5, 5, true), { edges: [], interval: 0 });
-  });
-  test("integers 0–100 take the smallest interval giving at most 20 bins", () => {
-    const { edges, interval } = numericBinEdges(0, 100, 25, 75, true);
-    assert.equal(interval, 5);
-    assert.equal(edges[0], 5);
-    assert.equal(edges.at(-1), 95);
-    assert.ok(edges.every((e, i) => i === 0 || e - edges[i - 1] === 5));
-  });
-  test("outliers past 1.5 IQR are cut off into the end bars, not given bins of their own", () => {
-    const { edges, interval } = numericBinEdges(0, 1000, 10, 20, false);
-    assert.equal(interval, 2); // the 0–35 inlier range, not 0–1000
-    assert.ok(edges.at(-1)! <= 35);
-  });
-  test("decimal data gets a decimal interval, and edges carry no float noise", () => {
-    const { edges, interval } = numericBinEdges(0, 1, 0.25, 0.75, false);
-    assert.equal(interval, 0.05);
-    assert.equal(edges[0], 0.05);
-    assert.ok(edges.includes(0.15));
-    assert.ok(edges.every((e) => String(e).length <= 4));
-  });
-  test("decimal data keeps its last interior edge, as integer data does (0–1 by 0.05 ends at 0.95, as 0–100 by 5 ends at 95)", () => {
-    assert.equal(numericBinEdges(0, 1, 0.25, 0.75, false).edges.at(-1), 0.95);
-  });
-  test("integer data never gets a fractional interval", () => {
-    assert.equal(numericBinEdges(0, 6, 1, 4, true).interval, 1);
-  });
-});
 
 describe("merging participants' facets", () => {
   const part = (o: Partial<ExploreResult>): ExploreResult => ({
@@ -811,6 +783,18 @@ describe("several studies", () => {
   const profiles = new Map([["st1", { profiles: ["mutations"], gaProfiles: [] }], ["st2", { profiles: ["mutations"], gaProfiles: [] }]]);
   const connByStudy = new Map([["st2", SECOND]]);
 
+  test("STS-MD-5: an attribute patient-level in one study and sample-level in another is read per sample everywhere", async () => {
+    on(/groupUniqArray\(lower\(toString\(cam\.patient_attribute\)\)\) AS lv/, (q) => /cbio_b\./.test(q)
+      ? [{ a: "GRADE", lv: ["0"] }, { a: "SEX", lv: ["1"] }] : [{ a: "GRADE", lv: ["1"] }, { a: "SEX", lv: ["true"] }]);
+    assert.deepEqual(await conflictingLevels(["st1", "st2"], connByStudy), ["GRADE"], "SEX is patient-level in both");
+    assert.deepEqual(await conflictingLevels(["st1"], connByStudy), [], "one study has nothing to reconcile");
+    twoConnAnswers();
+    await buildExploreFederated({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy, attributes: ["GRADE", "SEX"] });
+    const lifted = sent.filter((q) => /attribute_name IN \('GRADE'\)\)/.test(q));
+    assert.ok(lifted.some((q) => /AS numratio/.test(q)), "the facets read GRADE per sample");
+    assert.ok(lifted.some((q) => /cbio_b\./.test(q)) && lifted.some((q) => /cbio_a\./.test(q)), "on every connection");
+  });
+
   test("each connection is asked once for all its studies, and the parts merge by name", async () => {
     twoConnAnswers();
     const r = await buildExploreFederated({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy });
@@ -878,7 +862,7 @@ describe("generic-assay charts", () => {
   const PT = "mutational_signature";
   const holders = new Map([["st1", { gaProfiles: [PT] }], ["st2", { gaProfiles: [PT] }], ["st3", { gaProfiles: [] }]]);
   const stats = (o: Row = {}) => ({ total_p: 10, total_s: 12, dt: "LIMIT-VALUE", pl: 0, nnum_p: 8, nnum_s: 10,
-    mn: 0, mx: 100, q1: 25, q2: 50, q3: 75, nv: 10, allints: 1, ...o });
+    mn: 0, mx: 100, q2: 50, nv: 10, ...o });
 
   test("a profile no selected study holds is refused by name", async () => {
     const [f] = await buildAssayFacets({ studies: ["st3"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "SBS1" }] });
@@ -886,10 +870,13 @@ describe("generic-assay charts", () => {
     assert.equal(sent.length, 0);
   });
 
-  test("a numeric entity: pooled range, size-weighted median, and the portal's (start, end] bars with outlier bars", async () => {
+  test("a numeric entity: pooled range and size-weighted median, its bars the DataBinner's over the values of every connection", async () => {
     on(/WITH ents AS/, [{ entity: "SBS1", name: "Clock-like" }]);
     on(/AS total_p/, (q) => [stats(/'st2_/.test(q) ? { mn: 10, mx: 60, q2: 30, nv: 30 } : {})]);
-    on(/AS b,\n/, [{ b: -1, n: 1 }, { b: 0, n: 3 }, { b: -2, n: 2 }]);
+    // st1's values on the primary, st2's on the second connection: binned together
+    on(/trimBoth\(value\) AS raw, uniqExact/, (q) => /cbio_b\./.test(q)
+      ? Array.from({ length: 10 }, (_, i) => ({ raw: String(10 * i + 5), n: 1 }))
+      : Array.from({ length: 10 }, (_, i) => ({ raw: String(10 * i), n: 1 })));
     const [f] = await buildAssayFacets({ studies: ["st1", "st2", "st3"], profilesByStudy: holders, connByStudy: new Map([["st2", SECOND]]),
       charts: [{ profileType: PT, entity: "SBS1" }] });
     assert.deepEqual(f.studies, ["st1", "st2"]);
@@ -898,24 +885,35 @@ describe("generic-assay charts", () => {
     assert.equal(f.name, "Clock-like");
     assert.deepEqual([f.total, f.measured, f.min, f.max, f.median], [24, 20, 0, 100, 35]);
     assert.ok(f.kind === "num");
-    const bins = f.bins!;
-    assert.deepEqual(bins[0], { special: "<=", end: 5, count: 2 });
-    assert.deepEqual(bins[1], { start: 5, end: 10, count: 6 });
-    assert.deepEqual(bins.at(-1), { special: ">", start: 100, count: 4 });
+    const values = [...Array.from({ length: 10 }, (_, i) => ({ value: String(10 * i), count: 1 })), ...Array.from({ length: 10 }, (_, i) => ({ value: String(10 * i + 5), count: 1 }))];
+    assert.deepEqual(f.bins, dataBins(values), "the pooled values, binned once");
+    assert.equal(f.bins!.reduce((n, b) => n + b.count, 0), 20);
+  });
+
+  test("STS-BAR-1: a generic-assay entity's bars are the portal's (brca methylation cg00000029, every bar and count)", async () => {
+    on(/AS total_p/, [stats({ total_s: 1084, nnum_s: 776, mn: 0.0419244, mx: 0.9, q2: 0.17, nv: 776 })]);
+    on(/trimBoth\(value\) AS raw, uniqExact/, CG29.values.map((raw) => ({ raw, n: 1 })));
+    const [f] = await buildAssayFacets({ studies: ["st1"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "cg00000029" }] });
+    assert.ok(f.kind === "num");
+    assert.deepEqual(f.bins, CG29.portalBins, "21 bars, the last \">0.44\" (49) as the portal's");
+    assert.equal(f.total - f.measured, 308, "the portal's NA");
   });
 
   test("a patient-level profile is counted in patients", async () => {
     on(/AS total_p/, [stats({ pl: 1 })]);
+    on(/trimBoth\(value\) AS raw, uniqExact/, [{ raw: "1", n: 3 }, { raw: "9", n: 5 }]);
     const [f] = await buildAssayFacets({ studies: ["st1"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "SBS1" }] });
     assert.deepEqual([f.unit, f.total, f.measured], ["patient", 10, 8]);
     assert.equal(f.name, undefined, "no name beyond the id");
-    assert.match(sent.find((q) => /AS b,\n/.test(q))!, /uniqExact\(patient_unique_id\) AS n/);
+    assert.match(sent.find((q) => /AS raw, uniqExact/.test(q))!, /uniqExact\(patient_unique_id\) AS n/);
   });
 
   test("a zero-inflated entity is binned over its whole range", async () => {
-    on(/AS total_p/, [stats({ mn: 0, mx: 10, q1: 0, q2: 0, q3: 0 })]);
+    on(/AS total_p/, [stats({ mn: 0, mx: 10, q2: 0 })]);
+    on(/trimBoth\(value\) AS raw, uniqExact/, [{ raw: "0", n: 90 }, { raw: "4", n: 3 }, { raw: "10", n: 2 }]);
     const [f] = await buildAssayFacets({ studies: ["st1"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "SBS1" }] });
     assert.ok(f.kind === "num" && f.bins!.length >= 2);
+    assert.equal(f.bins!.reduce((n, b) => n + b.count, 0), 95);
   });
 
   test("an entity with no numbers has no bars, and a single value has no histogram", async () => {
@@ -924,7 +922,8 @@ describe("generic-assay charts", () => {
     assert.ok(none.kind === "num");
     assert.deepEqual([none.measured, none.bins, none.min], [10, undefined, undefined]);
     answers = [];
-    on(/AS total_p/, [stats({ mn: 3, mx: 3, q1: 3, q3: 3 })]);
+    on(/AS total_p/, [stats({ mn: 3, mx: 3 })]);
+    on(/trimBoth\(value\) AS raw, uniqExact/, [{ raw: "3", n: 10 }]);
     const [one] = await buildAssayFacets({ studies: ["st1"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "SBS1" }] });
     assert.ok(one.kind === "num");
     assert.deepEqual([one.min, one.max, one.bins], [3, 3, undefined]);

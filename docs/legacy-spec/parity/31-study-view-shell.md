@@ -137,7 +137,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | ID | verdict | how | note |
 |---|---|---|---|
 | STV-AB-1 | 🟡 | B | ↓ Header "1 study · 594 patients · 594 samples" from the filtered totals, skeleton while counting; not the portal's "Selected: 594 patients | 594 samples" (no "Selected:", "·" for "|"), and "(overlap not deduplicated)" on several studies (`explore-sections.tsx:129-139`) |
-| STV-AB-2 | 🟡 | BC | "View patients" opens `/portal/patient` on the first patient with the cohort definition for stepping (`use-explore-state.ts:189-197`); same tab, not a new window; disabled reason shown |
+| STV-AB-2 | 🟡 | BC | "View patients" opens `/portal/patient` on the first patient with the cohort definition for stepping (`use-explore-state.ts:189-197`); disabled, saying why, with no study or at 0 matching patients (`explore-sections.tsx`, as the portal's "disabled if 0 patients"); same tab, not a new window |
 | STV-AB-3 | 🔶 | B | "Save as a Cohort" (filter bar, only once filtered) — see §8 |
 | STV-AB-4 | ✅ | B | "Download clinical data" beside View patients: `<study>_clinical_data.tsv` / `combined_study_clinical_data.tsv`, through the patient-level table route ([download-cases](download-cases.md) PC2, PC9). Shown always (no `skin_hide_download_controls`) |
 | STV-AB-5 | ❌ | B | No ⚙ / autosubmit setting |
@@ -183,7 +183,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-GR-7 | ❌ | B | — |
 | STV-GR-8 | ❌ | C | — |
 | STV-GR-9 | N/A | C | Legacy itself has no rename here |
-| STV-GR-10 | 🟡 | B | ↓ Clinical and gene charts' "…" → Compare groups / Analyze groups ✅; a generic-assay chart drops them when more than one study is selected (`explore-sections.tsx:1038`) |
+| STV-GR-10 | ✅ | B | ↓ Clinical, gene and generic-assay charts' "…" → Compare groups / Analyze groups ✅, across several studies too (Quartiles / Median one study only, as the clinical charts); brca + coadread 8q Gain 694 / Unchanged 658 / Loss 31 |
 
 ### §8 Virtual study
 
@@ -297,5 +297,3 @@ Found on 2026-11-18 (master `bc53b944`):
 - **CN Segments disappears at 0 selected samples** (`app/lab/page.tsx:445, 560`): the empty-selection page shows only Summary, though the study holds segments (STV-STM-13, STV-TAB-1).
 - **The Clinical Data tab cannot change its columns**: Add chart is in the Summary block, hidden on that tab (`app/lab/page.tsx:572, 584`), and the table has no menu of its own (STV-CD-9, STV-MD-13).
 - **The Explore tab is not in the URL, and Clinical Data / CN Segments unmount when left** (`app/lab/page.tsx:563-566`): a reload or shared link opens Summary, and switching tabs resets the table's search, sort and page and the CN locus (STV-URL-1, STV-TAB-1).
-- **A generic-assay chart drops Compare / Analyze groups across several studies** (`app/lab/explore-sections.tsx:1038`) while clinical charts keep them (STV-GR-10).
-- **View patients stays enabled at 0 matching patients** (`app/lab/explore-sections.tsx:184`) (STV-AB-2).

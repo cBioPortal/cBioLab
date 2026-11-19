@@ -2,7 +2,7 @@
 // cbioportal.org's link forms (STV-URL-2) are translated, with what has no translation named.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { FILTERS_PARAM, fromAttributeParams, fromStudyViewFilter, readFilters, writeFilters } from "../lib/study-view-url.ts";
+import { FILTERS_PARAM, TAB_PARAM, fromAttributeParams, fromStudyViewFilter, readFilters, readTab, writeFilters, writeTab } from "../lib/study-view-url.ts";
 import type { Clause } from "../lib/types.ts";
 
 const p = (s: string) => new URLSearchParams(s);
@@ -73,5 +73,25 @@ describe("cbioportal.org links", () => {
     const values = Array.from({ length: 9 }, (_, i) => ({ start: i * 10, end: i * 10 + 5 }));
     assert.deepEqual(fromStudyViewFilter({ clinicalDataFilters: [{ attributeId: "AGE", values }] }),
       { all: [], refused: ["AGE's 9 ranges (at most 8)"] });
+  });
+});
+
+describe("the tab in the URL (STV-URL-1)", () => {
+  const q = (s: string) => new URLSearchParams(s);
+  test("each tab by the portal's path for it; Summary leaves the parameter out", () => {
+    assert.equal(writeTab("clinical"), "clinicalData");
+    assert.equal(writeTab("cn"), "cnSegments");
+    assert.equal(writeTab("summary"), null);
+    assert.equal(TAB_PARAM, "svtab");
+  });
+  test("a link opens the tab it names, and Summary without one or with one it doesn't know", () => {
+    assert.equal(readTab(q("svtab=clinicalData")), "clinical");
+    assert.equal(readTab(q("tab=explore&svtab=cnSegments&study=x")), "cn");
+    assert.equal(readTab(q("tab=explore")), "summary");
+    assert.equal(readTab(q("svtab=plots")), "summary");
+    assert.equal(readTab(q("svtab=")), "summary");
+  });
+  test("round trip", () => {
+    for (const t of ["clinical", "cn"] as const) assert.equal(readTab(q("svtab=" + writeTab(t))), t);
   });
 });

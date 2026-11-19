@@ -118,3 +118,24 @@ export function readFilters(params: URLSearchParams, hash = ""): UrlFilters | nu
   if (attr && vals) return fromAttributeParams(attr, vals);
   return null;
 }
+
+/** Explore's own tabs: its charts, the Clinical Data table, the CN Segments figure */
+export type StudyViewTab = "summary" | "clinical" | "cn";
+
+/** the page's parameter for the tab shown, absent on Summary */
+export const TAB_PARAM = "svtab";
+
+/** each tab's value in the URL: the portal's path for it (`/study/clinicalData`, STV-URL-1) */
+const TAB_VALUES: Record<Exclude<StudyViewTab, "summary">, string> = { clinical: "clinicalData", cn: "cnSegments" };
+
+/** the tab a link opens: its `svtab`, else Summary (an unknown value too) */
+export function readTab(params: URLSearchParams): StudyViewTab {
+  const v = params.get(TAB_PARAM);
+  const hit = (Object.keys(TAB_VALUES) as (keyof typeof TAB_VALUES)[]).find((t) => TAB_VALUES[t] === v);
+  return hit ?? "summary";
+}
+
+/** the parameter's value for a tab; null for Summary, which the URL leaves out */
+export function writeTab(tab: StudyViewTab): string | null {
+  return tab === "summary" ? null : TAB_VALUES[tab];
+}

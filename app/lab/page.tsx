@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { currentLinkUrlMax, linkParams } from "../_links/link-state.ts";
-import { readFilters } from "../../lib/study-view-url.ts";
+import { currentLinkUrlMax, linkParams, writeSearch } from "../_links/link-state.ts";
+import { TAB_PARAM, readFilters, readTab, writeTab, type StudyViewTab } from "../../lib/study-view-url.ts";
 import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
@@ -178,8 +178,10 @@ export default function AnalysisPage() {
   // document store may already have written the URL
   const openedWith = useRef(typeof sp.doc === "string" ? sp.doc : null);
   const [tab, setTab] = useState<typeof TABS[number]>(() => tabFromParams(sp));
-  /** Explore's own tabs, the portal's study view's: its charts, or the Clinical Data table */
-  const [svTab, setSvTab] = useState<"summary" | "clinical" | "cn">("summary");
+  /** Explore's own tabs, the portal's study view's: its charts, the Clinical Data table, CN Segments; a link's `svtab` opens one */
+  const [svTab, setSvTabState] = useState<StudyViewTab>(() => readTab(new URLSearchParams(Object.entries(sp).filter(([, v]) => typeof v === "string") as [string, string][])));
+  /** the tabs opened so far, kept mounted so their search, sort, page and locus survive a switch */
+  const [opened, setOpened] = useState<Record<StudyViewTab, boolean>>(() => ({ summary: true, clinical: svTab === "clinical", cn: svTab === "cn" }));
   /** set when an opened document was written for an older version and has been upgraded */
   const [upgradeNote, setUpgradeNote] = useState<DocUpgrade | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -438,13 +440,48 @@ export default function AnalysisPage() {
     return !!own;
   };
   const hasSegments = cnSegmentsTab(studies.filter((s) => exStudies.includes(s.id)));
-  // the Clinical Data and CN Segments tabs need a selected sample; a new selection or set of
-  // studies opens on Summary again
+  // Clinical Data needs a selected sample; CN Segments a selected study with segments (at 0 samples
+  // too, as the portal's); a new set of studies opens on Summary again
   const hasSamples = !!explore && (explore.totals?.samples ?? 0) > 0;
   const studyKey = exStudies.join(",");
-  useEffect(() => { if (!hasSamples) setSvTab("summary"); }, [hasSamples]);
-  useEffect(() => { setSvTab("summary"); }, [studyKey]);
-  const shownTab = !hasSamples || (svTab === "cn" && !hasSegments) ? "summary" : svTab;
+  /** the tab shown, in the URL as the portal keeps it in its path (docs/LINKS.md: through writeSearch) */
+  const setSvTab = (t: StudyViewTab) => {
+    setSvTabState(t);
+    if (t !== "summary") setOpened((o) => o[t] ? o : { ...o, [t]: true });
+    if (addMode) return;
+    const q = linkParams();
+    const v = writeTab(t);
+    if ((q.get(TAB_PARAM) || null) === v) return;
+    if (v) q.set(TAB_PARAM, v); else q.delete(TAB_PARAM);
+    writeSearch("?" + q.toString());
+  };
+  // Back and Forward (the document's undo steps) carry the tab their entry was written with
+  useEffect(() => {
+    const onPop = () => {
+      const t = readTab(linkParams());
+      setSvTabState(t);
+      if (t !== "summary") setOpened((o) => o[t] ? o : { ...o, [t]: true });
+    };
+    addEventListener("popstate", onPop);
+    return () => removeEventListener("popstate", onPop);
+  }, []);
+  // a tab the selection no longer offers falls back to Summary, in the URL too: Clinical Data at 0
+  // samples, CN Segments once the selected studies are known to hold no segments
+  const studiesKnown = exStudies.length > 0 && exStudies.every((id) => studies.some((s) => s.id === id));
+  useEffect(() => {
+    if (addMode) return;
+    if ((svTab === "clinical" && explore && !hasSamples) || (svTab === "cn" && studiesKnown && !hasSegments)) setSvTab("summary");
+  }, [explore, hasSamples, studiesKnown, hasSegments, addMode]);   // eslint-disable-line react-hooks/exhaustive-deps -- reacts to the selection only
+  // a new set of studies opens on Summary, with fresh tabs; the studies a link opens with are not a
+  // change, nor are the ones Explore holds while it edits or adds a cohort (they come back after)
+  const lastStudies = useRef<string | null>(null);
+  useEffect(() => {
+    if (addMode) return;
+    const prev = lastStudies.current;
+    lastStudies.current = studyKey;
+    if (prev && prev !== studyKey) { setSvTab("summary"); setOpened({ summary: true, clinical: false, cn: false }); }
+  }, [studyKey, addMode]);   // eslint-disable-line react-hooks/exhaustive-deps -- reacts to the studies only
+  const shownTab: StudyViewTab = (svTab === "clinical" && !hasSamples) || (svTab === "cn" && !hasSegments) ? "summary" : svTab;
   // the tabs' props, kept while the selection and the charts stay the same
   const tabSelection = useMemo(() => { const d = barDef(); return d ? { def: d, study: exSel.current[0] } : null; },
     [explore, studyKey]);   // eslint-disable-line react-hooks/exhaustive-deps -- barDef reads the applied draft, which changes with explore
@@ -550,20 +587,20 @@ export default function AnalysisPage() {
               show — Analyze lives in the studies card above regardless of whether any
               filters exist, so this block's whole job now is the filters themselves. */}
           <ExploreBar ctx={exploreCtx} />
-          {/* the portal's study view tabs: Clinical Data and CN Segments only while the selection holds a
-              sample, CN Segments only when a selected study holds segments */}
+          {/* the portal's study view tabs: Clinical Data only while the selection holds a sample,
+              CN Segments whenever a selected study holds segments */}
           {!addMode && explore && exStudies.length > 0 && <Tabs value={shownTab} className="mb-3"
-            onValueChange={(v) => setSvTab(v as "summary" | "clinical" | "cn")}>
+            onValueChange={(v) => setSvTab(v as StudyViewTab)}>
             <TabsList variant="line" aria-label="study view sections" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
               <TabsTrigger value="summary" className={PAGE_TAB}>Summary</TabsTrigger>
               {hasSamples && <TabsTrigger value="clinical" className={PAGE_TAB}>Clinical Data</TabsTrigger>}
-              {hasSamples && hasSegments && <TabsTrigger value="cn" className={PAGE_TAB}>CN Segments</TabsTrigger>}
+              {hasSegments && <TabsTrigger value="cn" className={PAGE_TAB}>CN Segments</TabsTrigger>}
             </TabsList>
           </Tabs>}
-          {!addMode && explore && exStudies.length > 0 && shownTab === "clinical" &&
-            <ClinicalDataTab selection={tabSelection} studies={exStudies} charts={tabCharts} />}
-          {!addMode && explore && exStudies.length > 0 && shownTab === "cn" &&
-            <CnSegmentsTab selection={tabSelection} selected={explore.totals?.samples ?? 0} />}
+          {!addMode && explore && exStudies.length > 0 && opened.clinical &&
+            <div hidden={shownTab !== "clinical"}><ClinicalDataTab selection={tabSelection} studies={exStudies} charts={tabCharts} active={shownTab === "clinical"} /></div>}
+          {!addMode && explore && exStudies.length > 0 && hasSegments && opened.cn &&
+            <div hidden={shownTab !== "cn"}><CnSegmentsTab selection={tabSelection} selected={explore.totals?.samples ?? 0} active={shownTab === "cn"} /></div>}
           {/* A facet click starts a recount, and a second click before it lands
               would race it — so the facets themselves greyscale until it does.
               The study picker above stays live: choosing studies is a staged,

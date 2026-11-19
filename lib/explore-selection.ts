@@ -7,6 +7,7 @@
  * A click toggles: a selected bar or value is taken out again (STS-PIE-6).
  */
 import type { ClinicalLeaf, CohortDef, NumericBin } from "./types.ts";
+import { fmtNum } from "./chart/format.ts";
 
 type Clause = NonNullable<CohortDef["all"]>[number];
 
@@ -169,4 +170,25 @@ export function toggleValue(draft: CohortDef | null | undefined, attribute: stri
   const clause: ClinicalLeaf | null = !next.length ? null : next.length === 1
     ? { kind: "clinical", attribute, op: "=", value: next[0] } : { kind: "clinical", attribute, values: next };
   return { draft: replaceChart(draft, attribute, clause) };
+}
+
+/**
+ * A generic-assay bar as a filter's condition (STS-BAR-5, as the clinical bars): a one-value bar
+ * (start = end) the value itself, compared as a number so its stored spelling does not matter; an
+ * outlier bar ≤ end or > start; an interval (start, end]; a word bar the word.
+ */
+export function assayBinWhere(b: NumericBin): { range: { gt?: number; gte?: number; lte?: number } } | { values: string[] } {
+  if (b.value != null) return { values: [b.value] };
+  if (b.special === "<=") return { range: { lte: b.end! } };
+  if (b.special === ">") return { range: { gt: b.start! } };
+  if (b.start === b.end) return { range: { gte: b.start!, lte: b.end! } };
+  return { range: { gt: b.start!, lte: b.end! } };
+}
+
+/** a generic-assay bar's label: the word, "≤x", ">x", the one value "x", or "x–y" */
+export function assayBinText(b: NumericBin): string {
+  if (b.value != null) return b.value;
+  if (b.special === "<=") return "≤" + fmtNum(b.end!);
+  if (b.special === ">") return ">" + fmtNum(b.start!);
+  return b.start === b.end ? fmtNum(b.start!) : fmtNum(b.start!) + "–" + fmtNum(b.end!);
 }

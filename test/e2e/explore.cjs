@@ -1,7 +1,7 @@
 // Explore: facets (derived ones included), drafting and saving a cohort, Analyze carrying it into an analysis and replacing what was there.
 const { pickExploreStudies, pickFacet } = require("./helpers.cjs");
 
-async function explore({ ok, BASE, page }) {
+async function explore({ ok, BASE, page, browser }) {
   // Derived facets: computed from the data's shape, so they must appear for a
   // study regardless of how it names its events, and clicking must filter.
   // Currently hidden behind SHOW_DERIVED_FACETS=false (app/lab/page.tsx) at the
@@ -411,6 +411,104 @@ async function explore({ ok, BASE, page }) {
     binOk = before > 2 && kept === 2 && back === before;
   } catch (e) { binDetail = String(e.message).split("\n")[0]; }
   ok("explore: a histogram's Custom Bins redraws its bars, kept by the browser, an empty box restores them, and Show NA adds a bar", binOk, binDetail);
+
+  // Explore's tabs (STV-URL-1, STV-TAB-1, STV-STM-13): a link opens the tab it names, a tab keeps its search
+  // across a switch, the URL follows the tab through a reload, and CN Segments stays at 0 selected samples
+  let tabDetail = "", tabOk = false;
+  try {
+    const ST = "luad_tcga_pan_can_atlas_2018";
+    const tabs = page.getByRole("tablist", { name: "study view sections" });
+    const active = async () => (await tabs.locator("[role=tab][data-state=active]").innerText()).trim();
+    const svtab = () => new URL(page.url()).searchParams.get("svtab");
+    await page.goto(BASE + "/lab?tab=explore&study=" + ST + "&svtab=clinicalData", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => /Showing 1–\d+ of [\d,]+ results/.test(document.body.innerText), null, { timeout: 240000 });
+    const opened = await active();
+    const count = async () => (/Showing 1–\d+ of ([\d,]+) results/.exec(await page.locator("body").innerText()) || [])[1];
+    const all = await count();
+    const search = page.getByRole("searchbox", { name: "search results" });
+    await search.fill("Female"); await search.press("Enter");
+    await page.waitForFunction((n) => { const m = /Showing 1–\d+ of ([\d,]+) results/.exec(document.body.innerText); return m && m[1] !== n; }, all, { timeout: 120000 });
+    const shown = await count();
+    await tabs.getByRole("tab", { name: "Summary" }).click();
+    const onSummary = svtab();
+    await tabs.getByRole("tab", { name: "Clinical Data" }).click();
+    const back = { search: await search.inputValue(), shown: await count() };
+    await tabs.getByRole("tab", { name: "CN Segments" }).click();
+    const onCn = svtab();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("[data-test=cn-segments-info]").waitFor({ timeout: 240000 });
+    const reloaded = await active();
+    // the tab open on a selection with segments, then the same page's filter narrowed to nobody: the
+    // 0-sample line alone, nothing left of the earlier figure
+    await page.goto(BASE + "/lab?tab=explore&study=" + ST + "&filterAttributeId=AGE&filterValues=50-60&svtab=cnSegments", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => /^Segmented copy-number data for the selected [1-9]/.test(document.querySelector("[data-test=cn-segments-info]")?.textContent || "")
+      && !!document.querySelector("[data-test=cn-segments-info]")?.closest("section")?.querySelector(".vfoot"), null, { timeout: 240000 });
+    const age = (await page.locator(".svgroup[data-sv-chart='AGE'] .svname").innerText()).trim();
+    const hi = page.getByRole("textbox", { name: age + " end" });
+    await hi.fill("200"); await hi.press("Enter");
+    const lo = page.getByRole("textbox", { name: age + " start" });
+    await lo.fill("150"); await lo.press("Enter");
+    await page.waitForFunction(() => /\b0 patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const info = await page.locator("[data-test=cn-segments-info]").innerText({ timeout: 60000 });
+    const cn = page.locator("section.viewcard", { has: page.locator("[data-test=cn-segments-info]") });
+    const stale = await cn.locator(".vfoot, svg").count();
+    const names = (await tabs.locator("[role=tab]").allInnerTexts()).map((x) => x.trim());
+    tabDetail = JSON.stringify({ opened, all, shown, onSummary, back, onCn, reloaded, names, info, stale });
+    tabOk = opened === "Clinical Data" && !!shown && onSummary === null && back.search === "Female" && back.shown === shown &&
+      onCn === "cnSegments" && reloaded === "CN Segments" && names.join("|") === "Summary|CN Segments" &&
+      info === "No segmented copy-number data for the selected 0 samples." && stale === 0;
+  } catch (e) { tabDetail = String(e.message).split("\n")[0]; }
+  ok("explore: the tab is in the URL, keeps its search across a switch, and CN Segments stays at 0 samples", tabOk, tabDetail);
+
+  // a tab kept mounted retries a failed load when it is shown again (as a remount did): the first
+  // Clinical Data request fails, Summary and back loads the rows. Its own context, so the planted
+  // 500 stays out of the light pass's no-JS-errors check.
+  let retryDetail = "", retryOk = false;
+  const own = await browser.newContext({ viewport: { width: 1360, height: 900 } });
+  try {
+    const p = await own.newPage();
+    let calls = 0;
+    await p.route("**/api/analysis**", (route) => calls++ === 0
+      ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "planted failure" }) })
+      : route.continue());
+    await p.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018&svtab=clinicalData", { waitUntil: "domcontentloaded" });
+    const tabs = p.getByRole("tablist", { name: "study view sections" });
+    await p.waitForFunction(() => /Could not load the clinical data: planted failure/.test(document.body.innerText), null, { timeout: 240000 });
+    await tabs.getByRole("tab", { name: "Summary" }).click();
+    await tabs.getByRole("tab", { name: "Clinical Data" }).click();
+    await p.waitForFunction(() => /Showing 1–\d+ of [\d,]+ results/.test(document.body.innerText), null, { timeout: 240000 });
+    const rows = (/Showing 1–\d+ of ([\d,]+) results/.exec(await p.locator("body").innerText()) || [])[1];
+    retryDetail = JSON.stringify({ calls, rows });
+    retryOk = calls >= 2 && !!rows;
+  } catch (e) { retryDetail = String(e.message).split("\n")[0]; }
+  await own.close();
+  ok("explore: a tab whose load failed loads again when it is shown again", retryOk, retryDetail);
+  // Data types (STS-OT-1, STS-STM-14): each kind's Freq is its samples over the selected samples, highest
+  // first, and two checked kinds apply as Intersection by default; Timeline events' Freq is over patients
+  let dtDetail = "", dtOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const card = page.locator(".card", { has: page.locator("h2", { hasText: "Data types" }) });
+    await card.locator(".dtrow").first().waitFor({ timeout: 240000 });
+    const rows = await card.locator(".dtrow").evaluateAll((els) => els.map((e) => [...e.querySelectorAll(".gcount")].map((s) => s.textContent.trim())));
+    const top = Number(rows[0][0].replace(/,/g, ""));
+    const all = rows.map(([n]) => Number(n.replace(/,/g, "")));
+    const share = (n, of) => (100 * n / of).toFixed(1) + "%";
+    // the first row's Freq names the selected samples it divides by
+    const samples = Number((/of the ([\d,]+) selected samples/.exec(await card.locator(".dtrow .gcount.meta").first().getAttribute("data-tip")) || [])[1].replace(/,/g, ""));
+    const freqsOk = rows.every(([n, f]) => { const v = Number(n.replace(/,/g, "")); return f === share(v, samples) || (f === "100.0%" && v === samples); });
+    const sorted = all.every((n, i) => i === 0 || all[i - 1] >= n);
+    await card.locator(".dtrow", { has: page.locator(".gname", { hasText: /^gistic$/ }) }).first().click();
+    await card.locator(".generows").evaluate((e) => { e.scrollTop = e.scrollHeight; });
+    await card.locator(".dtrow", { has: page.locator(".gname", { hasText: /^mutations$/ }) }).first().click();
+    const op = (await card.locator(".pickbar").innerText()).replace(/\s+/g, " ");
+    await card.getByRole("button", { name: "Clear" }).click();
+    const ev = page.locator(".card", { has: page.locator("h2", { hasText: "Timeline events" }) });
+    const evText = (await ev.innerText()).replace(/\s+/g, " ");
+    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, evText: evText.slice(0, 120) });
+    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && /\d+(\.\d)?%/.test(evText);
+  } catch (e) { dtDetail = String(e.message).split("\n")[0]; }
+  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events their Freq", dtOk, dtDetail);
 }
 
 module.exports = { explore };
