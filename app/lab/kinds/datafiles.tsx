@@ -21,6 +21,7 @@ import { frequencyFilter, frequencySort, frequencyTsv, type FrequencyColumn } fr
 import { Input } from "../../_ui/input";
 import { cn } from "../../../lib/cn";
 import { exploreHref } from "../../portal/query-editor.tsx";
+import { copyText } from "../../_table/copy-text.ts";
 
 /**
  * A line's altered share as the portal's frequency table draws it (FrequencyBar, barWidth 200): the
@@ -88,7 +89,7 @@ function FileRow({ f, vi, docJson, updating }: { f: DataFile; vi: number; docJso
     try { setState(await act(await listIds(docJson, vi, f.id))); }
     catch (e) { setState("could not " + what + ": " + (e as Error).message); }
   };
-  const copy = () => withIds("copy", async (ids) => { await navigator.clipboard.writeText(ids.join("\n")); return ids.length.toLocaleString() + " sample ids copied"; });
+  const copy = () => withIds("copy", async (ids) => { await copyText(ids.join("\n")); return ids.length.toLocaleString() + " sample ids copied"; });
   const open = () => withIds("open", async (ids) => {
     const studies = [...new Set(ids.map((x) => x.slice(0, x.indexOf(":"))))];
     const name = f.name;
@@ -186,7 +187,7 @@ function FrequencyTable({ rows }: { rows: Result["frequency"] }) {
             <Download />TSV</a>
         </Button>
         <Button variant="outline" size="sm" className={TB} data-tip="copy every row of this table, in its order, as the portal's Copy does: the same tab-separated text as the file"
-          onClick={() => { navigator.clipboard.writeText(frequencyTsv(sorted)).then(() => setCopied(sorted.length + " rows copied"), (e) => setCopied("Could not copy: " + String((e as Error)?.message || e))); }}>
+          onClick={() => { copyText(frequencyTsv(sorted)).then(() => setCopied(sorted.length + " rows copied"), (e) => setCopied("Could not copy: " + String((e as Error)?.message || e))); }}>
           <Copy />Copy</Button>
         {copied && <span className="text-sm text-muted-foreground" role="status">{copied}</span>}
       </div>
