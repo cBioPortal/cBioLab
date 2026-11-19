@@ -21,7 +21,8 @@ const { dataBins } = await import("../lib/data-binner.ts");
 const CG29 = JSON.parse(readFileSync(new URL("./fixtures/assay-bins-brca-cg00000029.json", import.meta.url), "utf8")) as { values: string[]; portalBins: unknown[] };
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
 const { ASSAY_FREQ_TABLE_LIMIT } = await import("../lib/assay-frequency-table.ts");
-const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildAssayFreqTables, FACET_VALUE_LIMIT, buildTreatmentFacets, buildMutationTypeFacets } = await import("../lib/explore.ts");
+const { finiteSql } = await import("../lib/sql-number.ts");
+const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildAssayFreqTables, FACET_VALUE_LIMIT, buildTreatmentFacets, buildMutationTypeFacets, buildViolinFacets, VIOLIN_VALUE_LIMIT } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -1310,5 +1311,52 @@ describe("generic-assay frequency tables", () => {
     const { tables, notShown } = await buildAssayFreqTables({ studies: ["st1"], profilesByStudy: h, catalog: many });
     assert.deepEqual(tables.map((t) => t.profileType), many.slice(1, 1 + ASSAY_FREQ_TABLE_LIMIT).map((p) => p.profile));
     assert.deepEqual(notShown, ["Profile " + (ASSAY_FREQ_TABLE_LIMIT + 1)]);
+  });
+});
+
+// STS-VI-1: the clinical violin table's counts (scripts/check-violin.ts runs the SQL against data)
+describe("violin tables", () => {
+  const profiles = new Map([["st1", {}], ["st2", {}]]);
+  const chart = { categorical: "SEX", numeric: "AGE" };
+
+  test("per category, each value with the samples holding it and those the selection keeps; spellings folded, peers named", async () => {
+    on(/GROUP BY ck, v/, [
+      { cat: "Female", ck: "female", v: 50, n: 3, sel: 2 }, { cat: "female", ck: "female", v: 61, n: 1, sel: 1 },
+      { cat: "Male", ck: "male", v: 50, n: 2, sel: 0 },
+    ]);
+    const [f] = await buildViolinFacets({ studies: ["st1"], profilesByStudy: profiles, charts: [chart], leftOut: ["peer_study"] });
+    assert.deepEqual(f, { categorical: "SEX", numeric: "AGE", leftOut: ["peer_study"], categories: [
+      { category: "female", values: [{ v: 50, n: 3, sel: 2 }, { v: 61, n: 1, sel: 1 }] },
+      { category: "Male", values: [{ v: 50, n: 2, sel: 0 }] },
+    ] });
+    const q = sent.find((x) => /GROUP BY ck, v/.test(x))!;
+    assert.match(q, /type = 'sample' AND attribute_name IN \('SEX', 'AGE'\)/);
+    assert.ok(q.includes(finiteSql("anyIf(attribute_value, attribute_name = 'AGE')") + " AS x"), "a number as finiteSql reads it: nan and inf are missing");
+    assert.match(q, /WHERE c != '' AND x IS NOT NULL/, "a sample without both values is not counted");
+    assert.match(q, /1 AS kept/, "no filter: every sample kept");
+  });
+
+  test("two connections' samples add, value by value", async () => {
+    on(/GROUP BY ck, v/, (q) => /cbio_b\./.test(q) ? [{ cat: "Female", ck: "female", v: 50, n: 4, sel: 4 }] : [{ cat: "Female", ck: "female", v: 50, n: 1, sel: 1 }]);
+    const [f] = await buildViolinFacets({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy: new Map([["st2", SECOND]]), charts: [chart] });
+    assert.deepEqual(f.categories, [{ category: "Female", values: [{ v: 50, n: 5, sel: 5 }] }]);
+  });
+
+  test("drawn without the numeric attribute's own filter, # counted with it; another filter narrows both", async () => {
+    const own = { kind: "clinical", attribute: "AGE", range: { gt: 50, lte: 60 } }, other = { kind: "clinical", attribute: "SEX", op: "=", value: "Female" };
+    await buildViolinFacets({ studies: ["st1"], profilesByStudy: profiles, charts: [chart], draft: { all: [own, other] } as never });
+    const q = sent.find((x) => /GROUP BY ck, v/.test(x))!;
+    const [kept, drawn] = [q.slice(q.indexOf("sample_unique_id IN"), q.indexOf("AS kept")), q.slice(q.indexOf("AND sample_unique_id IN"))];
+    assert.match(kept, /50/, "# keeps the AGE range");
+    assert.match(drawn.slice(0, drawn.indexOf("GROUP BY sample_unique_id")), /'Female'/, "the values drawn keep the other filter");
+    assert.doesNotMatch(drawn.slice(0, drawn.indexOf("GROUP BY sample_unique_id")), /60/, "and not the numeric one's");
+  });
+
+  test("past the value limit the table is refused, naming it; a bad attribute or a pair of one is not asked", async () => {
+    on(/GROUP BY ck, v/, Array.from({ length: VIOLIN_VALUE_LIMIT + 1 }, (_, i) => ({ cat: "A", ck: "a", v: i, n: 1, sel: 1 })));
+    const [f] = await buildViolinFacets({ studies: ["st1"], profilesByStudy: profiles, charts: [chart, { categorical: "A B", numeric: "AGE" }, { categorical: "AGE", numeric: "AGE" }] });
+    assert.match(f.error!, /more than 50,000 distinct/);
+    assert.deepEqual(f.categories, []);
+    assert.equal((await buildViolinFacets({ studies: ["st1"], profilesByStudy: profiles, charts: [{ categorical: "A B", numeric: "AGE" }] })).length, 0);
   });
 });

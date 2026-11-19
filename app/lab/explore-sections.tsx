@@ -22,6 +22,7 @@ import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../..
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
+import { violinPairKey, violinTitle } from "../../lib/study-view-violin.ts";
 import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
@@ -1037,14 +1038,14 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
 
 /** the Add chart dialog's X vs Y tab (STV-AC-7): two clinical attributes, and the portal's button for the pair */
 function XvsYPicker({ ctx }: { ctx: ExploreCtx }) {
-  const { xyCharts, addXyChart } = ctx;
+  const { xyCharts, addXyChart, violinCharts, addViolinChart } = ctx;
   const attrs = xVsYAttributes(ctx.explore!.clinical || []).map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, numeric: c.kind === "num" }))
     .sort((a, b) => a.name.localeCompare(b.name));
   const [x, setX] = useState(""), [y, setY] = useState("");
   const [added, setAdded] = useState<string | null>(null);
   const ax = attrs.find((a) => a.attribute === x) ?? null, ay = attrs.find((a) => a.attribute === y) ?? null;
   // the default chart counts as existing, as on the portal
-  const existing = [...xyCharts.map(densityPairKey), densityPairKey(DEFAULT_DENSITY_PAIR)];
+  const existing = [...xyCharts.map(densityPairKey), ...violinCharts.map(violinPairKey), densityPairKey(DEFAULT_DENSITY_PAIR)];
   const button = xVsYButton(ax, ay, existing);
   const options = [["", "—"] as const, ...attrs.map((a) => [a.attribute, a.name] as const)];
   return (
@@ -1053,7 +1054,13 @@ function XvsYPicker({ ctx }: { ctx: ExploreCtx }) {
         <Choice className="w-64" value={x} onChange={setX} title="Select first clinical attribute" options={options} />
         <Choice className="w-64" value={y} onChange={setY} title="Select second clinical attribute" options={options} />
         <Button variant="outline" size="sm" disabled={!button.adds} data-tip={button.tip}
-          onClick={() => { addXyChart({ x, y }); setAdded((ay?.name || y) + " vs " + (ax?.name || x) + " added."); setX(""); setY(""); }}>{button.label}</Button>
+          onClick={() => {
+            // a numeric attribute against a categorical one is a violin table, titled "<numeric> vs <categorical>"
+            const [num, cat] = ax && ay && ax.numeric !== ay.numeric ? (ax.numeric ? [ax, ay] : [ay, ax]) : [null, null];
+            if (num && cat) { addViolinChart({ categorical: cat.attribute, numeric: num.attribute }); setAdded(violinTitle(num.name, cat.name, false) + " added."); }
+            else { addXyChart({ x, y }); setAdded((ay?.name || y) + " vs " + (ax?.name || x) + " added."); }
+            setX(""); setY("");
+          }}>{button.label}</Button>
       </div>
       {added && <p className="note flush mt-1.5">{added}</p>}
     </div>

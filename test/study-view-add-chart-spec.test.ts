@@ -230,11 +230,13 @@ test("the X vs Y button: what it says for each pair, and whether it adds", () =>
     [{ attribute: "FRACTION_GENOME_ALTERED", numeric: true }, mc, "A chart with these attributes already exists", false],
     [mc, { attribute: "FRACTION_GENOME_ALTERED", numeric: true }, "A chart with these attributes already exists", false],   // either way round
     [sex, race, "Can't add a chart with two categorical attributes (yet).", false],
-    [age, sex, "Add violin/box plot table", false],     // the portal's violin table: not drawn here yet, said so
+    [age, sex, "Add violin/box plot table", true],      // the portal's violin table (STS-VI-1), either way round
+    [sex, age, "Add violin/box plot table", true],
     [age, mc, "Add density plot", true],
   ];
   for (const [x, y, label, adds] of cases) { const b = xVsYButton(x, y, existing); assert.deepEqual([b.label, b.adds], [label, adds], label); }
-  assert.match(xVsYButton(age, sex, existing).tip!, /not drawn here yet/);
+  // a violin table that exists, either way round
+  assert.equal(xVsYButton(sex, age, [...existing, "AGE|SEX"]).label, "A chart with these attributes already exists");
 });
 
 test("the X vs Y attributes: every clinical attribute but a survival one other than OS_STATUS", () => {

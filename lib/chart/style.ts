@@ -21,6 +21,9 @@ export const PORTAL_NA = "#D3D3D3";
 /** cbioportal.org's Study View survival curve, the selection's one group (STS-KM-2) */
 export const PORTAL_STUDY_VIEW_KM = "#2986E2";
 
+/** cbioportal.org's violin table (StudyViewViolinPlot, STS-VI-4): the curve, the box, its outline and whiskers, the dashed grid */
+export const PORTAL_VIOLIN = { curve: "gray", box: "#dddddd", ink: "black", grid: "#aaa" } as const;
+
 /** the one neutral for "other", "not significant", "not profiled" marks */
 export const OTHER = "#9aa5ad";
 

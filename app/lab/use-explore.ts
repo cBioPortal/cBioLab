@@ -26,6 +26,8 @@ export interface ExploreRequest {
   geneCharts: string[];
   /** genes charted as a mutation-type table each */
   mutationTypeCharts: string[];
+  /** a clinical violin table per (categorical, numeric) pair */
+  violinCharts: { categorical: string; numeric: string }[];
   /** generic-assay entities charted one each */
   assayCharts: { profileType: string; entity: string }[];
   /** the derived facets to compute; the server computes none it is not asked for */
@@ -79,6 +81,7 @@ export function useExplore(onError: (message: string) => void) {
         ...(r.geneCharts.length ? { geneCharts: r.geneCharts } : {}),
         ...(r.assayCharts.length ? { assayCharts: r.assayCharts } : {}),
         ...(r.mutationTypeCharts.length ? { mutationTypeCharts: r.mutationTypeCharts } : {}),
+        ...(r.violinCharts.length ? { violinCharts: r.violinCharts } : {}),
         ...(r.derived.length ? { derived: r.derived } : {}),
         ...(r.drivers ? { drivers: true } : {}),
         ...(Object.keys(r.bins || {}).length ? { bins: r.bins } : {}),

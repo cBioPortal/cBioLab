@@ -5,6 +5,9 @@ import { TAB_PARAM, readFilters, readTab, writeTab, type StudyViewTab } from "..
 import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
 import { geneChartCount } from "../../lib/study-view-add-chart.ts";
+import { ViolinCard } from "./explore-violin";
+import { violinPairKey } from "../../lib/study-view-violin.ts";
+import { chartValues } from "../../lib/explore-selection.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
@@ -669,6 +672,11 @@ export default function AnalysisPage() {
                 addClauses={exploreState.addDensitySelection} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />}
                 density={exploreState.chartChecked("genomic|density")} pairs={exploreState.xyCharts} onRemovePair={exploreState.removeXyChart}
                 onClearDensity={exploreState.clearDensitySelection} />
+              {(explore.violinFacets || []).filter((f) => exploreState.violinCharts.some((p) => violinPairKey(p) === violinPairKey(f))).map((f) => (
+                <ViolinCard key={violinPairKey(f)} facet={f} selected={(chartValues(parseDraft(), f.categorical) || []).map(String)}
+                  nameOf={(a) => (explore.clinical || []).find((c: any) => c.attribute === a)?.displayName || a}
+                  onToggle={(v) => exploreState.togglePieValue(f.categorical, v)} onRemove={() => exploreState.removeViolinChart(f)} />
+              ))}
               <ClinicalFacets ctx={exploreCtx} />
               {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
                   gene per alteration type, the same tile shape a clinical attribute gets,
