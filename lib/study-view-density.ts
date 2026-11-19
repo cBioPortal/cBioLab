@@ -133,7 +133,7 @@ export function densityTip(bin: DensityBin, x: { name: string; log: boolean }, y
   ];
 }
 
-type RangeClause = { kind: "clinical"; attribute: string; range: { gte: number; lte: number } };
+type RangeClause = { kind: "clinical"; attribute: string; range: { gte: number; lte: number }; chart?: string };
 
 /** one axis's stretch of a drag box as a range of its attribute */
 function axisRange(a: DensityAxis, v0: number, v1: number, span: number): RangeClause {
@@ -205,5 +205,45 @@ export function densityBinEdges(clauses: { attribute: string; range: { gte: numb
 export function densitySelection(box: { x0: number; x1: number; y0: number; y1: number }, s: DensitySettings,
   span: { x: number; y: number }, pair: DensityPair = DEFAULT_DENSITY_PAIR): RangeClause[] {
   const { x, y } = densityAxes(s, pair);
-  return [axisRange(x, box.x0, box.x1, span.x), axisRange(y, box.y0, box.y1, span.y)];
+  // named for their chart: its selection has no pill (STV-FB-3b), the chart shows and clears it
+  const chart = densityChartName(pair);
+  return [axisRange(x, box.x0, box.x1, span.x), axisRange(y, box.y0, box.y1, span.y)].map((c) => ({ ...c, chart }));
+}
+
+/**
+ * The density charts drawn: the default Mutation Count vs FGA unless unchecked (`defaultShown`, the
+ * Genomic tab) and when the selection holds both attributes, then each added pair whose attributes
+ * it holds. What the cards draw, and what the filter bar hides a drag's pills for (STV-FB-3b).
+ */
+export function densityChartsShown(attrs: string[], defaultShown: boolean, pairs: DensityPair[]): { pair: DensityPair; added: boolean }[] {
+  const has = (a: string) => attrs.includes(a);
+  const def = densityPairKey(DEFAULT_DENSITY_PAIR);
+  return [
+    ...(defaultShown && has(MUTATION_COUNT) && has(FGA) ? [{ pair: DEFAULT_DENSITY_PAIR, added: false }] : []),
+    ...pairs.filter((p) => has(p.x) && has(p.y) && densityPairKey(p) !== def).map((pair) => ({ pair, added: true })),
+  ];
+}
+
+/** the name a density chart writes on its drag's clauses, whichever way round its pair was asked for */
+export const densityChartName = (pair: DensityPair): string => "density:" + densityPairKey(pair);
+
+/** a density chart's held selection, its two ranges by the axes of `pair`; null when the draft holds none */
+export function densityHeld(draft: { all?: unknown[] } | null | undefined, pair: DensityPair): { x?: { gte: number; lte: number }; y?: { gte: number; lte: number } } | null {
+  const name = densityChartName(pair);
+  const mine = (draft?.all || []).filter((c): c is RangeClause => !!c && (c as RangeClause).chart === name);
+  if (!mine.length) return null;
+  const of = (a: string) => mine.find((c) => c.attribute === a)?.range;
+  return { ...(of(pair.x) ? { x: of(pair.x) } : {}), ...(of(pair.y) ? { y: of(pair.y) } : {}) };
+}
+
+/** the draft after a drag (`clauses`, one chart's): its chart's earlier selection replaced, as the portal's, every other filter kept */
+export function withDensityDrag<D extends { all?: unknown[] }>(draft: D, clauses: RangeClause[]): D {
+  const names = new Set(clauses.map((c) => c.chart).filter(Boolean));
+  return { ...draft, all: [...(draft.all || []).filter((c) => !(c && names.has((c as RangeClause).chart))), ...clauses] };
+}
+
+/** the draft without a density chart's selection: its Reset, every other filter kept */
+export function withoutDensitySelection<D extends { all?: unknown[] }>(draft: D, pair: DensityPair): D {
+  const name = densityChartName(pair);
+  return { ...draft, all: (draft.all || []).filter((c) => !(c && (c as RangeClause).chart === name)) };
 }

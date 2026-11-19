@@ -56,6 +56,8 @@ export interface ClinicalLeaf {
    * chaining — and must resolve to a single study, same as the cohort this leaf lives in.
    */
   percentileOf?: string;
+  /** the Study View chart that wrote the clause (a density drag's "density:<pair>"), so the chart can show and clear it; no effect on the cohort */
+  chart?: string;
 }
 /**
  * An explicit, cross-study list of ids. Each id is "<study>:<bare-id>" — the
