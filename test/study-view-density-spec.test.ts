@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import {
   MUTATION_COUNT, FGA, DENSITY_GRID, densityAxes, swapDensity, logOffered, densityView, densityTitle,
   densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection, densityPairKey, DEFAULT_DENSITY_PAIR,
-  densityBinEdges, withDensityBins, densityHeld, withoutDensitySelection, withDensityDrag, densityBinsAfterDrag, densityBinsWithout, xyChartRemoval,
+  densityBinEdges, withDensityBins, densityHeld, withoutDensitySelection, withDensityDrag, densityChartsShown, densityBinsAfterDrag, densityBinsWithout, xyChartRemoval,
 } from "../lib/study-view-density.ts";
 import { plotExtent } from "../lib/plot.ts";
 
@@ -444,4 +444,14 @@ test("a second drag on a density chart replaces its first selection, as the port
   const d = withDensityDrag({ all: [...other, ...first] }, second);
   assert.deepEqual(d.all, [...other, ...second]);
   assert.deepEqual(densityHeld(d, pair), { x: { gte: 40, lte: 45 }, y: { gte: 10, lte: 20 } });
+});
+
+test("the density charts drawn: the default when unchecked not and both attributes held, then each added pair the selection holds", () => {
+  const pair = { x: "AGE", y: MUTATION_COUNT }, gone = { x: "TMB", y: MUTATION_COUNT };
+  const attrs = [FGA, MUTATION_COUNT, "AGE"];
+  assert.deepEqual(densityChartsShown(attrs, true, [pair, gone]).map((s) => [densityPairKey(s.pair), s.added]),
+    [["FRACTION_GENOME_ALTERED|MUTATION_COUNT", false], ["AGE|MUTATION_COUNT", true]]);
+  assert.deepEqual(densityChartsShown(attrs, false, [pair]).map((s) => s.added), [true], "the default unchecked in the Genomic tab");
+  assert.deepEqual(densityChartsShown(["AGE"], true, [pair]), [], "a study without the attributes draws neither");
+  assert.deepEqual(densityChartsShown(attrs, true, [DEFAULT_DENSITY_PAIR]).length, 1, "the default added again is one chart");
 });

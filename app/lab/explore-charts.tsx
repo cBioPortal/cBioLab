@@ -19,8 +19,8 @@ import { chartFileName } from "../../lib/study-view-download.ts";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import {
-  DEFAULT_DENSITY_PAIR, FGA, MUTATION_COUNT, correlationLines, densityAxes, densityPairKey, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
-  densityTitle, densityView, densityHeld, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensityPair, type DensitySettings
+  FGA, MUTATION_COUNT, correlationLines, densityAxes, densityPairKey, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
+  densityTitle, densityView, densityHeld, densityChartsShown, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensityPair, type DensitySettings
 } from "../../lib/study-view-density.ts";
 
 type Clause = Record<string, unknown>;
@@ -56,8 +56,6 @@ type PlotData = { shape: string; n: number; extent?: { x0: number; x1: number; y
   bins?: PlotCell[]; stats?: { pearson: number | null; spearman: number | null }; coverage?: { total: number; nx: number; ny: number } };
 
 export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km, density = true, pairs = [], onRemovePair, onClearDensity }: Props) {
-  const has = (a: string) => attrs.some((x) => x.attribute === a);
-  const hasScatter = density && has(MUTATION_COUNT) && has(FGA);
   const nameOf = (a: string) => attrs.find((x) => x.attribute === a)?.displayName || DENSITY_NAMES[a] || a;
   const [endpoint, setEndpoint] = useState<string>("OS");
   const ep = endpoints && endpoints.length ? (endpoints.includes(endpoint) ? endpoint : endpoints[0]) : null;
@@ -87,10 +85,8 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // the default Mutation Count vs FGA chart (unless unchecked), then the reader's X vs Y charts (STS-SC-1)
-  const shown: { pair: DensityPair; added: boolean }[] = [
-    ...(hasScatter ? [{ pair: DEFAULT_DENSITY_PAIR, added: false }] : []),
-    ...pairs.filter((p) => has(p.x) && has(p.y) && densityPairKey(p) !== densityPairKey(DEFAULT_DENSITY_PAIR)).map((pair) => ({ pair, added: true })),
-  ];
+  // the same rule the filter bar reads to hide a drag's pills (STV-FB-3b)
+  const shown = densityChartsShown(attrs.map((a) => a.attribute), density, pairs);
   const stale = loading || !res || res.key !== key;
   return <>
     {ep && (

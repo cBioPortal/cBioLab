@@ -35,7 +35,7 @@ function IntervalBody({ iv, name, edit }: { iv: Interval; name: string; edit: (e
 
 const pillText = (p: SvPill) => p.kind === "na" ? "NA" : p.kind === "value" ? String(p.value) : intervalText(p.interval);
 
-export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited, onRemoveClause, onCustomData }: {
+export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited, onRemoveClause, onCustomData, drawnDensity }: {
   draft: CohortDef;
   labelOf: (attribute: string) => string | undefined;
   /** applies an edited draft, or says why it can't be; false when refused */
@@ -44,6 +44,8 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
   onIntervalEdited?: (attribute: string, ends: number[]) => void;
   onRemoveClause: (i: number) => void;
   onCustomData?: OnCustomData;
+  /** the density charts drawn, whose drags' ranges have no pill (STV-FB-3b) */
+  drawnDensity?: ReadonlySet<string>;
 }) {
   type ChartGroup = Extract<ReturnType<typeof filterGroups>[number], { kind: "chart" }>;
   /** a clinical chart's pills: "<chart> : a or b" */
@@ -91,7 +93,7 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
     );
   };
   // two groups in a row from one chart are joined by "and" (STV-FB-2)
-  const groups = filterGroups(draft, labelOf), and = joinedByAnd(draft, groups);
+  const groups = filterGroups(draft, labelOf, drawnDensity), and = joinedByAnd(draft, groups);
   // a density drag's ranges have no pill (STV-FB-3b): its chart shows them and resets them
   return <span className="svpills">{groups.map((g, i) => g.kind === "hidden" ? null : g.kind === "other"
     ? <Fragment key={g.clause}>{and[i] && <span className="svop">and</span>}{other(g.clause)}</Fragment>

@@ -210,6 +210,20 @@ export function densitySelection(box: { x0: number; x1: number; y0: number; y1: 
   return [axisRange(x, box.x0, box.x1, span.x), axisRange(y, box.y0, box.y1, span.y)].map((c) => ({ ...c, chart }));
 }
 
+/**
+ * The density charts drawn: the default Mutation Count vs FGA unless unchecked (`defaultShown`, the
+ * Genomic tab) and when the selection holds both attributes, then each added pair whose attributes
+ * it holds. What the cards draw, and what the filter bar hides a drag's pills for (STV-FB-3b).
+ */
+export function densityChartsShown(attrs: string[], defaultShown: boolean, pairs: DensityPair[]): { pair: DensityPair; added: boolean }[] {
+  const has = (a: string) => attrs.includes(a);
+  const def = densityPairKey(DEFAULT_DENSITY_PAIR);
+  return [
+    ...(defaultShown && has(MUTATION_COUNT) && has(FGA) ? [{ pair: DEFAULT_DENSITY_PAIR, added: false }] : []),
+    ...pairs.filter((p) => has(p.x) && has(p.y) && densityPairKey(p) !== def).map((pair) => ({ pair, added: true })),
+  ];
+}
+
 /** the name a density chart writes on its drag's clauses, whichever way round its pair was asked for */
 export const densityChartName = (pair: DensityPair): string => "density:" + densityPairKey(pair);
 

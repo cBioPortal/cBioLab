@@ -29,7 +29,7 @@ import { chartFileName, geneStateCode, saveText, summaryCut, summaryDataTsv, typ
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
-import { DEFAULT_DENSITY_PAIR, densityPairKey } from "../../lib/study-view-density.ts";
+import { DEFAULT_DENSITY_PAIR, densityChartName, densityChartsShown, densityPairKey } from "../../lib/study-view-density.ts";
 import { ALTERED_ONLY_TYPES, ASSAY_FREQ_TABLE_LIMIT, freqRowKey, freqTableClause, freqTableRows } from "../../lib/assay-frequency-table.ts";
 import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
 import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
@@ -282,8 +282,11 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
               if (!dr) return null;
               const names = new Map<string, string>();
               for (const f of explore?.clinical || []) if (f.displayName && !names.has(f.attribute)) names.set(f.attribute, f.displayName);
+              // a density drag's ranges have no pill only while its chart is drawn to show them (STV-FB-3b)
+              const drawn = new Set(densityChartsShown((explore?.clinical || []).map((c) => c.attribute), ctx.chartChecked("genomic|density"), ctx.xyCharts)
+                .map((d) => densityChartName(d.pair)));
               return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay} onIntervalEdited={ctx.addBinEdges}
-                onRemoveClause={removeDraftClause} onCustomData={showClauseData()} />;
+                onRemoveClause={removeDraftClause} onCustomData={showClauseData()} drawnDensity={drawn} />;
             })()}
           </div>
           {exMsg && <p className="note flush mt-1.5">{exMsg}</p>}
@@ -1122,6 +1125,8 @@ function GenomicCharts({ ctx }: { ctx: ExploreCtx }) {
     if (l.attribute) clearAttributeFilters([l.attribute]);
     const table = /^genomic\|(mutated|cna|sv)$/.exec(l.key);
     if (table) clearGeneTableFilter(table[1] as "mutated" | "cna" | "sv");
+    // the default density chart unchecked takes its drag's selection with it
+    if (l.key === "genomic|density") ctx.clearDensitySelection(DEFAULT_DENSITY_PAIR);
   };
   return (
     <div className="attrtablewrap">

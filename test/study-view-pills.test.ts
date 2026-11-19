@@ -54,9 +54,21 @@ describe("groups (STV-FB-3)", () => {
 
 test("a density drag's ranges have no pill, as the portal's (STV-FB-3b); the same range from a bar keeps its pill", () => {
   const drag = { kind: "clinical", attribute: "AGE", range: { gte: 50, lte: 60 }, chart: "density:AGE|MUTATION_COUNT" } as ClinicalLeaf;
-  const [g, h] = filterGroups({ all: [drag, age({ gte: 50, lte: 60 })] }, labelOf);
+  const [g, h] = filterGroups({ all: [drag, age({ gte: 50, lte: 60 })] }, labelOf, new Set(["density:AGE|MUTATION_COUNT"]));
   assert.equal(g.kind, "hidden");
   assert.equal(h.kind, "chart");
+});
+
+// invariant 1 (Reviewer, #473): a drag's filter whose chart is not drawn (after a reload, a study
+// change, or the chart unchecked) must still show, so it reads as an ordinary range pill
+test("a density drag's ranges are a pill again when their chart is not drawn", () => {
+  const drag = { kind: "clinical", attribute: "AGE", range: { gte: 50, lte: 60 }, chart: "density:AGE|MUTATION_COUNT" } as ClinicalLeaf;
+  for (const drawn of [new Set<string>(), new Set(["density:FRACTION_GENOME_ALTERED|MUTATION_COUNT"])]) {
+    const [g] = filterGroups({ all: [drag] }, labelOf, drawn);
+    assert.equal(g.kind, "chart");
+    assert.deepEqual(g.kind === "chart" && g.pills.map((p) => p.kind === "interval" && intervalText(p.interval)), ["50 ≤ x ≤ 60"]);
+  }
+  assert.equal(filterGroups({ all: [drag] }, labelOf)[0].kind, "chart", "no charts said drawn: every pill shows");
 });
 
 describe("several ranges of one chart, one pill (STV-FB-4)", () => {
