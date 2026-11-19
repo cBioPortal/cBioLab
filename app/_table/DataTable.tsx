@@ -20,6 +20,7 @@ import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
+import { SHOW_MORE_SIZES, pageOfText, pagerHidden, resetOffered, showMoreDisabled, showMoreSize } from "../../lib/table-pager.ts";
 import { headerSort, type SortableColumn } from "../../lib/table-sort.ts";
 
 /** a page number in the pager, filled while it is the page shown */
@@ -115,6 +116,25 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
       <label className="tbfield">per page <OptionSelect value={String(p.size)} onValueChange={(v) => p.setSize(Number(v))}>
         {[...new Set([own, p.size, 25, 50, 100, 250])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
       </OptionSelect></label>
+      {p.error && <span className="mark">{p.error}</span>}
+    </div></div>
+  );
+}
+
+/**
+ * The portal's Show more pager (the Mutations table's): previous, Show more (a larger page), next, the rows
+ * shown, Reset once the page is larger than the first size; hidden when one page holds every row.
+ */
+export function ShowMorePager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
+  if (pagerHidden(p.total, p.size)) return null;
+  const from = p.total ? p.page * p.size + 1 : 0, to = Math.min(p.total, (p.page + 1) * p.size);
+  return (
+    <div className="viewtb pb-pager"><div className="tbz">
+      <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page === 0} onClick={() => p.setPage(p.page - 1)} aria-label="previous page"><ChevronLeft /></Button>
+      <Button type="button" variant="outline" size="sm" className={cn(TB, "w-[200px]")} disabled={showMoreDisabled(p.size, p.total)} onClick={() => p.setSize(showMoreSize(p.size))}>Show more</Button>
+      <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page"><ChevronRight /></Button>
+      {resetOffered(p.size) && <Button type="button" variant="link" size="sm" className={TB} onClick={() => p.setSize(SHOW_MORE_SIZES[0])}>Reset</Button>}
+      <span>Showing {from.toLocaleString()}–{to.toLocaleString()} of {p.total.toLocaleString()} {unit}</span>
       {p.error && <span className="mark">{p.error}</span>}
     </div></div>
   );
@@ -359,6 +379,8 @@ export interface DataTableProps<V> {
   /** a column whose runs of one value are drawn as groups (the alterations view's gene): the value shown on a run's
    *  first row only, no rule inside a run, alternate runs shaded */
   groupBy?: string;
+  /** the pager: numbered pages with a page-size choice (default), or the portal's Show more, with "(page x of y)" in the title (the Mutations table's) */
+  pager?: "pages" | "showMore";
   /** no column chooser and no per-column filters: the columns follow something else (the Explore charts) */
   plain?: boolean;
   /** the rows are one cohort's: no cohort column, the study column alone when there are several studies */
@@ -369,7 +391,7 @@ export interface DataTableProps<V> {
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, downloadFormat = "csv" }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, pager = "pages", downloadFormat = "csv" }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -454,7 +476,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     <div className="dt">
       <div className="dt-bar">
         <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}{kept ? " (" + portalKeptUnits(kept.samples, kept.patients) + ")" : null}</> : <>{t.total.toLocaleString()} {unit}</>}
-          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}{countNote ? ": " + countNote : null}</span>
+          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}{countNote ? ": " + countNote : null}{pager === "showMore" && pageOfText(p.page, p.pages) ? " " + pageOfText(p.page, p.pages) : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
@@ -551,7 +573,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         {/* the rows under it are the last answer, not this one: covered until the new one lands; the header stays usable */}
         {waiting && <div className="dt-wait" style={{ top: headH + 1 }} role="status" aria-live="polite"><span className="loading-block"><span className="spinner" /> {waiting}</span></div>}
       </div>
-      <Pager p={p as PageRows<unknown>} unit={unit} />
+      {pager === "showMore" ? <ShowMorePager p={p as PageRows<unknown>} unit={unit} /> : <Pager p={p as PageRows<unknown>} unit={unit} />}
     </div>
   );
 }
