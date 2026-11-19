@@ -7,7 +7,7 @@ import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
 import { useStemHover } from "../../_lollipop/stem-hover.ts";
 import { rowAtStem } from "../../../lib/lollipop.ts";
-import { vafEmptyTip } from "../../../lib/mutation-cell-text.ts";
+import { mutationUnit, vafEmptyTip } from "../../../lib/mutation-cell-text.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
@@ -28,7 +28,7 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
   return (
     <div className="pb">
       {tips.node}
-      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} countNote={portalDuplicatesNote(t.duplicates, "mutation", "mutations")} {...(t.kept ? { kept: t.kept } : {})} onQuery={onQuery}
+      <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={mutationUnit(t.total)} countNote={portalDuplicatesNote(t.duplicates, "mutation", "mutations")} {...(t.kept ? { kept: t.kept } : {})} onQuery={onQuery}
         pager="showMore"
         downloadFormat="table-tsv"
         num={(id, x) => id === "vafNormal" ? String(x) : x.toLocaleString()}

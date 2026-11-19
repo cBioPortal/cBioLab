@@ -19,7 +19,7 @@ async function tables({ browser, ok, BASE }) {
         await page.waitForFunction(() => !document.querySelector(".dt-wait") && !document.querySelector(".dt-bar .waiting"), null, { timeout: 120000 });
         await page.waitForTimeout(200);
       };
-      const count = async () => { const m = /(?:([\d,]+) of )?([\d,]+) KRAS mutations/.exec(await title.innerText()); return m ? { kept: Number((m[1] || m[2]).replace(/,/g, "")), all: Number(m[2].replace(/,/g, "")) } : null; };
+      const count = async () => { const m = /(?:([\d,]+) of )?([\d,]+) Mutations?\b/.exec(await title.innerText()); return m ? { kept: Number((m[1] || m[2]).replace(/,/g, "")), all: Number(m[2].replace(/,/g, "")) } : null; };
       const all = await count();
       ok("table: the mutation table lists KRAS's mutations", !!all && all.all > 50, JSON.stringify(all));
       await page.locator(".dt-search input").fill("G13");
@@ -180,7 +180,7 @@ async function tables({ browser, ok, BASE }) {
       const showMore = () => pager.getByRole("button", { name: "Show more" }).click();
       const first = await state();
       ok("table: the mutation table opens on 25 rows, titled with its page, Show more and no per-page select or Reset",
-        first.title === "223 KRAS mutations (page 1 of 9)" && first.rows === 25 && first.select === 0 && first.reset === 0, JSON.stringify(first));
+        first.title === "223 Mutations (page 1 of 9)" && first.rows === 25 && first.select === 0 && first.reset === 0, JSON.stringify(first));
       await showMore();
       const more = await state();
       ok("table: Show more shows 50 rows, page 1 of 5, and offers Reset",

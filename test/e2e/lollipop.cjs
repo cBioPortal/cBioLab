@@ -20,7 +20,7 @@ async function lollipop({ browser, ok, BASE }) {
       };
       await settle();
       const heads = () => page.locator(".lp-plot circle[r='2.8']").count();
-      const tableCount = async () => { const m = /(?:([\d,]+) of )?([\d,]+) TP53 mutations/.exec(await page.locator(".dt-title").innerText()); return m ? { kept: Number((m[1] || m[2]).replace(/,/g, "")), all: Number(m[2].replace(/,/g, "")) } : null; };
+      const tableCount = async () => { const m = /(?:([\d,]+) of )?([\d,]+) Mutations?\b/.exec(await page.locator(".dt-title").innerText()); return m ? { kept: Number((m[1] || m[2]).replace(/,/g, "")), all: Number(m[2].replace(/,/g, "")) } : null; };
       const svg = await page.locator(".lp-plot svg").first().innerHTML();
       ok("lollipop: the figure is the plot alone; the summary and the grid are controls beside it",
         !/Somatic Mutation Frequency|>Driver<|>VUS</.test(svg) && await page.locator(".lp-summary").count() > 0 && await page.locator(".lp-grid .lp-badge").count() >= 10);
@@ -154,10 +154,10 @@ async function lollipop({ browser, ok, BASE }) {
       ok("E1 badges: two .lp-status buttons, Somatic and Germline, both pressed",
         r0.length === 2 && /Somatic/.test(r0[0]) && /Germline/.test(r0[1]) && await pressed() === "true,true", JSON.stringify(r0) + " " + await pressed());
       const steps = [
-        ["Somatic off: the table keeps the 26 germline mutations", "Somatic", /^26 of 37 BRCA1 mutations/, "false,true"],
-        ["Germline off too: no mutation kept", "Germline", /^0 of 37 BRCA1 mutations/, "false,false"],
-        ["Somatic on: the 11 somatic mutations", "Somatic", /^11 of 37 BRCA1 mutations/, "true,false"],
-        ["both on: every mutation, no filter", "Germline", /^37 BRCA1 mutations/, "true,true"],
+        ["Somatic off: the table keeps the 26 germline mutations", "Somatic", /^26 of 37 Mutations/, "false,true"],
+        ["Germline off too: no mutation kept", "Germline", /^0 of 37 Mutations/, "false,false"],
+        ["Somatic on: the 11 somatic mutations", "Somatic", /^11 of 37 Mutations/, "true,false"],
+        ["both on: every mutation, no filter", "Germline", /^37 Mutations/, "true,true"],
       ];
       for (const [label, name, want, press] of steps) {
         await badge(name).click();

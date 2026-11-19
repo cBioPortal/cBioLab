@@ -172,3 +172,8 @@ export function mutationStatusCell(raw: string | null | undefined): { kind: "som
 export function vafEmptyTip(value: unknown): string | null {
   return value == null || value === "" ? "Data not available." : null;
 }
+
+/** what the mutation table counts its rows as, in its title and pager: the portal's "N Mutations", "1 Mutation" (MUT-TB-1) */
+export function mutationUnit(n: number): string {
+  return n === 1 ? "Mutation" : "Mutations";
+}
