@@ -28,6 +28,8 @@ export type ClinicalOp = "=" | "!=" | ">" | ">=" | "<" | "<=";
  * choice; without them, the study's z-score profile of that kind.
  */
 export interface OqlLeaf { kind: "oql"; q: string; exp?: string; prot?: string; ifHeld?: boolean;
+  /** the Study View gene table that wrote the clause, so taking the table off removes it; no effect on the cohort */
+  chart?: "mutated" | "cna" | "sv";
   /** how DRIVER reads: the page's driver settings (lib/driver-settings.ts); without them, OncoKB at the pin alone */
   drivers?: DriverSettings }
 export interface ClinicalLeaf {

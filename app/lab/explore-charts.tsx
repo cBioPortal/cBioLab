@@ -41,13 +41,15 @@ interface Props {
   addClauses: (clauses: Clause[]) => void;
   /** draws the survival curves the way the analysis page draws them */
   km: (curves: unknown[]) => React.ReactNode;
+  /** the Mutation Count vs FGA density, unless unchecked in Add chart's Genomic tab */
+  density?: boolean;
 }
 
 type PlotData = { shape: string; n: number; extent?: { x0: number; x1: number; y0: number; y1: number }; grid?: [number, number];
   bins?: PlotCell[]; stats?: { pearson: number | null; spearman: number | null }; coverage?: { total: number; nx: number; ny: number } };
 
-export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km }: Props) {
-  const hasScatter = [MUTATION_COUNT, FGA].every((a) => attrs.some((x) => x.attribute === a));
+export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km, density = true }: Props) {
+  const hasScatter = density && [MUTATION_COUNT, FGA].every((a) => attrs.some((x) => x.attribute === a));
   // the reader's own menu settings, kept by this browser; read after mounting, so a server render never touches storage
   const [dset, setDset] = useState<DensitySettings>({});
   useEffect(() => { try { setDset(JSON.parse(localStorage.getItem(DENSITY_KEY) || "{}") || {}); } catch { /* the defaults */ } }, []);

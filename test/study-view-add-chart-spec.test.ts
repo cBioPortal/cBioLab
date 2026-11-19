@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, SPECIAL_CHART_KEYS, specialChartsShown, type AddChartRow } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -217,4 +217,31 @@ test("the special tables: drawn when checked, or while the draft filters on what
     ["a sequence of two events is not this table's filter", none, [seq], true, { events: false, caseLists: false }],
   ];
   for (const [name, checked, leaves, hasEvents, want] of cases) assert.deepEqual(specialChartsShown(checked, leaves, hasEvents), want, name);
+});
+
+// STV-AC-2, STV-AC-4: the Genomic tab's charts, as the portal lists them (coadread, seen)
+test("the Genomic tab: each chart the selection has data for, its Freq the samples with that data, by Freq then name", () => {
+  const clinical = [{ key: "sample|FRACTION_GENOME_ALTERED", name: "Fraction Genome Altered", samples: 583, attribute: "FRACTION_GENOME_ALTERED" },
+    { key: "sample|MUTATION_COUNT", name: "Mutation Count", samples: 534, attribute: "MUTATION_COUNT" }];
+  const lines = genomicChartLines({ mutated: 534, cna: 592, sv: 534 }, 594, { datatypes: true, density: true }, clinical);
+  // the portal's seen list: Data Types 100.0%, CNA Genes 99.7%, FGA 98.1%, Mutated Genes 89.9%, Mutation Count 89.9%, SV Genes 89.9%
+  assert.deepEqual(lines.map((l) => [l.name, Number.isNaN(l.freq) ? "—" : portalFreq(l.freq)]), [
+    ["Data Types", "100.0%"], ["CNA Genes", "99.7%"], ["Fraction Genome Altered", "98.1%"], ["Mutated Genes", "89.9%"], ["Mutation Count", "89.9%"],
+    ["Structural Variant Genes", "89.9%"], ["Mutation Count vs Fraction Genome Altered", "—"],
+  ]);
+  assert.equal(lines.find((l) => l.name === "Mutation Count")!.attribute, "MUTATION_COUNT", "a clinical row's filter is its attribute's");
+  // a table without its profile, and charts without data, are not offered
+  assert.deepEqual(genomicChartLines({ mutated: 10, cna: 0, sv: 0 }, 10, { datatypes: true, density: false }).map((l) => l.name), ["Data Types", "Mutated Genes"]);
+  assert.deepEqual(genomicChartLines({ mutated: 0, cna: 0, sv: 0 }, 0, { datatypes: false, density: false }), []);
+});
+
+// STV-AC-2: a tab per generic-assay type, named as the portal names it
+test("a generic-assay type's tab: the portal's configured text, else its words capitalised; one per type, by label", () => {
+  const cases: [string, string][] = [["ARMLEVEL_CNA", "Arm-level CNA"], ["METHYLATION", "Methylation"], ["MUTATIONAL_SIGNATURE", "Mutational Signature"],
+    ["TREATMENT_RESPONSE", "Treatment Response"], ["GENETIC_ANCESTRY", "Genetic Ancestry"], ["PHOSPHOSITE_QUANTIFICATION", "Phosphosite Quantification"], ["Lipidome", "Lipidome"]];
+  for (const [t, want] of cases) assert.equal(assayTabLabel(t), want, t);
+  // coadread, seen: Arm-level CNA · Genetic Ancestry · Methylation (two methylation profiles, one tab)
+  const coadread = [{ type: "GENERIC_ASSAY", assayType: "METHYLATION" }, { type: "GENERIC_ASSAY", assayType: "ARMLEVEL_CNA" },
+    { type: "GENERIC_ASSAY", assayType: "METHYLATION" }, { type: "GENERIC_ASSAY", assayType: "GENETIC_ANCESTRY" }, { type: "MRNA_EXPRESSION" }];
+  assert.deepEqual(assayTabs(coadread).map((t) => t.label), ["Arm-level CNA", "Genetic Ancestry", "Methylation"]);
 });

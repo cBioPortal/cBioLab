@@ -63,3 +63,51 @@ export function specialChartsShown(checked: (key: string) => boolean, leaves: un
     caseLists: checked(SPECIAL_CHART_KEYS.caseLists) || kind("caseList"),
   };
 }
+
+/** the Genomic tab's charts (STV-AC-2): drawn by default, each a checkbox in Add chart that hides or shows it */
+export const GENOMIC_CHARTS = [
+  { key: "genomic|mutated", name: "Mutated Genes", table: "mutated" as const },
+  { key: "genomic|cna", name: "CNA Genes", table: "cna" as const },
+  { key: "genomic|sv", name: "Structural Variant Genes", table: "sv" as const },
+  { key: "genomic|datatypes", name: "Data Types", table: null },
+  { key: "genomic|density", name: "Mutation Count vs Fraction Genome Altered", table: null },
+] as const;
+
+/**
+ * The Genomic tab's rows (STV-AC-2, STV-AC-4), as the portal lists them: each chart the selection
+ * has data for, its Freq the selected samples with that data, a gene table's being those profiled
+ * for its alteration (coadread: CNA Genes 99.7 %, Mutated Genes 89.9 %), Data Types every sample;
+ * by Freq, then name; Mutation Count and FGA among them, as the portal lists them (STV-AC-4). The
+ * density's has no Freq of its own here (NaN, written "—").
+ */
+export function genomicChartLines(profiled: Record<"mutated" | "cna" | "sv", number>, selected: number, has: { datatypes: boolean; density: boolean },
+  clinical: { key: string; name: string; samples: number; attribute: string }[] = []):
+  { key: string; name: string; freq: number; attribute?: string }[] {
+  const pct = (n: number) => selected ? 100 * n / selected : 0;
+  // Mutation Count and Fraction Genome Altered, clinical charts the portal lists here, Freq the samples with a value
+  const fromClinical = clinical.map((c) => ({ key: c.key, name: c.name, freq: pct(c.samples), attribute: c.attribute }));
+  return [...fromClinical, ...GENOMIC_CHARTS.flatMap((c): { key: string; name: string; freq: number }[] => {
+    if (c.table) return profiled[c.table] > 0 ? [{ key: c.key, name: c.name, freq: pct(profiled[c.table]) }] : [];
+    if (c.key === "genomic|datatypes") return has.datatypes ? [{ key: c.key, name: c.name, freq: 100 }] : [];
+    return has.density ? [{ key: c.key, name: c.name, freq: NaN }] : [];
+  })].sort((a, b) => (Number.isNaN(b.freq) ? -1 : b.freq) - (Number.isNaN(a.freq) ? -1 : a.freq) || a.name.localeCompare(b.name));
+}
+
+/** the display text the portal's server config gives a few generic-assay types (`generic_assay_display_text`) */
+const ASSAY_TAB_TEXT: Record<string, string> = {
+  TREATMENT_RESPONSE: "Treatment Response", MUTATIONAL_SIGNATURE: "Mutational Signature", ARMLEVEL_CNA: "Arm-level CNA", METHYLATION: "Methylation",
+};
+
+/**
+ * A generic-assay type's Add chart tab (STV-AC-2, `deriveDisplayTextFromGenericAssayType`): the
+ * configured text, else the type's words capitalised ("GENETIC_ANCESTRY" → "Genetic Ancestry").
+ */
+export function assayTabLabel(type: string): string {
+  return ASSAY_TAB_TEXT[type] ?? type.split("_").filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+}
+
+/** one Add chart tab per generic-assay type the selected studies hold, by label (seen coadread: Arm-level CNA · Genetic Ancestry · Methylation) */
+export function assayTabs(profiles: { type: string; assayType?: string }[]): { type: string; label: string }[] {
+  const types = [...new Set(profiles.filter((p) => p.type === "GENERIC_ASSAY" && p.assayType).map((p) => p.assayType!))];
+  return types.map((type) => ({ type, label: assayTabLabel(type) })).sort((a, b) => a.label.localeCompare(b.label));
+}
