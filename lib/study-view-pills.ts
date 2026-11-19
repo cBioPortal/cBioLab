@@ -8,6 +8,7 @@
 import type { ClinicalLeaf, CohortDef } from "./types.ts";
 import { chartLeaves, isNaClause } from "./explore-selection.ts";
 import { STYLE } from "./oncoprint-style.ts";
+import { MUTATION_TYPE_PROFILE, geneChartName, geneStateLabel, geneStatesFilter, mutationTypeLabel, mutationTypesClause, parseGeneChartTag } from "./gene-state-clauses.ts";
 
 type Clause = NonNullable<CohortDef["all"]>[number];
 
@@ -28,7 +29,12 @@ export type SvGroup =
   | { kind: "chart"; clause: number; attribute: string; label: string; pills: SvPill[] }
   | { kind: "other"; clause: number }
   /** a density drag's range: no pill, as the portal's (STV-FB-3b); its chart shows and clears it */
-  | { kind: "hidden"; clause: number };
+  | { kind: "hidden"; clause: number }
+  /**
+   * A gene chart's filter (STV-FB-3 #5, #7): "<chart> : <state> or <state>", each removable. `tag`
+   * names a status chart's clauses (geneChartTag); a mutation-type table's is its one clause.
+   */
+  | { kind: "gene"; clause: number; label: string; tag?: string; pills: { key: string; label: string }[] };
 
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 
@@ -85,8 +91,21 @@ export function chartNames(current: { attribute: string; displayName?: string }[
 export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attribute: string) => string | undefined,
   /** the density charts drawn (densityChartName): a drag's ranges have no pill only while their chart shows them (STV-FB-3b) */
   drawnDensity: ReadonlySet<string> = new Set()): SvGroup[] {
+  const seen = new Set<string>();
   return (draft?.all || []).map((c, i): SvGroup => {
     if (drawnDensity.has(String((c as { chart?: unknown }).chart || ""))) return { kind: "hidden", clause: i };
+    // a gene status chart's states: one group for its clauses, at its first
+    const tag = geneTagOf(c), gene = parseGeneChartTag(tag);
+    if (tag && gene) {
+      if (seen.has(tag)) return { kind: "hidden", clause: i };
+      seen.add(tag);
+      return { kind: "gene", clause: i, tag, label: geneChartName(gene.gene, gene.type),
+        pills: gene.states.map((st) => ({ key: st, label: geneStateLabel(gene.type, st, gene.drivers) })) };
+    }
+    // a mutation-type table's filter: its types, by the table's labels
+    const mt = c as { kind?: string; profileType?: string; gene?: string; values?: unknown[] };
+    if (mt && mt.kind === "genomicData" && mt.profileType === MUTATION_TYPE_PROFILE && Array.isArray(mt.values))
+      return { kind: "gene", clause: i, label: String(mt.gene) + ": mutation types", pills: mt.values.map((v) => ({ key: String(v), label: mutationTypeLabel(String(v)) })) };
     const na = (c as { not?: ClinicalLeaf }).not;
     if (na && isNaClause(c, na.attribute)) return { kind: "chart", clause: i, attribute: na.attribute, label: labelOf(na.attribute) || na.attribute, pills: [{ kind: "na" }] };
     const attribute = clauseAttribute(c);
@@ -118,6 +137,41 @@ function withLeaves(draft: CohortDef, i: number, leaves: ClinicalLeaf[]): Cohort
   const all = [...(draft.all || [])];
   if (!leaves.length) all.splice(i, 1);
   else all[i] = leaves.length === 1 ? leaves[0] : { any: leaves };
+  return { ...draft, all };
+}
+
+/** the gene chart a clause names (`chart` on it, or on the leaf it negates) */
+function geneTagOf(c: unknown): string | null {
+  const l = ((c as { not?: unknown } | null)?.not ?? c) as { chart?: unknown } | null;
+  const t = l && typeof l.chart === "string" ? l.chart : null;
+  return t && t.startsWith("gene:") ? t : null;
+}
+
+/**
+ * A gene chart state's ×: the chart's filter re-made from its other states, where its first clause
+ * stood, or gone with its last; refused, saying why, when the rest is not one filter.
+ */
+export function removeGeneState(draft: CohortDef, tag: string, state: string): { draft: CohortDef } | { why: string } {
+  const g = parseGeneChartTag(tag);
+  const all = draft.all || [];
+  const at = all.findIndex((c) => geneTagOf(c) === tag);
+  if (!g || at < 0) return { draft };
+  const rest = g.states.filter((s) => s !== state);
+  const kept = all.filter((c) => geneTagOf(c) !== tag);
+  if (!rest.length) return { draft: { ...draft, all: kept } };
+  const r = geneStatesFilter(g.gene, g.type, rest, g.drivers);
+  if ("why" in r) return r;
+  return { draft: { ...draft, all: [...kept.slice(0, at), ...(r.clauses as typeof kept), ...kept.slice(at)] } };
+}
+
+/** a mutation type's ×: it leaves the table's clause, which goes with its last */
+export function removeMutationType(draft: CohortDef, clause: number, type: string): CohortDef {
+  const all = [...(draft.all || [])];
+  const c = all[clause] as { gene?: string; values?: unknown[] } | undefined;
+  if (!c || !Array.isArray(c.values)) return draft;
+  const rest = c.values.map(String).filter((v) => v !== type);
+  const r = rest.length ? mutationTypesClause(String(c.gene), rest) : null;
+  if (r && "clauses" in r) all.splice(clause, 1, ...(r.clauses as typeof all)); else all.splice(clause, 1);
   return { ...draft, all };
 }
 
@@ -195,7 +249,7 @@ export interface GenePill { gene: string; line: string; color: string }
  */
 export function geneTablePills(c: unknown): GenePill[] | null {
   const l = c as { kind?: string; q?: unknown; chart?: unknown } | null;
-  if (!l || l.kind !== "oql" || typeof l.q !== "string" || typeof l.chart !== "string") return null;
+  if (!l || l.kind !== "oql" || typeof l.q !== "string" || !["mutated", "cna", "sv"].includes(String(l.chart))) return null;
   const lines = l.q.split(";").map((x) => x.trim()).filter(Boolean);
   const out: GenePill[] = [];
   for (const line of lines) {

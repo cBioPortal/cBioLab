@@ -12,5 +12,5 @@ export const mutants: Mutant[] = [
     find: "if (rest.length) all[clause] = { ...c, q: rest.join(\"; \") } as never; else all.splice(clause, 1);", replace: "all.splice(clause, 1);" },
   { id: "gene-pills-untagged-oql", layer: "cohorts", guard: "unit", file: "lib/study-view-pills.ts",
     effect: "A Gene status chart's \"KRAS: MUT\" (beside its \"profiled KRAS\") is drawn as a gene-table pill, and its × removes the alteration alone, widening the cohort to the profiled samples.",
-    find: " || typeof l.chart !== \"string\") return null;", replace: ") return null;" },
+    find: " || ![\"mutated\", \"cna\", \"sv\"].includes(String(l.chart))) return null;", replace: ") return null;" },
 ];

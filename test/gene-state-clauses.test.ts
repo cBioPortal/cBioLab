@@ -5,7 +5,7 @@
 // Whether each clause selects what its state counts is checked live by scripts/check-gene-facets.ts.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { CNA_LEVELS, DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE, appliedMutationTypes, cnaLevelLabel, driverOql, geneStatesClauses, mutationTypeLabel, mutationTypesClause } from "../lib/gene-state-clauses.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE, appliedMutationTypes, cnaLevelLabel, driverOql, geneChartName, geneStateLabel, geneStatesClauses, geneStatesFilter, mutationTypeLabel, mutationTypesClause } from "../lib/gene-state-clauses.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
 
 const cna = (values: string[]) => ({ kind: "genomicData", gene: "KRAS", profileType: DISCRETE_CNA_PROFILE, values, ifHeld: true });
@@ -116,5 +116,31 @@ describe("a gene's mutation types", () => {
     const held = compileCohortDef({ all: [{ kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Missense"], ifHeld: true }] } as never, ctx);
     assert.doesNotMatch(held, /throwIf/);
     assert.throws(bad({ values: Array.from({ length: 21 }, (_, i) => "T" + i) }), /genomicData clause on KRAS: at most 20 values; this lists 21/);
+  });
+});
+
+// STV-FB-3 #5: a gene chart's filter names its chart and states in the filter bar, so its clauses say which they are
+describe("a gene chart's filter, named", () => {
+  test("each clause carries the chart and its states; a negated one on its leaf", () => {
+    const r = geneStatesFilter("KRAS", "MUTATION", ["unaltered"], false);
+    assert.ok("clauses" in r);
+    assert.deepEqual(r.clauses, [
+      { kind: "profiled", type: "MUTATION", gene: "KRAS", chart: "gene:KRAS|MUTATION|unaltered" },
+      { not: { kind: "oql", q: "KRAS: MUT", chart: "gene:KRAS|MUTATION|unaltered" } },
+    ]);
+    const d = geneStatesFilter("KRAS", "CNA", ["del", "amp"], true);
+    assert.ok("clauses" in d && d.clauses.every((c) => { const x = c as { not?: { chart?: string }; chart?: string }; return /\|amp,del\|drivers$/.test(String((x.not ?? x).chart)); }), "states in the chart's order; drivers said");
+    assert.deepEqual(geneStatesFilter("KRAS", "CNA", [], false), { why: "no state is checked" });
+  });
+  test("the chart's name and its states' names, as the chart shows them", () => {
+    assert.equal(geneChartName("KRAS", "MUTATION"), "KRAS: somatic mutations");
+    assert.equal(geneChartName("KRAS", "CNA"), "KRAS: copy-number alterations");
+    const cases: ["MUTATION" | "CNA", string, boolean, string][] = [
+      ["MUTATION", "altered", false, "Mutated"], ["MUTATION", "unaltered", false, "Not Mutated"], ["MUTATION", "notProfiled", false, "Not Profiled"],
+      ["MUTATION", "altered", true, "Driver mutation"], ["MUTATION", "unaltered", true, "No driver mutation"],
+      ["CNA", "amp", false, "Amplified"], ["CNA", "hetloss", false, "Heterozygously deleted"], ["CNA", "notProfiled", false, "Not profiled"],
+      ["CNA", "amp", true, "Driver amplification"], ["CNA", "del", true, "Driver deletion"], ["CNA", "unaltered", true, "No driver call"],
+    ];
+    for (const [type, state, drivers, label] of cases) assert.equal(geneStateLabel(type, state, drivers), label, type + " " + state);
   });
 });

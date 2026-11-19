@@ -731,7 +731,8 @@ async function explore({ ok, BASE, page, browser }) {
     const pick = rows[rows.length - 1][0];
     await card.locator(".valrow", { has: page.locator(".vname", { hasText: new RegExp("^" + pick + "$") }) }).click();
     await card.getByRole("button", { name: "Apply filter" }).click();
-    await page.waitForFunction((t) => document.body.innerText.includes("KRAS mutation type: " + t), pick, { timeout: 240000 });
+    // the filter bar names the table and its type, as the portal's (STV-FB-3 #7): "KRAS: mutation types : <type>"
+    await page.waitForFunction((t) => [...document.querySelectorAll("[data-sv-gene='KRAS: mutation types'] [data-sv-pill]")].some((e) => e.getAttribute("data-sv-pill") === t), pick, { timeout: 240000 });
     await page.waitForFunction((t) => document.querySelector("[data-mutationtypes='KRAS'] .valrow.on .vname")?.textContent === t, pick, { timeout: 240000 });
     const after = await card.locator(".valrow .vname").allInnerTexts();
     mtDetail = JSON.stringify({ header, rows, pick, after });

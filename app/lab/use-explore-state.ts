@@ -40,7 +40,7 @@ export type GroupsTarget = "comparison" | "analysis";
 export type EditingCohort = { id: string; name: string; def: CohortDef };
 
 import { toggleQueued, withoutGeneTableClauses } from "../../lib/study-view-gene-tables.ts";
-import { driverOql, geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
+import { driverOql, geneStatesFilter } from "../../lib/gene-state-clauses.ts";
 import { CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
@@ -635,7 +635,8 @@ export function useExploreState(page: ExplorePage) {
 
   /** the clauses that select any of several states of one gene's facet, or why that cannot be one filter */
   const geneStatesClauses = (gene: string, type: "MUTATION" | "CNA", states: string[]): { clauses: any[] } | { why: string } =>
-    geneStatesClausesFor(gene, type, states, !!explore?.drivers);
+    // named for the chart and its states, so the filter bar writes "<chart> : <state>" (STV-FB-3 #5)
+    geneStatesFilter(gene, type, states, !!explore?.drivers);
 
   /** which of a charted gene's two status charts are shown (STV-AC-5: one chart per gene and profile) */
   const [geneKinds, setGeneKinds] = useState<Record<string, ("MUTATION" | "CNA")[]>>({});
