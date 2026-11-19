@@ -15,7 +15,7 @@ import {
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
 import { patientSampleEvents, plural, refuse } from "../shared.ts";
-import type { AlterationsView, AlterationsResult, AlleleReads } from "./types.ts";
+import type { AlterationsView, AlterationsResult, AlleleReads, CohortCount } from "./types.ts";
 import { alterationsMethod } from "./method.ts";
 
 type Cell = string | number | null;
@@ -41,14 +41,23 @@ function readsOf(x: unknown): AlleleReads[] | undefined {
   return x.map((t) => ({ sample: String(t[0]), alt: Number(t[1]), ref: Number(t[2]) }));
 }
 
+/** A row's Cohort counts, when its table reads them: what the Cohort cell draws and its tooltip says. */
+function cohortOf(x: Record<string, unknown>): CohortCount | undefined {
+  if (x.cohortOf == null) return undefined;
+  const kw = String(x.keyword ?? "");
+  return { n: Number(x.cohortN ?? 0), of: Number(x.cohortOf), ...(kw ? { keyword: kw, keywordN: Number(x.cohortKwN ?? 0) } : {}) };
+}
+
 /**
  * A page of rows as the result carries them, aligned with `cols`; a mutation row's detail holds its
- * per-sample reads and its stored type (the cell shows the portal's label).
+ * per-sample reads and its stored type (the cell shows the portal's label); a mutation or copy-number
+ * row's, its Cohort counts.
  */
 const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map((x) => {
   const reads = readsOf(x.reads);
   const typed = cols.some((c) => c.id === "mutationType");
-  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}) };
+  const cohort = cohortOf(x);
+  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}) };
   return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
     values: cols.map((c) => cellOf(x, c)), ...(Object.keys(detail).length ? { detail } : {}) };
 });

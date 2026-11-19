@@ -155,6 +155,9 @@ export const STYLE = {
     } as Record<string, string>,
     unknown: "#EE4B2B"
   },
+  // the Patient tables' Cohort cell, the portal's FrequencyBar (shared/components/cohort/FrequencyBar.tsx):
+  // a grey bar, the gene's share over it, a mutation's keyword share darker still; copy number red or blue
+  cohortBar: { background: "#ccc", gene: "lightgreen", keyword: "green", amp: "red", del: "blue", width: 30, height: 8, textMargin: 6, textWidth: 35 },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,

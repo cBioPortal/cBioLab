@@ -39,6 +39,12 @@ export interface AlterationsView extends TableQuery {
 }
 /** A mutation's reads in one sample: allele frequency alt / (alt + ref). A mutation row's `detail.reads` lists them in the patient's sample order. */
 export interface AlleleReads { sample: string; alt: number; ref: number }
+/**
+ * What a row's Cohort cell draws (the portal's FrequencyBar): `n` of the `of` samples profiled for the
+ * gene have a mutation in it, or the same copy-number call; a mutation with a keyword (APC truncating)
+ * also has the `keywordN` samples with that keyword. A row's `detail.cohort`.
+ */
+export interface CohortCount { n: number; of: number; keyword?: string; keywordN?: number }
 export interface AlterationsResult extends TableRows<string | number | null> {
   /** the patient listed, with their samples (none on a page request), or null when the list is empty */
   patient: { study: string; id: string;
