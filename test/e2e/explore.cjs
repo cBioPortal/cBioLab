@@ -631,8 +631,11 @@ async function explore({ ok, BASE, page, browser }) {
     await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /Add chart/ }).first().click({ timeout: 240000 });
     await page.getByRole("tab", { name: "Gene status" }).click();
+    // the portal's gene tab: the mutation profile, "Mutation Type", the gene, Add Chart (STV-AC-5)
+    await page.getByRole("combobox", { name: /mutations by type/ }).click();
+    await page.getByRole("option", { name: "Mutation Type" }).click();
     await page.getByPlaceholder("chart a gene (e.g. EGFR)").fill("KRAS");
-    await page.getByRole("button", { name: "Add mutation types" }).click();
+    await page.getByRole("button", { name: "Add Chart" }).click();
     await page.keyboard.press("Escape");
     const card = page.locator("[data-mutationtypes='KRAS']");
     await card.locator(".valrow").first().waitFor({ timeout: 240000 });
