@@ -2,7 +2,7 @@
 // Explore's sections: the study picker, the action bar, the add-chart dialog and the facet grid's
 // cards. The page owns Explore's state (app/lab/use-explore.ts and the draft) and hands every
 // section the same ExploreCtx — what it reads and the edits it can make.
-import { useEffect, useMemo, useState } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
 import CustomBinsDialog from "./custom-bins-dialog";
@@ -15,6 +15,7 @@ import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
 import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
+import { countAxis } from "../../lib/chart/scale.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
@@ -631,25 +632,89 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
 const VALLIST_ROWS = 9;
 
 /**
- * A facet's histogram: one clickable bar per bin, its start labelled under it — every label that
- * fits its bar's width, and every second (third, …) bin's when they do not, rather than letting
- * neighbouring labels run into each other.
+ * A facet's histogram, as the portal's bar chart: a y axis of integer counts, one bar per bin (the
+ * caller sizes them against `top`), each bin's start labelled under it — every label that fits its
+ * bar, and every second (third, …) when they do not — and the last bin's end at the right edge
+ * (STS-BAR-2, STS-BAR-3). A click on a bar is the caller's; a drag across two or more bars hands
+ * their range to `onDrag` (STS-BAR-5). Bars take part in a drag by their `data-bar` index.
  */
-function Histogram({ ticks, na, children }: { ticks: string[]; na: string | null; children: React.ReactNode }) {
+function Histogram({ ticks, endTick, na, yTicks, top, onDrag, children }: {
+  ticks: string[]; endTick?: string | null; na: string | null; yTicks: number[]; top: number;
+  onDrag?: (from: number, to: number) => void; children: React.ReactNode;
+}) {
   const { ref, width } = useWidth(0);
   // the tick font is --t-xs, 0.66rem; the bars share the row with the NA note and 2px gaps
   const fs = 0.66 * 16;
-  const room = ((width ?? 280) - (na ? textWidth(na, fs) + 8 : 0)) / Math.max(1, ticks.length);
+  const yW = Math.max(...yTicks.map((t) => textWidth(fmtInt(t), fs))) + 6;
+  const naPad = na ? textWidth(na, fs) + 8 : 0;
+  const barsW = (width ?? 280) - yW - 4 - naPad;
+  const room = barsW / Math.max(1, ticks.length);
   const widest = Math.max(...ticks.map((t) => textWidth(t, fs))) + 4;
   const every = Math.max(1, Math.ceil(widest / Math.max(1, room)));
+  // the end tick, right-aligned at the bars' edge, only where it clears the last start label shown
+  const lastShown = Math.floor((ticks.length - 1) / every) * every;
+  const endFits = !!endTick && lastShown * room + textWidth(ticks[lastShown] || "", fs) + 4 <= barsW - textWidth(endTick, fs);
+  const drag = useRef<{ from: number; to: number } | null>(null);
+  const [dragged, setDragged] = useState<[number, number] | null>(null);
+  const swallowClick = useRef(false);
+  const barsEl = useRef<HTMLDivElement>(null);
+  const barAt = (x: number, y: number): number | null => {
+    const el = document.elementFromPoint(x, y)?.closest("[data-bar]");
+    return el && barsEl.current?.contains(el) ? Number(el.getAttribute("data-bar")) : null;
+  };
+  const stop = () => { drag.current = null; setDragged(null); };
+  // the bars a drag is passing over, marked in their own class so a re-render keeps the mark
+  const bars = dragged ? Children.map(children, (ch) => {
+    if (!isValidElement<{ className?: string; "data-bar"?: number }>(ch)) return ch;
+    const i = ch.props["data-bar"];
+    return i != null && i >= dragged[0] && i <= dragged[1] ? cloneElement(ch, { className: cn(ch.props.className, "dragged") }) : ch;
+  }) : children;
   return (
-    <div ref={ref} className="mt-1">
-      <div className="histo">
-        {children}
-        {na && <span className="meta nacount">{na}</span>}
+    <div ref={ref} className="mt-1 histowrap">
+      <div className="histo-y" aria-hidden="true" style={{ width: yW }}>
+        {yTicks.map((t) => <span key={t} style={{ bottom: (100 * t / top) + "%" }}>{fmtInt(t)}</span>)}
       </div>
-      <div className="histo-ticks" aria-hidden="true" style={{ paddingRight: na ? textWidth(na, fs) + 8 : 0 }}>
-        {ticks.map((t, i) => <span key={i}>{i % every === 0 ? t : ""}</span>)}
+      <div className="histo-main">
+        <div ref={barsEl} className={cn("histo", onDrag && "draggable")}
+          onPointerDown={(e) => {
+            swallowClick.current = false;
+            if (!onDrag || e.button !== 0) return;
+            const i = barAt(e.clientX, e.clientY);
+            if (i == null) return;
+            // not captured yet: a press and release on one bar stays that bar's click
+            drag.current = { from: i, to: i };
+          }}
+          onPointerMove={(e) => {
+            const d = drag.current;
+            if (!d) return;
+            // released somewhere this chart did not see: no drag any more
+            if (!(e.buttons & 1)) { stop(); return; }
+            const i = barAt(e.clientX, e.clientY);
+            if (i == null || i === d.to) return;
+            // onto another bar: a drag, followed past the chart's edge
+            if (!(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+            d.to = i;
+            setDragged([Math.min(d.from, d.to), Math.max(d.from, d.to)]);
+          }}
+          onPointerUp={() => {
+            const d = drag.current;
+            stop();
+            if (d && d.from !== d.to && onDrag) {
+              // the click a drag's release may raise is not a click on a bar; none may come, so it lapses
+              swallowClick.current = true;
+              setTimeout(() => { swallowClick.current = false; }, 0);
+              onDrag(Math.min(d.from, d.to), Math.max(d.from, d.to));
+            }
+          }}
+          onPointerCancel={stop}
+          onClickCapture={(e) => { if (swallowClick.current) { swallowClick.current = false; e.stopPropagation(); e.preventDefault(); } }}>
+          {bars}
+          {na && <span className="meta nacount">{na}</span>}
+        </div>
+        <div className="histo-ticks" aria-hidden="true" style={{ paddingRight: naPad }}>
+          {ticks.map((t, i) => <span key={i}>{i % every === 0 ? t : ""}</span>)}
+          {endFits && <span className="histo-end" style={{ right: naPad }}>{endTick}</span>}
+        </div>
       </div>
     </div>
   );
@@ -795,7 +860,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, togglePieValue, toggleNaValue } = ctx;
+  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, selectBars, togglePieValue, toggleNaValue } = ctx;
   const picks = usePicks();
   const [binsOpen, setBinsOpen] = useState(false);
   const binSet = c.kind === "num" ? chartBins(c.attribute) : undefined;
@@ -940,19 +1005,23 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           );
         })()}
         {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {
-          const maxN = Math.max(...c.bins.map((b: any) => b.count), showNa ? c.naCount! : 0, 1);
+          const axis = countAxis(Math.max(...c.bins.map((b: any) => b.count), showNa ? c.naCount! : 0, 1));
+          const maxN = axis.top;
+          const last = c.bins[c.bins.length - 1];
           // a bar is a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end]
           const label = binLabel;
           const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
           const sel = chartSelection(parseDraft(), c.attribute);
           const unit = c.per === "sample" ? "samples" : "patients";
           return (
-            <Histogram ticks={[...c.bins.map(tick), ...(showNa ? ["NA"] : [])]} na={c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null}>
+            <Histogram ticks={[...c.bins.map(tick), ...(showNa ? ["NA"] : [])]} na={c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null}
+              yTicks={axis.ticks} top={axis.top} endTick={!showNa && last.special == null && last.value == null && last.start !== last.end ? fmtNum(last.end!) : null}
+              onDrag={(from, to) => selectBars(c.attribute, c.bins!, from, to)}>
               {c.bins.map((b: any, i: number) => {
                 const on = binSelected(sel, b);
-                const tip = label(b) + " · " + fmtInt(b.count) + " " + unit + " — click to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter");
+                const tip = label(b) + " · " + fmtInt(b.count) + " " + unit + " — click to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter") + ", or drag across bars to select them";
                 return (
-                  <button key={i} className={cn("hbar", sel.length > 0 && (on ? "on" : "off"))} data-tip={tip} aria-label={tip} aria-pressed={on}
+                  <button key={i} data-bar={i} className={cn("hbar", sel.length > 0 && (on ? "on" : "off"))} data-tip={tip} aria-label={tip} aria-pressed={on}
                     onClick={() => toggleBar(c.attribute, c.bins!, i)}>
                     <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
                   </button>
@@ -1060,11 +1129,14 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
           onApply={(vs) => addClause({ ...base, values: vs })} />
       )}
       {f.kind === "num" && f.bins && f.bins.length > 1 && (() => {
-        const maxN = Math.max(...f.bins.map((b) => b.count), 1);
+        const axis = countAxis(Math.max(...f.bins.map((b) => b.count), 1));
+        const maxN = axis.top;
+        const last = f.bins[f.bins.length - 1];
         const label = binText;
         const tick = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!);
         return (
-          <Histogram ticks={f.bins.map(tick)} na={f.total > f.measured ? "NA " + fmtInt(f.total - f.measured) : null}>
+          <Histogram ticks={f.bins.map(tick)} na={f.total > f.measured ? "NA " + fmtInt(f.total - f.measured) : null}
+            yTicks={axis.ticks} top={axis.top} endTick={last.special == null && last.value == null && last.start !== last.end ? fmtNum(last.end!) : null}>
             {f.bins.map((b, i) => (
               <button key={i} className="hbar" disabled={!clickable}
                 data-tip={label(b) + " · " + fmtInt(b.count) + " " + noun + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
