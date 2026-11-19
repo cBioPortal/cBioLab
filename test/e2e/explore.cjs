@@ -587,13 +587,13 @@ async function explore({ ok, BASE, page, browser }) {
     const counts = (await pt.locator(".valrow .vn").allInnerTexts()).map((t) => Number(t.replace(/,/g, "")));
     const ordered = counts.every((n, i) => i === 0 || counts[i - 1] >= n);
     const pick = (await pt.locator(".valrow .vname").allInnerTexts())[0];
-    const before = (await st.locator(".facettitle").innerText()).trim();
+    const before = (await st.locator(".facettitle").textContent()).trim();   // as the wait below reads it
     await pt.locator(".valrow").first().click();
     await pt.getByRole("button", { name: "Apply filter" }).click();
     await page.waitForFunction((a) => document.body.innerText.includes("treated with " + a), pick, { timeout: 240000 });
     await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.textContent || "").trim() !== b, before, { timeout: 240000 });
     const pinned = await pt.locator(".valrow.on .vname").allInnerTexts();
-    const after = (await st.locator(".facettitle").innerText()).trim();
+    const after = (await st.locator(".facettitle").textContent()).trim();
     txDetail = JSON.stringify({ rows: counts.length, pick, pinned, before, after });
     txOk = counts.length > 1 && ordered && pinned.length === 1 && pinned[0] === pick && after !== before;
   } catch (e) { txDetail = String(e.message).split("\n")[0]; }
