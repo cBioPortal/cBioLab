@@ -14,4 +14,8 @@ export const mutants: Mutant[] = [
     effect: "The Genomic Evolution table never reads the OncoKB pin, so its Annotation column is always blank.",
     find: "evolutionMutationsSource(parts[0], pt.id, db, order, ctx.pin)",
     replace: "evolutionMutationsSource(parts[0], pt.id, db, order, null)" },
+  { id: "evolution-annotation-page-unpinned", layer: "counts", guard: "unit", file: "lib/views/evolution/run.ts",
+    effect: "A later page of the Genomic Evolution table carries annotations without naming the OncoKB version they were read at.",
+    find: "mutations: tableOf(r, r.rows), ...bare, oncokbPin: ctx.pin }",
+    replace: "mutations: tableOf(r, r.rows), ...bare }" },
 ];

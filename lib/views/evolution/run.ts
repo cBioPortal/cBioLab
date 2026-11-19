@@ -146,10 +146,10 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
       if (!want) return no("the cohort has no patient with two or more samples and allele counts, so there is no mutation table to page");
       const { samples } = await samplesOf(want);
       const r = await mutationRows(want, samples.map((s) => s.id), mSize);
-      return partial({ ...listOf(empty), patient: { ...want, samples }, mutations: tableOf(r, r.rows), ...bare });
+      return partial({ ...listOf(empty), patient: { ...want, samples }, mutations: tableOf(r, r.rows), ...bare, oncokbPin: ctx.pin });
     }
     const r = await listRows(show, { values: true, locate: view.patient && !ctx.page && !ctx.values ? { study: view.patient.study, patient: view.patient.id } : undefined });
-    if (ctx.page || ctx.values) return partial({ ...listOf(r), patient: null, ...bare });
+    if (ctx.page || ctx.values) return partial({ ...listOf(r), patient: null, ...bare, oncokbPin: ctx.pin });
 
     const want = view.patient ? { study: view.patient.study, id: view.patient.id } : r.rows[0] ? { study: String(r.rows[0].study), id: String(r.rows[0].patient) } : null;
     if (!want) {

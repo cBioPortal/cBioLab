@@ -14,7 +14,7 @@
  *   A6 the column sorts drivers first (order "drv"): descending, SMARCA4 last
  *   A7 the result echoes the pin it read
  *
- * Run: node --env-file=.env.local scripts/check-evolution-annotation.ts (connection b must be the
+ * Run (as scripts/gate.sh does): node --env-file=.env.local scripts/check-evolution-annotation.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { connById } from "../lib/ch.ts";

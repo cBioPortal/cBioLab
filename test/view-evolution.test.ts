@@ -256,6 +256,14 @@ describe("evolution: the patient drawn", () => {
     const none = await run({}, one(study({ everyone: [] }), { page: { offset: 0, limit: 2 }, table: "mutations" }));
     assert.match(none.error!, /no patient with two or more samples and allele counts/);
   });
+  test("PTB-GE-TB-1 a later page and a column's values name the OncoKB version their Annotation column read, as the first page does", async () => {
+    for (const extra of [{ page: { offset: 1, limit: 2 }, table: "mutations" }, { values: "annotation", table: "mutations" }, { page: { offset: 0, limit: 10 } }]) {
+      const v = await run({ patient: { study: "s1", id: "P1" } }, one(study(), { ...extra, pin: "v7.5" }));
+      assert.equal(v.error, undefined, String(v.error));
+      assert.equal(evo(v).oncokbPin, "v7.5", JSON.stringify(extra));
+    }
+    assert.equal(evo(await run({}, one(study(), { page: { offset: 1, limit: 2 }, table: "mutations" }))).oncokbPin, null, "no pin: null, not absent");
+  });
 
   test("the results text lists each drawn mutation by sample, and the table", async () => {
     const v = await run({}, one());
