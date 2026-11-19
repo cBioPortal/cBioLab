@@ -602,10 +602,23 @@ async function explore({ ok, BASE, page, browser }) {
     await card.locator("svg.xc-density").waitFor({ timeout: 240000 });
     const title = (await card.locator(".xc-title").innerText()).trim();
     const both = await page.locator("[data-chart=mutcount-fga]").count();
-    xyDetail = JSON.stringify({ mixed, numeric, title, both });
-    xyOk = mixed === "Add violin/box plot table" && numeric === "Add density plot" && title === "Mutation Count vs Diagnosis Age" && both === 1;
+    // a drag on the added chart filters on both its attributes; Remove chart takes the chart and those filters
+    const fig = card.locator("svg.xc-density");
+    await card.scrollIntoViewIfNeeded();
+    const bb = await fig.boundingBox();
+    await page.mouse.move(bb.x + bb.width * 0.25, bb.y + bb.height * 0.3); await page.mouse.down();
+    await page.mouse.move(bb.x + bb.width * 0.6, bb.y + bb.height * 0.8, { steps: 10 }); await page.mouse.up();
+    await page.waitForFunction(() => /Diagnosis Age/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    const dragged = (await page.locator(".svpills").innerText()).replace(/\s+/g, " ");
+    await card.getByRole("button", { name: /actions for/ }).click();
+    await page.getByRole("menuitem", { name: "Remove chart" }).click();
+    await page.waitForFunction(() => !/Diagnosis Age|Mutation Count/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    const removed = await page.locator("[data-chart=xvsy]").count();
+    xyDetail = JSON.stringify({ mixed, numeric, title, both, dragged: dragged.slice(0, 120), removed });
+    xyOk = mixed === "Add violin/box plot table" && numeric === "Add density plot" && title === "Mutation Count vs Diagnosis Age" && both === 1
+      && /Diagnosis Age/.test(dragged) && /Mutation Count/.test(dragged) && removed === 0;
   } catch (e) { xyDetail = String(e.message).split("\n")[0]; }
-  ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one", xyOk, xyDetail);
+  ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one; its drag filters, Remove chart clears them", xyOk, xyDetail);
 
   // the treatment tables (STS-OT-6), shown when the study has treatments: patients per agent, most
   // first; a checked agent applied filters on it, and the sample table narrows with it

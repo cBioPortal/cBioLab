@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import {
   MUTATION_COUNT, FGA, DENSITY_GRID, densityAxes, swapDensity, logOffered, densityView, densityTitle,
   densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection, densityPairKey, DEFAULT_DENSITY_PAIR,
-  densityBinEdges, withDensityBins,
+  densityBinEdges, withDensityBins, densityBinsAfterDrag, densityBinsWithout, xyChartRemoval,
 } from "../lib/study-view-density.ts";
 import { plotExtent } from "../lib/plot.ts";
 
@@ -393,4 +393,30 @@ test("STS-SC-6: a drag's edges are a temporary set, laid over the reader's bins 
   assert.deepEqual(withDensityBins(reader, [mc], null).MUTATION_COUNT, { showNa: true });
   // a chart the reader never set
   assert.deepEqual(withDensityBins({}, [mc], { all: [drag] }).MUTATION_COUNT, { bins: { method: "custom", edges: [20, 40, 240, 271, 5684] } });
+});
+
+// STS-SC-6 with several density charts: the portal keeps the scatter-selection bins per attribute
+// (StudyViewPageStore._customBinsFromScatterPlotSelectionSet), so a drag on one chart replaces only
+// its own two attributes' edges, and removing a chart drops its attributes' edges with their filters
+test("a drag on one density chart replaces its attributes' temporary edges only; another chart's stay", () => {
+  const fga = { attribute: FGA, range: { gte: 0.1, lte: 0.3 }, edges: [0, 0.1, 0.3, 1] };
+  const mc = { attribute: MUTATION_COUNT, range: { gte: 3, lte: 40 }, edges: [3, 20, 40] };
+  const age = { attribute: "AGE", range: { gte: 50, lte: 60 }, edges: [40, 50, 60, 80] };
+  const mc2 = { attribute: MUTATION_COUNT, range: { gte: 5, lte: 9 }, edges: [5, 9, 20] };
+  // the default chart dragged, then Mutation Count vs Diagnosis Age
+  assert.deepEqual(densityBinsAfterDrag([fga, mc], [age, mc2]), [fga, age, mc2], "FGA's edges kept; Mutation Count's replaced");
+  assert.deepEqual(densityBinsAfterDrag([], [fga, mc]), [fga, mc]);
+  // Remove chart on Mutation Count vs Diagnosis Age: both its attributes' edges go
+  assert.deepEqual(densityBinsWithout([fga, age, mc2], ["AGE", MUTATION_COUNT]), [fga]);
+});
+
+test("Remove chart on an added density chart: the pair goes, with its two attributes' filters and temporary edges", () => {
+  const pair = { x: "AGE", y: MUTATION_COUNT }, other = { x: "AGE", y: FGA };
+  const bins = [{ attribute: FGA, range: { gte: 0.1, lte: 0.3 }, edges: [0, 0.1, 0.3, 1] },
+    { attribute: "AGE", range: { gte: 50, lte: 60 }, edges: [50, 60] }, { attribute: MUTATION_COUNT, range: { gte: 3, lte: 9 }, edges: [3, 9] }];
+  // asked for either way round, the same chart
+  const r = xyChartRemoval([pair, other], bins, { x: MUTATION_COUNT, y: "AGE" });
+  assert.deepEqual(r.pairs, [other]);
+  assert.deepEqual(r.bins, [bins[0]]);
+  assert.deepEqual(r.clear, ["AGE", MUTATION_COUNT], "the portal clears the filters on both attributes");
 });

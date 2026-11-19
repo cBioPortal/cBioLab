@@ -169,6 +169,30 @@ export function withDensityBins(bins: Record<string, ChartBins>, density: Densit
   }
   return out;
 }
+/**
+ * The temporary edges after a drag on one density chart (`next`, its two attributes'): they replace
+ * those attributes' own, and every other attribute's, another chart's, stay, as the portal keeps
+ * them per attribute (_customBinsFromScatterPlotSelectionSet).
+ */
+export function densityBinsAfterDrag(current: DensityBins[], next: DensityBins[]): DensityBins[] {
+  const mine = new Set(next.map((d) => d.attribute));
+  return [...current.filter((d) => !mine.has(d.attribute)), ...next];
+}
+
+/** the temporary edges without these attributes': a density chart removed takes its attributes' with it */
+export function densityBinsWithout(current: DensityBins[], attributes: string[]): DensityBins[] {
+  return current.filter((d) => !attributes.includes(d.attribute));
+}
+
+/**
+ * Remove chart on an X vs Y density chart, as the portal's: the pair goes (whichever way round it
+ * was asked for), and with it the filters on both its attributes (`clear`) and their temporary edges.
+ */
+export function xyChartRemoval(pairs: DensityPair[], bins: DensityBins[], pair: DensityPair): { pairs: DensityPair[]; bins: DensityBins[]; clear: string[] } {
+  const clear = [pair.x, pair.y].sort();
+  return { pairs: pairs.filter((p) => densityPairKey(p) !== densityPairKey(pair)), bins: densityBinsWithout(bins, clear), clear };
+}
+
 export function densityBinEdges(clauses: { attribute: string; range: { gte: number; lte: number } }[]): { attribute: string; ends: number[] }[] {
   return clauses.map((c) => ({ attribute: c.attribute, ends: [c.range.gte, c.range.lte] }));
 }
