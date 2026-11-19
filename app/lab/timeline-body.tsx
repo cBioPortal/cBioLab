@@ -6,7 +6,7 @@
 // cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { timelineSvg, timelineSummary, zoomFromDrag } from "../../lib/timeline-svg.ts";
+import { rowAt, timelineSvg, timelineSummary, zoomFromDrag } from "../../lib/timeline-svg.ts";
 import { formatDays, sampleMarks, sampleTipRows, attr, SAMPLE_TRACK } from "../../lib/timeline-tracks.ts";
 import { canonicalEventName } from "../../lib/event-names.ts";
 import type { PatientEvent, TimelineResult } from "../../lib/types";
@@ -74,6 +74,8 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   const [zoom, setZoom] = useState<[number, number] | null>(null);
   const [drag, setDrag] = useState<{ x0: number; x1: number } | null>(null);
   const [cursor, setCursor] = useState<number | null>(null);
+  // the track row under the pointer, its band drawn #F2F2F2 as the portal highlights a hovered row
+  const [hotRow, setHotRow] = useState<number | null>(null);
   const dragged = useRef(false);
   useEffect(() => { setZoom(null); setDrag(null); }, [p, spec.expandGaps]);
   const drawn = useMemo(() => p ? timelineSvg(p, { width, collapsed, expandGaps: !!spec.expandGaps, interactive: true, zoom: zoom ?? undefined }) : null, [p, width, collapsed, spec.expandGaps, zoom]);
@@ -120,6 +122,8 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   const onMove = (e: React.MouseEvent) => {
     const at = figX(e);
     setCursor(at?.inPlot ? at.x : null);
+    const svg = box.current?.querySelector("svg");
+    setHotRow(svg && drawn ? rowAt(drawn.layout, e.clientY - svg.getBoundingClientRect().top) : null);
     if (drag && at) setDrag({ ...drag, x1: Math.max(drawn!.layout.plot.x, Math.min(drawn!.layout.plot.x + drawn!.layout.plot.width, at.x)) });
     if (tip?.pinned) return;
     const ev = marked(e);
@@ -166,10 +170,12 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
       ) : <p className="meta">No patient to draw: the cohort's patient list is empty.</p>}
       {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-static-element-interactions -- track groups in the drawn SVG expand on click only; there is no keyboard equivalent yet */}
       <div ref={box} className={"tl-fig" + (updating ? " stale" : "")} onClick={onClick} onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp}
-        onMouseLeave={() => { setCursor(null); setDrag(null); if (!tip?.pinned) dropTip(); }}>
+        onMouseLeave={() => { setCursor(null); setHotRow(null); setDrag(null); if (!tip?.pinned) dropTip(); }}>
         {drawn && (p!.events.length
           ? <div dangerouslySetInnerHTML={{ __html: drawn.svg }} />
           : <p className="meta tl-empty">{p!.patient} has no timeline events recorded.</p>)}
+        {drawn && p!.events.length > 0 && hotRow != null && drawn.layout.rows[hotRow] &&
+          <div className="tl-row-hot" aria-hidden="true" style={{ top: drawn.layout.rows[hotRow].y, height: drawn.layout.rows[hotRow].h, width: drawn.layout.width }} />}
         {drawn && p!.events.length > 0 && cursor != null && !drag &&
           <div className="tl-cursor" aria-hidden="true" style={{ left: cursor, height: drawn.layout.height }} />}
         {drag && drawn && Math.abs(drag.x1 - drag.x0) > 0 &&

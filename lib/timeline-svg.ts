@@ -99,6 +99,12 @@ export interface TimelineLayout {
   plot: { x: number; width: number };
 }
 
+/** The row a point `y` px down the figure falls in (PAT-TL-TR-5: the row the pointer is on is highlighted), or null outside every row. */
+export function rowAt(layout: Pick<TimelineLayout, "rows">, y: number): number | null {
+  const i = layout.rows.findIndex((r) => y >= r.y && y < r.y + r.h);
+  return i < 0 ? null : i;
+}
+
 /**
  * The figure, and what a caption must say about it. `interactive` adds the data- attributes the
  * card reads: `data-ev` (event indices) on each mark, `data-uid` on each header that collapses.

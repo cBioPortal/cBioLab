@@ -3,7 +3,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
-import { timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
+import { rowAt, timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
 import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
@@ -451,4 +451,17 @@ describe("drag to zoom (PAT-TL-ZM-3)", () => {
     const zx = inZoom.layout.plot.x;
     assert.ok(!labelsAt(inZoom.svg).some((l) => l.text === "0" && Math.abs(l.x - zx) < 20), labelsAt(inZoom.svg).map((l) => l.text + "@" + l.x).join(" "));
   });
+});
+
+test("PAT-TL-TR-5 rowAt: the row the pointer is on, by the figure's own rows; its bottom edge is the next row's", () => {
+  const t: PatientTimeline = { study: "s", patient: "P-1", events: EVENTS, samples: [{ id: "P-1-T02", type: "Primary" }], source: { label: "local", remote: false } };
+  const { layout } = timelineSvg(t, { width: 900, interactive: true });
+  const r = layout.rows;
+  assert.ok(r.length > 2);
+  assert.equal(rowAt(layout, r[0].y), 0);
+  assert.equal(rowAt(layout, r[0].y + r[0].h - 0.5), 0);
+  assert.equal(rowAt(layout, r[0].y + r[0].h), 1, "the next row starts where one ends");
+  assert.equal(rowAt(layout, r[r.length - 1].y + r[r.length - 1].h / 2), r.length - 1);
+  assert.equal(rowAt(layout, r[0].y - 1), null, "the axis above the rows");
+  assert.equal(rowAt(layout, r[r.length - 1].y + r[r.length - 1].h + 1), null, "below the last row");
 });

@@ -1817,6 +1817,8 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .tl-fig .tl-drag { position: absolute; top: 0; background: color-mix(in srgb, var(--primary) 15%, transparent); pointer-events: none; }
 .tl-fig .tl-m { cursor: default; }
 .tl-fig .tl-h:hover text { fill: var(--accent); }
+/* the row under the pointer (PAT-TL-TR-5): the portal's #F2F2F2 band, multiplied over the white figure so the marks stay as drawn */
+.tl-fig .tl-row-hot { position: absolute; left: 0; background: #f2f2f2; mix-blend-mode: multiply; pointer-events: none; }
 .tl-empty { padding: var(--s3); }
 .tl-tip { max-width: 340px; }
 .tl-tip table { border-collapse: collapse; font-size: var(--t-sm); }
