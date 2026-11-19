@@ -6,7 +6,7 @@
 // the fixture study by scripts/check-oncokb-tumor-type.ts. OncoKB is a stubbed fetch.
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { oncokbTumorTypeSource as src, proteinChangeQuery, storeRow, tumorTypeKeySpace } from "../src/sources/oncokb-tumor-type.ts";
+import { oncokbTumorTypeSource as src, biomarkerQuery, proteinChangeQuery, storeRow, tumorTypeKeySpace, OTHER_BIOMARKERS } from "../src/sources/oncokb-tumor-type.ts";
 
 const realFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = realFetch; });
@@ -165,4 +165,38 @@ test("key space: the study is quoted and scopes both tables; no study, no filter
   const all = tumorTypeKeySpace("cbioportal", null);
   assert.ok(!all.includes("o\\'brien") && !all.includes("m.studyId = "));
   assert.ok(all.includes("FROM cbioportal.mutation_derived"));
+});
+
+// TMB-H / MSI-H (PAT-STM-9): the header's queries (PatientViewPageStore.ts getOtherBiomarkerQueries,
+// cbioportal-frontend 3590-3610), filed under gene "Other Biomarkers" in the same table. Their key
+// space is run against the fixture by scripts/check-oncokb-tumor-type.ts.
+const biomarker = (alteration: string, tumorType: string) => ({
+  alteration_type: "MUTATION", hugo_gene_symbol: OTHER_BIOMARKERS, alteration, consequence: "", tumor_type: tumorType,
+  entrez_gene_id: "", protein_start: "", protein_end: ""
+});
+
+test("BQ1 a biomarker is asked by name under the Hugo symbol Other Biomarkers, at its tumour type, with nothing else", () => {
+  assert.equal(OTHER_BIOMARKERS, "Other Biomarkers");
+  assert.deepEqual(sent(biomarkerQuery(biomarker("TMB-H", "Lung Adenocarcinoma"))),
+    { alteration: "TMB-H", gene: { hugoSymbol: "Other Biomarkers" }, tumorType: "Lung Adenocarcinoma" });
+});
+
+test("BQ2 with no tumour type (no sample's, no study's) the query has none (tumorTypeResolver's undefined)", () => {
+  assert.ok(!("tumorType" in sent(biomarkerQuery(biomarker("MSI-H", "")))));
+});
+
+test("BQ3 biomarker keys are asked whatever the cancer gene list says, in the mutations' request, and stored under their key", async () => {
+  const asked = oncokb();
+  const rows = await src.annotate([biomarker("MSI-H", "Lung Adenocarcinoma"), L858R("Lung Adenocarcinoma"), key("NOTKB", NOTKB, "A1V", "Missense_Mutation", "Lung Adenocarcinoma", "1")]);
+  const queries = byProteinChange(asked).flatMap((a) => a.body as { alteration: string; gene: object }[]);
+  assert.deepEqual(queries.map((q) => [q.alteration, q.gene]), [["MSI-H", { hugoSymbol: OTHER_BIOMARKERS }], ["L858R", { entrezGeneId: EGFR }]]);
+  const r = rows.find((x) => x.alteration === "MSI-H")!;
+  assert.deepEqual([r.hugo_gene_symbol, r.consequence, r.tumor_type, r.oncogenicity, r.highest_sensitive_level], [OTHER_BIOMARKERS, "", "Lung Adenocarcinoma", "Oncogenic", "LEVEL_1"]);
+});
+
+test("key space: the sync's is the mutations' and the biomarkers' together, each scoped to the study", () => {
+  const sql = src.keySpace("cbioportal", "o'brien_2024");
+  assert.equal(sql.split(" UNION ALL ").length, 2);
+  assert.ok(sql.includes("'Other Biomarkers' AS hugo_gene_symbol"));
+  assert.equal(sql.split("cancer_study_identifier = 'o\\'brien_2024'").length - 1, 3, "the mutations' clinical rows and the biomarkers' (twice)");
 });
