@@ -12,7 +12,9 @@ import {
   seriesStyle, fmtInt, fmtMonths, fmtNum, label, textWidth, esc, FS, SW, type SvgOpts
 } from "../../svg-kit.ts";
 
-export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts): string {
+/** `single`: one colour for every curve, where a page draws one group as the portal does (the Study View's #2986E2) */
+export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: string): string {
+  const styleOf = (i: number) => single ? { color: single, dash: "" } : seriesStyle(i);
   const p = palette(o.theme), W = Math.max(360, o.width || 720);
   const curves = (v.curves || []) as KmCurve[];
   const incidence = v.display === "incidence";
@@ -39,7 +41,7 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts): string {
   curves.forEach((c, i) => {
     // a group with no patients (an overlap none of whom has the endpoint) has no curve to draw
     if (!c.n) return;
-    const st = seriesStyle(i);
+    const st = styleOf(i);
     // each curve runs to its own last follow-up, so a censored tail is drawn flat
     const d = stepPath(c.points.filter((q) => q.t <= tMax), xs, ys, { t: 0, s: incidence ? 0 : 1 }, Math.min(tMax, c.tLast ?? tMax));
     out.push(`<path d="${d}" fill="none" stroke="${st.color}" stroke-width="${SW.series}"` +
@@ -47,9 +49,9 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts): string {
   });
 
   let y = T + PLOT + bottomAxisHeight(xTitle) + 10;
-  if (risk) { const rt = riskTable(curves, xs, y, W, L, nameW, p); out.push(rt.svg); y += rt.height + 8; }
+  if (risk) { const rt = riskTable(curves, xs, y, W, L, nameW, p, styleOf); out.push(rt.svg); y += rt.height + 8; }
   const items = curves.map((c, i) => ({
-    label: c.cohort, color: seriesStyle(i).color, dash: seriesStyle(i).dash, kind: "line" as const,
+    label: c.cohort, color: styleOf(i).color, dash: styleOf(i).dash, kind: "line" as const,
     detail: !c.n ? "no patients with data" : (incidence ? "50% incidence by " + (c.median == null ? "not reached" : fmtMonths(c.median))
       : "median " + (c.median == null ? "not reached" : portalMedianCi(c.median, c.medianCi?.lo ?? null, c.medianCi?.hi ?? null) + " mo")) +
       " · n = " + fmtInt(c.n) + " · " + fmtInt(c.events) + " events"
@@ -92,7 +94,7 @@ function statLines(v: DrawnResultOf<"survival">): string[] {
  * counts are wider than the ticks are apart, every second (third, …) tick is printed.
  */
 function riskTable(curves: KmCurve[], xs: ReturnType<typeof linear>, y0: number, W: number, L: number, nameW: number,
-  p: ReturnType<typeof palette>): { svg: string; height: number } {
+  p: ReturnType<typeof palette>, styleOf: (i: number) => { color: string; dash: string } = seriesStyle): { svg: string; height: number } {
   const ROW = Math.round(FS.small * 1.6);
   const at = (c: KmCurve, t: number) => { const a = c.atRisk!; const m = Math.round(t); return m < a.length ? a[m] : 0; };
   const widest = Math.max(...curves.flatMap((c) => xs.ticks.map((t) => textWidth(fmtInt(at(c, t)), FS.small))));
@@ -100,7 +102,7 @@ function riskTable(curves: KmCurve[], xs: ReturnType<typeof linear>, y0: number,
   const every = Math.max(1, Math.ceil((widest + 6) / gap));
   const out: string[] = [label(8, y0 + FS.small, "Number at risk", { size: FS.small, fill: p.muted, weight: 600 })];
   curves.forEach((c, i) => {
-    const st = seriesStyle(i), cy = y0 + ROW * (i + 1) + ROW / 2, ty = cy + FS.small * 0.35;
+    const st = styleOf(i), cy = y0 + ROW * (i + 1) + ROW / 2, ty = cy + FS.small * 0.35;
     out.push(`<line x1="8" y1="${cy}" x2="24" y2="${cy}" stroke="${st.color}" stroke-width="${SW.series}"` + (st.dash ? ` stroke-dasharray="${st.dash}"` : "") + `/>`);
     out.push(label(28, ty, c.cohort, { size: FS.small, fill: p.ink, maxW: nameW }));
     let right = -Infinity;
