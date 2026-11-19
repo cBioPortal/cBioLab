@@ -65,7 +65,8 @@ def tie(*ls):
 
 
 def mut(pid, mt, driver=False, germ=False, gene="TP53"):
-    return {"pid": pid, "gene": gene, "vt": "mutation", "mt": mt, "driver": driver, "germ": germ}
+    # a promoter mutation as the warehouse stores one: type 5'Flank, protein change "Promoter" (the portal reads the change)
+    return {"pid": pid, "gene": gene, "vt": "mutation", "mt": mt, **({"mv": "Promoter"} if mt == "5'Flank" else {}), "driver": driver, "germ": germ}
 
 
 def cna(pid, v, driver=False, gene="TP53"):

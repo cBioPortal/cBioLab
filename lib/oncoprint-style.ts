@@ -14,7 +14,7 @@ export const STYLE = {
     MISSENSE: 1, TRUNCATING: 2, INFRAME: 4, SPLICE: 8, OTHER_MUT: 16,
     SV: 32, AMP: 64, HOMDEL: 128,
     DRIVER: 256,      // some alteration in the cell is annotated (putative) driver: the gutter's driver %, the sort
-    PROMOTER: 512,    // 5'Flank / promoter mutations, which the portal colours separately
+    PROMOTER: 512,    // promoter mutations (a protein change of "Promoter"), which the portal colours separately
     MRNA_HIGH: 1024, MRNA_LOW: 2048, PROT_HIGH: 4096, PROT_LOW: 8192,
     MUT_DRIVER: 16384, // the mutation classes in the cell are its driver mutations' (see the assembler)
     SV_DRIVER: 32768,  // the cell's structural variant is a driver
