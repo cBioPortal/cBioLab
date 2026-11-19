@@ -152,11 +152,11 @@ export function appliedLines(clauses: unknown[], lines: string[]): string[] {
 /** the most filters a selection holds (lib/cohort2.ts) */
 const MAX_FILTERS = 8;
 
-/** why Intersection can't be offered: one filter per gene would take the selection past its limit */
-export function intersectionRefusal(filters: number, genes: number): string | null {
-  const after = filters + genes;
+/** why Intersection can't be offered: one filter per checked row (a gene, a kind of data) would take the selection past its limit */
+export function intersectionRefusal(filters: number, rows: number, row = "gene"): string | null {
+  const after = filters + rows;
   if (after <= MAX_FILTERS) return null;
-  return "Intersection adds a filter per gene, which would make " + after + " filters; a selection holds at most " + MAX_FILTERS + " (Union adds one)";
+  return "Intersection adds a filter per " + row + ", which would make " + after + " filters; a selection holds at most " + MAX_FILTERS + " (Union adds one)";
 }
 
 /** a gene toggled in the genes queued for a query, with the message the portal shows */

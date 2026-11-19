@@ -749,3 +749,9 @@ test("GI1: filtered, the portal's first line then the filter note on a line of i
 test("GI1: every filtered tooltip ends with the note", () => {
   for (const k of KINDS) assert.ok(alteredHeaderTip(k, true).endsWith("\n" + FILTER_NOTE), k);
 });
+
+test("Intersection's refusal names the row it adds a filter for: a gene by default, or a kind of data", () => {
+  assert.equal(intersectionRefusal(7, 2), "Intersection adds a filter per gene, which would make 9 filters; a selection holds at most 8 (Union adds one)");
+  assert.equal(intersectionRefusal(7, 2, "kind of data"), "Intersection adds a filter per kind of data, which would make 9 filters; a selection holds at most 8 (Union adds one)");
+  assert.equal(intersectionRefusal(6, 2, "kind of data"), null);
+});
