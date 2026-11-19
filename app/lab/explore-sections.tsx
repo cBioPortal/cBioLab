@@ -20,6 +20,7 @@ import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
+import { chartOffered } from "../../lib/study-view-config.ts";
 import { addChartLines, bulkButtons, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
@@ -320,8 +321,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           const custom = explore.clinical.filter((c) => isCustomAttr(c.attribute));
           // with the declared attributes no selected sample has data for: the portal lists them, 0% and disabled;
           // only those the query counted (one it was not asked for, or cut at its limit, is unknown, not 0%)
-          const builtin = [...explore.clinical.filter((c) => !isCustomAttr(c.attribute)),
-            ...(explore.declaredAttributes || []).filter((d) => d.counted !== false && !isCustomAttr(d.attribute) && !explore.clinical.some((c) => c.attribute === d.attribute))
+          const builtin = [...explore.clinical.filter((c) => !isCustomAttr(c.attribute) && chartOffered(c.priority)),
+            ...(explore.declaredAttributes || []).filter((d) => d.counted !== false && !isCustomAttr(d.attribute) && chartOffered(d.priority) && !explore.clinical.some((c) => c.attribute === d.attribute))
               .map((d) => ({ ...d, kind: "cat" as const, values: [], patients: 0, samples: 0, absent: true }))] as typeof explore.clinical;
           const keysOf = (list: typeof explore.clinical) => list.map(attrKey);
           const checkedOf = (list: typeof explore.clinical) => list.filter((c) => chartChecked(attrKey(c))).length;
@@ -1295,7 +1296,7 @@ export function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
   if (!rows.length || !many) return null;
   const total = rows.reduce((n, r) => n + r.n, 0) || 1;
   return (
-    <div className="card wide">
+    <div className="card wide" data-chart="studies">
       <h2>Cancer Studies <span className="plain">— {explore.draftCount != null ? "the draft's" : "the selection's"} samples across the {exStudies.length} selected studies</span></h2>
       <VirtualRows items={rows} rowKey={(r) => r.study} estimate={26} className="sbrows">
         {(r) => (
@@ -1352,7 +1353,7 @@ export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
   const filters = (d?.all || []).length;
   const refusal = op === "intersection" && n > 1 ? intersectionRefusal(filters, n, "kind of data") : null;
   return (
-    <div className="card wide">
+    <div className="card wide" data-chart="datatypes">
       <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
       <VirtualRows items={rows} rowKey={(dt) => dt.profile} estimate={26} className="generows">
         {(dt) => {
