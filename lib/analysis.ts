@@ -14,13 +14,13 @@ import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, Clause, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { plainResult } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
-import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, attributeCutsSql, attributeLevels, type Resolver } from "./federation.ts";
+import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, attributeCutsSql, attributeValueCountsSql, attributeLevels, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
 import { describeSources, sourceIndex } from "./provenance.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, quantilePoints, rangeArms, SPLIT_BY_DEFAULT_MIN_COUNT, ANALYSIS_MAX_COHORTS } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, quantilePoints, pooledCuts, rangeArms, SPLIT_BY_DEFAULT_MIN_COUNT, ANALYSIS_MAX_COHORTS } from "./partition-arms.ts";
 import { ENTITY_RE, isCategoricalAssay, assayCohortMedianSql, assayCohortValuesSql, assayCohortCutsSql } from "./generic-assay.ts";
 import { entityShortName } from "./profile-names.ts";
 import { upgradeDocument } from "./doc-version.ts";
@@ -274,6 +274,17 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
   if (dist.kind === "num") {
     // A median split relative to the cohort being split, through a percentile leaf: the engine
     // resolves the cutoff live from this cohort's own values, at the level the study records them.
+    // across studies, quantiles cut over every study's values pooled (STS-STM-12); the live median
+    // split below resolves its cutoff within one study
+    if (studies.length > 1 && req.quantiles != null) {
+      const ps = quantilePoints(req.quantiles);
+      const counts = (await Promise.all(studies.map(async (s) => {
+        const r = await resolverOf(s);
+        if (!hasViewAggregates(r)) throw new Error(s + " cannot answer a quantile split here");
+        return r.viewAggregate("partition:quantile values", def, (c, st, d) => attributeValueCountsSql(c, attribute, st, d));
+      }))).flat().map((row) => ({ v: Number(row.v), n: Number(row.n) }));
+      return quantilePartition(cohort, nameFor(attribute), attribute, req.quantiles, pooledCuts(counts, ps), (range) => ({ kind: "clinical", attribute, range }), { attribute });
+    }
     if (studies.length > 1) throw new Error("'" + attribute + "' is numeric, and a median split needs a cohort in a single study (“" + cohort + "” spans " + studies.length + ")");
     const name = nameFor(attribute);
     if (req.quantiles != null) {

@@ -993,6 +993,23 @@ export function attributeCutsSql(cohortSql: string, attribute: string, ps: numbe
   ));
 }
 
+/**
+ * A numeric attribute's values in a cohort, each with how many cases hold it: values and counts, no
+ * identifier, for a quantile split over several studies to pool (pooledCuts) by the rule
+ * attributeCutsSql runs within one.
+ */
+export function attributeValueCountsSql(cohortSql: string, attribute: string, study: string, db: string = DB): AggregateSql {
+  return aggregateSql((
+    "WITH cohort AS (" + cohortSql + ")\n" +
+    "SELECT " + finiteSql("attribute_value") + " AS v, count() AS n\n" +
+    "FROM " + clinicalTable(db, [attribute]) + "\n" +
+    "WHERE cancer_study_identifier = " + sq(study) + " AND attribute_name = " + sq(attribute) + "\n" +
+    "  AND attribute_value != ''\n" +
+    "  AND " + inCohortClinical(study) + "\n" +
+    "GROUP BY v HAVING v IS NOT NULL"
+  ));
+}
+
 /** an axis that can answer "Not profiled": a gene's alterations, or a discrete copy-number profile */
 function undecidable(a: PlotAxis): boolean {
   return a.source === "alteration" || (a.source === "molecular" && !!a.discrete);
