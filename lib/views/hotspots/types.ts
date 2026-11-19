@@ -73,6 +73,8 @@ export interface HotspotGene {
   topChanges: { change: string; pos: number | null; n: number; pct: number }[];
   /** samples with a somatic mutation in the gene, and samples in the cohort */
   somaticSamples: number; cohortSamples: number;
+  /** the cohort's patients, summed over its studies (the stem tooltip's denominator); unknown when a site sent none */
+  cohortPatients?: number;
   /**
    * samples with a germline mutation in the gene (status matching /germline/i), and the rate's denominator: the
    * cohort's germline-consented samples where a study lists them, else every one. The portal shows the rate only

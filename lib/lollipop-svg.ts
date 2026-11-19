@@ -1,7 +1,7 @@
 // The lollipop figure: the plot alone, one panel per gene, and its caption's words for what the app
 // shows beside it as controls. Imports only the drawing kit and lib/lollipop.ts, so the app draws
 // it in the browser (app/_lollipop/HotspotsBody.tsx) from the same code the server uses for MCP.
-import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, lollipopGeneEmpty, defaultYMax, lollipopXTicks, lollipopYTicks, LOLLIPOP_Y_TITLE, type AlterationCell, type CodonSelection } from "./lollipop.ts";
+import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, lollipopGeneEmpty, lollipopStemTip, defaultYMax, lollipopXTicks, lollipopYTicks, LOLLIPOP_Y_TITLE, type AlterationCell, type CodonSelection } from "./lollipop.ts";
 
 import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, legend, label, textWidth, textOn,
@@ -97,9 +97,7 @@ export function lollipopPanelsSvg(genes: HotspotGene[], o: SvgOpts, captionText:
     const sel = new Set(codons?.[g.gene] || []);
     for (const q of [...g.positions.filter((q) => !sel.has(q.pos)), ...g.positions.filter((q) => sel.has(q.pos))]) {
       const cx = x(q.pos), cy = ys(Math.min(ys.domain[1], q.n));
-      const tip = "codon " + q.pos + ": " + fmtInt(q.n) + " mutation" + (q.n === 1 ? "" : "s") + "\n" +
-        q.changes.slice(0, 12).map((c) => c.change + " " + fmtInt(c.n)).join("\n") +
-        (q.changes.length > 12 ? "\n…and " + (q.changes.length - 12) + " more" : "");
+      const tip = lollipopStemTip(q, g.cohortPatients);
       const on = sel.has(q.pos);
       out.push(`<g data-gene="${esc(g.gene)}" data-codon="${q.pos}"${on ? ' data-selected="1"' : ""}><title>${esc(tip)}</title>` +
         `<line x1="${r1(cx)}" y1="${yBase}" x2="${r1(cx)}" y2="${r1(cy)}" stroke="${STICK}" stroke-width="${SW.line}"/>` +
