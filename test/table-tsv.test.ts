@@ -50,3 +50,12 @@ test("R1 the route refuses table-tsv for a non-mutations view", async () => {
   assert.match(text, /mutation table/);
   assert.deepEqual(sent, []);
 });
+
+// the Reviewer's case (#413): a download cut short answers 200 and ends with its # line; a copy of it is no copy of the table
+test("T5 cutShort: the reason of a cut-short table text, null for a whole one", async () => {
+  const { cutShort, INCOMPLETE_MARK } = await import("../lib/table-tsv.ts");
+  assert.equal(INCOMPLETE_MARK, "# DOWNLOAD INCOMPLETE");
+  assert.equal(cutShort("Gene\tSample ID\r\nKRAS\tS1\r\n"), null);
+  assert.equal(cutShort("Gene\r\nKRAS\r\n# DOWNLOAD INCOMPLETE: the page at row 1000 returned nothing\r\n"), "the page at row 1000 returned nothing");
+  assert.equal(cutShort("# DOWNLOAD INCOMPLETE\r\n"), "the table was cut short");
+});

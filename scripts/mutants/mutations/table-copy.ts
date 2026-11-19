@@ -10,4 +10,7 @@ export const mutants: Mutant[] = [
   { id: "copy-textarea-left", layer: "counts", guard: "unit", file: "app/_table/copy-text.ts",
     effect: "Each copy on a plain-http address leaves a hidden textarea of the whole table in the page.",
     find: "  area.remove();\n", replace: "" },
+  { id: "copy-cut-short-as-whole", layer: "counts", guard: "unit", file: "lib/table-tsv.ts",
+    effect: "A table download cut short (its # DOWNLOAD INCOMPLETE line) is copied as if it were the whole table.",
+    find: "const line = text.split(/\\r?\\n/).find((l) => l.startsWith(INCOMPLETE_MARK));", replace: "const line = undefined as string | undefined;" },
 ];

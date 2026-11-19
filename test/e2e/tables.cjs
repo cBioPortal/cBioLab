@@ -89,9 +89,13 @@ async function tables({ browser, ok, BASE }) {
       ok("table: the download reads \"download TSV (" + picked.all + ")\" while the table is filtered", picked.kept < picked.all && label === "download TSV (" + picked.all + ")", label);
       ok("table: the table.tsv holds every row, the columns by name, CRLF line ends", !!dl && dl.suggestedFilename() === "table.tsv" && lines[0].startsWith("Gene\tStudy of Origin\tCancer Type\tSample ID") && crlf && lines.length - 1 === picked.all,
         (dl ? dl.suggestedFilename() : "no download") + " · " + (lines.length - 1) + " rows of " + picked.all + ", crlf " + crlf + ", header " + JSON.stringify(lines[0] ? lines[0].slice(0, 60) : ""));
-      // Copy (MUT-TB-2): before the download, the same text as table.tsv on the clipboard, every row whatever the filter
+      // Copy (MUT-TB-2): before the download, in two clicks, the same text as table.tsv on the clipboard, every row whatever the filter
       await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(BASE).origin });
+      // the portal's two steps: the first click fetches every row ("Copy Ready!"), the second copies within its own click
       await page.getByRole("button", { name: "Copy", exact: true }).first().click();
+      const ready = await page.getByRole("button", { name: "Copy Ready!" }).first().waitFor({ timeout: 60000 }).then(() => true, () => false);
+      ok("table: a first Copy click fetches the rows and offers \"Copy Ready!\"", ready);
+      if (ready) await page.getByRole("button", { name: "Copy Ready!" }).first().click();
       const copied = await page.getByRole("status").filter({ hasText: "Copied!" }).first().waitFor({ timeout: 60000 }).then(() => true, () => false);
       const clip = copied ? await page.evaluate(() => navigator.clipboard.readText()) : "";
       const clipLines = clip.split(/\r?\n/);

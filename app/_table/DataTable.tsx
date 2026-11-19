@@ -13,6 +13,7 @@ import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { ViewPageBody, TableBody } from "../../lib/api-schemas.ts";
 import { ChevronLeft, ChevronRight, Columns3, Copy, Download, X } from "lucide-react";
 import { copyText } from "./copy-text.ts";
+import { cutShort } from "../../lib/table-tsv.ts";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
@@ -415,20 +416,28 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     if (x == null || x === "") return "";
     return typeof x === "number" ? (num ? num(c.id, x) : x.toLocaleString()) : String(x);
   };
-  // the portal's Copy: the same table.tsv text, to the clipboard, then "Copied!"
-  const [copied, setCopied] = useState<string | null>(null);
-  const copy = async () => {
-    setCopied("copying…");
+  // the portal's Copy, in its two steps: a first click fetches the table.tsv text ("Copy Ready!"), a second copies
+  // it within that click, which the browser's clipboard needs (a copy after a long fetch is refused)
+  const [copyState, setCopyState] = useState<{ phase: "idle" } | { phase: "loading" } | { phase: "ready"; text: string } | { phase: "done" } | { phase: "failed"; why: string }>({ phase: "idle" });
+  useEffect(() => { setCopyState({ phase: "idle" }); }, [t]);
+  const fetchCopy = async () => {
+    setCopyState({ phase: "loading" });
     try {
       const doc = JSON.parse(docJson ? docJson() : "");
       const r = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
         body: await api.tablePayload({ doc: doc as TableBody["doc"], view: vi, ...(table ? { table } : {}), format: "table-tsv" }) });
       const text = await r.text();
       if (!r.ok) throw new Error(text.trim());
-      await copyText(text);
-      setCopied("Copied!");
-    } catch (e) { setCopied("could not copy: " + String((e as Error)?.message || e)); }
+      const cut = cutShort(text);
+      if (cut) throw new Error("the table was cut short (" + cut + ")");
+      setCopyState({ phase: "ready", text });
+    } catch (e) { setCopyState({ phase: "failed", why: String((e as Error)?.message || e) }); }
   };
+  const copyNow = (text: string) => {
+    copyText(text).then(() => setCopyState({ phase: "done" }), (e) => setCopyState({ phase: "failed", why: String((e as Error)?.message || e) }));
+  };
+  const copyBlocked = updating ? "waiting for the table to update, so the copy matches it" : !docJson ? "this table has no document to copy from"
+    : !t.all ? "no rows to copy" : copyState.phase === "loading" ? "fetching every row to copy…" : null;
   const download = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = e.currentTarget;
@@ -461,10 +470,11 @@ export function DataTable<V extends string | number | null>({ t, query, updating
           data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download" : ownDownload.tip}
           onClick={ownDownload.onClick}><Download />{ownDownload.label}</Button> :
         <>{downloadFormat === "table-tsv" && <>
-          <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !docJson || !t.total}
-            data-tip={updating ? "waiting for the table to update, so the copy matches it" : "copy every row, as the download writes it, to the clipboard"}
-            onClick={() => void copy()} onBlur={() => setCopied(null)}><Copy />Copy</Button>
-          {copied && <span className="meta" role="status">{copied}</span>}
+          <Button variant="outline" size="sm" className={TB} type="button" disabled={!!copyBlocked}
+            data-tip={copyBlocked ?? (copyState.phase === "ready" ? "the rows are fetched: click to copy them to the clipboard" : "fetch every row, as the download writes it, to copy to the clipboard")}
+            onClick={() => copyState.phase === "ready" ? copyNow(copyState.text) : void fetchCopy()}>
+            <Copy />{copyState.phase === "ready" ? "Copy Ready!" : copyState.phase === "loading" ? "Copying…" : "Copy"}</Button>
+          {(copyState.phase === "done" || copyState.phase === "failed") && <span className="meta" role="status">{copyState.phase === "done" ? "Copied!" : "could not copy: " + copyState.why}</span>}
         </>}
                 <form method="post" action="/api/table" target="_blank" onSubmit={download}>
           <input type="hidden" name="payload" />
