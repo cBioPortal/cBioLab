@@ -14,12 +14,21 @@
  *   A6 the column sorts drivers first (order "drv"): descending, SMARCA4 last
  *   A7 the result echoes the pin it read
  *
+ * and its Cohort column (the Patient tables' rule, lib/patient-alterations.ts mutationCohortCtes):
+ *
+ *   C1 KRAS G12D (FX-P02): 24 of the study's 59 samples carry a called KRAS mutation, every sample's
+ *      panel covers KRAS (data_gene_panel_matrix.txt), 16 of them a G12 missense (G12C/D/V): n 24,
+ *      of 59, keywordN 16, Cohort % 100 × 24 / 59
+ *   C2 every evolution row's counts equal the Summary table's row for the same mutation (FX-P01, FX-P02)
+ *
  * Run (as scripts/gate.sh does): node --env-file=.env.local scripts/check-evolution-annotation.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
 import { connById } from "../lib/ch.ts";
 import { PatientLevelResolver } from "../lib/federation.ts";
 import { runEvolution } from "../lib/views/evolution/run.ts";
+import { runAlterations } from "../lib/views/alterations/run.ts";
+import type { AlterationsResult } from "../lib/views/alterations/types.ts";
 import type { ViewRun } from "../lib/views/run.ts";
 import type { EvolutionResult } from "../lib/views/evolution/types.ts";
 
@@ -75,6 +84,33 @@ const other = await table("FX-P02", "v0.0-none");
 ok("A5 a version the store does not hold: every row blank", typeof other !== "string" && Object.values(other.rows).every((x) => x === ""), show(other));
 const desc = await table("FX-P02", PIN, { column: "annotation", desc: true });
 ok("A6 sorted by Annotation, descending: the drivers first, SMARCA4 last", typeof desc !== "string" && desc.order.endsWith("SMARCA4") && desc.order.split(", ").length === 3, show(typeof desc === "string" ? desc : desc.order));
+
+// ---- C: the Cohort column -------------------------------------------------------------------------
+type CohortRow = { key: string; freq: unknown; cohort: unknown };
+async function cohortRows(patient: string, kind: "evolution" | "alterations"): Promise<CohortRow[] | string> {
+  try {
+    const cols = { columns: ["gene", "proteinChange", "freq"] };
+    const t = kind === "evolution"
+      ? (await runEvolution({ kind: "evolution", cohorts: ["c"], patient: { study: STUDY, id: patient }, mutations: cols }, ctxAt(PIN)) as { evolution?: EvolutionResult }).evolution?.mutations
+      : (await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: patient }, mutations: cols }, ctxAt(PIN)) as { alterations?: AlterationsResult }).alterations?.tables.mutations;
+    if (!t) return "refused";
+    const at = (id: string) => t.columns.findIndex((c) => c.id === id);
+    return t.rows.map((x) => ({ key: x.values[at("gene")] + " " + x.values[at("proteinChange")], freq: x.values[at("freq")], cohort: x.detail?.cohort ?? null }))
+      .sort((a, b) => a.key < b.key ? -1 : 1);
+  } catch (e) { return "threw: " + String((e as Error).message).slice(0, 300); }
+}
+{
+  const e02 = await cohortRows("FX-P02", "evolution");
+  const kras = typeof e02 === "string" ? undefined : e02.find((r) => r.key === "KRAS G12D");
+  const c = kras?.cohort as { n?: number; of?: number; keyword?: string; keywordN?: number } | undefined;
+  ok("C1 KRAS G12D: 24 of 59 samples, 16 with its G12 missense keyword", c?.n === 24 && c?.of === 59 && c?.keywordN === 16 && /G12/.test(c?.keyword || ""), show(typeof e02 === "string" ? e02 : kras));
+  ok("C1 KRAS G12D's Cohort % is 100 × 24 / 59", typeof kras?.freq === "number" && Math.abs((kras.freq as number) - 100 * 24 / 59) < 1e-9, show(kras?.freq));
+  for (const pt of ["FX-P01", "FX-P02"]) {
+    const ev = await cohortRows(pt, "evolution"), al = await cohortRows(pt, "alterations");
+    ok("C2 " + pt + ": every row's Cohort counts and % equal the Summary table's", typeof ev !== "string" && typeof al !== "string" && ev.length > 0 && show(ev) === show(al),
+      typeof ev === "string" ? ev : typeof al === "string" ? al : show(ev) + " vs " + show(al));
+  }
+}
 
 console.log(failures ? `${failures} of ${checks} evolution annotation checks FAILED` : `all ${checks} evolution annotation checks passed`);
 process.exit(failures ? 1 : 0);

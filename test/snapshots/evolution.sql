@@ -34,13 +34,21 @@ pn AS (SELECT replaceOne(sample_unique_id, 'glioma_msk_2018_', '') AS sid, any(g
   WHERE cancer_study_identifier = 'glioma_msk_2018' AND alteration_type = 'MUTATION_EXTENDED' AND sample_unique_id IN (SELECT concat('glioma_msk_2018_', sid) FROM s) GROUP BY sid),
 m AS (SELECT sampleId AS sid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')) AS k, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr,
          startPosition AS start, endPosition AS end, referenceAllele AS ref, tumorSeqAllele AS var, proteinPosStart AS codon,
-         tumorAltCount AS ac, tumorRefCount AS rc, toUInt8(molecularProfileId NOT LIKE '%uncalled%') AS called
+         tumorAltCount AS ac, tumorRefCount AS rc, toUInt8(molecularProfileId NOT LIKE '%uncalled%') AS called, ifNull(keyword, '') AS kw
   FROM snapshot_db.mutation_derived WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId = 'IM-GBM-28' AND ifNull(mutationType, '') != 'Fusion'),
 g AS (SELECT k, any(gene) AS gene, any(proteinChange) AS proteinChange, any(mutationType) AS mutationType, any(variantType) AS variantType,
-         any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos FROM m WHERE called = 1 GROUP BY k),
+         any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos, max(kw) AS kw FROM m WHERE called = 1 GROUP BY k),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
   GROUP BY gene, alteration),
+fa AS (SELECT hugo_gene_symbol AS gene, uniqExact(sample_unique_id) AS n FROM snapshot_db.genomic_event_derived
+  WHERE startsWith(genetic_profile_stable_id, 'glioma_msk_2018_') AND cancer_study_identifier = 'glioma_msk_2018' AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'
+    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),
+kc AS (SELECT keyword AS kw, uniqExact(sampleId) AS n FROM snapshot_db.mutation_derived
+  WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND molecularProfileId NOT LIKE '%uncalled%' AND keyword IN (SELECT kw FROM g WHERE kw != '') GROUP BY kw),
+fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot_db.sample_to_gene_panel_derived sp
+  JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (SELECT gene FROM g)
+  WHERE sp.cancer_study_identifier = 'glioma_msk_2018' AND sp.alteration_type = 'MUTATION_EXTENDED' GROUP BY gene),
 mm AS (SELECT k, sid, toUInt8(1) AS hit, max(called) AS cl, tupleElement(argMax(tuple(ac, rc), called), 1) AS mac, tupleElement(argMax(tuple(ac, rc), called), 2) AS mrc
   FROM m GROUP BY k, sid),
 pc AS (SELECT pn.sid AS sid, pg.gene AS gene FROM pn JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pn.panel WHERE pg.gene IN (SELECT gene FROM g)),
@@ -58,9 +66,9 @@ rows AS (SELECT 'Glioma' AS cohort, 'glioma_msk_2018' AS study, 0 AS ord, 'IM-GB
          arrayStringConcat(arrayMap(x -> concat(toString(x.1), ': ', multiIf(x.3 = 'called', toDecimalString(x.4, 2), x.3 = 'noVaf', 'called, no reads',
            x.3 = 'uncalled', concat(toDecimalString(x.4, 2), ' uncalled'), x.3 = 'absent', 'not found', 'not profiled')), a.cells), ' · ') AS vafs,
          if(arrayExists(x -> x.3 = 'called', a.cells), arrayMax(arrayMap(x -> ifNull(x.4, 0), arrayFilter(x -> x.3 = 'called', a.cells))), NULL) AS maxVaf,
-         length(arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)) AS called,
+         length(arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)) AS called, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq, toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end, g.ref AS ref, g.var AS var, g.pos AS pos, a.cells AS cells
-  FROM a JOIN g ON g.k = a.k LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange)
+  FROM a JOIN g ON g.k = a.k LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw)
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 0 evolution: evolution:mutations:rows · glioma_msk_2018
@@ -70,13 +78,21 @@ pn AS (SELECT replaceOne(sample_unique_id, 'glioma_msk_2018_', '') AS sid, any(g
   WHERE cancer_study_identifier = 'glioma_msk_2018' AND alteration_type = 'MUTATION_EXTENDED' AND sample_unique_id IN (SELECT concat('glioma_msk_2018_', sid) FROM s) GROUP BY sid),
 m AS (SELECT sampleId AS sid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')) AS k, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr,
          startPosition AS start, endPosition AS end, referenceAllele AS ref, tumorSeqAllele AS var, proteinPosStart AS codon,
-         tumorAltCount AS ac, tumorRefCount AS rc, toUInt8(molecularProfileId NOT LIKE '%uncalled%') AS called
+         tumorAltCount AS ac, tumorRefCount AS rc, toUInt8(molecularProfileId NOT LIKE '%uncalled%') AS called, ifNull(keyword, '') AS kw
   FROM snapshot_db.mutation_derived WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId = 'IM-GBM-28' AND ifNull(mutationType, '') != 'Fusion'),
 g AS (SELECT k, any(gene) AS gene, any(proteinChange) AS proteinChange, any(mutationType) AS mutationType, any(variantType) AS variantType,
-         any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos FROM m WHERE called = 1 GROUP BY k),
+         any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos, max(kw) AS kw FROM m WHERE called = 1 GROUP BY k),
 ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
   FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
   GROUP BY gene, alteration),
+fa AS (SELECT hugo_gene_symbol AS gene, uniqExact(sample_unique_id) AS n FROM snapshot_db.genomic_event_derived
+  WHERE startsWith(genetic_profile_stable_id, 'glioma_msk_2018_') AND cancer_study_identifier = 'glioma_msk_2018' AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'
+    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),
+kc AS (SELECT keyword AS kw, uniqExact(sampleId) AS n FROM snapshot_db.mutation_derived
+  WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND molecularProfileId NOT LIKE '%uncalled%' AND keyword IN (SELECT kw FROM g WHERE kw != '') GROUP BY kw),
+fp AS (SELECT pg.gene AS gene, uniqExact(sp.sample_unique_id) AS n FROM snapshot_db.sample_to_gene_panel_derived sp
+  JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = sp.gene_panel_id AND pg.gene IN (SELECT gene FROM g)
+  WHERE sp.cancer_study_identifier = 'glioma_msk_2018' AND sp.alteration_type = 'MUTATION_EXTENDED' GROUP BY gene),
 mm AS (SELECT k, sid, toUInt8(1) AS hit, max(called) AS cl, tupleElement(argMax(tuple(ac, rc), called), 1) AS mac, tupleElement(argMax(tuple(ac, rc), called), 2) AS mrc
   FROM m GROUP BY k, sid),
 pc AS (SELECT pn.sid AS sid, pg.gene AS gene FROM pn JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pn.panel WHERE pg.gene IN (SELECT gene FROM g)),
@@ -94,9 +110,9 @@ rows AS (SELECT 'Glioma' AS cohort, 'glioma_msk_2018' AS study, 0 AS ord, 'IM-GB
          arrayStringConcat(arrayMap(x -> concat(toString(x.1), ': ', multiIf(x.3 = 'called', toDecimalString(x.4, 2), x.3 = 'noVaf', 'called, no reads',
            x.3 = 'uncalled', concat(toDecimalString(x.4, 2), ' uncalled'), x.3 = 'absent', 'not found', 'not profiled')), a.cells), ' · ') AS vafs,
          if(arrayExists(x -> x.3 = 'called', a.cells), arrayMax(arrayMap(x -> ifNull(x.4, 0), arrayFilter(x -> x.3 = 'called', a.cells))), NULL) AS maxVaf,
-         length(arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)) AS called,
+         length(arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)) AS called, if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq, toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,
          g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end, g.ref AS ref, g.var AS var, g.pos AS pos, a.cells AS cells
-  FROM a JOIN g ON g.k = a.k LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange)
+  FROM a JOIN g ON g.k = a.k LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw)
 SELECT *, count() OVER () AS total FROM rows
 WHERE 1
 ORDER BY so, maxVaf DESC NULLS LAST, gene, pos ASC NULLS LAST, gene, chr, start, end, ref, var, proteinChange

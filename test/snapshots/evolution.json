@@ -397,6 +397,11 @@
               "numeric": true
             },
             {
+              "id": "freq",
+              "name": "Cohort %",
+              "numeric": true
+            },
+            {
               "id": "called",
               "name": "Samples called",
               "numeric": true
@@ -439,7 +444,8 @@
             "annotation",
             "mutationType",
             "vafs",
-            "maxVaf"
+            "maxVaf",
+            "freq"
           ],
           "defaults": [
             "samples",
@@ -448,7 +454,8 @@
             "annotation",
             "mutationType",
             "vafs",
-            "maxVaf"
+            "maxVaf",
+            "freq"
           ],
           "query": {},
           "rows": [
@@ -465,6 +472,7 @@
                 "Missense_Mutation",
                 "1: 0.81 · 2: not found · 3: 0.28 · 4: not found",
                 0.807,
+                3.2967032967032965,
                 2,
                 "SNP",
                 "23",
@@ -472,7 +480,15 @@
                 123176455,
                 "A",
                 "T"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 3,
+                  "of": 91,
+                  "keyword": "STAG2 N141 missense",
+                  "keywordN": 2
+                }
+              }
             },
             {
               "cohort": "Glioma",
@@ -487,6 +503,7 @@
                 "Missense_Mutation",
                 "1: 0.76 · 2: not found · 3: 0.24 · 4: not found",
                 0.762,
+                59.34065934065934,
                 2,
                 "SNP",
                 "17",
@@ -494,7 +511,15 @@
                 7578524,
                 "G",
                 "C"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 54,
+                  "of": 91,
+                  "keyword": "TP53 Q136 missense",
+                  "keywordN": 2
+                }
+              }
             },
             {
               "cohort": "Glioma",
@@ -509,6 +534,7 @@
                 "Missense_Mutation",
                 "1: 0.42 · 2: not found · 3: 0.11 · 4: not found",
                 0.418,
+                18.681318681318682,
                 2,
                 "SNP",
                 "3",
@@ -516,7 +542,15 @@
                 178936091,
                 "G",
                 "A"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 17,
+                  "of": 91,
+                  "keyword": "PIK3CA E545 missense",
+                  "keywordN": 3
+                }
+              }
             },
             {
               "cohort": "Glioma",
@@ -531,6 +565,7 @@
                 "5'Flank",
                 "1: 0.39 · 2: 0.40 · 3: 0.20 · 4: 0.11",
                 0.4,
+                null,
                 4,
                 "SNP",
                 "5",
@@ -538,7 +573,13 @@
                 1295228,
                 "G",
                 "A"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 56,
+                  "of": 91
+                }
+              }
             },
             {
               "cohort": "Glioma",
@@ -553,6 +594,7 @@
                 "Missense_Mutation",
                 "1: not found · 2: 0.80 · 3: not found · 4: 0.24",
                 0.798,
+                59.34065934065934,
                 2,
                 "SNP",
                 "17",
@@ -560,7 +602,15 @@
                 7577094,
                 "G",
                 "C"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 54,
+                  "of": 91,
+                  "keyword": "TP53 R282 missense",
+                  "keywordN": 2
+                }
+              }
             },
             {
               "cohort": "Glioma",
@@ -575,6 +625,7 @@
                 "Missense_Mutation",
                 "1: not found · 2: 0.26 · 3: not found · 4: 0.10",
                 0.257,
+                8.791208791208792,
                 2,
                 "SNP",
                 "12",
@@ -582,7 +633,15 @@
                 133226474,
                 "A",
                 "G"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 8,
+                  "of": 91,
+                  "keyword": "POLE V1195 missense",
+                  "keywordN": 2
+                }
+              }
             },
             {
               "cohort": "Glioma",
@@ -597,6 +656,7 @@
                 "Missense_Mutation",
                 "1: not found · 2: 0.26 · 3: not found · 4: 0.15",
                 0.255,
+                8.791208791208792,
                 2,
                 "SNP",
                 "19",
@@ -604,7 +664,15 @@
                 18279556,
                 "A",
                 "G"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 8,
+                  "of": 91,
+                  "keyword": "PIK3R2 D610 missense",
+                  "keywordN": 2
+                }
+              }
             },
             {
               "cohort": "Glioma",
@@ -619,6 +687,7 @@
                 "Missense_Mutation",
                 "1: not found · 2: 0.15 · 3: not found · 4: not found",
                 0.148,
+                3.2967032967032965,
                 1,
                 "SNP",
                 "5",
@@ -626,7 +695,15 @@
                 86685298,
                 "A",
                 "G"
-              ]
+              ],
+              "detail": {
+                "cohort": {
+                  "n": 3,
+                  "of": 91,
+                  "keyword": "RASA1 H1005 missense",
+                  "keywordN": 1
+                }
+              }
             }
           ],
           "offset": 0,
@@ -996,7 +1073,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "IM-GBM-28: 4 samples in collection order, placed by the day each was collected (days from diagnosis, from the study's timeline) on the patient's timeline axis — a tick a year across all the patient's events, as the portal's. 8 mutations; 8 are drawn. VAF is variant reads ÷ (variant + reference reads) in each sample. A mutation called in one sample is followed into the others: there it is an uncalled mutation where the study's uncalled-mutations profile found variant reads (drawn with that VAF), not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene — never 0. A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level), as on the Patient tables. Fusions recorded as mutations are left out, as the portal leaves them out. The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: 36 patients. Sorted with the most samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "IM-GBM-28: 4 samples in collection order, placed by the day each was collected (days from diagnosis, from the study's timeline) on the patient's timeline axis — a tick a year across all the patient's events, as the portal's. 8 mutations; 8 are drawn. VAF is variant reads ÷ (variant + reference reads) in each sample. A mutation called in one sample is followed into the others: there it is an uncalled mutation where the study's uncalled-mutations profile found variant reads (drawn with that VAF), not found (VAF 0) where the sample was sequenced for the gene, or NOT PROFILED where the sample's panel does not cover the gene — never 0. A line joins a mutation's VAFs from the first to the last sample with variant reads, as the portal draws it; it bridges a not-profiled sample, or one called without allele counts, with a dashed segment. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level), as on the Patient tables. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it (blank for a mutation with no keyword, as the portal's); its bar's darker part, those with the mutation's keyword. Fusions recorded as mutations are left out, as the portal leaves them out. The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: 36 patients. Sorted with the most samples first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
@@ -1018,7 +1095,7 @@
           {
             "kind": "fetch",
             "title": "Read IM-GBM-28's samples and mutations",
-            "detail": "The patient's samples (evolution:samples, with the gene panel each was sequenced with for mutations) and timeline (for each sample's collection day, and the span of all its events for the axis), numbered in collection order; then evolution:mutations: every mutation called in any of the patient's samples (fusions left out), merged across samples by gene, protein change and genomic position as the portal merges them, with its state in every sample — called (VAF = variant reads ÷ (variant + reference reads)), called without allele counts, uncalled with variant reads (the study's uncalled-mutations profile; drawn with its VAF), not found in a sample sequenced for the gene (VAF 0), or not profiled (the sample's panel omits the gene, or it was not sequenced for mutations: no VAF). Each mutation's Annotation is OncoKB's call for its gene and protein change at v7.5, read from the annotation store. The figure draws every mutation the table's query keeps that has a VAF in some sample where it was called.",
+            "detail": "The patient's samples (evolution:samples, with the gene panel each was sequenced with for mutations) and timeline (for each sample's collection day, and the span of all its events for the axis), numbered in collection order; then evolution:mutations: every mutation called in any of the patient's samples (fusions left out), merged across samples by gene, protein change and genomic position as the portal merges them, with its state in every sample — called (VAF = variant reads ÷ (variant + reference reads)), called without allele counts, uncalled with variant reads (the study's uncalled-mutations profile; drawn with its VAF), not found in a sample sequenced for the gene (VAF 0), or not profiled (the sample's panel omits the gene, or it was not sequenced for mutations: no VAF). Each mutation's Annotation is OncoKB's call for its gene and protein change at v7.5, read from the annotation store. Its Cohort % is the study's samples with a called mutation in the gene ÷ those whose panel covers the gene (blank for a mutation with no keyword), with the samples carrying its keyword beside it. The figure draws every mutation the table's query keeps that has a VAF in some sample where it was called.",
             "params": [
               [
                 "samples",

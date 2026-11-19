@@ -9,14 +9,14 @@ import { PATIENT_ID } from "../../patient-timeline.ts";
 import { sampleMarks } from "../../timeline-tracks.ts";
 import { mutationTypeLabel } from "../../mutation-type.ts";
 import {
-  annotationText,
+  annotationText, cohortOf,
   ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
   alterationDefaults, alterationSource, mrnaRankProfile, type MrnaRank, alterationPatientRowSource, patientProfiledSource, patientSamplesSource, patientVafSource, type AlterationPart, type AlterationTable,
 } from "../../patient-alterations.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
 import { patientSampleEvents, plural, refuse } from "../shared.ts";
-import type { AlterationsView, AlterationsResult, AlleleReads, CohortCount } from "./types.ts";
+import type { AlterationsView, AlterationsResult, AlleleReads } from "./types.ts";
 import { alterationsMethod } from "./method.ts";
 
 type Cell = string | number | null;
@@ -37,13 +37,6 @@ function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean })
 function readsOf(x: unknown): AlleleReads[] | undefined {
   if (!Array.isArray(x)) return undefined;
   return x.map((t) => ({ sample: String(t[0]), alt: Number(t[1]), ref: Number(t[2]) }));
-}
-
-/** A row's Cohort counts, when its table reads them: what the Cohort cell draws and its tooltip says. */
-function cohortOf(x: Record<string, unknown>): CohortCount | undefined {
-  if (x.cohortOf == null) return undefined;
-  const kw = String(x.keyword ?? "");
-  return { n: Number(x.cohortN ?? 0), of: Number(x.cohortOf), ...(kw ? { keyword: kw, keywordN: Number(x.cohortKwN ?? 0) } : {}) };
 }
 
 /**

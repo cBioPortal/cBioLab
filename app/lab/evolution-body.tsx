@@ -18,6 +18,7 @@ import { PAGE_ROWS_MAX } from "../../lib/table-pager.ts";
 import type { TableRows } from "../../lib/types";
 import { Slider } from "../_ui/slider";
 import { AnnotationBadge } from "./portal-bodies";
+import { CohortCell } from "./cohort-cell.tsx";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { TB } from "../_ui/toolbar.ts";
 import { OptionSelect } from "../_ui/choice.tsx";
@@ -206,7 +207,8 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
             {...(shownTable !== e.mutations && p ? { download: { label: "download CSV (" + shownTable!.total.toLocaleString() + ")", tip: "the selected mutations, with all " + shownTable!.columns.length + " columns, as comma-separated text",
               onClick: () => { const f = selectedCsv(shownTable!, p); saveText(f.name, f.text); } } } : {})}
             onRow={(r) => toggle(keyAt(r))} selected={(r) => !tableFilter && picked.has(keyAt(r))} num={(id, x) => id === "maxVaf" ? x.toFixed(2) : x.toLocaleString()}
-            cell={(id, x) => id === "gene" ? <b>{x}</b> : id === "annotation" ? (x ? <AnnotationBadge text={String(x)} /> : null) : id === "samples" ? <SampleMarks ids={String(x || "").split(", ").filter(Boolean)} samples={p.samples} /> : undefined} />
+            cell={(id, x, r) => id === "gene" ? <b>{x}</b> : id === "annotation" ? (x ? <AnnotationBadge text={String(x)} /> : null)
+              : id === "freq" ? <CohortCell row={r} gene={String(r.values[e.mutations!.columns.findIndex((c) => c.id === "gene")] ?? "")} shown={x != null} /> : id === "samples" ? <SampleMarks ids={String(x || "").split(", ").filter(Boolean)} samples={p.samples} /> : undefined} />
         </section>
       )}
       {listOpen && (

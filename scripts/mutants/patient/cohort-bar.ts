@@ -8,7 +8,7 @@ export const mutants: Mutant[] = [
     effect: "The Cohort bar's keyword share counts every mutation of the study, where the portal counts the samples with the row's keyword (APC truncating 376 of 534, not every APC sample).",
     find: "\"kc AS (SELECT keyword AS kw, uniqExact(sampleId) AS n FROM \"",
     replace: "\"kc AS (SELECT keyword AS kw, uniqExact(sampleId) * 0 + 1 AS n FROM \"" },
-  { id: "cohort-detail-keyword-count-is-gene-count", layer: "counts", guard: "unit", file: "lib/views/alterations/run.ts",
+  { id: "cohort-detail-keyword-count-is-gene-count", layer: "counts", guard: "unit", file: "lib/patient-alterations.ts",
     effect: "The Cohort cell's keyword count is the gene's count, so the tooltip says all 387 APC samples have APC truncating mutations (the portal: 376).",
     find: "keywordN: Number(x.cohortKwN ?? 0)",
     replace: "keywordN: Number(x.cohortN ?? 0)" },
