@@ -86,7 +86,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   const { holders, excluded } = rowHolders(ctx);
   const [pins, unannotated, clinical] = await Promise.all([variantPins(), studiesWithoutVariantAnnotation(holders), mutationClinicalColumns(ctx, holders)]);
   // the portal's columns, then one per clinical attribute the studies record (MUT-COL-36), hidden by default
-  const columns: MutationColumn[] = [...MUTATION_COLUMNS, ...clinical.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, firstSort: "asc" as const }))];
+  const columns: MutationColumn[] = [...MUTATION_COLUMNS, ...clinical.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, firstSort: "asc" as const, attribute: true as const, ...(c.description ? { tip: c.description } : {}) }))];
   const bad = checkQuery(q, columns);
   if (bad) return refuse("mutations", ctx, bad);
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");

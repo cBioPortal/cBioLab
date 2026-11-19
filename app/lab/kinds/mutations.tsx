@@ -7,7 +7,7 @@ import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
 import { useStemHover } from "../../_lollipop/stem-hover.ts";
 import { rowAtStem } from "../../../lib/lollipop.ts";
-import { mutationUnit, vafEmptyTip } from "../../../lib/mutation-cell-text.ts";
+import { clinicalCellText, mutationUnit, vafEmptyTip } from "../../../lib/mutation-cell-text.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
@@ -25,6 +25,8 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
   // the lollipop's stem under the pointer: its codon's rows are highlighted, as on the portal's table
   const hover = useStemHover();
   const posAt = t.columns.findIndex((c) => c.id === "proteinPos");
+  // the clinical attributes' columns (MUT-COL-36), drawn as the portal's ClinicalAttributeColumnFormatter
+  const attributes = new Set(t.columns.filter((c) => c.attribute).map((c) => c.id));
   return (
     <div className="pb">
       {tips.node}
@@ -34,7 +36,8 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
         num={(id, x) => id === "vafNormal" ? String(x) : x.toLocaleString()}
         hot={hover && posAt >= 0 ? (r) => rowAtStem(hover, t.gene, r.values[posAt]) : undefined}
         colHead={(id) => id === "functionalImpact" ? <FunctionalImpactHead show={tips.show} /> : null}
-        cell={(id, x, r) => id === "annotation" && x ? <AnnotationBadge text={String(x)} />
+        cell={(id, x, r) => attributes.has(id) ? <ClinicalCell value={x} />
+          : id === "annotation" && x ? <AnnotationBadge text={String(x)} />
           : id === "hgvsg" ? <HgvsgCell hgvsg={String(x ?? "")} detail={r.detail} show={tips.show} />
           : id === "hgvsc" ? <HgvscCell hgvsc={String(x ?? "")} detail={r.detail} />
           : id === "clinvar" ? <ClinvarCell detail={r.detail} show={tips.show} />
@@ -64,6 +67,12 @@ function CopyNumberCell({ label }: { label: string }) {
   const n = label in CN_VALUE ? CN_VALUE[label] : null;
   if (n == null) return <span className="text-[var(--muted)]" data-tip={copyNumberTip(null) ?? undefined}>{"\u00a0"}</span>;
   return <span className={n === 0 ? "text-xs" : "font-semibold"} style={{ color: copyNumberColor(n) }} data-tip={copyNumberTip(n) ?? undefined}>{label}</span>;
+}
+
+/** A clinical attribute's value, cut at 30 characters with the whole value as its tip; none an empty cell with the portal's "not available" tip */
+function ClinicalCell({ value }: { value: unknown }) {
+  const c = clinicalCellText(value);
+  return c.text ? <span data-tip={c.tip ?? undefined}>{c.text}</span> : <span className="text-[var(--muted)]" data-tip={c.tip ?? undefined}>{"\u00a0"}</span>;
 }
 
 /** Validation Status as the portal draws it: V, W or U on its badge, any other text small and grey */
