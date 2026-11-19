@@ -30,7 +30,7 @@
 // The rows these statements return, materialized and plain, are compared on the fixture study in
 // test/plot-materialized-fixture.test.ts (S6). The database here is a stub `fetch` that records what
 // it is sent.
-import { test, describe, afterEach, mock } from "node:test";
+import { test, describe, afterEach, beforeEach, before, after, mock } from "node:test";
 import assert from "node:assert/strict";
 import { cteCases, materializedNames, plainNames, expectedMaterialized, cohortArg, PLAIN_FORMS, MATERIALIZED_SETTING, type CaseAxes } from "./support/plot-cte-cases.ts";
 import type { ChConn } from "../lib/ch.ts";
@@ -443,5 +443,191 @@ describe("S4: materializedCteSupported(conn)", () => {
     const r = await withStub(() => ch.withChContext({ signal: ac.signal }, () => ch.materializedCteSupported(conn)));
     assert.equal(r, true);
     assert.equal(sent.length, 1);
+  });
+});
+
+// S4h–S4m: a check the server accepts but never answers, and what the check says when it fails.
+//
+//   S4h  a stalled check resolves false within about CTE_CHECK_TIMEOUT_MS, not after minutes
+//   S4i  when that timeout fires, the stalled HTTP request is cancelled (its AbortSignal aborts)
+//   S4j  callers at the same time during a stall all get false from one request; a later call
+//        within CTE_CHECK_TTL_MS reuses that false without a new request
+//   S4k  a failed check (server error, network error, timeout) warns exactly once, naming the
+//        connection's id and never its user or password; a check answered ok = 1 warns not at all;
+//        calls served from the remembered answer warn no further
+//   S4l  a timed-out check inside withoutFailedQueries does not make it throw
+//   S4m  a timed-out check is asked again after CTE_CHECK_TTL_MS
+//
+// The stalls here wait in real time, so the cases that stall run side by side; each connection has
+// its own url, and the stub database below answers by url, so they do not see each other's requests.
+const TIMEOUT: number = ch.CTE_CHECK_TIMEOUT_MS ?? 5000;
+const realSetTimeout = globalThis.setTimeout;
+const LATE = Symbol("no answer");
+/** p's value, or LATE when it has none within ms of real time */
+const within = <T>(p: Promise<T>, ms: number): Promise<T | typeof LATE> =>
+  Promise.race([p, new Promise<typeof LATE>((r) => realSetTimeout(() => r(LATE), ms))]);
+const MARGIN = 1500;
+
+let s4k = 0;
+/** a connection with its own url and credentials no other case uses */
+const secretConn = (): ChConn => {
+  const n = ++s4k;
+  return { id: "stall" + n, url: "http://stall-" + n + ".invalid", user: "user-secret-" + n, password: "pw-secret-" + n, db: "db", label: "stall " + n };
+};
+type Handler = (body: string, init?: RequestInit) => Response | Promise<Response>;
+interface Routed { body: string; signal?: AbortSignal | null }
+const routes = new Map<string, { handler: Handler; sent: Routed[] }>();
+/** pending stalls, so a check the code never cancels does not hold its connection slot past this file */
+const stalls: (() => void)[] = [];
+/** a database that takes the statement and never answers; like fetch, it gives up when the signal aborts */
+const stall: Handler = (_body, init) => new Promise<Response>((_, reject) => {
+  const fail = () => reject(new DOMException("This operation was aborted", "AbortError"));
+  stalls.push(fail);
+  const sig = init?.signal;
+  if (sig?.aborted) { fail(); return; }
+  sig?.addEventListener("abort", fail, { once: true });
+});
+const route = (conn: ChConn, handler: Handler) => {
+  const r = { handler, sent: [] as Routed[] };
+  routes.set(new URL(conn.url).host, r);
+  return r;
+};
+const warnings: string[] = [];
+const warningsFor = (conn: ChConn) => warnings.filter((w) => w.includes(conn.id));
+const assertNoSecrets = (conn: ChConn) => {
+  for (const w of warnings) {
+    assert.ok(!w.includes(conn.password), "a warning shows the password: " + w);
+    assert.ok(!w.includes(conn.user), "a warning shows the user: " + w);
+  }
+};
+let routedFetch: typeof fetch | undefined;
+const installRouted = () => {
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    const r = routes.get(new URL(String(url)).host);
+    if (!r) throw new TypeError("fetch failed: no stub for " + String(url));
+    r.sent.push({ body: typeof init?.body === "string" ? init.body : "", signal: init?.signal });
+    return r.handler(typeof init?.body === "string" ? init.body : "", init);
+  }) as typeof fetch;
+  routedFetch = globalThis.fetch;
+  mock.method(console, "warn", (...a: unknown[]) => { warnings.push(a.map(String).join(" ")); });
+};
+const uninstallRouted = () => {
+  if (globalThis.fetch === routedFetch) globalThis.fetch = realFetch;
+  mock.restoreAll();
+  for (const f of stalls.splice(0)) f();
+};
+
+describe("S4h–l: a check that never answers", { concurrency: true }, () => {
+  before(installRouted);
+  after(uninstallRouted);
+
+  test("CTE_CHECK_TIMEOUT_MS is exported, 5000", () => {
+    assert.equal(ch.CTE_CHECK_TIMEOUT_MS, 5000);
+  });
+
+  test("h: a stalled check resolves false within about CTE_CHECK_TIMEOUT_MS", { timeout: 30_000 }, async () => {
+    const conn = secretConn();
+    const r = route(conn, stall);
+    const t0 = performance.now();
+    const got = await within(ch.materializedCteSupported(conn), TIMEOUT + MARGIN);
+    const took = performance.now() - t0;
+    assert.equal(got, false, "resolved false within " + (TIMEOUT + MARGIN) + "ms");
+    assert.ok(took >= TIMEOUT * 0.8, "it waited for the timeout, not less: " + took + "ms");
+    assert.equal(r.sent.length, 1, "the check was sent once");
+  });
+
+  test("i: when the timeout fires, the stalled request's AbortSignal is aborted", { timeout: 30_000 }, async () => {
+    const conn = secretConn();
+    const r = route(conn, stall);
+    const got = await within(ch.materializedCteSupported(conn), TIMEOUT + MARGIN);
+    assert.equal(got, false);
+    assert.equal(r.sent.length, 1);
+    const sig = r.sent[0].signal;
+    assert.ok(sig, "the request was sent with a signal");
+    assert.equal(sig.aborted, true, "the stalled request was cancelled");
+  });
+
+  test("j: concurrent callers share one stalled request, all get false; a later call within the TTL reuses it", { timeout: 30_000 }, async () => {
+    const conn = secretConn();
+    const r = route(conn, stall);
+    const ps = [1, 2, 3, 4, 5].map(() => ch.materializedCteSupported(conn));
+    const got = await within(Promise.all(ps), TIMEOUT + MARGIN);
+    assert.deepEqual(got, [false, false, false, false, false]);
+    assert.equal(r.sent.length, 1, "one HTTP request, not one per caller");
+    r.handler = okAnswer;
+    assert.equal(await within(ch.materializedCteSupported(conn), 1000), false, "the false is remembered");
+    assert.equal(r.sent.length, 1, "no new request within the TTL");
+  });
+
+  test("k: a timed-out check warns once, with the connection's id and without its user or password; cached calls warn no more", { timeout: 30_000 }, async () => {
+    const conn = secretConn();
+    route(conn, stall);
+    const got = await within(Promise.all([ch.materializedCteSupported(conn), ch.materializedCteSupported(conn)]), TIMEOUT + MARGIN);
+    assert.deepEqual(got, [false, false]);
+    assert.equal(warningsFor(conn).length, 1, "one warning per check: " + JSON.stringify(warningsFor(conn)));
+    assertNoSecrets(conn);
+    await ch.materializedCteSupported(conn);
+    await ch.materializedCteSupported(conn);
+    assert.equal(warningsFor(conn).length, 1, "the remembered answer warns no further");
+  });
+
+  test("l: a timed-out check inside withoutFailedQueries does not make it throw", { timeout: 30_000 }, async () => {
+    const conn = secretConn();
+    route(conn, (body, init) => body === wire("SELECT 7 AS n") ? json([{ n: 7 }]) : stall(body, init));
+    const v = await within(ch.withoutFailedQueries(async () => {
+      const q = await ch.chQuery<{ n: number }>("SELECT 7 AS n", conn);
+      const m = await ch.materializedCteSupported(conn);
+      return { n: q.data[0].n, m };
+    }), TIMEOUT + MARGIN);
+    assert.deepEqual(v, { n: 7, m: false });
+  });
+});
+
+describe("S4k: what a check that fails or succeeds says", () => {
+  beforeEach(() => { warnings.length = 0; installRouted(); });
+  afterEach(uninstallRouted);
+  const failing: [string, Handler][] = [
+    ["a server error (HTTP 500)", () => new Response("Code: 115. DB::Exception: Setting enable_materialized_cte is neither a builtin setting nor started with the prefix 'SQL_'. (UNKNOWN_SETTING)", { status: 500 })],
+    ["bad credentials (HTTP 516)", () => new Response("Code: 516. DB::Exception: default: Authentication failed. (AUTHENTICATION_FAILED)", { status: 516 })],
+    ["a network error", () => { throw new TypeError("fetch failed: getaddrinfo ENOTFOUND"); }],
+  ];
+  for (const [what, h] of failing) {
+    test("k: " + what + ": exactly one warning, naming the id, not the user or password; none from cached calls", { timeout: 10_000 }, async () => {
+      const conn = secretConn();
+      route(conn, h);
+      assert.deepEqual(await within(Promise.all([ch.materializedCteSupported(conn), ch.materializedCteSupported(conn)]), 3000), [false, false]);
+      assert.equal(warningsFor(conn).length, 1, JSON.stringify(warnings));
+      assert.equal(warnings.length, 1, "no other warning: " + JSON.stringify(warnings));
+      assertNoSecrets(conn);
+      await ch.materializedCteSupported(conn);
+      assert.equal(warnings.length, 1, "the remembered answer warns no further");
+    });
+  }
+  test("k: a check answered ok = 1 warns not at all, nor do the calls after it", { timeout: 10_000 }, async () => {
+    const conn = secretConn();
+    route(conn, okAnswer);
+    assert.equal(await within(ch.materializedCteSupported(conn), 3000), true);
+    assert.equal(await ch.materializedCteSupported(conn), true);
+    assert.deepEqual(warnings, []);
+  });
+});
+
+describe("S4m: a timed-out check is asked again after CTE_CHECK_TTL_MS", () => {
+  before(installRouted);
+  after(uninstallRouted);
+  test("m: false for the TTL after a timeout, then asked again and answered", { timeout: 30_000 }, async () => {
+    let t = 1_900_000_000_000;
+    mock.method(Date, "now", () => t);
+    const conn = secretConn();
+    const r = route(conn, stall);
+    assert.equal(await within(ch.materializedCteSupported(conn), TIMEOUT + MARGIN), false);
+    assert.equal(r.sent.length, 1);
+    r.handler = okAnswer;
+    t += ch.CTE_CHECK_TTL_MS - 1;
+    assert.equal(await within(ch.materializedCteSupported(conn), 1000), false, "still false within the TTL");
+    assert.equal(r.sent.length, 1);
+    t += 1;
+    assert.equal(await within(ch.materializedCteSupported(conn), 3000), true, "asked again after the TTL");
+    assert.equal(r.sent.length, 2);
   });
 });
