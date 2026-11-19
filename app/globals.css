@@ -692,6 +692,12 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .row.baseline { align-items: baseline; }
 .row.g5 { gap: 0.5rem; }
 .facettitle { font-size: var(--t-md); font-weight: 600; }
+/* a chart's title as the portal's (STS-HD-1): one line, centred, a long one cut with an ellipsis
+   (the whole of it is in the tooltip); padded on both sides alike so the chart menu, placed over
+   the card's corner, neither covers it nor pulls it off centre */
+.facetgrid > .card > .facettitle { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 1.75rem; }
+/* what the chart counts, on a line of its own under the title, so a long title never hides it */
+.facetgrid > .card > .facettitle > .meta { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- view-card tables (app/lab/kinds/<kind>.tsx) ---------------- */
 .vscroll { overflow-x: auto; }

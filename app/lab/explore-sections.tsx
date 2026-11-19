@@ -603,7 +603,7 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
                     as the clinical facets do, rather than show a number that
                     cannot be reconciled with the draft. */}
                 <div className="facettitle" data-tip={d.note}>
-                  {d.label} <span className="meta">· {d.covered.toLocaleString()} patients
+                  {d.label} <span className="meta">{d.covered.toLocaleString()} patients
                     {(d as any).disjunctive ? " · not narrowed by its own filter" : ""}</span>
                 </div>
                 <div className="vallist">
@@ -881,12 +881,12 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           const unit = c.per === "sample" ? " samples" : " patients";
           return (
             <div
- className="facettitle"                data-tip={[c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
-                .filter(Boolean).join(" — ") || undefined}>
+ className="facettitle"                data-tip={[c.displayName || c.attribute, c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
+                .filter(Boolean).join(" — ")}>
               {isCustomAttr(c.attribute) && <span className="customtag" data-tip={c.description}>custom</span>}
               {c.displayName || c.attribute}{" "}
               <span className="meta">
-                {(c.per === "sample" ? "· sample-level · " : "· ") + shown.toLocaleString() + unit}
+                {(c.per === "sample" ? "sample-level · " : "") + shown.toLocaleString() + unit}
                 {disj ? " · not narrowed by its own filter" : ""}
               </span>
               {(() => {
@@ -1170,7 +1170,7 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
         <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
           <div className="facettitle">
             {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
-            <span className="meta"> · sample-level · {f.total.toLocaleString()} samples</span>
+            <span className="meta">sample-level · {f.total.toLocaleString()} samples</span>
             <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
               states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg)]} />
           </div>
