@@ -155,7 +155,7 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 | ONC-VI-3 | ✅ | BC | "whitespace between cells"; pad drawn only once a column is ≥6 px (legacy auto-off <2 px) |
 | ONC-VI-4 | 🟡 | C | Unchanged: engine has `display.clinicalLegends: all|none` (`oncoprint-assemble.ts:112`); no UI toggle in Display |
 | ONC-VI-5 | ❌ | C | Unchanged: no "only altered" legend option |
-| ONC-VI-6 | 🟡 | BC | Was ✅: a row's OQL line in grey after its gene, Display › show OQL filters, on by default with OQL. But the toggle is offered only when a row has OQL (`OncoprintFigure.tsx:817`): Q1's Display has no "show OQL filters", Q5's has. The spec's option is always there (default off without OQL) and writes the default OQL line on rows without one |
+| ONC-VI-6 | ✅ | BC | A row's OQL line in grey after its gene; Display › show OQL filters always offered, on by default only with OQL (`oncoprint.ts:523`); a single-gene row without OQL shows the default line, buildDefaultOQLProfile over the study's profiles in id order (`oql-match.ts:144`, `oncoprint.ts:453`, `oncoprint-assemble.ts:752`): coadread ": AMP HOMDEL MUT FUSION"; none on merged rows (#380) |
 | ONC-VI-7 | ✅ | BC | "white background (for print)" + legend caution |
 
 ### §1 Toolbar — Download

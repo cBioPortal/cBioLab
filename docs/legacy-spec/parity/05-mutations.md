@@ -131,7 +131,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-HD-1 | 🟡 | B | Unchanged: disabled one-entry select (`TranscriptSummary.tsx:20`) (tracked) |
 | MUT-HD-2 | ❌ | C | Unchanged: no other transcript (tracked) |
 | MUT-HD-2a | ✅ | BC | Same ids and links; Ensembl on GRCh38 when every study is (`TranscriptSummary.tsx:26`) (#250) |
-| MUT-HD-3 | 🟡 | B | "Somatic Mutation Frequency 36.7%" ✅ with a tip; "Germline Mutation Frequency" when a sample has a germline mutation, over every queried sample (legacy's default: no germline-consented list configured); no Somatic/Germline badges yet |
+| MUT-HD-3 | 🟡 | B | "Somatic Mutation Frequency 36.7%" ✅ with a tip; "Germline Mutation Frequency" when a sample has a germline mutation; then both are the Somatic / Germline toggles (ov_tcga_pub BRCA1: 26 / 0 / 11 / 37 as the portal's filter keeps them) (#396); styled as lines, not the portal's black-on-white badges |
 
 ### §3 Lollipop plot
 
@@ -147,7 +147,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-LP-8 | ✅ | BC | Palette identical; stem colours identical on 125/125 stems; driver → count → priority rule (`lollipop.ts lollipopColor`) |
 | MUT-LP-9 | ✅ | BC | "G12D/V/C and 3 more", "R175H/C"; tie rule copied (`labelledPosition`) |
 | MUT-LP-10 | ✅ | B | "142 mutated of 594 profiled patients" / "AA Change: G12D/V/C/A/S/R" on Q1 KRAS codon 12, as the portal (`lib/lollipop.ts` lollipopStemTip); shown as the native SVG title (#379) |
-| MUT-LP-11 | 🟡 | B | Unchanged: click / shift-click select codons, table narrows; no hover → row highlight |
+| MUT-LP-11 | ✅ | B | Click / shift-click select codons, the table narrows; hovering a stem highlights the table's rows at that codon, none after leaving, no page jump (`rowAtStem`, app/_lollipop/stem-hover.ts) (#402) |
 | MUT-LP-12 | 🟡 | BC | Unchanged: domain tip "Ras (PF00071): 5–164"; no description, PFAM / Mutation Aligner links |
 
 ### §4 Annotation tracks and 3D
@@ -180,7 +180,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-2 | ✅ | C | Gene, hidden by default; a fusion row's is its site 1 gene (`mutation-table.ts:23`) (#245) |
 | MUT-COL-3 | ✅ | B | Sample link → `/portal/patient?study=&sample=`, new tab |
 | MUT-COL-4 | ✅ | C | Cancer Type, hidden by default (#245) |
-| MUT-COL-5 | 🟡 | B | Unchanged: shown always (legacy only when >1 distinct value) |
+| MUT-COL-5 | 🟡 | B | Shown by default only when the rows hold more than one type, as legacy (prad TMPRSS2 hidden; `mutationDefaultColumns`) (#389); no fallback to the study's cancer type for a sample without one |
 | MUT-COL-6 | 🟡 | B | Unchanged: plain text; no bold italic, Germline tag, reVUE icon |
 | MUT-COL-7 | 🔶 | B | Unchanged: one text badge "Oncogenic · Level 1" |
 | MUT-COL-8 | ❌ | C | Unchanged: no custom driver column (tracked) |
@@ -193,7 +193,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-15 | ❌ | C | Unchanged |
 | MUT-COL-16 | ❌ | C | Unchanged |
 | MUT-COL-17 | ❌ | C | Unchanged |
-| MUT-COL-18 | 🟡 | B | Copy # column, values as legacy (Q1 G12C: ShallowDel, Gain, Diploid) (#245); shown by default, as legacy when the query holds the discrete CNA profile (ours shows it whatever the query holds) |
+| MUT-COL-18 | ✅ | B | Copy # values as legacy (Q1 G12C: ShallowDel, Gain, Diploid); shown by default when a queried study has a discrete CNA profile, as legacy's DiscreteCNACache (lgg_ucsf_2014 hidden) (#389) |
 | MUT-COL-19 | 🟡 | B | Unchanged: "MS" raw; no S / G badges |
 | MUT-COL-20 | ✅ | C | VS, hidden (#245) |
 | MUT-COL-21 | ✅ | C | Center, hidden (#245) |
@@ -202,7 +202,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-24 | ✅ | C | Ref / Var |
 | MUT-COL-25 | ✅ | C | HGVSg from the mutation's coordinates ("12:g.25398283_25398284insCCAGCT") (#245) |
 | MUT-COL-26 | 🟡 | C | HGVSc column (#245); blank on Q1 (not in the Genome Nexus store) |
-| MUT-COL-27 | 🟡 | BC | Values identical, written as the portal (4 decimals below 0.01, else 2; none for 0); shown by default, as legacy |
+| MUT-COL-27 | ✅ | BC | Values identical, written as the portal (4 decimals below 0.01, else 2); shown by default when a row has a non-zero frequency (stad_tcga_pub TP53 hidden); a cell with none empty with "Data not available." (#389) |
 | MUT-COL-28 | ✅ | C | Allele Freq (N), hidden (#245) |
 | MUT-COL-29 | ✅ | C | Normal read counts added (#245); a count of 0 or less blank, as the portal |
 | MUT-COL-30 | ✅ | BC | Default visible, identical 555/555 |
@@ -251,7 +251,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-TB-8 | 🔶 | BC | Unchanged: CSV `cohort-lab_<study>_KRAS_mutations.csv`, every column, rows kept by filters |
 | MUT-TB-9 | ✅ | BC | Was 🔶: default order is the Annotation column descending, then codon (`lib/mutation-table.ts:398`) (#309). KRAS's first row is still A11_G12dup where the portal's is G12C, because every KRAS row carries the gene's "Level 1" (MUT-AN-3), so they tie |
 | MUT-FM-1 | 🟡 | B | Search and header filters now reach the lollipop and badges; no mutation-status filter (FM-2) or tracks |
-| MUT-FM-2 | ❌ | C | Unchanged: no mutation-status filter |
+| MUT-FM-2 | ✅ | BC | The mutation-status filter is the badges: status lower-cased equals the kept one, both off keeps none, both on no filter; lollipop, impact badges and table follow, rates do not (`lib/lollipop.ts` statusFilter, `linkMutations`) (#396) |
 | MUT-FM-3 | ✅ | B | A stem selection narrows only the table; badge counts ignore the badge filter; Somatic Mutation Frequency ignores every in-tab filter |
 | MUT-FM-4 | 🔶 | C | Unchanged |
 | MUT-FM-5 | 🟡 | B | The filtered table's count says "(n samples / m patients)", as the portal's reset panel; in the table's title, not a panel on the lollipop; no Study View link (#307) |
@@ -286,7 +286,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-2 | ✅ | B | Distinct patient + change per codon; 125/125 stems identical |
 | MUT-STM-3 | ✅ | BC | M = the queried patients, whatever their profiling, as the portal's filteredPatients (its "profiled" wording copied); summed over studies (`LollipopReport.cohortPatients`, `buildLollipopGene`); Q1 594 (#379) |
 | MUT-STM-4 | 🟡 | B | Totals as legacy; driver split differs where the stores are not loaded: TP53 325/7 vs 329/3 (hotspots), TMPRSS2 Fusion 0/236 vs 207/29 (no OncoKB pair calls in the pinned v7.5 store; #230 matched at v7.7); tally follows the table's search and filters |
-| MUT-STM-5 | 🟡 | BC | 4 decimals below 0.01, else 2 (`portalVaf`, and the same in search and CSV); a negative count gives none; 0 shown blank where the portal writes "NA" on screen |
+| MUT-STM-5 | ✅ | BC | 4 decimals below 0.01, else 2 (`portalVaf`, and the same in search and CSV); none for a count ≤ 0; a cell without a frequency is the portal's NA: no text, the tooltip "Data not available." (#389) |
 | MUT-STM-6 | 🟡 | BC | Raw counts; 0 or less blank; no multi-sample "sampleId: value" form |
 | MUT-STM-7 | ✅ | BC | `MUTATION_COUNT`, identical 555/555 |
 | MUT-STM-8 | N/A | C | Cohort column not on the Results tab |

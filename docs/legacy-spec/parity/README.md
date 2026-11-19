@@ -35,11 +35,11 @@ Re-measurement against master `cc9004b7` (01) and `bc53b944` (05) (2026-11-18), 
 
 | Scorecard | IDs | ✅ | 🟡 | 🔶 | ❌ | 🐞 ok | N/A | ? | Strict | Half |
 |---|---|---|---|---|---|---|---|---|---|---|
-| [01 OncoPrint](01-oncoprint.md) | 104 | 54 | 36 | 1 | 10 | 1 | 2 | 0 | 55% | 72% |
+| [01 OncoPrint](01-oncoprint.md) | 104 | 55 | 35 | 1 | 10 | 1 | 2 | 0 | 56% | 73% |
 | [02 Cancer Types Summary](02-cancer-types-summary.md) | 59 | 33 | 17 | 2 | 3 | 1 | 3 | 0 | 63% | 77% |
 | [03 Mutual Exclusivity](03-mutual-exclusivity.md) | 40 | 5 | 14 | 9 | 10 | 1 | 1 | 0 | 18% | 35% |
 | [04 Plots](04-plots.md) | 170 | 33 | 44 | 17 | 69 | 2 | 5 | 0 | 24% | 36% |
-| [05 Mutations](05-mutations.md) | 139 | 45 | 38 | 10 | 30 | 3 | 7 | 6 | 40% | 53% |
+| [05 Mutations](05-mutations.md) | 139 | 50 | 34 | 10 | 29 | 3 | 7 | 6 | 43% | 55% |
 | [06 Structural Variants](06-structural-variants.md) | 54 | 32 | 13 | 4 | 3 | 2 | 0 | 0 | 63% | 75% |
 | [07 Co-expression](07-coexpression.md) | 49 | 10 | 14 | 11 | 6 | 1 | 6 | 1 | 35% | 49% |
 | [08 CN Segments](08-cn-segments.md) | 29 | 6 | 8 | 4 | 5 | 4 | 1 | 1 | 38% | 52% |
@@ -47,15 +47,15 @@ Re-measurement against master `cc9004b7` (01) and `bc53b944` (05) (2026-11-18), 
 | [10 Results › Download](10-results-download.md) | 41 | 11 | 21 | 2 | 4 | 1 | 2 | 0 | 34% | 60% |
 | [20 Comparison core](20-comparison-core.md) | 73 | 11 | 30 | 8 | 20 | 0 | 4 | 0 | 21% | 41% |
 | [21 Comparison molecular](21-comparison-molecular.md) | 88 | 22 | 37 | 16 | 7 | 2 | 3 | 1 | 31% | 52% |
-| [30 Study View summary](30-study-summary.md) | 135 | 41 | 48 | 12 | 29 | 3 | 2 | 0 | 34% | 52% |
-| [31 Study View shell](31-study-view-shell.md) | 118 | 18 | 40 | 10 | 42 | 2 | 6 | 0 | 22% | 39% |
-| [40 Patient summary](40-patient-summary.md) | 92 | 53 | 24 | 1 | 9 | 4 | 1 | 0 | 63% | 76% |
+| [30 Study View summary](30-study-summary.md) | 135 | 46 | 45 | 10 | 29 | 3 | 2 | 0 | 38% | 54% |
+| [31 Study View shell](31-study-view-shell.md) | 118 | 19 | 39 | 10 | 42 | 2 | 6 | 0 | 23% | 39% |
+| [40 Patient summary](40-patient-summary.md) | 92 | 55 | 24 | 1 | 7 | 4 | 1 | 0 | 65% | 78% |
 | [41 Patient tabs](41-patient-tabs.md) | 81 | 31 | 18 | 3 | 26 | 0 | 3 | 0 | 42% | 53% |
-| **Results** | 718 | 234 | 217 | 63 | 146 | 18 | 31 | 8 | 39% | 55% |
+| **Results** | 718 | 240 | 212 | 63 | 145 | 18 | 31 | 8 | 40% | 55% |
 | **Comparison** | 161 | 33 | 67 | 24 | 27 | 2 | 7 | 1 | 26% | 47% |
-| **Study View** | 253 | 59 | 88 | 22 | 71 | 5 | 8 | 0 | 28% | 46% |
-| **Patient** | 173 | 84 | 42 | 4 | 35 | 4 | 4 | 0 | 53% | 65% |
-| **All** | **1,305** | 410 | 414 | 113 | 279 | 29 | 50 | 9 | **37%** | **53%** |
+| **Study View** | 253 | 65 | 84 | 20 | 71 | 5 | 8 | 0 | 31% | 47% |
+| **Patient** | 173 | 86 | 42 | 4 | 33 | 4 | 4 | 0 | 54% | 66% |
+| **All** | **1,305** | 424 | 405 | 111 | 276 | 29 | 50 | 9 | **39%** | **54%** |
 
 One legacy bug is reproduced in cBioLab, and is not counted as a match:
 - ~~05 Mutations' legend lists "Splice site" under Truncating (MUT-LP-5).~~ Fixed rather than copied (#250); re-scored 2026-11-16.
