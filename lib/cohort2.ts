@@ -103,16 +103,22 @@ function alterationToOql(leaf: AlterationLeaf): string {
   return gene + ": " + specs.join(" ");
 }
 
+/** a clause listing more values than it may is refused, naming the limit (invariant 1), never cut short */
+function tooManyValues(what: string, n: number, limit: number): void {
+  if (n > limit) throw new Error(what + ": at most " + limit + " values; this lists " + n);
+}
+
 function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): LeafIds {
   const attr = String(leaf.attribute || "");
   if (!attr || attr.length > 200) throw new Error("invalid clinical attribute");
   rejectPer(leaf, "clinical");
   const conds: string[] = [];
   if (Array.isArray(leaf.values) && leaf.values.length) {
+    tooManyValues("clinical clause on " + attr, leaf.values.length, CLINICAL_VALUES_LIMIT);
     // folded on both sides, exactly as the `=` case is — a multi-value pick is
     // several facet clicks, and must select what those facets counted
     conds.push(clinicalValueFoldSql("attribute_value") + " IN (" +
-      leaf.values.slice(0, CLINICAL_VALUES_LIMIT).map(v => clinicalValueFoldSql(sq(String(v)))).join(",") + ")");
+      leaf.values.map(v => clinicalValueFoldSql(sq(String(v)))).join(",") + ")");
   }
   if (leaf.range && typeof leaf.range === "object") {
     const r = leaf.range as Record<string, number | undefined>;
@@ -432,8 +438,10 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
         (ctx.profiles ? " (its other profiles: " + (ctx.profiles.join(", ") || "none") + ")" : "") + "; add ifHeld: true to match nobody there instead") + ") != 0"
     : "";
   const conds = numRangeConds(leaf.range, finiteSql("ga.alteration_value"));
-  if (Array.isArray(leaf.values) && leaf.values.length)
-    conds.push("ga.alteration_value IN (" + leaf.values.slice(0, ASSAY_VALUES_LIMIT).map(v => sq(String(v))).join(",") + ")");
+  if (Array.isArray(leaf.values) && leaf.values.length) {
+    tooManyValues("genomicData clause on " + gene, leaf.values.length, ASSAY_VALUES_LIMIT);
+    conds.push("ga.alteration_value IN (" + leaf.values.map(v => sq(String(v))).join(",") + ")");
+  }
   if (!conds.length) throw new Error("genomicData clause needs range{gt,gte,lt,lte} or values[]");
   return ofSamples("SELECT DISTINCT " + PID("ga.sample_unique_id", ctx.study) + " AS sid\n" +
     "  FROM " + dbOf(ctx) + ".genetic_alteration_derived ga\n" +
@@ -450,8 +458,10 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): LeafIds {
   if (ctx.gaProfiles && !ctx.gaProfiles.includes(pt))
     throw new Error("genericAssay: profile '" + pt + "' not in this study (available: " + ctx.gaProfiles.join(", ") + ")");
   const conds = numRangeConds(leaf.range, finiteSql("value"));
-  if (Array.isArray(leaf.values) && leaf.values.length)
-    conds.push("value IN (" + leaf.values.slice(0, ASSAY_VALUES_LIMIT).map(v => sq(String(v))).join(",") + ")");
+  if (Array.isArray(leaf.values) && leaf.values.length) {
+    tooManyValues("genericAssay clause on " + entity, leaf.values.length, ASSAY_VALUES_LIMIT);
+    conds.push("value IN (" + leaf.values.map(v => sq(String(v))).join(",") + ")");
+  }
   if (leaf.measured === true) conds.push("trimBoth(value) NOT IN (" + ASSAY_MISSING_VALUES.map(sq).join(",") + ")");
   if (!conds.length) throw new Error("genericAssay clause needs range, values[] or measured: true");
   // a profile is measured per sample or (patient_level) per patient

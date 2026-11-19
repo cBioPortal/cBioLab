@@ -26,3 +26,22 @@ test("the compiler refuses an any clause past ANY_LEAF_LIMIT, naming it", () => 
   assert.throws(() => compileCohortDef({ all: [{ any: Array(ANY_LEAF_LIMIT + 1).fill(leaf) }] } as never, { study: "s1", db: "cbio" }), /any: 1-8 leaves/);
   assert.doesNotThrow(() => compileCohortDef({ all: [{ any: Array(ANY_LEAF_LIMIT).fill(leaf) }] } as never, { study: "s1", db: "cbio" }));
 });
+
+test("the compiler refuses a values list past its limit, naming it, rather than cutting it short (invariant 1)", () => {
+  const ctx = { study: "s1", db: "cbio", profiles: ["gistic"], gaProfiles: ["armlevel_cna"] };
+  const vals = (n: number) => Array.from({ length: n }, (_, i) => "v" + i);
+  const one = (leaf: unknown) => () => compileCohortDef({ all: [leaf] } as never, ctx);
+  const cases: [string, (n: number) => unknown, number, RegExp][] = [
+    ["clinical", (n) => ({ kind: "clinical", attribute: "CANCER_TYPE", values: vals(n) }), CLINICAL_VALUES_LIMIT,
+      /clinical clause on CANCER_TYPE: at most 50 values; this lists 51/],
+    ["genomicData", (n) => ({ kind: "genomicData", gene: "KRAS", profileType: "gistic", values: vals(n) }), ASSAY_VALUES_LIMIT,
+      /genomicData clause on KRAS: at most 20 values; this lists 21/],
+    ["genericAssay", (n) => ({ kind: "genericAssay", profileType: "armlevel_cna", entity: "1p", values: vals(n) }), ASSAY_VALUES_LIMIT,
+      /genericAssay clause on 1p: at most 20 values; this lists 21/],
+  ];
+  for (const [kind, leaf, limit, refusal] of cases) {
+    assert.doesNotThrow(one(leaf(limit)), kind + " at its limit");
+    assert.throws(one(leaf(limit + 1)), refusal, kind + " one past it");
+    assert.ok(compileCohortDef({ all: [leaf(limit)] } as never, ctx).includes("'v" + (limit - 1) + "'"), kind + ": every value at the limit is in the SQL");
+  }
+});
