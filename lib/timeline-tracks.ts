@@ -140,7 +140,7 @@ function markLines(t: TlTrack, events: PatientEvent[]): void {
 /**
  * The patient's tracks, in the portal's order: event types listed in TRACK_ORDER first, the rest
  * as they first occur. Event types are grouped by their case-folded name (lib/event-names.ts —
- * the label is the commonest spelling) and nested by TRACK_STRUCTURES.
+ * the label is the commonest spelling, upper-cased as the portal's) and nested by TRACK_STRUCTURES.
  */
 export function buildTracks(events: PatientEvent[]): TlTrack[] {
   const folded = foldEventNames(events.map((e) => ({ name: e.type, n: 1 })));
@@ -153,12 +153,16 @@ export function buildTracks(events: PatientEvent[]): TlTrack[] {
   const order = [...new Set([...TRACK_ORDER.map(canonicalEventName), ...byType.keys()])].filter((k) => byType.has(k));
   return order.map((k) => {
     const idx = byType.get(k)!;
-    const t = absorbOther(nest(events, idx, TRACK_STRUCTURES[k] || [], k, label.get(k) || k, 0));
+    // a root track is named by its event type upper-cased, as the portal names it (timeline_helpers: eventType.toUpperCase())
+    const t = absorbOther(nest(events, idx, TRACK_STRUCTURES[k] || [], k, rootLabel(label.get(k) || k), 0));
     if (SAMPLE_TRACK.test(k)) t.draw = "samples";
     if (k === "lab_test" || k === "measurements") markLines(t, events);
     return sortChildren(t);
   });
 }
+
+/** A root track's label: its event type as spelled most often, upper-cased (PAT-TL-TR-1: "SPECIMEN", "LAB_TEST"). */
+export const rootLabel = (type: string): string => type.toUpperCase();
 
 /** Every item under a track, its own and its descendants' — what a collapsed track shows. */
 export function allItems(t: TlTrack): TlItem[] {

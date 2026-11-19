@@ -30,8 +30,9 @@ const EVENTS: PatientEvent[] = [
 describe("timeline tracks: cBioPortal's grouping", () => {
   const tracks = buildTracks(EVENTS);
   test("event types in the portal's order, folded by case (lib/event-names.ts)", () => {
-    assert.deepEqual(tracks.map((t) => t.label), ["Sample acquisition", "Surgery", "Status", "Treatment", "Lab_Test"]);
-    // TREATMENT and Treatment are one track, labelled with the commoner spelling
+    // PAT-TL-TR-1: a root track is its event type upper-cased, as the portal's (eventType.toUpperCase())
+    assert.deepEqual(tracks.map((t) => t.label), ["SAMPLE ACQUISITION", "SURGERY", "STATUS", "TREATMENT", "LAB_TEST"]);
+    // TREATMENT and Treatment are one track
     assert.equal(tracks.find((t) => t.uid === "treatment")!.children.flatMap((c) => c.children.length ? c.children : [c]).length, 4);
   });
   test("treatment nests by type → subtype → agent; a lone Other is absorbed into its parent", () => {
