@@ -42,3 +42,19 @@ test("GL1: gene rows of other kinds of track are not read", () => {
 test("GL4: the style's own listing names both", () => {
   assert.deepEqual(geneLegend(STYLE).map((i) => i.label).slice(-2), ["No alterations", "Not profiled"]);
 });
+
+test("GL3 (ours): the server SVG puts Derived event before the closing No alterations and Not profiled", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { assembleContract } = await import("../lib/oncoprint-assemble.ts");
+  const { localInput, parseTsv } = await import("../lib/oncoprint-local.ts");
+  const { contractToSvg } = await import("../lib/oncoprint-svg.ts");
+  const FIX = "test/fixtures/oncoprint/";
+  const c = assembleContract(localInput({ events: parseTsv(readFileSync(FIX + "events.tsv", "utf8")), clinical: parseTsv(readFileSync(FIX + "clinical.tsv", "utf8")),
+    coverage: parseTsv(readFileSync(FIX + "coverage.tsv", "utf8")) }));
+  const gene = c.tracks.find((t) => t.kind === "gene")!;
+  c.tracks.push({ ...gene, kind: "derivedEvent", label: "Relapse" } as never);
+  const svg = contractToSvg(c, 800);
+  const at = (s: string) => svg.indexOf(">" + s + "<");
+  assert.ok(at("Derived event") > 0 && at("No alterations") > at("Derived event") && at("Not profiled") > at("No alterations"),
+    [at("Derived event"), at("No alterations"), at("Not profiled")].join(" "));
+});
