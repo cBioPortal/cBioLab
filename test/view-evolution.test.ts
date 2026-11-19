@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
 import { heatmapTsv, HEATMAP_FILE } from "../lib/views/evolution/download.ts";
-import { evolutionSvg, lineCells, cellText, portalCellTip, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { evolutionSvg, lineCells, cellText, portalCellTip, onlySelected, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
@@ -1040,6 +1040,24 @@ describe("PTB-GE-LC-6: portalCellTip, the portal's Genomic Evolution tooltip", (
     ["T8 not profiled", cell("np"), "P04_Rec1 is not sequenced for TP53 mutations."],
   ];
   for (const [name, c, want] of cases) test(name, () => assert.equal(tip(c), want));
+});
+
+describe("evolution: Show only selected mutations (PTB-GE-LC-2, the portal's VAFChartControls)", () => {
+  const keys = (svg: string | null) => [...(svg || "").matchAll(/class="evo-line" data-key="([^"]*)"/g)].map((m) => m[1].split("|").slice(0, 2).join(" "));
+  test("only the picked mutations are drawn; none picked, none drawn; the data range follows them", async () => {
+    const v = await run({ dataRange: true }, one());
+    const all = evo(v).drawn!, n = all.length;
+    const egfr = all.find((m) => m.gene === "EGFR")!.key, tp53 = all.find((m) => m.gene === "TP53")!.key;
+    assert.deepEqual(keys(evolutionSvg(v as never, { width: 800 })).sort(), ["EGFR L858R", "TP53 R273H"], "KRAS has no VAF to draw a line through");
+    const one1 = onlySelected(v as never, new Set([egfr]));
+    assert.deepEqual(keys(evolutionSvg(one1, { width: 800 })), ["EGFR L858R"]);
+    assert.deepEqual(keys(evolutionSvg(onlySelected(v as never, new Set([egfr, tp53])), { width: 800 })).sort(), ["EGFR L858R", "TP53 R273H"]);
+    assert.equal(evolutionSvg(onlySelected(v as never, new Set()), { width: 800 }), null, "an empty selection plots nothing");
+    assert.equal(evo(v).drawn!.length, n, "the result itself is left as it was");
+    const ticks = (svg: string | null) => [...(svg || "").matchAll(/>(0\.\d+)</g)].map((m) => Number(m[1]));
+    assert.ok(Math.max(...ticks(evolutionSvg(one1, { width: 800 }))) < Math.max(...ticks(evolutionSvg(v as never, { width: 800 }))),
+      "EGFR's VAFs (to 0.40) set the y range, not TP53's 0.50: " + ticks(evolutionSvg(one1, { width: 800 })) + " vs " + ticks(evolutionSvg(v as never, { width: 800 })));
+  });
 });
 
 describe("evolution: the heatmap's Data download (PTB-GE-HM-1, the portal's getDownloadData)", () => {
