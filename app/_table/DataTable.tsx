@@ -11,13 +11,16 @@ import type { ColumnFilter, ColumnValues, TableQuery, TableRows, TextFilterOp } 
 import { api } from "../lab/api.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
 import type { ViewPageBody, TableBody } from "../../lib/api-schemas.ts";
-import { ChevronLeft, ChevronRight, Columns3, Download, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Columns3, Copy, Download, X } from "lucide-react";
+import { copyText } from "./copy-text.ts";
+import { cutShort } from "../../lib/table-tsv.ts";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
+import { SHOW_MORE_SIZES, pageOfText, pagerHidden, resetOffered, showMoreDisabled, showMoreSize } from "../../lib/table-pager.ts";
 import { headerSort, type SortableColumn } from "../../lib/table-sort.ts";
 
 /** a page number in the pager, filled while it is the page shown */
@@ -113,6 +116,25 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
       <label className="tbfield">per page <OptionSelect value={String(p.size)} onValueChange={(v) => p.setSize(Number(v))}>
         {[...new Set([own, p.size, 25, 50, 100, 250])].sort((a, b) => a - b).map((n) => <option key={n} value={n}>{n}</option>)}
       </OptionSelect></label>
+      {p.error && <span className="mark">{p.error}</span>}
+    </div></div>
+  );
+}
+
+/**
+ * The portal's Show more pager (the Mutations table's): previous, Show more (a larger page), next, the rows
+ * shown, Reset once the page is larger than the first size; hidden when one page holds every row.
+ */
+export function ShowMorePager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
+  if (pagerHidden(p.total, p.size)) return null;
+  const from = p.total ? p.page * p.size + 1 : 0, to = Math.min(p.total, (p.page + 1) * p.size);
+  return (
+    <div className="viewtb pb-pager"><div className="tbz">
+      <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page === 0} onClick={() => p.setPage(p.page - 1)} aria-label="previous page"><ChevronLeft /></Button>
+      <Button type="button" variant="outline" size="sm" className={cn(TB, "w-[200px]")} disabled={showMoreDisabled(p.size, p.total)} onClick={() => p.setSize(showMoreSize(p.size))}>Show more</Button>
+      <Button type="button" variant="outline" size="sm" className={TB} disabled={p.page >= p.pages - 1} onClick={() => p.setPage(p.page + 1)} aria-label="next page"><ChevronRight /></Button>
+      {resetOffered(p.size) && <Button type="button" variant="link" size="sm" className={TB} onClick={() => p.setSize(SHOW_MORE_SIZES[0])}>Reset</Button>}
+      <span>Showing {from.toLocaleString()}–{to.toLocaleString()} of {p.total.toLocaleString()} {unit}</span>
       {p.error && <span className="mark">{p.error}</span>}
     </div></div>
   );
@@ -357,6 +379,8 @@ export interface DataTableProps<V> {
   /** a column whose runs of one value are drawn as groups (the alterations view's gene): the value shown on a run's
    *  first row only, no rule inside a run, alternate runs shaded */
   groupBy?: string;
+  /** the pager: numbered pages with a page-size choice (default), or the portal's Show more, with "(page x of y)" in the title (the Mutations table's) */
+  pager?: "pages" | "showMore";
   /** no column chooser and no per-column filters: the columns follow something else (the Explore charts) */
   plain?: boolean;
   /** the rows are one cohort's: no cohort column, the study column alone when there are several studies */
@@ -367,7 +391,7 @@ export interface DataTableProps<V> {
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, downloadFormat = "csv" }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, pager = "pages", downloadFormat = "csv" }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -414,6 +438,32 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     if (x == null || x === "") return "";
     return typeof x === "number" ? (num ? num(c.id, x) : x.toLocaleString()) : String(x);
   };
+  // the portal's Copy, in its two steps: a first click fetches the table.tsv text ("Copy Ready!"), a second copies
+  // it within that click, which the browser's clipboard needs (a copy after a long fetch is refused)
+  const [copyState, setCopyState] = useState<{ phase: "idle" } | { phase: "loading" } | { phase: "ready"; text: string } | { phase: "done" } | { phase: "failed"; why: string }>({ phase: "idle" });
+  // a fetch still running when the table changes (a sort, a filter) answers for the old table: its generation tells
+  const copyGen = useRef(0);
+  useEffect(() => { copyGen.current++; setCopyState({ phase: "idle" }); }, [t]);
+  const fetchCopy = async () => {
+    const g = ++copyGen.current;
+    setCopyState({ phase: "loading" });
+    const settle = (next: typeof copyState) => { if (copyGen.current === g) setCopyState(next); };
+    try {
+      const doc = JSON.parse(docJson ? docJson() : "");
+      const r = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
+        body: await api.tablePayload({ doc: doc as TableBody["doc"], view: vi, ...(table ? { table } : {}), format: "table-tsv" }) });
+      const text = await r.text();
+      if (!r.ok) throw new Error(text.trim());
+      const cut = cutShort(text);
+      if (cut) throw new Error("the table was cut short (" + cut + ")");
+      settle({ phase: "ready", text });
+    } catch (e) { settle({ phase: "failed", why: String((e as Error)?.message || e) }); }
+  };
+  const copyNow = (text: string) => {
+    copyText(text).then(() => setCopyState({ phase: "done" }), (e) => setCopyState({ phase: "failed", why: String((e as Error)?.message || e) }));
+  };
+  const copyBlocked = updating ? "waiting for the table to update, so the copy matches it" : !docJson ? "this table has no document to copy from"
+    : !t.all ? "no rows to copy" : copyState.phase === "loading" ? "fetching every row to copy…" : null;
   const download = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = e.currentTarget;
@@ -426,7 +476,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     <div className="dt">
       <div className="dt-bar">
         <span className={"dt-title" + (updating ? " stale" : "")}>{title}{title ? " · " : ""}{filtered ? <>{t.total.toLocaleString()} of {t.all.toLocaleString()} {unit}{kept ? " (" + portalKeptUnits(kept.samples, kept.patients) + ")" : null}</> : <>{t.total.toLocaleString()} {unit}</>}
-          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}{countNote ? ": " + countNote : null}</span>
+          {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}{countNote ? ": " + countNote : null}{pager === "showMore" && pageOfText(p.page, p.pages) ? " " + pageOfText(p.page, p.pages) : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
         <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
@@ -445,13 +495,20 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         {ownDownload ? <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !t.total || ownDownload.disabled}
           data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download" : ownDownload.tip}
           onClick={ownDownload.onClick}><Download />{ownDownload.label}</Button> :
-        <form method="post" action="/api/table" target="_blank" onSubmit={download}>
+        <>{downloadFormat === "table-tsv" && <>
+          <Button variant="outline" size="sm" className={TB} type="button" disabled={!!copyBlocked}
+            data-tip={copyBlocked ?? (copyState.phase === "ready" ? "the rows are fetched: click to copy them to the clipboard" : "fetch every row, as the download writes it, to copy to the clipboard")}
+            onClick={() => copyState.phase === "ready" ? copyNow(copyState.text) : void fetchCopy()}>
+            <Copy />{copyState.phase === "ready" ? "Copy Ready!" : copyState.phase === "loading" ? "Copying…" : "Copy"}</Button>
+          {(copyState.phase === "done" || copyState.phase === "failed") && <span className="meta" role="status">{copyState.phase === "done" ? "Copied!" : "could not copy: " + copyState.why}</span>}
+        </>}
+                <form method="post" action="/api/table" target="_blank" onSubmit={download}>
           <input type="hidden" name="payload" />
           <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
             data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
               : downloadFormat === "table-tsv" ? "every row, whatever the search and filters, in the table's order, with all " + t.columns.length + " columns, as tab-separated text (the portal's table.tsv)"
               : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />{downloadFormat === "table-tsv" ? "download TSV (" + t.all.toLocaleString() + ")" : "download CSV (" + t.total.toLocaleString() + ")"}</Button>
-        </form>}
+        </form></>}
       </div>
       {(filters.length > 0 || (q.search || "").trim()) && (
         <div className="dt-chips">
@@ -516,7 +573,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
         {/* the rows under it are the last answer, not this one: covered until the new one lands; the header stays usable */}
         {waiting && <div className="dt-wait" style={{ top: headH + 1 }} role="status" aria-live="polite"><span className="loading-block"><span className="spinner" /> {waiting}</span></div>}
       </div>
-      <Pager p={p as PageRows<unknown>} unit={unit} />
+      {pager === "showMore" ? <ShowMorePager p={p as PageRows<unknown>} unit={unit} /> : <Pager p={p as PageRows<unknown>} unit={unit} />}
     </div>
   );
 }

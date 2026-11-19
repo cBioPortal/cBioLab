@@ -15,6 +15,7 @@ import { MutationTypeCell } from "./mutation-cells.tsx";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult, AlleleReads, CohortCount } from "../../lib/views/alterations/types";
 import { cohortBar, cohortTooltip } from "../../lib/views/alterations/cohort-cell.ts";
+import { STYLE } from "../../lib/oncoprint-style.ts";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
@@ -25,6 +26,10 @@ type Spec = { patient?: PatientKey } & Record<string, unknown>;
 
 /** what the portal's not-profiled alerts call each table's data */
 const NOT_PROFILED_FOR: Record<"mutations" | "cna" | "sv", string> = { mutations: "mutations", cna: "copy number alterations", sv: "structural variants" };
+
+/** the portal's words for a sample whose panel leaves out the row's gene (TumorColumnFormatter) */
+const NOT_PROFILED = "This gene was not profiled for this sample (absent from gene panel)";
+const PILL = STYLE.notProfiledPill;
 
 /** The three tables, in the portal's order (Mutations, Structural Variants, Copy Number Alterations): the spec's key, and its name — its count line reads "7 Mutations", as the portal's does. */
 const TABLES = [
@@ -61,20 +66,25 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
   };
   // one slot per sample of the patient, in sample order: the sample's marker where it carries the row's alteration,
   // "--" in a slot of the same width where it does not — so a row reads as one alteration across the patient's samples
-  const sampleCell = (x: unknown) => {
+  // the portal's Samples cell (TumorColumnFormatter): a sample's marker where it carries the row, an empty slot where it
+  // was profiled for the gene and does not, a grey pill where its panel leaves the gene out (PAT-GP-2)
+  const sampleCell = (x: unknown, row: { detail?: Record<string, unknown> }) => {
     const has = new Set(String(x || "").split(", ").filter(Boolean));
+    const off = new Set((row.detail?.notProfiled as string[] | undefined) || []);
     const slots = [...marks.values()].map((m) => ({ id: m.id, label: m.label, color: m.color, type: m.type }));
     for (const id of has) if (!marks.has(id)) slots.push({ id, label: "?", color: "var(--muted)", type: "" });
     return (
       <span className="alt-samples" aria-label={"in " + [...has].join(", ")}>
         {slots.map((m) => {
-          const on = has.has(m.id);
+          const on = has.has(m.id), np = off.has(m.id);
+          const who = m.id + (m.type ? " — " + m.type : "");
+          const tip = on ? who + (np ? "\n" + NOT_PROFILED : "") : np ? who + "\n" + NOT_PROFILED + ". It is unknown whether it is mutated." : undefined;
           return (
-            <svg key={m.id} width="14" height="14" aria-hidden="true" data-tip={m.id + (m.type ? " — " + m.type : "") + (on ? "" : ": not found in this sample")}>
+            <svg key={m.id} width="14" height="14" aria-hidden="true" data-tip={tip} data-np={np && !on ? "" : undefined}>
               {on ? <>
                 <circle cx="7" cy="7" r="7" fill={m.color} />
                 <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text>
-              </> : <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="var(--muted)">--</text>}
+              </> : np ? <rect x={(14 - PILL.width) / 2} y={PILL.y + 1} width={PILL.width} height={PILL.height} rx={PILL.height / 2} fill={PILL.fill} /> : null}
             </svg>);
         })}
       </span>
@@ -147,7 +157,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 ? <GenesProfiledMenu table={key} value={(spec.genesProfiled as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
                     onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} />
                 : id === "vaf" && key === "mutations" ? <VafPlotHead vafs={a.vafs} marks={marks} /> : null}
-              cell={(id, x, row) => id === "samples" ? sampleCell(x)
+              cell={(id, x, row) => id === "samples" ? sampleCell(x, row)
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />

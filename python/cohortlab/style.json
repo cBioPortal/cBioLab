@@ -578,6 +578,12 @@
     "curveWidth": 1.5,
     "curveOpacity": 0.9
   },
+  "notProfiledPill": {
+    "fill": "#cccccc",
+    "width": 12,
+    "height": 2.5,
+    "y": 5
+  },
   "geometry": {
     "rowH": 20,
     "rowGap": 3,

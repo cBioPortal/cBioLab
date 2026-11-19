@@ -58,7 +58,9 @@ const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map
   const typed = cols.some((c) => c.id === "mutationType");
   const mrnaZ = x.mrnaZ == null ? undefined : Number(x.mrnaZ);
   const cohort = cohortOf(x);
-  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}), ...(mrnaZ != null && Number.isFinite(mrnaZ) ? { mrnaZ } : {}) };
+  // the samples in view not profiled for the row's gene (PAT-GP-2): the Samples cell's grey pills
+  const notProfiled = Array.isArray(x.notProfiled) && x.notProfiled.length ? (x.notProfiled as unknown[]).map(String) : null;
+  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}), ...(notProfiled ? { notProfiled } : {}), ...(mrnaZ != null && Number.isFinite(mrnaZ) ? { mrnaZ } : {}) };
   return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
     values: cols.map((c) => cellOf(x, c)), ...(Object.keys(detail).length ? { detail } : {}) };
 });
@@ -197,7 +199,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const mrna = t === "mutations" ? rank : null;
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = alterationDefaults(t, inView.length, !!mrna);
     const r = await runRows(ctx, "alterations:" + t, [pt.study], tqq, defs, shownColumns(tqq, cols, defs), size,
-      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, { genes, inAll: asksInAll(tqq) }, mrna),
+      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, { genes, inAll: asksInAll(tqq) || (inView.length > 1 && t !== "sv") }, mrna),
       ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined,
       remote(("alterations:" + t) as PeerTable, { patient: pt.id, order }));
     const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, ...(c.unsorted ? { unsorted: true } : {}) }));

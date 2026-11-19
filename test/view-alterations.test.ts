@@ -447,6 +447,27 @@ describe("allele frequency and per-sample reads", () => {
   });
 });
 
+describe("not-profiled samples (PAT-GP-2)", () => {
+  /** the mutations table's SQL as the run asks it, with the result */
+  const asked = async (view: Partial<AlterationsView>, mut: Row[] = MUT) => {
+    let sql = "";
+    const base = study({ mut });
+    const t: Tables = (table, src) => { if (table === "alterations:mutations") sql = src.with; return base(table, src); };
+    const m = alt(await run(view, one(t))).tables.mutations!;
+    return { sql, m };
+  };
+  test("with several samples in view, each row's panel coverage is worked out and its uncovered samples ride in its detail", async () => {
+    const { sql, m } = await asked({}, [{ ...MUT[0], notProfiled: ["S1b"] }]);
+    assert.match(sql, /miss AS \(SELECT gene, length\(np\) AS n, np FROM/);
+    assert.deepEqual(m.rows[0].detail?.notProfiled, ["S1b"]);
+  });
+  test("one sample in view: no coverage asked, nothing in the detail", async () => {
+    const { sql, m } = await asked({ samples: "cohort" }, [{ ...MUT[0], notProfiled: [] }]);
+    assert.doesNotMatch(sql, /miss AS/);
+    assert.equal(m.rows[0].detail?.notProfiled, undefined);
+  });
+});
+
 describe("mRNA Expr. (PAT-MT-5)", () => {
   const PROFILES = { profiles: ["mutations", "rna_seq_v2_mrna", "rna_seq_v2_mrna_median_Zscores"], gaProfiles: [] };
   /** the mutations table's SQL as the run asks it, with the result */

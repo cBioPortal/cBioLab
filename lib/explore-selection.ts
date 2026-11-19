@@ -11,8 +11,8 @@ import { fmtNum } from "./chart/format.ts";
 
 type Clause = NonNullable<CohortDef["all"]>[number];
 
-/** a cohort's `any` holds at most this many leaves (lib/cohort2.ts) */
-export const ANY_LEAF_LIMIT = 8;
+import { ANY_LEAF_LIMIT } from "./filter-limits.ts";
+export { ANY_LEAF_LIMIT };
 
 const isPlainLeaf = (c: unknown, attribute: string): c is ClinicalLeaf => {
   const l = c as ClinicalLeaf | null;

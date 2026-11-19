@@ -104,6 +104,7 @@ Re-score of 2026-11-16: the rows PRs #203, #222, #257, #260, #261 and #266 had a
 | msk_impact_2017 gene tables, Freq text (2026-11-19) | GT-5 | `getFrequencyStr` of the API's on-panel ÷ profiled | 413 / 413 mutated, 786 / 786 CNA identical | ✅ |
 | Cancer Studies, msk_impact_2017 + acc_tcga_pan_can_atlas_2018 (2026-11-19) | STM-19 | 10,945 / 92; SEX Female 5,497 / 60 | identical | ✅ |
 | GRADE, blca_tcga + ampca_bcm_2016 (2026-11-19) | MD-5 | one chart per sample; High Grade filter 389 samples / 388 patients | identical | ✅ |
+| Generic-assay bars, 6 entities (brca ancestry ×2, phosphoprotein, methylation; luad_cas_2020 SBS1, SBS4) (2026-11-19) | BAR-1, GS-5 | STATIC bins, NA | identical bars, counts and NA | ✅ |
 
 Legacy figures for Q1, Q2 and Q4 were taken again on 2026-11-18 from `/api/clinical-data-counts/fetch`, `/api/clinical-data-bin-counts/fetch?dataBinMethod=STATIC`, `/api/mutated-genes/fetch`, `/api/cna-genes/fetch`, `/api/structuralvariant-genes/fetch`, `/api/molecular-profile-sample-counts/fetch`, `/api/sample-lists-counts/fetch`, `/api/clinical-event-type-counts/fetch` and `/api/filtered-samples/fetch`, and compared row by row with `POST /api/explore` on master; the KM and density from the rendered page. Rows marked (2026-11-11) were not re-run.
 
@@ -171,7 +172,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-BAR-1 | 🟡 | BC | Clinical bins from `lib/data-binner.ts` (DataBinner port, STATIC); the MSI scores' initial custom bins ✅; GA bars use `numericBinEdges`, not DataBinner |
+| STS-BAR-1 | ✅ | BC | Clinical and generic-assay bins from `lib/data-binner.ts` (DataBinner port, STATIC); the MSI scores' initial custom bins ✅; generic-assay entities identical to the portal API (brca AFR, EUR, AAAS_pS462, cg00000029; luad_cas_2020 SBS1, SBS4) |
 | STS-BAR-2 | 🟡 | B | Numeric bins then category bins ✅; HTML bars, NA as a right-hand "NA n" note; no y axis |
 | STS-BAR-3 | 🟡 | B | Tick = bin start ("≤35 40 50 …", thinned to fit); no trailing end tick, no 10^n superscripts |
 | STS-BAR-4 | 🟡 | B | ↓ Tip "35–40 · 11 patients — click to filter": the unit follows the attribute's level (legacy bug not copied ✅), but the range is "35–40", not "(35, 40]", and there is no "Number of samples: / Range:" layout (`explore-sections.tsx:767-768, 950`) |
@@ -194,7 +195,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-GT-7 | ❌ | C | No OncoKB cancer-gene filter |
 | STS-GT-8 | ✅ | B | The `#` header's filter icon, dark under "Alterations: OncoKB drivers only" (the page's alteration filter), with the portal's filtered tooltip ([gene-tables-cases](gene-tables-cases.md)) GI1–GI2 |
 | STS-GT-9 | 🟡 | B | Check rows → [Apply filter], Union (one OQL clause) or Intersection (a clause per gene, refused past the selection's 8 filters), the choice kept by the browser; applied rows pinned, checked and disabled ([gene-tables-cases](gene-tables-cases.md)) GU1–GU6; compare via "…" |
-| STS-GT-10 | 🟡 | C | ↓ "find gene" matches the gene symbol only (`explore-sections.tsx:1234-1237`); the spec searches every column (# Mut, #, Freq, cytoband). Legacy Freq-search bug not reproduced |
+| STS-GT-10 | ✅ | C | ↓ The search matches any column as shown (gene, # Mut / # SV, #, Freq; CNA: cytoband, AMP / HOMDEL; `geneRowMatches`); legacy Freq-search bug not reproduced |
 | STS-GT-11 | 🟡 | BC | ↓ Counts follow the page's one alteration filter, "Alterations: all / OncoKB drivers only" (`app/lab/page.tsx:596-600`); no germline / somatic / unknown, VUS or tier choices, CNA fixed to AMP / HOMDEL |
 
 ### §7 Other table charts
@@ -254,7 +255,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-GS-2 | ❌ | C | No mutation-type option |
 | STS-GS-3 | 🟡 | B | ↓ "KRAS: copy-number alterations" Amplified / Gained / Diploid / Heterozygously deleted / Homozygously deleted / Not profiled = 6 / 128 / 390 / 67 / 1 / 2 (= legacy `/api/genomic-data-counts/fetch`) ✅, a click a `genomicData` clause on the discrete profile's values (`lib/explore.ts`, `lib/gene-state-clauses.ts`); drawn as a list without the portal's CNA colours |
 | STS-GS-4 | ❌ | C | No continuous-profile gene bar |
-| STS-GS-5 | 🟡 | C | Generic assays › one entity → histogram (`buildAssayFacets`), bins from `numericBinEdges`, ≤6 charts |
+| STS-GS-5 | 🟡 | C | Generic assays › one entity → histogram (`buildAssayFacets`), bars by the DataBinner over every study's values (as the portal's, 6 entities compared), ≤6 charts |
 | STS-GS-6 | 🟡 | C | Categorical GA entity → value list (top 30) |
 | STS-GS-7 | 🟡 | B | "Custom data" uploads become clinical-like facets (tag "custom") |
 
