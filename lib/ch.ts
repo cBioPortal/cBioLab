@@ -276,11 +276,25 @@ const MATERIALIZED = " AS MATERIALIZED (";
  * One subquery of a WITH clause, `name AS (sql)`, or `name AS MATERIALIZED (sql)` when
  * `materialized`. ClickHouse inlines a CTE at every place it is referenced, so one a statement
  * reads several times is computed several times; materialized, it is computed once per statement.
- * A statement holding one is sent with `enable_materialized_cte=1` (postToDatabase). Whether a
- * connection's server can is materializedCteSupported's answer.
+ * A statement holding one needs `enable_materialized_cte` (withStatement adds it); without it the
+ * keyword is ignored and the subquery is inlined.
  */
 export function cte(name: string, sql: string, materialized: boolean): string {
   return name + (materialized ? MATERIALIZED : " AS (") + sql + ")";
+}
+
+/** one WITH subquery: computed once when the statement is materialized, or always inlined ("inline") */
+export type WithCte = [name: string, sql: string] | [name: string, sql: string, mode: "inline"];
+const MATERIALIZED_SETTING = "\nSETTINGS enable_materialized_cte = 1";
+/**
+ * `WITH <ctes> <body>`. When `materialized`, every subquery not marked "inline" is `AS
+ * MATERIALIZED` and the statement ends with the setting that turns them on, so it runs as written
+ * (and as logged) in any client. `body` is the rest of one top-level SELECT and must not end with
+ * its own SETTINGS or FORMAT. Whether a connection may be sent one is materializedCteSupported's answer.
+ */
+export function withStatement(ctes: WithCte[], body: string, materialized: boolean): string {
+  return "WITH " + ctes.map(([name, sql, mode]) => cte(name, sql, materialized && mode !== "inline")).join(",\n     ") + "\n" +
+    body + (materialized ? MATERIALIZED_SETTING : "");
 }
 
 /** One statement as the database would receive it: its text, and the tables that ride along with it. */
@@ -295,14 +309,21 @@ export type ChTransport = (st: ChStatement, send: (settings?: string) => Promise
 let transport: ChTransport | null = null;
 export function setChTransport(t: ChTransport | null): void { transport = t; }
 
-const cteSupport = new Map<string, Promise<boolean>>();
+/** how long a connection's answer is kept before it is asked again: its server can be upgraded, rolled back or re-pointed */
+export const CTE_CHECK_TTL_MS = 10 * 60 * 1000;
+const cteSupport = new Map<string, { at: number; known: Promise<boolean> }>();
+/** the check: the setting itself, which fails where the server does not know it or this user may not set it */
+export const CTE_CHECK_SQL = "SELECT 1 AS ok" + MATERIALIZED_SETTING;
 /**
- * Whether this connection's server computes a materialized CTE once (the `enable_materialized_cte`
- * setting, which ClickHouse added recently and marks experimental): asked of its system.settings
- * once per server process and connection, and remembered. CLICKHOUSE_MATERIALIZED_CTE=0 turns it
- * off and =1 on without asking. A server too old to know the setting, or a check that fails, means
- * no: its statements are written as before. With a transport set (recorded answers) nothing is
- * asked and the statements are the plain ones, whatever CLICKHOUSE_MATERIALIZED_CTE says.
+ * Whether statements to this connection may be materialized (withStatement): whether its server
+ * runs `SETTINGS enable_materialized_cte = 1` for this user. That fails on a server too old to
+ * know the setting, and where a settings profile, readonly=1 or allow_feature_tier stops this user
+ * changing it (the setting is experimental). Asked once per connection and kept for
+ * CTE_CHECK_TTL_MS; a check that fails is kept as no for as long. The check runs outside the
+ * request that asked: it is not cancelled with that request, and its failure is not one of that
+ * request's failed queries (withoutFailedQueries). CLICKHOUSE_MATERIALIZED_CTE=0 turns it off and
+ * =1 on without asking. With a transport set (recorded answers) nothing is asked and the
+ * statements are the plain ones, whatever CLICKHOUSE_MATERIALIZED_CTE says.
  */
 export function materializedCteSupported(conn: ChConn): Promise<boolean> {
   // recorded answers are keyed by statement, so a run with them gets the plain statements whatever is set
@@ -311,14 +332,11 @@ export function materializedCteSupported(conn: ChConn): Promise<boolean> {
   if (forced === "0") return Promise.resolve(false);
   if (forced === "1") return Promise.resolve(true);
   const key = conn.id + "\u0000" + conn.url + "\u0000" + conn.db;
-  let known = cteSupport.get(key);
-  if (!known) {
-    known = chQuery<{ n: string }>("SELECT count() AS n FROM system.settings WHERE name = 'enable_materialized_cte'", conn)
-      .then((r) => Number(r.data[0]?.n) > 0)
-      // asked again next time: a check that failed says nothing about the server
-      .catch(() => { cteSupport.delete(key); return false; });
-    cteSupport.set(key, known);
-  }
+  const now = Date.now(), had = cteSupport.get(key);
+  if (had && now - had.at < CTE_CHECK_TTL_MS) return had.known;
+  const known = failedStore.exit(() => ctxStore.exit(() => chQuery<{ ok: number }>(CTE_CHECK_SQL, conn)))
+    .then((r) => Number(r.data[0]?.ok) === 1, () => false);
+  cteSupport.set(key, { at: now, known });
   return known;
 }
 
@@ -365,8 +383,7 @@ async function postToDatabase(conn: ChConn, query: string, externals: ChStatemen
   // request keeps its share of the database until it finishes, which is most of what an
   // abandoned request costs.
   const scope = studyScope(conn);
-  const materialized = query.includes(MATERIALIZED) ? "&enable_materialized_cte=1" : "";
-  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "") + materialized + (scope ? "&" + scope : "");
+  const url = conn.url.replace(/\/+$/, "") + "/?cancel_http_readonly_queries_on_client_close=1" + (settings ? "&" + settings : "") + (scope ? "&" + scope : "");
   const send = async (): Promise<string> => {
     const auth = "Basic " + Buffer.from(conn.user + ":" + conn.password).toString("base64");
     let init: RequestInit;

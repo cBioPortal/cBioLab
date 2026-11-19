@@ -89,8 +89,8 @@ SELECT replaceOne(patient_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'luad_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'luad_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
-,    e AS (SELECT any(33) x0, any(90) x1, any(0) y0, any(67.2) y1 FROM pair)
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL),
+     e AS (SELECT any(33) x0, any(90) x1, any(0) y0, any(67.2) y1 FROM pair)
 SELECT toUInt32(least(239, greatest(0, if(x1 > x0, floor((x - x0) / ((x1 - x0) / 240)), 0)))) AS bx,
        toUInt32(least(159, greatest(0, if(y1 > y0, floor((y - y0) / ((y1 - y0) / 160)), 0)))) AS by,
        count() AS n, min(x) AS minX, max(x) AS maxX, min(y) AS minY, max(y) AS maxY
@@ -125,8 +125,8 @@ SELECT replaceOne(patient_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') AS id,
   WHERE cancer_study_identifier = 'lusc_tcga_pan_can_atlas_2018' AND attribute_name = 'TMB_NONSYNONYMOUS' AND attribute_value != '' AND if(isFinite(ifNull(toFloat64OrNull(attribute_value), nan)), toFloat64OrNull(attribute_value), NULL) IS NOT NULL
     AND type = 'sample' AND replaceOne(sample_unique_id, 'lusc_tcga_pan_can_atlas_2018_', '') IN (SELECT sid FROM cohort)
 ) GROUP BY id),
-     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL)
-,    e AS (SELECT any(33) x0, any(90) x1, any(0) y0, any(67.2) y1 FROM pair)
+     pair AS (SELECT xs.v AS x, ys.v AS y FROM xs INNER JOIN ys ON ys.id = xs.id WHERE x IS NOT NULL AND y IS NOT NULL),
+     e AS (SELECT any(33) x0, any(90) x1, any(0) y0, any(67.2) y1 FROM pair)
 SELECT toUInt32(least(239, greatest(0, if(x1 > x0, floor((x - x0) / ((x1 - x0) / 240)), 0)))) AS bx,
        toUInt32(least(159, greatest(0, if(y1 > y0, floor((y - y0) / ((y1 - y0) / 160)), 0)))) AS by,
        count() AS n, min(x) AS minX, max(x) AS maxX, min(y) AS minY, max(y) AS maxY

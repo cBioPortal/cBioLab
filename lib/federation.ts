@@ -1913,7 +1913,7 @@ abstract class BaseResolver implements AggregateCapable {
     validateAxis(spec.x, "x", { cohort: true });
     validateAxis(spec.y, "y");
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.plotAxisCtx()) };
 
     const { kinds, names } = await this.clinicalMeta([spec.x, spec.y, spec.colorBy]);
     const title = (a: PlotAxis) => axisLabel(named(a, names));
@@ -2018,18 +2018,19 @@ abstract class BaseResolver implements AggregateCapable {
 
   /** what an OQL axis needs from this participant: its pinned OncoKB version and its profiles */
   protected oqlCtx() { return { oncokbPin: this.ctx.oncokbPin, profiles: this.ctx.profiles }; }
-  /**
-   * a plot axis's context: the OQL pins, the Genome Nexus releases a driver axis reads Cancer
-   * Hotspots at, and whether this site's database computes a WITH subquery once (lib/ch.ts cte)
-   */
+  /** an axis's context: the OQL pins and the Genome Nexus releases a driver axis reads Cancer Hotspots at */
   protected async axisCtx() {
-    const [pins, materialized] = await Promise.all([variantPins(), materializedCteSupported(this.instance.conn)]);
-    return { ...this.oqlCtx(), variantPins: pins, materialized };
+    return { ...this.oqlCtx(), variantPins: await variantPins() };
+  }
+  /** a plot's axis context: axisCtx, and whether this site's statements may be materialized (lib/ch.ts withStatement) */
+  protected async plotAxisCtx() {
+    const [axis, materialized] = await Promise.all([this.axisCtx(), materializedCteSupported(this.instance.conn)]);
+    return { ...axis, materialized };
   }
 
   protected async plotCtx(def: CohortDef | null | undefined, spec: PlotRequest) {
     return { study: this.study, db: this.instance.conn.db,
-      unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+      unit: spec.unit === "sample" ? "sample" as const : "patient" as const, cohortSql: this.cohortSql(def), ...(await this.plotAxisCtx()) };
   }
 
   /** This site's cases, and how many carry each axis — summed across sites by lib/views/plot/run.ts. */
@@ -2302,7 +2303,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   private async boxSelects(def: CohortDef | null | undefined, spec: PlotRequest) {
     const db = this.instance.conn.db;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.plotAxisCtx()) };
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "box") return null;
@@ -2319,7 +2320,7 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
   async plotScatterPoints(def: CohortDef | null | undefined, spec: PlotRequest, cap = POINTS_CAP, sparse?: SparseCells): Promise<PlotXYPoint[] | null> {
     const db = this.instance.conn.db, conn = this.instance.conn;
     const unit = spec.unit === "sample" ? "sample" as const : "patient" as const;
-    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.axisCtx()) };
+    const ctx = { study: this.study, db, unit, cohortSql: this.cohortSql(def), ...(await this.plotAxisCtx()) };
     const kinds = await this.clinicalKinds([spec.x, spec.y]);
     const xk = axisKind(spec.x, (a) => kinds.get(a)), yk = axisKind(spec.y, (a) => kinds.get(a));
     if (plotShape(xk, yk) !== "scatter") return [];
