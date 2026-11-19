@@ -127,6 +127,51 @@ async function tables({ browser, ok, BASE }) {
     ok("results structural variants: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+  // The Mutations table's Show more pager (legacy PaginationControls showMoreButton, MutationTable's options
+  // [25, 50, 100]): Show more grows the page, Reset returns to 25, the title carries "(page x of y)".
+  // coadread_tcga_pan_can_atlas_2018 has 223 KRAS mutations.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/portal/results?study=coadread_tcga_pan_can_atlas_2018&genes=KRAS,NRAS,BRAF,TP53,APC", { waitUntil: "domcontentloaded" });
+      await page.locator("button, [role=tab]").filter({ hasText: /^Mutations$/ }).first().click({ timeout: 120000 });
+      const title = page.locator(".dt-title").first();
+      await title.waitFor({ timeout: 240000 });
+      const pager = page.locator(".dt .pb-pager").first();
+      const state = async () => {
+        await page.waitForTimeout(300);
+        await page.waitForFunction(() => !document.querySelector(".dt-wait") && !document.querySelector(".dt-bar .waiting"), null, { timeout: 120000 });
+        await page.waitForTimeout(200);
+        return { title: (await title.innerText()).trim(), rows: await page.locator(".dt-table tbody tr").count(),
+          select: await pager.locator("select, [role=combobox]").count(), reset: await pager.getByRole("button", { name: "Reset" }).count(),
+          showing: (/Showing [^\n]*/.exec(await pager.innerText()) || [""])[0] };
+      };
+      const showMore = () => pager.getByRole("button", { name: "Show more" }).click();
+      const first = await state();
+      ok("table: the mutation table opens on 25 rows, titled with its page, Show more and no per-page select or Reset",
+        first.title === "223 KRAS mutations (page 1 of 9)" && first.rows === 25 && first.select === 0 && first.reset === 0, JSON.stringify(first));
+      await showMore();
+      const more = await state();
+      ok("table: Show more shows 50 rows, page 1 of 5, and offers Reset",
+        more.rows === 50 && /\(page 1 of 5\)$/.test(more.title) && more.reset === 1, JSON.stringify(more));
+      await showMore(); await state(); await showMore();
+      const most = await state();
+      ok("table: Show more twice more shows 200 rows", most.rows === 200 && /\(page 1 of 2\)$/.test(most.title), JSON.stringify(most));
+      await pager.getByRole("button", { name: "Reset" }).click();
+      const reset = await state();
+      ok("table: Reset returns to 25 rows, page 1 of 9", reset.rows === 25 && /\(page 1 of 9\)$/.test(reset.title) && reset.reset === 0, JSON.stringify(reset));
+      await pager.getByRole("button", { name: "next page" }).click();
+      const next = await state();
+      ok("table: next shows rows 26–50, page 2 of 9", /^Showing 26–50 of 223\b/.test(next.showing) && /\(page 2 of 9\)$/.test(next.title), JSON.stringify(next));
+    } catch (e) {
+      ok("table: the mutation table's Show more pager", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("table show more: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
   // The Structural Variants table's controls, on TCGA prostate's TMPRSS2–ERG fusion, reached by the tab's own
   // link. The portal's /api/structural-variant/fetch: 236 TMPRSS2 calls (194 with ERG as the partner), 220 ERG calls.
   {
@@ -152,6 +197,11 @@ async function tables({ browser, ok, BASE }) {
       ok("results: the SV table shows the portal's default columns, in its order",
         ["Sample ID", "Cancer Type Detailed", "Gene 1", "Gene 2", "Annotation (OncoKB)", "Connection Type", "Event Info", "Variant Class"].every((c, i) => heads[i]?.startsWith(c)),
         heads.join(" | "));
+      const svPager = page.locator(".dt .pb-pager").first();
+      const svPages = { numbered: await svPager.locator("button[aria-current=page]").count(), select: await svPager.locator("select, [role=combobox]").count(),
+        perPage: /per page/.test(await svPager.innerText()), showMore: await svPager.getByRole("button", { name: "Show more" }).count() };
+      ok("results: the SV table keeps numbered pages with a per-page select, not Show more",
+        svPages.numbered === 1 && svPages.select === 1 && svPages.perPage && svPages.showMore === 0, JSON.stringify(svPages));
       const link = page.locator(".dt-table tbody tr td a").first();
       const href = (await link.getAttribute("href")) || "";
       ok("results: an SV row's sample id opens that sample's page",
