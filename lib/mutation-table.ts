@@ -68,7 +68,7 @@ export const MUTATION_COLUMNS: MutationColumn[] = ([
   { id: "hgvsg", name: "HGVSg", numeric: false, tip: "Genomic change in HGVS notation (HGVSg). Click a value to view it in Genome Nexus." },
   // the rest from Genome Nexus, read from the offline store at its pin (lib/variant-annotation.ts)
   { id: "hgvsc", name: "HGVSc", numeric: false, tip: "Coding DNA change in HGVS notation (HGVSc) for the selected transcript" },
-  { id: "status", name: "MS", numeric: false },
+  { id: "status", name: "MS", numeric: false, tip: "Mutation Status" },
   { id: "validationStatus", name: "VS", numeric: false, tip: "Validation Status (VS): whether the mutation was confirmed by an independent validation experiment. V (Valid): Confirmed by an independent validation method. W (Wildtype): Validation found the wildtype allele. U (Unknown): Not validated, or validation status unknown." },
   { id: "center", name: "Center", numeric: false, tip: "Center that sequenced or called the mutation" },
   { id: "gnomad", name: "gnomAD", numeric: true,

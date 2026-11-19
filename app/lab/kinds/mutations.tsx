@@ -9,7 +9,7 @@ import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
   validationStatusCell, exonCell, VALIDATION_STATUS_STYLE } from "../../../lib/mutation-type.ts";
-import { ClinvarCell, DbsnpCell, FunctionalImpactCell, MutationTypeCell, FunctionalImpactHead, GnomadCell, HgvscCell, HgvsgCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
+import { ClinvarCell, DbsnpCell, FunctionalImpactCell, MutationStatusCell, MutationTypeCell, FunctionalImpactHead, GnomadCell, HgvscCell, HgvsgCell, ProteinChangeCell, SignalCell, useCellTips } from "../mutation-cells.tsx";
 
 // ---- Mutations: one gene's mutation table, on the shared table (app/_table/DataTable.tsx) ---------
 
@@ -17,6 +17,8 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
   onQuery: (q: TableQuery) => void }) {
   const t = v.mutations;
   const tips = useCellTips();
+  // the row's mutation status, which its Protein Change cell tags as germline
+  const statusAt = t.columns.findIndex((c) => c.id === "status");
   return (
     <div className="pb">
       {tips.node}
@@ -32,6 +34,8 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
           : id === "dbsnp" ? <DbsnpCell rsid={String(x ?? "")} detail={r.detail} />
           : id === "functionalImpact" ? <FunctionalImpactCell detail={r.detail} show={tips.show} />
           : id === "mutationType" ? <MutationTypeCell raw={x == null ? "" : String(x)} />
+          : id === "proteinChange" ? <ProteinChangeCell change={String(x ?? "")} status={statusAt >= 0 ? String(r.values[statusAt] ?? "") : ""} />
+          : id === "status" ? <MutationStatusCell raw={String(x ?? "")} />
           : id === "variantType" && x ? <span className="font-semibold" style={{ color: variantTypeColor(String(x)) }} data-tip={variantTypeTip(String(x)) ?? undefined}>{String(x)}</span>
           : id === "copyNumber" ? <CopyNumberCell label={String(x ?? "")} />
           : id === "validationStatus" && x ? <ValidationStatus raw={String(x)} />

@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
-import { dbsnpUrl, gnomadText, hgvsgUrl, impactLevel, msaUrls, num, signalRows, truncate, upperFirst,
+import { dbsnpUrl, gnomadText, hgvsgUrl, mutationStatusCell, proteinChangeCell, impactLevel, msaUrls, num, signalRows, truncate, upperFirst,
   type GnomadRow, type MaPrediction, type Prediction, type SignalEntry } from "../../lib/mutation-cell-text.ts";
 import { portalPct, portalSig2 } from "../../lib/chart/format.ts";
 import { mutationTypeLabel, mutationTypeColor, mutationTypeTip } from "../../lib/mutation-type.ts";
@@ -294,4 +294,27 @@ export function MutationTypeCell({ raw }: { raw: string }) {
   const label = mutationTypeLabel(raw);
   const bold = ["Missense", "Nonsense", "Splice", "IF del", "Fusion", "Silent"].includes(label) || label === raw;
   return <span className={bold ? "font-semibold" : undefined} style={{ color: mutationTypeColor(raw) }} data-tip={mutationTypeTip(raw) ?? undefined}>{label}</span>;
+}
+
+/** Protein Change as the portal draws it: bold italic, cut at 40 characters (the whole change its tooltip), a red "Germline" tag on a germline call */
+export function ProteinChangeCell({ change, status }: { change: string; status: string }) {
+  const c = proteinChangeCell(change, status);
+  return (
+    <span className="block">
+      <span className="font-bold italic" data-tip={c.shown !== c.full ? c.full : undefined}>{c.shown}</span>
+      {c.germline && <span className="ml-[5px] text-[x-small] text-[red]">Germline</span>}
+    </span>
+  );
+}
+
+const STATUS_BADGE: Record<"somatic" | "germline", React.CSSProperties> = {
+  somatic: { background: "#ccffff", color: "#000", padding: "0 5px", fontWeight: "bold", fontSize: "small" },
+  germline: { background: "#ffffcc", color: "#000", padding: "0 5px", fontWeight: "bold", fontSize: "small" },
+};
+/** MS as the portal draws it: S or G on its badge, the stored status its tooltip; any other status small and grey */
+export function MutationStatusCell({ raw }: { raw: string }) {
+  const c = mutationStatusCell(raw);
+  if (c.kind === "none") return <span />;
+  if (c.kind === "other") return <span style={{ color: "#9d9d9d", fontSize: "xx-small" }}>{c.text}</span>;
+  return <span style={STATUS_BADGE[c.kind]} data-tip={c.tip ?? undefined}>{c.text}</span>;
 }
