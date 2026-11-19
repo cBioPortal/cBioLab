@@ -5,6 +5,7 @@
 import { Children, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
+import { chartNames } from "../../lib/study-view-pills.ts";
 import CustomBinsDialog from "./custom-bins-dialog";
 import { logScaleOffered, looksLogarithmic, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
@@ -280,13 +281,13 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
             {(() => {
               const dr = parseDraft();
               if (!dr) return null;
-              const names = new Map<string, string>();
-              for (const f of explore?.clinical || []) if (f.displayName && !names.has(f.attribute)) names.set(f.attribute, f.displayName);
+              // the answer's chart names, else the vocabulary's: with no sample left the answer has no charts
+              const nameOf = chartNames(explore?.clinical || [], ctx.exploring.vocab.current.attrs);
               // a density drag's ranges have no pill only while its chart is drawn to show them (STV-FB-3b)
               // with no sample left the page draws no chart, so every drag's ranges are pills again
               const drawn = new Set(explore?.draftCount === 0 ? [] : densityChartsShown((explore?.clinical || []).map((c) => c.attribute),
                 ctx.chartChecked("genomic|density"), ctx.xyCharts).map((d) => densityChartName(d.pair)));
-              return <StudyViewPills draft={dr} labelOf={(a) => names.get(a)} apply={applyOrSay} onIntervalEdited={ctx.addBinEdges}
+              return <StudyViewPills draft={dr} labelOf={nameOf} apply={applyOrSay} onIntervalEdited={ctx.addBinEdges}
                 onRemoveClause={removeDraftClause} onCustomData={showClauseData()} drawnDensity={drawn} />;
             })()}
           </div>

@@ -2,7 +2,7 @@
 // chart (STV-FB-3), the interval text (STV-FB-4), its editable ends, and each pill's ×.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { ALL_LEAVES, editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill, geneTablePills, removeOqlLine, joinedByAnd } from "../lib/study-view-pills.ts";
+import { ALL_LEAVES, chartNames, editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill, geneTablePills, removeOqlLine, joinedByAnd } from "../lib/study-view-pills.ts";
 import { naClause } from "../lib/explore-selection.ts";
 import type { ClinicalLeaf, CohortDef } from "../lib/types.ts";
 
@@ -188,4 +188,15 @@ test("two generic groups in a row from the same chart are joined by \"and\"; a c
   const groups = filterGroups(draft, () => undefined);
   assert.deepEqual(joinedByAnd(draft, groups), [false, true, false, false, true, false, false]);
   assert.deepEqual(joinedByAnd(null, []), []);
+});
+
+// a pill is named by its chart; when the answer holds no chart (no sample left), by the attribute
+// vocabulary Explore keeps from its unfiltered answer, not the attribute's id
+test("a pill's chart name: the answer's, else the kept vocabulary's, else none (the id is shown)", () => {
+  const name = chartNames([{ attribute: "AGE", displayName: "Diagnosis Age" }, { attribute: "SEX" }],
+    [{ attribute: "FRACTION_GENOME_ALTERED", displayName: "Fraction Genome Altered" }, { attribute: "AGE", displayName: "Age (old)" }]);
+  assert.equal(name("AGE"), "Diagnosis Age", "the answer's name first");
+  assert.equal(name("FRACTION_GENOME_ALTERED"), "Fraction Genome Altered", "no chart in the answer: the kept name");
+  assert.equal(name("SEX"), undefined);
+  assert.equal(name("TMB"), undefined);
 });
