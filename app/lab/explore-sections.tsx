@@ -21,7 +21,7 @@ import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../..
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
-import { addChartLines, assayTabs, bulkButtons, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, assayTabs, bulkButtons, genomicChartLines, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -310,7 +310,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         <Tabs value={chartTab} onValueChange={(v) => setChartTab(v as typeof chartTab)} className="mb-3">
           <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
             {/* a tab per generic-assay type, as the portal's (STV-AC-2) */}
-            {([["clinical", "Clinical"], ["gene", "Gene status"], ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
+            {([["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"],
+              ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
               ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
               <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
@@ -482,6 +483,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             )}
           </div>
         )}
+        {chartTab === "genomic" && <GenomicCharts ctx={ctx} />}
         {chartTab.startsWith("assay:") && <AssayChartPicker ctx={ctx} assayType={chartTab.slice("assay:".length)} />}
         {chartTab === "derived" && (explore.events.length === 0 ? (
           <p className="note mt-0 mb-3">This study has no clinical timeline events to derive a filter from.</p>
@@ -1062,6 +1064,49 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
   );
 }
 
+/** the Add chart dialog's Genomic tab (STV-AC-2): the gene tables, Data Types and the density, each shown unless unchecked */
+/** the Genomic tab's rows for this selection (STV-AC-2, STV-AC-4); none hides the tab, as the portal's */
+function genomicLines(explore: NonNullable<ExploreCtx["explore"]>, attrKey: ExploreCtx["attrKey"]) {
+  const byKind = Object.fromEntries((explore.dataTypes || []).map((d) => [d.profile, d.n]));
+  const clinical = explore.clinical || [];
+  const names = new Set(clinical.map((c) => c.attribute));
+  return genomicChartLines({ mutated: profiledSamples("mutated", byKind), cna: profiledSamples("cna", byKind), sv: profiledSamples("sv", byKind) },
+    explore.totals?.samples ?? 0, { datatypes: (explore.dataTypes || []).length > 0, density: names.has("MUTATION_COUNT") && names.has("FRACTION_GENOME_ALTERED") },
+    clinical.filter((c) => c.attribute === "MUTATION_COUNT" || c.attribute === "FRACTION_GENOME_ALTERED")
+      .map((c) => ({ key: attrKey(c), name: c.displayName || c.attribute, samples: c.samples ?? 0, attribute: c.attribute })));
+}
+
+/** the Add chart dialog's Genomic tab (STV-AC-2): the gene tables, Data Types, the density, Mutation Count and FGA, each shown unless unchecked */
+function GenomicCharts({ ctx }: { ctx: ExploreCtx }) {
+  const { chartChecked, setChartsChecked, clearAttributeFilters, clearGeneTableFilter, attrKey } = ctx;
+  const lines = genomicLines(ctx.explore!, attrKey);
+  if (!lines.length) return <p className="note mt-0 mb-3">No selected study has molecular data to chart.</p>;
+  /** checked or unchecked; an unchecked chart takes its filter with it, as the portal's (STV-STM-3) */
+  const toggle = (l: (typeof lines)[number], on: boolean) => {
+    setChartsChecked([l.key], on);
+    if (on) return;
+    if (l.attribute) clearAttributeFilters([l.attribute]);
+    const table = /^genomic\|(mutated|cna|sv)$/.exec(l.key);
+    if (table) clearGeneTableFilter(table[1] as "mutated" | "cna" | "sv");
+  };
+  return (
+    <div className="attrtablewrap">
+      <table className="attrtable">
+        <thead><tr><th></th><th>Chart</th><th className="num" data-tip="% samples with data">Freq</th></tr></thead>
+        <tbody>
+          {lines.map((l) => (
+            <tr key={l.key} onClick={(e) => { if (!(e.target as HTMLElement).closest("[role=checkbox]")) toggle(l, !chartChecked(l.key)); }}>
+              <td><Checkbox checked={chartChecked(l.key)} onCheckedChange={(v) => toggle(l, v === true)} aria-label={"chart " + l.name} /></td>
+              <td>{l.name}</td>
+              <td className="num meta">{Number.isNaN(l.freq) ? "—" : portalFreq(l.freq)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 /** the Add chart dialog's generic-assay tab: a profile, then one of its entities found by search */
 function AssayChartPicker({ ctx, assayType }: { ctx: ExploreCtx; assayType: string }) {
   const { assayCharts, chartAssay, unchartAssay, exploreBusy } = ctx;
@@ -1383,7 +1428,8 @@ export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
-  return <>{(["mutated", "cna", "sv"] as const).map((kind) => <GeneTable key={kind} kind={kind} ctx={ctx} />)}</>;
+  // each table unless unchecked in Add chart's Genomic tab
+  return <>{(["mutated", "cna", "sv"] as const).filter((kind) => ctx.chartChecked("genomic|" + kind)).map((kind) => <GeneTable key={kind} kind={kind} ctx={ctx} />)}</>;
 }
 
 /** a gene table row's height in px: one line of --t-md plus the row's padding */
@@ -1520,7 +1566,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         const how = op === "union" || n < 2 ? "any of" : "every one of";
         return (
           <PickBar picks={picks} why={refusal} hint={"keep the samples " + (drivers ? "with an OncoKB driver call in" : "altered in") + " " + how + " the checked genes"}
-            onApply={(keys) => addClauses(geneSelection(keys.map((k) => meta.oql(byKey.get(k))), n > 1 ? op : "union"))}>
+            onApply={(keys) => addClauses(geneSelection(keys.map((k) => meta.oql(byKey.get(k))), n > 1 ? op : "union", kind))}>
             {n > 1 && <Choice value={op} onChange={(v) => chooseOp(v as GeneOp)} className="geneop"
               title="Union keeps the samples altered in any of the checked genes; Intersection, those altered in every one"
               options={[["union", "Union"], ["intersection", "Intersection"]]} />}
