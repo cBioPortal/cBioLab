@@ -49,7 +49,7 @@ function ctx(r: ReturnType<typeof local>): ViewRun {
 const LINE = "PIK3CA: MUT_DRIVER";
 const run = (view: Record<string, unknown>, r = local()) => runDatafiles({ kind: "datafiles", oql: [LINE], ...view } as DatafilesView, ctx(r));
 const err = (v: ViewResult) => String((v as { error?: string }).error || "");
-/** the line's events statement as oqlEventsSql builds it for this study, with or without the settings */
+/** the line's events statement as oqlEventsSql builds it for this study, with or without the settings; the case table's with its notes */
 const events = (extra: Record<string, unknown> = {}) => oqlEventsSql(LINE, { oncokbPin: "v7", profiles: [], pins: {}, study: "s1", db: "c1", ...extra });
 
 describe("L5: malformed drivers are refused with resolveDrivers' message (ours)", () => {
@@ -68,7 +68,7 @@ describe("L1/L2/L4: the runner hands the settings to the line's SQL (DT; the row
     const r = local();
     assert.equal(err(await run({}, r)), "");
     assert.ok(r.sources.length > 0, "the case table was asked");
-    for (const s of r.sources) assert.ok(s.with.includes(events()), "events without settings");
+    for (const s of r.sources) assert.ok(s.with.includes(events({ notes: true })), "the case table's events without settings");
   });
   for (const [row, drivers] of [["L1", {}], ["L2", { oncokb: false }]] as const)
     test(row + " drivers " + JSON.stringify(drivers) + ": the line's events carry them and the hotspot pins", async () => {
@@ -77,7 +77,7 @@ describe("L1/L2/L4: the runner hands the settings to the line's SQL (DT; the row
       assert.ok(r.sources.length > 0);
       const want = events({ drivers, hotspotPins: HOT });
       assert.notEqual(want, events(), "the settings change the statement");
-      for (const s of r.sources) assert.ok(s.with.includes(want), "events under the settings");
+      for (const s of r.sources) assert.ok(s.with.includes(events({ drivers, hotspotPins: HOT, notes: true })), "the case table's events under the settings");
     });
 });
 

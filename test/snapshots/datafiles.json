@@ -86,7 +86,7 @@
               "1",
               "no alteration",
               "no alteration",
-              "P408Afs*99"
+              "P408Afs*99 (driver)"
             ]
           },
           {
@@ -99,7 +99,7 @@
               "TCGA-3C-AALI-01",
               "TCGA-3C-AALI",
               "1",
-              "S183*",
+              "S183* (driver)",
               "no alteration",
               "no alteration"
             ]
@@ -116,7 +116,7 @@
               "1",
               "no alteration",
               "no alteration",
-              "H423Afs*84"
+              "H423Afs*84 (driver)"
             ]
           },
           {
@@ -130,7 +130,7 @@
               "TCGA-3C-AALK",
               "1",
               "no alteration",
-              "E542K, M1004I",
+              "E542K (driver), M1004I (driver)",
               "no alteration"
             ]
           },
@@ -145,7 +145,7 @@
               "TCGA-5L-AAT0",
               "1",
               "no alteration",
-              "H1047L",
+              "H1047L (driver)",
               "no alteration"
             ]
           },
@@ -161,7 +161,7 @@
               "1",
               "no alteration",
               "no alteration",
-              "S436Pfs*40"
+              "S436Pfs*40 (driver)"
             ]
           },
           {
@@ -175,7 +175,7 @@
               "TCGA-A1-A0SH",
               "1",
               "no alteration",
-              "AMP",
+              "AMP (driver)",
               "no alteration"
             ]
           },
@@ -189,8 +189,8 @@
               "TCGA-A1-A0SI-01",
               "TCGA-A1-A0SI",
               "1",
-              "R175H",
-              "E726K, H1047R",
+              "R175H (driver)",
+              "E726K, H1047R (driver)",
               "no alteration"
             ]
           },
@@ -204,7 +204,7 @@
               "TCGA-A1-A0SK-01",
               "TCGA-A1-A0SK",
               "1",
-              "M133K",
+              "M133K (driver)",
               "no alteration",
               "no alteration"
             ]
@@ -219,7 +219,7 @@
               "TCGA-A1-A0SO-01",
               "TCGA-A1-A0SO",
               "1",
-              "Y220C",
+              "Y220C (driver)",
               "no alteration",
               "no alteration"
             ]
@@ -234,7 +234,7 @@
               "TCGA-A1-A0SP-01",
               "TCGA-A1-A0SP",
               "1",
-              "S183*",
+              "S183* (driver)",
               "no alteration",
               "no alteration"
             ]
@@ -251,7 +251,7 @@
               "1",
               "no alteration",
               "no alteration",
-              "S436Lfs*71"
+              "S436Lfs*71 (driver)"
             ]
           },
           {
@@ -265,7 +265,7 @@
               "TCGA-A2-A04N",
               "1",
               "no alteration",
-              "E542K",
+              "E542K (driver)",
               "no alteration"
             ]
           },
@@ -279,8 +279,8 @@
               "TCGA-A2-A04P-01",
               "TCGA-A2-A04P",
               "1",
-              "G108Vfs*15",
-              "R88Q, AMP",
+              "G108Vfs*15 (driver)",
+              "R88Q (driver), AMP (driver)",
               "no alteration"
             ]
           },
@@ -294,8 +294,8 @@
               "TCGA-A2-A04T-01",
               "TCGA-A2-A04T",
               "1",
-              "D208G, R273H",
-              "H1047Y, AMP",
+              "D208G, R273H (driver)",
+              "H1047Y (driver), AMP (driver)",
               "no alteration"
             ]
           },
@@ -309,7 +309,7 @@
               "TCGA-A2-A04U-01",
               "TCGA-A2-A04U",
               "1",
-              "Y107Cfs*16",
+              "Y107Cfs*16 (driver)",
               "no alteration",
               "no alteration"
             ]
@@ -325,7 +325,7 @@
               "TCGA-A2-A04V",
               "1",
               "no alteration",
-              "G118D",
+              "G118D (driver)",
               "no alteration"
             ]
           },
@@ -339,8 +339,8 @@
               "TCGA-A2-A04W-01",
               "TCGA-A2-A04W",
               "1",
-              "V272M",
-              "H1047R",
+              "V272M (driver)",
+              "H1047R (driver)",
               "no alteration"
             ]
           },
@@ -354,7 +354,7 @@
               "TCGA-A2-A0CL-01",
               "TCGA-A2-A0CL",
               "1",
-              "R273L",
+              "R273L (driver)",
               "no alteration",
               "no alteration"
             ]
@@ -369,7 +369,7 @@
               "TCGA-A2-A0CM-01",
               "TCGA-A2-A0CM",
               "1",
-              "E204Sfs*43",
+              "E204Sfs*43 (driver)",
               "no alteration",
               "no alteration"
             ]
@@ -619,7 +619,7 @@
           {
             "kind": "fetch",
             "title": "Count the samples per cohort and study",
-            "detail": "The datafiles:cases:counts query above: every sample of the cohort with its status against the query and, per line, the events it matched — or no alteration, or not profiled.",
+            "detail": "The datafiles:cases:counts query above: every sample of the cohort with its status against the query and, per line, the events it matched, each with \" [germline]\" and \" (driver)\" as the portal writes them — or no alteration, or not profiled.",
             "params": [
               [
                 "Queried · brca_tcga_pan_can_atlas_2018",

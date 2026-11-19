@@ -94,6 +94,10 @@ describe("SQL", () => {
     assert.match(statusRowSource("unaltered", parts, lines, plan).with, /WHERE status = 'unaltered'\)\n$/);
     assert.match(statusRowSource("altered", parts, lines, plan).with, /WHERE status = 'altered'\)\n$/);
     assert.deepEqual(statusRowSource("matrix", parts, lines, plan).columns.map((c) => c.text), ["sid", "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')", "m0", "m1"]);
+    // only the case table writes each call's germline / driver note (CaseAlterationTable); the lists, the matrix and the counts read the calls alone
+    assert.match(cases.with, /concat\(ev, note\)/);
+    for (const t of ["altered", "unaltered", "matrix"] as const) assert.doesNotMatch(statusRowSource(t, parts, lines, plan).with, /note/, t);
+    assert.doesNotMatch(datafilesCountsSql("SELECT pid, sid FROM x", lines, { study: "s", db: "d", pin: null, profiles: [] }), /note/);
     assert.throws(() => statusRowSource("cases", [], lines, plan), /at least one part/);
     assert.deepEqual(lineColumns([{ line: "TP53", gene: "TP53" }, { line: "TP53: AMP", gene: "TP53" }]).map((c) => c.id), ["TP53_1", "TP53_2"]);
     assert.deepEqual(statusColumns("altered", lines).map((c) => c.id), ["sample", "patient"]);
