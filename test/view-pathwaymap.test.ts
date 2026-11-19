@@ -5,7 +5,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { PATHWAYS, PANCAN_PATHWAYS, LIBRARY_GENES, parsePathway, pathwayNamed, GENE_SYMBOL } from "../lib/views/pathwaymap/library.ts";
-import { rankPathways, scorePathway, arrangeFor, rankProblem, rankSettingsOf, rankingPct, round2 } from "../lib/views/pathwaymap/rank.ts";
+import { rankPathways, scorePathway, arrangeFor, rankProblem, rankSettingsOf, rankingPct, round2, pathwayAltered } from "../lib/views/pathwaymap/rank.ts";
 import { runPathwayMap } from "../lib/views/pathwaymap/run.ts";
 import { pathwayMapSvg, nodeBoxes } from "../lib/views/pathwaymap/figure.ts";
 import { pathwaymapKind } from "../lib/views/pathwaymap/kind.ts";
@@ -193,6 +193,21 @@ describe("pathwaymap: the runner", () => {
     const r = await run({ genes: ["KRAS"], pathway: "nope" }, two());
     assert.match(r.error!, /no pathway named “nope”/);
     assert.equal(pmOf(r).pathway, "RTK-RAS");
+  });
+});
+
+describe("PTB-PW-4: the Patient page's \"Pathway altered\" (PathwayMapperTable in patient mode)", () => {
+  test("Yes when the pathway scores above 0, No at 0 (PTB-STM-10)", () => {
+    assert.equal(pathwayAltered({ score: 3 }), true);
+    assert.equal(pathwayAltered({ score: 1 }), true);
+    assert.equal(pathwayAltered({ score: 0 }), false);
+  });
+  test("with the page's settings (match count, PanCanAtlas only), the altered pathways come first", async () => {
+    const pm = pmOf(await run({}, two()));
+    const yes = pm.ranked.map((r) => pathwayAltered(r));
+    assert.ok(yes.some((x) => x) && yes.some((x) => !x), JSON.stringify(yes));
+    assert.equal(yes.indexOf(false), yes.lastIndexOf(true) + 1, "every Yes before the first No");
+    assert.deepEqual(pm.ranked.filter((r) => pathwayAltered(r)).map((r) => r.name), pm.ranked.filter((r) => r.matched.length > 0).map((r) => r.name));
   });
 });
 
