@@ -7,12 +7,15 @@ import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource, EVOLUTION_DEFAULT_COLUMNS } from "../lib/views/evolution/sql.ts";
 import { heatmapTsv, HEATMAP_FILE } from "../lib/views/evolution/download.ts";
-import { evolutionSvg, lineCells, cellText, portalCellTip, heatmapColumns, onlySelected, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
+import { evolutionSvg, lineCells, cellText, portalCellTip, notProfiledForMutations, heatmapColumns, onlySelected, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
 import { pageSql } from "../lib/table-query.ts";
 import { annotationText } from "../lib/patient-alterations.ts";
+import { selectedCsv } from "../lib/views/evolution/download.ts";
+import { selectedRows } from "../lib/views/evolution/table.ts";
+import { evolutionKey } from "../lib/views/evolution/figure.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import { pagedTable } from "../lib/views/rows.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
@@ -180,6 +183,12 @@ describe("evolution: what it refuses", () => {
 });
 
 describe("evolution: the patient drawn", () => {
+  test("PTB-GE-3 the not-profiled alert: the samples without a mutation panel, in the patient's order; none when all have one (all_phase2_target_2018_pub TARGET-10-PAPLDL: -04)", () => {
+    const s = (id: string, panel: string | null): EvolutionSample => ({ id, type: "", label: id, color: "#000", day: null, panel });
+    assert.deepEqual(notProfiledForMutations([s("TARGET-10-PAPLDL-03", "WES"), s("TARGET-10-PAPLDL-04", null), s("TARGET-10-PAPLDL-09", "WES")]).map((x) => x.id), ["TARGET-10-PAPLDL-04"]);
+    assert.deepEqual(notProfiledForMutations([s("b", null), s("a", null)]).map((x) => x.id), ["b", "a"]);
+    assert.deepEqual(notProfiledForMutations([s("a", "IMPACT341"), s("b", "WES")]), []);
+  });
   test("the list holds drawable patients only; the first is drawn with its samples in collection order, days and panels", async () => {
     const v = await run({}, one());
     assert.equal(v.error, undefined, String(v.error));
@@ -194,6 +203,7 @@ describe("evolution: the patient drawn", () => {
     assert.equal(e.mutations!.total, 3);
     assert.deepEqual(e.position, { index: 0, prev: null, next: null });
     assert.match(v.caveat!, /^P1: 3 samples in collection order, placed by the day each was collected/);
+    assert.deepEqual(notProfiledForMutations(e.patient!.samples).map((s) => s.id), ["T3"], "PTB-GE-3: the alert names the sample outside the mutation profile, alone");
     assert.match(v.caveat!, /3 mutations; 2 are drawn — 1 mutation with no allele counts in any sample is listed but not drawn\./);
     assert.match(v.caveat!, /or the sample was not sequenced for mutations \(T3\) — never 0 \(1 such cell here\)/);
     assert.ok(v.method && v.method.steps.length === 3);
@@ -1148,5 +1158,33 @@ describe("evolution: Show Timeline (PTB-GE-LC-1, the portal's genomicEvolutionSe
     assert.doesNotMatch(plain, />Specimen</);
     assert.notEqual(ys(plain, "1y")[0], year[1], "unaligned, the chart's own margin puts the year elsewhere");
     assert.deepEqual(lintSvg(svg), [], "nothing overprinted or outside");
+  });
+});
+
+describe("PTB-GE-TB-1: the table's \"Show only selected mutations\" (showOnlySelectedMutationsInTable)", () => {
+  const cols = ["samples", "gene", "proteinChange", "chr", "start", "end", "ref", "var"].map((id) => ({ id, name: id, numeric: false }));
+  const row = (gene: string, pc: string, start: number) => ({ cohort: "A", study: "s1", patient: "P1", sample: "T1", values: ["1", gene, pc, "17", start, start, "C", "T"] as (string | number | null)[] });
+  const all = [row("TP53", "R248Q", 100), row("EGFR", "L858R", 200), row("KRAS", "G12D", 300), row("TP53", "R175H", 50)];
+  const key = (r: { values: (string | number | null)[] }) => evolutionKey([r.values[1], r.values[2], r.values[3], r.values[4], r.values[5], r.values[6], r.values[7]]);
+  // the table as the result holds it: the first page of 2 of the 4 rows
+  const t = { columns: cols, shown: [], defaults: [], query: {}, rows: all.slice(0, 2), offset: 0, pageSize: 2, lists: [], total: 4, all: 4 };
+  test("nothing picked: every row, the table as it is", () => {
+    assert.equal(selectedRows(t, all, new Set()), t);
+  });
+  test("picked: those rows of every row the query keeps, past the first page, in the table's order, on one page", () => {
+    const s = selectedRows(t, all, new Set([key(all[3]), key(all[0])]));
+    assert.deepEqual(s.rows.map((r) => r.values[2]), ["R248Q", "R175H"]);
+    assert.deepEqual([s.total, s.all, s.offset, s.pageSize], [2, 4, 0, 2]);
+  });
+  test("its download: the rows shown, with every column, as the table's CSV writes them, named _selected", () => {
+    const tt = { ...t, columns: [...cols, { id: "study", name: "Study", numeric: false }] };
+    const s = selectedRows(tt, all.map((r) => ({ ...r, values: [...r.values, "s1"], study: "s1" })), new Set([key(all[1])]));
+    const f = selectedCsv(s, { study: "s1", id: "P 1" });
+    assert.equal(f.name, "cohort-lab_s1_P_1_evolution_mutations_selected.csv");
+    assert.equal(f.text, "cohort,study,samples,gene,proteinChange,chr,start,end,ref,var\r\nA,s1,1,EGFR,L858R,17,200,200,C,T\r\n");
+  });
+  test("a picked mutation the query does not keep lists nothing; the count says so", () => {
+    const s = selectedRows(t, all.slice(1), new Set([key(all[0])]));
+    assert.deepEqual([s.rows.length, s.total, s.pageSize], [0, 0, 1]);
   });
 });

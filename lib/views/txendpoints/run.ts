@@ -58,7 +58,7 @@ export async function runTxendpoints(view: TxendpointsView, ctx: ViewRun): Promi
     let late = 0, anchored = 0, cohortN = 0;
     await Promise.all(cohorts[n].studies.filter((st) => ok[st]).map(async (st) => {
       cohortN += cohorts[n].perStudy[st]?.count || 0;
-      const rows = await ok[st].viewAggregate("txendpoints:" + endpoint + ":" + n, doc.cohorts[n], (c, s, d) => txEndpointCountsSql(c, s, d, opts));
+      const rows = await ok[st].viewAggregate("txendpoints:" + endpoint + ":" + n, doc.cohorts[n], (c, s, d, m) => txEndpointCountsSql(c, s, d, opts, m), { materialize: true });
       const recs: SurvRecord[] = [];
       let siteLate = 0, siteAnch = 0;
       for (const r of rows) {

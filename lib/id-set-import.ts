@@ -45,7 +45,7 @@ export async function createIdSet(principal: string | null, input: unknown): Pro
   });
   const duplicates = ids.length - new Set(ids).size;
   const set = await saveIdSet(principal, {
-    name: String(b.name ?? ""), level: level as IdSetLevel, perStudy,
+    name: String(b.name ?? ""), level: level as IdSetLevel, perStudy, ordered: true,
     source: { idsIn: ids.length, unmatched: r.unmatched, duplicates, multiStudy: r.multiStudy }
   });
   return { set, unmatched: r.unmatched, unmatchedExamples, duplicates, multiStudy: r.multiStudy, refused: r.refused };

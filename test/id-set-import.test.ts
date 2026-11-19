@@ -94,6 +94,11 @@ test("samples are matched by sample id and saved as samples", async () => {
   assert.equal(r.unmatched, 2, "a patient id is not a sample id");
 });
 
+test("a typed list is kept in the order typed, for the OncoPrint's case list order (ONC-SO-3)", async () => {
+  const r = await createIdSet(alice.id, input({ level: "sample", ids: ["P2-T", "P1-T", "P2-M"] }));
+  assert.deepEqual((await readIdSet(alice.id, r.set.id)).perStudy, { s_a: ["P2-T", "P1-T", "P2-M"] });
+});
+
 test("ids given more than once are counted as duplicates and kept once", async () => {
   const r = await createIdSet(alice.id, input({ ids: ["P1", "P1", "P2", "P1"] }));
   assert.equal(r.duplicates, 2);
@@ -107,7 +112,7 @@ test("a study-qualified id is looked up in that study alone; a bare one in every
   assert.equal(q.multiStudy, 0);
 
   const b = await createIdSet(alice.id, input({ studies: ["s_a", "s_c"], ids: ["SHARED", "C1"] }));
-  assert.deepEqual((await readIdSet(alice.id, b.set.id)).perStudy, { s_a: ["SHARED"], s_c: ["C1", "SHARED"] });
+  assert.deepEqual((await readIdSet(alice.id, b.set.id)).perStudy, { s_a: ["SHARED"], s_c: ["SHARED", "C1"] });
   assert.equal(b.multiStudy, 1);
 });
 

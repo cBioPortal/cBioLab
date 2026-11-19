@@ -3,6 +3,7 @@ import { GENOME_CHROMS, CHROM_LENGTHS } from "../../federation-views.ts";
 import { inCohortSamples, bareSampleId } from "../../cohort2.ts";
 import { sq } from "../../compiler.ts";
 import { aggregateSql, type AggregateSql } from "../../sql-kinds.ts";
+import { cte, materializedSetting } from "../../ch.ts";
 
 /** the arms scored: 39 autosomal arms (and Xp, Xq with includeX), in genome order */
 export function instabilityArms(includeX: boolean): string[] {
@@ -10,18 +11,18 @@ export function instabilityArms(includeX: boolean): string[] {
 }
 
 /** FGA in 1-point bins × aneuploidy score, with how many arms each sample had measured: counts of samples. */
-export function instabilityScoresSql(cohortSql: string, study: string, db: string, o: InstabilityOpts): AggregateSql {
+export function instabilityScoresSql(cohortSql: string, study: string, db: string, o: InstabilityOpts, materialized = false): AggregateSql {
   return aggregateSql((
-    instabilityCtes(cohortSql, study, db, o) + "\n" +
+    instabilityCtes(cohortSql, study, db, o, materialized) + "\n" +
     "SELECT toInt32(least(100, floor(100 * alt / greatest(1, cov)))) AS fga_bin, score, measured, count() AS n\n" +
-    "FROM per GROUP BY fga_bin, score, measured ORDER BY fga_bin, score"
+    "FROM per GROUP BY fga_bin, score, measured ORDER BY fga_bin, score" + materializedSetting(materialized)
   ));
 }
 
 /** Per arm: the samples that measured it, and those with it gained or lost. */
 export function instabilityArmsSql(cohortSql: string, study: string, db: string, o: InstabilityOpts): AggregateSql {
   return aggregateSql((
-    instabilityCtes(cohortSql, study, db, o) + "\n" +
+    instabilityCtes(cohortSql, study, db, o, false) + "\n" +
     "SELECT arm, countIf(measured) AS n_measured, countIf(measured AND gain) AS n_gain, countIf(measured AND loss) AS n_loss FROM calls GROUP BY arm"
   ));
 }
@@ -50,8 +51,9 @@ export interface InstabilityOpts { threshold: number; armShare: number; includeX
  * the scored chromosomes whose |segment mean| is past the threshold — and, per arm, the share of
  * the arm's length gained and lost; an arm is gained (lost) when that share passes armShare, and
  * measured when segments cover at least armShare of it. Aneuploidy score = arms gained or lost.
+ * `arms` is computed once for the statement when `materialized` (lib/ch.ts cte).
  */
-function instabilityCtes(cohortSql: string, study: string, db: string, o: InstabilityOpts): string {
+function instabilityCtes(cohortSql: string, study: string, db: string, o: InstabilityOpts, materialized: boolean): string {
   const T = Number(o.threshold), S = Number(o.armShare);
   const chroms = GENOME_CHROMS.filter((c) => o.includeX || c !== "X");
   const arr = (xs: (string | number)[]) => "[" + xs.map((x) => typeof x === "number" ? String(x) : sq(x)).join(",") + "]";
@@ -78,10 +80,9 @@ function instabilityCtes(cohortSql: string, study: string, db: string, o: Instab
     "    FROM seg WHERE chrom IN (" + chroms.map(sq).join(",") + ") AND en > st\n" +
     "  ) WHERE NOT (arm IN (" + ACROCENTRIC.map((c) => sq(c + "p")).join(",") + "))\n" +
     "),\n" +
-    "arms AS (\n" +
+    cte("arms", "\n" +
     "  SELECT sid, arm, any(arm_len) AS alen, sum(bp) AS cov, sumIf(bp, m >= " + T + ") AS gbp, sumIf(bp, m <= " + (-T) + ") AS lbp\n" +
-    "  FROM parts GROUP BY sid, arm\n" +
-    "),\n" +
+    "  FROM parts GROUP BY sid, arm\n", materialized) + ",\n" +
     "calls AS (\n" +
     "  SELECT sid, arm, cov >= " + S + " * alen AS measured, gbp > " + S + " * alen AS gain, lbp > " + S + " * alen AS loss FROM arms\n" +
     "),\n" +
