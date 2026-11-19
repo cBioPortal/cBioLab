@@ -5,6 +5,7 @@
 // download. The rows are the clinical `table` view's, the patient-level path (docs/DATA-BOUNDARY.md).
 import { useEffect, useMemo, useState } from "react";
 import { DataTable } from "../_table/DataTable.tsx";
+import { Button } from "../_ui/button";
 import { patientHref, sampleHref } from "../portal/cohort-navigation.ts";
 import { api } from "./api.ts";
 import { runCaseFile } from "./chart-files.ts";
@@ -23,9 +24,11 @@ export interface ClinicalTabProps {
   charts: TabChart[];
   /** shown: a tab kept mounted while another is shown reads nothing, and catches up when shown again */
   active?: boolean;
+  /** opens the chart menu as this tab's Columns (STV-CD-9) */
+  onColumns?: () => void;
 }
 
-export function ClinicalDataTab({ selection, studies, charts, active = true }: ClinicalTabProps) {
+export function ClinicalDataTab({ selection, studies, charts, active = true, onColumns }: ClinicalTabProps) {
   const [query, setQuery] = useState<TableQuery>({});
   const columns = useMemo(() => clinicalTabColumns(charts), [charts]);
   const doc = useMemo(() => selection ? clinicalTabDoc(selection.def, selection.study, columns, query) : null, [selection, columns, query]);
@@ -69,10 +72,13 @@ export function ClinicalDataTab({ selection, studies, charts, active = true }: C
   const download = () => { void runCaseFile(file, fileName, selection, setMessage, setSaving); };
   return (
     <div className="card" data-tab="clinical-data">
+      {/* the portal's Columns menu on this tab: the chart menu's Clinical, Genomic and X vs Y tabs; a column is a chart shown (STV-CD-9) */}
+      {onColumns && <div className="row mb-2"><Button variant="outline" size="sm" onClick={onColumns} data-columns-menu
+        data-tip="choose the columns: each is a chart on the Summary tab">Columns</Button></div>}
       {res.failed === docText && <p className="note">Could not update the clinical data: {res.error}</p>}
       {/* each attribute's header tooltip as the portal's: name, description, attribute id (STV-CD-3) */}
       <DataTable t={{ ...res.table, columns: res.table.columns.map((c) => { const ch = charts.find((x) => x.attribute === c.id); return ch ? { ...c, tip: clinicalColumnTip(ch) } : c; }) }}
-        query={{ ...query, columns }} updating={updating} vi={0} docJson={() => res.doc} unit="results" plain oneCohort studyHead="Cancer Study"
+        query={{ ...query, columns }} updating={updating} vi={0} docJson={() => res.doc} unit="results" plain oneCohort studyHead="Cancer Study" pager="showMore"
         onQuery={(q) => setQuery({ ...(q.search ? { search: q.search } : {}), ...(q.sort ? { sort: q.sort } : {}) })}
         download={{ label: saving ? "preparing…" : "Download", disabled: saving,
           tip: "every row the search keeps, the columns shown, as " + fileName, onClick: download }}

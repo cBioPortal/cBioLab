@@ -23,7 +23,7 @@ import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
 import { violinPairKey, violinTitle } from "../../lib/study-view-violin.ts";
-import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView, columnsMenuTabs } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -311,16 +311,20 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
   const explore = ctx.explore!;
   return <>
     {explore && (
-      <Dialog open={addChartOpen} onOpenChange={setAddChartOpen}>
+      <Dialog open={addChartOpen} onOpenChange={(open) => { setAddChartOpen(open); if (!open) ctx.setChartMenuColumns(false); }}>
       <DialogContent aria-describedby={undefined}
         className="addchart flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-0 overflow-auto p-6 sm:max-w-[94vw]">
-        <DialogHeader className="mb-2"><DialogTitle className="text-base">Add chart</DialogTitle></DialogHeader>
+        <DialogHeader className="mb-2"><DialogTitle className="text-base">{ctx.chartMenuColumns ? "Columns" : "Add chart"}</DialogTitle></DialogHeader>
         <Tabs value={chartTab} onValueChange={(v) => setChartTab(v as typeof chartTab)} className="mb-3">
           <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
             {/* a tab per generic-assay type, as the portal's (STV-AC-2) */}
-            {([["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"],
-              ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
-              ["derived", "Derived timeline filters"], ["custom", "Custom data"], ["xvsy", "X vs Y"]] as const).map(([t, label]) =>
+            {/* on the Clinical Data tab, its Columns: Clinical, Genomic and X vs Y only (STV-CD-9) */}
+            {(() => {
+              const tabs = [["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"],
+                ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
+                ["derived", "Derived timeline filters"], ["custom", "Custom data"], ["xvsy", "X vs Y"]] as const;
+              return ctx.chartMenuColumns ? columnsMenuTabs(tabs) : tabs;
+            })().map(([t, label]) =>
               <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>

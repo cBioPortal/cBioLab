@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, geneTabView } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, assayTabLabel, assayTabs, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, genomicChartLines, type AddChartRow, geneChartProfiles, geneChartsChanged, geneChartCount, geneChartsAsked, geneTabView, columnsMenuTabs } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -331,4 +331,12 @@ test("the gene tab: its chips, each with what it removes, show whatever the sele
   assert.deepEqual([some.current?.kind, some.kind, some.note, some.chips], ["cna", "CNA", null, chips]);
   assert.equal(geneTabView(dt, charts, "mutation", true).kind, "types", "Mutation Type");
   assert.equal(geneTabView(dt.slice(1), charts, "mutation", false).current?.kind, "cna", "the profile asked for absent: the first offered");
+});
+
+// STV-CD-9 / STV-MD-13: on the Clinical Data tab the menu is "Columns", with the Clinical, Genomic and X vs Y tabs only
+test("the Clinical Data tab's Columns: the chart menu's Clinical · Genomic · X vs Y tabs", () => {
+  const all = [["clinical", "Clinical"], ["genomic", "Genomic"], ["gene", "Gene status"], ["assay:METHYLATION", "Methylation"],
+    ["derived", "Derived timeline filters"], ["custom", "Custom data"], ["xvsy", "X vs Y"]] as const;
+  assert.deepEqual(columnsMenuTabs(all).map(([t]) => t), ["clinical", "genomic", "xvsy"]);
+  assert.deepEqual(columnsMenuTabs(all.filter(([t]) => t !== "genomic")).map(([t]) => t), ["clinical", "xvsy"], "no Genomic tab to offer");
 });

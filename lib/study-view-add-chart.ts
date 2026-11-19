@@ -200,3 +200,11 @@ export function assayTabs(profiles: { type: string; assayType?: string }[]): { t
   const types = [...new Set(profiles.filter((p) => p.type === "GENERIC_ASSAY" && p.assayType).map((p) => p.assayType!))];
   return types.map((type) => ({ type, label: assayTabLabel(type) })).sort((a, b) => a.label.localeCompare(b.label));
 }
+
+/** the Clinical Data tab's Columns menu: the chart menu's Clinical, Genomic and X vs Y tabs only, as the portal's (STV-CD-9) */
+const COLUMNS_TABS = ["clinical", "genomic", "xvsy"];
+
+/** the Clinical Data tab's Columns menu: of the chart menu's tabs, its Clinical, Genomic and X vs Y ones */
+export function columnsMenuTabs<T extends readonly [string, string]>(tabs: readonly T[]): T[] {
+  return tabs.filter(([t]) => COLUMNS_TABS.includes(t));
+}

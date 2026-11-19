@@ -604,7 +604,8 @@ export default function AnalysisPage() {
             </TabsList>
           </Tabs>}
           {!addMode && explore && exStudies.length > 0 && opened.clinical &&
-            <div hidden={shownTab !== "clinical"}><ClinicalDataTab selection={tabSelection} studies={exStudies} charts={tabCharts} active={shownTab === "clinical"} /></div>}
+            <div hidden={shownTab !== "clinical"}><ClinicalDataTab selection={tabSelection} studies={exStudies} charts={tabCharts} active={shownTab === "clinical"}
+              onColumns={() => { exploreState.setChartMenuColumns(true); exploreState.setChartTab("clinical"); exploreState.setAddChartOpen(true); }} /></div>}
           {!addMode && explore && exStudies.length > 0 && hasSegments && opened.cn &&
             <div hidden={shownTab !== "cn"}><CnSegmentsTab selection={tabSelection} selected={explore.totals?.samples ?? 0} active={shownTab === "cn"} /></div>}
           {/* A facet click starts a recount, and a second click before it lands
