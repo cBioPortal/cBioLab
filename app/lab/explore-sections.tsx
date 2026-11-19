@@ -105,6 +105,8 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
       const byId = new Map(studies.map((s) => [s.id, s] as const));
       const selPts = exStudies.reduce((n: number, id: string) => n + (byId.get(id)?.patients ?? 0), 0);
       const ready = exStudies.length > 0;      // a study alone is enough to analyse
+      // as the portal's "View selected cases": none to open when the filters leave no patient
+      const viewWhy = !ready ? "select a study first" : explore?.draftCount === 0 ? "no patient matches your filters" : null;
       // Two toggles on purpose. The chips in the header are an edit to a
       // selection the reader has already committed, so they apply at once.
       // The checkboxes below are them composing a new one, so they stage.
@@ -179,9 +181,9 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
                 ", and open the results — oncoprint, mutations, survival…"}>
               <Dna />Query genes…{queuedGenes.length ? " (" + queuedGenes.length + ")" : ""}
             </Button>}
-            {!addMode && <Button variant="outline" className="viewpatients" disabled={!ready} onClick={() => void viewPatients()}
-              data-tip={ready ? "open the Patient page on the first of " + (parseDraft() ? "the patients your filters select" : "the selected studies' patients") +
-                ", and step through the rest" : "select a study first"}>
+            {!addMode && <Button variant="outline" className="viewpatients" disabled={!!viewWhy} onClick={() => void viewPatients()}
+              data-tip={viewWhy || "open the Patient page on the first of " + (parseDraft() ? "the patients your filters select" : "the selected studies' patients") +
+                ", and step through the rest"}>
               <Users />View patients
             </Button>}
             {!addMode && <ClinicalDataButton ctx={ctx} ready={ready} />}
@@ -1023,6 +1025,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   // a study without the profile cannot compile the clause, so a partial chart only shows
   const clickable = f.studies.length >= exStudies.length;
   const why = clickable ? "" : " — held by " + f.studies.length + " of " + exStudies.length + " selected studies, so it cannot filter them all";
+  const noun = f.unit === "patient" ? "patients" : "samples";
   const base = { kind: "genericAssay", profileType: f.profileType, entity: f.entity };
   const checked = f.kind === "cat" ? picks.picked.filter((k) => (f.values || []).some((v) => v.v === k)) : [];
   const chart: ChartKey = { kind: "assay", profileType: f.profileType, entity: f.entity };
@@ -1035,9 +1038,9 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
         <span className="min-w-0 flex-1 truncate" data-tip={f.entity}>{title}</span>
-        <ChartMenu label={title} actions={[...(addMode || exStudies.length > 1 ? [] : f.kind === "cat"
+        <ChartMenu label={title} actions={[...(addMode || !clickable ? [] : f.kind === "cat"
           ? forBoth((t) => compareAction((f.values || []).map((v) => ({ ...valueArm(v.v), n: v.n })), checked.map(valueArm), "value of " + title, (arms) => compareItems(chart, arms, t), t))
-          : forBoth((t) => compareNumeric(title, true, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title, t),
+          : forBoth((t) => compareNumeric(title, exStudies.length === 1, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title, t),
             binArms, () => compareItems(chart, binArms, t), t))),
           ...(f.kind === "num" && f.bins && f.bins.length > 1 ? [{ label: "Download", title: "save this chart as a file", sub: figureActions(title, () => barFigure(
             f.bins!.map((b) => ({ count: b.count, tick: b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!) })),
@@ -1046,12 +1049,12 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
         <Button variant="ghost" size="icon-xs" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
           onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
       </div>
-      <span className="meta">{f.unit === "patient" ? "patients" : "samples"} · {fmtInt(f.measured)} of {fmtInt(f.total)} with a value{f.disjunctive ? " · counted without its own filter" : ""}{why}</span>
+      <span className="meta">{noun} · {fmtInt(f.measured)} of {fmtInt(f.total)} with a value{f.disjunctive ? " · counted without its own filter" : ""}{why}</span>
       {f.error && <p className="note flush mt-1">{f.error}</p>}
       {f.kind === "cat" && f.values && (
-        <ValueList picks={picks} hint={"keep the patients whose " + title + " is any of the checked values"}
+        <ValueList picks={picks} hint={"keep the " + noun + " whose " + title + " is any of the checked values"}
           rows={f.values.map((v) => ({ key: v.v, name: v.v, n: v.n, total: f.measured, disabled: !clickable,
-            title: v.v + " — " + fmtInt(v.n) + " patients" + why }))}
+            title: v.v + " — " + fmtInt(v.n) + " " + noun + why }))}
           onApply={(vs) => addClause({ ...base, values: vs })} />
       )}
       {f.kind === "num" && f.bins && f.bins.length > 1 && (() => {
@@ -1063,7 +1066,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
           <Histogram ticks={f.bins.map(tick)} na={f.total > f.measured ? "NA " + fmtInt(f.total - f.measured) : null}>
             {f.bins.map((b, i) => (
               <button key={i} className="hbar" disabled={!clickable}
-                data-tip={label(b) + " · " + fmtInt(b.count) + " patients" + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " patients"}
+                data-tip={label(b) + " · " + fmtInt(b.count) + " " + noun + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
                 onClick={() => addClause({ ...base, range: range(b) })}>
                 <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
               </button>
@@ -1105,16 +1108,16 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
             onApply={(states) => { const r = apply(states); if ("clauses" in r) addClauses(r.clauses); }} />
           {f.overlap ? (
             <p className="note flush mt-1">
-              {f.overlap.toLocaleString()} patient{f.overlap === 1 ? " is" : "s are"} counted in both
-              Amplified and Deleted — amplified in one sample, deleted in another — so these rows
-              over-sum the cohort by that much.
+              {f.overlap.toLocaleString()} sample{f.overlap === 1 ? " is" : "s are"} counted in both
+              {" " + (f.states.find((st) => st.state === "amp")?.label || "Amplified")} and {f.states.find((st) => st.state === "del")?.label || "Deleted"} (each
+              holds both calls for {f.gene}), so these rows over-sum the cohort by that much.
             </p>
           ) : null}
           {f.alteredUnprofiled ? (
             <p className="note flush mt-1">
-              {f.alteredUnprofiled.toLocaleString()} patient{f.alteredUnprofiled === 1 ? " has" : "s have"} a
-              call for {f.gene} but sit on no panel covering it — a contradiction in the source data. They are
-              counted as not profiled.
+              {f.alteredUnprofiled.toLocaleString()} sample{f.alteredUnprofiled === 1 ? " has" : "s have"} a
+              call for {f.gene} but {f.alteredUnprofiled === 1 ? "is" : "are"} on no panel covering it — a contradiction in the source data.
+              {f.alteredUnprofiled === 1 ? " It is" : " They are"} counted as not profiled.
             </p>
           ) : null}
         </div>
