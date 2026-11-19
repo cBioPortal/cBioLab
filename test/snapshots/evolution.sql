@@ -38,6 +38,9 @@ m AS (SELECT sampleId AS sid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifN
   FROM snapshot_db.mutation_derived WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId = 'IM-GBM-28' AND ifNull(mutationType, '') != 'Fusion'),
 g AS (SELECT k, any(gene) AS gene, any(proteinChange) AS proteinChange, any(mutationType) AS mutationType, any(variantType) AS variantType,
          any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos FROM m WHERE called = 1 GROUP BY k),
+ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
+  GROUP BY gene, alteration),
 mm AS (SELECT k, sid, toUInt8(1) AS hit, max(called) AS cl, tupleElement(argMax(tuple(ac, rc), called), 1) AS mac, tupleElement(argMax(tuple(ac, rc), called), 2) AS mrc
   FROM m GROUP BY k, sid),
 pc AS (SELECT pn.sid AS sid, pg.gene AS gene FROM pn JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pn.panel WHERE pg.gene IN (SELECT gene FROM g)),
@@ -51,13 +54,13 @@ a AS (SELECT k, arraySort(x -> x.1, groupArray(tuple(o, sid, status, f, ac, rc))
 rows AS (SELECT 'Glioma' AS cohort, 'glioma_msk_2018' AS study, 0 AS ord, 'IM-GBM-28' AS patient,
          arrayFirst(x -> x.3 IN ('called', 'noVaf'), a.cells).2 AS sid, arrayFirst(x -> x.3 IN ('called', 'noVaf'), a.cells).1 AS so,
          arrayStringConcat(arrayMap(x -> x.2, arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)), ', ') AS samples,
-         g.gene AS gene, g.proteinChange AS proteinChange, g.mutationType AS mutationType,
+         g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv, g.mutationType AS mutationType,
          arrayStringConcat(arrayMap(x -> concat(toString(x.1), ': ', multiIf(x.3 = 'called', toDecimalString(x.4, 2), x.3 = 'noVaf', 'called, no reads',
            x.3 = 'uncalled', concat(toDecimalString(x.4, 2), ' uncalled'), x.3 = 'absent', 'not found', 'not profiled')), a.cells), ' · ') AS vafs,
          if(arrayExists(x -> x.3 = 'called', a.cells), arrayMax(arrayMap(x -> ifNull(x.4, 0), arrayFilter(x -> x.3 = 'called', a.cells))), NULL) AS maxVaf,
          length(arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)) AS called,
          g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end, g.ref AS ref, g.var AS var, g.pos AS pos, a.cells AS cells
-  FROM a JOIN g ON g.k = a.k)
+  FROM a JOIN g ON g.k = a.k LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange)
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 0 evolution: evolution:mutations:rows · glioma_msk_2018
@@ -71,6 +74,9 @@ m AS (SELECT sampleId AS sid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifN
   FROM snapshot_db.mutation_derived WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId = 'IM-GBM-28' AND ifNull(mutationType, '') != 'Fusion'),
 g AS (SELECT k, any(gene) AS gene, any(proteinChange) AS proteinChange, any(mutationType) AS mutationType, any(variantType) AS variantType,
          any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos FROM m WHERE called = 1 GROUP BY k),
+ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver
+  FROM annotation.oncokb WHERE oncokb_version = 'v7.5' AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (SELECT gene FROM g)
+  GROUP BY gene, alteration),
 mm AS (SELECT k, sid, toUInt8(1) AS hit, max(called) AS cl, tupleElement(argMax(tuple(ac, rc), called), 1) AS mac, tupleElement(argMax(tuple(ac, rc), called), 2) AS mrc
   FROM m GROUP BY k, sid),
 pc AS (SELECT pn.sid AS sid, pg.gene AS gene FROM pn JOIN snapshot_db.gene_panel_to_gene_derived pg ON pg.gene_panel_id = pn.panel WHERE pg.gene IN (SELECT gene FROM g)),
@@ -84,13 +90,13 @@ a AS (SELECT k, arraySort(x -> x.1, groupArray(tuple(o, sid, status, f, ac, rc))
 rows AS (SELECT 'Glioma' AS cohort, 'glioma_msk_2018' AS study, 0 AS ord, 'IM-GBM-28' AS patient,
          arrayFirst(x -> x.3 IN ('called', 'noVaf'), a.cells).2 AS sid, arrayFirst(x -> x.3 IN ('called', 'noVaf'), a.cells).1 AS so,
          arrayStringConcat(arrayMap(x -> x.2, arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)), ', ') AS samples,
-         g.gene AS gene, g.proteinChange AS proteinChange, g.mutationType AS mutationType,
+         g.gene AS gene, g.proteinChange AS proteinChange, ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv, g.mutationType AS mutationType,
          arrayStringConcat(arrayMap(x -> concat(toString(x.1), ': ', multiIf(x.3 = 'called', toDecimalString(x.4, 2), x.3 = 'noVaf', 'called, no reads',
            x.3 = 'uncalled', concat(toDecimalString(x.4, 2), ' uncalled'), x.3 = 'absent', 'not found', 'not profiled')), a.cells), ' · ') AS vafs,
          if(arrayExists(x -> x.3 = 'called', a.cells), arrayMax(arrayMap(x -> ifNull(x.4, 0), arrayFilter(x -> x.3 = 'called', a.cells))), NULL) AS maxVaf,
          length(arrayFilter(x -> x.3 IN ('called', 'noVaf'), a.cells)) AS called,
          g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end, g.ref AS ref, g.var AS var, g.pos AS pos, a.cells AS cells
-  FROM a JOIN g ON g.k = a.k)
+  FROM a JOIN g ON g.k = a.k LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange)
 SELECT *, count() OVER () AS total FROM rows
 WHERE 1
 ORDER BY so, maxVaf DESC NULLS LAST, gene, pos ASC NULLS LAST, gene, chr, start, end, ref, var, proteinChange

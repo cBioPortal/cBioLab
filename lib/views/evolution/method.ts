@@ -6,7 +6,9 @@ export function evolutionMethod(t: { cohorts: string[]; queryText: string; sortN
   lists: TableLists; excluded: { study: string; reason: string; patients: number }[]; instances: number;
   patient: { study: string; id: string }; samples: number; table: { total: number; all: number; queryText: string };
   /** mutations drawn, or null when the figure is not drawn (past its limit) */
-  drawn: number | null; noVaf: number }): MethodRecord {
+  drawn: number | null; noVaf: number;
+  /** the OncoKB version the Annotation column reads, or null */
+  oncokbPin?: string | null }): MethodRecord {
   const steps = tableSteps({ label: "evolution", what: "patients", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
     source: "every patient of each cohort with two or more samples and at least one called mutation with allele counts (variant reads above zero, and reference reads), with their sample count, called mutations and those with allele counts.",
     order: t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + " with missing values last, then patient id" : "most samples first, then by patient id" });
@@ -16,6 +18,7 @@ export function evolutionMethod(t: { cohorts: string[]; queryText: string; sortN
       "every mutation called in any of the patient's samples (fusions left out), merged across samples by gene, protein change and genomic position as the portal merges them, " +
       "with its state in every sample — called (VAF = variant reads ÷ (variant + reference reads)), called without allele counts, uncalled with variant reads (the study's uncalled-mutations profile; drawn with its VAF), " +
       "not found in a sample sequenced for the gene (VAF 0), or not profiled (the sample's panel omits the gene, or it was not sequenced for mutations: no VAF). " +
+      "Each mutation's Annotation is OncoKB's call for its gene and protein change " + (t.oncokbPin ? "at " + t.oncokbPin : "(none: no OncoKB version is pinned)") + ", read from the annotation store. " +
       "The figure draws every mutation the table's query keeps that has a VAF in some sample where it was called.",
     params: [["samples", String(t.samples)],
       ["mutations", (t.table.queryText ? t.table.total.toLocaleString("en-US") + " of " : "") + t.table.all.toLocaleString("en-US") + (t.table.queryText ? " (kept: " + t.table.queryText + ")" : "")],
