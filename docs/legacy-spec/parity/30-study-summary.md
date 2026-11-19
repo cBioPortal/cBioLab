@@ -120,12 +120,12 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 |---|---|---|---|
 | STS-LY-1 | 🔶 | B | CSS grid `.facetgrid`, cards ~301 px wide, 5 columns at 1600 px; heights follow content; not react-grid-layout |
 | STS-LY-2 | 🔶 | B | Fixed shapes: clinical cards one cell; gene tables, survival, density, data types wider; no w×h model |
-| STS-LY-3 | 🟡 | BC | Clinical charts by priority, then name (`lib/study-view-config.ts:31`, `lib/explore.ts:322`); the other cards in a fixed CSS order (`app/globals.css:248-253`): gene tables first, survival and density last (legacy ranks them 400 / 200, above the gene tables); no findSpot |
+| STS-LY-3 | 🟡 | BC | Every card by priority, then name, clinical and other kinds together (`cardOrders`, `lib/study-view-config.ts`); charts the reader adds last; no findSpot (the grid flows in order) |
 | STS-LY-4 | ❌ | B | No drag |
 | STS-LY-5 | ❌ | B | No resize |
 | STS-LY-6 | ❌ | C | No highlight of a newly added chart |
 | STS-LY-7 | ✅ | BC | The portal's defaults (#188): coadread charts 17 of 59, Sex, Race, Ethnicity and Subtype among them; constant charts (Cancer Type, Samples per Patient) hidden |
-| STS-LY-8 | 🟡 | C | ↓ Clinical priorities and the DB-priority-1 override from the portal's table (`lib/study-view-config.ts:11-28`); priority < 0 still offered in Add chart (legacy drops it); the non-clinical priorities (survival 400, density 200, SV 85 before CNA 80) not used, CSS order instead |
+| STS-LY-8 | ✅ | C | Clinical priorities and the DB-priority-1 override from the portal's table; the non-clinical priorities (`CARD_PRIORITY`: survival 400, density 200, SV 85 before CNA 80, …); priority < 0 dropped from Add chart (`chartOffered`) |
 | STS-LY-9 | 🔶 | BC | Pie only for `PIE_ATTRIBUTES` (SEX, GENDER, *_STATUS, SAMPLE_TYPE, SOMATIC_STATUS; `explore-sections.tsx:57`), every other STRING a list; NUMBER → histogram ✅ |
 | STS-LY-10 | 🟡 | B | Skeleton grid while building, "updating…" over survival/density, busy class on the grid; no progress list, no per-chart error text beyond the API error |
 | STS-LY-11 | 🟡 | BC | 0 samples: the portal's message, no charts, the filter bar kept ([empty-caselists-cases](empty-caselists-cases.md) EM1–EM5). No invalid-sample alert, no saved-layout banner |
@@ -134,7 +134,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-HD-1 | 🟡 | B | ↓ displayName + "· sample-level · N samples"; gene tables "Mutated Genes (534 profiled samples)" (#261) ✅; but left-aligned and wrapped over two lines ("American Joint Committee on Cancer Metastasis Stage Code"), not centred and ellipsized (`.facettitle`, `app/globals.css:669`) |
+| STS-HD-1 | ✅ | B | displayName centred on one line, ellipsized ("American Joint Committee on Cancer M…"), the whole name in the tooltip; gene tables "Mutated Genes (534 profiled samples)" (#261); ours adds a count line under the title ("sample-level · 1,084 samples") |
 | STS-HD-2 | 🔶 | B | "…" menu button always visible, not hover-only |
 | STS-HD-3 | ❌ | B | No ⓘ, ↶ reset, ✕ delete buttons; only the "…" menu (remove a filter via its pill, hide a chart via Add chart) |
 | STS-HD-4 | 🟡 | B | Title `data-tip` = "ID — description"; no survival unit lines |
@@ -219,7 +219,7 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 | STS-SC-3 | ✅ | BC | Pearson and Spearman with p, as the portal writes them; shown whenever n > 2 (⚠ S9) |
 | STS-SC-4 | ✅ | B | "Number of Samples", the x range to 2 places, the y range as formatRange |
 | STS-SC-5 | ✅ | B | Swap Axes, Log Scale X / Y on the MC axis (kept by the browser); Download ▸ SVG, PDF with the legend and coefficients inside the file ([download-cases](download-cases.md) FG8); Data, the samples with both values (PC7) |
-| STS-SC-6 | 🟡 | C | Drag a box → two range clauses (MC rounded to whole counts, FGA by span) (`explore-charts.tsx:89-92`); no custom bins added to the bar charts |
+| STS-SC-6 | ✅ | C | Drag a box → two range clauses (MC rounded to whole counts, FGA by span), and their ends added to the two bar charts as a temporary set of edges while the filters hold (`withDensityBins`) |
 | STS-SC-7 | ✅ | C | Own filters included (the plot is drawn over the draft) |
 | STS-SC-8 | 🐞 ok | C | Legacy dead code / out-of-range bin bug not present |
 

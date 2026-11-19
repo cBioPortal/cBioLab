@@ -198,7 +198,7 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 | ONC-GL-3 | ✅ | C | One glyph per layer, legacy priority, driver before VUS; no per-count tiebreak, no germline stripe |
 | ONC-GL-4 | ✅ | C | MUT, AMP/HOMDEL (±2 only), FUSION drawn; a line's EXP / PROT as mRNA / protein high and low in the cells |
 | ONC-GL-5 | ✅ | BC | OncoKB, Cancer Hotspots (on by default) and the study's custom calls (#168, #211) |
-| ONC-GL-6 | 🟡 | B | Unchanged: lists only present glyphs; "Not profiled" always listed; no "No alterations" entry (legacy Q1 lists it) |
+| ONC-GL-6 | ✅ | B | Lists only present glyphs; then "No alterations" whenever a gene row is drawn and "Not profiled" only when one is not, last in that order (`geneLegend`, `glyphPresence`); coadread KRAS TP53 no Not profiled, msk_impact_2017 with NEGR1 both (#451) |
 
 Glyph table (colours, bands, z-order) matches legacy exactly for every row present; GAIN/HETLOSS and Germline rows are absent (see OQL coverage / germline gaps).
 
