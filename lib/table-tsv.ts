@@ -27,3 +27,12 @@ export function cutShort(text: string): string | null {
   const line = text.split(/\r?\n/).find((l) => l.startsWith(INCOMPLETE_MARK));
   return line === undefined ? null : line.slice(INCOMPLETE_MARK.length).replace(/^[:\s]+/, "").trim() || "the table was cut short";
 }
+
+/**
+ * What the copied text depends on, as one string: the table's query (its sort among it), its columns and every
+ * study's row counts. Two answers with the same key copy the same text, so a fetched copy outlives a re-render
+ * or a page turn, and is dropped when the query, the columns or the rows change.
+ */
+export function copyTableKey(t: { query: unknown; columns: { id: string }[]; lists: { cohort: string; study: string; total: number; all: number }[]; total: number; all: number }): string {
+  return JSON.stringify([t.query, t.columns.map((c) => c.id), t.lists.map((l) => [l.cohort, l.study, l.total, l.all]), t.total, t.all]);
+}
