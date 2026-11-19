@@ -443,10 +443,11 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   // the portal's Copy, in its two steps: a first click fetches the table.tsv text ("Copy Ready!"), a second copies
   // it within that click, which the browser's clipboard needs (a copy after a long fetch is refused)
   const [copyState, setCopyState] = useState<{ phase: "idle" } | { phase: "loading" } | { phase: "ready"; text: string } | { phase: "done" } | { phase: "failed"; why: string }>({ phase: "idle" });
-  // a fetch still running when the table changes (a sort, a filter, other rows) answers for the old table: its
-  // generation tells. The same table answered again (a re-render, a page turn) keeps what was fetched.
+  // a fetch still running when the table changes (its document: a sort, a filter, a gene, a cohort, a driver
+  // setting; or its rows) answers for the old table: its generation tells. The same table answered again (a
+  // re-render, a page turn) keeps what was fetched.
   const copyGen = useRef(0);
-  const copyKey = copyTableKey(t);
+  const copyKey = copyTableKey(t, { doc: docJson ? docJson() : "", view: vi, ...(table ? { table } : {}) });
   useEffect(() => { copyGen.current++; setCopyState({ phase: "idle" }); }, [copyKey]);
   const fetchCopy = async () => {
     const g = ++copyGen.current;

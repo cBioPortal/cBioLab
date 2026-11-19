@@ -21,5 +21,8 @@ export const mutants: Mutant[] = [
     find: "t.lists.map((l) => [l.cohort, l.study, l.total, l.all]), t.total, t.all]", replace: "t.total]" },
   { id: "copy-key-ignores-sort", layer: "counts", guard: "unit", file: "lib/table-tsv.ts",
     effect: "A fetched copy survives a sort, so Copy Ready! pastes the rows in the old order.",
-    find: "return JSON.stringify([t.query, t.columns", replace: "return JSON.stringify([null, t.columns" },
+    find: "from.table ?? null, t.query, t.columns", replace: "from.table ?? null, null, t.columns" },
+  { id: "copy-key-ignores-doc", layer: "counts", guard: "unit", file: "lib/table-tsv.ts",
+    effect: "A fetched copy survives a change to the document alone (a driver setting, a gene or cohort with equal counts, a pin), so Copy Ready! pastes the old rows.",
+    find: "JSON.stringify([from.doc, from.view,", replace: "JSON.stringify([null, from.view," },
 ];
