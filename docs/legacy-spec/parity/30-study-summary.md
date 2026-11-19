@@ -160,23 +160,23 @@ Data version: every count matches exactly, so the warehouse holds the same coadr
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-TBL-1 | 🟡 | B | Value list: checkbox, value, bar, count, % of every patient, NA row (Race White 48.0 %, NA 232; #190); no header row, no swatch |
-| STS-TBL-2 | 🟡 | BC | Count order (ordinal attributes in natural order); selected rows marked, not pinned |
-| STS-TBL-3 | ❌ | B | No search box under a list |
+| STS-TBL-1 | 🟡 | B | Value list: checkbox, value, bar, count, % of every patient, NA row (Race White 48.0 %, NA 232; #190) and a "# / Freq" header (`ValueList`, `app/lab/pick-list.tsx`); no swatch |
+| STS-TBL-2 | ✅ | BC | Count order (ordinal attributes in natural order), the values the filter holds pinned first (`listRows`, `lib/value-list.ts`) |
+| STS-TBL-3 | ✅ | B | A list of 10 rows or more has "Search...": the value, count or Freq as written (`listRowMatches`) |
 | STS-TBL-4 | 🟡 | B | Checkboxes stage; [Apply filter] writes one OR clause (`ValueList`) |
-| STS-TBL-5 | ❌ | B | No Select all / Deselect all ("Clear" of staged picks only) |
+| STS-TBL-5 | ✅ | B | Select all / Deselect all over the rows the search shows, each shown only when it changes something (`listBulk`) |
 | STS-TBL-6 | 🟡 | B | Compare via "…" menu: checked rows → groups, none checked → top 20 values; one checked → disabled "Check another row" |
-| STS-TBL-7 | 🟡 | C | ↑ Rows 24 px (`VALROW_H`, `app/lab/pick-list.tsx:94`), legacy 25; no header row; the list scrolls after 9 rows |
+| STS-TBL-7 | ✅ | C | Rows 25 px (`VALROW_H`), as the portal's; a header row; the list scrolls after 9 rows |
 
 ### §5 Bar chart
 
 | ID | verdict | how | note |
 |---|---|---|---|
 | STS-BAR-1 | ✅ | BC | Clinical and generic-assay bins from `lib/data-binner.ts` (DataBinner port, STATIC); the MSI scores' initial custom bins ✅; generic-assay entities identical to the portal API (brca AFR, EUR, AAAS_pS462, cg00000029; luad_cas_2020 SBS1, SBS4) |
-| STS-BAR-2 | 🟡 | B | Numeric bins then category bins ✅; HTML bars, NA as a right-hand "NA n" note; no y axis |
-| STS-BAR-3 | 🟡 | B | Tick = bin start ("≤35 40 50 …", thinned to fit); no trailing end tick, no 10^n superscripts |
+| STS-BAR-2 | 🟡 | B | Numeric bins then category bins ✅; a y axis of integer counts (`countAxis`) ✅; HTML bars, NA as a right-hand "NA n" note |
+| STS-BAR-3 | 🟡 | B | Tick = bin start ("≤35 40 50 …", thinned to fit) and the last bin's end at the right edge ✅; no 10^n superscripts |
 | STS-BAR-4 | 🟡 | B | ↓ Tip "35–40 · 11 patients — click to filter": the unit follows the attribute's level (legacy bug not copied ✅), but the range is "35–40", not "(35, 40]", and there is no "Number of samples: / Range:" layout (`explore-sections.tsx:767-768, 950`) |
-| STS-BAR-5 | 🟡 | BC | Click a bar adds its range; a second bar of the chart ORs and a click takes it out (#188); unselected bars greyed (`hbar off`, `explore-sections.tsx:951`); no drag |
+| STS-BAR-5 | ✅ | BC | A drag across bars selects them, replacing the chart's filter (`selectBins`): coadread AGE bars (45, 60] 145, as the portal; a click adds or removes one bar (#188); unselected bars greyed |
 | STS-BAR-6 | ✅ | B | Show NA [off]: off the "NA n" note, on an NA bar last (clicking it filters to NA); the y-max takes it in only when drawn; kept per chart by the browser |
 | STS-BAR-7 | 🟡 | C | ↓ Offered as the portal offers it (`looksLogarithmic`, `lib/study-view-bins.ts:24-34`); unchecking gives linear bars (Days to Birth ≤-32000 … >-12000). But toggling keeps the chart's filter, where the spec clears it |
 | STS-BAR-8 | ✅ | C | Custom Bins dialog: Quartiles / Median split / Generate bins (size, min value) / Custom bins [default], the box starting from the bars' edges (0 kept, unlike legacy); a non-number refused by name. Disabled, saying why, on a chart of ≤10 values (legacy shows it and ignores it) |
