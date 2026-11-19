@@ -21,7 +21,7 @@ const { dataBins } = await import("../lib/data-binner.ts");
 const CG29 = JSON.parse(readFileSync(new URL("./fixtures/assay-bins-brca-cg00000029.json", import.meta.url), "utf8")) as { values: string[]; portalBins: unknown[] };
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
 const { ASSAY_FREQ_TABLE_LIMIT } = await import("../lib/assay-frequency-table.ts");
-const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildAssayFreqTables, buildTreatmentFacets, buildMutationTypeFacets } = await import("../lib/explore.ts");
+const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildAssayFreqTables, FACET_VALUE_LIMIT, buildTreatmentFacets, buildMutationTypeFacets } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -66,6 +66,12 @@ describe("merging participants' facets", () => {
     assert.deepEqual(c.values, [{ v: "Female", n: 536 }, { v: "Male", n: 313 }]);
   });
 
+  // the user's answer (2026-11-19): a chart carries every value in practice, so Summary Data is whole;
+  // the warehouse's largest categorical list is 5,033 values (pancan_mimsi_msk_2024 SAMPLE_DISPLAY_NAME)
+  test("SD13: the bound on a chart's values is about 20,000, above every list the warehouse holds", () => {
+    assert.ok(FACET_VALUE_LIMIT >= 20_000 && FACET_VALUE_LIMIT <= 50_000, String(FACET_VALUE_LIMIT));
+  });
+
   describe("SD15: values cut across studies", () => {
     const cat = (study: string, vals: string[], distinct: number, base = 1000): ExploreResult => part({
       study, totals: { patients: 10000, samples: 10000 },
@@ -79,22 +85,23 @@ describe("merging participants' facets", () => {
       return f;
     };
 
-    test("SD15 a union past 200 keeps the 200 most frequent, and distinct counts the whole union", () => {
-      const f = merged(cat("s1", range("v", 0, 150), 150), cat("s2", range("v", 150, 150), 150, 999));
-      assert.equal(f.values.length, 200);
-      assert.ok(f.distinct! >= 300, `distinct ${f.distinct} must be at least the union's 300`);
+    // the bound is FACET_VALUE_LIMIT: a union past it keeps that many, the most frequent
+    const L = FACET_VALUE_LIMIT, half = Math.ceil(L * 0.75);
+    test("SD15 a union past the bound keeps that many, the most frequent, and distinct counts the whole union", () => {
+      const f = merged(cat("s1", range("v", 0, half), half), cat("s2", range("v", half, half), half, 999));
+      assert.equal(f.values.length, L);
+      assert.ok(f.distinct! >= 2 * half, `distinct ${f.distinct} must be at least the union's ${2 * half}`);
       assert.ok(f.distinct! > f.values.length, "the cut shows");
     });
 
-    test("SD15 a mostly-different union past 200 still reports at least its size", () => {
-      // 20 values shared, 130 each own: a union of 280
-      const a = range("v", 0, 150), b = [...range("v", 0, 20), ...range("w", 0, 130)];
-      const f = merged(cat("s1", a, 150), cat("s2", b, 150, 999));
-      assert.equal(f.values.length, 200);
-      assert.ok(f.distinct! >= 280);
+    test("SD15 a mostly-different union past the bound still reports at least its size", () => {
+      const shared = Math.floor(L * 0.1), a = range("v", 0, half), b = [...range("v", 0, shared), ...range("w", 0, half - shared)];
+      const f = merged(cat("s1", a, half), cat("s2", b, half, 999));
+      assert.equal(f.values.length, L);
+      assert.ok(f.distinct! >= 2 * half - shared);
     });
 
-    test("SD15 a union within 200 is not cut, and distinct is not below the values shown", () => {
+    test("SD15 a union within the bound is not cut, and distinct is not below the values shown", () => {
       // 2 × 50 overlapping by 25: a union of 75
       const f = merged(cat("s1", range("v", 0, 50), 50), cat("s2", range("v", 25, 50), 50));
       assert.equal(f.values.length, 75);
@@ -102,9 +109,9 @@ describe("merging participants' facets", () => {
     });
 
     test("SD15 a study's own larger distinct is kept", () => {
-      const f = merged(cat("s1", range("v", 0, 150), 5000), cat("s2", range("v", 150, 150), 150, 999));
-      assert.equal(f.values.length, 200);
-      assert.ok(f.distinct! >= 5000);
+      const f = merged(cat("s1", range("v", 0, half), 5 * L), cat("s2", range("v", half, half), half, 999));
+      assert.equal(f.values.length, L);
+      assert.ok(f.distinct! >= 5 * L);
     });
   });
 
@@ -952,14 +959,15 @@ describe("generic-assay charts", () => {
     for (const q of sent.filter((x) => /trimBoth\(value\) AS v/.test(x))) assert.match(q, /NOT IN \('','NA','N\/A'/);
   });
 
-  test("SD16: a categorical entity keeps its 30 most frequent values and reports how many it has", async () => {
+  test("SD16: a categorical entity keeps its values up to the clinical charts' bound, and reports how many it has", async () => {
+    const past = FACET_VALUE_LIMIT + 15;
     on(/AS total_p/, [stats({ dt: "CATEGORICAL" })]);
-    on(/trimBoth\(value\) AS v, uniqExact/, Array.from({ length: 45 }, (_, i) => ({ v: "V" + String(i).padStart(2, "0"), n: 100 - i })));
-    on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_\w\.generic_assay_data_derived/, [{ n: 45 }]);
+    on(/trimBoth\(value\) AS v, uniqExact/, Array.from({ length: past }, (_, i) => ({ v: "V" + String(i).padStart(6, "0"), n: past + 100 - i })));
+    on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_\w\.generic_assay_data_derived/, [{ n: past }]);
     const [many] = await buildAssayFacets({ studies: ["st1"], profilesByStudy: holders, charts: [{ profileType: PT, entity: "MSI" }] });
     assert.ok(many.kind === "cat");
-    assert.equal(many.values!.length, 30, "ASSAY_VALUE_LIMIT");
-    assert.equal(many.distinct, 45, "the true number of distinct values, so the cut shows");
+    assert.equal(many.values!.length, FACET_VALUE_LIMIT, "ASSAY_VALUE_LIMIT, the clinical charts' bound");
+    assert.equal(many.distinct, past, "the true number of distinct values, so the cut shows");
     answers = [];
     on(/AS total_p/, [stats({ dt: "CATEGORICAL" })]);
     on(/trimBoth\(value\) AS v, uniqExact/, Array.from({ length: 12 }, (_, i) => ({ v: "W" + i, n: 20 - i })));
