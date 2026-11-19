@@ -1769,6 +1769,9 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .alt-cna.del { color: var(--del); }
 .tl-fig { position: relative; border: 1px solid var(--line); border-radius: var(--r-md); background: #fff; overflow-x: auto; }
 .tl-fig.stale { opacity: 0.5; }
+/* the timeline's cursor line and the stretch being dragged to zoom (PAT-TL-ZM-3) */
+.tl-fig .tl-cursor { position: absolute; top: 0; width: 0; border-left: 1px solid var(--muted); pointer-events: none; }
+.tl-fig .tl-drag { position: absolute; top: 0; background: color-mix(in srgb, var(--primary) 15%, transparent); pointer-events: none; }
 .tl-fig .tl-m { cursor: default; }
 .tl-fig .tl-h:hover text { fill: var(--accent); }
 .tl-empty { padding: var(--s3); }

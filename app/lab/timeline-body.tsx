@@ -6,12 +6,12 @@
 // cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { timelineSvg, timelineSummary } from "../../lib/timeline-svg.ts";
+import { timelineSvg, timelineSummary, zoomFromDrag } from "../../lib/timeline-svg.ts";
 import { formatDays, sampleMarks, sampleTipRows, attr, SAMPLE_TRACK } from "../../lib/timeline-tracks.ts";
 import { canonicalEventName } from "../../lib/event-names.ts";
 import type { PatientEvent, TimelineResult } from "../../lib/types";
 import { PatientNav, PatientsDialog, patientKeys } from "./patient-nav.tsx";
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { TB } from "../_ui/toolbar.ts";
@@ -69,7 +69,33 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
   }, []);
   const p = t.patient;
   const collapsed = useMemo(() => spec.collapsed || [], [spec.collapsed]);
-  const drawn = useMemo(() => p ? timelineSvg(p, { width, collapsed, expandGaps: !!spec.expandGaps, interactive: true }) : null, [p, width, collapsed, spec.expandGaps]);
+  // the portal's drag to zoom (PAT-TL-ZM-3, kept in the browser as the portal keeps it): the stretch shown, the drag
+  // under way, and the cursor line that follows the pointer over the plot
+  const [zoom, setZoom] = useState<[number, number] | null>(null);
+  const [drag, setDrag] = useState<{ x0: number; x1: number } | null>(null);
+  const [cursor, setCursor] = useState<number | null>(null);
+  const dragged = useRef(false);
+  useEffect(() => { setZoom(null); setDrag(null); }, [p, spec.expandGaps]);
+  const drawn = useMemo(() => p ? timelineSvg(p, { width, collapsed, expandGaps: !!spec.expandGaps, interactive: true, zoom: zoom ?? undefined }) : null, [p, width, collapsed, spec.expandGaps, zoom]);
+  /** the pointer's x in the figure, and whether it is over the plot */
+  const figX = (e: React.MouseEvent) => {
+    const svg = box.current?.querySelector("svg");
+    if (!svg || !drawn) return null;
+    const x = e.clientX - svg.getBoundingClientRect().left;
+    return { x, inPlot: x >= drawn.layout.plot.x && x <= drawn.layout.plot.x + drawn.layout.plot.width };
+  };
+  const onDown = (e: React.MouseEvent) => {
+    const at = figX(e);
+    if (e.button !== 0 || !at?.inPlot) return;
+    dragged.current = false;
+    setDrag({ x0: at.x, x1: at.x });
+  };
+  const onUp = () => {
+    if (!drag || !drawn) return;
+    const z = zoomFromDrag(drag.x0, drag.x1, drawn.layout.plot, zoom);
+    if (z) { dragged.current = true; setZoom(z); setTip(null); }
+    setDrag(null);
+  };
   const marks = useMemo(() => p ? sampleMarks(p.samples, p.events) : new Map(), [p]);
 
   const toggle = (uid: string) => {
@@ -81,6 +107,8 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
     return m?.dataset.ev ? m.dataset.ev : null;
   };
   const onClick = (e: React.MouseEvent) => {
+    // the click that ends a drag to zoom is not a click on what it ends over
+    if (dragged.current) { dragged.current = false; return; }
     const h = (e.target as Element).closest?.(".tl-h") as SVGGElement | null;
     if (h?.dataset.uid) { toggle(h.dataset.uid); return; }
     // a click on a mark pins its tooltip, or lets a pinned one go
@@ -90,6 +118,9 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
     setTip((t) => t && t.pinned && t.ev.join(",") === ev ? { ...t, pinned: false } : { x: e.clientX, y: e.clientY, ev: ev.split(",").map(Number), pinned: true, page: t && t.ev.join(",") === ev ? t.page : 0 });
   };
   const onMove = (e: React.MouseEvent) => {
+    const at = figX(e);
+    setCursor(at?.inPlot ? at.x : null);
+    if (drag && at) setDrag({ ...drag, x1: Math.max(drawn!.layout.plot.x, Math.min(drawn!.layout.plot.x + drawn!.layout.plot.width, at.x)) });
     if (tip?.pinned) return;
     const ev = marked(e);
     if (!ev) { if (tip) dropTip(); return; }
@@ -121,20 +152,28 @@ export function TimelineBody({ t, spec, vi, updating, docJson, patch, fixed }: {
               <label className="chk" data-tip="draw every year, rather than cutting runs of four or more years without an event to one dashed mark">
                 <Checkbox checked={!!spec.expandGaps} onCheckedChange={(on) => patch({ expandGaps: (on === true) || undefined })} /> every year
               </label>
+              {zoom
+                ? <Button type="button" variant="outline" size="sm" className={TB} data-tip="show the whole timeline again" onClick={() => setZoom(null)}><ZoomOut />reset zoom</Button>
+                : <span className="text-sm text-muted-foreground" data-tip="drag across the timeline to zoom to that stretch"><ZoomIn className="inline size-4" /> drag to zoom</span>}
               <Button type="button" variant="outline" size="sm" className={TB} disabled={!collapsed.length} data-tip="unfold every nested track"
                 onClick={() => patch({ collapsed: undefined })}><ChevronsUpDown />expand all tracks</Button>
               <ImageDownload name="timeline" formats={["pdf", "png", "svg"]} label="download the timeline" tip="download the timeline as drawn (its folded tracks, every year or not)"
-                svg={() => p ? timelineSvg(p, { width, collapsed, expandGaps: !!spec.expandGaps, theme: "light" }).svg : null}
+                svg={() => p ? timelineSvg(p, { width, collapsed, expandGaps: !!spec.expandGaps, theme: "light", zoom: zoom ?? undefined }).svg : null}
                 extra={p && p.events.length ? [{ label: "Data (ZIP)", save: () => saveZip(TIMELINE_ZIP, timelineDataFiles(p.patient, p.events)) }] : undefined} />
             </div>
           </div>
         </div>
       ) : <p className="meta">No patient to draw: the cohort's patient list is empty.</p>}
       {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-static-element-interactions -- track groups in the drawn SVG expand on click only; there is no keyboard equivalent yet */}
-      <div ref={box} className={"tl-fig" + (updating ? " stale" : "")} onClick={onClick} onMouseMove={onMove} onMouseLeave={() => { if (!tip?.pinned) dropTip(); }}>
+      <div ref={box} className={"tl-fig" + (updating ? " stale" : "")} onClick={onClick} onMouseMove={onMove} onMouseDown={onDown} onMouseUp={onUp}
+        onMouseLeave={() => { setCursor(null); setDrag(null); if (!tip?.pinned) dropTip(); }}>
         {drawn && (p!.events.length
           ? <div dangerouslySetInnerHTML={{ __html: drawn.svg }} />
           : <p className="meta tl-empty">{p!.patient} has no timeline events recorded.</p>)}
+        {drawn && p!.events.length > 0 && cursor != null && !drag &&
+          <div className="tl-cursor" aria-hidden="true" style={{ left: cursor, height: drawn.layout.height }} />}
+        {drag && drawn && Math.abs(drag.x1 - drag.x0) > 0 &&
+          <div className="tl-drag" aria-hidden="true" style={{ left: Math.min(drag.x0, drag.x1), width: Math.abs(drag.x1 - drag.x0), height: drawn.layout.height }} />}
         {tip && p && <EventTip x={tip.x} y={tip.y} events={tip.ev.map((i) => p.events[i]).filter(Boolean)} marks={marks} sampleAttrs={p.sampleAttrs} page={tip.page} pinned={tip.pinned}
           onPage={(n) => setTip((t) => t && { ...t, page: n })} onClose={() => setTip(null)} onHold={holdTip} onLeave={() => { if (!tip.pinned) dropTip(); }} />}
       </div>
