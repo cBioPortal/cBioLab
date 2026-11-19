@@ -12,11 +12,11 @@ import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binar
 import { zoomedTip } from "./zoomed-tip.ts";
 import { clusterSort, clusteredProfile, isEngineSortKey, selectSort, trackSort } from "./track-edits.ts";
 import { GEOM, rowTops, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
-  virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
+  virtualWidth, menuButtonX, GUTTER_FONT, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { portalTipNumber } from "../../lib/chart/format.ts";
 import { trackAtY, trackTops } from "../../lib/oncoprint-rows.ts";
-import { STYLE, thresholdColor, stackColor, clinicalLegend, alteredColumns, emptyClinicalKey, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { formatGutterPct, STYLE, thresholdColor, stackColor, clinicalLegend, alteredColumns, emptyClinicalKey, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { contractToTsv, orderFileName, orderFileText, tabularFileName } from "../../lib/oncoprint-tabular.ts";
@@ -71,6 +71,15 @@ function patientPage(study: string, column: string, unit: string): { href: strin
  * never a number, so they never need a refetch. Options that change numbers — hideVUS,
  * annotate — live in the spec and are the page's business.
  */
+let measureCtx: CanvasRenderingContext2D | null = null;
+/** text widths in the gutter's font, as draw() measures them */
+function gutterMeasure(): (s: string) => number {
+  measureCtx ??= document.createElement("canvas").getContext("2d");
+  if (!measureCtx) return (s) => s.length * 6;
+  measureCtx.font = GUTTER_FONT;
+  return (s) => measureCtx!.measureText(s).width;
+}
+
 export interface FigureDisplay {
   showUnaltered: boolean; whitespace: boolean; gaps: "none" | "gaps" | "pct" | "pct-left"; colorByType: boolean;
   /** mark germline mutations with a white stripe (the portal's "Somatic vs Germline" colouring) */
@@ -367,7 +376,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const S = figureStyle(data, display);
     const r = draw(ctx, data, visible.order, visible.groups, { ...view, scrollX: Math.min(maxScroll, Math.max(0, view.scrollX)) },
-      cssW, paletteOf(S), { gap: gapPx, pctLabels: pctMode, style: S, colors: display.colors ?? data.display?.colors, showOql: display.showOql });
+      cssW, paletteOf(S), { gap: gapPx, pctLabels: pctMode, style: S, colors: display.colors ?? data.display?.colors, showOql: display.showOql, menuButtons: true });
     const mem = (performance as any).memory;
     bump({ drawMs: r.ms, cellsDrawn: r.cellsDrawn, bucketsDrawn: r.bucketsDrawn, frames: perfRef.current.frames + 1, heapMB: mem ? Math.round(mem.usedJSHeapSize / 1048576) : undefined });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -954,6 +963,21 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               const ti = trackAtY(y, rowTops(data.tracks), GEOM.rowH);
               setTrackMenu(ti >= 0 ? { ti, cx: e.clientX, cy: e.clientY } : null);
             }} />
+          {(() => {
+            const tops = rowTops(data.tracks);
+            const measure = gutterMeasure();
+            return data.tracks.map((t, ti) => {
+              const name = t.name || t.label;
+              return (
+                <button key={ti} type="button" className={cn("onco-trackbtn", trackMenu?.ti === ti && "is-open")} aria-label={"Track options: " + name}
+                  style={{ left: menuButtonX(t, formatGutterPct(t, data.n), measure), top: tops[ti], width: GEOM.menuW, height: GEOM.rowH }}
+                  onClick={(e) => {
+                    const b = e.currentTarget.getBoundingClientRect();
+                    setTrackMenu(trackMenu?.ti === ti ? null : { ti, cx: b.left, cy: b.bottom - 6 });
+                  }}>⋮</button>
+              );
+            });
+          })()}
           {trackMenu && (() => {
             const t = data.tracks[trackMenu.ti];
             // gene tracks set the staircase, and a track with no values sorts nothing

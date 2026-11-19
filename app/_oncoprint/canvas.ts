@@ -28,7 +28,9 @@ export type Palette = typeof PALETTE;
  * row with no gutter by swapping these for one call and putting them back, rather than
  * threading a geometry argument through every function for one caller.
  */
-export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap, trackGroupGap: STYLE.geometry.trackGroupGap, footer: 10 };
+export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap, trackGroupGap: STYLE.geometry.trackGroupGap, footer: 10,
+  /** a track's ⋮ button in the gutter, left of its %: the portal's track options column (oncoprinttrackoptionsview) */
+  menuW: 14 };
 /** each track's top at the current geometry, then the end of the last row */
 export const rowTops = (tracks: readonly RowTrack[]): number[] => trackTops(tracks, GEOM);
 
@@ -196,7 +198,18 @@ export interface DrawResult { ms: number; cellsDrawn: number; bucketsDrawn: numb
 
 export interface DrawOpts { gap?: Gap; pctLabels?: boolean; style?: Style; colors?: Record<string, Record<string, string>>;
   /** draw each row's OQL line after its label; the contract's own display when absent */
-  showOql?: boolean }
+  showOql?: boolean;
+  /** leave room for each row's ⋮ button (menuButtonX): the figure on screen, not an export */
+  menuButtons?: boolean }
+
+/** the gutter's text font, which the figure measures with too */
+export const GUTTER_FONT = "11px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
+
+/** where a track's ⋮ button sits: just left of its % in the gutter, or of the gutter's edge when it has none */
+export function menuButtonX(t: { freqPct?: number | null }, pctText: string, measure: (s: string) => number): number {
+  const pctW = t.freqPct !== undefined ? measure(pctText) + 6 : 0;
+  return GEOM.gutter - 8 - pctW - GEOM.menuW;
+}
 
 export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[],
   view: View, cssW: number, P: Palette = PALETTE, opts: DrawOpts = {}): DrawResult {
@@ -211,7 +224,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   const tops = rowTops(data.tracks);
   const H = tops.at(-1)! + GEOM.footer;
   ctx.fillStyle = P.paper; ctx.fillRect(0, 0, cssW, H);
-  ctx.font = "11px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
+  ctx.font = GUTTER_FONT;
   ctx.textBaseline = "alphabetic";
   const zoom = view.zoom, sx = view.scrollX;
   const offs = groupOffsets(groups, zoom, gap);
@@ -281,8 +294,9 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     const label = trackLabelText(t, S);
     ctx.fillText(label, 4, y + 14);
     const subX = 4 + ctx.measureText(label).width;
-    const pctW = t.freqPct !== undefined ? ctx.measureText(formatGutterPct(t, data.n)).width + 6 : 0;
-    const sub = fitSublabel(trackSublabelText(t, opts.showOql === undefined ? data.display : { showOql: opts.showOql }), gutter - 8 - pctW - subX, (s) => ctx.measureText(s).width);
+    const subEnd = opts.menuButtons ? menuButtonX(t, formatGutterPct(t, data.n), (s) => ctx.measureText(s).width)
+      : gutter - 8 - (t.freqPct !== undefined ? ctx.measureText(formatGutterPct(t, data.n)).width + 6 : 0);
+    const sub = fitSublabel(trackSublabelText(t, opts.showOql === undefined ? data.display : { showOql: opts.showOql }), subEnd - subX, (s) => ctx.measureText(s).width);
     if (sub) { ctx.fillStyle = P.sublabel; ctx.fillText(sub, subX, y + 14); }
     if (t.freqPct !== undefined) {
       ctx.fillStyle = P.muted; ctx.textAlign = "right";
