@@ -471,8 +471,8 @@ export interface DisplaySpec {
    * each run with its altered percentages to its right, "pct-left" to its left
    */
   gaps?: "none" | "gaps" | "pct" | "pct-left";
-  /** category keys under the figure (default "all") */
-  clinicalLegends?: "all" | "none";
+  /** clinical keys under the figure: every value (default "all"), the altered columns' values only, or none */
+  clinicalLegends?: "all" | "altered" | "none";
   /** colour each mutation class separately (default true); off draws them all as one */
   colorByType?: boolean;
   /** mark a germline mutation with a white stripe (default true) — the portal's "Somatic vs Germline" */

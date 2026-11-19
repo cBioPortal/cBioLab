@@ -738,6 +738,14 @@ export function clinicalLegend(t: { label: string; categories?: string[]; cells:
   return { kind: "categories", entries, more: Math.max(0, values.length - 8) };
 }
 
+/** the columns some gene row alters, in column order: the portal's alteredKeys, over which "only altered" legends read */
+export function alteredColumns(tracks: readonly { kind: string; cells: ArrayLike<number> }[]): number[] {
+  const genes = tracks.filter((t) => t.kind === "gene");
+  const n = genes[0]?.cells.length ?? 0, out: number[] = [];
+  for (let i = 0; i < n; i++) if (genes.some((t) => t.cells[i] > 0)) out.push(i);
+  return out;
+}
+
 /** a patient's clinical value when its samples disagree (lib/oncoprint.ts) */
 export const MIXED = "Mixed";
 const darken = (c: string): string =>

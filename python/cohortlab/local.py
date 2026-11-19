@@ -114,7 +114,7 @@ def parse_sort(spec: str | list[str] | None) -> list[dict[str, str]]:
 DISPLAY_KEYS = ("showUnaltered", "whitespace", "gaps", "clinicalLegends", "colorByType", "colorByGermline", "hideVUS", "annotate", "whiteBackground", "showOql",
                 "sortByMutationType", "sortByDrivers", "sortIgnoreVUS", "style", "colors")
 _GAP_MODES = ("none", "gaps", "pct", "pct-left")
-_LEGEND_MODES = ("all", "none")
+_LEGEND_MODES = ("all", "altered", "none")
 _ANNOTATE_MODES = ("oncokb", "none")
 
 

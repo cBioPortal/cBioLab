@@ -1583,7 +1583,7 @@ all reproduce the same picture. Unknown keys are rejected loudly.
 | \`sortByMutationType\` | \`true\` | the genomic staircase ranks mutations by class (the portal's Sort › Mutation Type) |
 | \`sortByDrivers\` | \`true\` | the staircase ranks every driver before every VUS (Sort › Driver) |
 | \`sortIgnoreVUS\` | \`false\` | the staircase orders as if VUS were absent, still drawing them (Sort › Ignore VUS) |
-| \`clinicalLegends\` | \`"all"\` | \`"none"\` drops the category keys under the figure |
+| \`clinicalLegends\` | \`"all"\` | \`"altered"\` lists in each clinical key only the values of the columns some gene row alters (the portal's "Only show clinical track legends for altered patients"); \`"none"\` drops the clinical keys under the figure, never the gene legend |
 | \`colors\` | — | \`{track: {value: "#rrggbb"}}\`, the portal's Edit Colors |
 | \`style\` | — | override any visual decision (palette, glyph bands, legend); validated against the style schema |
 | **\`hideVUS\`** | \`false\` | older spelling of \`drivers.hideVus\` (below), still read |
