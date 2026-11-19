@@ -29,10 +29,11 @@ import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import { lockClause } from "./cohort-lock.ts";
 import { DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE } from "./gene-state-clauses.ts";
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT } from "./filter-limits.ts";
+import { SAMPLE_TIME_EVENTS, TREATMENT_EVENT } from "./treatment-tables.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, OqlLeaf, GenomicDataLeaf, GenericAssayLeaf,
-  SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf
+  SampleListLeaf, PatientListLeaf, SplitLeaf, UploadLeaf, AlterationLeaf, EventLeafFields, ProteinPositionLeaf, TreatmentLeaf
 } from "./types.ts";
 
 import { finiteSql, boundedNumberSql } from "./sql-number.ts";
@@ -514,6 +515,40 @@ function proteinPositionLeafSql(leaf: ProteinPositionLeaf, ctx: Ctx): LeafIds {
     "    AND " + conds.join(" AND "));
 }
 
+/**
+ * Patients treated with any of the agents; or, with `time`, the samples taken on or before ("Pre")
+ * or after ("Post") the patient's first treatment with one of them (each agent's earliest start),
+ * as cBioPortal's patientTreatmentFilters / sampleTreatmentFilters select them.
+ */
+function treatmentLeafSql(leaf: TreatmentLeaf, ctx: Ctx): LeafIds {
+  if (!Array.isArray(leaf.agents) || !leaf.agents.length || leaf.agents.some((a) => typeof a !== "string" || !a))
+    throw new Error("treatment clause needs agents[], the treatments as the study names them");
+  tooManyValues("treatment clause", leaf.agents.length, CLINICAL_VALUES_LIMIT);
+  if (leaf.time != null && leaf.time !== "Pre" && leaf.time !== "Post")
+    throw new Error("treatment clause: time is \"Pre\" or \"Post\" (got " + JSON.stringify(leaf.time) + ")");
+  if (leaf.ifHeld != null && leaf.ifHeld !== true) throw new Error("treatment clause: ifHeld is true or absent");
+  const events = dbOf(ctx) + ".clinical_event_data_derived";
+  const treatments = "lower(event_type) = " + sq(TREATMENT_EVENT) + " AND key = 'AGENT'";
+  const agents = treatments + " AND value IN (" + leaf.agents.map(sq).join(",") + ")";
+  // an agent the study never gives (a misspelling, or a study without treatments) is refused by name,
+  // unless ifHeld, when it matches nobody there
+  const agentCheck = leaf.ifHeld === true ? "" : "\n  UNION DISTINCT\nSELECT '' AS " + (leaf.time == null ? "pid" : "sid") +
+    " FROM (SELECT groupUniqArray(value) AS ts FROM " + events + " WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + treatments + ")\n" +
+    "  WHERE " + leaf.agents.map((a) => "throwIf(NOT has(ts, " + sq(a) + "), " +
+      sq("treatment clause: no patient in " + ctx.study + " is treated with '" + a + "' (agents are spelled as the study's timeline writes them); add ifHeld: true to match nobody there instead") + ")").join(" + ") + " != 0";
+  if (leaf.time == null) return ofPatients("SELECT DISTINCT " + PID("patient_unique_id", ctx.study) + " AS pid FROM " + events + "\n" +
+    "  WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + agents + agentCheck);
+  return ofSamples("SELECT DISTINCT sa.sid AS sid FROM (\n" +
+    "    SELECT patient_unique_id AS p, value AS sid, min(start_date) AS t FROM " + events + "\n" +
+    "    WHERE cancer_study_identifier = " + sq(ctx.study) + " AND lower(event_type) IN (" + SAMPLE_TIME_EVENTS.map(sq).join(",") + ") AND key = 'SAMPLE_ID'\n" +
+    "    GROUP BY p, sid) AS sa\n" +
+    "  INNER JOIN (\n" +
+    "    SELECT patient_unique_id AS p, value AS agent, min(start_date) AS st FROM " + events + "\n" +
+    "    WHERE cancer_study_identifier = " + sq(ctx.study) + " AND " + agents + "\n" +
+    "    GROUP BY p, agent) AS tx ON tx.p = sa.p\n" +
+    "  WHERE sa.t " + (leaf.time === "Pre" ? "<=" : ">") + " tx.st" + agentCheck);
+}
+
 function eventLeafSql(leaf: EventLeafFields, ctx: Ctx): LeafIds {
   const { patientsSql } = compileCohort({
     db: dbOf(ctx), study: ctx.study, a: leaf.a, b: leaf.b, rel: leaf.rel,
@@ -681,6 +716,7 @@ function leafIds(leaf: Leaf, ctx: Ctx): LeafIds {
     case "genomicData": return genomicDataLeafSql(leaf, ctx);
     case "genericAssay": return genericAssayLeafSql(leaf, ctx);
     case "proteinPosition": return proteinPositionLeafSql(leaf, ctx);
+    case "treatment": return treatmentLeafSql(leaf, ctx);
     case "event": return eventLeafSql(leaf, ctx);
     case "derived": return derivedLeafSql(leaf, ctx);
     case "sampleList": return sampleListLeafSql(leaf, ctx);
@@ -782,6 +818,7 @@ function leafText(leaf: any): string {
     (leaf.ifHeld ? " (in each study holding it; none in a study without it)" : "");
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "proteinPosition") return leaf.gene + " protein position " + JSON.stringify(leaf.range || {});
+  if (leaf.kind === "treatment") return (leaf.time ? "samples taken " + (leaf.time === "Pre" ? "before" : "after") + " treatment with " : "treated with ") + (leaf.agents || []).join(" or ");
   if (leaf.kind === "sampleList" || leaf.kind === "patientList") {
     const noun = leaf.kind === "sampleList" ? "sample" : "patient";
     if (typeof leaf.set === "string") {

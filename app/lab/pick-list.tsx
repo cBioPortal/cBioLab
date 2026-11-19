@@ -9,7 +9,7 @@ import { Checkbox } from "../_ui/checkbox";
 import { Button } from "../_ui/button";
 import { Input } from "../_ui/input";
 import { cn } from "@/lib/cn";
-import { fmtPct } from "../../lib/chart/format.ts";
+import { fmtInt, fmtPct } from "../../lib/chart/format.ts";
 import { LIST_SEARCH_FROM, listBulk, listRows } from "../../lib/value-list.ts";
 
 /** a list's checked rows, in the order they were checked */
@@ -97,8 +97,8 @@ export function PickBar({ picks, onApply, why, action = "Apply filter", hint, ch
 const VALROW_H = 25;
 
 export type ValueRow = { key: string; name: string; n: number; total?: number; on?: boolean; muted?: boolean; disabled?: boolean; title: string;
-  /** the value of the list's `extra` column */
-  extra?: number;
+  /** the value of the list's `extra` column: a count, or a word (a sample's "Pre" / "Post") */
+  extra?: number | string;
   /** a row that cannot join others in one filter (NA), left out of Select all */
   solo?: boolean };
 
@@ -150,7 +150,7 @@ export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPc
       {(r) => (
         <PickRow className="valrow" picks={picks} k={r.key} on={r.on} applied={r.on} disabled={r.disabled} title={r.title} label={r.name}>
           <span className="vname" style={r.muted ? { color: "var(--muted)" } : undefined}>{r.name}</span>
-          {extra ? <span className="vn">{(r.extra ?? 0).toLocaleString()}</span>
+          {extra ? <span className="vn">{typeof r.extra === "string" ? r.extra : fmtInt(r.extra ?? 0)}</span>
             : <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * r.n / max)) + "%" }} /></span>}
           <span className="vn">{r.n.toLocaleString()}</span>
           <span className="vpct">{r.share}</span>

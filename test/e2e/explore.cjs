@@ -545,12 +545,17 @@ async function explore({ ok, BASE, page, browser }) {
     }).length);
     await c2.getByRole("button", { name: "Select all" }).click();
     const checked = Number(((await c2.locator(".pickbar").innerText()).match(/(\d+) checked/) || [])[1]);
+    // Compare groups takes every value whatever is checked, as the portal's (STS-HD-7)
+    await c2.locator(".chartgear").click();
+    const menu = await page.getByRole("menuitem").allInnerTexts();
+    await page.keyboard.press("Escape");
+    const compareAll = menu.some((m) => /^Compare (top \d+ )?groups$/.test(m.trim())) && !menu.some((m) => /checked groups/.test(m));
     await c2.getByRole("button", { name: "Deselect all" }).click();
     const cleared = await c2.locator(".pickbar").count();
-    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checkable, checked, cleared });
-    vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0;
+    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checkable, checked, cleared, compareAll });
+    vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0 && compareAll;
   } catch (e) { vlDetail = String(e.message).split("\n")[0]; }
-  ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first", vlOk, vlDetail);
+  ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first; Compare takes every value", vlOk, vlDetail);
 
   // a histogram as the portal's bar chart (STS-BAR-2/3/5): a y axis of integer counts, and a drag
   // across bars selects them, the rest greyed; a click on a bar still adds it
@@ -575,6 +580,29 @@ async function explore({ ok, BASE, page, browser }) {
     barOk = yTicks.length >= 2 && yTicks.every((t) => /^[\d,]+$/.test(t)) && /^0011100*$/.test(states) && !!filters;
   } catch (e) { barDetail = String(e.message).split("\n")[0]; }
   ok("explore: a histogram has an integer y axis, and a drag across bars selects them, the others greyed", barOk, barDetail);
+
+  // the treatment tables (STS-OT-6), shown when the study has treatments: patients per agent, most
+  // first; a checked agent applied filters on it, and the sample table narrows with it
+  let txDetail = "", txOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const pt = page.locator("[data-treatments='patient']"), st = page.locator("[data-treatments='sample']");
+    await pt.locator(".valrow").first().waitFor({ timeout: 240000 });
+    await st.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const counts = (await pt.locator(".valrow .vn").allInnerTexts()).map((t) => Number(t.replace(/,/g, "")));
+    const ordered = counts.every((n, i) => i === 0 || counts[i - 1] >= n);
+    const pick = (await pt.locator(".valrow .vname").allInnerTexts())[0];
+    const before = (await st.locator(".facettitle").innerText()).trim();
+    await pt.locator(".valrow").first().click();
+    await pt.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction((a) => document.body.innerText.includes("treated with " + a), pick, { timeout: 240000 });
+    await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.textContent || "").trim() !== b, before, { timeout: 240000 });
+    const pinned = await pt.locator(".valrow.on .vname").allInnerTexts();
+    const after = (await st.locator(".facettitle").innerText()).trim();
+    txDetail = JSON.stringify({ rows: counts.length, pick, pinned, before, after });
+    txOk = counts.length > 1 && ordered && pinned.length === 1 && pinned[0] === pick && after !== before;
+  } catch (e) { txDetail = String(e.message).split("\n")[0]; }
+  ok("explore: the treatment tables count patients and samples per treatment, and a treatment applied filters on it", txOk, txDetail);
 
   // a gene's Mutation Type Counts table (STS-OT-3), from Add chart: # Mut, #, Freq, most samples
   // first; a checked type applied filters on it, and the table keeps counting without its own filter
