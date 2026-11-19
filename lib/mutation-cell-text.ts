@@ -191,3 +191,11 @@ export function clinicalCellText(value: unknown): { text: string; tip: string | 
   const text = String(value);
   return text.length > 32 ? { text: text.substring(0, 30) + "...", tip: text } : { text, tip: null };
 }
+
+/**
+ * The unit a mutation table counts in, for its title, pager and search box: numbered by every row it holds, the total
+ * a filtered title's "N of M" ends on ("1 of 223 Mutations", "1 Mutation" when the table holds one).
+ */
+export function mutationTableUnit(t: { all: number }): string {
+  return mutationUnit(t.all);
+}
