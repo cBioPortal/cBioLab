@@ -459,6 +459,27 @@ async function explore({ ok, BASE, page }) {
       info === "No segmented copy-number data for the selected 0 samples." && stale === 0;
   } catch (e) { tabDetail = String(e.message).split("\n")[0]; }
   ok("explore: the tab is in the URL, keeps its search across a switch, and CN Segments stays at 0 samples", tabOk, tabDetail);
+
+  // a tab kept mounted retries a failed load when it is shown again (as a remount did): the first
+  // Clinical Data request fails, Summary and back loads the rows
+  let retryDetail = "", retryOk = false;
+  try {
+    let calls = 0;
+    await page.route("**/api/analysis**", (route) => calls++ === 0
+      ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "planted failure" }) })
+      : route.continue());
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018&svtab=clinicalData", { waitUntil: "domcontentloaded" });
+    const tabs = page.getByRole("tablist", { name: "study view sections" });
+    await page.waitForFunction(() => /Could not load the clinical data: planted failure/.test(document.body.innerText), null, { timeout: 240000 });
+    await tabs.getByRole("tab", { name: "Summary" }).click();
+    await tabs.getByRole("tab", { name: "Clinical Data" }).click();
+    await page.waitForFunction(() => /Showing 1–\d+ of [\d,]+ results/.test(document.body.innerText), null, { timeout: 240000 });
+    await page.unroute("**/api/analysis**");
+    const rows = (/Showing 1–\d+ of ([\d,]+) results/.exec(await page.locator("body").innerText()) || [])[1];
+    retryDetail = JSON.stringify({ calls, rows });
+    retryOk = calls >= 2 && !!rows;
+  } catch (e) { retryDetail = String(e.message).split("\n")[0]; await page.unroute("**/api/analysis**").catch(() => {}); }
+  ok("explore: a tab whose load failed loads again when it is shown again", retryOk, retryDetail);
 }
 
 module.exports = { explore };

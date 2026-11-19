@@ -457,7 +457,11 @@ export default function AnalysisPage() {
   };
   // Back and Forward (the document's undo steps) carry the tab their entry was written with
   useEffect(() => {
-    const onPop = () => setSvTabState(readTab(linkParams()));
+    const onPop = () => {
+      const t = readTab(linkParams());
+      setSvTabState(t);
+      if (t !== "summary") setOpened((o) => o[t] ? o : { ...o, [t]: true });
+    };
     addEventListener("popstate", onPop);
     return () => removeEventListener("popstate", onPop);
   }, []);

@@ -31,6 +31,8 @@ export function CnSegmentsTab({ selection, selected, active = true }: CnSegments
   useEffect(() => {
     // read once per document; a failed read is tried again when the tab is shown again
     if (!doc || !active || (res?.doc === docText && !res.error)) return;
+    // a retry shows the waiting state, not the failure it is retrying
+    if (res?.doc === docText && res.error) setRes(null);
     const ac = new AbortController();
     api.analysis(doc, { signal: ac.signal })
       .then((r) => r.json())
