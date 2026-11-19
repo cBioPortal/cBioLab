@@ -202,6 +202,29 @@ export interface AttrStats {
   /** set when THIS site declines to describe it, with the reason */
   skipped?: string;
 }
+
+/** true when the answer holds values: only those say which level they were counted at */
+const holdsValues = (x: AttrStats | undefined): x is AttrStats =>
+  !!x && !x.skipped && (x.kind === "cat" ? !!x.values?.length : !!x.n);
+
+/**
+ * Answers about one attribute, one per (cohort, study), counted per patient where a study stores
+ * it per patient and per sample where per sample. Pooled, they would add patients to samples, so
+ * a disagreement is a refusal: why, or null when the answers holding values share one level.
+ * `level` is the first value-holding answer's level, for the row that reports either outcome.
+ */
+export function attributeLevels(answers: { study: string; stat: AttrStats | undefined }[]): { level: "patient" | "sample" | null; conflict: string | null } {
+  const held = answers.filter((a): a is { study: string; stat: AttrStats } => holdsValues(a.stat));
+  const at = (lvl: string) => [...new Set(held.filter((a) => a.stat.per === lvl).map((a) => a.study))].sort();
+  const patient = at("patient"), sample = at("sample");
+  const level = held.length ? held[0].stat.per : null;
+  if (!patient.length || !sample.length) return { level, conflict: null };
+  const both = patient.filter((s) => sample.includes(s));
+  const why = both.length
+    ? both.join(", ") + (both.length === 1 ? " stores" : " store") + " it both per patient and per sample"
+    : "the participating studies store it at different levels (patient in " + patient.join(", ") + "; sample in " + sample.join(", ") + ")";
+  return { level, conflict: why + "; its counts would mix patients with samples" };
+}
 /** One gene pair's 2x2 among samples profiled for BOTH genes. Counts only. */
 export interface PairCounts {
   a: string; b: string;
@@ -1811,13 +1834,15 @@ abstract class BaseResolver implements AggregateCapable {
     const db = this.instance.conn.db, conn = this.instance.conn;
     const list = attrs.map(sq).join(",");
     const meta = await this.runQuiet<ChRow>(aggregateSql(
-      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt\n" +
+      "SELECT cam.attr_id AS a, upper(cam.datatype) AS dt, lower(toString(cam.patient_attribute)) AS pa\n" +
       "FROM " + clinicalMetaTable(db) + " cam\n" +
       "JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
       "WHERE cs.cancer_study_identifier = " + sq(this.study) + " AND cam.attr_id IN (" + list + ")"))
       .catch(() => ({ data: [] as ChRow[] }));
     const kindOf = new Map<string, "cat" | "num">(
       meta.data.map((r) => [r.a, String(r.dt) === "NUMBER" ? "num" as const : "cat" as const]));
+    // the level the study declares, for an answer with no rows to read it from
+    const declared = new Map<string, "patient" | "sample">(meta.data.map((r) => [r.a, ["1", "true"].includes(String(r.pa)) ? "patient" as const : "sample" as const]));
     const catAttrs = attrs.filter((a) => kindOf.get(a) === "cat");
     const numAttrs = attrs.filter((a) => kindOf.get(a) === "num");
     const cohort = this.cohortSql(def);
@@ -1837,7 +1862,7 @@ abstract class BaseResolver implements AggregateCapable {
     }
     for (const a of catAttrs) {
       const g = grouped.get(a);
-      if (!g) { out.push({ attribute: a, per: "patient", kind: "cat", values: [] }); continue; }
+      if (!g) { out.push({ attribute: a, per: declared.get(a) ?? "patient", kind: "cat", values: [] }); continue; }
       // a caller choosing which values deserve a group of its own asks for the most frequent
       // ones only; it runs no test over the table, so nothing is wrong about a partial one
       const top = opts?.topValues != null ? Math.max(1, Math.min(500, Math.floor(opts.topValues))) : null;

@@ -19,6 +19,7 @@
 import { chQuery, connById } from "../lib/ch.ts";
 import { buildExplore, buildExploreFederated } from "../lib/explore.ts";
 import { studyProfilesMany } from "../lib/analysis.ts";
+import { CLINICAL_MISSING_VALUES } from "../lib/event-names.ts";
 import type { ClinicalFacet, ExploreResult } from "../lib/types.ts";
 
 const TRACERX = "nsclc_tracerx_2017", CAS = "luad_cas_2020";
@@ -70,7 +71,7 @@ const valuesSql = (studies: string[], attribute: string, samples?: string[]) =>
   "WITH sel AS (" + selectedSql(studies, samples) + "),\n" +
   " c AS (SELECT type, sample_unique_id, patient_unique_id, attribute_value FROM " + db + ".clinical_data_derived\n" +
   "   WHERE cancer_study_identifier IN (" + studies.map(q).join(", ") + ") AND attribute_name = " + q(attribute) + "\n" +
-  "     AND lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))\n" +
+  "     AND lowerUTF8(trimBoth(attribute_value)) NOT IN (" + CLINICAL_MISSING_VALUES.map(q).join(", ") + "))\n" +
   "SELECT sel.sid AS sid, c.attribute_value AS v FROM sel JOIN c ON c.sample_unique_id = sel.sid WHERE c.type = 'sample'\n" +
   "UNION ALL\n" +
   "SELECT sel.sid AS sid, c.attribute_value AS v FROM sel JOIN c ON c.patient_unique_id = sel.pid WHERE c.type = 'patient'";
@@ -79,11 +80,12 @@ async function selectedCount(studies: string[], samples?: string[]) {
 }
 /** folded value → selected samples holding it; and how many selected samples hold any value */
 async function truthCat(studies: string[], attribute: string, samples?: string[]) {
-  const r = await chQuery<{ f: string; n: string }>(
-    "SELECT lowerUTF8(trimBoth(v)) AS f, uniqExact(sid) AS n FROM (" + valuesSql(studies, attribute, samples) + ") GROUP BY f", conn!);
-  const withValue = Number((await chQuery<{ n: string }>(
-    "SELECT uniqExact(sid) AS n FROM (" + valuesSql(studies, attribute, samples) + ")", conn!)).data[0].n);
-  return { byValue: Object.fromEntries(r.data.map((x) => [x.f, Number(x.n)])), withValue };
+  const [r, w] = await Promise.all([
+    chQuery<{ f: string; n: string }>(
+      "SELECT lowerUTF8(trimBoth(v)) AS f, uniqExact(sid) AS n FROM (" + valuesSql(studies, attribute, samples) + ") GROUP BY f", conn!),
+    chQuery<{ n: string }>("SELECT uniqExact(sid) AS n FROM (" + valuesSql(studies, attribute, samples) + ")", conn!),
+  ]);
+  return { byValue: Object.fromEntries(r.data.map((x) => [x.f, Number(x.n)])), withValue: Number(w.data[0].n) };
 }
 /** selected samples whose value (own or patient's) is a number */
 async function truthNumeric(studies: string[], attribute: string, samples?: string[]) {
@@ -92,7 +94,8 @@ async function truthNumeric(studies: string[], attribute: string, samples?: stri
 }
 /**
  * One sample from each of `onePer` multi-sample patients of `study`, plus a second sample of the first
- * `twoPer` of them — so each such patient has samples left out — as "<study>:<sample>".
+ * `twoPer` of them — so each such patient has samples left out — as "<study>:<sample>". Throws when the
+ * study has fewer than `onePer` patients with 3+ samples, so a row never tests a smaller selection than it says.
  */
 async function multiSampleSelection(study: string, onePer: number, twoPer: number) {
   const r = await chQuery<{ s: string; p: string; k: string; m: string }>(
@@ -100,6 +103,7 @@ async function multiSampleSelection(study: string, onePer: number, twoPer: numbe
     "  count() OVER (PARTITION BY patient_stable_id) AS m\n" +
     "FROM " + db + ".sample_derived WHERE cancer_study_identifier = " + q(study) + " ORDER BY p, s", conn!);
   const multi = [...new Set(r.data.filter((x) => Number(x.m) > 2).map((x) => x.p))].slice(0, onePer);
+  if (multi.length < onePer) throw new Error(`${study} has ${multi.length} patients with 3+ samples; the selection needs ${onePer}`);
   return r.data.filter((x) => multi.includes(x.p) && (Number(x.k) === 1 || (Number(x.k) === 2 && multi.indexOf(x.p) < twoPer)))
     .map((x) => study + ":" + x.s);
 }

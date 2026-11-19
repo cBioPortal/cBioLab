@@ -14,7 +14,7 @@ import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, Clause, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { plainResult } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
-import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, attributeCutsSql, type Resolver } from "./federation.ts";
+import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, attributeCutsSql, attributeLevels, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
 import { describeSources, sourceIndex } from "./provenance.ts";
 import { resolveParams } from "./params.ts";
@@ -166,7 +166,8 @@ export interface RunOpts {
  * A categorical attribute's value counts within a cohort, merged across every study the cohort
  * spans. Each study answers for its own part of the cohort (attributeStats is on AggregateCapable, so an
  * aggregate-only or remote participant answers too), and disagreeing declared types across
- * studies are refused, not silently merged, as the clinical view's cross-study comparison does.
+ * studies are refused, not silently merged, as the clinical view's cross-study comparison does — and so
+ * are studies storing it at different levels, whose counts would add patients to samples.
  */
 async function mergedDistribution(cohortName: string, def: CohortDef, studies: string[],
   resolverOf: (s: string) => Promise<Resolver>, attribute: string, opts?: { topValues?: number }): Promise<AttributeDistribution & { partial?: boolean }> {
@@ -180,8 +181,10 @@ async function mergedDistribution(cohortName: string, def: CohortDef, studies: s
   if (kinds.size > 1)
     return { kind: "cat", per: "patient",
       skipped: "'" + attribute + "' is declared inconsistently (numeric in one study, categorical in another) across “" + cohortName + "”'s studies" };
+  const levels = attributeLevels(studies.map((study, i) => ({ study, stat: perStudyStats[i] })));
+  if (levels.conflict) return { kind: "cat", per: levels.level ?? "patient", skipped: "'" + attribute + "' across “" + cohortName + "”'s studies: " + levels.conflict };
   const kind = (perStudyStats[0]?.kind ?? "cat") as "cat" | "num";
-  const per = (perStudyStats[0]?.per ?? "patient") as "patient" | "sample";
+  const per = (levels.level ?? perStudyStats[0]?.per ?? "patient") as "patient" | "sample";
   if (kind === "num") return { kind, per };
   const merged = new Map<string, number>();
   for (const s of perStudyStats) for (const { v, n } of (s?.values || [])) merged.set(v, (merged.get(v) || 0) + n);
