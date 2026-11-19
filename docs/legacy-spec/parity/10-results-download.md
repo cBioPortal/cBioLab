@@ -100,8 +100,8 @@ Data version: every count identical.
 | RDL-1.1 | ✅ | B | "Copy-number Alterations (OQL is not in effect)" → `cna.txt` / `cna_transposed.txt`, each study's own selected (first) discrete copy-number profile; every queried sample, NP throughout for a study without one |
 | RDL-1.2 | ✅ | B | "Mutations (OQL is not in effect)"; Tab Delimited → `mutations.txt`, Transposed → `mutations_transposed.txt` (coadread KRAS + TP53: 594 rows, "G12D", WT, NP); every queried sample, NP throughout for a study without a mutation profile |
 | RDL-1.3 | 🟡 | BC | "Structural Variants (OQL is not in effect)" → `structural_variants.txt` / `_transposed.txt`, events space-separated ✅; shown when the study holds an SV profile, not when any SV exists |
-| RDL-1.4 | 🟡 | B | Every mRNA profile offered by name; no "selected in the query" row (the query's mRNA choice does not change the list) |
-| RDL-1.5 | 🟡 | B | Same for protein |
+| RDL-1.4 | ✅ | B | Every mRNA profile offered by name; the one the query selected for EXP listed right after Structural Variants, before the lists, as the portal's selected row (#437) |
+| RDL-1.5 | ✅ | B | Same for protein (PROT) (#437) |
 | RDL-1.6 | 🟡 | B | "Altered samples" 485 rows: CSV, Copy, Open as cohort; no Download as `altered_samples.txt`, Query, Virtual Study |
 | RDL-1.7 | 🟡 | B | "Unaltered samples" 55 rows (see STM-1); same actions |
 | RDL-1.8 | 🟡 | B | "Sample matrix: … 1 = altered, 0 = unaltered, NP = not profiled": CSV only, no Copy |
@@ -120,7 +120,7 @@ Data version: every count identical.
 | RDL-2.3 | ✅ | C | Re-measured 2026-11-18 (was 🟡): a line nobody was profiled for reads "Not Profiled" in both columns, "N/P" in the file (`datafiles.tsx:170-171`, `frequency.ts` `frequencyTsv`) |
 | RDL-2.4 | ✅ | BC | Re-measured 2026-11-18 (was 🔶): a 200 px grey bar filled light green + getPercentage's text (`FrequencyBar`, `datafiles.tsx:27`); Q1 APC 396 67%, TP53 315 53%, KRAS 222 37%, BRAF 64 11%, NRAS 38 6% on both sides |
 | RDL-2.5 | ✅ | C | Re-measured 2026-11-18 (was 🔶): the file's Percent Samples Altered is `percentAltered`'s string (`portalPercentAltered`, `frequency.ts` `frequencyTsv`), "N/P" when unprofiled; the file has the portal's four columns |
-| RDL-2.6 | 🟡 | BC | Re-measured 2026-11-18 (was 🔶): Percent desc by altered/profiled ✅, header sorts ✅, 10 a page ✅, filter on gene (and line while shown) ✅, `gene_alteration_frequency.tsv` ✅ (Q1 order APC, TP53, KRAS, BRAF, NRAS as the portal); no "Columns" menu (an OQL Line toggle instead), no Copy |
+| RDL-2.6 | ✅ | BC | Percent desc by altered/profiled ✅, header sorts ✅, 10 a page ✅, filter on gene (and line while shown) ✅, `gene_alteration_frequency.tsv` ✅ (Q1 order APC, TP53, KRAS, BRAF, NRAS as the portal); a Columns menu (OQL Line hidden at first; ours adds Profiled) and Copy of the file's text (#442) |
 
 ### §3 Type of Genetic Alterations Across All Samples
 

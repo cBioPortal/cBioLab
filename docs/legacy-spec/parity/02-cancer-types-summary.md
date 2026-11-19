@@ -154,7 +154,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | ID | verdict | how | note |
 |---|---|---|---|
 | CTS-CH-1 | ✅ | B | "40 of 58 categories (Cancer Type) are shown based on filtering." above the chart at the default threshold (Q1), as legacy (`figure.ts:67-69`) |
-| CTS-CH-2 | 🟡 | BC | Vertical stacked bars ≤ 32 px, plot 240 px (legacy 20 px / 400); y titles identical; labels at 45° under the bars (legacy 50°); more groups than fit → figure grows and scrolls, no synced top scrollbar |
+| CTS-CH-2 | ✅ | BC | Vertical stacked bars 20 px wide, 8 px apart; plot 300 px, the tallest bar 280 (the portal's 400 px chart less its padding); y titles identical; labels at 50° from their start under the strip; more groups than fit → figure grows and scrolls, with a synced scrollbar on top (`figure.ts`, `figure.tsx` `topScroll`) (#434) |
 | CTS-CH-3 | 🟡 | BC | Stack bottom → top Multiple, Protein low/high, mRNA low/high, Deep Deletion, Amplification, SV, Mutation, Multiple `#666` (`figure.ts:18-21`, `common.ts:35`) ✅; no Gain / Shallow Deletion buckets: OQL GAIN / HETLOSS is refused ("only high-level CNA is stored") |
 | CTS-CH-4 | ✅ | B | Types present only; Mutation · Structural Variant · Amplification · Deep Deletion · Multiple Alterations (Q1), as legacy |
 | CTS-CH-5 | ✅ | BC | The profiled-data strip as the portal's: a row per data type the query reads (Structural variant / Mutation / CNA, and mRNA / Protein for an EXP / PROT line), "+" or "−" per group; on a gene tab for that gene's panels (msk_impact_2017 NEGR1: Colorectal 782 of 982 patients) |
@@ -194,7 +194,7 @@ Data version: every denominator and every altered count matches in all 65 group 
 | CTS-MD-8 | ✅ | BC | Denominator excludes cases whose panels lack the genes ✅ (all denominators identical); the strip shows "−" for a group with no case profiled for a type |
 | CTS-MD-9 | 🐞 ok | C | All groups filtered away: "No category passes the filters.", the controls stay |
 | CTS-MD-10 | ✅ | C | Grey tab label; "There are no alterations in this gene." in place of the bars; "No category passes the filters." first when every group is filtered away |
-| CTS-MD-11 | 🟡 | B | > 37 groups: figure widens and scrolls; no top scrollbar |
+| CTS-MD-11 | ✅ | B | Many groups: figure widens and scrolls, a synced scrollbar on top; ours whenever the bars don't fit the card, the portal's past 37 groups (#434) |
 | CTS-MD-12 | ❌ | C | No hide-download switch (no downloads either) (tracked: Data-governance switches) |
 
 §7 Persistence (no IDs): legacy persists nothing; cBioLab keeps category, count-by, measure, min group and y-axis in the document (`?changes=`) per invariant 9; the active gene pill stays in the browser.

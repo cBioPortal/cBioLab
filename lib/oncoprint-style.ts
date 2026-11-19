@@ -542,7 +542,8 @@ export function trackTooltipLines(t: TrackSummary, columns: number, unit = "pati
   return lines;
 }
 
-export interface LegendItem { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" | "germline" }
+/** "unaltered": the grey cell's swatch, drawn with an edge so it shows on a white background too */
+export interface LegendItem { label: string; color: string; kind: "swatch" | "outline" | "notProfiled" | "germline" | "unaltered" }
 
 /**
  * What a figure's gene cells actually draw, for its legend: every bit present, and for the
@@ -550,16 +551,23 @@ export interface LegendItem { label: string; color: string; kind: "swatch" | "ou
  * entry is the one `cellLayers` picks by priority, not every class a cell carries, so a legend
  * never lists a colour the figure does not show.
  */
-export interface GlyphPresence { bits: number; mutDriver: number; mutVus: number; svDriver: boolean; svVus: boolean; germline?: boolean }
+export interface GlyphPresence { bits: number; mutDriver: number; mutVus: number; svDriver: boolean; svVus: boolean; germline?: boolean;
+  /**
+   * a gene row is drawn (the portal's always rule, "No alterations", is then always counted as used, even with every
+   * cell not profiled); some gene cell is not profiled (its NA rule, "Not profiled"); a derived-event row is drawn
+   */
+  genes?: boolean; notProfiled?: boolean; derived?: boolean }
 export function glyphPresence(tracks: readonly { kind: string; cells: ArrayLike<number> }[], S: Style = STYLE): GlyphPresence {
   const B = S.bits as Record<string, number>;
   const out: GlyphPresence = { bits: 0, mutDriver: 0, mutVus: 0, svDriver: false, svVus: false, germline: false };
   // altered cells take a handful of distinct codes; look each one up once
   const seen = new Set<number>();
   for (const t of tracks) {
+    if (t.kind === "derivedEvent") out.derived = true;
     if (t.kind !== "gene") continue;
+    out.genes = true;
     const cs = t.cells;
-    for (let i = 0; i < cs.length; i++) { const c = cs[i]; if (c > 0) seen.add(c); }
+    for (let i = 0; i < cs.length; i++) { const c = cs[i]; if (c > 0) seen.add(c); else if (c === -1) out.notProfiled = true; }
   }
   for (const c of seen) {
     out.bits |= c;
@@ -593,7 +601,11 @@ export function geneLegend(S: Style = STYLE, present?: GlyphPresence): LegendIte
   for (const o of G.cna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "swatch" });
   for (const o of G.mrna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "outline" });
   for (const o of G.protein.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "swatch" });
-  items.push({ label: G.notProfiled.label, color: G.notProfiled.stripe.color, kind: "notProfiled" });
+  if (present?.derived) items.push({ label: "Derived event", color: S.palette.derived, kind: "swatch" });
+  // last, as the portal's (both at legend order infinity, then by label): the grey cell whenever a gene row is drawn,
+  // and Not profiled only when some cell is not
+  if (!present || present.genes) items.push({ label: G.unalteredLabel, color: S.palette.unaltered, kind: "unaltered" });
+  if (!present || present.notProfiled) items.push({ label: G.notProfiled.label, color: G.notProfiled.stripe.color, kind: "notProfiled" });
   // colour-by-type off gives every mutation class one label and colour; list it once
   const seen = new Set<string>();
   return items.filter((it) => { const k = it.label + it.color; return seen.has(k) ? false : (seen.add(k), true); });
@@ -736,6 +748,22 @@ export function clinicalLegend(t: { label: string; categories?: string[]; cells:
     .map((c) => ({ label: t.categories![c], color: trackCategoryColor(t, c, S, colors) }));
   if (used.has(-1) && !t.profiledFor) entries.push({ label: "No data", color: S.glyph.notProfiled.fill, noData: true });
   return { kind: "categories", entries, more: Math.max(0, values.length - 8) };
+}
+
+/** the columns some gene row alters, in column order: the portal's alteredKeys, over which "only altered" legends read */
+export function alteredColumns(tracks: readonly { kind: string; cells: ArrayLike<number> }[]): number[] {
+  const genes = tracks.filter((t) => t.kind === "gene");
+  const n = genes[0]?.cells.length ?? 0, out: number[] = [];
+  for (let i = 0; i < n; i++) if (genes.some((t) => t.cells[i] > 0)) out.push(i);
+  return out;
+}
+
+/** a categorical clinical track with nothing to list over `shown` (the altered columns hold none of its values): no key row at all */
+export function emptyClinicalKey(t: { kind: string; categories?: string[]; cells: ArrayLike<number>; bar?: boolean; numeric?: boolean; stack?: string[]; label: string; profiledFor?: string },
+  shown?: ArrayLike<number>): boolean {
+  if (t.kind !== "clinical" || t.bar || t.numeric || t.stack || t.profiledFor || !t.categories) return false;
+  const key = clinicalLegend(t, STYLE, undefined, shown);
+  return key.kind === "categories" && !key.entries.length && !key.more;
 }
 
 /** a patient's clinical value when its samples disagree (lib/oncoprint.ts) */

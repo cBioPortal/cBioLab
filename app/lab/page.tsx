@@ -36,6 +36,7 @@ import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
 import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, TreatmentTables, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { cardOrders } from "../../lib/study-view-config.ts";
 import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
@@ -650,6 +651,8 @@ export default function AnalysisPage() {
             </div>
           )}
           {explore && explore.draftCount !== 0 && <>
+            {/* every card's place by the portal's priorities, clinical and other kinds together (STS-LY-3) */}
+            <style>{cardOrders(explore.clinical || []).map((c) => ".facetgrid > " + c.selector + " { order: " + c.order + "; }").join("\n")}</style>
             <div className="facetgrid">
               <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} selection={() => tabSelection} draft={parseDraft()}
                 attrs={explore.clinical || []}
