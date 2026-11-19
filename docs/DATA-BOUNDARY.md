@@ -261,6 +261,13 @@ suite fail. A test that cannot fail is decoration.
 
 ## Known limits — stated, not hidden
 
+- **A connector sends what the model writes to a third party, and this app cannot check it.** A
+  chat **connector** (`lib/chat-connectors.ts`: OpenEvidence, cBioPortal MCP, or what `CHAT_CONNECTORS`
+  names) is an external server the reader switches on; it is off by default. What the assistant puts in a
+  call to one leaves the app, and free-text ones (`sendsFreeText`) can carry a patient fact in a question. The
+  guards are procedural, not technical: the model is told never to include an identifier, the reader approves
+  every call after seeing the server and the exact arguments (no "always allow"), and a connector never
+  receives the app's data, only that call. A deployment that must not allow it sets `CHAT_CONNECTORS=[]`.
 - **The assistant sends what a page shows to a model provider.** The chat sidebar
   (`CHAT_PROVIDER`) sends the page's content, and what its tools return, to Anthropic or
   Bedrock whenever the reader asks. The patient page's **Summarize** button
