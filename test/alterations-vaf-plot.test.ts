@@ -6,13 +6,15 @@
 //      SD = max(1.06 × population SD × n^(-1/5), 0.01); n is the sample's values (the portal's NaN padding
 //      counted in n is a legacy bug, not copied)
 //   Y  the left axis counts mutations, 0 to the fullest bin of any sample; bars drawn on it
-//   O  bars 0.1 opaque with several samples, 0.3 with one; a legend entry's sample alone, its bars 0.5
+//   O  bars 0.1 opaque with several samples in view, 0.3 with one — every sample counted, with frequencies or not
+//      (computeMutationFrequencyBySample pads each sample of sampleOrder; Object.keys(data).length); a legend
+//      entry's sample alone, its bars 0.5
 //   E  a sample with no allele frequency draws nothing; with none in view there is no plot (the portal
 //      checks only the first sample's first value, a legacy bug, not copied)
 // Expected densities were worked out apart from the code (Python, the formula above).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { VAF_BIN_EDGES, VAF_GRID, hasVafs, vafBandwidth, vafBins, vafDensity, vafPlotSvg } from "../lib/views/alterations/vaf-plot.ts";
+import { VAF_BIN_EDGES, VAF_GRID, hasVafs, vafBandwidth, vafBins, vafDensity, vafPlotSvg as draw, vafSeries } from "../lib/views/alterations/vaf-plot.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 
 const close = (a: number, b: number, eps = 1e-9) => assert.ok(Math.abs(a - b) < eps, a + " ≉ " + b);
@@ -44,6 +46,7 @@ test("K: the curve's points every 0.01 over [-0.1, 1]; Silverman's bandwidth ove
 
 const T1 = { id: "P-T1", label: "1", color: "black", values: [38 / 195, 215 / 313, 267 / 792] };
 const T2 = { id: "P-T2", label: "2", color: "orange", values: [190 / 280] };
+const vafPlotSvg = (samples: Parameters<typeof vafSeries>[0], o: Parameters<typeof draw>[1], S?: Parameters<typeof draw>[2]) => draw(vafSeries(samples), o, S);
 const attrs = (svg: string, el: string, attr: string) => [...svg.matchAll(new RegExp("<" + el + " [^>]*" + attr + "=\"([^\"]*)\"", "g"))].map((m) => m[1]);
 
 test("Y, O: bars on the count axis, faint with several samples, darker with one, the picked sample's alone", () => {
@@ -56,6 +59,8 @@ test("Y, O: bars on the count axis, faint with several samples, darker with one,
   assert.match(both, />mutation count</); assert.match(both, />variant allele frequency</);
   const one = vafPlotSvg([T2], { histogram: true, curve: true }).svg;
   assert.deepEqual([...new Set(attrs(one, "rect", "opacity"))], ["0.3"]);
+  const oneWithReads = vafPlotSvg([{ ...T1, values: [] }, T2], { histogram: true, curve: true }).svg;
+  assert.deepEqual([...new Set(attrs(oneWithReads, "rect", "opacity"))], ["0.1"], "two samples in view, one without reads: still the several-sample opacity");
   const picked = vafPlotSvg([T1, T2], { histogram: true, curve: true, only: "P-T2" }).svg;
   assert.deepEqual(attrs(picked, "rect", "data-sample"), ["P-T2"]); assert.deepEqual(attrs(picked, "path", "data-sample"), ["P-T2"]);
   assert.deepEqual(attrs(picked, "rect", "opacity"), ["0.5"]);
@@ -83,4 +88,10 @@ test("sizes and opacities come from the style (invariant 8)", () => {
   const svg = vafPlotSvg([T1, T2], { histogram: true, curve: false }, S).svg;
   assert.deepEqual([...new Set(attrs(svg, "rect", "height").map(Number))], [100]);
   assert.deepEqual([...new Set(attrs(svg, "rect", "opacity"))], ["0.2"]);
+});
+
+test("the axes follow the page's theme (the default palette's CSS colours), light when asked", () => {
+  const page = vafPlotSvg([T1], { histogram: true, curve: true }).svg;
+  assert.match(page, /fill="var\(--/); assert.doesNotMatch(page, /fill="#/, "no literal colour on the axes");
+  assert.match(vafPlotSvg([T1], { histogram: true, curve: true, theme: "light" }).svg, /#5b6b76/);
 });

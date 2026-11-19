@@ -56,4 +56,4 @@ Structural Variants: 3 rows; the first 3, tab-separated (the web app's view page
         Mutations: 3 of 7 rows (kept: rows Annotation (OncoKB) contains “Oncogenic”)
         Copy Number Alterations: 3 rows
         Structural Variants: 3 rows
-    A listing: no statistic is computed, so there is no script — the queries are the numbers.
+    The tables are a listing: no statistic is computed, so there is no script — the queries are the numbers. The VAF plot's values are alterations:vafs's rows as returned; its histogram and density are drawn from them in the browser, not numbers the result reports, and their rules (bins, Silverman's bandwidth, the kernel) are checked against values computed apart in Python (test/alterations-vaf-plot.test.ts).

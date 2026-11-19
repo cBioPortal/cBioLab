@@ -32,5 +32,7 @@ export function alterationsMethod(t: { cohorts: string[]; oncokbPin: string | nu
   });
   return { steps, implementation: { functions: ["runAlterations", "alterationPatientRowSource", "patientMutationsSource", "patientVafSource", "patientCnaSource", "patientSvSource", "pageSql", "countsSql", "rankSql"],
     file: "lib/views/alterations/run.ts, lib/patient-alterations.ts, lib/table-query.ts", commit: BUILD_COMMIT },
-    verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
+    verification: "The tables are a listing: no statistic is computed, so there is no script — the queries are the numbers. " +
+      "The VAF plot's values are alterations:vafs's rows as returned; its histogram and density are drawn from them in the browser, not numbers the result reports, " +
+      "and their rules (bins, Silverman's bandwidth, the kernel) are checked against values computed apart in Python (test/alterations-vaf-plot.test.ts)." };
 }

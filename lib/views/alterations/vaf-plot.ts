@@ -5,7 +5,7 @@ import { STYLE, type Style } from "../../oncoprint-style.ts";
 import { linear } from "../../chart/scale.ts";
 import { axisBottom, axisLeft, bottomAxisHeight, leftAxisWidth } from "../../chart/axis.ts";
 import { esc } from "../../chart/esc.ts";
-import { palette } from "../../svg-kit.ts";
+import { palette, type SvgOpts } from "../../svg-kit.ts";
 
 /** the histogram's bin edges: d3's ticks(30) over [-0.1, 1], every 0.05 */
 export const VAF_BIN_EDGES = Array.from({ length: 23 }, (_, i) => (-10 + 5 * i) / 100);
@@ -50,18 +50,25 @@ export interface VafPlotOptions {
   histogram: boolean; curve: boolean;
   /** one sample alone, as the legend's hovered entry shows it */
   only?: string;
+  theme?: SvgOpts["theme"];
+}
+
+/** Every sample in view, and for those with frequencies their bins and density curve: worked out once, then drawn under any options. */
+export interface VafSeries { samples: readonly VafSample[]; drawn: VafSample[]; bins: number[][]; curves: number[][] }
+export function vafSeries(samples: readonly VafSample[]): VafSeries {
+  const drawn = samples.filter((s) => s.values.length > 0);
+  return { samples, drawn, bins: drawn.map((s) => vafBins(s.values)), curves: drawn.map((s) => vafDensity(s.values)) };
 }
 
 /**
  * The plot as SVG markup. The histogram's bars are counts on the left axis (mutation count); the
  * curves have a scale of their own, from the lowest to the highest density of any sample's curve.
- * Bars are faint with several samples, darker with one; the sample a legend entry picks is drawn alone.
+ * Bars are faint when the patient has several samples in view (with frequencies or not, as the
+ * portal counts every sample), darker with one; the sample a legend entry picks is drawn alone.
  */
-export function vafPlotSvg(samples: readonly VafSample[], o: VafPlotOptions, S: Style = STYLE): { svg: string; width: number; height: number } {
-  const V = S.vafPlot, pal = palette("light");
-  const drawn = samples.filter((s) => s.values.length > 0);
-  const bins = drawn.map((s) => vafBins(s.values));
-  const curves = drawn.map((s) => vafDensity(s.values));
+export function vafPlotSvg(series: VafSeries, o: VafPlotOptions, S: Style = STYLE): { svg: string; width: number; height: number } {
+  const V = S.vafPlot, pal = palette(o.theme);
+  const { drawn, bins, curves } = series;
   const maxCount = Math.max(1, ...bins.flat());
   const ys = curves.flat();
   const yLo = Math.min(...ys), yHi = Math.max(...ys);
@@ -73,7 +80,7 @@ export function vafPlotSvg(samples: readonly VafSample[], o: VafPlotOptions, S: 
   const top = V.top, height = top + V.height + bottomAxisHeight(xTitle), width = left + V.width + V.right;
   const out: string[] = [];
   const shown = (s: VafSample) => !o.only || o.only === s.id;
-  const barOpacity = o.only ? V.barOpacityPicked : drawn.length > 1 ? V.barOpacityMany : V.barOpacityOne;
+  const barOpacity = o.only ? V.barOpacityPicked : series.samples.length > 1 ? V.barOpacityMany : V.barOpacityOne;
   const binW = x(VAF_BIN_EDGES[1]) - x(VAF_BIN_EDGES[0]) - 1;
   if (o.histogram) drawn.forEach((s, i) => {
     if (!shown(s)) return;

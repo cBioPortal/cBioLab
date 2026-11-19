@@ -287,4 +287,4 @@ Structural Variants: 0 rows; the first 0, tab-separated (the web app's view page
         Mutations: 31 rows
         Copy Number Alterations: 3 rows
         Structural Variants: 0 rows
-    A listing: no statistic is computed, so there is no script — the queries are the numbers.
+    The tables are a listing: no statistic is computed, so there is no script — the queries are the numbers. The VAF plot's values are alterations:vafs's rows as returned; its histogram and density are drawn from them in the browser, not numbers the result reports, and their rules (bins, Silverman's bandwidth, the kernel) are checked against values computed apart in Python (test/alterations-vaf-plot.test.ts).

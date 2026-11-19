@@ -19,6 +19,7 @@ import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 import { VafPlotHead } from "./vaf-plot-head";
+import { SampleMarker } from "../portal/sample-marker";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
 
@@ -127,8 +128,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
         return (
           <section key={key} className="alt-table" aria-label={name}>
             {outside.length > 0 && <p className="note flex flex-wrap items-center gap-1" role="status">
-              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
-                <svg width="14" height="14" aria-label={m.id}><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
+              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} role="img" aria-label={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
+                <SampleMarker mark={m} className="" />
               </span>)} not profiled for {what}{none ? "" : "."}
             </p>}
             {!none && <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
