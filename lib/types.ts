@@ -1038,9 +1038,11 @@ export interface TreatmentFacets {
 export interface AssayFreqTable {
   profileType: string; name: string; assayType?: string; unit: "sample" | "patient"; binary: boolean;
   total: number; rows: { entity: string; name: string; value: string; n: number }[];
-  /** the selected studies holding the profile */
+  /** the selected local studies holding the profile; `total` counts every selected local study's cases */
   studies: string[];
   disjunctive?: true;
+  /** selected studies a peer holds with the profile, not counted here (its federation API has no such counts) */
+  leftOut?: string[];
 }
 
 export interface AssayFacet {
@@ -1182,6 +1184,8 @@ export interface ExploreResult {
   assayFacets?: AssayFacet[];
   /** a frequency table per binary or categorical generic-assay profile the selection holds (AssayFreqTable) */
   assayFreqTables?: AssayFreqTable[];
+  /** the frequency tables past ASSAY_FREQ_TABLE_LIMIT, by profile name: not drawn, and said so */
+  assayFreqTablesNotShown?: string[];
   /** the portal's treatment tables (TreatmentFacets), when a selected study has treatments */
   treatments?: TreatmentFacets;
   /** one gene's mutations by type per table the reader asked for (MutationTypeFacet) */

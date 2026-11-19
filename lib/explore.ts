@@ -11,7 +11,7 @@ import { driverEventSql } from "./oql.ts";
 
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, DerivedFacet, DerivedRequest, AssayFacet, MutationTypeFacet, TreatmentFacets, AssayFreqTable } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
-import { freqTableKeeps } from "./assay-frequency-table.ts";
+import { ASSAY_FREQ_TABLE_LIMIT, freqTableKeeps } from "./assay-frequency-table.ts";
 import { clinicalValueFold, clinicalValueFoldSql, keptSpelling } from "./event-names.ts";
 import { dataBins, recountBins, type BinInput, type BinSettings } from "./data-binner.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor, withSampleLevel } from "./custom-data.ts";
@@ -1911,9 +1911,6 @@ export async function buildTreatmentFacets(o: {
   };
 }
 
-/** a genericAssay clause on this entity, possibly negated: what the chart itself adds */
-/** the most frequency tables Explore draws (one per binary or categorical generic-assay profile) */
-export const ASSAY_FREQ_TABLE_LIMIT = 4;
 
 /**
  * cBioPortal's generic-assay frequency tables (STS-OT-5), shown by default, one per binary or
@@ -1926,47 +1923,57 @@ export async function buildAssayFreqTables(o: {
   profilesByStudy: Map<string, { profiles?: string[]; gaProfiles?: string[] }>;
   connByStudy?: Map<string, ChConn>;
   catalog: { profile: string; type: string; datatype: string; name: string; assayType?: string; patientLevel?: boolean }[];
-}): Promise<AssayFreqTable[]> {
+  /** selected studies a peer holds: named on a table whose profile they hold, never counted (its federation API has no such counts) */
+  peers?: string[];
+}): Promise<{ tables: AssayFreqTable[]; notShown: string[] }> {
   const ctx: DefCtx = { oncokbPin: o.oncokbPin, profilesByStudy: o.profilesByStudy };
-  const profiles = [...new Map(o.catalog.filter((p) => p.type === "GENERIC_ASSAY" && isCategoricalAssay(p.datatype)).map((p) => [p.profile, p] as const)).values()]
-    .slice(0, ASSAY_FREQ_TABLE_LIMIT);
-  return ensureChContext(() => Promise.all(profiles.map(async (p): Promise<AssayFreqTable | null> => {
-    const holders = o.studies.filter((s) => (o.profilesByStudy.get(s)?.gaProfiles || []).includes(p.profile));
-    if (!holders.length) return null;
-    const own = (c: unknown): boolean => { const l = c as { kind?: string; profileType?: string; not?: unknown } | null;
-      return !!l && ((l.kind === "genericAssay" && l.profileType === p.profile) || (!!l.not && own(l.not))); };
+  const holding = (studies: string[] | undefined, profile: string) => (studies || []).filter((s) => (o.profilesByStudy.get(s)?.gaProfiles || []).includes(profile));
+  // a table per binary or categorical profile some selected study holds, the limit counted over those
+  const held = [...new Map(o.catalog.filter((p) => p.type === "GENERIC_ASSAY" && isCategoricalAssay(p.datatype)).map((p) => [p.profile, p] as const)).values()]
+    .filter((p) => holding(o.studies, p.profile).length || holding(o.peers, p.profile).length);
+  const profiles = held.slice(0, ASSAY_FREQ_TABLE_LIMIT), notShown = held.slice(ASSAY_FREQ_TABLE_LIMIT).map((p) => p.name);
+  const tables = await ensureChContext(() => Promise.all(profiles.map(async (p): Promise<AssayFreqTable> => {
+    const holders = holding(o.studies, p.profile), peers = holding(o.peers, p.profile);
+    const leftOut = peers.length ? { leftOut: peers } : {};
+    // the table's own filter: one leaf per entity, or an any of them for several (freqTableClause)
+    const leaf = (c: unknown): boolean => { const l = c as { kind?: string; profileType?: string; not?: unknown } | null;
+      return !!l && ((l.kind === "genericAssay" && l.profileType === p.profile) || (!!l.not && leaf(l.not))); };
+    const own = (c: unknown): boolean => { const any = (c as { any?: unknown[] } | null)?.any;
+      return leaf(c) || (Array.isArray(any) && any.length > 0 && any.every(leaf)); };
     const mine = !!o.draft && Array.isArray(o.draft.all) && o.draft.all.some(own);
     const def = mine ? draftWithout(o.draft!, own) : o.draft;
     const unit = p.patientLevel ? "patient" as const : "sample" as const;
     const id = unit === "patient" ? "patient_unique_id" : "sample_unique_id";
     const binary = /^BINARY$/i.test(p.datatype);
+    // Freq divides by every selected case, as the portal's, a study without the profile included
+    const totals = await Promise.all(byConnection(o.studies, o.connByStudy).map((g) => chQuery<ChRow>("SELECT uniqExact(" + id + ") AS n FROM " + g.conn.db +
+      ".sample_derived WHERE " + studyIn(g.studies) + inSamples(cohortSet(g.studies, g.conn.db, def, ctx)), g.conn)));
+    const total = totals.reduce((n, r) => n + Number(r.data[0]?.n || 0), 0);
+    const base = { profileType: p.profile, name: p.name, ...(p.assayType ? { assayType: p.assayType } : {}), unit, binary, studies: holders, total,
+      ...(mine ? { disjunctive: true as const } : {}), ...leftOut };
+    if (!holders.length) return { ...base, rows: [] };
     const groups = byConnection(holders, o.connByStudy).map((g) => ({ ...g, set: cohortSet(g.studies, g.conn.db, def, ctx) }));
-    const parts = await Promise.all(groups.map((g) => Promise.all([
-      chQuery<ChRow>("SELECT uniqExact(" + id + ") AS n FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + inSamples(g.set), g.conn),
+    const parts = await Promise.all(groups.map((g) =>
       chQuery<ChRow>("SELECT entity_stable_id AS e, trimBoth(value) AS v, uniqExact(" + id + ") AS n FROM " + g.conn.db + ".generic_assay_data_derived\n" +
         "WHERE profile_type = " + sq(p.profile) + " AND profile_stable_id IN (" + g.studies.map((s) => sq(s + "_" + p.profile)).join(",") + ")" +
         (g.set.samples ? "\n  AND if(ifNull(patient_level, 0) = 1, patient_unique_id IN " + g.set.patients + ", sample_unique_id IN " + g.set.samples + ")" : "") + "\n" +
-        "GROUP BY e, v", g.conn),
-    ])));
+        "GROUP BY e, v", g.conn)));
     const names = new Map((await chQuery<ChRow>(assayEntitySearchSql(holders[0], groups[0].conn.db, p.profile, "", 200), groups[0].conn)).data
       .map((r) => [String(r.entity), String(r.name || "")] as const));
     const counts = new Map<string, { entity: string; value: string; n: number }>();
-    for (const [, r] of parts) for (const x of r.data) {
+    for (const r of parts) for (const x of r.data) {
       const value = String(x.v), entity = String(x.e);
       if (!freqTableKeeps(value, binary)) continue;
       const k = entity + "\u0000" + value, was = counts.get(k);
       // the studies' cases are disjoint, so their counts add
       counts.set(k, { entity, value, n: (was?.n || 0) + Number(x.n) });
     }
-    return {
-      profileType: p.profile, name: p.name, ...(p.assayType ? { assayType: p.assayType } : {}), unit, binary, studies: holders,
-      total: parts.reduce((n, [t]) => n + Number(t.data[0]?.n || 0), 0),
-      rows: [...counts.values()].filter((r) => r.n > 0).map((r) => ({ ...r, name: names.get(r.entity) || r.entity })),
-      ...(mine ? { disjunctive: true as const } : {}),
-    };
-  }))).then((ts) => ts.filter((t): t is AssayFreqTable => t != null));
+    return { ...base, rows: [...counts.values()].filter((r) => r.n > 0).map((r) => ({ ...r, name: names.get(r.entity) || r.entity })) };
+  })));
+  return { tables, notShown };
 }
 
+/** a genericAssay clause on this entity, possibly negated: what the chart itself adds */
 function isAssayClauseFor(c: unknown, profileType: string, entity: string): boolean {
   const leaf = (x: unknown) => { const l = x as { kind?: string; profileType?: string; entity?: string };
     return !!l && l.kind === "genericAssay" && l.profileType === profileType && l.entity === entity; };

@@ -29,7 +29,7 @@ import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
-import { ALTERED_ONLY_TYPES, freqRowKey, freqTableClause, freqTableRows } from "../../lib/assay-frequency-table.ts";
+import { ALTERED_ONLY_TYPES, ASSAY_FREQ_TABLE_LIMIT, freqRowKey, freqTableClause, freqTableRows } from "../../lib/assay-frequency-table.ts";
 import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
 import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
@@ -1144,7 +1144,12 @@ function AssayChartPicker({ ctx, assayType }: { ctx: ExploreCtx; assayType: stri
  * Freq of every selected case; arm-level CNA and LOH tables show altered categories until asked
  */
 export function AssayFreqTables({ ctx }: { ctx: ExploreCtx }) {
-  return <>{(ctx.explore!.assayFreqTables || []).map((t) => <AssayFreqTable key={t.profileType} t={t} ctx={ctx} />)}</>;
+  const more = ctx.explore!.assayFreqTablesNotShown || [];
+  return <>
+    {(ctx.explore!.assayFreqTables || []).map((t) => <AssayFreqTable key={t.profileType} t={t} ctx={ctx} />)}
+    {more.length > 0 && <p className="note" data-assayfreq-more>
+      {ASSAY_FREQ_TABLE_LIMIT} frequency tables are drawn at most; not drawn: {more.join(", ")}.</p>}
+  </>;
 }
 
 function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["explore"]>["assayFreqTables"]>[number]; ctx: ExploreCtx }) {
@@ -1157,7 +1162,10 @@ function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["exp
   const on = new Set(leaves.filter((l: any) => l && l.kind === "genericAssay" && l.profileType === t.profileType)
     .flatMap((l: any) => (l.values || []).map((v: unknown) => freqRowKey({ entity: l.entity, value: String(v) }))));
   const rows = freqTableRows(t.rows, t.assayType, all);
-  const clickable = t.studies.length >= exStudies.length;
+  // a row filters every selected study only when each holds the profile; the note names those that do not
+  const peers = t.leftOut || [];
+  const without = exStudies.filter((s: string) => !t.studies.includes(s) && !peers.includes(s));
+  const clickable = !without.length && !peers.length;
   return (
     <div className="card" data-assayfreq={t.profileType}>
       <div className="facettitle">
@@ -1167,7 +1175,8 @@ function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["exp
       {curated && <Button variant="ghost" size="xs" aria-pressed={!all} onClick={() => setAll(!all)}
         data-tip={all ? "Showing all categories. Click to hide unchanged or unknown rows." : "Showing altered categories only. Click to include unchanged or unknown rows."}>
         <Filter /> {all ? "all categories" : "altered only"}</Button>}
-      {!clickable && <p className="note flush mt-1">Held by {t.studies.length} of {exStudies.length} selected studies, so its rows cannot filter them all.</p>}
+      {without.length > 0 && <p className="note flush mt-1">Not held by {without.join(", ")}: counted in Freq, but its rows cannot filter {without.length === 1 ? "it" : "them"}.</p>}
+      {peers.length > 0 && <p className="note flush mt-1">Not counted: {peers.join(", ")} (a peer's {peers.length === 1 ? "study" : "studies"}, whose counts are not shared).</p>}
       {rows.length ? <ValueList unit={noun} pct={portalFreq} hint={"keep the " + noun + " with any checked value"}
         extra={t.binary ? undefined : { head: "Category", tip: "the entity's value" }}
         rows={rows.map((r) => ({ key: freqRowKey(r), name: r.name, extra: r.value, n: r.n, total: t.total, on: on.has(freqRowKey(r)), disabled: !clickable,

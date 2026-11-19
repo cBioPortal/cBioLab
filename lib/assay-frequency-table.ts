@@ -5,6 +5,9 @@
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, limitRefusal } from "./filter-limits.ts";
 
 /** a row: an entity, one of its values, and the cases holding that value */
+/** the most frequency tables Explore draws (one per binary or categorical generic-assay profile); the rest are named */
+export const ASSAY_FREQ_TABLE_LIMIT = 4;
+
 export interface FreqRow { entity: string; name: string; value: string; n: number }
 
 /** values that are no answer, dropped from every table */

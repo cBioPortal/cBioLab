@@ -144,9 +144,11 @@ async function exploreFor(body: any) {
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
   const treatments = await treatmentsP;
-  // the portal's frequency table per binary or categorical generic-assay profile (STS-OT-5), local studies only
-  const assayFreqTables = body.attributesOnly === true && studies.length === 1 ? [] : await buildAssayFreqTables({ studies: local, draft, oncokbPin: pin,
-    profilesByStudy, connByStudy, catalog: profileCatalog });
+  // the portal's frequency table per binary or categorical generic-assay profile (STS-OT-5), counted
+  // over the local studies; a peer's studies holding the profile are named on it, not counted
+  const freq = body.attributesOnly === true && studies.length === 1 ? { tables: [], notShown: [] } : await buildAssayFreqTables({ studies: local, peers: remote, draft,
+    oncokbPin: pin, profilesByStudy, connByStudy, catalog: profileCatalog });
+  const assayFreqTables = freq.tables;
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...(assayFreqTables.length ? { assayFreqTables } : {}), ...mt, ...tx(treatments) };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...(assayFreqTables.length ? { assayFreqTables } : {}), ...(freq.notShown.length ? { assayFreqTablesNotShown: freq.notShown } : {}), ...mt, ...tx(treatments) };
 }
