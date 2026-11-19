@@ -1,0 +1,13 @@
+// Planted bugs: Explore's value lists as the portal's tables (STS-TBL-2, -3, -5). How they are planted and run: scripts/check-mutants.ts.
+import type { GuardCommands, Mutant } from "../types.ts";
+
+export const guards: GuardCommands = {};
+
+export const mutants: Mutant[] = [
+  { id: "value-list-applied-not-pinned", layer: "cohorts", guard: "unit", file: "lib/value-list.ts",
+    effect: "The values a chart's filter holds stay in count order instead of first, so in a long list they scroll out of sight.",
+    find: "return [...shown.filter((r) => r.on), ...shown.filter((r) => !r.on)];", replace: "return shown;" },
+  { id: "value-list-select-all-rechecks-applied", layer: "cohorts", guard: "unit", file: "lib/value-list.ts",
+    effect: "Select all also checks the values the chart's filter already holds, so applying adds them to the filter a second time.",
+    find: "const checkable = shown.filter((r) => !r.on && !r.disabled).map((r) => r.key);", replace: "const checkable = shown.concat([]).filter((r) => !r.disabled).map((r) => r.key);" },
+];

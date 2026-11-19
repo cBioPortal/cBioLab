@@ -897,7 +897,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           if (asList) {
             const byKey = new Map(values.map((v: any) => [String(v.v), v]));
             return (<>
-              <ValueList picks={picks} pct={portalFreq} hint={"keep the cases whose " + (c.displayName || c.attribute) + " is any of the checked values"}
+              <ValueList picks={picks} pct={portalFreq} unit={c.per === "patient" ? "patients" : "samples"} hint={"keep the cases whose " + (c.displayName || c.attribute) + " is any of the checked values"}
                 rows={values.map((v: any) => ({ key: v.isNa ? NA_KEY : String(v.v), name: String(v.v), n: v.n, total, on: isSel(v), muted: v.isNa,
                   title: v.isNa ? "no " + (c.displayName || c.attribute) + " recorded — " + v.n.toLocaleString() : v.v + " — " + v.n.toLocaleString() }))}
                 why={(keys) => keys.includes(NA_KEY) && keys.length > 1 ? "NA can't be combined with other values" : null}
@@ -1051,7 +1051,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
       <span className="meta">{noun} · {fmtInt(f.measured)} of {fmtInt(f.total)} with a value{f.disjunctive ? " · counted without its own filter" : ""}{why}</span>
       {f.error && <p className="note flush mt-1">{f.error}</p>}
       {f.kind === "cat" && f.values && (
-        <ValueList picks={picks} hint={"keep the " + noun + " whose " + title + " is any of the checked values"}
+        <ValueList picks={picks} unit={noun} hint={"keep the " + noun + " whose " + title + " is any of the checked values"}
           rows={f.values.map((v) => ({ key: v.v, name: v.v, n: v.n, total: f.measured, disabled: !clickable,
             title: v.v + " — " + fmtInt(v.n) + " " + noun + why }))}
           onApply={(vs) => addClause({ ...base, values: vs })} />
@@ -1099,7 +1099,7 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
             <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
               states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg)]} />
           </div>
-          <ValueList hint={"keep the samples in any of the checked states of " + f.gene}
+          <ValueList unit="samples" hint={"keep the samples in any of the checked states of " + f.gene}
             rows={states.map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",
               title: st.label + " — " + st.n.toLocaleString() + " samples" }))}
             why={(states) => { const r = apply(states); return "why" in r ? r.why : null; }}
@@ -1389,7 +1389,7 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
       <h2>Timeline events</h2>
       {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
       {explore.events.length > 0 && (
-        <ValueList hint="keep the patients with any of the checked events" pct={portalFreq}
+        <ValueList unit="patients" hint="keep the patients with any of the checked events" pct={portalFreq}
           rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
             title: e.n.toLocaleString() + " of " + (explore.totals?.patients ?? 0).toLocaleString() + " selected patients with a " + e.type + " event" }))}
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
@@ -1397,7 +1397,7 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
     </div>
     <div className="card">
       <h2>Case lists</h2>
-      <ValueList hint="keep the samples on any of the checked case lists" pct={portalFreq}
+      <ValueList unit="samples" hint="keep the samples on any of the checked case lists" pct={portalFreq}
         rows={explore.caseLists.map((l) => ({ key: l.id, name: l.name, n: l.n, total: explore.totals?.samples, on: listOn(l.id),
           title: l.id + " — " + l.n.toLocaleString() + " of " + (explore.totals?.samples ?? 0).toLocaleString() + " selected samples" }))}
         onApply={(ids) => anyOf(ids.map((id) => ({ kind: "caseList", id })))} />

@@ -563,6 +563,8 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* Explore: high-cardinality categorical facets as a ranked list (portal table) */
 .vallist {
+  /* checkbox · name · bar · count · share, shared by the rows and their header */
+  --valrow-cols: calc(0.75rem + 2px) 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
   margin-top: 0.25rem;
   /* every value is present; the list scrolls rather than being trimmed */
   max-height: 13.5rem; overflow-y: auto; overscroll-behavior: contain;
@@ -573,12 +575,17 @@ main.analysis-main { max-width: min(132rem, 100%); }
      relative size, deliberately small so the label and the number stay the
      content. Declare a column for EVERY child: adding the share without one
      wrapped it to a second line under each value. */
-  display: grid; grid-template-columns: calc(0.75rem + 2px) 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
+  display: grid; grid-template-columns: var(--valrow-cols);
   gap: 0 0.6rem; align-items: center; width: 100%;
   background: none; border: none; padding: 0.12rem 0; border-radius: var(--r-sm);
   font: inherit; font-size: var(--t-md); color: var(--ink); text-align: left; cursor: pointer;
 }
 .valrow:hover { background: var(--code-bg); }
+/* the portal's table header: # and Freq over their columns */
+.valhead { display: grid; grid-template-columns: var(--valrow-cols); gap: 0 0.6rem; width: 100%; padding: 0.1rem 0; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
+.valhead > span:nth-child(n + 4) { text-align: right; }
+/* the search box and Select all / Deselect all under a list that scrolls */
+.vsearch { display: flex; align-items: center; gap: var(--s1); margin-top: var(--s1); }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
    below it, not a boxed, rounded outline — this is a dense list, not a card. */
 .valrow.on { background: var(--accent-soft); border-radius: 0; }
