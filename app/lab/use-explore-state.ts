@@ -38,6 +38,7 @@ export type EditingCohort = { id: string; name: string; def: CohortDef };
 
 import { toggleQueued } from "../../lib/study-view-gene-tables.ts";
 import { driverOql, geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
+import { CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
 
@@ -496,6 +497,8 @@ export function useExploreState(page: ExplorePage) {
       const same = d.all.find((c: any) => c.kind === "clinical" && c.attribute === clause.attribute && (c.op === "=" || c.values));
       if (same) { // more values on the same attribute join its OR list
         const vals = new Set([...(same.values || []), ...(same.op === "=" ? [same.value] : []), ...(clause.values || [clause.value])]);
+        const refusal = limitRefusal(vals.size, CLINICAL_VALUES_LIMIT, "values of " + clause.attribute);
+        if (refusal) { setExMsg("Not added: " + refusal.replace(" are checked", " would be selected")); return; }
         delete same.op; delete same.value; same.values = [...vals];
         const txt = JSON.stringify(d, null, 2); setCDefText(txt); fetchExplore(d); return;
       }

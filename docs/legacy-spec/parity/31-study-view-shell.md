@@ -103,7 +103,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-URL-1 | 🔶 | B | `/lab?tab=explore` (also `analysis`); no per-tab paths; `/lab?tab=cohorts` redirects to Explore + Saved work |
+| STV-URL-1 | 🔶 | B | `/lab?tab=explore` (also `analysis`); Explore's own tab as `svtab=clinicalData` \| `cnSegments` (the portal's path names, `lib/study-view-url.ts`), read on load, absent on Summary; no per-tab paths; `/lab?tab=cohorts` redirects to Explore + Saved work |
 | STV-URL-2 | 🟡 | BC | `study=a,b` (comma list), `filters=1.…` (the filters, compressed), `#filterJson=` and `filterAttributeId` + `filterValues` read (SEX = Female → 280 patients) (#189); `drivers=1`, `custom=add`, `editCohort=<id>`; no sharedGroups / sharedCustomData / plots_* |
 | STV-URL-3 | N/A | BC | ↓ Filters are written to the URL (`filters=1.…`, `app/lab/use-explore-state.ts:527-535`; #189), where legacy writes them only through its bookmark link: N/A per invariant 9 (a link carries what the reader sees), as STS-FL-2 |
 | STV-URL-4 | ❌ | C | URL read once on load (`page.tsx:340-346`); in-page study changes write the URL (`use-explore-state.ts:657-664`) |
@@ -137,7 +137,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | ID | verdict | how | note |
 |---|---|---|---|
 | STV-AB-1 | 🟡 | B | ↓ Header "1 study · 594 patients · 594 samples" from the filtered totals, skeleton while counting; not the portal's "Selected: 594 patients | 594 samples" (no "Selected:", "·" for "|"), and "(overlap not deduplicated)" on several studies (`explore-sections.tsx:129-139`) |
-| STV-AB-2 | 🟡 | BC | "View patients" opens `/portal/patient` on the first patient with the cohort definition for stepping (`use-explore-state.ts:189-197`); disabled, saying why, with no study or at 0 matching patients (`explore-sections.tsx`, as the portal's "disabled if 0 patients"); same tab, not a new window |
+| STV-AB-2 | ✅ | BC | "View patients" opens `/portal/patient` in a new window on the first patient, with the cohort definition for stepping (`use-explore-state.ts`); disabled, saying why, with no study or at 0 matching patients |
 | STV-AB-3 | 🔶 | B | "Save as a Cohort" (filter bar, only once filtered) — see §8 |
 | STV-AB-4 | ✅ | B | "Download clinical data" beside View patients: `<study>_clinical_data.tsv` / `combined_study_clinical_data.tsv`, through the patient-level table route ([download-cases](download-cases.md) PC2, PC9). Shown always (no `skin_hide_download_controls`) |
 | STV-AB-5 | ❌ | B | No ⚙ / autosubmit setting |
@@ -208,7 +208,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-TAB-1 | 🟡 | B | Explore's Summary · Clinical Data · CN Segments tabs under the filter bar; Clinical Data not offered on an empty selection ([clinical-tab-cases](clinical-tab-cases.md) CT1), CN Segments only when a selected study holds segments ([study-cn-segments-cases](study-cn-segments-cases.md) CS1). Not yet: Plots; the tab is not in the URL |
+| STV-TAB-1 | 🟡 | B | Explore's Summary · Clinical Data · CN Segments tabs under the filter bar, in the URL (`svtab`) and kept mounted once opened (search, sort, page, locus kept); Clinical Data not offered on an empty selection ([clinical-tab-cases](clinical-tab-cases.md) CT1), CN Segments whenever a selected study holds segments ([study-cn-segments-cases](study-cn-segments-cases.md) CS1). Not yet: Plots |
 | STV-CD-1 | ✅ | B | "loading clinical data…" until the first page; later pages and queries cover the rows with "updating…" |
 | STV-CD-2 | N/A | C | No row limit: the table pages in the database (`lib/study-view-clinical-tab.ts:28-32`; [clinical-tab-cases](clinical-tab-cases.md) CT9), so the product limit and its message do not apply. Not a legacy bug, so N/A rather than 🐞 ok |
 | STV-CD-3 | 🟡 | BC | Patient ID and Sample ID (links), then each visible clinical-attribute chart by priority then name ([clinical-tab-cases](clinical-tab-cases.md) CT2, CT5). Several studies: the shared table's study column, not "Cancer Study". No header tooltip with description and id yet |
@@ -285,7 +285,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-STM-10 | ❌ | C | No group counts |
 | STV-STM-11 | ✅ | C | Gene × sample limit 1,000,000 refused in the query dialog in legacy's words (PORTAL-PARITY, ticked) |
 | STV-STM-12 | 🐞 ok | C | No row limit (the table pages in the database) and no 500-row download cap (clinical-tab-cases CT7, CT9, CT12) |
-| STV-STM-13 | 🟡 | BC | ↓ Offered when a selected study holds segments (the study list's `seg` flag), read for at most 20,000 selected samples ✅; but also hidden at 0 selected samples (`app/lab/page.tsx:445, 560`; Q4 shows only Summary), where the portal counts segments over every cohort sample |
+| STV-STM-13 | ✅ | BC | Offered when a selected study holds segments (the study list's `seg` flag), at 0 selected samples too ("No segmented copy-number data for the selected 0 samples."), read for at most 20,000 selected samples |
 
 ---
 
@@ -294,6 +294,4 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 Fixed since the first audit (#189): the filters can now be shared and restored (Copy link and a reload keep them). The 30-study-summary bugs of 2026-11-11 are fixed too (#188).
 
 Found on 2026-11-18 (master `bc53b944`):
-- **CN Segments disappears at 0 selected samples** (`app/lab/page.tsx:445, 560`): the empty-selection page shows only Summary, though the study holds segments (STV-STM-13, STV-TAB-1).
 - **The Clinical Data tab cannot change its columns**: Add chart is in the Summary block, hidden on that tab (`app/lab/page.tsx:572, 584`), and the table has no menu of its own (STV-CD-9, STV-MD-13).
-- **The Explore tab is not in the URL, and Clinical Data / CN Segments unmount when left** (`app/lab/page.tsx:563-566`): a reload or shared link opens Summary, and switching tabs resets the table's search, sort and page and the CN locus (STV-URL-1, STV-TAB-1).

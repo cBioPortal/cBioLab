@@ -92,6 +92,8 @@
 :where(hr) { color: var(--line); }
 
 :root {
+  /* a value list: nine 25 px rows (VALLIST_ROWS) under its 22 px header and its rule */
+  --vallist-h: calc(9 * 25px + 23px);
   /* Light or dark: the reader's choice (the header's toggle, app/_ui/theme-toggle.tsx, which sets
      data-theme on <html>), else the system's. Each colour is light-dark(light, dark), resolved by
      color-scheme, so the two palettes sit side by side and native controls and scrollbars follow. */
@@ -237,7 +239,7 @@ pre {
    grows into whatever height a taller neighbour sets, so no tile ends in empty space. */
 .facetgrid > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; }
 .facetgrid > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; max-height: none; }
-.facetgrid > .card > .vallist { min-height: 13.5rem; }
+.facetgrid > .card > .vallist { min-height: var(--vallist-h); }
 .facetgrid > .card > :is(.generows, .sbrows) { min-height: 20rem; }
 /* Studies and data types are dense multi-column rows (see .sbrow/.dtrow's own
    grid-template-columns) that read as cramped at one tile's width. */
@@ -563,9 +565,11 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* Explore: high-cardinality categorical facets as a ranked list (portal table) */
 .vallist {
+  /* checkbox · name · bar · count · share, shared by the rows and their header */
+  --valrow-cols: calc(0.75rem + 2px) 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
   margin-top: 0.25rem;
   /* every value is present; the list scrolls rather than being trimmed */
-  max-height: 13.5rem; overflow-y: auto; overscroll-behavior: contain;
+  max-height: var(--vallist-h); overflow-y: auto; overscroll-behavior: contain;
 }
 .vlistfoot { display: block; margin-top: var(--s1); }
 .valrow {
@@ -573,12 +577,19 @@ main.analysis-main { max-width: min(132rem, 100%); }
      relative size, deliberately small so the label and the number stay the
      content. Declare a column for EVERY child: adding the share without one
      wrapped it to a second line under each value. */
-  display: grid; grid-template-columns: calc(0.75rem + 2px) 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
+  display: grid; grid-template-columns: var(--valrow-cols);
   gap: 0 0.6rem; align-items: center; width: 100%;
+  /* the portal's table row (STS-TBL-7): 25 px whatever the font, as VALROW_H in pick-list.tsx */
+  height: 25px; box-sizing: border-box;
   background: none; border: none; padding: 0.12rem 0; border-radius: var(--r-sm);
   font: inherit; font-size: var(--t-md); color: var(--ink); text-align: left; cursor: pointer;
 }
 .valrow:hover { background: var(--code-bg); }
+/* the portal's table header: # and Freq over their columns */
+.valhead { display: grid; grid-template-columns: var(--valrow-cols); gap: 0 0.6rem; width: 100%; height: 22px; box-sizing: border-box; align-items: center; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
+.valhead > span:nth-child(n + 4) { text-align: right; }
+/* the search box and Select all / Deselect all under a list that scrolls */
+.vsearch { display: flex; align-items: center; gap: var(--s1); margin-top: var(--s1); }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
    below it, not a boxed, rounded outline — this is a dense list, not a card. */
 .valrow.on { background: var(--accent-soft); border-radius: 0; }

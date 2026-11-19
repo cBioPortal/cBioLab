@@ -90,7 +90,7 @@ const P1_SAMPLES = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", type:
 const MUT: Row[] = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", gene: "KRAS", proteinChange: "G12D", oncogenicity: "Oncogenic", level: "LEVEL_1",
   mutationType: "Missense_Mutation", copy: null, freq: 12.345, vaf: 10 / 57, altCount: "", refCount: null, start: "25398284" }];
 const CNA: Row[] = [{ cohort: "A", study: "s1", patient: "P1", sid: "S1a", gene: "MYC", cna: "AMP", oncogenicity: "Likely Oncogenic", level: "", cytoband: "8q24.21", freq: 3.06 }];
-const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?: Row[]; profiled?: Row[] } = {}): Tables => (table, src) => {
+const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?: Row[]; profiled?: Row[]; vafs?: Row[] } = {}): Tables => (table, src) => {
   switch (table) {
     case "alterations": return o.list ?? LIST;
     // the cohort's samples of the patient: the source filters the patient's samples to the cohort's
@@ -101,6 +101,7 @@ const study = (o: { list?: Row[]; samples?: Row[]; mut?: Row[]; cna?: Row[]; sv?
     // the mixed-panel counts: no mixed panel unless a test supplies rows
     case "alterations:mixed-mutations": case "alterations:mixed-cna": return [];
     case "alterations:profiled": return o.profiled ?? [];
+    case "alterations:vafs": return o.vafs ?? [];
     default: throw new Error("unexpected table " + table);
   }
 };
@@ -331,6 +332,11 @@ describe("alterations: a federation peer that serves patient alterations", () =>
     assert.ok(p.reqs.some((r) => r.table === "alterations:mutations" && r.oncokbPin === "local-v1"), "the peer is told this instance's pin");
   });
 
+  test("PAT-STM-7: no VAF plot values for the peer's patient (the peer pages its own tables)", async () => {
+    const v = await run({}, ctx({ A: cohort({ p: 2 }) }, { p: peer(study({ vafs: [{ sid: "S1a", vafs: [0.5] }] })) }));
+    assert.equal(alt(v).vafs, undefined);
+  });
+
   test("a named patient the peer's list leaves out is checked for membership by the peer", async () => {
     const p = peer(study({ list: [LIST[0], { ...LIST[1], _out: true }] }));
     const ok = await run({ patient: { study: "p", id: "P2" } }, ctx({ A: cohort({ p: 2 }) }, { p }));
@@ -438,6 +444,40 @@ describe("allele frequency and per-sample reads", () => {
     const bare = await cell([{ ...MUT[0], cohortN: 3, cohortKwN: 0, cohortOf: 534, keyword: "" }], "gene");
     assert.deepEqual(bare.t.rows[0].detail?.cohort, { n: 3, of: 534 });
     assert.equal((await cell(MUT, "gene")).t.rows[0].detail?.cohort, undefined, "no counts read, none carried");
+  });
+});
+
+describe("not-profiled samples (PAT-GP-2)", () => {
+  /** the mutations table's SQL as the run asks it, with the result */
+  const asked = async (view: Partial<AlterationsView>, mut: Row[] = MUT) => {
+    let sql = "";
+    const base = study({ mut });
+    const t: Tables = (table, src) => { if (table === "alterations:mutations") sql = src.with; return base(table, src); };
+    const m = alt(await run(view, one(t))).tables.mutations!;
+    return { sql, m };
+  };
+  test("with several samples in view, each row's panel coverage is worked out and its uncovered samples ride in its detail", async () => {
+    const { sql, m } = await asked({}, [{ ...MUT[0], notProfiled: ["S1b"] }]);
+    assert.match(sql, /miss AS \(SELECT gene, length\(np\) AS n, np FROM/);
+    assert.deepEqual(m.rows[0].detail?.notProfiled, ["S1b"]);
+  });
+  test("PAT-GP-2: the Gene panel column shown asks for coverage, even with one sample in view", async () => {
+    const { sql } = await asked({ samples: "cohort", mutations: { columns: ["gene", "genePanel"] } });
+    assert.match(sql, /spn AS/);
+    assert.doesNotMatch((await asked({})).sql, /spn AS/, "hidden: two samples work out the coverage, not the panels");
+    assert.match(sql, /miss AS \(SELECT gene/);
+  });
+  test("PAT-GP-2: the cell shows the panels with the unprofiled samples' too, in the detail; the column's value is the download's", async () => {
+    const { m } = await asked({ mutations: { columns: ["gene", "genePanel"] } }, [{ ...MUT[0], genePanel: "IMPACT505", genePanelShown: "IMPACT505, IMPACT468" }]);
+    assert.equal(m.rows[0].values[m.columns.findIndex((c) => c.id === "genePanel")], "IMPACT505");
+    assert.equal(m.rows[0].detail?.genePanelShown, "IMPACT505, IMPACT468");
+    const same = await asked({ mutations: { columns: ["gene", "genePanel"] } }, [{ ...MUT[0], genePanel: "IMPACT505", genePanelShown: "IMPACT505" }]);
+    assert.equal(same.m.rows[0].detail?.genePanelShown, undefined, "the same list is not carried twice");
+  });
+  test("one sample in view: no coverage asked, nothing in the detail", async () => {
+    const { sql, m } = await asked({ samples: "cohort" }, [{ ...MUT[0], notProfiled: [] }]);
+    assert.doesNotMatch(sql, /miss AS/);
+    assert.equal(m.rows[0].detail?.notProfiled, undefined);
   });
 });
 
@@ -582,4 +622,20 @@ describe("PAT-NP-1 / PAT-CNA-2 / PAT-SV-2: which samples a study profiled", () =
 
   // NP3 skipped: the harness's peer resolver serves only alterations tables through patientRows and has no
   // "alterations:profiled" mode, so there is no peer behaviour here to assert.
+});
+
+describe("alterations: the VAF plot's values (PAT-STM-7)", () => {
+  test("each sample's allele frequencies, read over the Mutations table's rows under genesProfiled; none for a page request", async () => {
+    const seen: RowSource[] = [];
+    const t: Tables = (table, src) => { if (table === "alterations:vafs") seen.push(src); return study({ vafs: [{ sid: "S1a", vafs: ["0.175", 0.5] }] })(table, src); };
+    const a = alt(await run({}, one(t)));
+    assert.deepEqual(a.vafs, { S1a: [0.175, 0.5] });
+    assert.match(seen[0].with, /FROM g ARRAY JOIN reads AS x GROUP BY sid/, "genesProfiled any: every row");
+    assert.doesNotMatch(seen[0].with, /cohortOf|genomic_event_derived/, "none of the table's cohort counts");
+    await run({ genesProfiled: "all" }, one(t));
+    assert.match(seen[1].with, /FROM g ARRAY JOIN reads AS x LEFT JOIN miss ON miss\.gene = g\.gene WHERE ifNull\(miss\.n, 0\) = 0 GROUP BY sid/,
+      "genesProfiled all: the rows whose gene every sample in view was profiled for, as the table keeps them");
+    const page = alt(await run({ patient: { study: "s1", id: "P1" } }, one(t, { table: "mutations", page: { offset: 0, limit: 25 } })));
+    assert.equal(page.vafs, undefined);
+  });
 });

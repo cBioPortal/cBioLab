@@ -10,6 +10,7 @@
 // Unknown fields are kept (parseBody), so an addition to the document needs no change here.
 // Browser-safe: the client imports it.
 import { z } from "zod";
+import { PAGE_ROWS_MAX } from "./table-pager.ts";
 import type { CohortDef, View } from "./types.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
@@ -124,7 +125,7 @@ export const ViewPageRequest = z.object({
   doc: DocEnvelope,
   view: z.number().int().min(0),
   offset: z.number().int().min(0).default(0),
-  limit: z.number().int().min(1).max(1000).default(25),
+  limit: z.number().int().min(1).max(PAGE_ROWS_MAX).default(25),
   values: z.string().optional(),
   /** which of the view's tables, for a view that holds several (the alterations view's "mutations", "cna", "sv"; a datafiles view's files, "profile:<profile>" among them) */
   table: z.string().max(120).optional(),

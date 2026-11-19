@@ -29,6 +29,7 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
     <div className="pb">
       {tips.node}
       <DataTable t={t} query={specQuery(spec)} updating={updating} vi={vi} docJson={docJson} unit={t.gene + " mutations"} countNote={portalDuplicatesNote(t.duplicates, "mutation", "mutations")} {...(t.kept ? { kept: t.kept } : {})} onQuery={onQuery}
+        pager="showMore"
         downloadFormat="table-tsv"
         num={(id, x) => id === "vafNormal" ? String(x) : x.toLocaleString()}
         hot={hover && posAt >= 0 ? (r) => rowAtStem(hover, t.gene, r.values[posAt]) : undefined}

@@ -65,6 +65,11 @@ export interface AlterationsResult extends TableRows<string | number | null> {
    * … not profiled for …" alerts. Absent for a peer's patient.
    */
   profiling?: Record<"mutations" | "cna" | "sv", { study: boolean; profiled: string[] }>;
+  /**
+   * the VAF plot's values (PAT-STM-7): for each sample in view with allele counts, its mutations' allele
+   * frequencies, over the Mutations table's rows under genesProfiled; absent for a peer's patient
+   */
+  vafs?: Record<string, number[]>;
   /** the OncoKB version the annotation columns read, or null when none is pinned */
   oncokbPin: string | null;
 }

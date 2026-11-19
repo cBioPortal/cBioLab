@@ -62,6 +62,27 @@ describe("the alterations view's tables", () => {
     // the denominator stays the samples profiled for the gene (invariant 7)
     assert.match(sql, /fp AS \(SELECT pg\.gene AS gene/);
   });
+  test("PAT-GP-2: with panel coverage worked out, each row names the samples in view whose panels leave its gene out, A to Z; without, none", () => {
+    for (const t of ["mutations", "cna"] as const) {
+      const sql = alterationSource(t, part, "P-1", "db", null, [], "patient", { genes: "any", inAll: true }).with;
+      assert.match(sql, /arraySort\(groupArrayIf\(replaceOne\(vs\.su, 'msk_chord_2024_', ''\), vs\.su NOT IN \(SELECT su FROM pan WHERE panel = 'WES'\) AND \(gg\.gene, vs\.su\) NOT IN \(SELECT gene, su FROM cov\)\)\) AS np/, t);
+      assert.match(sql, /miss AS \(SELECT gene, length\(np\) AS n, np FROM/, t);
+      assert.match(sql, /AS inAll, miss\.np AS notProfiled/, t);
+      assert.match(alterationSource(t, part, "P-1", "db", null, []).with, /AS inAll, CAST\(\[\] AS Array\(String\)\) AS notProfiled/, t);
+      // PAT-GP-2: the Gene panel values, each sample's panel in sample order (one a sample, WES left out: N/A), asked for with panels
+      const gp = alterationSource(t, part, "P-1", "db", null, ["P-1-T03", "P-1-T01"], "patient", { genes: "any", inAll: true, panels: true }).with;
+      assert.match(gp, /spn AS \(SELECT CAST\(\(groupArray\(s\), groupArray\(sp\)\), 'Map\(String, String\)'\) AS m FROM \(\n {2}SELECT replaceOne\(su, 'msk_chord_2024_', ''\) AS s, min\(panel\) AS sp FROM pan WHERE panel != 'WES' GROUP BY s\)\)/, t);
+      const seq = "arrayConcat\\(\\['P-1-T03', 'P-1-T01'\\], arrayFilter\\(s -> NOT has\\(\\['P-1-T03', 'P-1-T01'\\], s\\), arrayDistinct\\(arrayConcat\\(splitByString\\(', ', g\\.samples\\), miss\\.np\\)\\)\\)\\)";
+      const list = (keep: string) => "arrayStringConcat\\(arrayMap\\(s -> if\\(mapContains\\(spn\\.m, s\\), spn\\.m\\[s\\], 'N\\/A'\\), arrayFilter\\(s -> " + keep + ", " + seq + "\\)\\), ', '\\)";
+      // the column's value is the portal's download: carrying samples profiled for the gene; the cell adds the unprofiled
+      assert.match(gp, new RegExp(list("has\\(splitByString\\(', ', g\\.samples\\), s\\) AND NOT has\\(miss\\.np, s\\)") + " AS genePanel, "), t);
+      assert.match(gp, new RegExp(list("has\\(splitByString\\(', ', g\\.samples\\), s\\) OR has\\(miss\\.np, s\\)") + " AS genePanelShown"), t);
+      assert.match(gp, /CROSS JOIN spn/, t);
+      const bare = alterationSource(t, part, "P-1", "db", null, [], "patient", { genes: "any", inAll: true }).with;
+      assert.match(bare, /'' AS genePanel, '' AS genePanelShown/, t + ": coverage without panels, no panels");
+      assert.doesNotMatch(bare, /spn/, t);
+    }
+  });
   test("samples: \"cohort\" reads only the cohort's samples, in every table and in the patient list's counts", () => {
     const inCohort = /IN \(SELECT sid FROM ck\)/;
     for (const t of ALTERATION_TABLES) {
