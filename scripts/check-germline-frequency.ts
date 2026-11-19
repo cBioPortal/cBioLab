@@ -16,6 +16,15 @@
  * (MutationUtils germlineMutationRate), so PTEN is 3 of 5 = 60.0% and KRAS 0 of 5. A sample alone
  * counts 1 in the denominator when listed, 0 when not.
  *
+ * L1 the Somatic / Germline badges' filter on the Mutations table (MUT-FM-2): the mutations view for
+ * PTEN with filters.status keeps the rows whose Mutation_Status, lower-cased, is exactly the value
+ * (legacy FilterUtils applyDefaultMutationStatusFilter), so neither Germline_LOH nor a blank status
+ * matches either badge; no badge on ({ values: [] }) keeps no row. PTEN's 8 rows:
+ *   equals "germline"  FX-P12-T1, FX-P13-T1, FX-P14-T1                     -> 3 rows
+ *   equals "somatic"   FX-P10-T1, FX-P29-T1 ×2                              -> 3 rows
+ *   values []          none                                                -> 0 rows
+ *   no filter          all 8 (FX-P15-T1 Germline_LOH and FX-P17-T1 blank in neither of the above)
+ *
  * Run: node --env-file=.env.local scripts/check-germline-frequency.ts (connection b must be the
  * fixture: `npm run peer-db` prints its CLICKHOUSE2_* lines).
  */
@@ -25,6 +34,8 @@ import { connById } from "../lib/ch.ts";
 import { PatientLevelResolver } from "../lib/federation.ts";
 import { buildLollipopGene } from "../lib/lollipop.ts";
 import { runHotspots } from "../lib/views/hotspots/run.ts";
+import { runMutations } from "../lib/views/mutations/run.ts";
+import type { ColumnFilter } from "../lib/table-query.ts";
 import type { ViewRun } from "../lib/views/run.ts";
 import type { CohortDef } from "../lib/types.ts";
 import type { HotspotGene } from "../lib/views/hotspots/types.ts";
@@ -109,6 +120,29 @@ async function pass(label: string, pg: number, pOf: number, singles: [string, st
     const lines = germlineLines(v);
     ok(`G9a ${label}: the card's one germline line is PTEN's "${card}"`, lines.length === 1 && lines[0] === card, JSON.stringify(lines));
   } catch (e) { ok(`G1 G2 G9a ${label}: the hotspots view`, false, "threw: " + String((e as Error).message).slice(0, 200)); }
+}
+
+/** the sample ids of PTEN's mutations-view rows under these filters, sorted, or why there are none */
+const ptenSamples = async (filters?: Record<string, ColumnFilter>): Promise<string[] | string> => {
+  try {
+    const res = await runMutations({ kind: "mutations", gene: "PTEN", cohorts: ["c"], rows: 1000, ...(filters ? { filters } : {}) } as never, ctx()) as
+      { mutations?: { rows: { sample: string }[] }; error?: string };
+    if (!res.mutations) return "refused: " + String(res.error || JSON.stringify(res).slice(0, 200));
+    return res.mutations.rows.map((r) => r.sample).sort();
+  } catch (e) { return "threw: " + String((e as Error).message).slice(0, 200); }
+};
+const L1: [string, Record<string, ColumnFilter> | undefined, string[]][] = [
+  ["no status filter: all 8 rows", undefined,
+    ["FX-P10-T1", "FX-P12-T1", "FX-P13-T1", "FX-P14-T1", "FX-P15-T1", "FX-P17-T1", "FX-P29-T1", "FX-P29-T1"]],
+  ["status equals \"germline\": Germline, germline, GERMLINE (3 rows; not Germline_LOH, not blank)", { status: { op: "equals", value: "germline" } },
+    ["FX-P12-T1", "FX-P13-T1", "FX-P14-T1"]],
+  ["status equals \"somatic\": FX-P10 and FX-P29 ×2 (3 rows; not blank)", { status: { op: "equals", value: "somatic" } },
+    ["FX-P10-T1", "FX-P29-T1", "FX-P29-T1"]],
+  ["status values []: no row", { status: { values: [] } }, []],
+];
+for (const [label, filters, want] of L1) {
+  const got = await ptenSamples(filters);
+  ok(`L1 PTEN ${label}`, JSON.stringify(got) === JSON.stringify(want), JSON.stringify(got));
 }
 
 const dropScratch = async () => {

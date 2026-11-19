@@ -8,7 +8,7 @@ import { ViewHead } from "../view-chrome.tsx";
 import { placement } from "./parts.tsx";
 
 function HotspotsCard({ ctx, v, vi }: CardProps) {
-  const { busy, cohortChoice, docView, menuOpenRef, openGenes, updateViewLocal } = ctx;
+  const { busy, cohortChoice, docView, menuOpenRef, openGenes, updateView, updateViewLocal } = ctx;
   return <>
     {v.kind === "hotspots" && v.hotspots && <>
       <ViewHead menuStore={menuOpenRef.current} v={v} title="Mutations" cohorts={cohortChoice(vi, docView(vi), 1)} sub="lollipop by protein position, as the portal's mutation tab draws it" {...placement(ctx, vi)}
@@ -21,6 +21,8 @@ function HotspotsCard({ ctx, v, vi }: CardProps) {
         const nx = { ...vv }; if (c) nx.codons = c; else delete nx.codons; return nx;
       })} yMax={docView(vi).yMax} onYMax={(y) => updateViewLocal(vi, (vv: any) => {
         const nx = { ...vv }; if (y) nx.yMax = y; else delete nx.yMax; return nx;
+      })} table={docView(vi).table} onTable={(t) => updateView(vi, (vv: any) => {
+        const nx = { ...vv }; if (t) nx.table = t; else delete nx.table; return nx;
       })} />
     </>}
   </>;

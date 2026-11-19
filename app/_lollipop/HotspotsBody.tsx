@@ -7,7 +7,8 @@
 // carries the summary and the selection in its caption instead.
 import React, { useMemo, useRef, useState } from "react";
 import type { ViewResultOf } from "../../lib/types.ts";
-import { filterHotspotGene, clickCodon, defaultYMax, lollipopGeneEmpty, nextYMax, type CodonSelection } from "../../lib/lollipop.ts";
+import { filterHotspotGene, clickCodon, defaultYMax, lollipopGeneEmpty, nextYMax, hasGermlineRate, statusFilter, statusSelection, withStatusFilter, STATUS_COLUMN, type CodonSelection, type StatusSelection } from "../../lib/lollipop.ts";
+import type { LollipopRows } from "../../lib/federation.ts";
 import { AlterationGrid, classesOf } from "./AlterationGrid.tsx";
 import { TranscriptSummary } from "./TranscriptSummary.tsx";
 import { ColorLegend } from "./ColorLegend.tsx";
@@ -21,23 +22,30 @@ import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
 import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
 
-/** The transcript and its ids, and the somatic (and, when any, germline) mutation frequency — the portal's GeneSummary. */
-function GeneSummary({ g, grch38 }: { g: HotspotGene; grch38: boolean }) {
+/**
+ * The transcript and its ids, and the somatic (and, when any, germline) mutation frequency — the portal's GeneSummary.
+ * With a germline mutation the two rates are the portal's Somatic / Germline badges (MutationStatusSelector): each
+ * toggles that status in or out of the tab's mutations; the rates themselves never change with them.
+ */
+function GeneSummary({ g, grch38, status, onStatus }: { g: HotspotGene; grch38: boolean; status: StatusSelection; onStatus?: (next: StatusSelection) => void }) {
   const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
+  const germline = hasGermlineRate(g);
+  const badges = germline && !!onStatus;
+  const rate = (key: keyof StatusSelection, label: string, value: string, tip: string) => badges
+    ? <button type="button" className={"lp-freq lp-status w-full text-left" + (status[key] ? "" : " off")} aria-pressed={status[key]}
+        data-tip={tip + " — click to " + (status[key] ? "leave out" : "show") + " " + key + " mutations"} onClick={() => onStatus!({ ...status, [key]: !status[key] })}>
+        <span>{label}</span> <b>{value}</b>
+      </button>
+    : <div className="lp-freq" data-tip={tip}><span>{label}</span> <b>{value}</b></div>;
   return (
     <>
       <TranscriptSummary ids={g.ids} gene={g.gene} grch38={grch38} />
       {/* the portal shows no frequency for a gene with no mutation (ResultsViewMutationMapper) */}
       {!lollipopGeneEmpty(g) && <div className="lp-summary">
-        <div className="lp-freq" data-tip={g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene}>
-          <span>Somatic Mutation Frequency</span> <b>{freq}</b>
-        </div>
+        {rate("somatic", "Somatic Mutation Frequency", freq, g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene)}
         {/* the portal adds the germline rate only when some sample has a germline mutation (MutationRateSummary), over the germline-consented samples where a study lists them */}
-        {(g.germlineSamples ?? 0) > 0 && (g.germlineCohortSamples ?? 0) > 0 && (
-          <div className="lp-freq" data-tip={(g.germlineSamples ?? 0).toLocaleString() + " of " + (g.germlineCohortSamples ?? 0).toLocaleString() + " samples carry a germline mutation in " + g.gene}>
-            <span>Germline Mutation Frequency</span> <b>{fmtShare((g.germlineSamples ?? 0) / (g.germlineCohortSamples ?? 1))}</b>
-          </div>
-        )}
+        {germline && rate("germline", "Germline Mutation Frequency", fmtShare((g.germlineSamples ?? 0) / (g.germlineCohortSamples ?? 1)),
+          (g.germlineSamples ?? 0).toLocaleString() + " of " + (g.germlineCohortSamples ?? 0).toLocaleString() + " samples carry a germline mutation in " + g.gene)}
       </div>}
     </>
   );
@@ -105,7 +113,9 @@ function SelectedCodons({ g, selected, onSelect }: { g: HotspotGene; selected: n
   );
 }
 
-export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons, yMax, onYMax }: { v: ViewResultOf<"hotspots">; hide?: string[]; onHide: (next: string[] | undefined) => void;
+export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons, yMax, onYMax, table, onTable }: { v: ViewResultOf<"hotspots">; hide?: string[]; onHide: (next: string[] | undefined) => void;
+  /** the table query that narrows the plot (the view's `table`), and where the Somatic / Germline badges write its status filter (omitted: no badges) */
+  table?: LollipopRows; onTable?: (next: LollipopRows | undefined) => void;
   /** the stems selected on each gene's plot, and where a click writes the next selection */
   codons?: CodonSelection; onCodons: (next: CodonSelection | undefined) => void;
   /** each gene's y-axis maximum the reader set, and where a change writes it (omitted: no control) */
@@ -149,7 +159,8 @@ export function HotspotsBody({ v, hide: hideList, onHide, codons, onCodons, yMax
         <div key={d.gene.gene} className="lp-gene">
           <GenePlot gene={d.gene} selected={picked(d.gene.gene)} onSelect={(next) => pick(d.gene.gene, next)} annotated={v.annotated !== false} yMax={yMax?.[d.gene.gene]} onYMax={(n) => { if (!onYMax) return; const all = { ...(yMax || {}) }; if (n == null) delete all[d.gene.gene]; else all[d.gene.gene] = n; onYMax(Object.keys(all).length ? all : undefined); }} />
           <div className="lp-side">
-            <GeneSummary g={genes[i]} grch38={!!v.grch38} />
+            <GeneSummary g={genes[i]} grch38={!!v.grch38} status={statusSelection(table && table.gene === genes[i].gene ? table.filters?.[STATUS_COLUMN] : undefined)}
+              {...(onTable ? { onStatus: (sel: StatusSelection) => onTable(withStatusFilter(table, genes[i].gene, statusFilter(sel))) } : {})} />
             <AlterationGrid tally={genes[i].tally} classes={classes} hide={hide} onHide={set} annotated={v.annotated !== false} />
           </div>
         </div>

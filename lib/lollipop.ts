@@ -3,7 +3,7 @@
 // from the portal is a bug here rather than a design choice. Pure except fetchProteinInfo.
 import type { LollipopReport } from "./federation.ts";
 import type { HotspotGene, LollipopPosition, LollipopDomain } from "./views/hotspots/types.ts";
-import type { TableQuery } from "./table-query.ts";
+import type { ColumnFilter, TableQuery } from "./table-query.ts";
 
 // ---- mutation types: getCanonicalMutationType / getProteinImpactTypeFromCanonical ----------
 
@@ -470,4 +470,50 @@ export function lollipopNarrowing<Q extends TableQuery>(q: Q): Q | null {
   const out = { ...q } as Q;
   delete out.filters; delete out.search; delete out.sort;
   return { ...out, ...(search ? { search } : {}), ...(Object.keys(filters).length ? { filters } : {}) };
+}
+
+/** the Somatic / Germline badges beside a gene's mutation frequencies: which statuses the tab keeps (MUT-HD-3, MUT-FM-2) */
+export interface StatusSelection { somatic: boolean; germline: boolean }
+
+/** the mutation table's column the badges filter: the call's mutation status */
+export const STATUS_COLUMN = "status";
+
+/**
+ * The badges' selection read from the table's filter on the status column: none is both, an `equals`
+ * on one status is that one alone, an empty value list is neither. A filter set some other way (the
+ * column's own menu) reads as both, since the badges then filter nothing of their own.
+ */
+export function statusSelection(f: ColumnFilter | undefined): StatusSelection {
+  if (f && "op" in f && f.op === "equals") {
+    const v = f.value.toLowerCase();
+    if (v === "somatic" || v === "germline") return { somatic: v === "somatic", germline: v === "germline" };
+  }
+  if (f && "values" in f && Array.isArray(f.values) && f.values.length === 0) return { somatic: false, germline: false };
+  return { somatic: true, germline: true };
+}
+
+/**
+ * The filter for a selection, as the portal's mutation status filter keeps rows (react-mutation-mapper
+ * onFilterOptionSelect, FilterUtils): both selected is no filter; one keeps the rows whose status,
+ * lower-cased, is that one (a blank status is neither); none keeps no row.
+ */
+export function statusFilter(sel: StatusSelection): ColumnFilter | undefined {
+  if (sel.somatic && sel.germline) return undefined;
+  if (sel.somatic || sel.germline) return { op: "equals", value: sel.somatic ? "somatic" : "germline" };
+  return { values: [] };
+}
+
+/** the lollipop's `table` with its status filter set to `f` (removed when undefined); undefined when nothing is left of it */
+export function withStatusFilter<T extends Pick<TableQuery, "search" | "filters" | "columns"> & { gene: string }>(table: T | undefined, gene: string, f: ColumnFilter | undefined): T | undefined {
+  const base = table && table.gene === gene ? table : ({ gene } as T);
+  const filters: Record<string, ColumnFilter> = { ...(base.filters || {}) };
+  if (f) filters[STATUS_COLUMN] = f; else delete filters[STATUS_COLUMN];
+  const next = { ...base } as T;
+  if (Object.keys(filters).length) next.filters = filters; else delete next.filters;
+  return next.search || next.filters ? next : undefined;
+}
+
+/** the portal shows a germline rate, and with it the Somatic / Germline badges, only when some sample has a germline mutation (MutationRateSummary) */
+export function hasGermlineRate(g: Pick<HotspotGene, "germlineSamples" | "germlineCohortSamples">): boolean {
+  return (g.germlineSamples ?? 0) > 0 && (g.germlineCohortSamples ?? 0) > 0;
 }
