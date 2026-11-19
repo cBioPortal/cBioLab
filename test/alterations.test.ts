@@ -83,6 +83,15 @@ describe("the alterations view's tables", () => {
       assert.doesNotMatch(bare, /spn/, t);
     }
   });
+  test("PAT-GP-2: the SV table's Gene panel column, as the portal's (StructuralVariantTableWrapper genePanelProps): each sample's structural-variant panel, site 1's gene deciding whether it was profiled", () => {
+    const sv = alterationSource("sv", part, "P-1", "db", null, ["P-1-T03", "P-1-T01"], "patient", { genes: "any", inAll: false, panels: true }).with;
+    assert.match(sv, /alteration_type = 'STRUCTURAL_VARIANT'/);
+    assert.match(sv, /max\(tumorReadCount\) AS tumorReadCount, gene1 AS gene\n/, "site 1's gene, as the portal's data[0].entrezGeneId = site1EntrezGeneId");
+    assert.match(sv, /AS genePanel, /); assert.match(sv, /AS genePanelShown FROM g LEFT JOIN miss ON miss\.gene = g\.gene CROSS JOIN spn\)/);
+    const bare = alterationSource("sv", part, "P-1", "db", null, []).with;
+    assert.match(bare, /'' AS genePanel, '' AS genePanelShown FROM g\)/, "not asked for, not worked out");
+    assert.doesNotMatch(bare, /sample_to_gene_panel_derived|gene1 AS gene/);
+  });
   test("samples: \"cohort\" reads only the cohort's samples, in every table and in the patient list's counts", () => {
     const inCohort = /IN \(SELECT sid FROM ck\)/;
     for (const t of ALTERATION_TABLES) {

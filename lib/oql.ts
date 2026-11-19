@@ -24,7 +24,7 @@ import { finiteSql } from "./sql-number.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { PORTAL_TYPE_CLASS, oqlHasMutationOql } from "./oql-match.ts";
 export { oqlHasMutationOql };
-import { driverCondSql } from "./driver-sql.ts";
+import { driverCondSql, germlineCondSql } from "./driver-sql.ts";
 import { svDriverKeysSql } from "./sv-oncokb.ts";
 import { hotspotKeysSql } from "./hotspots.ts";
 import { resolveDrivers, type DriverSettings } from "./driver-settings.ts";
@@ -222,10 +222,13 @@ const EVENT_ORDER = "multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'c
  * protein 4; `ev`, its label — the protein change, AMP or HOMDEL, the structural variant's event
  * info, or EXP / PROT HIGH or LOW). The same conditions as oqlCasesSql, row by row: a sample is in
  * oqlCasesSql's samples exactly when it has a row here. The rows name samples: patient-level SQL.
+ * With `notes`, a fourth column `note`, the portal's Download-tab text after a call (CaseAlterationTable,
+ * forDownload): " [germline]" for a germline mutation, then " (driver)" for a mutation or copy-number
+ * call that is a putative driver — by `drivers` (the page's settings), else OncoKB at the pin — or "".
  */
-export function oqlEventsSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB, drivers, hotspotPins }:
-  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string } & OqlDriverOpts): string {
-  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: "sample_unique_id", events: true, drivers, hotspotPins });
+export function oqlEventsSql(q: string, { oncokbPin, profiles, pins, study = STUDY, db = DB, drivers, hotspotPins, notes }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study?: string; db?: string; notes?: boolean } & OqlDriverOpts): string {
+  return oqlSelectSql(q, { oncokbPin, profiles, pins, study, db, caseCol: "sample_unique_id", events: true, drivers, hotspotPins, notes });
 }
 
 /**
@@ -257,8 +260,8 @@ export function expressionProfileFor(type: "EXP" | "PROT", profiles: string[] | 
  */
 export interface OqlDriverOpts { drivers?: DriverSettings; hotspotPins?: VariantPins }
 
-function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol, events, drivers, hotspotPins }:
-  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study: string; db: string; caseCol: string; events: boolean } & OqlDriverOpts): string {
+function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol, events, drivers, hotspotPins, notes }:
+  { oncokbPin?: string | null; profiles?: string[]; pins?: OqlPins; study: string; db: string; caseCol: string; events: boolean; notes?: boolean } & OqlDriverOpts): string {
   const parsed = parseOql(q);
   const settings = drivers === undefined ? undefined : resolveDrivers(drivers);
   // the driver rule of the settings, as a condition on the event `g` of `gene`
@@ -268,9 +271,16 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
     return driverCondSql(settings!, oncokbPin, "g", settings!.hotspots ? hotspotKeysSql(db, [study], [gene], hotspotPins!) : null, { db, studies: [study] });
   };
   const parts: string[] = [];
-  // what each part selects: the case alone, distinct; or, for events, the case with the event's order and label
-  const head = (t: "g" | "sd", order: string, label: string) => events
-    ? "SELECT replaceOne(" + t + "." + caseCol + ", " + sq(study + "_") + ", '') AS sid, " + order + " AS o, " + label + " AS ev\n"
+  // an event `g` of `genes` as the Download tab's text follows its call: germline, then putative driver (any source the settings name and the deployment can read)
+  const noteOf = (genes: string[]): string => {
+    const drv = settings
+      ? driverCondSql(settings, oncokbPin, "g", settings.hotspots && hotspotPins ? hotspotKeysSql(db, [study], genes, hotspotPins) : null, { db, studies: [study] })
+      : oncokbPin ? driverEventSql(oncokbPin, "g", { db, studies: [study] }) : "0";
+    return "concat(if(" + germlineCondSql("g") + ", ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND " + drv + ", ' (driver)', ''))";
+  };
+  // what each part selects: the case alone, distinct; or, for events, the case with the event's order and label (and note)
+  const head = (t: "g" | "sd", order: string, label: string, note = "''") => events
+    ? "SELECT replaceOne(" + t + "." + caseCol + ", " + sq(study + "_") + ", '') AS sid, " + order + " AS o, " + label + " AS ev" + (notes ? ", " + note + " AS note" : "") + "\n"
     : "SELECT DISTINCT replaceOne(" + t + "." + caseCol + ", " + sq(study + "_") + ", '') AS pid\n";
   // the plain event conditions of every gene, read in one pass over genomic_event_derived: one
   // subquery per gene had ClickHouse plan the view again for each
@@ -290,7 +300,7 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
       }
       if (!spec.range && !spec.driver) { plain.push({ gene, cond: specCond(spec) }); continue; }
       parts.push(
-        head("g", spec.range ? "1" : EVENT_ORDER, spec.range ? "g.mutation_variant" : EVENT_LABEL) +
+        head("g", spec.range ? "1" : EVENT_ORDER, spec.range ? "g.mutation_variant" : EVENT_LABEL, notes ? noteOf([gene]) : undefined) +
         "  FROM " + (spec.range ? mutationsWithPositions(db, study, gene) : db + ".genomic_event_derived g\n") +
         "  WHERE " + (spec.range ? "g.cancer_study_identifier = " + sq(study) : genomicStudySql(study, "g")) + "\n" +
         "    AND g.hugo_gene_symbol = " + sq(gene) + "\n" +
@@ -301,7 +311,7 @@ function oqlSelectSql(q: string, { oncokbPin, profiles, pins, study, db, caseCol
   }
   if (plain.length)
     parts.unshift(
-      head("g", EVENT_ORDER, EVENT_LABEL) +
+      head("g", EVENT_ORDER, EVENT_LABEL, notes ? noteOf([...new Set(plain.map((x) => x.gene))]) : undefined) +
       "  FROM " + db + ".genomic_event_derived g\n" +
       "  WHERE " + genomicStudySql(study, "g") + "\n" +
       "    AND g.hugo_gene_symbol IN (" + [...new Set(plain.map((x) => x.gene))].map(sq).join(", ") + ")\n" +

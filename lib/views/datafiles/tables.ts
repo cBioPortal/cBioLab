@@ -8,7 +8,9 @@ import { sq, genomicStudySql, mutationStudySql } from "../../compiler.ts";
 import { inCohortSamples, profiledCasesSql } from "../../cohort2.ts";
 import type { TablePart } from "../../mutation-table.ts";
 import type { QueryColumn, RowSource } from "../../table-query.ts";
-import { lineCtes, lineProfiled, type LinePlan, type StudyOpts } from "./sql.ts";
+import { lineCtes, lineProfiled, profiledIn, type CallKind, type DataType, type LinePlan, type StudyOpts } from "./sql.ts";
+import { parseOql, type OqlSpec } from "../../oql-parse.ts";
+import { specText } from "../../oql-match.ts";
 
 /** What a part's study reads: its own plan of the lines (the data types it holds) and its options. */
 export type StudyPlan = { lines: LinePlan[]; opts: StudyOpts };
@@ -24,30 +26,73 @@ export function lineColumns(lines: { line: string; gene: string }[]): FileColumn
   return lines.map((l, k) => ({ id: lines.filter((x) => x.gene === l.gene).length > 1 ? l.gene + "_" + (k + 1) : l.gene, name: l.line, numeric: false }));
 }
 
-/** The columns of each status table, in download order. */
-export function statusColumns(t: StatusTable, lines: { line: string; gene: string }[]): FileColumn[] {
+/** a case-table column of one gene's calls of one kind (the portal's hidden per-alteration columns) */
+export interface AltColumn extends FileColumn { gene: string; kind: CallKind }
+const KIND_OF: Partial<Record<OqlSpec["type"], CallKind>> = { MUT: "mut", CNA: "cna", SV: "sv", EXP: "exp", PROT: "prot" };
+
+/**
+ * The portal's per-alteration columns of the case table, hidden at first (CaseAlterationTable, after the line
+ * columns): per gene in query order, one per command of its lines as written back (parsedOQLAlterationToSourceOQL),
+ * each once, "<gene>: <command>", a later line's first (DownloadTab geneAlterationMap: _.union(this line's, the earlier)); a bare line's commands are the query's default OQL (`defaults`,
+ * buildDefaultOQLProfile: "AMP", "HOMDEL", "MUT", "FUSION"). A column reads its command's kind of call, so AMP
+ * and HOMDEL both read copy number, as the portal's.
+ */
+export function alterationColumns(lines: { gene: string; specs: OqlSpec[] }[], defaults: string[]): AltColumn[] {
+  const out: AltColumn[] = [];
+  const add = (gene: string, command: string, spec: OqlSpec) => {
+    const kind = KIND_OF[spec.type], name = gene + ": " + command;
+    if (kind && !out.some((c) => c.name === name)) out.push({ id: "alt_" + out.length, name, numeric: false, gene, kind });
+  };
+  for (const gene of [...new Set(lines.map((l) => l.gene))])
+    for (const l of lines.filter((x) => x.gene === gene).reverse())
+      for (const s of l.specs) {
+        if (s.type !== "ANY") { add(gene, specText(s), s); continue; }
+        for (const d of defaults) add(gene, d, parseOql(gene + ": " + d)[0].specs[0]);
+      }
+  return out;
+}
+
+/** The columns of each status table, in download order; the case table's per-alteration columns (`alts`) last. */
+export function statusColumns(t: StatusTable, lines: { line: string; gene: string }[], alts: AltColumn[] = []): FileColumn[] {
   const sample = { id: "sample", name: "Sample ID", numeric: false }, patient = { id: "patient", name: "Patient ID", numeric: false };
   if (t === "altered" || t === "unaltered") return [sample, patient];
   if (t === "matrix") return [sample, { id: "altered", name: "Altered (1 / 0 / NP)", numeric: false }, ...lineColumns(lines)];
-  return [{ id: "study", name: "Study ID", numeric: false }, sample, patient, { id: "altered", name: "Altered", numeric: false }, ...lineColumns(lines)];
+  return [{ id: "study", name: "Study ID", numeric: false }, sample, patient, { id: "altered", name: "Altered", numeric: false }, ...lineColumns(lines), ...alts];
 }
 export const STATUS_DEFAULTS = (t: StatusTable, lines: { line: string; gene: string }[]) => statusColumns(t, lines).map((c) => c.id);
 
-/** The parts' samples with their status per line: `ev<k>` (events matched, '' when none), `pa<k>` / `pf<k>` (profiled in any / every type). */
-function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan): { ctes: string; union: string; n: number } {
+const DATA_TYPE: Partial<Record<CallKind, DataType>> = { mut: "MUTATION", cna: "CNA", sv: "SV" };
+/**
+ * A per-alteration column's cell for sample `s.sid` (CaseAlterationTable generatePseudoOqlSummary): "not profiled" when
+ * its gene is off the sample's panel for the kind's data type (an EXP / PROT kind, never), whatever was called; else
+ * the calls of that kind every line of the gene matched, in line order, each once, with their notes; else "no alteration".
+ */
+function altCell(pre: string, lines: LinePlan[], c: AltColumn): string {
+  const ks = lines.flatMap((l, k) => (l.gene === c.gene ? [k] : []));
+  const type = DATA_TYPE[c.kind];
+  const profiled = !type ? "1" : lines.some((l) => l.gene === c.gene && l.types.includes(type)) ? profiledIn(pre, c.gene, type, "s.sid") : "0";
+  const calls = "arrayStringConcat(arrayDistinct(arrayConcat(" + ks.map((k) => "e" + k + ".k_" + c.kind).join(", ") + ")), ', ')";
+  return "multiIf(NOT " + profiled + ", 'not profiled', " + calls + " != '', " + calls + ", 'no alteration')";
+}
+
+/**
+ * The parts' samples with their status per line: `ev<k>` (events matched, '' when none; with `notes`, each with
+ * its germline / driver note), `pa<k>` / `pf<k>` (profiled in any / every type).
+ */
+function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan, notes: boolean, alts: AltColumn[] = []): { ctes: string; union: string; n: number } {
   let n = 0;
   const ctes: string[] = [], selects: string[] = [];
   parts.forEach((p, i) => {
     const { lines, opts } = plan(p.study);
     n = lines.length;
     const pre = "d" + i;
-    ctes.push("c" + i + " AS (" + p.cohortSql + "),\n" + lineCtes(pre, "c" + i, lines, opts));
+    ctes.push("c" + i + " AS (" + p.cohortSql + "),\n" + lineCtes(pre, "c" + i, lines, opts, { notes }));
     selects.push(
       "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord, s.pid AS patient, s.sid AS sid" +
       lines.map((l, k) => {
         const pr = lineProfiled(pre, l, "s.sid");
         return ",\n         e" + k + ".ev AS ev" + k + ", " + pr.any + " AS pa" + k + ", " + pr.every + " AS pf" + k;
-      }).join("") + "\n" +
+      }).join("") + alts.map((c, j) => ",\n         " + altCell(pre, lines, c) + " AS h" + j).join("") + "\n" +
       "  FROM (SELECT DISTINCT pid, sid FROM c" + i + ") s\n" +
       lines.map((_, k) => "  LEFT JOIN " + pre + "_e" + k + " e" + k + " ON e" + k + ".sid = s.sid\n").join(""));
   });
@@ -61,21 +106,23 @@ function statusRows(parts: TablePart[], plan: (study: string) => StudyPlan): { c
  * line's types); `altered` / `unaltered` — those samples alone; `matrix` — the portal's sample
  * matrix, 1 / 0 with NP where the sample is not profiled. Default order: altered first, then sample.
  */
-export function statusRowSource(t: StatusTable, parts: TablePart[], lines: { line: string; gene: string }[], plan: (study: string) => StudyPlan): RowSource {
+export function statusRowSource(t: StatusTable, parts: TablePart[], lines: { line: string; gene: string }[], plan: (study: string) => StudyPlan, alts: AltColumn[] = []): RowSource {
   if (!parts.length) throw new Error("statusRowSource needs at least one part");
-  const { ctes, union, n } = statusRows(parts, plan);
+  const caseAlts = t === "cases" ? alts : [];
+  const { ctes, union, n } = statusRows(parts, plan, t === "cases", caseAlts);
   const ks = Array.from({ length: n }, (_, k) => k);
   const status = "multiIf(" + ks.map((k) => "ev" + k + " != ''").join(" OR ") + ", 'altered', " + ks.map((k) => "pf" + k).join(" AND ") + ", 'unaltered', 'not profiled')";
   const derived = ks.map((k) => ",\n    multiIf(ev" + k + " != '', ev" + k + ", pa" + k + ", 'no alteration', 'not profiled') AS c" + k +
     ", multiIf(ev" + k + " != '', '1', pa" + k + ", '0', 'NP') AS m" + k).join("");
   const keep = t === "altered" ? "WHERE status = 'altered'" : t === "unaltered" ? "WHERE status = 'unaltered'" : "";
-  const cols = statusColumns(t, lines);
+  const cols = statusColumns(t, lines, caseAlts);
   const lineIds = lineColumns(lines).map((c) => c.id);
   const text = (c: FileColumn): string => {
     if (c.id === "sample") return "sid";
     if (c.id === "patient") return "patient";
     if (c.id === "study") return "study";
     if (c.id === "altered") return "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')";
+    if (c.id.startsWith("alt_")) return "h" + caseAlts.findIndex((a) => a.id === c.id);
     return (t === "matrix" ? "m" : "c") + lineIds.indexOf(c.id);
   };
   return {

@@ -35,28 +35,32 @@ cov AS (
     AND sp.alteration_type IN ('MUTATION_EXTENDED','COPY_NUMBER_ALTERATION','STRUCTURAL_VARIANT')
 ),
 sg AS (
-  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types, groupUniqArray(cov.pt) AS pts
+  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types, groupUniqArray(cov.pt) AS pts,
+         groupUniqArrayIf((cov.suid, indexOf(['KRAS','NRAS','HRAS'], cov.gene), alt.t), alt.t NOT IN ('', 'mutation', 'sv')) AS met
   FROM cov LEFT JOIN alt ON alt.suid = cov.suid AND alt.gene = cov.gene GROUP BY suid, gene
 ),
-sg2 AS (SELECT suid, gene, types, pts FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,
-        arrayDistinct(arrayFlatten(groupArray(pts))) AS pts FROM sg GROUP BY suid),
+sg2 AS (SELECT suid, gene, types, pts, met FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,
+        arrayDistinct(arrayFlatten(groupArray(pts))) AS pts, arrayFlatten(groupArray(met)) AS met FROM sg GROUP BY suid),
 u AS (
   SELECT samp.puid AS k, ifNull(grp.g, '') AS g, min(ifNull(grp.label, '')) AS label, sg2.gene AS gene,
-         arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types, arrayDistinct(arrayFlatten(groupArray(sg2.pts))) AS pts
+         arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types, arrayDistinct(arrayFlatten(groupArray(sg2.pts))) AS pts,
+         arrayDistinct(arrayFlatten(groupArray(sg2.met))) AS met
   FROM sg2 JOIN samp ON samp.suid = sg2.suid LEFT JOIN grp ON grp.suid = sg2.suid
   GROUP BY k, g, gene
 ),
 uall AS (SELECT k, '\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,
-         arrayDistinct(arrayFlatten(groupArray(pts))) AS pts FROM u GROUP BY k, gene),
-uu AS (SELECT k, g, label, gene, types, pts FROM u UNION ALL SELECT k, g, label, gene, types, pts FROM uall),
+         arrayDistinct(arrayFlatten(groupArray(pts))) AS pts, arrayDistinct(arrayFlatten(groupArray(met))) AS met FROM u GROUP BY k, gene),
+uu AS (SELECT k, g, label, gene, types, pts, met FROM u UNION ALL SELECT k, g, label, gene, types, pts, met FROM uall),
 uk AS (SELECT grp_, gene, label, types, arrayDistinct(arrayMap((t) -> multiIf(t IN ('amp', 'homdel'), 'cna', t IN ('mrnaHigh', 'mrnaLow'), 'mrna',
-         t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds, pts FROM (SELECT g AS grp_, gene, label, types, pts FROM uu))
+         t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds, pts, arrayMap((x) -> x.3, arraySort(met)) AS order_,
+         arrayFirst((t) -> t IN ('amp', 'homdel'), order_) AS cna1, arrayFirst((t) -> t IN ('mrnaHigh', 'mrnaLow'), order_) AS mrna1,
+         arrayFirst((t) -> t IN ('protHigh', 'protLow'), order_) AS prot1 FROM (SELECT g AS grp_, gene, label, types, pts, met FROM uu))
 SELECT grp_ AS grp, gene, min(label) AS label, count() AS profiled,
        countIf(length(types) > 0) AS altered,
-       countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND has(types, 'amp')) AS amp,
-       countIf(kinds = ['cna'] AND NOT has(types, 'amp')) AS homdel, countIf(kinds = ['sv']) AS sv,
-       countIf(kinds = ['mrna'] AND has(types, 'mrnaHigh')) AS mrnaHigh, countIf(kinds = ['mrna'] AND NOT has(types, 'mrnaHigh')) AS mrnaLow,
-       countIf(kinds = ['prot'] AND has(types, 'protHigh')) AS protHigh, countIf(kinds = ['prot'] AND NOT has(types, 'protHigh')) AS protLow,
+       countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND cna1 = 'amp') AS amp,
+       countIf(kinds = ['cna'] AND cna1 != 'amp') AS homdel, countIf(kinds = ['sv']) AS sv,
+       countIf(kinds = ['mrna'] AND mrna1 = 'mrnaHigh') AS mrnaHigh, countIf(kinds = ['mrna'] AND mrna1 != 'mrnaHigh') AS mrnaLow,
+       countIf(kinds = ['prot'] AND prot1 = 'protHigh') AS protHigh, countIf(kinds = ['prot'] AND prot1 != 'protHigh') AS protLow,
        countIf(length(kinds) > 1) AS multiple,
        countIf(has(pts, 'mut')) AS pmut, countIf(has(pts, 'cna')) AS pcna, countIf(has(pts, 'sv')) AS psv,
        countIf(has(pts, 'mrna')) AS pmrna, countIf(has(pts, 'prot')) AS pprot

@@ -20,7 +20,7 @@ export function datafilesMethod(t: { lines: { line: string; gene: string }[]; co
       "; frequency = altered and profiled ÷ profiled × 100, rounded to one decimal.",
     params: t.frequency.map((f) => [f.line, f.altered.toLocaleString("en-US") + " / " + f.profiled.toLocaleString("en-US") + (f.percent == null ? "" : " = " + f.percent + "%")] as [string, string]),
   }, ...tableSteps({ label: "datafiles:cases", what: "samples", queryText: t.queryText, shown: t.shown, lists: t.lists, instances: t.instances, excluded: t.excluded,
-    source: "every sample of the cohort with its status against the query and, per line, the events it matched — or no alteration, or not profiled.",
+    source: "every sample of the cohort with its status against the query and, per line, the events it matched, each with \" [germline]\" and \" (driver)\" as the portal writes them — or no alteration, or not profiled.",
     order: t.sortName ? "by " + t.sortName + (t.desc ? " descending" : "") + " with missing values last, then sample id" : "altered samples first, then by sample id" })];
   return { steps, implementation: { functions: ["datafilesCountsSql", "statusRowSource", "matrixRowSource", "oqlEventsSql", "pageSql", "countsSql"],
     file: "lib/views/datafiles/run.ts, lib/views/datafiles/sql.ts, lib/views/datafiles/tables.ts, lib/oql.ts", commit: BUILD_COMMIT },

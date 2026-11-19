@@ -110,31 +110,36 @@ export function cancerTypesSql(cohortSql: string, study: string, db: string, gen
     (oql ? oqlLevelCoverageSql(oql, study, db) : "") + "\n" +
     "),\n" +
     "sg AS (\n" +
-    "  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types, groupUniqArray(cov.pt) AS pts\n" +
+    "  SELECT cov.suid AS suid, cov.gene AS gene, groupUniqArrayIf(alt.t, alt.t != '') AS types, groupUniqArray(cov.pt) AS pts,\n" +
+    "         groupUniqArrayIf((cov.suid, indexOf([" + geneList + "], cov.gene), alt.t), alt.t NOT IN ('', 'mutation', 'sv')) AS met\n" +
     "  FROM cov LEFT JOIN alt ON alt.suid = cov.suid AND alt.gene = cov.gene GROUP BY suid, gene\n" +
     "),\n" +
-    "sg2 AS (SELECT suid, gene, types, pts FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,\n" +
-    "        arrayDistinct(arrayFlatten(groupArray(pts))) AS pts FROM sg GROUP BY suid),\n" +
+    "sg2 AS (SELECT suid, gene, types, pts, met FROM sg UNION ALL SELECT suid, '*' AS gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,\n" +
+    "        arrayDistinct(arrayFlatten(groupArray(pts))) AS pts, arrayFlatten(groupArray(met)) AS met FROM sg GROUP BY suid),\n" +
     "u AS (\n" +
     "  SELECT " + (unit === "patient" ? "samp.puid" : "sg2.suid") + " AS k, ifNull(grp.g, '') AS g, min(ifNull(grp.label, '')) AS label, sg2.gene AS gene,\n" +
-    "         arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types, arrayDistinct(arrayFlatten(groupArray(sg2.pts))) AS pts\n" +
+    "         arrayDistinct(arrayFlatten(groupArray(sg2.types))) AS types, arrayDistinct(arrayFlatten(groupArray(sg2.pts))) AS pts,\n" +
+    "         arrayDistinct(arrayFlatten(groupArray(sg2.met))) AS met\n" +
     "  FROM sg2 JOIN samp ON samp.suid = sg2.suid LEFT JOIN grp ON grp.suid = sg2.suid\n" +
     "  GROUP BY k, g, gene\n" +
     "),\n" +
     // the whole cohort, each unit once however many groups it is in: grp '' is reserved for it below
     "uall AS (SELECT k, '\\x01all' AS g, '' AS label, gene, arrayDistinct(arrayFlatten(groupArray(types))) AS types,\n" +
-    "         arrayDistinct(arrayFlatten(groupArray(pts))) AS pts FROM u GROUP BY k, gene),\n" +
-    "uu AS (SELECT k, g, label, gene, types, pts FROM u UNION ALL SELECT k, g, label, gene, types, pts FROM uall),\n" +
+    "         arrayDistinct(arrayFlatten(groupArray(pts))) AS pts, arrayDistinct(arrayFlatten(groupArray(met))) AS met FROM u GROUP BY k, gene),\n" +
+    "uu AS (SELECT k, g, label, gene, types, pts, met FROM u UNION ALL SELECT k, g, label, gene, types, pts, met FROM uall),\n" +
     // a unit's alterations are counted once per TYPE (the portal's uniqBy alterationType): an
-    // amplification and a deep deletion are one copy-number kind, shown as the amplification
+    // amplification and a deep deletion are one copy-number kind, named by the first the portal
+    // meets — its samples by id, each sample's genes in query order (`met` sorted)
     "uk AS (SELECT grp_, gene, label, types, arrayDistinct(arrayMap((t) -> multiIf(t IN ('amp', 'homdel'), 'cna', t IN ('mrnaHigh', 'mrnaLow'), 'mrna',\n" +
-    "         t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds, pts FROM (SELECT g AS grp_, gene, label, types, pts FROM uu))\n" +
+    "         t IN ('protHigh', 'protLow'), 'prot', t), types)) AS kinds, pts, arrayMap((x) -> x.3, arraySort(met)) AS order_,\n" +
+    "         arrayFirst((t) -> t IN ('amp', 'homdel'), order_) AS cna1, arrayFirst((t) -> t IN ('mrnaHigh', 'mrnaLow'), order_) AS mrna1,\n" +
+    "         arrayFirst((t) -> t IN ('protHigh', 'protLow'), order_) AS prot1 FROM (SELECT g AS grp_, gene, label, types, pts, met FROM uu))\n" +
     "SELECT grp_ AS grp, gene, min(label) AS label, count() AS profiled,\n" +
     "       countIf(length(types) > 0) AS altered,\n" +
-    "       countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND has(types, 'amp')) AS amp,\n" +
-    "       countIf(kinds = ['cna'] AND NOT has(types, 'amp')) AS homdel, countIf(kinds = ['sv']) AS sv,\n" +
-    "       countIf(kinds = ['mrna'] AND has(types, 'mrnaHigh')) AS mrnaHigh, countIf(kinds = ['mrna'] AND NOT has(types, 'mrnaHigh')) AS mrnaLow,\n" +
-    "       countIf(kinds = ['prot'] AND has(types, 'protHigh')) AS protHigh, countIf(kinds = ['prot'] AND NOT has(types, 'protHigh')) AS protLow,\n" +
+    "       countIf(kinds = ['mutation']) AS mutation, countIf(kinds = ['cna'] AND cna1 = 'amp') AS amp,\n" +
+    "       countIf(kinds = ['cna'] AND cna1 != 'amp') AS homdel, countIf(kinds = ['sv']) AS sv,\n" +
+    "       countIf(kinds = ['mrna'] AND mrna1 = 'mrnaHigh') AS mrnaHigh, countIf(kinds = ['mrna'] AND mrna1 != 'mrnaHigh') AS mrnaLow,\n" +
+    "       countIf(kinds = ['prot'] AND prot1 = 'protHigh') AS protHigh, countIf(kinds = ['prot'] AND prot1 != 'protHigh') AS protLow,\n" +
     "       countIf(length(kinds) > 1) AS multiple,\n" +
     // the units profiled for each alteration type (the portal's profiled-data strip)
     "       countIf(has(pts, 'mut')) AS pmut, countIf(has(pts, 'cna')) AS pcna, countIf(has(pts, 'sv')) AS psv,\n" +

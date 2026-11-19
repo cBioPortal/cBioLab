@@ -26,6 +26,11 @@ export interface TabChooser {
   label: string; options: string[]; value: (views: View[]) => string; apply: (views: View[], value: string) => View[];
   /** the view settings the chooser sets, which the views' own settings bars therefore leave out */
   locks: string[];
+  /**
+   * the options to grey (the portal's gene chip with no mutations, MUT-GT-2): a view the page runs beside the tab,
+   * over every option, and the options its result finds empty; still clickable
+   */
+  empties?: { view: (views: View[]) => View; empty: (result: unknown) => string[] };
 }
 
 /**

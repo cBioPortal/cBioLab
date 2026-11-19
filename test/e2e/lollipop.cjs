@@ -172,6 +172,36 @@ async function lollipop({ browser, ok, BASE }) {
     ok("E1 badges: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+  // The greyed gene chip (MUT-GT-2; spec E1): every queried gene gets a chip, and one with no mutations in the
+  // query is greyed (data-empty="1") but stays clickable, as legacy Mutations.tsx generateTabs. cbioportal.org's
+  // API gives coadread_tcga_pub no MYC or CDKN2A mutations, and 10 ERBB2.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/portal/results?study=coadread_tcga_pub&genes=KRAS%20MYC%20CDKN2A%20ERBB2&tab=Mutations", { waitUntil: "domcontentloaded" });
+      await page.locator(".lp-plot").first().waitFor({ timeout: 240000 });
+      const chip = (g) => page.locator("[role=tab]").filter({ hasText: new RegExp("^" + g + "$") }).first();
+      await page.waitForFunction(() => document.querySelectorAll("[role=tab][data-empty='1']").length > 0, null, { timeout: 240000 }).catch(() => {});
+      const empty = {};
+      for (const g of ["KRAS", "MYC", "CDKN2A", "ERBB2"]) empty[g] = await chip(g).getAttribute("data-empty");
+      ok("E1 chips: MYC and CDKN2A are greyed (data-empty=1), KRAS and ERBB2 are not",
+        empty.MYC === "1" && empty.CDKN2A === "1" && empty.KRAS === null && empty.ERBB2 === null, JSON.stringify(empty));
+      await chip("MYC").click();
+      await page.waitForFunction(() => [...document.querySelectorAll("[role=tab]")].some((t) => t.textContent === "MYC" && t.getAttribute("aria-selected") === "true"), null, { timeout: 60000 });
+      await page.waitForFunction(() => /MYC/.test(document.querySelector(".lp-plot")?.textContent || "") || document.querySelectorAll(".lp-plot g[data-codon]").length === 0, null, { timeout: 240000 });
+      await page.waitForTimeout(1000);
+      const stems = await page.locator(".lp-plot g[data-codon]").count();
+      ok("E1 chips: clicking the greyed MYC chip selects it, and its plot draws empty",
+        await chip("MYC").getAttribute("aria-selected") === "true" && await page.locator(".lp-plot").count() > 0 && stems === 0, "stems " + stems);
+    } catch (e) {
+      ok("E1 chips: the greyed gene chips", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("E1 chips: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
 }
 
 module.exports = { lollipop };
