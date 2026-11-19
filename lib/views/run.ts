@@ -31,7 +31,7 @@ export interface ViewRun {
   participationFor: (studies: string[], requiresPatientLevel: boolean) => ViewParticipation;
   pin: string | null;
   /** the molecular and generic-assay profiles a study holds (runAnalysis's cached inventory) */
-  studyProfiles: (study: string) => Promise<{ profiles: string[]; gaProfiles: string[]; catalog?: ProfileInfo[] }>;
+  studyProfiles: (study: string) => Promise<{ profiles: string[]; gaProfiles: string[]; catalog?: ProfileInfo[]; unanswered?: true }>;
   /** a paged view's page (the mutation and clinical tables): rows offset to offset + limit of its one global order */
   page?: { offset: number; limit: number };
   /** a table view's column whose values to return instead of rows (what its filter offers) */

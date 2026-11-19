@@ -2,7 +2,8 @@
 import type { ViewResult } from "../../types.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
 import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
-import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterationOf } from "../../mutation-table.ts";
+import { MUTATION_COLUMNS, mutationRowSource, alterationOf, mutationDefaultColumns, type TablePart } from "../../mutation-table.ts";
+import { mutationDefaultFacts } from "../mutation-defaults.ts";
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows, keyOnFirstRun } from "../rows.ts";
@@ -86,9 +87,11 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   const { holders, excluded } = rowHolders(ctx);
   const [pins, unannotated] = await Promise.all([variantPins(), studiesWithoutVariantAnnotation(holders)]);
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
-  let r: Rows;
+  const source = (parts: TablePart[]) => (db: string) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers));
+  let r: Rows, defaults: string[];
   try {
-    r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS), size, (parts) => (db) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers)),
+    defaults = mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, source));
+    r = await runRows(ctx, "mutations", holders, q, defaults, shownColumns(q, MUTATION_COLUMNS, defaults), size, source,
       ctx.values ? { column: ctx.values, numeric: !!MUTATION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   const rows = r.rows.map((x) => {
@@ -97,8 +100,8 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
       values: MUTATION_COLUMNS.map((c) => mutationValue(x, c.id, drivers ? true : pin)), ...(detail ? { detail } : {}) };
   });
   const gn = describePins(pins);
-  const shown = shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS);
-  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns: MUTATION_COLUMNS, shown, defaults: MUTATION_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
+  const shown = shownColumns(q, MUTATION_COLUMNS, defaults);
+  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns: MUTATION_COLUMNS, shown, defaults, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
     ...(unannotated.length ? { unannotated } : {}),
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (ctx.page || ctx.values) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };
