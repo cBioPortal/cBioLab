@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { zoomedTip } from "./zoomed-tip.ts";
-import { clusterSort, clusteredProfile, selectSort, trackSort } from "./track-edits.ts";
+import { clusterSort, clusteredProfile, isEngineSortKey, selectSort, trackSort } from "./track-edits.ts";
 import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
@@ -298,11 +298,12 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
       // eslint-disable-next-line react-hooks/set-state-in-render -- a timing readout; perf is not an input of this memo, so the update does not recompute it
       bump({ hideMs: performance.now() - t0 });
     }
-    // A clustering is computed in the engine from values the browser never receives, so a
-    // figure sorted that way keeps the order it was given rather than trying to redo it.
+    // A clustering is computed in the engine from values the browser never receives, and the
+    // case list order from the cohort's typed list, so a figure sorted either way keeps the
+    // order it was given rather than trying to redo it.
     // The staircase switches re-sort here too: the engine's order was drawn with its own.
     const keys = sortKeys.length ? sortKeys : data.conventions.sort;
-    const engineSorted = keys.some((k) => k.replace(/^-/, "").startsWith("cluster:"));
+    const engineSorted = keys.some(isEngineSortKey);
     const switches = staircaseOptions({ ...display, annotate: data.display?.annotate }), engineSwitches = staircaseOptions(data.display);
     const switched = switches.byType !== engineSwitches.byType || switches.byDriver !== engineSwitches.byDriver || switches.ignoreVus !== engineSwitches.ignoreVus;
     if ((sortKeys.length || switched) && !engineSorted) {
@@ -884,6 +885,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <option value={sortKeys[0]}>{sortKeys[0]}</option>}
               <option value="genomic">genomic staircase</option>
               <option value="id">{data.unit} id</option>
+              {sortKeys[0] === "-caseList" && <option value="-caseList">case list order, reversed</option>}
+              <option value="caseList" disabled={!data.conventions.caseList}>
+                {data.conventions.caseList ? "case list order" : "case list order (with a user-defined case list)"}</option>
               {/* clustering is chosen from a heatmap row's menu; the select only shows it, as the portal's Sort menu */}
               {data.tracks.some((t) => t.kind === "heatmap" && t.profileType) &&
                 <option value={sortKeys[0]?.startsWith("cluster:") && data.tracks.some((t) => t.profileType === sortKeys[0].slice(8)) ? sortKeys[0] : ""} disabled>sorted by heatmap clustering order</option>}
