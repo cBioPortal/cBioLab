@@ -5,7 +5,7 @@
 // lib/view-svg.ts for the MCP figure, so both are the same drawing.
 import { esc, frame, caption, palette, label, textWidth, textOn, fmtNum, r1, FS, SW, type SvgOpts } from "./svg-kit.ts";
 import {
-  buildTracks, flattenTracks, axisTicks, dayScale, sampleMarks, numericResult, attr, formatDays, axisMarks,
+  buildTracks, flattenTracks, trackLabel, axisTicks, dayScale, sampleMarks, numericResult, attr, formatDays, axisMarks,
   COLOR_KEY, SHAPE_KEY, POINT_COLOR, type TlItem, type TlTrack, type SampleMark,
 } from "./timeline-tracks.ts";
 import type { PatientEvent, PatientTimeline } from "./types.ts";
@@ -100,6 +100,27 @@ export interface TimelineLayout {
 }
 
 /**
+ * A line-chart row's points as the portal plots them (TimelineTrack, getLineChartYCoordinateForEvents):
+ * one per day, at the highest of that day's values, in day order. `ix` lists every event of the day,
+ * which the mark's tooltip pages through; `at` is the event plotted.
+ */
+export function linePoints(items: readonly TlItem[], events: readonly PatientEvent[]): { start: number; v: NonNullable<ReturnType<typeof numericResult>>; at: number; ix: number[] }[] {
+  const byDay = new Map<number, TlItem[]>();
+  for (const it of items) (byDay.get(it.start) || byDay.set(it.start, []).get(it.start)!).push(it);
+  return [...byDay.entries()].sort((a, b) => a[0] - b[0]).map(([start, g]) => {
+    const vs = g.map((it) => ({ it, v: numericResult(events[it.i])! }));
+    const top = vs.reduce((m, x) => x.v.v > m.v.v ? x : m, vs[0]);
+    return { start, v: top.v, at: top.it.i, ix: g.map((it) => it.i) };
+  });
+}
+
+/** The row a point `y` px down the figure falls in (PAT-TL-TR-5: the row the pointer is on is highlighted), or null outside every row. */
+export function rowAt(layout: Pick<TimelineLayout, "rows">, y: number): number | null {
+  const i = layout.rows.findIndex((r) => y >= r.y && y < r.y + r.h);
+  return i < 0 ? null : i;
+}
+
+/**
  * The figure, and what a caption must say about it. `interactive` adds the data- attributes the
  * card reads: `data-ev` (event indices) on each mark, `data-uid` on each header that collapses.
  */
@@ -115,7 +136,7 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
   const marks = sampleMarks(t.samples, ev);
 
   // the header column: as wide as its labels (and a line chart's value ticks) need, within bounds
-  const headText = (r: (typeof flat)[number]) => (r.track.children.length ? (r.collapsed ? "▸ " : "▾ ") : "") + r.track.label;
+  const headText = (r: (typeof flat)[number]) => (r.track.children.length ? (r.collapsed ? "▸ " : "▾ ") : "") + trackLabel(r.track);
   const lineRange = (items: TlItem[]) => {
     const vals = items.map((it) => numericResult(ev[it.i])!.v);
     let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -171,25 +192,25 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
     const x0 = 5 + tr.depth * INDENT;
     const room = HW - x0 - (tr.draw === "line" && !r.collapsed ? tickRoom : 0) - 6;
     parts.push(`<g${o.interactive && hasKids ? ` class="tl-h" data-uid="${esc(tr.uid)}" style="cursor:pointer"` : ""}>` +
-      `<title>${esc(tr.label)}</title>` +
+      `<title>${esc(trackLabel(tr))}</title>` +
       label(x0, cy + FS.body * 0.35, headText(r), { size: FS.body, fill: pal.ink, weight: tr.depth === 0 ? 600 : 400, maxW: room })
         .replace(/<title>.*?<\/title>/, "") + `</g>`);
     parts.push(`<line x1="0" x2="${W}" y1="${r.y + r.h - 0.5}" y2="${r.y + r.h - 0.5}" stroke="${pal.line}" stroke-width="${SW.hair}" opacity="0.6"/>`);
-    const tag = (ix: number[]) => (o.interactive ? ` class="tl-m" data-ev="${ix.join(",")}"` : "");
+    const tag = (ix: number[], line = false) => (o.interactive ? ` class="tl-m" data-ev="${ix.join(",")}"${line ? ` data-line="1"` : ""}` : "");
 
     if (tr.draw === "line" && !r.collapsed) {
-      const pts = r.items.map((it) => ({ it, v: numericResult(ev[it.i])! })).sort((a, b) => a.it.start - b.it.start);
+      const pts = linePoints(r.items, ev);
       const { lo, hi } = lineRange(r.items);
       const yy = (v: number) => r.y + r.h - 7 - (v - lo) / (hi - lo) * (r.h - 14);
       for (const v of [hi, lo]) {
         parts.push(label(HW - 8, yy(v) + FS.small * 0.35, fmtNum(v), { size: FS.small, fill: pal.muted, anchor: "end" }) +
           `<line x1="${HW - 5}" x2="${HW}" y1="${yy(v)}" y2="${yy(v)}" stroke="${pal.muted}" stroke-width="${SW.line}"/>`);
       }
-      plot.push(`<polyline fill="none" stroke="${pal.muted}" stroke-width="${SW.line}" points="${pts.map((p) => X(p.it.start).toFixed(1) + "," + yy(p.v.v).toFixed(1)).join(" ")}"/>`);
+      plot.push(`<polyline fill="none" stroke="${pal.muted}" stroke-width="${SW.line}" points="${pts.map((p) => X(p.start).toFixed(1) + "," + yy(p.v.v).toFixed(1)).join(" ")}"/>`);
       for (const p of pts) {
-        const c = colorOf(ev[p.it.i]);
+        const c = colorOf(ev[p.at]);
         if (p.v.censored) censored++;
-        plot.push(`<g${tag([p.it.i])} transform="translate(${X(p.it.start).toFixed(1)} 0)">` +
+        plot.push(`<g${tag(p.ix, true)} transform="translate(${X(p.start).toFixed(1)} 0)">` +
           (p.v.censored ? `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="${pal.bg}" stroke="${c}" stroke-width="1.5"/>` : `<circle cx="0" cy="${yy(p.v.v)}" r="3" fill="${c}"/>`) + `</g>`);
       }
       continue;

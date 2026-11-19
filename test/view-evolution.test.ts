@@ -1158,7 +1158,7 @@ describe("evolution: Show Timeline (PTB-GE-LC-1, the portal's genomicEvolutionSe
   test("drawn above the chart, the chart's time axis on the timeline's: each year's tick at the same x in both", async () => {
     const v = await run({ showTimeline: true }, one());
     const svg = evolutionSvg(v as never, { width: 900, theme: "light" })!;
-    assert.match(svg, />Specimen</, "the timeline's track");
+    assert.match(svg, />SPECIMEN</, "the timeline's track");
     const year = ys(svg, "1y");
     assert.equal(year.length, 2, "the timeline's axis and the chart's: " + year);
     assert.equal(year[0], year[1]);

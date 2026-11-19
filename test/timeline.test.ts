@@ -2,8 +2,8 @@
 // patient-view timeline — and the figure's promises about what it draws (lib/timeline-svg.ts).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
-import { timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
+import { buildTracks, trackSortKey, trackLabel, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
+import { linePoints, rowAt, timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
 import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
@@ -30,17 +30,26 @@ const EVENTS: PatientEvent[] = [
 describe("timeline tracks: cBioPortal's grouping", () => {
   const tracks = buildTracks(EVENTS);
   test("event types in the portal's order, folded by case (lib/event-names.ts)", () => {
-    assert.deepEqual(tracks.map((t) => t.label), ["Sample acquisition", "Surgery", "Status", "Treatment", "Lab_Test"]);
-    // TREATMENT and Treatment are one track, labelled with the commoner spelling
+    // PAT-TL-TR-1: a root track is its event type upper-cased, as the portal's (eventType.toUpperCase())
+    assert.deepEqual(tracks.map((t) => t.label), ["SAMPLE ACQUISITION", "SURGERY", "STATUS", "TREATMENT", "LAB_TEST"]);
+    // shown as the portal's TrackHeader shows every track (getTrackLabel): underscores dropped
+    assert.deepEqual(tracks.map(trackLabel), ["SAMPLE ACQUISITION", "SURGERY", "STATUS", "TREATMENT", "LABTEST"]);
+    assert.equal(trackLabel({ label: "Radiation_Therapy" }), "RadiationTherapy", "sub-tracks too");
+    const svg = timelineSvg({ study: "s", patient: "P-1", events: EVENTS, samples: [], source: { label: "local", remote: false } }, { width: 900 }).svg;
+    assert.match(svg, />LABTEST</);
+    assert.doesNotMatch(svg, />LAB_TEST</);
+    // TREATMENT and Treatment are one track
     assert.equal(tracks.find((t) => t.uid === "treatment")!.children.flatMap((c) => c.children.length ? c.children : [c]).length, 4);
   });
   test("treatment nests by type → subtype → agent; a lone Other is absorbed into its parent", () => {
     const tx = tracks.find((t) => t.uid === "treatment")!;
     // no TREATMENT_TYPE anywhere: the single Other level vanishes, and subtypes sit directly under Treatment
-    assert.deepEqual(tx.children.map((c) => c.label), ["Chemo", "Radiation Therapy", "Immuno"], "sorted by first start");
+    // PAT-TL-TR-2, the portal's sortNestedTracks: a track's own first event's start, 0 for one whose events are all in
+    // sub-tracks (Chemo, Immuno), ties in first-occurrence order; Radiation Therapy absorbed its Other, so starts at 33
+    assert.deepEqual(tx.children.map((c) => c.label), ["Chemo", "Immuno", "Radiation Therapy"], "sorted as the portal's");
     assert.deepEqual(tx.children[0].children.map((c) => c.uid), ["treatment.Chemo.METHOTREXATE", "treatment.Chemo.CISPLATIN"]);
     // Radiation has no AGENT: its own Other child is absorbed, so its events sit on it
-    const rt = tx.children[1];
+    const rt = tx.children.find((c) => c.label === "Radiation Therapy")!;
     assert.equal(rt.children.length, 0);
     assert.equal(rt.items.length, 1);
   });
@@ -450,4 +459,41 @@ describe("drag to zoom (PAT-TL-ZM-3)", () => {
     const zx = inZoom.layout.plot.x;
     assert.ok(!labelsAt(inZoom.svg).some((l) => l.text === "0" && Math.abs(l.x - zx) < 20), labelsAt(inZoom.svg).map((l) => l.text + "@" + l.x).join(" "));
   });
+});
+
+test("PAT-TL-TR-5 rowAt: the row the pointer is on, by the figure's own rows; its bottom edge is the next row's", () => {
+  const t: PatientTimeline = { study: "s", patient: "P-1", events: EVENTS, samples: [{ id: "P-1-T02", type: "Primary" }], source: { label: "local", remote: false } };
+  const { layout } = timelineSvg(t, { width: 900, interactive: true });
+  const r = layout.rows;
+  assert.ok(r.length > 2);
+  assert.equal(rowAt(layout, r[0].y), 0);
+  assert.equal(rowAt(layout, r[0].y + r[0].h - 0.5), 0);
+  assert.equal(rowAt(layout, r[0].y + r[0].h), 1, "the next row starts where one ends");
+  assert.equal(rowAt(layout, r[r.length - 1].y + r[r.length - 1].h / 2), r.length - 1);
+  assert.equal(rowAt(layout, r[0].y - 1), null, "the axis above the rows");
+  assert.equal(rowAt(layout, r[r.length - 1].y + r[r.length - 1].h + 1), null, "below the last row");
+});
+
+test("PAT-TL-TR-2 trackSortKey: lgg_ucsf_2014 P04's Radiation Therapy before Medical Therapy, both parents (key 0), in the order the events list them", () => {
+  // the portal's API lists P04's day-488 events Radiation Therapy (XRT) first, then Medical Therapy (TMZ), and so does the timeline query (start, id)
+  const p04 = [
+    ev("Treatment", 488, { TREATMENT_TYPE: "Radiation Therapy", SUBTYPE: "XRT" }, 530),
+    ev("Treatment", 488, { TREATMENT_TYPE: "Medical Therapy", SUBTYPE: "Chemotherapy", AGENT: "TMZ" }, 700),
+    ev("Treatment", 1111, { TREATMENT_TYPE: "Medical Therapy", SUBTYPE: "Chemotherapy", AGENT: "TMZ" }, 1300),
+  ];
+  const tx = buildTracks(p04)[0];
+  assert.deepEqual(tx.children.map((c) => c.label), ["Radiation Therapy", "Medical Therapy"]);
+  assert.deepEqual(tx.children.map(trackSortKey), [0, 0], "both hold their events in sub-tracks");
+  assert.equal(trackSortKey({ items: [{ i: 0, start: -40, end: -40 }, { i: 1, start: -90, end: -90 }] }), -40, "the first event as listed, not the earliest");
+});
+
+test("PAT-TL-TT-4 linePoints: a line chart plots one point a day, the highest of its values, its mark carrying every event of the day", () => {
+  const evs = [ev("Lab_Test", 10, { TEST: "CEA", RESULT: "1.8" }), ev("Lab_Test", 10, { TEST: "CEA", RESULT: "3.2" }), ev("Lab_Test", 5, { TEST: "CEA", RESULT: "<0.5" }),
+    ev("Lab_Test", 20, { TEST: "CEA", RESULT: "2" }), ev("Lab_Test", 20, { TEST: "CEA", RESULT: "2" })];
+  const items = evs.map((e, i) => ({ i, start: e.start, end: e.start }));
+  const pts = linePoints(items, evs);
+  assert.deepEqual(pts.map((p) => [p.start, p.v.v, p.v.censored, p.at, p.ix]), [[5, 0.5, true, 2, [2]], [10, 3.2, false, 1, [0, 1]], [20, 2, false, 3, [3, 4]]]);
+  const svg = timelineSvg({ study: "s", patient: "P-1", events: evs, samples: [], source: { label: "local", remote: false } }, { width: 900, interactive: true }).svg;
+  assert.equal((svg.match(/data-line="1"/g) || []).length, 3, "three days, three marks");
+  assert.match(svg, /data-ev="0,1" data-line="1"/);
 });
