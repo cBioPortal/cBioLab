@@ -34,14 +34,17 @@ export function clinicalColumns(perStudy: Record<string, unknown>[][], taken: Re
 
 /** how the table reads a clinical column off its rows: the value as text ('' for none), a NUMBER attribute also as a number */
 export function clinicalQueryColumn(c: ClinicalColumn): QueryColumn {
-  const text = "ifNull(" + (c.per === "patient" ? CLIN_PATIENT : CLIN_SAMPLE) + "[" + sq(c.id) + "], '')";
+  // a study records the attribute for its samples or its patients (two studies may differ): the sample's value, else the patient's
+  const at = (map: string) => "ifNull(" + map + "[" + sq(c.id) + "], '')";
+  const text = "if(" + at(CLIN_SAMPLE) + " != '', " + at(CLIN_SAMPLE) + ", " + at(CLIN_PATIENT) + ")";
   return { id: c.id, name: c.name, numeric: c.numeric, text, ...(c.numeric ? { num: finiteSql("nullIf(" + text + ", '')") } : {}) };
 }
 
-/** a row's value of a clinical column, from the maps the row source selected: a number for a NUMBER attribute, else the text; null for none */
+/** a row's value of a clinical column, from the maps the row source selected (the sample's, else the patient's): a number for a NUMBER attribute, else the text; null for none */
 export function clinicalValue(row: Record<string, unknown>, c: ClinicalColumn): string | number | null {
-  const map = row[c.per === "patient" ? CLIN_PATIENT : CLIN_SAMPLE] as Record<string, unknown> | null | undefined;
-  const v = map && typeof map === "object" ? map[c.id] : undefined;
+  const of = (field: string) => { const m = row[field] as Record<string, unknown> | null | undefined; return m && typeof m === "object" ? m[c.id] : undefined; };
+  const s = of(CLIN_SAMPLE);
+  const v = s != null && s !== "" ? s : of(CLIN_PATIENT);
   if (v == null || v === "") return null;
   if (c.numeric) { const n = Number(v); return Number.isFinite(n) ? n : String(v); }
   return String(v);

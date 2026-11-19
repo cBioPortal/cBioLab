@@ -65,14 +65,13 @@ export const CLINICAL_TAB_BUILTINS: ReadonlyMap<string, string | null> = new Map
  * with a value ÷ the queried samples, over every cohort and study that may list rows (lib/mutation-clinical-freq.ts).
  */
 export async function mutationClinicalFreq(ctx: ViewRun, holders: string[], clinical: ClinicalColumn[]): Promise<Record<string, number>> {
-  const attrs = [...clinical.map((c) => ({ id: c.id, per: c.per })),
-    ...[...CLINICAL_TAB_BUILTINS.values()].filter((a): a is string => !!a).map((id) => ({ id, per: "sample" as const }))];
+  const attrs = [...clinical.map((c) => c.id), ...[...CLINICAL_TAB_BUILTINS.values()].filter((a): a is string => !!a)];
   const asks: Promise<Record<string, unknown>[]>[] = [];
   for (const cn of ctx.vNames) for (const st of ctx.cohorts[cn].studies.filter((s) => holders.includes(s))) {
     const r = ctx.resolvers[st] as Partial<ViewResolver>;
     if (typeof r.viewAggregate === "function") asks.push(r.viewAggregate("mutations:clinical-freq", ctx.doc.cohorts[cn], (c, s, d) => clinicalFreqSql(c, s, d, attrs)));
   }
-  const byAttr = clinicalFreq(await Promise.all(asks), attrs.map((a) => a.id));
+  const byAttr = clinicalFreq(await Promise.all(asks), attrs);
   return Object.fromEntries([
     ...clinical.map((c) => [c.id, byAttr[c.id] ?? 0] as const),
     ...[...CLINICAL_TAB_BUILTINS].map(([col, attr]) => [col, attr ? byAttr[attr] ?? 0 : 100] as const),

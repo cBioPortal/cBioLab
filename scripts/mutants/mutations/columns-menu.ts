@@ -9,7 +9,7 @@ export const mutants: Mutant[] = [
     find: "if (a === \"\") total += k; else n.set(a, (n.get(a) || 0) + k);", replace: "if (a === \"\") total = k; else n.set(a, k);" },
   { id: "clinical-freq-of-patients", layer: "statistics", guard: "mutation-columns", file: "lib/mutation-clinical-freq.ts",
     effect: "A patient attribute's Freq counts patients, where the portal counts their samples (lgg_ucsf_2014 SEX: 23 of 61, not 61).",
-    find: "SELECT v.a AS a, uniqExact(c.sid) AS n FROM cohort AS c JOIN (\" + from(\"patient\", p)", replace: "SELECT v.a AS a, uniqExact(c.pid) AS n FROM cohort AS c JOIN (\" + from(\"patient\", p)" },
+    find: "SELECT v.a AS a, c.sid AS sid FROM cohort AS c JOIN (\" + from(\"patient\")", replace: "SELECT v.a AS a, c.pid AS sid FROM cohort AS c JOIN (\" + from(\"patient\")" },
   { id: "clinical-tab-misses-study-of-origin", layer: "counts", guard: "unit", file: "lib/views/mutation-defaults.ts",
     effect: "Study of Origin is missing from the Columns menu's Clinical tab, where the portal lists it at 100%.",
     find: "[\"studyOfOrigin\", null], ", replace: "" },

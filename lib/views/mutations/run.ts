@@ -119,7 +119,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
     method: mutationsMethod({ gene, cohorts: vNames, oncokbPin: pin, variantPins: gn, queryText: describeQuery(q, columns),
       ...(drivers ? { drivers: driverSourceText(drivers, pin ? "OncoKB " + pin : null, gn ? "a Cancer Hotspot of its kind in the stored " + gn + " annotation" : null) } : {}),
       sortName: q.sort ? columns.find((c) => c.id === q.sort!.column)?.name || q.sort.column : null, desc: !!q.sort?.desc,
-      shown: rows.length, lists: r.lists, excluded, instances: r.groups, ...(r.duplicates !== undefined ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}) }),
+      shown: rows.length, lists: r.lists, ...(Object.keys(freq).length ? { freqColumns: Object.keys(freq).length } : {}), excluded, instances: r.groups, ...(r.duplicates !== undefined ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}) }),
     participation: ctx.participationFor(ctx.vStudies, true),
     ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
     caveat: "Every " + gene + " mutation call in " + (vNames.length > 1 ? "each cohort's" : "the cohort's") + " samples, one row per call; uncalled mutations are left out, as the portal leaves them out. " +

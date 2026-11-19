@@ -88,4 +88,6 @@ export const JUDGMENT_CALLS: { choice: string; why: string }[] = [
     why: "Patients sequenced years after diagnosis would otherwise make early survival look better than it was." },
   { choice: "A gene's frequency divides by samples whose panel covers that gene, not by every sample.",
     why: "A sample whose panel omits a gene is not profiled for it, so counting it as unaltered makes the gene look rarer. This matches cBioPortal." },
+  { choice: "The mutation table's Columns menu Freq for a clinical attribute is 100 × the queried samples with a value ÷ every queried sample, summed over studies; a patient attribute counts every sample of a patient that has one, each study at the level it records the attribute.",
+    why: "It says how much of the cohort the column would fill, not a frequency among the mutated: cBioPortal's Columns menu computes it so (clinicalAttributeIdToAvailableFrequency, its counts endpoint per study), and the two agree on lgg_ucsf_2014 (SEX 61 of 61 samples over 23 patients, OS_STATUS 59, NOTE 2)." },
 ];

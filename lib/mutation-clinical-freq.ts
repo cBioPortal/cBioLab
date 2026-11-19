@@ -7,23 +7,27 @@ import { sq } from "./compiler.ts";
 import { clinicalTable } from "./custom-data.ts";
 import { aggregateSql, type AggregateSql } from "./sql-kinds.ts";
 
-/** per attribute (`a`), the cohort's samples with a value (`n`), and the cohort's samples (`total`) in a row of its own with `a` '' */
-export function clinicalFreqSql(cohortSql: string, study: string, db: string, attrs: { id: string; per: "patient" | "sample" }[]): AggregateSql {
+/**
+ * per attribute (`a`), the cohort's samples with a value (`n`), and the cohort's samples (`total`) in a row of its own
+ * with `a` ''. Each attribute is looked for at both levels: a study records it as a sample or a patient attribute, and
+ * two studies may differ, so each counts at its own (the portal's counts endpoint asks each study about its own).
+ */
+export function clinicalFreqSql(cohortSql: string, study: string, db: string, ids: string[]): AggregateSql {
   const pre = sq(study + "_");
-  const ids = (per: "patient" | "sample") => attrs.filter((a) => a.per === per).map((a) => sq(a.id));
-  const s = ids("sample"), p = ids("patient");
-  const from = (per: "patient" | "sample", list: string[]) =>
-    "SELECT " + (per === "sample" ? "replaceOne(sample_unique_id, " + pre + ", '')" : "replaceOne(patient_unique_id, " + pre + ", '')") + " AS k, attribute_name AS a\n" +
-    "    FROM " + clinicalTable(db, attrs.map((x) => x.id)) + "\n" +
-    "    WHERE cancer_study_identifier = " + sq(study) + " AND type = " + sq(per) + " AND attribute_value != ''" +
-    (list.length ? " AND attribute_name IN (" + list.join(", ") + ")" : " AND 0") + "\n";
+  const list = ids.length ? " AND attribute_name IN (" + ids.map(sq).join(", ") + ")" : " AND 0";
+  const from = (per: "patient" | "sample") =>
+    "SELECT replaceOne(" + (per === "sample" ? "sample_unique_id" : "patient_unique_id") + ", " + pre + ", '') AS k, attribute_name AS a\n" +
+    "    FROM " + clinicalTable(db, ids) + "\n" +
+    "    WHERE cancer_study_identifier = " + sq(study) + " AND type = " + sq(per) + " AND attribute_value != ''" + list + "\n";
   return aggregateSql(
     "WITH cohort AS (" + cohortSql + ")\n" +
     "SELECT '' AS a, uniqExact(sid) AS n FROM cohort\n" +
     "UNION ALL\n" +
-    "SELECT v.a AS a, uniqExact(c.sid) AS n FROM cohort AS c JOIN (" + from("sample", s) + "  ) AS v ON v.k = c.sid GROUP BY v.a\n" +
-    "UNION ALL\n" +
-    "SELECT v.a AS a, uniqExact(c.sid) AS n FROM cohort AS c JOIN (" + from("patient", p) + "  ) AS v ON v.k = c.pid GROUP BY v.a\n");
+    "SELECT a, uniqExact(sid) AS n FROM (\n" +
+    "  SELECT v.a AS a, c.sid AS sid FROM cohort AS c JOIN (" + from("sample") + "  ) AS v ON v.k = c.sid\n" +
+    "  UNION ALL\n" +
+    "  SELECT v.a AS a, c.sid AS sid FROM cohort AS c JOIN (" + from("patient") + "  ) AS v ON v.k = c.pid\n" +
+    ") GROUP BY a\n");
 }
 
 /**
