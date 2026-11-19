@@ -202,23 +202,23 @@ export function clusteredProfile(keys: string[]): string | null {
  * its key first; "Don't cluster" drops that profile's key and leaves another profile's clustering alone.
  */
 export function clusterSort(keys: string[], profileType: string, on: boolean): string[] {
-  const rest = keys.filter((k) => !k.replace(/^-/, "").startsWith("cluster:"));
+  const rest = keys.filter((k) => !isEngineSortKey(k));
   return on ? ["cluster:" + profileType, ...rest].slice(0, 4) : keys.filter((k) => k.replace(/^-/, "") !== "cluster:" + profileType);
 }
 
 /**
  * The sort keys after a track's "Sort a-Z" ("" ), "Sort Z-a" ("-") or "Don't sort by this" (null): a
- * direction makes the track the first key and ends heatmap clustering, as the portal's sortByData does
+ * direction makes the track the first key and ends heatmap clustering and the case list order, as the portal's sortByData does
  * (ResultsViewOncoprint onTrackSortDirectionChange); "Don't sort by this" only drops the track's key.
  */
 export function trackSort(keys: string[], label: string, dir: "" | "-" | null): string[] {
   const others = keys.filter((x) => x.replace(/^-/, "") !== label);
-  return dir === null ? others : [dir + label, ...others.filter((k) => !isClusterKey(k))].slice(0, 4);
+  return dir === null ? others : [dir + label, ...others.filter((k) => !isEngineSortKey(k))].slice(0, 4);
 }
 
-/** the sort keys after the sort select picks a primary key ("" for the engine's order): any pick ends heatmap clustering, as sortByData */
+/** the sort keys after the sort select picks a primary key ("" for the engine's order): any pick ends heatmap clustering and the case list order, as sortByData */
 export function selectSort(keys: string[], v: string): string[] {
-  const rest = keys.slice(1).filter((k) => !isClusterKey(k));
+  const rest = keys.slice(1).filter((k) => !isEngineSortKey(k));
   return v ? [v, ...rest].slice(0, 4) : rest;
 }
 

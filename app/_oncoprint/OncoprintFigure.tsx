@@ -885,6 +885,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 <option value={sortKeys[0]}>{sortKeys[0]}</option>}
               <option value="genomic">genomic staircase</option>
               <option value="id">{data.unit} id</option>
+              {sortKeys[0] === "-caseList" && <option value="-caseList">case list order, reversed</option>}
               <option value="caseList" disabled={!data.conventions.caseList}>
                 {data.conventions.caseList ? "case list order" : "case list order (with a user-defined case list)"}</option>
               {/* clustering is chosen from a heatmap row's menu; the select only shows it, as the portal's Sort menu */}

@@ -1,7 +1,7 @@
 // The OncoPrint's "case list order" (ONC-SO-3): columns in the order a user-defined case list
 // typed them, as the portal's Sort › "Sort by case list order" (ResultsViewOncoprint sortOrder,
 // ResultsViewPageStore givenSampleOrder). Pure apart from reading the request's stored id sets.
-import { idSetIfLoaded } from "./id-sets.ts";
+import { loadedIdSet } from "./id-sets.ts";
 
 /** a user-defined list's ids for one study, bare, in typed order, and what they name */
 export interface CaseList { level: "sample" | "patient"; ids: string[] }
@@ -11,7 +11,8 @@ type Leaf = { kind?: unknown; set?: unknown; ids?: unknown; part?: unknown };
 /**
  * The user-defined case list a cohort is chosen by: the first `sampleList` / `patientList` clause
  * of its top-level `all`, its ids for `study` in the order typed (a stored set keeps that order,
- * lib/id-sets.ts tidyIdSet). null when the cohort names no such list, or a lock's part of one.
+ * lib/id-sets.ts tidyIdSet). null when the cohort names no such list, or a lock's part of one;
+ * a stored set this request did not read is refused, as compiling it is.
  */
 export function caseListOf(dsl: unknown, study: string): CaseList | null {
   const all = dsl && typeof dsl === "object" ? (dsl as { all?: unknown }).all : null;
@@ -19,10 +20,7 @@ export function caseListOf(dsl: unknown, study: string): CaseList | null {
   const leaf = all.find((c: Leaf) => c && (c.kind === "sampleList" || c.kind === "patientList") && !c.part) as Leaf | undefined;
   if (!leaf) return null;
   const level = leaf.kind === "sampleList" ? "sample" : "patient";
-  if (typeof leaf.set === "string") {
-    const s = idSetIfLoaded(leaf.set);
-    return s ? { level, ids: s.perStudy[study] || [] } : null;
-  }
+  if (typeof leaf.set === "string") return { level, ids: loadedIdSet(leaf.set).perStudy[study] || [] };
   if (!Array.isArray(leaf.ids)) return null;
   const pre = study + ":";
   return { level, ids: leaf.ids.filter((x): x is string => typeof x === "string" && x.startsWith(pre)).map((x) => x.slice(pre.length)) };

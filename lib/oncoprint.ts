@@ -966,6 +966,8 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
     unit === "patient" && rowsByStudy.get(s)!.length ? columnSamplesIn(s, columnSamples.get(s)!, rowsByStudy.get(s)!) : null;
   const allPids = groups.flatMap(g => g.pids);
   if (!allPids.length) throw new Error("cohort is empty");
+  if (peers.size && sort.some((k) => k.track === "caseList"))
+    throw new Error("sort: 'caseList' cannot place the columns of " + [...peers.keys()].join(", ") + ", which a federation peer draws from its own copy of the list; sort another way or drop those studies");
 
   // ---- genomic events + panel coverage, per study --------------------
   const events: EventRow[] = [];

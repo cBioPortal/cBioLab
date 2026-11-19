@@ -15,6 +15,8 @@
 //   CL5  a column the list does not reach is left out (sorts last)
 //   CL6  sort "caseList" orders the columns so, unlisted last; "-caseList" reverses the listed ones
 //   CL7  without a list the key is refused, saying why; with one the contract says it is on offer
+//   CL9  sorting by data leaves case-list mode (OncoprintControls sortByData sets sortMode data): a
+//        track's Sort a-Z / Z-a, the sort select and a clustering drop the caseList key
 //   CL8  the browser cannot apply it (the contract holds no list), so choosing it re-runs the view
 //        and the figure keeps the engine's order, as a clustering
 import test, { describe } from "node:test";
@@ -53,9 +55,12 @@ describe("CL2: the cohort's list", () => {
     const dsl = { all: [{ kind: "clinical", attribute: "SEX", values: ["Male"] }, { kind: "sampleList", ids: ["st:B", "st:A"] }, { kind: "sampleList", ids: ["st:A", "st:B"] }] };
     assert.deepEqual(c.caseListOf(dsl, "st"), { level: "sample", ids: ["B", "A"] });
   });
+  test("a stored set this request did not read is refused, not taken for no list", () => {
+    assert.throws(() => c.caseListOf({ all: [{ kind: "sampleList", set: SET }] }, "st"), /did not read/);
+  });
   test("no list, a lock's part, no all: none", () => {
     assert.equal(c.caseListOf({ all: [{ kind: "caseList", id: "st_all" }] }, "st"), null);
-    assert.equal(c.caseListOf({ all: [{ kind: "sampleList", set: SET, part: "arm:x / a" }] }, "st"), null);
+    assert.equal(c.caseListOf({ all: [{ kind: "sampleList", ids: ["st:A"], part: "arm:x / a" }] }, "st"), null);
     assert.equal(c.caseListOf(null, "st"), null);
   });
 });
@@ -125,5 +130,24 @@ describe("CL8: applied by the engine", () => {
   });
   test("a case-list key survives pruning", () => {
     assert.deepEqual(t.pruneSort({ genes: ["KRAS"], sort: ["caseList", "GONE"] }).sort, ["caseList"]);
+  });
+});
+
+describe("CL9: sorting by data leaves case-list mode", () => {
+  const t = te as unknown as Record<string, any>;
+  test("a track's Sort a-Z and Z-a drop caseList, wherever it sits", () => {
+    assert.deepEqual(t.trackSort(["caseList"], "SEX", ""), ["SEX"]);
+    assert.deepEqual(t.trackSort(["AGE", "-caseList"], "SEX", "-"), ["-SEX", "AGE"]);
+  });
+  test("\"Don't sort by this\" drops only the track's key", () => {
+    assert.deepEqual(t.trackSort(["SEX", "caseList"], "SEX", null), ["caseList"]);
+  });
+  test("the sort select's pick drops caseList; picking it keeps the rest", () => {
+    assert.deepEqual(t.selectSort(["X", "caseList"], "genomic"), ["genomic"]);
+    assert.deepEqual(t.selectSort(["caseList", "SEX"], "id"), ["id", "SEX"]);
+    assert.deepEqual(t.selectSort(["SEX", "AGE"], "caseList"), ["caseList", "AGE"]);
+  });
+  test("a clustering ends the case list order", () => {
+    assert.deepEqual(t.clusterSort(["caseList", "SEX"], "mrna", true), ["cluster:mrna", "SEX"]);
   });
 });
