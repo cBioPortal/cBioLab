@@ -123,7 +123,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | ID | verdict | how | note |
 |---|---|---|---|
 | STV-FB-1 | 🟡 | B | A pill per value or range with its × ✅; cBioLab's own pill style kept on purpose (not the portal's blue); no pending style (no manual mode, STV-FB-6) |
-| STV-FB-2 | 🟡 | B | ↓ Clinical pills "<chart> : a or b", no word between charts ✅ (`study-view-pills.tsx:115-120`); gene, case-list and other generic pills join with "OR" in capitals and have no parentheses or outer "and" (`pills.tsx:154`) |
+| STV-FB-2 | ✅ | B | Clinical pills "<chart> : a or b", no word between charts; generic OR groups "( a or b )" and two groups of one chart joined by "and" (`joinedByAnd`, `lib/study-view-pills.ts`); a gene-table Union is one OQL clause, its pill text under STV-FB-3 |
 | STV-FB-3 | 🟡 | B | Clinical (incl. NA) named by the chart's display name, a pill per value or range; gene, GA, case-list, event and derived clauses still the generic pills; no group-filter or treatment pills |
 | STV-FB-3a | ❌ | C | No survival-attribute pills (no survival filter) |
 | STV-FB-3b | 🔶 | C | A density drag adds two visible range pills (`explore-charts.tsx:149`); legacy shows no pill beyond the chart's own |
@@ -136,7 +136,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STV-AB-1 | 🟡 | B | ↓ Header "1 study · 594 patients · 594 samples" from the filtered totals, skeleton while counting; not the portal's "Selected: 594 patients | 594 samples" (no "Selected:", "·" for "|"), and "(overlap not deduplicated)" on several studies (`explore-sections.tsx:129-139`) |
+| STV-AB-1 | ✅ | B | Header "594 patients \| 594 samples", "Selected: 41 patients \| 41 samples" while filtered (`portalSelectedInfo`), from the filtered totals, skeleton while counting; "(overlap not deduplicated)" kept on several studies (invariant 3) |
 | STV-AB-2 | ✅ | BC | "View patients" opens `/portal/patient` in a new window on the first patient, with the cohort definition for stepping (`use-explore-state.ts`); disabled, saying why, with no study or at 0 matching patients |
 | STV-AB-3 | 🔶 | B | "Save as a Cohort" (filter bar, only once filtered) — see §8 |
 | STV-AB-4 | ✅ | B | "Download clinical data" beside View patients: `<study>_clinical_data.tsv` / `combined_study_clinical_data.tsv`, through the patient-level table route ([download-cases](download-cases.md) PC2, PC9). Shown always (no `skin_hide_download_controls`) |
@@ -162,13 +162,13 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | ID | verdict | how | note |
 |---|---|---|---|
 | STV-AC-1 | ❌ | B | No Save settings |
-| STV-AC-2 | 🟡 | B | Tabs Clinical · Gene status · Generic assays · Derived timeline filters · Custom data; no Genomic, X vs Y, Variant Annotations, per-GA-type tabs |
+| STV-AC-2 | 🟡 | B | Tabs Clinical · Genomic · Gene status · a tab per generic-assay type (#456) · Derived timeline filters · Custom data; the Genomic tab's charts each shown unless unchecked (`genomicChartLines`); Mutation Count and FGA listed in the Clinical tab too (the portal: Genomic only); no X vs Y, Variant Annotations |
 | STV-AC-3 | 🟡 | B | Checkbox · Attribute · **Freq** ("% samples with data") · Type · Level, ordered by Freq then name; a 0% row is greyed and cannot be checked; "Select all (N)" / "Deselect all" as the portal shows them; unchecking a chart clears its filter ([add-chart-cases](add-chart-cases.md) AC1–AC8). No info banner |
-| STV-AC-4 | 🟡 | B | Clinical Freq for brca_tcga_pan_can_atlas_2018: all 60 attributes as the portal's API gives them; filtered to Sex = Male, the 3 the portal greys out. No Genomic tab yet |
+| STV-AC-4 | ✅ | B | Clinical Freq for brca_tcga_pan_can_atlas_2018: all 60 attributes as the portal's API gives them; filtered to Sex = Male, the 3 the portal greys out. Genomic Freq for coadread: Data Types 100.0 %, CNA Genes 99.7 %, FGA 98.1 %, Mutated Genes / Mutation Count / SV Genes 89.9 %, the portal's list and order |
 | STV-AC-5 | 🟡 | B | Gene status: type a gene → mutation + CNA charts (≤6 genes); no profile select, gene sets, chart-type radios |
 | STV-AC-6 | 🟡 | B | "Custom data" button / tab: upload and manage datasets, charted as facets; sign-in rules differ |
 | STV-AC-7 | ❌ | B | No X vs Y |
-| STV-AC-8 | 🟡 | C | Generic assays tab: profile select + entity search, one chart per entity (`AssayChartPicker`) |
+| STV-AC-8 | 🟡 | C | A tab per generic-assay type, named as the portal's (`assayTabLabel`; coadread Arm-level CNA · Genetic Ancestry · Methylation), each a profile select of that type + entity search, one chart per entity (`AssayChartPicker`); no "Frequency Table" row |
 
 ### §7 Groups
 
@@ -211,7 +211,7 @@ Re-score of 2026-11-16: the rows PRs #191, #203 and #260 had already updated wer
 | STV-TAB-1 | 🟡 | B | Explore's Summary · Clinical Data · CN Segments tabs under the filter bar, in the URL (`svtab`) and kept mounted once opened (search, sort, page, locus kept); Clinical Data not offered on an empty selection ([clinical-tab-cases](clinical-tab-cases.md) CT1), CN Segments whenever a selected study holds segments ([study-cn-segments-cases](study-cn-segments-cases.md) CS1). Not yet: Plots |
 | STV-CD-1 | ✅ | B | "loading clinical data…" until the first page; later pages and queries cover the rows with "updating…" |
 | STV-CD-2 | N/A | C | No row limit: the table pages in the database (`lib/study-view-clinical-tab.ts:28-32`; [clinical-tab-cases](clinical-tab-cases.md) CT9), so the product limit and its message do not apply. Not a legacy bug, so N/A rather than 🐞 ok |
-| STV-CD-3 | 🟡 | BC | Patient ID and Sample ID (links), then each visible clinical-attribute chart by priority then name ([clinical-tab-cases](clinical-tab-cases.md) CT2, CT5). Several studies: the shared table's study column, not "Cancer Study". No header tooltip with description and id yet |
+| STV-CD-3 | ✅ | BC | Patient ID and Sample ID (links), then each visible clinical-attribute chart by priority then name ([clinical-tab-cases](clinical-tab-cases.md) CT2, CT5); each header's tooltip name, description and attribute id (`clinicalColumnTip`); several studies: a "Cancer Study" column (first, where the portal has it third) |
 | STV-CD-4 | ✅ | BC | Grey "—" (tooltip "No data available"), http(s) values as links ([clinical-tab-cases](clinical-tab-cases.md) CT3, CT4) |
 | STV-CD-5 | 🟡 | B | ↓ "N results" and 20 rows a page with the shared pager ✅ ([clinical-tab-cases](clinical-tab-cases.md) CT6); no "Show more", no max height of 100vh − 220px |
 | STV-CD-6 | ✅ | B | Search and sort in the database over every row; ⚠ no 500-row cap or its message ([clinical-tab-cases](clinical-tab-cases.md) CT7) |
