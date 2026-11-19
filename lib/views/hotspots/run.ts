@@ -11,7 +11,8 @@ import type { HotspotsView, HotspotGene } from "./types.ts";
 import { checkQuery, describeQuery } from "../../table-query.ts";
 import { MUTATION_COLUMNS } from "../../mutation-table.ts";
 import { lollipopNarrowing } from "../../lollipop.ts";
-import { driverSourceText, resolveDrivers } from "../../driver-settings.ts";
+import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
+import { mutationDefaults } from "../mutation-defaults.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
@@ -33,8 +34,12 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
     const bad = checkQuery(hv.table, MUTATION_COLUMNS);
     if (bad) return untimed({ kind: "hotspots", error: "table: " + bad });
   }
-  const narrowing = hv.table ? lollipopNarrowing(hv.table) : null;
-  if (hv.drivers !== undefined) { try { resolveDrivers(hv.drivers); } catch (e) { return untimed({ kind: "hotspots", error: (e as Error).message }); } }
+  let narrowing = hv.table ? lollipopNarrowing(hv.table) : null;
+  let drivers: ResolvedDrivers | undefined;
+  if (hv.drivers !== undefined) { try { drivers = resolveDrivers(hv.drivers); } catch (e) { return untimed({ kind: "hotspots", error: (e as Error).message }); } }
+  // the table's search reads the columns it shows: with none named, its defaults, which follow its data
+  if (narrowing && narrowing.search && !narrowing.columns?.length)
+    narrowing = { ...narrowing, columns: await mutationDefaults(c, c.vStudies.filter((st) => isPatientLevel(resolvers[st])), hv.table!.gene, lines.oql, drivers) };
   const cn = vNames[0];
   const studies = cohorts[cn].studies;
   // the table lists only patient-level studies' rows, and only those may be narrowed by its row values

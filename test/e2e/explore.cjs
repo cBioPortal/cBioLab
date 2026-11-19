@@ -483,6 +483,32 @@ async function explore({ ok, BASE, page, browser }) {
   } catch (e) { retryDetail = String(e.message).split("\n")[0]; }
   await own.close();
   ok("explore: a tab whose load failed loads again when it is shown again", retryOk, retryDetail);
+  // Data types (STS-OT-1, STS-STM-14): each kind's Freq is its samples over the selected samples, highest
+  // first, and two checked kinds apply as Intersection by default; Timeline events' Freq is over patients
+  let dtDetail = "", dtOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const card = page.locator(".card", { has: page.locator("h2", { hasText: "Data types" }) });
+    await card.locator(".dtrow").first().waitFor({ timeout: 240000 });
+    const rows = await card.locator(".dtrow").evaluateAll((els) => els.map((e) => [...e.querySelectorAll(".gcount")].map((s) => s.textContent.trim())));
+    const top = Number(rows[0][0].replace(/,/g, ""));
+    const all = rows.map(([n]) => Number(n.replace(/,/g, "")));
+    const share = (n, of) => (100 * n / of).toFixed(1) + "%";
+    // the first row's Freq names the selected samples it divides by
+    const samples = Number((/of the ([\d,]+) selected samples/.exec(await card.locator(".dtrow .gcount.meta").first().getAttribute("data-tip")) || [])[1].replace(/,/g, ""));
+    const freqsOk = rows.every(([n, f]) => { const v = Number(n.replace(/,/g, "")); return f === share(v, samples) || (f === "100.0%" && v === samples); });
+    const sorted = all.every((n, i) => i === 0 || all[i - 1] >= n);
+    await card.locator(".dtrow", { has: page.locator(".gname", { hasText: /^gistic$/ }) }).first().click();
+    await card.locator(".generows").evaluate((e) => { e.scrollTop = e.scrollHeight; });
+    await card.locator(".dtrow", { has: page.locator(".gname", { hasText: /^mutations$/ }) }).first().click();
+    const op = (await card.locator(".pickbar").innerText()).replace(/\s+/g, " ");
+    await card.getByRole("button", { name: "Clear" }).click();
+    const ev = page.locator(".card", { has: page.locator("h2", { hasText: "Timeline events" }) });
+    const evText = (await ev.innerText()).replace(/\s+/g, " ");
+    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, evText: evText.slice(0, 120) });
+    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && /\d+(\.\d)?%/.test(evText);
+  } catch (e) { dtDetail = String(e.message).split("\n")[0]; }
+  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events their Freq", dtOk, dtDetail);
 }
 
 module.exports = { explore };

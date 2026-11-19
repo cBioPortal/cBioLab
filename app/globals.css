@@ -552,7 +552,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .pikey .pn { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Explore: data-types rows */
-.generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 6rem; }
+.generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 4.5rem 3.5rem; }
 .generow.dtrow.is-static { cursor: default; }
 .generow.dtrow.is-static:hover { background: none; }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
@@ -1712,6 +1712,8 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .lp-summary { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
 .lp-summary a { color: var(--accent-ink); }
 .lp-freq { display: flex; justify-content: space-between; gap: var(--s2); color: var(--ink); margin-top: var(--s1); }
+.lp-status { cursor: pointer; background: none; border: 0; padding: 0; font: inherit; }
+.lp-status.off { color: var(--muted); text-decoration: line-through; }
 .lp-grid { border-collapse: collapse; }
 .lp-grid th, .lp-grid td { padding: 2px 4px; text-align: center; font-weight: 400; }
 .lp-grid tbody th { text-align: right; }
