@@ -85,6 +85,18 @@ export function clinicalValueFoldSql(expr: string): string {
   return "lowerUTF8(trimBoth(" + expr + "))";
 }
 
+/** a clinical value folded as clinicalValueFoldSql folds it, for merging lists already counted */
+export function clinicalValueFold(v: string): string {
+  return v.trim().toLowerCase();
+}
+
+/**
+ * The spelling a folded value is shown under, as cBioPortal's study view keeps it
+ * (StudyViewColumnarServiceUtil): the greatest by code unit, "true" over "TRUE", "Female" over
+ * "FEMALE"; SQL's max() orders UTF-8 bytes the same way for these values.
+ */
+export const keptSpelling = (a: string, b: string): string => (a > b ? a : b);
+
 /** the folded spellings cBioPortal's study view reads as "no value recorded" (its isAttributeValueNA): empty, NA, N/A, NaN */
 export const CLINICAL_MISSING_VALUES: readonly string[] = ["", "na", "n/a", "nan"];
 

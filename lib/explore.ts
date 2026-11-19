@@ -10,7 +10,7 @@ import { driverEventSql } from "./oql.ts";
 
 import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, DerivedFacet, DerivedRequest, AssayFacet, MutationTypeFacet } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
-import { clinicalValueFoldSql } from "./event-names.ts";
+import { clinicalValueFold, clinicalValueFoldSql, keptSpelling } from "./event-names.ts";
 import { dataBins, recountBins, type BinInput, type BinSettings } from "./data-binner.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor, withSampleLevel } from "./custom-data.ts";
 
@@ -1319,7 +1319,7 @@ async function scanDraft(g: ConnGroup, draft: CohortDef, ctx: DefCtx): Promise<S
       return groupByStudy((await chQuery<ChRow>(
         "SELECT s, type, a, v, vkey, n FROM (\n" +
         "SELECT c.s AS s, c.type AS type, c.a AS a, " + clinicalValueFoldSql("c.val") + " AS vkey,\n" +
-        "  topKIf(1)(c.val, bitTest(e.pm, c.bit))[1] AS v, uniqExactIf(c.id, bitTest(e.pm, c.bit)) AS n\n" +
+        "  maxIf(c.val, bitTest(e.pm, c.bit)) AS v, uniqExactIf(c.id, bitTest(e.pm, c.bit)) AS n\n" +
         "FROM " + rows(attrs, "attribute_value != '' AND attribute_name IN (" + attrs.map(sq).join(",") + ")") + "\n" + join("INNER") + "\n" +
         "GROUP BY s, type, a, vkey)\nWHERE n > 0 ORDER BY n DESC, vkey LIMIT " + FACET_VALUE_LIMIT + " BY s, type, a", conn)).data);
     },
@@ -1569,7 +1569,7 @@ async function prefetchFacets(opts: {
 /**
  * The value lists of `attrs` for these studies, by study: each value folded (Female / FEMALE are
  * one row, counted with uniqExact at the folded level, so a patient with one sample spelled each
- * way counts once) under its most frequent spelling, counted in its own unit, the
+ * way counts once) under its greatest spelling, as the portal keeps it (keptSpelling), counted in its own unit, the
  * FACET_VALUE_LIMIT most frequent per (study, type, attribute), sample rows of the cohort's samples
  * and patient rows of their owners. Serves every value list: the facets', and a drafted
  * attribute's counted without its own clauses.
@@ -1578,7 +1578,7 @@ async function valueCounts(o: { studies: string[]; db: string; conn: ChConn; att
   if (!o.attrs.length) return new Map();
   return groupByStudy((await chQuery<ChRow>(
     "SELECT cancer_study_identifier AS s, type, attribute_name AS a,\n" +
-    "       topK(1)(attribute_value)[1] AS v,\n" +
+    "       max(attribute_value) AS v,\n" +
     "       " + clinicalValueFoldSql("attribute_value") + " AS vkey,\n" +
     "       uniqExact(if(type = 'sample', sample_unique_id, patient_unique_id)) AS n\n" +
     "FROM " + clinicalTable(o.db, o.attrs) + "\n" +
@@ -1677,8 +1677,12 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
         min: Math.min(...nums.map((i) => i.min)), max: Math.max(...nums.map((i) => i.max)),
         median: Math.round(10 * nums.reduce((s: number, i) => s + i.median * i.patients, 0) / patients) / 10 };
     }
-    const vals = new Map<string, number>();
-    for (const i of cats) for (const v of i.values) vals.set(v.v, (vals.get(v.v) || 0) + v.n);
+    // one row per folded value across the studies, under its greatest spelling, as the portal merges them
+    const vals = new Map<string, { v: string; n: number }>();
+    for (const i of cats) for (const v of i.values) {
+      const k = clinicalValueFold(String(v.v)), was = vals.get(k);
+      vals.set(k, { v: was ? keptSpelling(was.v, String(v.v)) : String(v.v), n: (was?.n || 0) + v.n });
+    }
     // preserve the disjunctive marker: if any participant re-queried this
     // attribute without its own clauses, the merged totals are on that basis
     const disjunctive = cats.some((i) => i.disjunctive) || undefined;
@@ -1689,7 +1693,7 @@ export function mergeExplore(parts: ExploreResult[], hasDraft?: boolean): Explor
     // at least the values the studies' lists hold between them, so a list cut here reads as cut
     const distinct = Math.max(base.distinct ?? 0, vals.size) || undefined;
     return { ...base, distinct, kind: "cat" as const, ...(disjunctive ? { disjunctive } : {}), ...(na != null ? { na } : {}),
-      values: [...vals.entries()].map(([v, n]) => ({ v, n })).sort((x, y) => y.n - x.n || x.v.localeCompare(y.v)).slice(0, FACET_VALUE_LIMIT) };
+      values: [...vals.values()].sort((x, y) => y.n - x.n || x.v.localeCompare(y.v)).slice(0, FACET_VALUE_LIMIT) };
   }).sort(chartOrder);
 
   const sumBy = (arrs: any[][], key: string): Map<string, number> => {

@@ -55,6 +55,16 @@ describe("merging participants' facets", () => {
     assert.equal(mergeExplore([p]), p);
   });
 
+  test("STS-STM-1: values spelled differently across studies are one row, under the greatest spelling, as the portal's", () => {
+    const sex = (study: string, values: { v: string; n: number }[]) => part({ study, totals: { patients: 1000, samples: 1000 },
+      clinical: [{ attribute: "SEX", per: "patient", kind: "cat", patients: values.reduce((n, x) => n + x.n, 0), values }] });
+    // coadread writes "Female", brca_mbcproject_2022 "FEMALE": cbioportal.org lists Female 536
+    const m = mergeExplore([sex("coadread", [{ v: "Female", n: 264 }, { v: "Male", n: 312 }]), sex("mbc", [{ v: "FEMALE", n: 272 }, { v: " male ", n: 1 }])]);
+    const c = m.clinical.find((x) => x.attribute === "SEX")!;
+    assert.ok(c.kind === "cat");
+    assert.deepEqual(c.values, [{ v: "Female", n: 536 }, { v: "Male", n: 313 }]);
+  });
+
   describe("SD15: values cut across studies", () => {
     const cat = (study: string, vals: string[], distinct: number, base = 1000): ExploreResult => part({
       study, totals: { patients: 10000, samples: 10000 },
@@ -565,7 +575,7 @@ describe("one study", () => {
         // bits: 0 = all but SEX, 1 = all but AGE, 2 = all but TMB, 3 = the draft
         on(/^SELECT st, s, p, pm FROM/, [{ st: S, s: S + "_S1", p: S + "_P1", pm: "15" }, { st: S, s: S + "_S2", p: S + "_P1", pm: "1" },
           { st: S, s: S + "_S3", p: S + "_P2", pm: "8" }]);
-        on(/topKIf\(1\)/, [{ s: S, type: "patient", a: "SEX", v: "Female", vkey: "female", n: 2 }, { s: S, type: "patient", a: "SEX", v: "Male", vkey: "male", n: 1 },
+        on(/maxIf\(c\.val/, [{ s: S, type: "patient", a: "SEX", v: "Female", vkey: "female", n: 2 }, { s: S, type: "patient", a: "SEX", v: "Male", vkey: "male", n: 1 },
           { s: S, type: "sample", a: "CODE", v: "1", vkey: "1", n: 2 }]);
         on(/AS n_all/, [{ type: "patient", a: "AGE", v: "30", n: 1, n_all: 40 }, { type: "patient", a: "AGE", v: "60", n: 2, n_all: 50 }, { type: "sample", a: "TMB", v: "5", n: 2, n_all: 100 }]);
         on(/ARRAY JOIN range\(3\)/, [{ lvl: "patient", k: 0, n: 3 }, { lvl: "sample", k: 0, n: 3 }, { lvl: "patient", k: 1, n: 3 }, { lvl: "sample", k: 1, n: 3 }]);
@@ -835,7 +845,7 @@ describe("several studies", () => {
     // two filtered attributes (bits 0, 1) and the OQL clause as the rest: bit 2 is every filter
     on(/^SELECT st, s, p, pm FROM/, (q) => /cbio_b\./.test(q) ? [{ st: "st2", s: "st2_X1", p: "st2_Y1", pm: "4" }]
       : [{ st: "st1", s: "st1_S1", p: "st1_P1", pm: "7" }, { st: "st1", s: "st1_S2", p: "st1_P2", pm: "1" }]);
-    on(/topKIf\(1\)/, (q) => [{ s: /cbio_b\./.test(q) ? "st2" : "st1", type: "patient", a: "SEX", v: "Female", vkey: "female", n: 1 }]);
+    on(/maxIf\(c\.val/, (q) => [{ s: /cbio_b\./.test(q) ? "st2" : "st1", type: "patient", a: "SEX", v: "Female", vkey: "female", n: 1 }]);
     on(/AS n_all/, (q) => [{ type: "patient", a: "AGE", v: /cbio_b\./.test(q) ? "40" : "60", n: 1, n_all: 5 }]);
     twoConnAnswers();
     const draft = { all: [{ kind: "clinical" as const, attribute: "SEX", values: ["Female"] }, { kind: "clinical" as const, attribute: "AGE", range: { gt: 1 } },
