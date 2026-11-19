@@ -13,7 +13,8 @@ import type { TableQuery } from "../../lib/types";
 import { AnnotationBadge } from "./portal-bodies";
 import { MutationTypeCell } from "./mutation-cells.tsx";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
-import type { AlterationsResult, AlleleReads } from "../../lib/views/alterations/types";
+import type { AlterationsResult, AlleleReads, CohortCount } from "../../lib/views/alterations/types";
+import { cohortBar, cohortTooltip } from "../../lib/views/alterations/cohort-cell.ts";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
@@ -148,6 +149,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
                 : id === "mrna" && key === "mutations" ? <MrnaCell percentile={x == null ? null : Number(x)} z={row.detail?.mrnaZ as number | undefined} />
+                : id === "freq" && (key === "mutations" || key === "cna") ? <CohortCell row={row} gene={String(row.values[t.columns.findIndex((c) => c.id === "gene")] ?? "")}
+                    cna={key === "cna" ? String(row.values[t.columns.findIndex((c) => c.id === "cna")] ?? "") : undefined} shown={x != null} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
                 : id === "status" && key === "sv" ? <SvStatus value={String(x || "")} />
                 : id === "gene" || id === "gene1" || id === "gene2" ? <b>{x}</b>
@@ -182,6 +185,25 @@ function MrnaCell({ percentile, z }: { percentile: number | null; z?: number }) 
       <text x={d.textX} y={d.textY} fontSize={d.fontSize} fill="currentColor">{d.text}</text>
       <line x1={0} y1={d.lineY} x2={d.lineWidth} y2={d.lineY} stroke={d.line} strokeWidth={d.lineStroke} />
       <circle cx={d.cx} cy={d.lineY} r={d.r} fill={d.fill} />
+    </svg>
+  );
+}
+
+/**
+ * The Cohort cell as the portal's patient tables draw it (FrequencyBar): a grey bar with the gene's
+ * share over it — a mutation's keyword share darker within it, a copy-number call red or blue — the
+ * percent beside it, and the counts on hover; "Data not available." where there is no count to draw.
+ */
+function CohortCell({ row, gene, cna, shown }: { row: { detail?: Record<string, unknown> }; gene: string; cna?: string; shown: boolean }) {
+  const c = row.detail?.cohort as CohortCount | undefined;
+  if (!c || !shown) return <span className="alt-cohort-na" data-tip="Data not available.">&nbsp;</span>;
+  const b = cohortBar(c, cna);
+  const tip = cohortTooltip(gene, c, cna);
+  return (
+    <svg width={b.width} height={b.height} data-tip={tip} role="img" aria-label={tip}>
+      <rect y={b.top} width={b.barWidth} height={b.barHeight} fill={b.background} />
+      {b.bars.map((r, i) => <rect key={i} y={b.top} width={r.width} height={b.barHeight} fill={r.color} />)}
+      <text x={b.textX} y={b.textY} fontSize={b.fontSize} fill="currentColor">{b.text}</text>
     </svg>
   );
 }

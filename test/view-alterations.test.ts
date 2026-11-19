@@ -432,6 +432,13 @@ describe("allele frequency and per-sample reads", () => {
     const { t } = await cell(MUT, "gene");
     assert.equal(t.rows[0].detail?.reads, undefined);
   });
+  test("D3 PAT-STM-2: a row's Cohort counts become detail.cohort, the keyword only when it has one (coadread APC 387, 376 of 534)", async () => {
+    const { t } = await cell([{ ...MUT[0], cohortN: "387", cohortKwN: "376", cohortOf: "534", keyword: "APC truncating" }], "gene");
+    assert.deepEqual(t.rows[0].detail?.cohort, { n: 387, of: 534, keyword: "APC truncating", keywordN: 376 });
+    const bare = await cell([{ ...MUT[0], cohortN: 3, cohortKwN: 0, cohortOf: 534, keyword: "" }], "gene");
+    assert.deepEqual(bare.t.rows[0].detail?.cohort, { n: 3, of: 534 });
+    assert.equal((await cell(MUT, "gene")).t.rows[0].detail?.cohort, undefined, "no counts read, none carried");
+  });
 });
 
 describe("mRNA Expr. (PAT-MT-5)", () => {

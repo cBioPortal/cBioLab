@@ -1608,7 +1608,13 @@
                       "ref": 446
                     }
                   ],
-                  "mutationType": "Nonsense_Mutation"
+                  "mutationType": "Nonsense_Mutation",
+                  "cohort": {
+                    "n": 835,
+                    "of": 25040,
+                    "keyword": "ATRX truncating",
+                    "keywordN": 209
+                  }
                 }
               },
               {
@@ -1645,7 +1651,13 @@
                       "ref": 294
                     }
                   ],
-                  "mutationType": "Frame_Shift_Del"
+                  "mutationType": "Frame_Shift_Del",
+                  "cohort": {
+                    "n": 353,
+                    "of": 25040,
+                    "keyword": "BLM truncating",
+                    "keywordN": 138
+                  }
                 }
               },
               {
@@ -1682,7 +1694,13 @@
                       "ref": 440
                     }
                   ],
-                  "mutationType": "Nonsense_Mutation"
+                  "mutationType": "Nonsense_Mutation",
+                  "cohort": {
+                    "n": 1120,
+                    "of": 25040,
+                    "keyword": "FBXW7 truncating",
+                    "keywordN": 403
+                  }
                 }
               },
               {
@@ -1719,7 +1737,13 @@
                       "ref": 248
                     }
                   ],
-                  "mutationType": "Splice_Site"
+                  "mutationType": "Splice_Site",
+                  "cohort": {
+                    "n": 1120,
+                    "of": 25040,
+                    "keyword": "FBXW7 truncating",
+                    "keywordN": 403
+                  }
                 }
               },
               {
@@ -1756,7 +1780,13 @@
                       "ref": 341
                     }
                   ],
-                  "mutationType": "Nonsense_Mutation"
+                  "mutationType": "Nonsense_Mutation",
+                  "cohort": {
+                    "n": 786,
+                    "of": 25040,
+                    "keyword": "MAP3K1 truncating",
+                    "keywordN": 423
+                  }
                 }
               },
               {
@@ -1793,7 +1823,13 @@
                       "ref": 227
                     }
                   ],
-                  "mutationType": "Splice_Site"
+                  "mutationType": "Splice_Site",
+                  "cohort": {
+                    "n": 786,
+                    "of": 25040,
+                    "keyword": "MAP3K1 truncating",
+                    "keywordN": 423
+                  }
                 }
               },
               {
@@ -1830,7 +1866,13 @@
                       "ref": 439
                     }
                   ],
-                  "mutationType": "Nonsense_Mutation"
+                  "mutationType": "Nonsense_Mutation",
+                  "cohort": {
+                    "n": 1084,
+                    "of": 25038,
+                    "keyword": "PTPRD truncating",
+                    "keywordN": 147
+                  }
                 }
               },
               {
@@ -1867,7 +1909,13 @@
                       "ref": 318
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 1084,
+                    "of": 25038,
+                    "keyword": "PTPRD P1338 missense",
+                    "keywordN": 1
+                  }
                 }
               },
               {
@@ -1904,7 +1952,13 @@
                       "ref": 380
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 1199,
+                    "of": 25038,
+                    "keyword": "PTPRT G969 missense",
+                    "keywordN": 1
+                  }
                 }
               },
               {
@@ -1941,7 +1995,13 @@
                       "ref": 243
                     }
                   ],
-                  "mutationType": "Splice_Site"
+                  "mutationType": "Splice_Site",
+                  "cohort": {
+                    "n": 1199,
+                    "of": 25038,
+                    "keyword": "PTPRT truncating",
+                    "keywordN": 212
+                  }
                 }
               },
               {
@@ -1978,7 +2038,13 @@
                       "ref": 313
                     }
                   ],
-                  "mutationType": "Nonsense_Mutation"
+                  "mutationType": "Nonsense_Mutation",
+                  "cohort": {
+                    "n": 1085,
+                    "of": 25040,
+                    "keyword": "SMARCA4 truncating",
+                    "keywordN": 367
+                  }
                 }
               },
               {
@@ -2015,7 +2081,13 @@
                       "ref": 113
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 13124,
+                    "of": 25040,
+                    "keyword": "TP53 T256 missense",
+                    "keywordN": 4
+                  }
                 }
               },
               {
@@ -2052,7 +2124,13 @@
                       "ref": 131
                     }
                   ],
-                  "mutationType": "Frame_Shift_Del"
+                  "mutationType": "Frame_Shift_Del",
+                  "cohort": {
+                    "n": 13124,
+                    "of": 25040,
+                    "keyword": "TP53 truncating",
+                    "keywordN": 4611
+                  }
                 }
               },
               {
@@ -2089,7 +2167,13 @@
                       "ref": 398
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 668,
+                    "of": 25040,
+                    "keyword": "ATR R2431 missense",
+                    "keywordN": 1
+                  }
                 }
               },
               {
@@ -2126,7 +2210,13 @@
                       "ref": 561
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 515,
+                    "of": 25038,
+                    "keyword": "AXIN2 I375 missense",
+                    "keywordN": 1
+                  }
                 }
               },
               {
@@ -2163,7 +2253,13 @@
                       "ref": 538
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 339,
+                    "of": 25040,
+                    "keyword": "BRIP1 D393 missense",
+                    "keywordN": 1
+                  }
                 }
               },
               {
@@ -2200,7 +2296,13 @@
                       "ref": 222
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 134,
+                    "of": 25040,
+                    "keyword": "CCNE1 A47 missense",
+                    "keywordN": 1
+                  }
                 }
               },
               {
@@ -2237,7 +2339,13 @@
                       "ref": 203
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 862,
+                    "of": 25040,
+                    "keyword": "CREBBP M2161 missense",
+                    "keywordN": 2
+                  }
                 }
               },
               {
@@ -2274,7 +2382,13 @@
                       "ref": 324
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 565,
+                    "of": 25040,
+                    "keyword": "DOT1L W305 missense",
+                    "keywordN": 4
+                  }
                 }
               },
               {
@@ -2311,12 +2425,18 @@
                       "ref": 193
                     }
                   ],
-                  "mutationType": "Missense_Mutation"
+                  "mutationType": "Missense_Mutation",
+                  "cohort": {
+                    "n": 689,
+                    "of": 25040,
+                    "keyword": "FLT4 S293 missense",
+                    "keywordN": 1
+                  }
                 }
               },
               {
                 "…": "5 more",
-                "sha256": "ceeb89e3fa86f59b"
+                "sha256": "2d243923e47bed5b"
               }
             ],
             "offset": 0,
@@ -2401,7 +2521,13 @@
                   "12q14.1",
                   1.5575079872204474,
                   null
-                ]
+                ],
+                "detail": {
+                  "cohort": {
+                    "n": 390,
+                    "of": 25040
+                  }
+                }
               },
               {
                 "cohort": "Breast",
@@ -2416,7 +2542,13 @@
                   "1q21.2",
                   1.5095846645367412,
                   null
-                ]
+                ],
+                "detail": {
+                  "cohort": {
+                    "n": 378,
+                    "of": 25040
+                  }
+                }
               },
               {
                 "cohort": "Breast",
@@ -2431,7 +2563,13 @@
                   "1q22",
                   0.7388769071012061,
                   null
-                ]
+                ],
+                "detail": {
+                  "cohort": {
+                    "n": 185,
+                    "of": 25038
+                  }
+                }
               }
             ],
             "offset": 0,
@@ -2626,7 +2764,7 @@
         "requiresPatientLevel": true,
         "aggregateOnly": []
       },
-      "caveat": "P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it (blank for a mutation with no keyword, as the portal's), or with the same copy-number call. Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
+      "caveat": "P-0000012 — Mutations: 31 rows; Copy Number Alterations: 3 rows; Structural Variants: 0 rows. Each table lists a variant, a gene's call or an event once however many of the patient's samples carry it (Samples names them); allele frequency and read counts are the highest among those samples, each sample's reads drawn beside them; sorting by allele frequency compares the samples' frequencies in sample order. Copy number is the deep calls only (AMP, HOMDEL), as the portal's patient view lists them. Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it (blank for a mutation with no keyword, as the portal's), or with the same copy-number call; a mutation's cell also gives the share, over the same samples, with its keyword (APC truncating). Annotation is OncoKB v7.5 (oncogenicity and its highest sensitivity level); structural variants carry the study's own annotation, not OncoKB's. The patient list: 5,368 patients. Sorted with patients who have any alteration first, then by patient id across the cohort; every page is a slice of that one order, and the download holds every row kept, with every column. ",
       "method": {
         "steps": [
           {
@@ -2648,7 +2786,7 @@
           {
             "kind": "fetch",
             "title": "Read P-0000012's three tables",
-            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; blank for a mutation with no keyword (in-frame indels, splice region), as the portal's variant counts; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
+            "detail": "The alterations:mutations, alterations:cna and alterations:sv queries above, each paged, searched, filtered and sorted in the database like any table view. Each table reads the patient's samples. Mutations: every called mutation of those samples (uncalled calls left out), one row per variant with the samples carrying it, each sample's reads and allele frequency (variant / (variant + reference) reads; Allele Freq is the highest of them, and sorts by the samples' frequencies in sample order, one by one, a missing one last), and the gene's deep copy-number calls in those samples (Copy #). Copy-number alterations: the deep calls (AMP, HOMDEL), one row per gene and call. Structural variants: one row per event as the portal keys it (both genes, positions and chromosomes and the class, sorted, so A–B and B–A are one row), its fields the first record's, the highest read counts among its samples; the patient list counts them the same way. Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; blank for a mutation with no keyword (in-frame indels, splice region), as the portal's variant counts. A mutation's Cohort cell also gives its keyword's share (IDH1 R132 missense, APC truncating; the darker part of the bar and the tooltip's \"out of which N (x%) have … mutations\"): the study's samples with a called mutation carrying the row's keyword, over the same denominator, the samples profiled for the gene; the annotation is the OncoKB v7.5 call for the protein change, or for AMPLIFICATION / DELETION.",
             "params": [
               [
                 "Mutations",
