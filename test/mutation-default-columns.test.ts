@@ -10,6 +10,7 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationDefaultColumns } from "../lib/mutation-table.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
+import { runHotspots } from "../lib/views/hotspots/run.ts";
 import { Untimed, type ViewRun, type EvaluatedCohort } from "../lib/views/run.ts";
 import type { AnalysisDoc, AnalysisResult, ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { MutationsView } from "../lib/views/mutations/types.ts";
@@ -17,6 +18,7 @@ import type { ProfileInfo } from "../lib/profile-catalog.ts";
 import type { TableQuery } from "../lib/table-query.ts";
 import { renderViewCards } from "./support/render-views.ts";
 import { vafEmptyTip } from "../lib/mutation-cell-text.ts";
+import { mutationDefaults } from "../lib/views/mutation-defaults.ts";
 
 process.env.GENOME_NEXUS_PIN = "gn-hg19";
 process.env.GENOME_NEXUS_GRCH38_PIN = "gn-hg38";
@@ -75,13 +77,13 @@ const TWO_TYPES = [{ v: "Colon Adenocarcinoma", n: 3 }, { v: "Rectal Adenocarcin
 const ONE_TYPE = [{ v: "Colon Adenocarcinoma", n: 5 }];
 
 type Call = { label: string; q: TableQuery; defaults: string[]; column?: string };
-type Calls = { values: Call[]; page: Call[]; counts: Call[] };
+type Calls = { values: Call[]; page: Call[]; counts: Call[]; lollipop?: unknown[][] };
 
 function standIn(cohort: string, study: string, answers: Answers, calls: Calls, conn = "c1", rows: Record<string, unknown>[] = [{ sid: study + "-S1", vaf: 0.3, vafText: "0.30" }]) {
   return {
     instance: { id: conn, mode: "patient-level", label: "Local " + conn, conn: { id: conn, db: conn } },
     cohortSql: () => "SELECT 1",
-    lollipopCounts: async () => ({ changes: [], types: [], totals: [], cohortSamples: 10, minCount: 1, annotated: true }),
+    lollipopCounts: async (...args: unknown[]) => { (calls.lollipop ??= []).push(args); return { changes: [], types: [], totals: [], cohortSamples: 10, minCount: 1, annotated: true }; },
     rowsPage: async (label: string, _src: unknown, q: TableQuery, defaults: string[]) => {
       calls.page.push({ label, q, defaults });
       return { rows: rows.map((r) => ({ cohort: cohort, study, patient: String(r.sid), ...r })), total: rows.length };
@@ -129,9 +131,9 @@ test("R1 a study whose catalog has a COPY_NUMBER_ALTERATION / DISCRETE profile: 
   assert.deepEqual(m.shown, ALL, "a view naming no columns shows the defaults");
 });
 
-test("R2 no DISCRETE copy-number profile (CONTINUOUS, LOG2-VALUE, a DISCRETE profile of another type, or none): no Copy #", async (t) => {
+test("R2 no DISCRETE copy-number profile (CONTINUOUS, LOG2-VALUE, or a DISCRETE profile of another type): no Copy #", async (t) => {
   for (const [name, catalog] of [["CONTINUOUS only", [MUTATIONS, CONTINUOUS_CNA]], ["CONTINUOUS and LOG2-VALUE", [MUTATIONS, CONTINUOUS_CNA, LOG2_CNA]],
-    ["a DISCRETE mRNA profile", [MUTATIONS, DISCRETE_MRNA]], ["mutations only", [MUTATIONS]], ["an empty catalog", []]] as [string, ProfileInfo[]][]) {
+    ["a DISCRETE mRNA profile", [MUTATIONS, DISCRETE_MRNA]], ["mutations only", [MUTATIONS]]] as [string, ProfileInfo[]][]) {
     await t.test(name, async () => {
       const { m } = await run({ s1: { catalog, answers: keep } });
       assert.deepEqual(m.defaults, without("copyNumber"));
@@ -240,6 +242,42 @@ test("R8 the page and counts queries receive the facts' defaults", async () => {
   for (const c of [...none.page, ...none.counts]) assert.deepEqual(c.defaults, ["sample", "proteinChange", "annotation", "mutationType", "mutCount"], c.label);
 });
 
+test("R9 an empty catalog (a peer that failed to answer) leaves Copy # unknown, so kept; a mutations-only catalog drops it", async () => {
+  const { m } = await run({ s1: { catalog: [], answers: keep } });
+  assert.ok(m.defaults.includes("copyNumber"), m.defaults.join(","));
+  const { m: only } = await run({ s1: { catalog: [MUTATIONS], answers: keep } });
+  assert.ok(!only.defaults.includes("copyNumber"), only.defaults.join(","));
+});
+
+// ---- H: the hotspots view narrowed by the table -------------------------------------------------
+
+async function hot(table: Record<string, unknown>, catalog: ProfileInfo[] = [MUTATIONS, DISCRETE_CNA]) {
+  const calls = newCalls();
+  const r = await runHotspots({ kind: "hotspots", genes: ["KRAS"], cohorts: ["Q"], table } as never,
+    ctxFor({ s1: { catalog, answers: { vaf: VAF_NONE, cancerType: ONE_TYPE } } }, calls));
+  const res = (r instanceof Untimed ? r.result : r) as ViewResult & { error?: string };
+  assert.equal(res.error, undefined, JSON.stringify(res).slice(0, 300));
+  assert.equal(calls.lollipop?.length, 1, "lollipopCounts asked once");
+  return { rows: calls.lollipop![0][5] as { columns?: string[]; filters?: unknown }, calls };
+}
+
+test("H1 a table search with no columns: lollipopCounts gets the facts' defaults as columns", async () => {
+  const { rows } = await hot({ gene: "KRAS", search: "G12" });
+  assert.deepEqual(rows?.columns, ["sample", "proteinChange", "annotation", "mutationType", "copyNumber", "mutCount"]);
+});
+
+test("H2 a table naming its columns: lollipopCounts gets exactly those", async () => {
+  const { rows } = await hot({ gene: "KRAS", search: "G12", columns: ["sample", "vaf"] });
+  assert.deepEqual(rows?.columns, ["sample", "vaf"]);
+});
+
+test("H3 filters but no search: no defaults computed, no columns added", async () => {
+  const { rows, calls } = await hot({ gene: "KRAS", filters: { mutationType: { values: ["Missense"] } } });
+  assert.equal(calls.values.length, 0, "rowsValues called: " + JSON.stringify(calls.values.map((c) => c.column)));
+  assert.equal(rows?.columns, undefined);
+  assert.ok(rows?.filters, "the filters still reach the lollipop");
+});
+
 // ---- C: the Allele Freq (T) cell -----------------------------------------------------------------
 
 test("C1 the mutations card: a row without a frequency has an empty Allele Freq (T) cell tipped 'Data not available.'; 0.31 is written", async () => {
@@ -282,4 +320,9 @@ test("C1 the mutations card: a row without a frequency has an empty Allele Freq 
 test("C2 vafEmptyTip: the portal's NA tip for a cell with no frequency, none for one with", () => {
   for (const x of [null, undefined, ""]) assert.equal(vafEmptyTip(x), "Data not available.");
   for (const x of ["0.31", "0.0030", 0.5]) assert.equal(vafEmptyTip(x), null);
+});
+
+test("M1 mutationDefaults: no participant may list rows, so nothing is known and every default column is kept", async () => {
+  const ctx = { vStudies: ["s1"], vNames: ["Q"], cohorts: { Q: { studies: ["s1"], perStudy: {} } }, resolvers: { s1: { instance: { id: "a", mode: "aggregate-only", label: "a", conn: { id: "a", db: "a" } } } } } as unknown as ViewRun;
+  assert.deepEqual(await mutationDefaults(ctx, [], "KRAS", undefined, undefined), MUTATION_DEFAULT_COLUMNS);
 });
