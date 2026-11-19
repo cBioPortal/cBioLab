@@ -3,6 +3,8 @@
 // takes with it when unchecked. The rules, case by case: docs/legacy-spec/parity/add-chart-cases.md.
 // Browser-safe; no I/O.
 import { isClinicalLeaf, type Clause } from "./types.ts";
+import { fmtInt } from "./chart/format.ts";
+import { PROFILE_KINDS } from "./study-view-gene-tables.ts";
 
 /** a row of the list: its key, its name, the selected samples with data (unknown when not counted), and whether it is checked */
 export interface AddChartRow { key: string; name: string; samples: number | undefined; checked: boolean }
@@ -82,6 +84,73 @@ export function xVsYButton(x: { attribute: string; numeric: boolean } | null, y:
 /** the X vs Y tab's attributes: every clinical attribute but a survival one other than OS_STATUS, as the portal lists them */
 export function xVsYAttributes<T extends { attribute: string }>(attrs: T[]): T[] {
   return attrs.filter((a) => !/_(MONTHS|STATUS)$/.test(a.attribute) || a.attribute === "OS_STATUS");
+}
+
+/** what Add chart's gene tab charts (STV-AC-5): a gene's mutation status, its mutation types, or its copy number */
+export type GeneChartKind = "MUTATION" | "types" | "CNA";
+
+/**
+ * The gene tab's profile select, as the portal lists it: the selection's mutation and discrete
+ * copy-number profiles, each "<name> (N samples)", N the selected samples profiled. `dataTypes` is
+ * Explore's count per profile kind; the discrete copy-number kinds are the CNA gene table's
+ * (PROFILE_KINDS.cna), summed, since two studies may hold it under different ids ("gistic", "cna"),
+ * the label the one with the most samples.
+ */
+export function geneChartProfiles(dataTypes: { profile: string; label: string; alterationType: string; n: number }[]): { kind: "mutation" | "cna"; label: string }[] {
+  const option = (kind: "mutation" | "cna", rows: typeof dataTypes) => {
+    const held = rows.filter((d) => d.n > 0);
+    if (!held.length) return [];
+    const top = held.reduce((a, b) => (b.n > a.n ? b : a), held[0]);
+    return [{ kind, label: top.label + " (" + fmtInt(held.reduce((n, d) => n + d.n, 0)) + " samples)" }];
+  };
+  return [
+    ...option("mutation", dataTypes.filter((d) => d.alterationType === "MUTATION_EXTENDED")),
+    ...option("cna", dataTypes.filter((d) => d.alterationType === "COPY_NUMBER_ALTERATION" && PROFILE_KINDS.cna.includes(d.profile))),
+  ];
+}
+
+/** the gene charts asked for: genes whose status charts Explore counts, which of the two each shows, and genes charted by mutation type */
+export interface GeneCharts { genes: string[]; kinds: Record<string, ("MUTATION" | "CNA")[]>; types: string[] }
+
+/**
+ * What the gene tab shows (STV-AC-5): the profile picked (`chosen`, else the first offered) and the
+ * kind of chart Add makes, or, with no profile to chart from, a note in their place; and always
+ * every charted gene's chips with what each removes, since a chart's tile has no close of its own.
+ */
+export function geneTabView(dataTypes: Parameters<typeof geneChartProfiles>[0], charts: GeneCharts, chosen: "mutation" | "cna", byType: boolean): {
+  profiles: ReturnType<typeof geneChartProfiles>; current: ReturnType<typeof geneChartProfiles>[number] | null; kind: GeneChartKind;
+  note: string | null; chips: { gene: string; kind: GeneChartKind; text: string }[];
+} {
+  const profiles = geneChartProfiles(dataTypes);
+  const current = profiles.find((p) => p.kind === chosen) ?? profiles[0] ?? null;
+  const chips = [
+    ...charts.genes.flatMap((g) => (charts.kinds[g] || []).map((k) => ({ gene: g, kind: k as GeneChartKind, text: k === "CNA" ? "copy number" : "mutations" }))),
+    ...charts.types.map((g) => ({ gene: g, kind: "types" as GeneChartKind, text: "mutation types" })),
+  ];
+  return { profiles, current, kind: current?.kind === "cna" ? "CNA" : byType ? "types" : "MUTATION",
+    note: current ? null : "No selected study has mutation or copy-number data to chart a gene from.", chips };
+}
+
+/** how many charts a gene list draws: one per gene and kind shown, one per mutation-type table */
+export const geneChartCount = (s: GeneCharts): number => s.genes.reduce((n, g) => n + (s.kinds[g]?.length || 0), 0) + s.types.length;
+
+/** whether a change asks Explore for something new: its genes or mutation-type tables; another kind of a counted gene is already there */
+export const geneChartsAsked = (before: GeneCharts, after: GeneCharts): boolean =>
+  before.genes.join("|") !== after.genes.join("|") || before.types.join("|") !== after.types.join("|");
+
+/** a gene chart added (`on`) or removed, at most `limit` genes of each list, as the portal adds one chart per gene and profile */
+export function geneChartsChanged(s: GeneCharts, gene: string, kind: GeneChartKind, on: boolean, limit = 6): GeneCharts {
+  if (kind === "types") {
+    const types = on ? (s.types.includes(gene) ? s.types : [...s.types, gene].slice(-limit)) : s.types.filter((g) => g !== gene);
+    return { ...s, types };
+  }
+  const had = s.kinds[gene] || [];
+  const kinds = on ? (had.includes(kind) ? had : [...had, kind]) : had.filter((k) => k !== kind);
+  const all = { ...s.kinds };
+  if (kinds.length) all[gene] = kinds; else delete all[gene];
+  const genes = kinds.length ? (s.genes.includes(gene) ? s.genes : [...s.genes, gene].slice(-limit)) : s.genes.filter((g) => g !== gene);
+  for (const g of Object.keys(all)) if (!genes.includes(g)) delete all[g];
+  return { genes, kinds: all, types: s.types };
 }
 
 /** the Genomic tab's charts (STV-AC-2): drawn by default, each a checkbox in Add chart that hides or shows it */

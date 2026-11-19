@@ -620,6 +620,25 @@ async function explore({ ok, BASE, page, browser }) {
   } catch (e) { xyDetail = String(e.message).split("\n")[0]; }
   ok("explore: Add chart's X vs Y tab adds a density for two numeric attributes, beside the default one; its drag filters, Remove chart clears them", xyOk, xyDetail);
 
+  // the generic-assay frequency table (STS-OT-5), shown by default for arm-level CNA: altered
+  // categories only, losses first, Freq of every selected sample; a row applied filters to its count
+  let ftDetail = "", ftOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const card = page.locator("[data-assayfreq=armlevel_cna]");
+    await card.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const title = (await card.locator(".facettitle").textContent()).trim();
+    const cats = await card.locator(".valrow").evaluateAll((rs) => rs.slice(0, 8).map((r) => r.querySelectorAll(".vn")[0]?.textContent));
+    const first = await card.locator(".valrow").first().evaluate((r) => ({ n: Number(r.querySelectorAll(".vn")[1].textContent.replace(/,/g, "")) }));
+    await card.locator(".valrow").first().click();
+    await card.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction(() => /[\d,]+ patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const matched = Number((/([\d,]+) patients match/.exec(await page.locator(".exbar").innerText()) || [])[1]?.replace(/,/g, ""));
+    ftDetail = JSON.stringify({ title: title.slice(0, 60), cats, first, matched });
+    ftOk = /^Frequency Table: /.test(title) && cats.length > 0 && cats.every((c) => !/^(Unchanged|Unknown)$/i.test(c)) && /loss/i.test(cats[0]) && first.n > 0 && matched > 0 && matched <= first.n;
+  } catch (e) { ftDetail = String(e.message).split("\n")[0]; }
+  ok("explore: the arm-level CNA frequency table shows altered categories, losses first, and a row filters to its cases", ftOk, ftDetail);
+
   // the treatment tables (STS-OT-6), shown when the study has treatments: patients per agent, most
   // first; a checked agent applied filters on it, and the sample table narrows with it
   let txDetail = "", txOk = false;
@@ -650,8 +669,11 @@ async function explore({ ok, BASE, page, browser }) {
     await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: /Add chart/ }).first().click({ timeout: 240000 });
     await page.getByRole("tab", { name: "Gene status" }).click();
+    // the portal's gene tab: the mutation profile, "Mutation Type", the gene, Add Chart (STV-AC-5)
+    await page.getByRole("combobox", { name: /mutations by type/ }).click();
+    await page.getByRole("option", { name: "Mutation Type" }).click();
     await page.getByPlaceholder("chart a gene (e.g. EGFR)").fill("KRAS");
-    await page.getByRole("button", { name: "Add mutation types" }).click();
+    await page.getByRole("button", { name: "Add Chart" }).click();
     await page.keyboard.press("Escape");
     const card = page.locator("[data-mutationtypes='KRAS']");
     await card.locator(".valrow").first().waitFor({ timeout: 240000 });

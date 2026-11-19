@@ -1030,6 +1030,21 @@ export interface TreatmentFacets {
   leftOut?: string[];
 }
 
+/**
+ * cBioPortal's generic-assay frequency table (STS-OT-5): a row per (entity, value) the selection
+ * holds, its count in the profile's unit (patients for a patient-level profile, else samples), out of
+ * every selected case of that unit (`total`, unprofiled included), counted without the table's own filter.
+ */
+export interface AssayFreqTable {
+  profileType: string; name: string; assayType?: string; unit: "sample" | "patient"; binary: boolean;
+  total: number; rows: { entity: string; name: string; value: string; n: number }[];
+  /** the selected local studies holding the profile; `total` counts every selected local study's cases */
+  studies: string[];
+  disjunctive?: true;
+  /** selected studies a peer holds, not counted here, the profile held or not (its federation API has no such counts) */
+  leftOut?: string[];
+}
+
 export interface AssayFacet {
   profileType: string; entity: string;
   /** the entity's display name, where the study gives one */
@@ -1167,6 +1182,10 @@ export interface ExploreResult {
   geneFacets?: GeneStateFacet[];
   /** one entity of a generic-assay profile per chart the reader asked for (AssayFacet) */
   assayFacets?: AssayFacet[];
+  /** a frequency table per binary or categorical generic-assay profile the selection holds (AssayFreqTable) */
+  assayFreqTables?: AssayFreqTable[];
+  /** the frequency tables past ASSAY_FREQ_TABLE_LIMIT, by profile name: not drawn, and said so */
+  assayFreqTablesNotShown?: string[];
   /** the portal's treatment tables (TreatmentFacets), when a selected study has treatments */
   treatments?: TreatmentFacets;
   /** one gene's mutations by type per table the reader asked for (MutationTypeFacet) */

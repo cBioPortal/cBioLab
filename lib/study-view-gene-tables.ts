@@ -19,7 +19,7 @@ export function geneTableTitle(kind: GeneTableKind, profiled: number | undefined
 }
 
 /** the profile kinds a table's count is read from, the first that is not 0 winning */
-const PROFILE_KINDS: Record<GeneTableKind, string[]> = {
+export const PROFILE_KINDS: Record<GeneTableKind, string[]> = {
   mutated: ["mutations"],
   sv: ["fusion", "structural_variants"],
   cna: ["cna", "gistic", "cna_rae", "cna_consensus"]

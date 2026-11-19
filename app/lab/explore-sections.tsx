@@ -21,7 +21,7 @@ import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../..
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
-import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -30,6 +30,7 @@ import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { DEFAULT_DENSITY_PAIR, densityPairKey } from "../../lib/study-view-density.ts";
+import { ALTERED_ONLY_TYPES, ASSAY_FREQ_TABLE_LIMIT, freqRowKey, freqTableClause, freqTableRows } from "../../lib/assay-frequency-table.ts";
 import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
 import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
@@ -300,7 +301,7 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
-  const { addChartOpen, setAddChartOpen, addSeqFilter, clearAttributeFilters, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, mutationTypeCharts, chartChecked, setChartsChecked, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setSeq, treatmentEventType, unchartGene } = ctx;
+  const { addChartOpen, setAddChartOpen, addSeqFilter, clearAttributeFilters, attrCoverage, attrKey, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, openCustomManager, chartChecked, setChartsChecked, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setSeq, treatmentEventType } = ctx;
   const explore = ctx.explore!;
   return <>
     {explore && (
@@ -443,47 +444,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             </div>
           );
         })()}
-        {chartTab === "gene" && (
-          <div>
-            <div className="row baseline g5">
-              <Input type="search" className={SEARCH} placeholder="chart a gene (e.g. EGFR)" autoFocus
-                value={geneChartInput} disabled={exploreBusy}
-                onChange={e => setGeneChartInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
-              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}
-                data-tip="its mutation and copy-number status">Add</Button>
-              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput, true)}
-                data-tip="a table of its mutations by type: mutations, samples, and their share of the selected samples">Add mutation types</Button>
-            </div>
-            {!geneCharts.length && !mutationTypeCharts.length && (
-              <p className="note flush mt-1.5">
-                Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
-                it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
-                covering EGFR copy number.
-              </p>
-            )}
-            {geneCharts.map(g => (
-              <span key={g} className="qchip mr-1">
-                {g}
-                <Button variant="ghost" size="icon-xs" className={CHIP_X} data-tip={"stop charting " + g} aria-label={"stop charting " + g}
-                  onClick={() => unchartGene(g)}><X /></Button>
-              </span>
-            ))}
-            {mutationTypeCharts.map(g => (
-              <span key={"types|" + g} className="qchip mr-1">
-                {g}<span className="meta"> · mutation types</span>
-                <Button variant="ghost" size="icon-xs" className={CHIP_X} data-tip={"stop charting " + g + "'s mutation types"} aria-label={"stop charting " + g + "'s mutation types"}
-                  onClick={() => unchartGene(g, true)}><X /></Button>
-              </span>
-            ))}
-            {geneCharts.length + mutationTypeCharts.length > 0 && (
-              <p className="note flush mt-1.5">
-                Each chart is drawn as its own tile in the facet grid, alongside the clinical
-                attributes — close this dialog to see them.
-              </p>
-            )}
-          </div>
-        )}
+        {chartTab === "gene" && <GeneChartPicker ctx={ctx} />}
         {chartTab === "genomic" && <GenomicCharts ctx={ctx} />}
         {chartTab.startsWith("assay:") && <AssayChartPicker ctx={ctx} assayType={chartTab.slice("assay:".length)} />}
         {chartTab === "xvsy" && <XvsYPicker ctx={ctx} />}
@@ -1091,6 +1052,49 @@ function XvsYPicker({ ctx }: { ctx: ExploreCtx }) {
   );
 }
 
+/**
+ * The Add chart dialog's gene tab, as the portal's (STV-AC-5): a profile, "<name> (N samples)"; for
+ * mutations, Mutated vs Wild Type or Mutation Type; a gene; one chart per gene and profile.
+ */
+function GeneChartPicker({ ctx }: { ctx: ExploreCtx }) {
+  const { chartGene, unchartGene, geneChartInput, setGeneChartInput, exploreBusy, geneCharts, geneKinds, mutationTypeCharts } = ctx;
+  const [profile, setProfile] = useState<"mutation" | "cna">("mutation");
+  const [byType, setByType] = useState(false);
+  const { profiles, current, kind, note, chips } = geneTabView(ctx.explore!.dataTypes || [], { genes: geneCharts, kinds: geneKinds, types: mutationTypeCharts }, profile, byType);
+  const add = () => chartGene(geneChartInput, kind);
+  return (
+    <div>
+      {/* the charted genes' chips stay, so a chart can be removed whatever the selection holds */}
+      {!current ? <p className="note mt-0 mb-3">{note}</p> : <div className="row baseline g5 flex-wrap">
+        <Choice className="w-80" value={current.kind} onChange={(v) => setProfile(v as "mutation" | "cna")} title="the profile the chart reads"
+          options={profiles.map((p) => [p.kind, p.label] as const)} />
+        {current.kind === "mutation" && <Choice className="w-48" value={byType ? "types" : "mutated"} onChange={(v) => setByType(v === "types")}
+          title="a gene's mutated and wild-type samples, or its mutations by type" options={[["mutated", "Mutated vs Wild Type"], ["types", "Mutation Type"]] as const} />}
+        <Input type="search" className={SEARCH} placeholder="chart a gene (e.g. EGFR)" autoFocus aria-label="gene to chart"
+          value={geneChartInput} disabled={exploreBusy}
+          onChange={(e) => setGeneChartInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+        <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={add}>Add Chart</Button>
+      </div>}
+      {current && !chips.length && (
+        <p className="note flush mt-1.5">
+          Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
+          it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
+          covering EGFR copy number.
+        </p>
+      )}
+      {chips.map((c) => (
+        <span key={c.gene + "|" + c.kind} className="qchip mr-1">
+          {c.gene}<span className="meta"> · {c.text}</span>
+          <Button variant="ghost" size="icon-xs" className={CHIP_X} data-tip={"stop charting " + c.gene + "'s " + c.text} aria-label={"stop charting " + c.gene + "'s " + c.text}
+            onClick={() => unchartGene(c.gene, c.kind)}><X /></Button>
+        </span>
+      ))}
+      {chips.length > 0 && <p className="note flush mt-1.5">Each chart is drawn as its own tile in the facet grid, alongside the clinical attributes — close this dialog to see them.</p>}
+    </div>
+  );
+}
+
 /** the Add chart dialog's Genomic tab (STV-AC-2): the gene tables, Data Types and the density, each shown unless unchecked */
 /** the Genomic tab's rows for this selection (STV-AC-2, STV-AC-4); none hides the tab, as the portal's */
 function genomicLines(explore: NonNullable<ExploreCtx["explore"]>, attrKey: ExploreCtx["attrKey"]) {
@@ -1161,6 +1165,55 @@ function AssayChartPicker({ ctx, assayType }: { ctx: ExploreCtx; assayType: stri
             onClick={() => unchartAssay(c.profileType, c.entity)}><X /></Button>
         </span>
       ))}
+    </div>
+  );
+}
+
+/**
+ * the portal's generic-assay frequency tables (STS-OT-5): a row per (entity, value), its cases and
+ * Freq of every selected case; arm-level CNA and LOH tables show altered categories until asked
+ */
+export function AssayFreqTables({ ctx }: { ctx: ExploreCtx }) {
+  const more = ctx.explore!.assayFreqTablesNotShown || [];
+  return <>
+    {(ctx.explore!.assayFreqTables || []).map((t) => <AssayFreqTable key={t.profileType} t={t} ctx={ctx} />)}
+    {more.length > 0 && <p className="note" data-assayfreq-more>
+      {ASSAY_FREQ_TABLE_LIMIT} frequency tables are drawn at most; not drawn: {more.join(", ")}.</p>}
+  </>;
+}
+
+function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["explore"]>["assayFreqTables"]>[number]; ctx: ExploreCtx }) {
+  const { addClauses, parseDraft, exStudies } = ctx;
+  const [all, setAll] = useState(false);
+  const curated = !!t.assayType && ALTERED_ONLY_TYPES.includes(t.assayType);
+  const noun = t.unit === "patient" ? "patients" : "samples";
+  // the rows the draft already filters on: its genericAssay clauses on this profile
+  const leaves = ((parseDraft()?.all) || []).flatMap((c: any) => Array.isArray(c?.any) ? c.any : [c]);
+  const on = new Set(leaves.filter((l: any) => l && l.kind === "genericAssay" && l.profileType === t.profileType)
+    .flatMap((l: any) => (l.values || []).map((v: unknown) => freqRowKey({ entity: l.entity, value: String(v) }))));
+  const rows = freqTableRows(t.rows, t.assayType, all);
+  // a row filters every selected study only when each holds the profile; the note names those that do not
+  const peers = t.leftOut || [];
+  const without = exStudies.filter((s: string) => !t.studies.includes(s) && !peers.includes(s));
+  const clickable = !without.length && !peers.length;
+  return (
+    <div className="card" data-assayfreq={t.profileType}>
+      <div className="facettitle">
+        Frequency Table: {t.name}
+        <span className="meta">{t.unit}-level · Freq of {fmtInt(t.total)} {noun}{t.disjunctive ? " · counted without its own filter" : ""}</span>
+      </div>
+      {curated && <Button variant="ghost" size="xs" aria-pressed={!all} onClick={() => setAll(!all)}
+        data-tip={all ? "Showing all categories. Click to hide unchanged or unknown rows." : "Showing altered categories only. Click to include unchanged or unknown rows."}>
+        <Filter /> {all ? "all categories" : "altered only"}</Button>}
+      {without.length > 0 && <p className="note flush mt-1">Not held by {without.join(", ")}: counted in Freq, but its rows cannot filter {without.length === 1 ? "it" : "them"}.</p>}
+      {peers.length > 0 && <p className="note flush mt-1">Not counted: {peers.join(", ")} (a peer's {peers.length === 1 ? "study" : "studies"}, whose counts are not shared).</p>}
+      {rows.length ? <ValueList unit={noun} pct={portalFreq} hint={"keep the " + noun + " with any checked value"}
+        extra={t.binary ? undefined : { head: "Category", tip: "the entity's value" }}
+        rows={rows.map((r) => ({ key: freqRowKey(r), name: r.name, extra: r.value, n: r.n, total: t.total, on: on.has(freqRowKey(r)), disabled: !clickable,
+          title: r.name + " " + r.value + " — " + fmtInt(r.n) + " " + noun }))}
+        why={(keys) => { const r = freqTableClause(t.profileType, keys); return "why" in r ? r.why : null; }}
+        onApply={(keys) => { const r = freqTableClause(t.profileType, keys); if ("clauses" in r) addClauses(r.clauses); }} />
+        : <p className="note flush mt-1">No {curated && !all ? "altered " : ""}value in the selection.</p>}
     </div>
   );
 }
@@ -1247,7 +1300,7 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
   const { addClauses, geneStatesClauses } = ctx;
   const explore = ctx.explore!;
   return <>
-    {(explore.geneFacets || []).map(f => {
+    {(explore.geneFacets || []).filter((f) => (ctx.geneKinds[f.gene] || []).includes(f.type)).map(f => {
       const apply = (states: string[]) => geneStatesClauses(f.gene, f.type, states);
       // the copy-number levels the portal draws: none at 0 (the drivers-only chart keeps its fixed rows)
       const states = f.type === "CNA" && !explore.drivers ? f.states.filter((st) => st.n > 0) : f.states;

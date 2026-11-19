@@ -4,6 +4,7 @@ import { currentLinkUrlMax, linkParams, writeSearch } from "../_links/link-state
 import { TAB_PARAM, readFilters, readTab, writeTab, type StudyViewTab } from "../../lib/study-view-url.ts";
 import { useLinkParams } from "../_links/use-link.ts";
 import { ExploreCharts } from "./explore-charts";
+import { geneChartCount } from "../../lib/study-view-add-chart.ts";
 import type { UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import type { AnalysisDoc, CohortDef } from "../../lib/types.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
@@ -35,7 +36,7 @@ import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
-import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, TreatmentTables, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, AssayFreqTables, TreatmentTables, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { cardOrders } from "../../lib/study-view-config.ts";
 import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
@@ -630,7 +631,10 @@ export default function AnalysisPage() {
                 return shown < all && <span className="meta" data-charted={shown + "/" + all}>
                   {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
               })()}
-              {geneCharts.length + mutationTypeCharts.length > 0 && <span className="meta">{geneCharts.length + mutationTypeCharts.length} gene chart{geneCharts.length + mutationTypeCharts.length === 1 ? "" : "s"}</span>}
+              {(() => {
+                const n = geneChartCount({ genes: geneCharts, kinds: exploreState.geneKinds, types: mutationTypeCharts });
+                return n > 0 && <span className="meta">{n} gene chart{n === 1 ? "" : "s"}</span>;
+              })()}
               {(() => {
                 // drivers only where every selected study has OncoKB calls here; the server refuses the rest too
                 const without = exStudies.filter((id) => studies.find((x) => x.id === id)?.oncokb === false);
@@ -672,6 +676,7 @@ export default function AnalysisPage() {
               <GeneFacets ctx={exploreCtx} />
               <MutationTypeFacets ctx={exploreCtx} />
               <AssayFacets ctx={exploreCtx} />
+              <AssayFreqTables ctx={exploreCtx} />
               <TreatmentTables ctx={exploreCtx} />
               <StudyBreakdown ctx={exploreCtx} />
               {exploreState.chartChecked("genomic|datatypes") && <DataTypes ctx={exploreCtx} />}
