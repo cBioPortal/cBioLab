@@ -7,7 +7,7 @@
 // carries the summary and the selection in its caption instead.
 import React, { useMemo, useRef, useState } from "react";
 import type { ViewResultOf } from "../../lib/types.ts";
-import { filterHotspotGene, clickCodon, lollipopFilename, LOLLIPOP_FORMATS, defaultYMax, lollipopGeneEmpty, nextYMax, hasGermlineRate, statusFilter, statusSelection, withStatusFilter, STATUS_COLUMN, type CodonSelection, type StatusSelection } from "../../lib/lollipop.ts";
+import { filterHotspotGene, clickCodon, lollipopFilename, LOLLIPOP_FORMATS, defaultYMax, lollipopGeneEmpty, nextYMax, hasGermlineRate, mutationRateText, statusFilter, statusSelection, withStatusFilter, STATUS_COLUMN, type CodonSelection, type StatusSelection } from "../../lib/lollipop.ts";
 import type { LollipopRows } from "../../lib/federation.ts";
 import { AlterationGrid, classesOf } from "./AlterationGrid.tsx";
 import { TranscriptSummary } from "./TranscriptSummary.tsx";
@@ -17,7 +17,6 @@ import { useStemClicks } from "./use-stem-clicks.ts";
 import { setStemHover } from "./stem-hover.ts";
 import { lollipopPanelsSvg } from "../../lib/lollipop-svg.ts";
 import { DrawAtWidth } from "../lab/figure.tsx";
-import { fmtShare } from "../../lib/chart/format.ts";
 import { X } from "lucide-react";
 import { Button } from "../_ui/button";
 import { TB } from "../_ui/toolbar.ts";
@@ -29,7 +28,7 @@ import type { HotspotGene } from "../../lib/views/hotspots/types.ts";
  * toggles that status in or out of the tab's mutations; the rates themselves never change with them.
  */
 function GeneSummary({ g, grch38, status, onStatus }: { g: HotspotGene; grch38: boolean; status: StatusSelection; onStatus?: (next: StatusSelection) => void }) {
-  const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
+  const freq = mutationRateText(g.somaticSamples, g.cohortSamples);
   const germline = hasGermlineRate(g);
   const badges = germline && !!onStatus;
   const rate = (key: keyof StatusSelection, label: string, value: string, tip: string) => badges
@@ -45,7 +44,7 @@ function GeneSummary({ g, grch38, status, onStatus }: { g: HotspotGene; grch38: 
       {!lollipopGeneEmpty(g) && <div className="lp-summary">
         {rate("somatic", "Somatic Mutation Frequency", freq, g.somaticSamples.toLocaleString() + " of " + g.cohortSamples.toLocaleString() + " samples carry a somatic mutation in " + g.gene)}
         {/* the portal adds the germline rate only when some sample has a germline mutation (MutationRateSummary), over the germline-consented samples where a study lists them */}
-        {germline && rate("germline", "Germline Mutation Frequency", fmtShare((g.germlineSamples ?? 0) / (g.germlineCohortSamples ?? 1)),
+        {germline && rate("germline", "Germline Mutation Frequency", mutationRateText(g.germlineSamples ?? 0, g.germlineCohortSamples ?? 0),
           (g.germlineSamples ?? 0).toLocaleString() + " of " + (g.germlineCohortSamples ?? 0).toLocaleString() + " samples carry a germline mutation in " + g.gene)}
       </div>}
     </>

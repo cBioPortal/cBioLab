@@ -1,11 +1,11 @@
 // The lollipop figure: the plot alone, one panel per gene, and its caption's words for what the app
 // shows beside it as controls. Imports only the drawing kit and lib/lollipop.ts, so the app draws
 // it in the browser (app/_lollipop/HotspotsBody.tsx) from the same code the server uses for MCP.
-import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, lollipopGeneEmpty, lollipopStemTip, defaultYMax, lollipopXTicks, lollipopYTicks, LOLLIPOP_Y_TITLE, type AlterationCell, type CodonSelection } from "./lollipop.ts";
+import { IMPACT_COLORS, IMPACT_TYPES, filterHotspotGene, cellLabel, lollipopGeneEmpty, lollipopStemTip, defaultYMax, lollipopXTicks, lollipopYTicks, LOLLIPOP_Y_TITLE, mutationRateText, type AlterationCell, type CodonSelection } from "./lollipop.ts";
 
 import {
   esc, palette, frame, caption, linear, axisLeft, axisBottom, leftAxisWidth, legend, label, textWidth, textOn,
-  fmtInt, fmtShare, FS, SW, type SvgOpts, type LegendItem
+  fmtInt, FS, SW, type SvgOpts, type LegendItem
 } from "./svg-kit.ts";
 import type { HotspotGene } from "./views/hotspots/types.ts";
 
@@ -18,7 +18,7 @@ export function lollipopSummaryText(genes: HotspotGene[], hide: readonly string[
   const parts = genes.map((g) => {
     // the portal hides an empty gene's frequency (ResultsViewMutationMapper, no mutation data)
     if (lollipopGeneEmpty(g)) return g.gene + ": no mutations in the cohort.";
-    const freq = g.cohortSamples ? fmtShare(g.somaticSamples / g.cohortSamples) : "–";
+    const freq = mutationRateText(g.somaticSamples, g.cohortSamples);
     const cells = IMPACT_TYPES.filter((k) => g.tally[k].driver || g.tally[k].vus)
       .map((k) => IMPACT_COLORS[k].label.toLowerCase() + " " + fmtInt(g.tally[k].driver) + " driver / " + fmtInt(g.tally[k].vus) + " VUS");
     const f = filterHotspotGene(g, hide);
