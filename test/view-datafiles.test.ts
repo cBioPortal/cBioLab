@@ -100,7 +100,7 @@ describe("SQL", () => {
     assert.match(statusRowSource("altered", parts, lines, plan).with, /WHERE status = 'altered'\)\n$/);
     assert.deepEqual(statusRowSource("matrix", parts, lines, plan).columns.map((c) => c.text), ["sid", "multiIf(status = 'altered', '1', status = 'unaltered', '0', 'NP')", "m0", "m1"]);
     // only the case table writes each call's germline / driver note (CaseAlterationTable); the lists, the matrix and the counts read the calls alone
-    assert.match(cases.with, /concat\(ev, note\)/);
+    assert.match(cases.with, /concat\(call_, note\)/);
     for (const t of ["altered", "unaltered", "matrix"] as const) assert.doesNotMatch(statusRowSource(t, parts, lines, plan).with, /note/, t);
     assert.doesNotMatch(datafilesCountsSql("SELECT pid, sid FROM x", lines, { study: "s", db: "d", pin: null, profiles: [] }), /note/);
     assert.throws(() => statusRowSource("cases", [], lines, plan), /at least one part/);
@@ -178,8 +178,11 @@ describe("runDatafiles", () => {
     assert.deepEqual(d.files.map((f) => [f.id, f.rows]), [["cna", 3], ["mutations", 3], ["sv", 3], ["altered", 1], ["unaltered", 1], ["matrix", 3],
       ["profile:log2CNA", 3], ["profile:rna_seq_v2_mrna", 3], ["profile:rppa", 3]]);
     assert.deepEqual(d.lines, [{ line: "TP53", gene: "TP53", column: "TP53" }, { line: "KRAS: MUT", gene: "KRAS", column: "KRAS" }]);
-    assert.deepEqual(d.rows.map((r) => r.values), [["s1", "A-01", "A", "1", "R175H", "no alteration"], ["s1", "B-01", "B", "0", "no alteration", "no alteration"],
+    assert.deepEqual(d.rows.map((r) => r.values.slice(0, 6)), [["s1", "A-01", "A", "1", "R175H", "no alteration"], ["s1", "B-01", "B", "0", "no alteration", "no alteration"],
       ["s1", "C-01", "C", "NP", "not profiled", "no alteration"]]);
+    // the portal's per-alteration columns, hidden: TP53's default OQL in the profiles' id order (gistic, mutations, structural_variants), KRAS's own
+    assert.deepEqual(d.columns.slice(6).map((c) => c.name), ["TP53: AMP", "TP53: HOMDEL", "TP53: MUT", "TP53: FUSION", "KRAS: MUT"]);
+    assert.deepEqual(d.shown, ["study", "sample", "patient", "altered", "TP53", "KRAS"]);
     assert.match(String(v.caveat), /alters 1 sample \(33\.3%\) of the cohort's 3 samples; 1 sample are unaltered .* and 1 sample are neither/);
     assert.ok(v.method && v.method.steps.length === 4);
     assert.deepEqual(r1.asked.sort(), ["datafiles:cases:counts", "datafiles:cases:rows", "datafiles:counts"]);

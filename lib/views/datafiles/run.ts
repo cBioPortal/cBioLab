@@ -4,6 +4,7 @@
 // lib/table-query.ts (tables.ts), downloaded whole through POST /api/table naming the file.
 import type { ViewResult, TableRows } from "../../types.ts";
 import { parseOql, OQL_PROFILE } from "../../oql-parse.ts";
+import { defaultOqlSublabel } from "../../oql-match.ts";
 import type { OqlPins } from "../../oql.ts";
 import { MAX_GENE_SYMBOLS } from "../../gene-tracks.ts";
 import { hasViewAggregates } from "../../federation.ts";
@@ -14,7 +15,7 @@ import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
 import { plural, refuse } from "../shared.ts";
 import { datafilesCountsSql, type DataType, type LinePlan } from "./sql.ts";
-import { STATUS_TABLES, everySample, lineColumns, matrixColumns, matrixRowSource, statusColumns, statusRowSource, type FileColumn, type MatrixFile, type StatusTable, type StudyPlan } from "./tables.ts";
+import { STATUS_TABLES, alterationColumns, everySample, lineColumns, matrixColumns, matrixRowSource, statusColumns, statusRowSource, type FileColumn, type MatrixFile, type StatusTable, type StudyPlan } from "./tables.ts";
 import type { DataFile, DatafilesResult, DatafilesView, LineFrequency } from "./types.ts";
 import { datafilesMethod } from "./method.ts";
 import { resolveDrivers } from "../../driver-settings.ts";
@@ -136,13 +137,18 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   const size = pageSize(view.rows);
   if (!(size >= 1 && size <= TABLE_ROWS_MAX)) return no("rows (the page size of the case table) is 1 to " + TABLE_ROWS_MAX);
   const q = viewQuery(view);
-  const caseCols = statusColumns("cases", lines);
-  { const bad = checkQuery(q, caseCols); if (bad) return no(bad); }
 
   const { holders, excluded } = rowHolders(ctx);
   if (!holders.length) return no("no study here may disclose patients' samples (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   const catalogs: Record<string, ProfileInfo[]> = {}, profiles: Record<string, string[]> = {};
   await Promise.all(holders.map(async (st) => { const sp = await ctx.studyProfiles(st); catalogs[st] = sp.catalog || []; profiles[st] = sp.profiles; }));
+  // the case table's per-alteration columns: a bare line's commands are the default OQL of the studies' profiles, each study's in id order
+  const defaultCommands = defaultOqlSublabel(holders.flatMap((st) => catalogs[st]
+    .filter((p) => p.type === "MUTATION_EXTENDED" || p.type === "STRUCTURAL_VARIANT" || (p.type === "COPY_NUMBER_ALTERATION" && p.datatype.toUpperCase() === "DISCRETE"))
+    .sort((a, b) => (a.profile < b.profile ? -1 : a.profile > b.profile ? 1 : 0)))).replace(/^: /, "").split(" ").filter(Boolean);
+  const alts = alterationColumns(checked.map((l) => ({ gene: l.gene, specs: parseOql(l.line)[0].specs })), defaultCommands);
+  const caseCols = statusColumns("cases", lines, alts);
+  { const bad = checkQuery(q, caseCols); if (bad) return no(bad); }
   const plans: Record<string, StudyPlan> = {};
   for (const st of holders) {
     const held = heldTypes(catalogs[st]);
@@ -160,12 +166,12 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
   /** one table's rows (the page or values asked for) and its TableRows */
   const tableRows = async (id: string, tq: TableQuery, n: number): Promise<{ r: Rows; rows: TableRows<Cell> }> => {
     const file = offered.find((f) => f.id === id);
-    const cols = file ? matrixColumns(genes) : statusColumns(id as StatusTable, lines);
-    const defs = cols.map((c) => c.id);
+    const cols = file ? matrixColumns(genes) : statusColumns(id as StatusTable, lines, id === "cases" ? alts : []);
+    const defs = cols.map((c) => c.id).filter((c) => !c.startsWith("alt_"));
     const shown = shownColumns(tq, cols, defs);
     // a gene-by-sample file lists every queried sample, as the portal's: NP in a study without its profile
     const r = await runRows(ctx, "datafiles:" + id, file && !everySample(file.matrix) ? file.studies : holders, tq, defs, shown, n,
-      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db, (p) => file.studies.includes(p.study)) : statusRowSource(id as StatusTable, parts, lines, planOf),
+      (parts: TablePart[]) => (db) => file ? matrixRowSource(file.matrix, parts, genes, db, (p) => file.studies.includes(p.study)) : statusRowSource(id as StatusTable, parts, lines, planOf, alts),
       ctx.values ? { column: ctx.values, numeric: false } : undefined);
     const lineIds = lineColumns(lines).map((c) => c.id);
     const reads = (x: Record<string, unknown>, c: FileColumn): Cell => {
@@ -175,6 +181,7 @@ export async function runDatafiles(view: DatafilesView, ctx: ViewRun): Promise<V
       if (c.id === "patient") return String(x.patient ?? "");
       if (c.id === "study") return String(x.study ?? "");
       if (c.id === "altered") return x.status === "altered" ? "1" : x.status === "unaltered" ? "0" : "NP";
+      if (c.id.startsWith("alt_")) return String(x["h" + alts.findIndex((a) => a.id === c.id)] ?? "");
       return String(x[(id === "matrix" ? "m" : "c") + lineIds.indexOf(c.id)] ?? "");
     };
     return { r, rows: { columns: cols, shown, defaults: defs, query: tq, rows: rowsOf(r, cols, reads), offset: r.offset, pageSize: n,
