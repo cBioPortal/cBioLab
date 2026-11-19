@@ -209,10 +209,10 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
         if "freqPct" in t.meta:
             ax.text(gutter - 8, y, format_gutter_pct(t.meta, c.n), fontsize=7.5, color=P["muted"], va="center", ha="right")
     gene_cells = np.concatenate([np.asarray(t.cells) for t in c.tracks if t.kind == "gene"] or [np.zeros(0, dtype=np.int32)])
-    present = glyph_presence(np.unique(gene_cells[gene_cells > 0]), S)
-    handles = [Patch(color=color, label=label) for label, color, kind in gene_legend(S, present)]
-    if any(t.kind == "derivedEvent" for t in c.tracks):
-        handles.append(Patch(color=P["derived"], label="Derived event"))
+    present = {**glyph_presence(np.unique(gene_cells), S), "genes": any(t.kind == "gene" for t in c.tracks),
+               "derived": any(t.kind == "derivedEvent" for t in c.tracks)}
+    edge = S["glyph"]["notProfiled"]["stripe"]["color"]
+    handles = [Patch(facecolor=color, edgecolor=edge if kind == "unaltered" else color, label=label) for label, color, kind in gene_legend(S, present)]
     fig.legend(handles=handles, loc="lower left", ncol=len(handles), fontsize=7, frameon=False, bbox_to_anchor=(0.005, 0.0), handlelength=1.2, columnspacing=1.0)
     if title:
         fig.suptitle(title, fontsize=9, x=0.005, ha="left")

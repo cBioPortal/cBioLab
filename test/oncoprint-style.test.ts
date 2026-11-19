@@ -83,14 +83,14 @@ test("percent format follows the portal, legend order is mutations, SV, CNA, not
   // a legend lists only what the cells draw: the displayed mutation class, as driver or VUS
   const tracks = [{ kind: "gene", cells: [0, -1, B.MISSENSE | B.TRUNCATING, B.MISSENSE | B.MUT_DRIVER | B.DRIVER, B.AMP | B.DRIVER] }];
   assert.deepEqual(geneLegend(STYLE, glyphPresence(tracks)).map((i) => i.label),
-    ["Truncating Mutation (unknown significance)", "Missense Mutation (putative driver)", "Amplification", "Not profiled"]);
+    ["Truncating Mutation (unknown significance)", "Missense Mutation (putative driver)", "Amplification", "No alterations", "Not profiled"]);
   // annotation off: one entry per glyph in its driver colour (the portal's rule set without recurrence)
   const off = geneLegend(styleForDisplay(STYLE, { annotate: "none" }), glyphPresence([{ kind: "gene", cells: [B.MISSENSE] }]));
-  assert.deepEqual(off.map((i) => [i.label, i.color]), [["Missense Mutation", "#008000"], ["Not profiled", "#bebebe"]]);
+  assert.deepEqual(off.map((i) => [i.label, i.color]), [["Missense Mutation", "#008000"], ["No alterations", "#bebebe"]], "every cell profiled: no Not profiled");
   assert.equal(cellLayers(B.MISSENSE, styleForDisplay(STYLE, { annotate: "none" }))[1].color, "#008000");
   // colour by type off: one pair for every class, listed once
   const one = geneLegend(styleForDisplay(STYLE, { colorByType: false }), glyphPresence([{ kind: "gene", cells: [B.MISSENSE, B.TRUNCATING | B.MUT_DRIVER] }]));
-  assert.deepEqual(one.map((i) => i.label), ["Mutation (putative driver)", "Mutation (unknown significance)", "Not profiled"]);
+  assert.deepEqual(one.map((i) => i.label), ["Mutation (putative driver)", "Mutation (unknown significance)", "No alterations"]);
   assert.equal(numericColor(0, null), "rgb(222,235,247)"); assert.equal(numericColor(255, 128), "rgb(178,24,43)"); assert.equal(numericColor(128, 128), "rgb(255,255,255)");
 });
 
