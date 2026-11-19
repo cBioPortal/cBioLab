@@ -5,7 +5,8 @@
 //
 // | ID  | rule                                                                                              |
 // |-----|---------------------------------------------------------------------------------------------------|
-// | GL1 | "No alterations" (the always rule, the grey cell) is listed when some gene cell is profiled          |
+// | GL1 | "No alterations" (the always rule, the grey cell) is listed whenever a gene row is drawn: the rule is   |
+// |     | counted as used for every datum, profiled or not                                                     |
 // | GL2 | "Not profiled" (the NA rule) is listed only when some gene cell is not profiled                      |
 // | GL3 | both have the last order; "No alterations" sorts before "Not profiled"                               |
 // | GL4 | a style listing (no cells) names both                                                                |
@@ -30,8 +31,12 @@ test("GL2/GL3: a cell not profiled: Not profiled, after No alterations", () => {
   assert.deepEqual(labels([[B.AMP, 0, -1]]).slice(-2), ["No alterations", "Not profiled"]);
 });
 
-test("GL1/GL2: every cell not profiled: Not profiled alone", () => {
-  assert.deepEqual(labels([[-1, -1]]), ["Not profiled"]);
+test("GL1/GL2: every cell not profiled: No alterations still, then Not profiled", () => {
+  assert.deepEqual(labels([[-1, -1]]), ["No alterations", "Not profiled"]);
+});
+
+test("GL1: no gene row: no No alterations", () => {
+  assert.deepEqual(geneLegend(STYLE, glyphPresence([{ kind: "clinical", cells: Int32Array.from([0, -1]) }])).map((i) => i.label), []);
 });
 
 test("GL1: gene rows of other kinds of track are not read", () => {
@@ -43,7 +48,9 @@ test("GL4: the style's own listing names both", () => {
   assert.deepEqual(geneLegend(STYLE).map((i) => i.label).slice(-2), ["No alterations", "Not profiled"]);
 });
 
-test("GL3 (ours): the server SVG puts Derived event before the closing No alterations and Not profiled", async () => {
+test("GL3 (ours): a derived-event row's entry comes before the closing two, on screen and in the SVG alike", async () => {
+  assert.deepEqual(geneLegend(STYLE, glyphPresence([{ kind: "gene", cells: Int32Array.from([0, -1]) }, { kind: "derivedEvent", cells: Int32Array.from([1, 0]) }]))
+    .map((i) => i.label), ["Derived event", "No alterations", "Not profiled"]);
   const { readFileSync } = await import("node:fs");
   const { assembleContract } = await import("../lib/oncoprint-assemble.ts");
   const { localInput, parseTsv } = await import("../lib/oncoprint-local.ts");

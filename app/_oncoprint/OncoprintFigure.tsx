@@ -1186,9 +1186,9 @@ function Legend({ data, display, colors, shown }: { data: UnpackedContract; disp
       {geneLegend(S, present).map((it) => <span key={it.label + it.color}>{it.kind === "notProfiled" ? np
         // the stripe over a mutation glyph, at least 2px so a 10px swatch shows it
         : it.kind === "germline" ? <span style={{ display: "inline-block", width: 10, height: 10, background: `linear-gradient(${S.glyph.mutation.single.color} calc(50% - 1px), ${it.color} calc(50% - 1px), ${it.color} calc(50% + 1px), ${S.glyph.mutation.single.color} calc(50% + 1px))`, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />
+        : it.kind === "unaltered" ? <span style={{ display: "inline-block", width: 10, height: 10, background: it.color, boxShadow: "inset 0 0 0 1px " + P.npStripe, marginRight: 4, verticalAlign: -1, borderRadius: 2 }} />
         : it.kind === "outline" ? <span style={{ display: "inline-block", width: 10, height: 10, border: "2px solid " + it.color, background: P.unaltered, marginRight: 4, verticalAlign: -1, borderRadius: 2, boxSizing: "border-box" }} />
         : sw(it.color)}{it.label}</span>)}
-      {data.tracks.some((t) => t.kind === "derivedEvent") && <span>{sw(P.derived)}Derived event</span>}
       <span>% = driver / any</span>
       {white && <span className="mark">white background: unaltered and not-profiled differ only by the stripe</span>}
       {data.stats.hiddenVus != null && <span className="mark">{data.stats.hiddenVus.toLocaleString()} alterations of unknown significance hidden — the percentages are over drivers alone</span>}

@@ -35,10 +35,6 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   // gene legend, wrapped to the available width; each row is 16 px
   // only the alterations these cells actually carry
   const items: { label: string; color: string; kind: string }[] = geneLegend(S, glyphPresence(contract.tracks as { kind: string; cells: ArrayLike<number> }[], S));
-  if (contract.tracks.some((t) => t.kind === "derivedEvent")) {
-    const tail = items.findIndex((it) => it.label === S.glyph.unalteredLabel || it.kind === "notProfiled");
-    items.splice(tail < 0 ? items.length : tail, 0, { label: "Derived event", color: P.derived, kind: "swatch" });
-  }
   const itemW = (label: string): number => 14 + label.length * 6.2 + 16;
   const legendRows: typeof items[] = [[]];
   { let lx = GUTTER; for (const it of items) { if (lx + itemW(it.label) > width - 8 && legendRows[legendRows.length - 1].length) { legendRows.push([]); lx = GUTTER; } legendRows[legendRows.length - 1].push(it); lx += itemW(it.label); } }
@@ -144,6 +140,8 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
       } else if (it.kind === "outline") {
         parts.push(rect(lx, ly - 9, 10, 10, S.palette.unaltered));
         parts.push(`<rect x="${lx + 1}" y="${ly - 8}" width="8" height="8" fill="none" stroke="${it.color}" stroke-width="2"/>`);
+      } else if (it.kind === "unaltered") {
+        parts.push(`<rect x="${lx + 0.5}" y="${ly - 8.5}" width="9" height="9" fill="${it.color}" stroke="${S.glyph.notProfiled.stripe.color}" stroke-width="1"/>`);
       } else parts.push(rect(lx, ly - 9, 10, 10, it.color));
       parts.push(`<text x="${lx + 14}" y="${ly}" fill="${P.muted}">${esc(it.label)}</text>`);
       lx += itemW(it.label);
