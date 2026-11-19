@@ -70,6 +70,17 @@ function rangesOf(leaves: ClinicalLeaf[]): Interval[] | null {
   return ivs.length > 1 && ivs.every((iv): iv is Interval => iv != null) ? ivs : null;
 }
 
+/**
+ * A pill's chart name by attribute: the answer's chart's display name, else the one the attribute
+ * vocabulary kept from Explore's unfiltered answer (an answer with no sample left has no charts),
+ * else none, and the bar writes the attribute's id.
+ */
+export function chartNames(current: { attribute: string; displayName?: string }[], kept: { attribute: string; displayName?: string }[]): (attribute: string) => string | undefined {
+  const names = new Map<string, string>();
+  for (const f of [...current, ...kept]) if (f.displayName && !names.has(f.attribute)) names.set(f.attribute, f.displayName);
+  return (attribute) => names.get(attribute);
+}
+
 /** the filter bar's groups, in the draft's clause order; `labelOf` names a chart by its attribute */
 export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attribute: string) => string | undefined,
   /** the density charts drawn (densityChartName): a drag's ranges have no pill only while their chart shows them (STV-FB-3b) */
