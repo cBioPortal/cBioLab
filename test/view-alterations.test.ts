@@ -457,8 +457,16 @@ describe("not-profiled samples (PAT-GP-2)", () => {
   });
   test("PAT-GP-2: the Gene panel column shown asks for coverage, even with one sample in view", async () => {
     const { sql } = await asked({ samples: "cohort", mutations: { columns: ["gene", "genePanel"] } });
-    assert.match(sql, /AS genePanel/);
+    assert.match(sql, /spn AS/);
+    assert.doesNotMatch((await asked({})).sql, /spn AS/, "hidden: two samples work out the coverage, not the panels");
     assert.match(sql, /miss AS \(SELECT gene/);
+  });
+  test("PAT-GP-2: the cell shows the panels with the unprofiled samples' too, in the detail; the column's value is the download's", async () => {
+    const { m } = await asked({ mutations: { columns: ["gene", "genePanel"] } }, [{ ...MUT[0], genePanel: "IMPACT505", genePanelShown: "IMPACT505, IMPACT468" }]);
+    assert.equal(m.rows[0].values[m.columns.findIndex((c) => c.id === "genePanel")], "IMPACT505");
+    assert.equal(m.rows[0].detail?.genePanelShown, "IMPACT505, IMPACT468");
+    const same = await asked({ mutations: { columns: ["gene", "genePanel"] } }, [{ ...MUT[0], genePanel: "IMPACT505", genePanelShown: "IMPACT505" }]);
+    assert.equal(same.m.rows[0].detail?.genePanelShown, undefined, "the same list is not carried twice");
   });
   test("one sample in view: no coverage asked, nothing in the detail", async () => {
     const { sql, m } = await asked({ samples: "cohort" }, [{ ...MUT[0], notProfiled: [] }]);

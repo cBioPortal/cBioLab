@@ -161,7 +161,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
-                : id === "genePanel" ? <PanelLinks text={String(x || "")} open={(panel) => void panels.open(panel)} />
+                : id === "genePanel" ? <PanelLinks text={String(row.detail?.genePanelShown ?? x ?? "")} open={p?.source?.remote ? null : (panel) => void panels.open(panel)} />
                 : id === "mrna" && key === "mutations" ? <MrnaCell percentile={x == null ? null : Number(x)} z={row.detail?.mrnaZ as number | undefined} />
                 : id === "freq" && (key === "mutations" || key === "cna") ? <CohortCell row={row} gene={String(row.values[t.columns.findIndex((c) => c.id === "gene")] ?? "")}
                     cna={key === "cna" ? String(row.values[t.columns.findIndex((c) => c.id === "cna")] ?? "") : undefined} shown={x != null} />
@@ -188,11 +188,12 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
 
 /**
  * The Gene panel cell (PanelColumnFormatter GenePanelLinks): each sample's panel id, a link opening the
- * gene panel window; "N/A" (a sample with no panel) plain.
+ * gene panel window; "N/A" (a sample with no panel) plain, as is every id of a peer's patient, whose
+ * panels' genes are not read from here.
  */
-function PanelLinks({ text, open }: { text: string; open: (panel: string) => void }) {
+function PanelLinks({ text, open }: { text: string; open: ((panel: string) => void) | null }) {
   const ids = text ? text.split(", ") : [];
-  return <span>{ids.map((id, i) => <span key={i}>{i > 0 && ", "}{id === "N/A" ? id
+  return <span>{ids.map((id, i) => <span key={i}>{i > 0 && ", "}{id === "N/A" || !open ? id
     : <button type="button" className="linkish" data-tip={"the genes of " + id} onClick={() => open(id)}>{id}</button>}</span>)}</span>;
 }
 

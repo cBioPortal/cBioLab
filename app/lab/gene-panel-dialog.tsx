@@ -27,7 +27,7 @@ export function useGenePanelDialog(study: string) {
     const r = await api.genes({ panel: { id: panel, study } }).catch(() => null);
     if (!r) return answer({ panel, error: "the server could not be reached" });
     const j = await r.json().catch(() => ({ error: "the server's answer could not be read" }));
-    answer(r.ok ? { panel, genes: j.genes as string[] } : { panel, error: j.error || "the panel's genes could not be read" });
+    answer(r.ok && Array.isArray(j.genes) ? { panel, genes: j.genes as string[] } : { panel, error: j.error || "the panel's genes could not be read" });
   };
   const kept = shown?.genes ? filterPanelGenes(shown.genes, filter) : [];
   const node = (

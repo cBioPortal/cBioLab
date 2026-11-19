@@ -1587,7 +1587,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "ATRX",
-                  "IMPACT341",
+                  "",
                   "K983*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1631,7 +1631,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "BLM",
-                  "IMPACT341",
+                  "",
                   "A363fs",
                   "Likely Oncogenic",
                   "FS del",
@@ -1675,7 +1675,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FBXW7",
-                  "IMPACT341",
+                  "",
                   "G61*",
                   "Likely Oncogenic · Level 3A",
                   "Nonsense",
@@ -1719,7 +1719,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FBXW7",
-                  "IMPACT341",
+                  "",
                   "X413_splice",
                   "Likely Oncogenic · Level 3A",
                   "Splice",
@@ -1763,7 +1763,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "MAP3K1",
-                  "IMPACT341",
+                  "",
                   "E302*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1807,7 +1807,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "MAP3K1",
-                  "IMPACT341",
+                  "",
                   "X696_splice",
                   "Likely Oncogenic",
                   "Splice",
@@ -1851,7 +1851,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRD",
-                  "IMPACT341",
+                  "",
                   "E915*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1895,7 +1895,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRD",
-                  "IMPACT341",
+                  "",
                   "P1338T",
                   "Unknown",
                   "Missense",
@@ -1939,7 +1939,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRT",
-                  "IMPACT341",
+                  "",
                   "G969V",
                   "Unknown",
                   "Missense",
@@ -1983,7 +1983,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRT",
-                  "IMPACT341",
+                  "",
                   "X1053_splice",
                   "Likely Oncogenic",
                   "Splice",
@@ -2027,7 +2027,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "SMARCA4",
-                  "IMPACT341",
+                  "",
                   "E1211*",
                   "Likely Oncogenic · Level 3A",
                   "Nonsense",
@@ -2071,7 +2071,7 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "TP53",
-                  "IMPACT341",
+                  "",
                   "T256P",
                   "Likely Oncogenic",
                   "Missense",
@@ -2115,7 +2115,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "TP53",
-                  "IMPACT341",
+                  "",
                   "P67Qfs*56",
                   "Likely Oncogenic",
                   "FS del",
@@ -2159,7 +2159,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "ATR",
-                  "IMPACT341",
+                  "",
                   "R2431M",
                   "Unknown",
                   "Missense",
@@ -2203,7 +2203,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "AXIN2",
-                  "IMPACT341",
+                  "",
                   "I375M",
                   "Unknown",
                   "Missense",
@@ -2247,7 +2247,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "BRIP1",
-                  "IMPACT341",
+                  "",
                   "D393V",
                   "Unknown",
                   "Missense",
@@ -2291,7 +2291,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CCNE1",
-                  "IMPACT341",
+                  "",
                   "A47V",
                   "Unknown",
                   "Missense",
@@ -2335,7 +2335,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CREBBP",
-                  "IMPACT341",
+                  "",
                   "M2161I",
                   "Unknown",
                   "Missense",
@@ -2379,7 +2379,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "DOT1L",
-                  "IMPACT341",
+                  "",
                   "W305C",
                   "Unknown",
                   "Missense",
@@ -2423,7 +2423,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FLT4",
-                  "IMPACT341",
+                  "",
                   "S293R",
                   "Unknown",
                   "Missense",
@@ -2461,7 +2461,7 @@
               },
               {
                 "…": "5 more",
-                "sha256": "4c4e7cb3abca8f6c"
+                "sha256": "5adde494eb68e1d2"
               }
             ],
             "offset": 0,
@@ -2546,7 +2546,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CDK4",
-                  "IMPACT341",
+                  "",
                   "AMP",
                   "Oncogenic · Level 4",
                   "12q14.1",
@@ -2568,7 +2568,7 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "MCL1",
-                  "IMPACT341",
+                  "",
                   "AMP",
                   "Oncogenic",
                   "1q21.2",
@@ -2590,7 +2590,7 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "RIT1",
-                  "IMPACT341",
+                  "",
                   "AMP",
                   "Unknown",
                   "1q22",
