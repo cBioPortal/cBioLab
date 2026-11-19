@@ -145,12 +145,12 @@ export interface GenePill { gene: string; line: string; color: string }
  * A gene table's selection as the portal's filter bar draws it (STV-FB-3 #9): each gene its own
  * pill, coloured by what its table counts (a mutation green, a structural variant purple, an
  * amplification red, a deep deletion blue, the oncoprint's colours), the OQL line in its tooltip.
- * Null when the clause is not one a gene table writes (typed OQL, a gene chart's), so it keeps
- * the generic pill.
+ * Null when the clause is not one a gene table writes, which carries the table's name (`chart`):
+ * typed OQL and a Gene status chart's clause, which can hold the same text, keep the generic pill.
  */
 export function geneTablePills(c: unknown): GenePill[] | null {
-  const l = c as { kind?: string; q?: unknown } | null;
-  if (!l || l.kind !== "oql" || typeof l.q !== "string") return null;
+  const l = c as { kind?: string; q?: unknown; chart?: unknown } | null;
+  if (!l || l.kind !== "oql" || typeof l.q !== "string" || typeof l.chart !== "string") return null;
   const lines = l.q.split(";").map((x) => x.trim()).filter(Boolean);
   const out: GenePill[] = [];
   for (const line of lines) {
