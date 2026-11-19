@@ -12,6 +12,9 @@ import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
 import { pageSql } from "../lib/table-query.ts";
+import { selectedCsv } from "../lib/views/evolution/download.ts";
+import { selectedRows } from "../lib/views/evolution/table.ts";
+import { evolutionKey } from "../lib/views/evolution/figure.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import { pagedTable } from "../lib/views/rows.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
@@ -1135,5 +1138,33 @@ describe("evolution: Show Timeline (PTB-GE-LC-1, the portal's genomicEvolutionSe
     assert.doesNotMatch(plain, />Specimen</);
     assert.notEqual(ys(plain, "1y")[0], year[1], "unaligned, the chart's own margin puts the year elsewhere");
     assert.deepEqual(lintSvg(svg), [], "nothing overprinted or outside");
+  });
+});
+
+describe("PTB-GE-TB-1: the table's \"Show only selected mutations\" (showOnlySelectedMutationsInTable)", () => {
+  const cols = ["samples", "gene", "proteinChange", "chr", "start", "end", "ref", "var"].map((id) => ({ id, name: id, numeric: false }));
+  const row = (gene: string, pc: string, start: number) => ({ cohort: "A", study: "s1", patient: "P1", sample: "T1", values: ["1", gene, pc, "17", start, start, "C", "T"] as (string | number | null)[] });
+  const all = [row("TP53", "R248Q", 100), row("EGFR", "L858R", 200), row("KRAS", "G12D", 300), row("TP53", "R175H", 50)];
+  const key = (r: { values: (string | number | null)[] }) => evolutionKey([r.values[1], r.values[2], r.values[3], r.values[4], r.values[5], r.values[6], r.values[7]]);
+  // the table as the result holds it: the first page of 2 of the 4 rows
+  const t = { columns: cols, shown: [], defaults: [], query: {}, rows: all.slice(0, 2), offset: 0, pageSize: 2, lists: [], total: 4, all: 4 };
+  test("nothing picked: every row, the table as it is", () => {
+    assert.equal(selectedRows(t, all, new Set()), t);
+  });
+  test("picked: those rows of every row the query keeps, past the first page, in the table's order, on one page", () => {
+    const s = selectedRows(t, all, new Set([key(all[3]), key(all[0])]));
+    assert.deepEqual(s.rows.map((r) => r.values[2]), ["R248Q", "R175H"]);
+    assert.deepEqual([s.total, s.all, s.offset, s.pageSize], [2, 4, 0, 2]);
+  });
+  test("its download: the rows shown, with every column, as the table's CSV writes them, named _selected", () => {
+    const tt = { ...t, columns: [...cols, { id: "study", name: "Study", numeric: false }] };
+    const s = selectedRows(tt, all.map((r) => ({ ...r, values: [...r.values, "s1"], study: "s1" })), new Set([key(all[1])]));
+    const f = selectedCsv(s, { study: "s1", id: "P 1" });
+    assert.equal(f.name, "cohort-lab_s1_P_1_evolution_mutations_selected.csv");
+    assert.equal(f.text, "cohort,study,samples,gene,proteinChange,chr,start,end,ref,var\r\nA,s1,1,EGFR,L858R,17,200,200,C,T\r\n");
+  });
+  test("a picked mutation the query does not keep lists nothing; the count says so", () => {
+    const s = selectedRows(t, all.slice(1), new Set([key(all[0])]));
+    assert.deepEqual([s.rows.length, s.total, s.pageSize], [0, 0, 1]);
   });
 });
