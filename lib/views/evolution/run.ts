@@ -7,6 +7,7 @@ import { hasPatientTimeline, type PatientLevelCapable, type Resolver } from "../
 import type { TablePart } from "../../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../../table-query.ts";
 import { PATIENT_ID } from "../../patient-timeline.ts";
+import { annotationText } from "../../patient-alterations.ts";
 import { axisTicks, timelineAxisItems, sampleDays, sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
@@ -27,6 +28,7 @@ type Cell = string | number | null;
 
 /** A row's value in a column: numbers as numbers (VAF to three places), text as text. */
 function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean }): Cell {
+  if (c.id === "annotation") return annotationText(r);
   const x = r[c.id];
   if (!c.numeric) return x == null ? "" : String(x);
   if (x == null || x === "") return null;
@@ -110,7 +112,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
   };
   const mutationRows = (pt: { study: string; id: string }, order: string[], size: number) =>
     runRows(ctx, "evolution:mutations", [pt.study], mq, EVOLUTION_DEFAULT_COLUMNS, shownColumns(mq, EVOLUTION_COLUMNS, EVOLUTION_DEFAULT_COLUMNS), size,
-      (parts: TablePart[]) => (db) => evolutionMutationsSource(parts[0], pt.id, db, order),
+      (parts: TablePart[]) => (db) => evolutionMutationsSource(parts[0], pt.id, db, order, ctx.pin),
       ctx.values && ctx.table === "mutations" ? { column: ctx.values, numeric: !!EVOLUTION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
   const mColumns = EVOLUTION_COLUMNS.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric }));
   const tableOf = (r: Rows, rows: Rows["rows"]): TableRows<Cell> => ({ columns: mColumns, shown: shownColumns(mq, mColumns, EVOLUTION_DEFAULT_COLUMNS), defaults: EVOLUTION_DEFAULT_COLUMNS,
@@ -216,9 +218,9 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
         ...(!view.sequential && noDay.length ? { noDay } : {}), ...(axis ? { axis } : {}), events: events.length,
         ...(display.showTimeline && display.chart === "line" && events.length ? { timeline } : {}),
         ...(options ? { groupOptions: options } : {}), ...(grouping ? { groupBy: grouping } : {}), ...(ungrouped ? { ungrouped } : {}),
-        ...(drawn && display.chart === "heatmap" ? { heatmapOrder: heatmapOrder(drawn, samples.length, display) } : {}), display },
+        ...(drawn && display.chart === "heatmap" ? { heatmapOrder: heatmapOrder(drawn, samples.length, display) } : {}), display, oncokbPin: ctx.pin },
       method: evolutionMethod({ cohorts: vNames, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length, lists: r.lists, excluded, instances: r.groups,
-        patient: want, samples: samples.length, table: { total: m.total, all: m.all, queryText: tq }, drawn: drawn?.length ?? null, noVaf }),
+        patient: want, samples: samples.length, table: { total: m.total, all: m.all, queryText: tq }, drawn: drawn?.length ?? null, noVaf, oncokbPin: ctx.pin }),
       participation: ctx.participationFor(ctx.vStudies, true),
       ...(ctx.vStudies.length > 1 ? { studies: ctx.vStudies } : {}),
       caveat: want.id + ": " + plural(samples.length, "sample") + " in " + (x === "time" ? "collection order, placed by the day each was collected (days from diagnosis, from the study's timeline)" +
@@ -237,6 +239,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
             (display.cluster ? "both clustered by VAF as the portal clusters an oncoprint heatmap" : "the samples in order and the mutations by name") +
             (display.mutationLabels ? "" : ", mutation labels hidden") + "; it colours each sample's VAF from 0 to 1 on the portal's VAF ramp; grey is not found, white with a bar is not profiled. ") +
         (ungrouped ? "Group by: " + ungrouped + ". " : "") +
+        (ctx.pin ? "Annotation is OncoKB " + ctx.pin + " (oncogenicity and its highest sensitivity level), as on the Patient tables. " : "No OncoKB version is pinned here, so the Annotation column is empty. ") +
         "Fusions recorded as mutations are left out, as the portal leaves them out. " +
         "The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: " + tableTail(r, q, listColumns, "patient", "with the most samples first, then by patient id", excluded, false),
     };

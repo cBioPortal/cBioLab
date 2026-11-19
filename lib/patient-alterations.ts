@@ -22,7 +22,7 @@ const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
 const text = (id: string, name: string, expr = id): QueryColumn => ({ id, name, numeric: false, text: str(expr) });
 const number = (id: string, name: string, expr = id): QueryColumn => ({ id, name, numeric: true, text: str(expr), num: num(expr) });
 /** OncoKB's call as the table shows it, so search and the value list match what is on screen; ordered drivers first */
-const annotation: QueryColumn = { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: "drv",
+export const ANNOTATION_COLUMN: QueryColumn = { id: "annotation", name: "Annotation (OncoKB)", numeric: false, order: "drv",
   text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))" };
 const samples = text("samples", "Samples");
 /** the panels of the row's samples, as the portal's Gene panel column lists them (PanelColumnFormatter): hidden by default */
@@ -32,13 +32,13 @@ const freq = number("freq", "Cohort %");
 
 export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   mutations: [
-    samples, text("gene", "Gene"), genePanel, { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, annotation,
+    samples, text("gene", "Gene"), genePanel, { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, ANNOTATION_COLUMN,
     { id: "mutationType", name: "Mutation Type", numeric: false, ...mutationTypeColumn("mutationType") },
     number("vaf", "Allele Freq"), number("altCount", "Variant Reads"), number("refCount", "Ref Reads"), text("copy", "Copy #"), number("mrna", "mRNA Expr."), freq,
     text("variantType", "Variant Type"), text("chr", "Chromosome"), number("start", "Start Pos"), number("end", "End Pos"),
     text("ref", "Ref"), text("var", "Var"), text("status", "MS"), number("inAll", "Profiled in all samples"),
   ],
-  cna: [samples, text("gene", "Gene"), genePanel, text("cna", "CNA"), annotation, text("cytoband", "Cytoband"), freq, number("inAll", "Profiled in all samples")],
+  cna: [samples, text("gene", "Gene"), genePanel, text("cna", "CNA"), ANNOTATION_COLUMN, text("cytoband", "Cytoband"), freq, number("inAll", "Profiled in all samples")],
   sv: [
     samples, text("gene1", "Gene 1"), text("gene2", "Gene 2"), genePanel,
     // the portal's s / g badge, not sorted (StructuralVariantTableWrapper: MutationStatus, sortBy a constant)
@@ -126,12 +126,18 @@ function mrnaCte(db: string, study: string, m: MrnaRank): string {
 }
 
 /** OncoKB's calls at `pin` for one alteration type and the genes `genesFrom` names. */
-function oncokbCte(pin: string, type: "MUTATION" | "CNA", genesFrom: string): string {
+export function oncokbCte(pin: string, type: "MUTATION" | "CNA", genesFrom: string): string {
   return "ann AS (SELECT hugo_gene_symbol AS gene, alteration, any(oncogenicity) AS oncogenicity, any(highest_sensitive_level) AS level, max(is_driver) AS driver\n" +
     "  FROM " + ONCOKB_TABLE + " WHERE oncokb_version = " + sq(pin) + " AND alteration_type = '" + type + "' AND hugo_gene_symbol IN (" + genesFrom + ")\n" +
     "  GROUP BY gene, alteration),\n";
 }
-const annSelect = (pin: string | null) => pin
+/** A row's Annotation cell: OncoKB's call as ANNOTATION_COLUMN's SQL spells it ("Oncogenic · Level 1"), blank without one. */
+export function annotationText(r: Record<string, unknown>): string {
+  const o = String(r.oncogenicity || ""), lv = String(r.level || "");
+  return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
+}
+/** the row's OncoKB call as ANNOTATION_COLUMN reads it (oncogenicity, level, drv), from oncokbCte's `ann` joined as `ann`; blank with no pin */
+export const annSelect = (pin: string | null) => pin
   ? "ifNull(ann.oncogenicity, '') AS oncogenicity, ifNull(ann.level, '') AS level, toUInt8(ifNull(ann.driver, 0)) AS drv"
   : "'' AS oncogenicity, '' AS level, toUInt8(0) AS drv";
 

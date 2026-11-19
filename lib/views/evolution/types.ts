@@ -118,6 +118,8 @@ export interface EvolutionResult extends TableRows<string | number | null> {
   groupBy?: { attribute: string; name: string; groups: EvolutionGroup[] };
   /** why the chart is not grouped though groupBy was asked for, or why the attributes to group by could not be listed */
   ungrouped?: string;
+  /** the OncoKB version the table's Annotation column reads; null when none is pinned */
+  oncokbPin?: string | null;
   /** the display as drawn, from the spec */
   display: { chart: "line" | "heatmap"; logScale: boolean; dataRange: boolean; expandGaps: boolean; transpose: boolean; cluster: boolean; mutationLabels: boolean; /** the Group by attribute applied, or null when the chart is not grouped */ groupBy: string | null; showTimeline: boolean };
 }

@@ -131,6 +131,7 @@ warehouse_checks() (
   phase "duplicate counts (mutations, structural variants)" && npm run check:table-duplicates 2>&1 | summary grep -E "^FAIL|table duplicate checks passed|FAILED"
   phase "filtered table's samples and patients" && npm run check:table-kept-units 2>&1 | summary grep -E "^FAIL|table kept unit checks passed|FAILED"
   phase "patient allele frequency"  && npm run check:patient-vaf 2>&1 | summary grep -E "^FAIL|patient VAF checks passed|FAILED"
+  phase "Genomic Evolution annotation" && npm run check:evolution-annotation 2>&1 | summary grep -E "^FAIL|evolution annotation checks passed|FAILED"
   phase "mutation table search narrows the lollipop" && npm run check:mutation-search-lollipop 2>&1 | summary grep -E "^FAIL|mutation search lollipop checks passed|FAILED"
   phase "mutation tab driver settings" && npm run check:mutation-driver-settings 2>&1 | summary grep -E "^FAIL|mutation driver settings checks passed|FAILED"
   phase "patient structural variants" && npm run check:patient-sv 2>&1 | summary grep -E "^FAIL|patient SV checks passed|FAILED"

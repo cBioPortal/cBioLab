@@ -9,6 +9,7 @@ import { PATIENT_ID } from "../../patient-timeline.ts";
 import { sampleMarks } from "../../timeline-tracks.ts";
 import { mutationTypeLabel } from "../../mutation-type.ts";
 import {
+  annotationText,
   ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
   alterationDefaults, alterationSource, mrnaRankProfile, type MrnaRank, alterationPatientRowSource, patientProfiledSource, patientSamplesSource, patientVafSource, type AlterationPart, type AlterationTable,
 } from "../../patient-alterations.ts";
@@ -22,10 +23,7 @@ type Cell = string | number | null;
 
 /** A row's value in a column: numbers as numbers, OncoKB's call spelled as the SQL spells it. */
 function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean }): Cell {
-  if (c.id === "annotation") {
-    const o = String(r.oncogenicity || ""), lv = String(r.level || "");
-    return o ? o + (lv ? " · " + lv.replace(/^LEVEL_/, "Level ") : "") : "";
-  }
+  if (c.id === "annotation") return annotationText(r);
   const x = r[c.id];
   // the portal's label, which the column searches, filters and sorts by; the stored type rides in the row's detail
   if (c.id === "mutationType") return mutationTypeLabel(x == null ? "" : String(x));

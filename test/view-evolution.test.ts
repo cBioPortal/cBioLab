@@ -5,13 +5,14 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
-import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
+import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource, EVOLUTION_DEFAULT_COLUMNS } from "../lib/views/evolution/sql.ts";
 import { heatmapTsv, HEATMAP_FILE } from "../lib/views/evolution/download.ts";
 import { evolutionSvg, lineCells, cellText, portalCellTip, heatmapColumns, onlySelected, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
 import { pageSql } from "../lib/table-query.ts";
+import { annotationText } from "../lib/patient-alterations.ts";
 import { lintSvg } from "../lib/chart/lint.ts";
 import { pagedTable } from "../lib/views/rows.ts";
 import type { ViewRun, EvaluatedCohort } from "../lib/views/run.ts";
@@ -486,6 +487,25 @@ describe("evolution: its row sources name one patient and live only with patient
     assert.match(pageSql(evolutionSamplesSource(part, "P-1", "db"), {}, [], 10, 0), /AS sid, ifNull\(pn\.panel, ''\) AS panel/);
     // a sample id reaches SQL only through sq()
     assert.match(pageSql(evolutionMutationsSource(part, "P-1", "db", ["a'b"]), {}, [], 10, 0), /'a\\'b'/);
+  });
+  test("PTB-GE-TB-1 the Annotation column: OncoKB's call at the pin (the values are checked on the fixture, scripts/check-evolution-annotation.ts)", () => {
+    const pinned = pageSql(evolutionMutationsSource(part, "P-1", "db", [], "v7.5"), {}, ["annotation"], 10, 0);
+    assert.match(pinned, /oncokb_version = 'v7\.5' AND alteration_type = 'MUTATION'/);
+    assert.match(pinned, /LEFT JOIN ann ON ann\.gene = g\.gene AND ann\.alteration = g\.proteinChange/);
+    const bare = pageSql(evolutionMutationsSource(part, "P-1", "db", []), {}, ["annotation"], 10, 0);
+    assert.doesNotMatch(bare, /annotation\.oncokb/);
+    assert.match(bare, /'' AS oncogenicity/);
+    assert.ok(EVOLUTION_DEFAULT_COLUMNS.indexOf("annotation") === EVOLUTION_DEFAULT_COLUMNS.indexOf("proteinChange") + 1, "after Protein Change, as the portal's");
+  });
+  test("annotationText: the call as the Patient tables write it", () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ oncogenicity: "Oncogenic", level: "LEVEL_1" }, "Oncogenic · Level 1"],
+      [{ oncogenicity: "Likely Oncogenic", level: "" }, "Likely Oncogenic"],
+      [{ oncogenicity: "Oncogenic", level: "LEVEL_3A" }, "Oncogenic · Level 3A"],
+      [{ oncogenicity: "", level: "LEVEL_1" }, ""],
+      [{}, ""],
+    ];
+    for (const [r, want] of cases) assert.equal(annotationText(r), want, JSON.stringify(r));
   });
 });
 

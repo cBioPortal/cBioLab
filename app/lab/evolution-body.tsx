@@ -13,6 +13,7 @@ import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./pati
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
 import { Slider } from "../_ui/slider";
+import { AnnotationBadge } from "./portal-bodies";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { TB } from "../_ui/toolbar.ts";
 import { OptionSelect } from "../_ui/choice.tsx";
@@ -186,7 +187,7 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
           <DataTable t={e.mutations} query={specQuery((spec.mutations || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table="mutations" unit="Mutations"
             onQuery={setQuery} onHover={(r) => setHot(r ? keyAt(r) : null)} hot={(r) => hot != null && keyAt(r) === hot}
             onRow={(r) => toggle(keyAt(r))} selected={(r) => picked.has(keyAt(r))} num={(id, x) => id === "maxVaf" ? x.toFixed(2) : x.toLocaleString()}
-            cell={(id, x) => id === "gene" ? <b>{x}</b> : id === "samples" ? <SampleMarks ids={String(x || "").split(", ").filter(Boolean)} samples={p.samples} /> : undefined} />
+            cell={(id, x) => id === "gene" ? <b>{x}</b> : id === "annotation" ? (x ? <AnnotationBadge text={String(x)} /> : null) : id === "samples" ? <SampleMarks ids={String(x || "").split(", ").filter(Boolean)} samples={p.samples} /> : undefined} />
         </section>
       )}
       {listOpen && (

@@ -49,6 +49,7 @@
     "check:table-kept-units": "node --env-file=.env.local scripts/check-table-kept-units.ts",
     "check:sv-levels": "node --env-file=.env.local scripts/check-sv-levels.ts",
     "check:patient-vaf": "node --env-file=.env.local scripts/check-patient-vaf.ts",
+    "check:evolution-annotation": "node --env-file=.env.local scripts/check-evolution-annotation.ts",
     "check:mutation-search-lollipop": "node --env-file=.env.local scripts/check-mutation-search-lollipop.ts",
     "check:mutation-driver-settings": "node --env-file=.env.local scripts/check-mutation-driver-settings.ts",
     "check:patient-sv": "node --env-file=.env.local scripts/check-patient-sv.ts",
