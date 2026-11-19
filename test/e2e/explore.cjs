@@ -1,7 +1,7 @@
 // Explore: facets (derived ones included), drafting and saving a cohort, Analyze carrying it into an analysis and replacing what was there.
 const { pickExploreStudies, pickFacet } = require("./helpers.cjs");
 
-async function explore({ ok, BASE, page }) {
+async function explore({ ok, BASE, page, browser }) {
   // Derived facets: computed from the data's shape, so they must appear for a
   // study regardless of how it names its events, and clicking must filter.
   // Currently hidden behind SHOW_DERIVED_FACETS=false (app/lab/page.tsx) at the
@@ -461,24 +461,27 @@ async function explore({ ok, BASE, page }) {
   ok("explore: the tab is in the URL, keeps its search across a switch, and CN Segments stays at 0 samples", tabOk, tabDetail);
 
   // a tab kept mounted retries a failed load when it is shown again (as a remount did): the first
-  // Clinical Data request fails, Summary and back loads the rows
+  // Clinical Data request fails, Summary and back loads the rows. Its own context, so the planted
+  // 500 stays out of the light pass's no-JS-errors check.
   let retryDetail = "", retryOk = false;
+  const own = await browser.newContext({ viewport: { width: 1360, height: 900 } });
   try {
+    const p = await own.newPage();
     let calls = 0;
-    await page.route("**/api/analysis**", (route) => calls++ === 0
+    await p.route("**/api/analysis**", (route) => calls++ === 0
       ? route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "planted failure" }) })
       : route.continue());
-    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018&svtab=clinicalData", { waitUntil: "domcontentloaded" });
-    const tabs = page.getByRole("tablist", { name: "study view sections" });
-    await page.waitForFunction(() => /Could not load the clinical data: planted failure/.test(document.body.innerText), null, { timeout: 240000 });
+    await p.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018&svtab=clinicalData", { waitUntil: "domcontentloaded" });
+    const tabs = p.getByRole("tablist", { name: "study view sections" });
+    await p.waitForFunction(() => /Could not load the clinical data: planted failure/.test(document.body.innerText), null, { timeout: 240000 });
     await tabs.getByRole("tab", { name: "Summary" }).click();
     await tabs.getByRole("tab", { name: "Clinical Data" }).click();
-    await page.waitForFunction(() => /Showing 1–\d+ of [\d,]+ results/.test(document.body.innerText), null, { timeout: 240000 });
-    await page.unroute("**/api/analysis**");
-    const rows = (/Showing 1–\d+ of ([\d,]+) results/.exec(await page.locator("body").innerText()) || [])[1];
+    await p.waitForFunction(() => /Showing 1–\d+ of [\d,]+ results/.test(document.body.innerText), null, { timeout: 240000 });
+    const rows = (/Showing 1–\d+ of ([\d,]+) results/.exec(await p.locator("body").innerText()) || [])[1];
     retryDetail = JSON.stringify({ calls, rows });
     retryOk = calls >= 2 && !!rows;
-  } catch (e) { retryDetail = String(e.message).split("\n")[0]; await page.unroute("**/api/analysis**").catch(() => {}); }
+  } catch (e) { retryDetail = String(e.message).split("\n")[0]; }
+  await own.close();
   ok("explore: a tab whose load failed loads again when it is shown again", retryOk, retryDetail);
 }
 
