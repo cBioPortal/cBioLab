@@ -15,14 +15,22 @@ import { MutationTypeCell } from "./mutation-cells.tsx";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import type { AlterationsResult, AlleleReads, CohortCount } from "../../lib/views/alterations/types";
 import { cohortBar, cohortTooltip } from "../../lib/views/alterations/cohort-cell.ts";
+import { STYLE } from "../../lib/oncoprint-style.ts";
+import { useGenePanelDialog } from "./gene-panel-dialog.tsx";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
 import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
+import { VafPlotHead } from "./vaf-plot-head";
+import { SampleMarker } from "../portal/sample-marker";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
 
 /** what the portal's not-profiled alerts call each table's data */
 const NOT_PROFILED_FOR: Record<"mutations" | "cna" | "sv", string> = { mutations: "mutations", cna: "copy number alterations", sv: "structural variants" };
+
+/** the portal's words for a sample whose panel leaves out the row's gene (TumorColumnFormatter) */
+const NOT_PROFILED = "This gene was not profiled for this sample (absent from gene panel)";
+const PILL = STYLE.notProfiledPill;
 
 /** The three tables, in the portal's order (Mutations, Structural Variants, Copy Number Alterations): the spec's key, and its name — its count line reads "7 Mutations", as the portal's does. */
 const TABLES = [
@@ -38,6 +46,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
 }) {
   const [listOpen, setListOpen] = useState(false);
   const p = a.patient;
+  // the portal's gene panel window, which every gene-panel link opens (PAT-GP-3, PAT-GP-4)
+  const panels = useGenePanelDialog(p?.study || "");
   // numbered on the server as the header numbers them (collection day, type, id)
   const allMarks = useMemo(() => new Map((p?.samples || []).map((m) => [m.id, m])), [p]);
   // the samples the tables read, each keeping its number among all the patient's (the portal's sample view)
@@ -59,20 +69,25 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
   };
   // one slot per sample of the patient, in sample order: the sample's marker where it carries the row's alteration,
   // "--" in a slot of the same width where it does not — so a row reads as one alteration across the patient's samples
-  const sampleCell = (x: unknown) => {
+  // the portal's Samples cell (TumorColumnFormatter): a sample's marker where it carries the row, an empty slot where it
+  // was profiled for the gene and does not, a grey pill where its panel leaves the gene out (PAT-GP-2)
+  const sampleCell = (x: unknown, row: { detail?: Record<string, unknown> }) => {
     const has = new Set(String(x || "").split(", ").filter(Boolean));
+    const off = new Set((row.detail?.notProfiled as string[] | undefined) || []);
     const slots = [...marks.values()].map((m) => ({ id: m.id, label: m.label, color: m.color, type: m.type }));
     for (const id of has) if (!marks.has(id)) slots.push({ id, label: "?", color: "var(--muted)", type: "" });
     return (
       <span className="alt-samples" aria-label={"in " + [...has].join(", ")}>
         {slots.map((m) => {
-          const on = has.has(m.id);
+          const on = has.has(m.id), np = off.has(m.id);
+          const who = m.id + (m.type ? " — " + m.type : "");
+          const tip = on ? who + (np ? "\n" + NOT_PROFILED : "") : np ? who + "\n" + NOT_PROFILED + ". It is unknown whether it is mutated." : undefined;
           return (
-            <svg key={m.id} width="14" height="14" aria-hidden="true" data-tip={m.id + (m.type ? " — " + m.type : "") + (on ? "" : ": not found in this sample")}>
+            <svg key={m.id} width="14" height="14" aria-hidden="true" data-tip={tip} data-np={np && !on ? "" : undefined}>
               {on ? <>
                 <circle cx="7" cy="7" r="7" fill={m.color} />
                 <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text>
-              </> : <text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="var(--muted)">--</text>}
+              </> : np ? <rect x={(14 - PILL.width) / 2} y={PILL.y + 1} width={PILL.width} height={PILL.height} rx={PILL.height / 2} fill={PILL.fill} /> : null}
             </svg>);
         })}
       </span>
@@ -126,8 +141,8 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
         return (
           <section key={key} className="alt-table" aria-label={name}>
             {outside.length > 0 && <p className="note flex flex-wrap items-center gap-1" role="status">
-              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
-                <svg width="14" height="14" aria-label={m.id}><circle cx="7" cy="7" r="7" fill={m.color} /><text x="7" y="7" dy=".33em" textAnchor="middle" fontSize="9" fill="white">{m.label}</text></svg>
+              Sample{outside.length === 1 ? "" : "s"} {outside.map((m) => <span key={m.id} role="img" aria-label={m.id} data-tip={m.id + (m.type ? " — " + m.type : "")}>
+                <SampleMarker mark={m} className="" />
               </span>)} not profiled for {what}{none ? "" : "."}
             </p>}
             {!none && <DataTable t={t} query={specQuery((spec[key] || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table={key} unit={name} groupBy={key === "sv" ? "gene1" : "gene"}
@@ -143,11 +158,13 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
               num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : id === "mrna" ? Math.round(x) + "%" : x.toLocaleString()}
               colHead={(id) => id === "gene" && (key === "mutations" || key === "cna") && marks.size > 1 && a.mixedPanels?.[key]
                 ? <GenesProfiledMenu table={key} value={(spec.genesProfiled as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
-                    onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} /> : null}
-              cell={(id, x, row) => id === "samples" ? sampleCell(x)
+                    onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} />
+                : id === "vaf" && key === "mutations" ? <VafPlotHead vafs={a.vafs} marks={marks} /> : null}
+              cell={(id, x, row) => id === "samples" ? sampleCell(x, row)
                 : id === "vaf" && key === "mutations" ? vafCell(row)
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
+                : id === "genePanel" ? <PanelLinks text={String(row.detail?.genePanelShown ?? x ?? "")} open={p?.source?.remote ? null : (panel) => void panels.open(panel)} />
                 : id === "mrna" && key === "mutations" ? <MrnaCell percentile={x == null ? null : Number(x)} z={row.detail?.mrnaZ as number | undefined} />
                 : id === "freq" && (key === "mutations" || key === "cna") ? <CohortCell row={row} gene={String(row.values[t.columns.findIndex((c) => c.id === "gene")] ?? "")}
                     cna={key === "cna" ? String(row.values[t.columns.findIndex((c) => c.id === "cna")] ?? "") : undefined} shown={x != null} />
@@ -157,6 +174,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : undefined} />}
           </section>);
       })}
+      {panels.node}
       {listOpen && (
         <PatientsDialog title={"Patients of " + (a.lists[0]?.cohort ?? "the cohort")} onClose={() => setListOpen(false)}>
           {(close) => (
@@ -169,6 +187,17 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
       )}
     </div>
   );
+}
+
+/**
+ * The Gene panel cell (PanelColumnFormatter GenePanelLinks): each sample's panel id, a link opening the
+ * gene panel window; "N/A" (a sample with no panel) plain, as is every id of a peer's patient, whose
+ * panels' genes are not read from here.
+ */
+function PanelLinks({ text, open }: { text: string; open: ((panel: string) => void) | null }) {
+  const ids = text ? text.split(", ") : [];
+  return <span>{ids.map((id, i) => <span key={i}>{i > 0 && ", "}{id === "N/A" || !open ? id
+    : <button type="button" className="linkish" data-tip={"the genes of " + id} onClick={() => open(id)}>{id}</button>}</span>)}</span>;
 }
 
 /**

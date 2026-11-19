@@ -10,7 +10,7 @@ import { sampleMarks } from "../../timeline-tracks.ts";
 import { mutationTypeLabel } from "../../mutation-type.ts";
 import {
   ALTERATION_TABLES, ALTERATION_TABLE_NAMES, ALTERATION_COLUMNS, ALTERATION_PATIENT_COLUMNS, ALTERATION_PATIENT_DEFAULT_COLUMNS,
-  alterationDefaults, alterationSource, mrnaRankProfile, type MrnaRank, alterationPatientRowSource, patientProfiledSource, patientSamplesSource, type AlterationPart, type AlterationTable,
+  alterationDefaults, alterationSource, mrnaRankProfile, type MrnaRank, alterationPatientRowSource, patientProfiledSource, patientSamplesSource, patientVafSource, type AlterationPart, type AlterationTable,
 } from "../../patient-alterations.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type RemoteRows, type Rows } from "../rows.ts";
@@ -58,7 +58,11 @@ const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map
   const typed = cols.some((c) => c.id === "mutationType");
   const mrnaZ = x.mrnaZ == null ? undefined : Number(x.mrnaZ);
   const cohort = cohortOf(x);
-  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}), ...(mrnaZ != null && Number.isFinite(mrnaZ) ? { mrnaZ } : {}) };
+  // the samples in view not profiled for the row's gene (PAT-GP-2): the Samples cell's grey pills
+  const notProfiled = Array.isArray(x.notProfiled) && x.notProfiled.length ? (x.notProfiled as unknown[]).map(String) : null;
+  // the Gene panel cell's list (with the unprofiled samples' panels), where it differs from the column's value
+  const genePanelShown = x.genePanelShown && x.genePanelShown !== x.genePanel ? String(x.genePanelShown) : null;
+  const detail = { ...(reads ? { reads } : {}), ...(typed ? { mutationType: String(x.mutationType ?? "") } : {}), ...(cohort ? { cohort } : {}), ...(notProfiled ? { notProfiled } : {}), ...(genePanelShown ? { genePanelShown } : {}), ...(mrnaZ != null && Number.isFinite(mrnaZ) ? { mrnaZ } : {}) };
   return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
     values: cols.map((c) => cellOf(x, c)), ...(Object.keys(detail).length ? { detail } : {}) };
 });
@@ -169,11 +173,24 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const [mutations, cna] = await Promise.all([count("mutations"), count("cna")]);
     return { mutations, cna };
   };
+  /** each sample's allele frequencies for the VAF plot, over the Mutations table's rows; a peer's patient is not asked (null) */
+  const vafsOf = async (pt: { study: string; id: string }, order: string[]): Promise<Record<string, number[]> | null> => {
+    const res = ctx.resolvers[pt.study];
+    if (peerOf(res)) return null;
+    const part = { cohort: vNames[0], study: pt.study, cohortSql: scope === "cohort" ? res.cohortSql(ctx.doc.cohorts[vNames[0]]) : "" };
+    const page = await (res as unknown as PatientLevelCapable).rowsPage("alterations:vafs", (db) => patientVafSource(part, pt.id, db, order, scope, genes),
+      {}, ["sid"], TABLE_ROWS_MAX, 0);
+    return Object.fromEntries(page.rows.map((x) => [String(x.sid), (Array.isArray(x.vafs) ? x.vafs : []).map(Number)]));
+  };
   /** genesProfiled "all" needs each sample's panels, which a peer does not send: refused for a peer's patient, never ignored */
   const peerRefusal = (pt: { study: string; id: string }) => genes === "all" && peerOf(ctx.resolvers[pt.study])
     ? no("genesProfiled \"all\" is not available for " + pt.id + ", whose tables come from " + ctx.resolvers[pt.study].instance.label + " via federation; set it to \"any\"") : null;
-  /** whether a table's query reads the inAll column (shows, filters, sorts or lists its values), so each row's panel coverage must be worked out */
-  const asksInAll = (tq: TableQuery) => !!(tq.columns?.includes("inAll") || tq.filters?.inAll || tq.sort?.column === "inAll" || ctx.values === "inAll");
+  /** whether a table's query reads a column (shows, filters, sorts or lists its values) */
+  const asks = (tq: TableQuery, c: string) => !!(tq.columns?.includes(c) || tq.filters?.[c] || tq.sort?.column === c || ctx.values === c);
+  /** whether a table's query reads the inAll column, so each row's panel coverage must be worked out */
+  const asksInAll = (tq: TableQuery) => asks(tq, "inAll");
+  /** whether the Gene panel column's values are needed: asked for, or a page read whole (the download, which writes every column) */
+  const asksPanels = (tq: TableQuery) => asks(tq, "genePanel") || !!ctx.page;
   /**
    * the mutation table's mRNA Expr. ranking: with one sample in view and an mRNA z-score profile in its
    * study, that sample and profile (PAT-MT-5); a peer's patient is not asked (null)
@@ -188,7 +205,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const mrna = t === "mutations" ? rank : null;
     const cols = ALTERATION_COLUMNS[t], { q: tqq, size } = tq[t], defs = alterationDefaults(t, inView.length, !!mrna);
     const r = await runRows(ctx, "alterations:" + t, [pt.study], tqq, defs, shownColumns(tqq, cols, defs), size,
-      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, { genes, inAll: asksInAll(tqq) }, mrna),
+      (parts: TablePart[]) => (db) => alterationSource(t, parts[0], pt.id, db, pin, order, scope, { genes, inAll: asksInAll(tqq) || (inView.length > 1 && t !== "sv"), panels: t !== "sv" && asksPanels(tqq) }, mrna),
       ctx.values && only === t ? { column: ctx.values, numeric: !!cols.find((c) => c.id === ctx.values)?.numeric } : undefined,
       remote(("alterations:" + t) as PeerTable, { patient: pt.id, order }));
     const columns = cols.map((c) => ({ id: c.id, name: c.name, numeric: c.numeric, ...(c.unsorted ? { unsorted: true } : {}) }));
@@ -237,8 +254,9 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     const [smp, inCohort, profiled] = want ? await Promise.all([numbered(want), scope === "cohort" ? samplesOf(want, "cohort") : null, profilingOf(want)]) : [null, null, null];
     const inView = want ? (inCohort || smp!.samples).map((x) => x.id) : [];
     const mrna = want ? await mrnaOf(want, inView) : null;
-    const [mixed, position, ...tabs] = await Promise.all([
+    const [mixed, vafs, position, ...tabs] = await Promise.all([
       want ? mixedPanelsOf(want, smp!.order, inCohort ? inCohort.length : smp!.samples.length) : Promise.resolve(null),
+      want ? vafsOf(want, smp!.order) : Promise.resolve(null),
       want ? listPosition(r, !!view.patient, (first) => listRows(1, { locate: first })) : Promise.resolve(null),
       ...ALTERATION_TABLES.map((t) => want ? tableRows(t, want, smp!.order, inView, mrna) : Promise.resolve(null)),
     ]);
@@ -254,7 +272,7 @@ export async function runAlterations(view: AlterationsView, ctx: ViewRun): Promi
     };
     return {
       kind: "alterations", cohorts: vNames,
-      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, ...(profiled ? { profiling: profiled } : {}), ...(mixed ? { mixedPanels: mixed } : {}), oncokbPin: shownPin },
+      alterations: { ...list, patient: want ? { ...want, samples, ...(inCohort ? { shown: inCohort.map((x) => x.id) } : {}), ...sourceOf(want.study) } : null, position, tables, ...(profiled ? { profiling: profiled } : {}), ...(mixed ? { mixedPanels: mixed } : {}), ...(vafs ? { vafs } : {}), oncokbPin: shownPin },
       method: alterationsMethod({ samples: scope, genesProfiled: genes, mrnaProfile: mrna?.profile ?? null, cohorts: vNames, oncokbPin: shownPin, queryText: describeQuery(q, listColumns), sortName, desc: !!q.sort?.desc, shown: list.rows.length,
         lists: r.lists, excluded, instances: r.groups, patient: want,
         tables: want ? ALTERATION_TABLES.map((t) => ({ name: ALTERATION_TABLE_NAMES[t], total: tables[t]!.total, all: tables[t]!.all, queryText: describeQuery(tables[t]!.query, tables[t]!.columns) })) : [] }),

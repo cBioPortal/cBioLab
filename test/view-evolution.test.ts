@@ -6,6 +6,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { runEvolution, cellsOf } from "../lib/views/evolution/run.ts";
 import { evolutionPatientsSource, evolutionMutationsSource, evolutionSamplesSource } from "../lib/views/evolution/sql.ts";
+import { heatmapTsv, HEATMAP_FILE } from "../lib/views/evolution/download.ts";
 import { evolutionSvg, lineCells, cellText, portalCellTip, heatmapColumns, HEAT_CELL, LOG_FLOOR } from "../lib/views/evolution/figure.ts";
 import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
@@ -1059,5 +1060,28 @@ describe("evolution: the heatmap's zoom (PTB-GE-HM-1, the portal's horizontal zo
     assert.equal(heatmapColumns(t as never, 800).floor, 14, "transposed, a column holds a sample's marker");
     const rows = [...evolutionSvg(t as never, { width: 800, zoom: 1.5 })!.matchAll(/<g data-s="\d+"><title>[^<]*<\/title><rect [^>]*width="([\d.]+)"/g)].map((m) => Number(m[1]));
     assert.ok(rows.length > 0 && rows.every((w) => w === 29), "transposed, a sample's column is zoom × 20 px less the 1 px gap: " + rows);
+  });
+});
+
+describe("evolution: the heatmap's Data download (PTB-GE-HM-1, the portal's getDownloadData)", () => {
+  const S = [{ id: "T1" }, { id: "T2" }, { id: "T3" }] as never[];
+  const c = (status: string, vaf: number | null) => ({ status, vaf, alt: null, ref: null });
+  const M = [
+    { key: "a", gene: "TP53", proteinChange: "R273H", mutationType: "", cells: [c("called", 0.5), c("called", 0.25), c("np", null)] },
+    { key: "b", gene: "EGFR", proteinChange: "L858R", mutationType: "", cells: [c("absent", 0), c("called", 0.4), c("uncalled", 0.05)] },
+    { key: "c", gene: "KRAS", proteinChange: "G12D", mutationType: "", cells: [c("noVaf", null), c("absent", null), c("uncalled", null)] },
+  ] as never[];
+  test("a line per called or uncalled cell with a VAF, by sample then the figure's order; not found, no reads and not profiled left out", () => {
+    assert.equal(HEATMAP_FILE, "vafHeatmap");
+    assert.equal(heatmapTsv(M, S, false), [
+      "Sample_ID\tGene\tProtein_Change\tVariant_Allele_Frequency",
+      "T1\tTP53\tR273H\t0.5", "T2\tTP53\tR273H\t0.25", "T2\tEGFR\tL858R\t0.4", "T3\tEGFR\tL858R\t0.05"].join("\n"));
+  });
+  test("transposed: by mutation, GENE pChange alphabetically, then the samples in order", () => {
+    assert.equal(heatmapTsv(M, S, true).split("\n").slice(1).join("|"), "T2\tEGFR\tL858R\t0.4|T3\tEGFR\tL858R\t0.05|T1\tTP53\tR273H\t0.5|T2\tTP53\tR273H\t0.25");
+  });
+  test("an unrounded VAF is written as it is, as the portal writes its number", () => {
+    const one = [{ key: "x", gene: "IDH1", proteinChange: "R132H", mutationType: "", cells: [{ status: "called", vaf: 0.6923, alt: 45, ref: 20 }] }] as never[];
+    assert.equal(heatmapTsv(one, [{ id: "T1" }] as never[], false).split("\n")[1], "T1\tIDH1\tR132H\t0.6923076923076923", "45 / 65 from the reads, not the cell's 4 places");
   });
 });
