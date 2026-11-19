@@ -140,7 +140,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-LP-1 | 🟡 | B | Y-Axis Max, [Legend 👁] [☁]; no track selector |
 | MUT-LP-2 | ✅ | B | "Y-Axis Max:" slider 1…default and a number box above it; below 1 read as 1; kept in the view (`yMax`), as in-tab state is (invariant 9), not local |
 | MUT-LP-3 | ✅ | C | No %/# toggle, no log scale |
-| MUT-LP-4 | 🟡 | BC | Unchanged: SVG / PNG of the plot; no PDF; `KRAS_mutation_diagram.<ext>` |
+| MUT-LP-4 | ✅ | BC | SVG / PNG / PDF, `KRAS_lollipop.<ext>` (`lollipopFilename`, the shared ImageDownload's PDF) (#404); no tracks to include yet (MUT-TK) |
 | MUT-LP-5 | 🐞 ok | BC | Legend lists Splice as its own entry, as the stems draw it, not under Truncating as the portal's legend does (#250) |
 | MUT-LP-6 | ✅ | B | Y "# patients", 0 to the maximum exactly, only the ends labelled (">= N" when capped), steps from [1,2,5,…] unlabelled; X "0" … "<len>aa", steps from [50,100,200,250,…], every other labelled (TP53 0, 100, 200, 300, 393aa) (`lib/lollipop.ts` lollipopXTicks/lollipopYTicks) |
 | MUT-LP-7 | ✅ | B | Heights identical on 125/125 stems (KRAS, TP53) |
@@ -180,21 +180,21 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-2 | ✅ | C | Gene, hidden by default; a fusion row's is its site 1 gene (`mutation-table.ts:23`) (#245) |
 | MUT-COL-3 | ✅ | B | Sample link → `/portal/patient?study=&sample=`, new tab |
 | MUT-COL-4 | ✅ | C | Cancer Type, hidden by default (#245) |
-| MUT-COL-5 | 🟡 | B | Shown by default only when the rows hold more than one type, as legacy (prad TMPRSS2 hidden; `mutationDefaultColumns`) (#389); no fallback to the study's cancer type for a sample without one |
-| MUT-COL-6 | 🟡 | B | Unchanged: plain text; no bold italic, Germline tag, reVUE icon |
+| MUT-COL-5 | ✅ | B | The portal's tumour-type map (the study's cancer type for a sample with neither attribute; luad_msk_npjpo_2021 TP53 "Lung Adenocarcinoma") (#408); shown by default only when the rows hold more than one type (#389) |
+| MUT-COL-6 | 🟡 | B | Bold italic, cut at 40 with the whole change as tooltip, a red "Germline" tag on germline calls (`proteinChangeCell`) (#400); the search does not match "germline" through this column; no reVUE icon |
 | MUT-COL-7 | 🔶 | B | Unchanged: one text badge "Oncogenic · Level 1" |
 | MUT-COL-8 | ❌ | C | Unchanged: no custom driver column (tracked) |
 | MUT-COL-9 | ❌ | C | Unchanged (tracked) |
 | MUT-COL-10 | 🟡 | BC | Functional Impact column, hidden, unsorted, as legacy (#245); blank on Q1 (coadread not yet in the Genome Nexus store) |
 | MUT-COL-11 | ✅ | B | The portal's labels in its colours (Missense, IF ins, FS del, Splice, Fusion), stored text as tooltip (#245) |
-| MUT-COL-12 | 🟡 | C | Upper-cased, header tooltip (#245); still uncoloured |
+| MUT-COL-12 | ✅ | C | Upper-cased, coloured as the portal (variantTypeColor), header tooltip (#245) |
 | MUT-COL-13 | ❌ | C | Unchanged: no ASCN columns |
 | MUT-COL-14 | ❌ | C | Unchanged |
 | MUT-COL-15 | ❌ | C | Unchanged |
 | MUT-COL-16 | ❌ | C | Unchanged |
 | MUT-COL-17 | ❌ | C | Unchanged |
 | MUT-COL-18 | ✅ | B | Copy # values as legacy (Q1 G12C: ShallowDel, Gain, Diploid); shown by default when a queried study has a discrete CNA profile, as legacy's DiscreteCNACache (lgg_ucsf_2014 hidden) (#389) |
-| MUT-COL-19 | 🟡 | B | Unchanged: "MS" raw; no S / G badges |
+| MUT-COL-19 | ✅ | B | "S" on #ccffff / "G" on #ffffcc with the status as tooltip, other values small and grey, header tip "Mutation Status" (`mutationStatusCell`) (#400) |
 | MUT-COL-20 | ✅ | C | VS, hidden (#245) |
 | MUT-COL-21 | ✅ | C | Center, hidden (#245) |
 | MUT-COL-22 | ✅ | C | Chromosome sorts by the portal's value: the first integer, X 23, Y 24, else −1, blank last (`lib/mutation-sort.ts` chromosomeSortSql) (#381) |
@@ -215,7 +215,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-37 | ❌ | C | Unchanged: no namespace columns |
 | MUT-COL-38 | ✅ | B | The portal's 8 by default: Sample ID, Cancer Type Detailed, Protein Change, Annotation, Mutation Type, Copy #, Allele Freq (T), # Mut in Sample |
 | MUT-COL-T1 | ✅ | B | Label mapping and colours (`lib/mutation-type.ts`) (#245) |
-| MUT-COL-T2 | ❌ | C | Unchanged: no Variant Type colours |
+| MUT-COL-T2 | ✅ | C | SNP/DNP/TNP/ONP #008000, INS #8b4513, DEL #8b00c9, other black (`lib/mutation-type.ts` variantTypeColor) (#245) |
 | MUT-COL-40 | N/A | C | Patient View column, not on the Results tab (audit in 40/41) |
 | MUT-COL-41 | N/A | C | Same |
 | MUT-COL-42 | N/A | C | Same |
@@ -248,7 +248,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-TB-5 | 🟡 | B | Unchanged: one list "Columns (6 of 35)"; no Clinical tab, no Freq |
 | MUT-TB-6 | 🟡 | BC | Unchanged |
 | MUT-TB-7 | ❌ | B | Unchanged: no annotation filter |
-| MUT-TB-8 | 🔶 | BC | Unchanged: CSV `cohort-lab_<study>_KRAS_mutations.csv`, every column, rows kept by filters |
+| MUT-TB-8 | ✅ | BC | table.tsv: every row in the current sort whatever the search and filters, every column by name, tab-separated, CRLF (`lib/table-tsv.ts`, /api/table format table-tsv) (#411) |
 | MUT-TB-9 | ✅ | BC | Was 🔶: default order is the Annotation column descending, then codon (`lib/mutation-table.ts:398`) (#309). KRAS's first row is still A11_G12dup where the portal's is G12C, because every KRAS row carries the gene's "Level 1" (MUT-AN-3), so they tie |
 | MUT-FM-1 | 🟡 | B | Search and header filters now reach the lollipop and badges; no mutation-status filter (FM-2) or tracks |
 | MUT-FM-2 | ✅ | BC | The mutation-status filter is the badges: status lower-cased equals the kept one, both off keeps none, both on no filter; lollipop, impact badges and table follow, rates do not (`lib/lollipop.ts` statusFilter, `linkMutations`) (#396) |
