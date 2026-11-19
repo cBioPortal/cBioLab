@@ -517,3 +517,8 @@ export function withStatusFilter<T extends Pick<TableQuery, "search" | "filters"
 export function hasGermlineRate(g: Pick<HotspotGene, "germlineSamples" | "germlineCohortSamples">): boolean {
   return (g.germlineSamples ?? 0) > 0 && (g.germlineCohortSamples ?? 0) > 0;
 }
+
+/** the lollipop's table query, kept only while the view still draws its gene (a gene removed takes its search and filters, the badges' included, with it) */
+export function pruneLollipopTable<T extends { gene: string }>(table: T | undefined, genes: string[]): T | undefined {
+  return table && genes.includes(table.gene) ? table : undefined;
+}

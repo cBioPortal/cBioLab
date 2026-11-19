@@ -19,4 +19,7 @@ export const mutants: Mutant[] = [
   { id: "status-badges-without-germline", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
     effect: "The germline rate and the Somatic / Germline badges show for a gene with no germline mutation, where the portal shows the somatic rate alone.",
     find: "return (g.germlineSamples ?? 0) > 0 && (g.germlineCohortSamples ?? 0) > 0;", replace: "return (g.germlineCohortSamples ?? 0) > 0;" },
+  { id: "status-table-outlives-gene", layer: "counts", guard: "unit", file: "lib/lollipop.ts",
+    effect: "Removing a gene from the lab's lollipop keeps its table query (a badge's filter), and the view then fails as naming a gene it does not draw.",
+    find: "return table && genes.includes(table.gene) ? table : undefined;", replace: "return table;" },
 ];

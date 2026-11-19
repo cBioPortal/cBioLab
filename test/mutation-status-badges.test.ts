@@ -19,7 +19,7 @@ process.env.STUDY_ID = "s1";
 for (const k of ["CLICKHOUSE2_URL", "FEDERATION_PEERS", "LOOPBACK_PEER", "CH_RUN_CACHE"]) delete process.env[k];
 
 register("./support/tsx-loader.mjs", import.meta.url);
-const { statusSelection, statusFilter, withStatusFilter, buildLollipopGene } = await import("../lib/lollipop.ts");
+const { statusSelection, statusFilter, withStatusFilter, buildLollipopGene, pruneLollipopTable } = await import("../lib/lollipop.ts");
 const { linkMutations } = await import("../app/portal/results-layout.ts");
 const React = await import("react");
 const { renderToStaticMarkup } = await import("react-dom/server");
@@ -226,4 +226,12 @@ test("B12 the rates' text does not change with the selection", () => {
   assert.match(texts[0][0], /2\.2%/);
   assert.match(texts[0][1], /1\.5%/);
   for (const t of texts.slice(1)) assert.deepEqual(t, texts[0]);
+});
+
+// the Reviewer's case (#396): a badge's filter on a gene the lab card then removes must go with the gene
+test("B13 pruneLollipopTable: kept while its gene is drawn, dropped with the gene", () => {
+  const t = { gene: "PTEN", filters: { status: { op: "equals" as const, value: "germline" } } };
+  assert.deepEqual(pruneLollipopTable(t, ["PTEN", "KRAS"]), t);
+  assert.equal(pruneLollipopTable(t, ["KRAS"]), undefined);
+  assert.equal(pruneLollipopTable(undefined, ["KRAS"]), undefined);
 });
