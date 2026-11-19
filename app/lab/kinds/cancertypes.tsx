@@ -114,7 +114,7 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
     const same = hover.tip && el && hover.tip.panel === panel && hover.tip.key === key;
     hover.move(same ? hover.tip : el && b ? { panel, key, at: { left: b.left, top: b.top, right: b.right, bottom: b.bottom } } : null, e.clientX, e.clientY);
   };
-  // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls
+  // each cohort's chart laid out for the card's width; one with more groups than fit grows and scrolls, with the portal's scrollbar on top too
   const draw = (i: number) => (width: number) => {
     const c = cancertypesPanelSvg(r, i, { width, gene: gene === ALL ? null : gene, title: r.panels.length > 1 || gene !== ALL, popover: true });
     return frame(c.width, c.height, c.body, palette("auto").bg, c.grown, "Cancer types summary — " + r.panels[i].cohort);
@@ -126,7 +126,7 @@ function CancertypesBody({ v }: { v: DrawnResultOf<"cancertypes"> }) {
       {r.panels.map((_, i) => <div key={i}>
         <Downloads r={r} panel={i} gene={gene === ALL ? null : gene} />
         <div onPointerMove={onMove(i)} onPointerDown={onMove(i)} onPointerLeave={(e) => hover.move(null, e.clientX, e.clientY)}>
-          <DrawAtWidth draw={draw(i)} deps={[r, gene]} />
+          <DrawAtWidth draw={draw(i)} deps={[r, gene]} topScroll />
         </div>
       </div>)}
       {hover.tip && <BarPopover r={r} panel={hover.tip.panel} gene={gene === ALL ? null : gene} groupKey={hover.tip.key} at={hover.tip.at} live={hover.live} />}
