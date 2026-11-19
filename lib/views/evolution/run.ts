@@ -7,7 +7,7 @@ import { hasPatientTimeline, type PatientLevelCapable, type Resolver } from "../
 import type { TablePart } from "../../mutation-table.ts";
 import { checkQuery, describeQuery, shownColumns, type TableQuery } from "../../table-query.ts";
 import { PATIENT_ID } from "../../patient-timeline.ts";
-import { annotationText } from "../../patient-alterations.ts";
+import { annotationText, cohortOf } from "../../patient-alterations.ts";
 import { axisTicks, timelineAxisItems, sampleDays, sampleMarks } from "../../timeline-tracks.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, listPosition, rowHolders, runRows, tableTail, viewQuery, type Rows } from "../rows.ts";
@@ -35,9 +35,12 @@ function cellOf(r: Record<string, unknown>, c: { id: string; numeric: boolean })
   const n = Number(x);
   return c.id === "maxVaf" ? Math.round(n * 1000) / 1000 : n;
 }
-const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map((x) => ({
-  cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
-  values: cols.map((c) => cellOf(x, c)) }));
+/** a page of rows aligned with `cols`; a mutation row's detail holds its Cohort counts, what its Cohort cell draws */
+const rowsOf = (r: Rows, cols: { id: string; numeric: boolean }[]) => r.rows.map((x) => {
+  const cohort = cohortOf(x);
+  return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? x.sample ?? ""),
+    values: cols.map((c) => cellOf(x, c)), ...(cohort ? { detail: { cohort } } : {}) };
+});
 
 const pageSize = (n: unknown) => n == null ? 25 : Math.floor(Number(n));
 const STATUSES: EvolutionStatus[] = ["called", "noVaf", "uncalled", "absent", "np"];
@@ -240,6 +243,7 @@ export async function runEvolution(view: EvolutionView, ctx: ViewRun): Promise<V
             (display.mutationLabels ? "" : ", mutation labels hidden") + "; it colours each sample's VAF from 0 to 1 on the portal's VAF ramp; grey is not found, white with a bar is not profiled. ") +
         (ungrouped ? "Group by: " + ungrouped + ". " : "") +
         (ctx.pin ? "Annotation is OncoKB " + ctx.pin + " (oncogenicity and its highest sensitivity level), as on the Patient tables. " : "No OncoKB version is pinned here, so the Annotation column is empty. ") +
+        "Cohort % is the share of the study's samples profiled for the gene by their panel with a mutation in it (blank for a mutation with no keyword, as the portal's); its bar's darker part, those with the mutation's keyword. " +
         "Fusions recorded as mutations are left out, as the portal leaves them out. " +
         "The patient list holds the cohort's patients with two or more samples and a mutation with allele counts: " + tableTail(r, q, listColumns, "patient", "with the most samples first, then by patient id", excluded, false),
     };

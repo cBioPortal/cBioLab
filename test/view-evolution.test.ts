@@ -12,7 +12,7 @@ import { heatmapOrder } from "../lib/views/evolution/order.ts";
 import { FS, textWidth } from "../lib/svg-kit.ts";
 import { evolutionKind } from "../lib/views/evolution/kind.ts";
 import { pageSql } from "../lib/table-query.ts";
-import { annotationText } from "../lib/patient-alterations.ts";
+import { annotationText, mutationCohortCtes, MUTATION_COHORT_JOIN, MUTATION_FREQ } from "../lib/patient-alterations.ts";
 import { selectedCsv } from "../lib/views/evolution/download.ts";
 import { selectedRows } from "../lib/views/evolution/table.ts";
 import { evolutionKey } from "../lib/views/evolution/figure.ts";
@@ -514,6 +514,12 @@ describe("evolution: its row sources name one patient and live only with patient
     assert.doesNotMatch(bare, /annotation\.oncokb/);
     assert.match(bare, /'' AS oncogenicity/);
     assert.ok(EVOLUTION_DEFAULT_COLUMNS.indexOf("annotation") === EVOLUTION_DEFAULT_COLUMNS.indexOf("proteinChange") + 1, "after Protein Change, as the portal's");
+  });
+  test("PTB-GE-TB-1 the Cohort column: the Patient tables' counts, last of the defaults (the values are checked on the fixture, against the Summary table's)", () => {
+    const sql = pageSql(evolutionMutationsSource(part, "P-1", "db", []), {}, ["freq"], 10, 0);
+    assert.ok(sql.includes(mutationCohortCtes("db", part.study)), "the Patient tables' fa, kc and fp");
+    assert.ok(sql.includes(MUTATION_COHORT_JOIN) && sql.includes(MUTATION_FREQ + " AS freq"));
+    assert.equal(EVOLUTION_DEFAULT_COLUMNS[EVOLUTION_DEFAULT_COLUMNS.length - 1], "freq", "Cohort last, as the portal's");
   });
   test("annotationText: the call as the Patient tables write it", () => {
     const cases: [Record<string, unknown>, string][] = [

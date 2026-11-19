@@ -6,7 +6,7 @@ import { mutationStudySql, sq } from "../../compiler.ts";
 import { inCohortPatients } from "../../cohort2.ts";
 import type { QueryColumn, RowSource } from "../../table-query.ts";
 import type { TablePart } from "../../mutation-table.ts";
-import { ANNOTATION_COLUMN, annSelect, oncokbCte } from "../../patient-alterations.ts";
+import { ANNOTATION_COLUMN, annSelect, oncokbCte, mutationCohortCtes, MUTATION_COHORT_COUNTS, MUTATION_COHORT_JOIN, MUTATION_FREQ } from "../../patient-alterations.ts";
 
 const str = (x: string) => "ifNull(toString(" + x + "), '')";
 const num = (x: string) => "CAST(" + x + " AS Nullable(Float64))";
@@ -80,12 +80,12 @@ export function evolutionPatientsSource(parts: TablePart[], db: string, drawable
 /** The mutation table's columns. `vafs` is the mutation in each sample, by the sample's number. */
 export const EVOLUTION_COLUMNS: QueryColumn[] = [
   text("samples", "Samples"), text("gene", "Gene"), { ...text("proteinChange", "Protein Change"), order: "gene, pos" }, ANNOTATION_COLUMN,
-  text("mutationType", "Mutation Type"), text("vafs", "VAF by sample"), number("maxVaf", "Max VAF", "round(maxVaf, 3)"),
+  text("mutationType", "Mutation Type"), text("vafs", "VAF by sample"), number("maxVaf", "Max VAF", "round(maxVaf, 3)"), number("freq", "Cohort %"),
   number("called", "Samples called"),
   text("variantType", "Variant Type"), text("chr", "Chromosome"), number("start", "Start Pos"), number("end", "End Pos"),
   text("ref", "Ref"), text("var", "Var"),
 ];
-export const EVOLUTION_DEFAULT_COLUMNS = ["samples", "gene", "proteinChange", "annotation", "mutationType", "vafs", "maxVaf"];
+export const EVOLUTION_DEFAULT_COLUMNS = ["samples", "gene", "proteinChange", "annotation", "mutationType", "vafs", "maxVaf", "freq"];
 
 /** The patient's samples in their order, as an SQL array, and a sample's place in it from 1 (one it does not name, last). */
 const orderArray = (order: string[]) => order.length ? "[" + order.map(sq).join(", ") + "]" : "CAST([] AS Array(String))";
@@ -116,13 +116,14 @@ export function evolutionMutationsSource(p: TablePart, patient: string, db: stri
       "  WHERE cancer_study_identifier = " + st + " AND alteration_type = 'MUTATION_EXTENDED' AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM s) GROUP BY sid),\n" +
       "m AS (SELECT sampleId AS sid, " + MUTATION_KEY + " AS k, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr,\n" +
       "         startPosition AS start, endPosition AS end, referenceAllele AS ref, tumorSeqAllele AS var, proteinPosStart AS codon,\n" +
-      "         tumorAltCount AS ac, tumorRefCount AS rc, toUInt8(" + CALLED + ") AS called\n" +
+      "         tumorAltCount AS ac, tumorRefCount AS rc, toUInt8(" + CALLED + ") AS called, ifNull(keyword, '') AS kw\n" +
       "  FROM " + db + ".mutation_derived WHERE " + MUTATIONS_OF(p.study, "patientId = " + sq(patient)) + "),\n" +
       // a mutation is listed when it was called in some sample; an uncalled record only fills in another sample
       "g AS (SELECT k, any(gene) AS gene, any(proteinChange) AS proteinChange, any(mutationType) AS mutationType, any(variantType) AS variantType,\n" +
-      "         any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos FROM m WHERE called = 1 GROUP BY k),\n" +
+      "         any(chr) AS chr, any(start) AS start, any(end) AS end, any(ref) AS ref, any(var) AS var, min(codon) AS pos, max(kw) AS kw FROM m WHERE called = 1 GROUP BY k),\n" +
       // per mutation and sample: the called record when there is one, else the uncalled one
       (pin ? oncokbCte(pin, "MUTATION", "SELECT gene FROM g") : "") +
+      mutationCohortCtes(db, p.study) +
       "mm AS (SELECT k, sid, toUInt8(1) AS hit, max(called) AS cl, tupleElement(argMax(tuple(ac, rc), called), 1) AS mac, tupleElement(argMax(tuple(ac, rc), called), 2) AS mrc\n" +
       "  FROM m GROUP BY k, sid),\n" +
       "pc AS (SELECT pn.sid AS sid, pg.gene AS gene FROM pn JOIN " + db + ".gene_panel_to_gene_derived pg ON pg.gene_panel_id = pn.panel WHERE pg.gene IN (SELECT gene FROM g)),\n" +
@@ -140,9 +141,9 @@ export function evolutionMutationsSource(p: TablePart, patient: string, db: stri
       "         arrayStringConcat(arrayMap(x -> concat(toString(x.1), ': ', multiIf(x.3 = 'called', " + d2("x.4") + ", x.3 = 'noVaf', 'called, no reads',\n" +
       "           x.3 = 'uncalled', concat(" + d2("x.4") + ", ' uncalled'), x.3 = 'absent', 'not found', 'not profiled')), a.cells), ' · ') AS vafs,\n" +
       "         if(arrayExists(x -> x.3 = 'called', a.cells), arrayMax(arrayMap(x -> ifNull(x.4, 0), arrayFilter(x -> x.3 = 'called', a.cells))), NULL) AS maxVaf,\n" +
-      "         length(arrayFilter(x -> " + isCall + ", a.cells)) AS called,\n" +
+      "         length(arrayFilter(x -> " + isCall + ", a.cells)) AS called, " + MUTATION_FREQ + " AS freq, " + MUTATION_COHORT_COUNTS + ",\n" +
       "         g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end, g.ref AS ref, g.var AS var, g.pos AS pos, a.cells AS cells\n" +
-      "  FROM a JOIN g ON g.k = a.k" + (pin ? " LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange" : "") + ")\n",
+      "  FROM a JOIN g ON g.k = a.k" + (pin ? " LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange" : "") + " " + MUTATION_COHORT_JOIN + ")\n",
     columns: EVOLUTION_COLUMNS,
     select: "*",
     defaultOrder: "so, maxVaf DESC NULLS LAST, gene, pos ASC NULLS LAST",

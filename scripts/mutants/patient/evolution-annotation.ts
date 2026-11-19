@@ -1,4 +1,4 @@
-// Planted bugs: the Genomic Evolution table's Annotation column (PTB-GE-TB-1). How they are planted and run: scripts/check-mutants.ts.
+// Planted bugs: the Genomic Evolution table's Annotation and Cohort columns (PTB-GE-TB-1). How they are planted and run: scripts/check-mutants.ts.
 import type { GuardCommands, Mutant } from "../types.ts";
 
 export const guards: GuardCommands = {
@@ -18,4 +18,8 @@ export const mutants: Mutant[] = [
     effect: "A later page of the Genomic Evolution table carries annotations without naming the OncoKB version they were read at.",
     find: "mutations: tableOf(r, r.rows), ...bare, oncokbPin: ctx.pin }",
     replace: "mutations: tableOf(r, r.rows), ...bare }" },
+  { id: "evolution-cohort-no-keyword", layer: "counts", guard: "evolution-annotation", file: "lib/views/evolution/sql.ts",
+    effect: "The Genomic Evolution table reads no mutation's keyword, so its Cohort % is blank everywhere and the bar has no keyword share.",
+    find: "min(codon) AS pos, max(kw) AS kw FROM m",
+    replace: "min(codon) AS pos, '' AS kw FROM m" },
 ];

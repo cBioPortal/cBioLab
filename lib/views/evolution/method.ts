@@ -19,6 +19,7 @@ export function evolutionMethod(t: { cohorts: string[]; queryText: string; sortN
       "with its state in every sample — called (VAF = variant reads ÷ (variant + reference reads)), called without allele counts, uncalled with variant reads (the study's uncalled-mutations profile; drawn with its VAF), " +
       "not found in a sample sequenced for the gene (VAF 0), or not profiled (the sample's panel omits the gene, or it was not sequenced for mutations: no VAF). " +
       "Each mutation's Annotation is OncoKB's call for its gene and protein change " + (t.oncokbPin ? "at " + t.oncokbPin : "(none: no OncoKB version is pinned)") + ", read from the annotation store. " +
+      "Its Cohort % is the study's samples with a called mutation in the gene ÷ those whose panel covers the gene (blank for a mutation with no keyword), with the samples carrying its keyword beside it. " +
       "The figure draws every mutation the table's query keeps that has a VAF in some sample where it was called.",
     params: [["samples", String(t.samples)],
       ["mutations", (t.table.queryText ? t.table.total.toLocaleString("en-US") + " of " : "") + t.table.all.toLocaleString("en-US") + (t.table.queryText ? " (kept: " + t.table.queryText + ")" : "")],

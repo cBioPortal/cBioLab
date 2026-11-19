@@ -11,6 +11,7 @@ import { patientSamplesSql } from "./patient-timeline.ts";
 import { inCohortPatients, inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE } from "./annotation-store.ts";
 import { mutationTypeColumn } from "./mutation-type.ts";
+import type { CohortCount } from "./views/alterations/types.ts";
 
 /** The view's three tables, in the portal's order. */
 export const ALTERATION_TABLES = ["mutations", "cna", "sv"] as const;
@@ -142,6 +143,33 @@ export const annSelect = (pin: string | null) => pin
   : "'' AS oncogenicity, '' AS level, toUInt8(0) AS drv";
 
 /**
+ * The study's counts behind a mutation row's Cohort cell, for the genes and keywords of the CTE `g`
+ * (columns gene, kw): `fa`, the samples with a called mutation in the gene; `kc`, those with the
+ * row's keyword (IDH1 R132 missense, APC truncating), the bar's darker part; `fp`, those profiled
+ * for the gene by their panel, the denominator. Joined on g as MUTATION_COHORT_JOIN.
+ */
+export function mutationCohortCtes(db: string, study: string): string {
+  return "fa AS (SELECT hugo_gene_symbol AS gene, uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
+    "  WHERE " + genomicStudySql(study) + " AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'\n" +
+    "    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),\n" +
+    "kc AS (SELECT keyword AS kw, uniqExact(sampleId) AS n FROM " + db + ".mutation_derived\n" +
+    "  WHERE " + mutationStudySql(study) + " AND molecularProfileId NOT LIKE '%uncalled%' AND keyword IN (SELECT kw FROM g WHERE kw != '') GROUP BY kw),\n" +
+    profiledCte("fp", db, study, "MUTATION_EXTENDED", "SELECT gene FROM g");
+}
+export const MUTATION_COHORT_JOIN = "LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw";
+/** the Cohort % (freq): blank for a mutation with no keyword, as the portal's; else the gene's mutated share of the samples profiled for it */
+export const MUTATION_FREQ = "if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL)";
+/** what the Cohort cell draws and says: samples with a mutation in the gene, with the row's keyword, out of those profiled */
+export const MUTATION_COHORT_COUNTS = "toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword";
+
+/** A row's Cohort counts, when its table reads them (MUTATION_COHORT_COUNTS): what the Cohort cell draws and its tooltip says. */
+export function cohortOf(x: Record<string, unknown>): CohortCount | undefined {
+  if (x.cohortOf == null) return undefined;
+  const kw = String(x.keyword ?? "");
+  return { n: Number(x.cohortN ?? 0), of: Number(x.cohortOf), ...(kw ? { keyword: kw, keywordN: Number(x.cohortKwN ?? 0) } : {}) };
+}
+
+/**
  * Which of the patient's samples a table reads: every one ("patient", cBioPortal's patient view) or
  * only those in the cohort ("cohort", its sample view — a cohort of one sample shows that sample).
  */
@@ -265,28 +293,21 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "cn AS (SELECT hugo_gene_symbol AS gene, arrayStringConcat(arraySort(groupUniqArray(if(cna_alteration > 0, 'AMP', 'HOMDEL'))), ', ') AS copy\n" +
       "  FROM " + db + ".genomic_event_derived WHERE " + genomicStudySql(p.study) + " AND patient_unique_id = " + uid + "\n" +
       "    AND variant_type = 'cna' AND abs(cna_alteration) >= 2 AND hugo_gene_symbol IN (SELECT gene FROM g)" + onlyCohort("replaceOne(sample_unique_id, " + pre + ", '')", samples) + " GROUP BY gene),\n" +
-      "fa AS (SELECT hugo_gene_symbol AS gene, uniqExact(sample_unique_id) AS n FROM " + db + ".genomic_event_derived\n" +
-      "  WHERE " + genomicStudySql(p.study) + " AND variant_type = 'mutation' AND genetic_profile_stable_id NOT LIKE '%uncalled%'\n" +
-      "    AND hugo_gene_symbol IN (SELECT gene FROM g) GROUP BY gene),\n" +
-      // the study's samples with each of the rows' keywords (IDH1 R132 missense, APC truncating): the Cohort bar's darker part
-      "kc AS (SELECT keyword AS kw, uniqExact(sampleId) AS n FROM " + db + ".mutation_derived\n" +
-      "  WHERE " + mutationStudySql(p.study) + " AND molecularProfileId NOT LIKE '%uncalled%' AND keyword IN (SELECT kw FROM g WHERE kw != '') GROUP BY kw),\n" +
-      profiledCte("fp", db, p.study, "MUTATION_EXTENDED", "SELECT gene FROM g") +
+      mutationCohortCtes(db, p.study) +
       (mrna ? mrnaCte(db, p.study, mrna) : "") +
       (covered ? missCte(p, patient, db, "MUTATION_EXTENDED", samples, cover.panels) : "") +
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
       "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll, " + (covered ? "miss.np" : "CAST([] AS Array(String))") + " AS notProfiled, " + genePanelSql(!!cover.panels, order) + ",\n" +
-      "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, " + (mrna ? "if(mr.gene != '', mr.pct, NULL) AS mrna, if(mr.gene != '', mr.z, NULL) AS mrnaZ" : "CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ") + ", if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
-      // what the Cohort cell draws and says: samples with a mutation in the gene, with the row's keyword, out of those profiled
-      "         toUInt64(ifNull(fa.n, 0)) AS cohortN, toUInt64(ifNull(kc.n, 0)) AS cohortKwN, toUInt64(ifNull(fp.n, 0)) AS cohortOf, g.kw AS keyword,\n" +
+      "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, " + (mrna ? "if(mr.gene != '', mr.pct, NULL) AS mrna, if(mr.gene != '', mr.z, NULL) AS mrnaZ" : "CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ") + ", " + MUTATION_FREQ + " AS freq,\n" +
+      "         " + MUTATION_COHORT_COUNTS + ",\n" +
       // the value the cell shows, filters and searches, to 4 places (the page writes it as the portal does)
       "         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,\n" +
       "         " + vafVector(order, "arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)") + " AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,\n" +
       "         g.ref AS ref, g.var AS var, g.status AS status, g.pos AS pos\n" +
       "  FROM g\n" +
       (pin ? "  LEFT JOIN ann ON ann.gene = g.gene AND ann.alteration = g.proteinChange\n" : "") +
-      "  LEFT JOIN cn ON cn.gene = g.gene LEFT JOIN fa ON fa.gene = g.gene LEFT JOIN fp ON fp.gene = g.gene LEFT JOIN kc ON kc.kw = g.kw " + (mrna ? "LEFT JOIN mr ON mr.gene = g.gene " : "") + (covered ? "LEFT JOIN miss ON miss.gene = g.gene" + (cover.panels ? " CROSS JOIN spn" : "") : "") + "\n" +
+      "  LEFT JOIN cn ON cn.gene = g.gene " + MUTATION_COHORT_JOIN + " " + (mrna ? "LEFT JOIN mr ON mr.gene = g.gene " : "") + (covered ? "LEFT JOIN miss ON miss.gene = g.gene" + (cover.panels ? " CROSS JOIN spn" : "") : "") + "\n" +
       ")" + (cover.genes === "all" ? " WHERE inAll = 1" : "") + ")\n",
     columns: ALTERATION_COLUMNS.mutations.map((c) => c.id === "vaf" ? { ...c, sort: vafSort(order.length) } : c),
     select: "* EXCEPT (vafs)",
