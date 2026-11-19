@@ -545,12 +545,17 @@ async function explore({ ok, BASE, page, browser }) {
     }).length);
     await c2.getByRole("button", { name: "Select all" }).click();
     const checked = Number(((await c2.locator(".pickbar").innerText()).match(/(\d+) checked/) || [])[1]);
+    // Compare groups takes every value whatever is checked, as the portal's (STS-HD-7)
+    await c2.locator(".chartgear").click();
+    const menu = await page.getByRole("menuitem").allInnerTexts();
+    await page.keyboard.press("Escape");
+    const compareAll = menu.some((m) => /^Compare (top \d+ )?groups$/.test(m.trim())) && !menu.some((m) => /checked groups/.test(m));
     await c2.getByRole("button", { name: "Deselect all" }).click();
     const cleared = await c2.locator(".pickbar").count();
-    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checkable, checked, cleared });
-    vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0;
+    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checkable, checked, cleared, compareAll });
+    vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0 && compareAll;
   } catch (e) { vlDetail = String(e.message).split("\n")[0]; }
-  ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first", vlOk, vlDetail);
+  ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first; Compare takes every value", vlOk, vlDetail);
 
   // a histogram as the portal's bar chart (STS-BAR-2/3/5): a y axis of integer counts, and a drag
   // across bars selects them, the rest greyed; a click on a bar still adds it
