@@ -28,23 +28,42 @@ export function useWidth(min = MIN_FIGURE_W) {
   return { ref, width };
 }
 
-/** SVG markup laid out at `width` (lib/svg-kit.ts frame()), shown 1:1, scrolling when wider than its box */
-export function SvgAtWidth({ svg, className = "viewfig" }: { svg: string; className?: string }) {
+/**
+ * SVG markup laid out at `width` (lib/svg-kit.ts frame()), shown 1:1, scrolling when wider than its box;
+ * with `topScroll`, a second scrollbar above it, kept in step, for a figure taller than the screen
+ */
+export function SvgAtWidth({ svg, className = "viewfig", topScroll }: { svg: string; className?: string; topScroll?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
+  const top = useRef<HTMLDivElement>(null);
+  // the top bar moves the figure only while the pointer holds it (the portal's ScrollWrapper), so the two never echo each other
+  const held = useRef(false);
   const [more, setMore] = useState(false);
+  const [wider, setWider] = useState(false);
   const w = Number(/viewBox="0 0 ([\d.]+) /.exec(svg)?.[1]) || undefined;
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    const check = () => setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+    const check = () => {
+      setMore(el.scrollWidth - el.clientWidth - el.scrollLeft > 2);
+      setWider(el.scrollWidth - el.clientWidth > 2);
+      if (top.current && top.current.scrollLeft !== el.scrollLeft) top.current.scrollLeft = el.scrollLeft;
+    };
     check();
     el.addEventListener("scroll", check, { passive: true });
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => { el.removeEventListener("scroll", check); ro.disconnect(); };
   }, [svg]);
+  const fromTop = () => { const t = top.current, el = box.current; if (held.current && t && el) el.scrollLeft = t.scrollLeft; };
+  const hold = (on: boolean) => () => { held.current = on; };
+  useLayoutEffect(() => {
+    const release = () => { held.current = false; };
+    window.addEventListener("pointerup", release);
+    return () => window.removeEventListener("pointerup", release);
+  }, []);
   return (
     <div className={className + " figbox"} data-more={more || undefined}>
+      {topScroll && wider && <div ref={top} className="overflow-x-auto overflow-y-hidden" onScroll={fromTop} onPointerDown={hold(true)} onPointerCancel={hold(false)} aria-hidden><div style={{ width: w, height: 1 }} /></div>}
       <div ref={box} className="figscroll">
         {/* the renderer escapes every label it writes (lib/chart/esc.ts) */}
         <div style={{ width: w }} dangerouslySetInnerHTML={{ __html: svg }} />
@@ -66,9 +85,9 @@ export function ViewFigure({ v, error, empty = "nothing to draw", className, min
 }
 
 /** Any figure function drawn at its box's width (portal bodies, lollipop, timeline) */
-export function DrawAtWidth({ draw, deps, className, min }: { draw: (width: number) => string | null; deps: unknown[]; className?: string; min?: number }) {
+export function DrawAtWidth({ draw, deps, className, min, topScroll }: { draw: (width: number) => string | null; deps: unknown[]; className?: string; min?: number; topScroll?: boolean }) {
   const { ref, width } = useWidth(min);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `deps` are the drawing's inputs, named by the caller
   const svg = useMemo(() => width == null ? null : draw(width), [width, ...deps]);
-  return <div ref={ref} className="figwidth">{svg && <SvgAtWidth svg={svg} className={className} />}</div>;
+  return <div ref={ref} className="figwidth">{svg && <SvgAtWidth svg={svg} className={className} topScroll={topScroll} />}</div>;
 }
