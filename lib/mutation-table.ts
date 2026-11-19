@@ -394,9 +394,9 @@ function tumorTypeCtes(p: TablePart, i: number, db: string): string {
  * patient (as lib/clinical-table.ts keeps them), for the rows' samples and patients only.
  */
 function clinicalMapCtes(parts: TablePart[], db: string, clinical: ClinicalColumn[]): string {
-  // every attribute at both levels: a study records each for its samples or its patients, and two studies may differ
-  const attrs = clinical.map((c) => sq(c.id));
+  const of = (per: "sample" | "patient") => clinical.filter((c) => c.per === per).map((c) => sq(c.id));
   const map = (name: string, per: "sample" | "patient", key: "sid" | "pid") => {
+    const attrs = of(per);
     return name + " AS (\n" + parts.map((p, i) => {
       const pre = sq(p.study + "_"), col = per === "sample" ? "sample_unique_id" : "patient_unique_id";
       return "  SELECT " + sq(p.study) + " AS st, replaceOne(" + col + ", " + pre + ", '') AS k,\n" +

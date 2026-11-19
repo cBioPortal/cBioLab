@@ -5,8 +5,8 @@ export const guards: GuardCommands = {};
 
 export const mutants: Mutant[] = [
   { id: "clinical-patient-read-as-sample", layer: "counts", guard: "unit", file: "lib/mutation-clinical.ts",
-    effect: "A patient attribute (SEX, AGE) is read from the sample's map alone, so its column is blank on every row.",
-    find: "const v = s != null && s !== \"\" ? s : of(CLIN_PATIENT);", replace: "const v = s;" },
+    effect: "A patient attribute (SEX, AGE) is read from the sample's map, so its column is blank on every row.",
+    find: "const map = row[c.per === \"patient\" ? CLIN_PATIENT : CLIN_SAMPLE]", replace: "const map = row[CLIN_SAMPLE]" },
   { id: "clinical-number-as-text", layer: "counts", guard: "unit", file: "lib/mutation-clinical.ts",
     effect: "A NUMBER attribute's column holds text, so it sorts as text (\"10\" before \"9\") and takes no range filter.",
     find: "numeric: String(m.datatype ?? \"\").toUpperCase() === \"NUMBER\"", replace: "numeric: false" },

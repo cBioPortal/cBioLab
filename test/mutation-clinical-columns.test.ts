@@ -66,8 +66,7 @@ const AGE_COL: ClinicalColumn = { id: "AGE", name: "Diagnosis Age", per: "patien
 test("K4 clinicalValue: a sample STRING attribute from the sample map, a patient NUMBER one from the patient map as a number; missing → null", () => {
   assert.equal(CLIN_SAMPLE, "clinS");
   assert.equal(CLIN_PATIENT, "clinP");
-  // a study records an attribute at one level, so a row holds it in one map only
-  const row = { [CLIN_SAMPLE]: { SAMPLE_TYPE: "Primary" }, [CLIN_PATIENT]: { AGE: "42" } };
+  const row = { [CLIN_SAMPLE]: { SAMPLE_TYPE: "Primary", AGE: "7" }, [CLIN_PATIENT]: { AGE: "42", SAMPLE_TYPE: "wrong map" } };
   assert.equal(clinicalValue(row, SAMPLE_TYPE), "Primary");
   assert.equal(clinicalValue(row, AGE_COL), 42);
   assert.equal(clinicalValue({ [CLIN_SAMPLE]: { OTHER: "x" }, [CLIN_PATIENT]: {} }, SAMPLE_TYPE), null, "a missing key");
@@ -87,16 +86,15 @@ test("K6 clinicalQueryColumn: num only for NUMBER; the text reads the sample map
   assert.equal(s.name, "Sample Type");
   assert.equal(s.numeric, false);
   assert.equal(s.num, undefined);
-  // the sample's value, else the patient's: either map, whichever level the row's study records it at (the Reviewer's #423 case)
   assert.match(s.text, /\bclinS\b/);
-  assert.match(s.text, /\bclinP\b/);
-  assert.ok(s.text.indexOf("clinS") < s.text.indexOf("clinP"), "the sample map first");
+  assert.doesNotMatch(s.text, /\bclinP\b/);
   assert.match(s.text, /SAMPLE_TYPE/);
   const p = clinicalQueryColumn(AGE_COL);
   assert.equal(p.numeric, true);
   assert.equal(typeof p.num, "string");
   assert.ok(p.num!.length > 0);
   assert.match(p.text, /\bclinP\b/);
+  assert.doesNotMatch(p.text, /\bclinS\b/);
   assert.match(p.text, /AGE/);
   const ps = clinicalQueryColumn({ id: "SEX", name: "Sex", per: "patient", numeric: false });
   assert.equal(ps.num, undefined);
@@ -104,6 +102,23 @@ test("K6 clinicalQueryColumn: num only for NUMBER; the text reads the sample map
   const sn = clinicalQueryColumn({ id: "TMB", name: "TMB", per: "sample", numeric: true });
   assert.equal(typeof sn.num, "string");
   assert.match(sn.text, /\bclinS\b/);
+});
+
+// Legacy (cbioportal-frontend cd8c6df, ClinicalAttributeColumnFormatter): a column carries ONE attribute
+// description (the first queried study's) and every row is read at that level —
+// `entityId: attribute.patientAttribute ? d[0].patientId : d[0].sampleId` — so a row of a study that
+// records the attribute at the other level is blank.
+test("K7 a column reads only its description's level: a row recording the attribute at the other level is blank", () => {
+  const ageSample: ClinicalColumn = { ...AGE_COL, per: "sample" };
+  assert.equal(clinicalValue({ [CLIN_SAMPLE]: {}, [CLIN_PATIENT]: { AGE: "42" } }, ageSample), null, "K7a");
+  assert.equal(clinicalValue({ [CLIN_SAMPLE]: { AGE: "7" }, [CLIN_PATIENT]: {} }, ageSample), 7, "K7b");
+  assert.equal(clinicalValue({ [CLIN_SAMPLE]: { AGE: "7" }, [CLIN_PATIENT]: {} }, AGE_COL), null, "K7c");
+  const s = clinicalQueryColumn(ageSample);
+  assert.match(s.text, /\bclinS\b/, "K7d sample");
+  assert.doesNotMatch(s.text, /\bclinP\b/, "K7d sample");
+  const p = clinicalQueryColumn(AGE_COL);
+  assert.match(p.text, /\bclinP\b/, "K7d patient");
+  assert.doesNotMatch(p.text, /\bclinS\b/, "K7d patient");
 });
 
 // ---- R: runMutations / runHotspots over stand-in resolvers ---------------------------------------
@@ -220,13 +235,4 @@ test("R4 runHotspots with a table filtering SEX: accepted; lollipopCounts' rows 
   const sex = rows.clinical?.find((c) => c.id === "SEX");
   assert.ok(sex, "clinical carries SEX: " + JSON.stringify(rows.clinical));
   assert.deepEqual({ ...sex }, { id: "SEX", name: "Sex", per: "patient", numeric: false });
-});
-
-// the Reviewer's case (#423): an attribute recorded per sample in one study and per patient in another
-test("K7 clinicalValue reads whichever map the row's study holds the attribute in", () => {
-  const sampleLevelStudy = { [CLIN_SAMPLE]: { AGE: "7" }, [CLIN_PATIENT]: {} };
-  const patientLevelStudy = { [CLIN_SAMPLE]: {}, [CLIN_PATIENT]: { AGE: "42" } };
-  assert.equal(clinicalValue(sampleLevelStudy, AGE_COL), 7);
-  assert.equal(clinicalValue(patientLevelStudy, AGE_COL), 42);
-  assert.equal(clinicalValue(sampleLevelStudy, SAMPLE_TYPE), null);
 });
