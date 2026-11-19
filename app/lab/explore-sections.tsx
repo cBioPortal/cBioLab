@@ -24,7 +24,7 @@ import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
-import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
+import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
@@ -1031,9 +1031,8 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   const chart: ChartKey = { kind: "assay", profileType: f.profileType, entity: f.entity };
   const short = f.name || entityShortName(f.entity, f.profileType);
   const valueArm = (v: string) => ({ name: armLabel(v), where: { ...base, values: [v] } as Leaf });
-  const binRange = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? { lte: b.end } : b.special === ">" ? { gt: b.start } : { gt: b.start, lte: b.end };
-  const binText = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!) + "–" + fmtNum(b.end!);
-  const binArms = (f.bins || []).filter((b) => b.count > 0).map((b) => ({ name: armLabel(short + " " + binText(b)), where: { ...base, range: binRange(b) } as Leaf }));
+  const binText = assayBinText;
+  const binArms = (f.bins || []).filter((b) => b.count > 0).map((b) => ({ name: armLabel(short + " " + binText(b)), where: { ...base, ...assayBinWhere(b) } as Leaf }));
   return (
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
@@ -1059,7 +1058,6 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
       )}
       {f.kind === "num" && f.bins && f.bins.length > 1 && (() => {
         const maxN = Math.max(...f.bins.map((b) => b.count), 1);
-        const range = binRange;
         const label = binText;
         const tick = (b: NonNullable<typeof f.bins>[number]) => b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!);
         return (
@@ -1067,7 +1065,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
             {f.bins.map((b, i) => (
               <button key={i} className="hbar" disabled={!clickable}
                 data-tip={label(b) + " · " + fmtInt(b.count) + " " + noun + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
-                onClick={() => addClause({ ...base, range: range(b) })}>
+                onClick={() => addClause({ ...base, ...assayBinWhere(b) })}>
                 <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
               </button>
             ))}
