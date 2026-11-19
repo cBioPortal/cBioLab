@@ -818,7 +818,7 @@ function leafText(leaf: any): string {
     (leaf.ifHeld ? " (in each study holding it; none in a study without it)" : "");
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "proteinPosition") return leaf.gene + " protein position " + JSON.stringify(leaf.range || {});
-  if (leaf.kind === "treatment") return (leaf.time ? "samples taken " + (leaf.time === "Pre" ? "before" : "after") + " treatment with " : "treated with ") + leaf.agents.join(" or ");
+  if (leaf.kind === "treatment") return (leaf.time ? "samples taken " + (leaf.time === "Pre" ? "before" : "after") + " treatment with " : "treated with ") + (leaf.agents || []).join(" or ");
   if (leaf.kind === "sampleList" || leaf.kind === "patientList") {
     const noun = leaf.kind === "sampleList" ? "sample" : "patient";
     if (typeof leaf.set === "string") {

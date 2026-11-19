@@ -124,11 +124,15 @@ async function exploreFor(body: any) {
   // studies are not counted in them, as its federation API has no treatment counts, so the tables
   // name each peer study whose timeline has treatments
   const peerTreated = remote.filter((_, i) => (remoteParts[i]?.events || []).some((e) => e.type.trim().toLowerCase() === TREATMENT_EVENT));
-  const treatments = body.attributesOnly === true ? null
-    : await buildTreatmentFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, leftOut: peerTreated });
-  const tx = treatments ? { treatments } : {};
+  // started here and awaited with the other builders, which do not depend on it; skipped only where
+  // attributesOnly applies (one study), as buildExplore reads it
+  const treatmentsP = body.attributesOnly === true && studies.length === 1 ? Promise.resolve(null)
+    : buildTreatmentFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, leftOut: peerTreated });
+  // marked handled for the case where another builder throws first; awaiting it below still raises its own error
+  treatmentsP.catch(() => undefined);
+  const tx = (t: Awaited<typeof treatmentsP>) => t ? { treatments: t } : {};
   if (!local.length) {
-    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...mt, ...tx };
+    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...mt, ...tx(await treatmentsP) };
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
@@ -139,6 +143,7 @@ async function exploreFor(body: any) {
     ? await buildAssayFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy,
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
+  const treatments = await treatmentsP;
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...mt, ...tx };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...mt, ...tx(treatments) };
 }

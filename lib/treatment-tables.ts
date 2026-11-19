@@ -23,6 +23,7 @@ function parseSampleKey(key: string): { agent: string; time: TreatmentTime } | n
  */
 export function treatmentClause(level: "patient" | "sample", keys: string[]): { clauses: unknown[] } | { why: string } {
   if (!keys.length) return { why: "no treatment is checked" };
+  if (keys.some((k) => !k || /^::(Pre|Post)$/.test(k))) return { why: "a treatment with no name cannot be filtered on" };
   if (level === "patient") {
     const refusal = limitRefusal(keys.length, CLINICAL_VALUES_LIMIT, "treatments");
     return refusal ? { why: refusal } : { clauses: [{ kind: "treatment", agents: keys, ifHeld: true }] };

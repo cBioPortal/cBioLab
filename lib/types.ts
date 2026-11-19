@@ -12,6 +12,8 @@
 export type ChRow = Record<string, string>;
 export interface ChResult<R = ChRow> {
   data: R[];
+  /** a statement WITH TOTALS: its totals row */
+  totals?: R;
   statistics?: { rows_read?: number; elapsed?: number };
   _ms?: number;
 }

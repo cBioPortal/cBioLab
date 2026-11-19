@@ -19,8 +19,9 @@ describe("the clause a table's checked rows add", () => {
       { clauses: [{ kind: "treatment", agents: ["Leucovorin", "Oxaliplatin"], time: "Pre", ifHeld: true }] }],
     ["Pre and Post rows are any of two leaves", "sample", [sampleTreatmentKey("Leucovorin", "Pre"), sampleTreatmentKey("Bevacizumab", "Post")],
       { clauses: [{ any: [{ kind: "treatment", agents: ["Leucovorin"], time: "Pre", ifHeld: true }, { kind: "treatment", agents: ["Bevacizumab"], time: "Post", ifHeld: true }] }] }],
-    ["an agent's name may hold the separator", "sample", [sampleTreatmentKey("A::B", "Post")],
-      { clauses: [{ kind: "treatment", agents: ["A::B"], time: "Post", ifHeld: true }] }],
+    ["an agent's name may hold the separator", "sample", [sampleTreatmentKey("AGENT_A::X", "Post")],
+      { clauses: [{ kind: "treatment", agents: ["AGENT_A::X"], time: "Post", ifHeld: true }] }],
+    ["a treatment with no name is refused rather than sent", "patient", [""], { why: "a treatment with no name cannot be filtered on" }],
     ["51 Post rows are refused", "sample", many(51).map((a) => sampleTreatmentKey(a, "Post")), { why: "one filter holds at most 50 Post treatments; 51 are checked" }],
   ];
   for (const [name, level, keys, want] of cases) test(name, () => assert.deepEqual(treatmentClause(level, keys), want));

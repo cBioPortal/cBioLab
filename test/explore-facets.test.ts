@@ -1075,13 +1075,13 @@ describe("review of #276 (multi-study Freq): one attribute charted as different 
 describe("treatment tables", () => {
   const profiles = new Map([["st1", {}], ["st2", {}]]);
   // the two statements, told apart by what they read
-  const PATIENTS = /GROUP BY agent WITH TOTALS/, SAMPLES = /GROUP BY agent, time WITH TOTALS/;
+  const PATIENTS = /GROUP BY agent WITH TOTALS/, SAMPLES = /GROUP BY agent, time WITH TOTALS/, ANY = /SELECT count\(\) AS n FROM \(SELECT 1 FROM/;
 
   test("patients per agent, most first; samples per agent and time; the totals as the database counts them", async () => {
     // chQuery hands back the database's JSON, totals included; the stand-in carries them on the reply
     setChTransport(async ({ query }) => {
       sent.push(query);
-      const body = PATIENTS.test(query) ? { data: [{ agent: "Leucovorin", n: 137 }, { agent: "Fluorouracil", n: 156 }], totals: { n: 214 } }
+      const body = ANY.test(query) ? { data: [{ n: 1 }] } : PATIENTS.test(query) ? { data: [{ agent: "Leucovorin", n: 137 }, { agent: "Fluorouracil", n: 156 }], totals: { n: 214 } }
         : SAMPLES.test(query) ? { data: [{ agent: "Fluorouracil", time: "Pre", n: 155 }, { agent: "Fluorouracil", time: "Post", n: 1 }], totals: { n: 214 } }
         : { data: [] };
       return JSON.stringify({ meta: [], rows: body.data.length, ...body });
@@ -1096,12 +1096,17 @@ describe("treatment tables", () => {
       assert.match(s, /arrayMin\(arrayMap\(x -> x\.2, arrayFilter\(x -> x\.1 = a, t\)\)\)/);
       assert.match(s, /if\(sa\.2 <= tx\.2, 'Pre', 'Post'\)/);
       assert.doesNotMatch(s, /(patient|sample)_unique_id AS|SELECT (patient|sample)_unique_id,/, "no id is projected; ids are only grouped on or tested for membership");
+      // the grouping reads only the rows it keeps, and an empty AGENT is no treatment
+      assert.match(s, /GROUP BY patient_unique_id/);
+      assert.match(s, /AND \(\(lower\(event_type\) = 'treatment' AND key = 'AGENT' AND value != ''\) OR \(lower\(event_type\) IN \('sample acquisition','specimen'\) AND key = 'SAMPLE_ID'\)\)/);
+      assert.match(sent.find((q) => PATIENTS.test(q))!, /AND value != ''/);
     } finally {
       setChTransport(async ({ query }) => { sent.push(query); for (const [re, rows] of answers) if (re.test(query)) { const data = typeof rows === "function" ? rows(query) : rows; return JSON.stringify({ meta: [], data, rows: data.length }); } return JSON.stringify({ meta: [], data: [], rows: 0 }); });
     }
   });
 
   test("two connections add up, agent by agent", async () => {
+    on(ANY, [{ n: 1 }]);
     on(PATIENTS, (q) => /cbio_b\./.test(q) ? [{ agent: "Fluorouracil", n: 4 }] : [{ agent: "Fluorouracil", n: 6 }, { agent: "Cisplatin", n: 1 }]);
     on(SAMPLES, (q) => /cbio_b\./.test(q) ? [{ agent: "Fluorouracil", time: "Post", n: 2 }] : [{ agent: "Fluorouracil", time: "Post", n: 3 }]);
     const t = await buildTreatmentFacets({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy: new Map([["st2", SECOND]]) });
@@ -1110,6 +1115,7 @@ describe("treatment tables", () => {
   });
 
   test("the tables are counted under every filter, their own included, as the portal's", async () => {
+    on(ANY, [{ n: 1 }]);
     const draft = { all: [{ kind: "treatment", agents: ["Fluorouracil"], ifHeld: true }] } as never;
     await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, draft });
     assert.ok(sent.filter((q) => PATIENTS.test(q) || SAMPLES.test(q)).every((q) => /value IN \('Fluorouracil'\)/.test(q)),
@@ -1123,9 +1129,19 @@ describe("treatment tables", () => {
       { patients: [], samples: [], totalPatients: 0, totalSamples: 0, leftOut: ["peer_study"] });
     assert.equal(sent.length, 0);
     assert.equal(await buildTreatmentFacets({ studies: [], profilesByStudy: profiles }), null);
+    on(ANY, [{ n: 1 }]);
     on(PATIENTS, [{ agent: "Cisplatin", n: 1 }]);
     const t = await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, leftOut: ["peer_study"] });
     assert.deepEqual(t!.leftOut, ["peer_study"]);
+  });
+
+  test("a study without treatments is not asked; one with them gets its tables even when a filter empties them", async () => {
+    assert.equal(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles }), null);
+    assert.deepEqual(sent.filter((q) => PATIENTS.test(q) || SAMPLES.test(q)), [], "only the existence check ran");
+    on(ANY, [{ n: 1 }]);
+    const draft = { all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] } as never;
+    assert.deepEqual(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, draft }),
+      { patients: [], samples: [], totalPatients: 0, totalSamples: 0 }, "empty tables, which say so, rather than none");
   });
 });
 
