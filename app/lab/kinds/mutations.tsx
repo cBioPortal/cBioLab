@@ -34,6 +34,8 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
           : id === "mutationType" ? <MutationTypeCell raw={x == null ? "" : String(x)} />
           : id === "variantType" && x ? <span className="font-semibold" style={{ color: variantTypeColor(String(x)) }} data-tip={variantTypeTip(String(x)) ?? undefined}>{String(x)}</span>
           : id === "copyNumber" ? <CopyNumberCell label={String(x ?? "")} />
+          // the portal's TableCellStatusIndicator NA: no text, its tooltip (TumorAlleleFreqColumnFormatter renderFunction)
+          : id === "vaf" && (x == null || x === "") ? <span className="text-[var(--muted)]" data-tip={VAF_NA_TIP}>{"\u00a0"}</span>
           : id === "validationStatus" && x ? <ValidationStatus raw={String(x)} />
           : id === "exon" ? <span>{exonCell(String(x ?? ""))}</span>
           // as on the portal's table, a sample id opens that sample's page, in a new tab so the table keeps its place
@@ -42,6 +44,9 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
     </div>
   );
 }
+
+/** the tooltip of an Allele Freq (T) cell with no frequency (none, 0, or a count missing), as the portal's */
+const VAF_NA_TIP = "Data not available.";
 
 const CN_VALUE: Record<string, number> = { Amp: 2, Gain: 1, Diploid: 0, ShallowDel: -1, DeepDel: -2 };
 /** Copy # as the portal draws it: the call's label in its colour, Diploid plain and small, none as an empty cell with a tooltip */

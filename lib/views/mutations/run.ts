@@ -2,8 +2,8 @@
 import type { ViewResult } from "../../types.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
 import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
-import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterationOf } from "../../mutation-table.ts";
-import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
+import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterationOf, mutationDefaultColumns, type MutationDefaultFacts, type TablePart } from "../../mutation-table.ts";
+import { checkQuery, describeQuery, shownColumns, type RowSource } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
 import { TABLE_ROWS_MAX, rowHolders, runRows, tableTail, viewQuery, type Rows, keyOnFirstRun } from "../rows.ts";
 import { overLimit, refuse, viewOql } from "../shared.ts";
@@ -67,6 +67,23 @@ function mutationDetail(r: Record<string, unknown>, build: string | undefined): 
   return Object.keys(d).length ? d : undefined;
 }
 
+/**
+ * The facts the default columns follow, over every row of the gene's table whatever its search and
+ * filters (the portal reads its table's allData): whether a queried study has a discrete CNA profile,
+ * whether a row has a non-zero allele frequency, how many Cancer Type Detailed values the rows hold.
+ */
+async function defaultFacts(ctx: ViewRun, holders: string[], size: number, source: (parts: TablePart[]) => (db: string) => RowSource): Promise<MutationDefaultFacts> {
+  const valuesOf = async (column: string, numeric: boolean) =>
+    (await runRows(ctx, "mutations", holders, {}, MUTATION_DEFAULT_COLUMNS, MUTATION_DEFAULT_COLUMNS, size, source, { column, numeric })).values;
+  const [vaf, types, catalogs] = await Promise.all([valuesOf("vaf", true), valuesOf("cancerType", false),
+    Promise.all(ctx.vStudies.map(async (st) => (await ctx.studyProfiles(st)).catalog))]);
+  return {
+    ...(catalogs.every((c) => c) ? { discreteCna: catalogs.some((c) => c!.some((p) => p.type === "COPY_NUMBER_ALTERATION" && p.datatype === "DISCRETE")) } : {}),
+    ...(vaf?.numeric ? { nonZeroVaf: vaf.max != null && vaf.max > 0 } : {}),
+    ...(types && !types.numeric ? { cancerTypes: types.truncated ? Infinity : types.values.filter((x) => x.value !== "").length } : {}),
+  };
+}
+
 export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<ViewResult> {
   const { vNames, pin } = ctx;
   { const e = overLimit("a mutations view", 6, vNames.length); if (e) return refuse("mutations", ctx, e.replace("at most 6", "at most 6 cohorts")); }
@@ -86,9 +103,11 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   const { holders, excluded } = rowHolders(ctx);
   const [pins, unannotated] = await Promise.all([variantPins(), studiesWithoutVariantAnnotation(holders)]);
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
-  let r: Rows;
+  const source = (parts: TablePart[]) => (db: string) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers));
+  let r: Rows, defaults: string[];
   try {
-    r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS), size, (parts) => (db) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers)),
+    defaults = mutationDefaultColumns(await defaultFacts(ctx, holders, size, source));
+    r = await runRows(ctx, "mutations", holders, q, defaults, shownColumns(q, MUTATION_COLUMNS, defaults), size, source,
       ctx.values ? { column: ctx.values, numeric: !!MUTATION_COLUMNS.find((c) => c.id === ctx.values)?.numeric } : undefined);
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   const rows = r.rows.map((x) => {
@@ -97,8 +116,8 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
       values: MUTATION_COLUMNS.map((c) => mutationValue(x, c.id, drivers ? true : pin)), ...(detail ? { detail } : {}) };
   });
   const gn = describePins(pins);
-  const shown = shownColumns(q, MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS);
-  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns: MUTATION_COLUMNS, shown, defaults: MUTATION_DEFAULT_COLUMNS, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
+  const shown = shownColumns(q, MUTATION_COLUMNS, defaults);
+  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns: MUTATION_COLUMNS, shown, defaults, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
     ...(unannotated.length ? { unannotated } : {}),
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (ctx.page || ctx.values) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };
