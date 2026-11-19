@@ -58,6 +58,8 @@ export const ExploreRequest = z.object({
   geneSearch: z.string().optional(),
   attributes: z.array(z.string()).optional(),
   geneCharts: z.array(z.string()).optional(),
+  /** genes to chart as the portal's Mutation Type Counts table, one each */
+  mutationTypeCharts: z.array(z.string()).max(6).optional(),
   /** generic-assay entities to chart, one each */
   assayCharts: z.array(z.object({ profileType: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/), entity: z.string().max(120) })).max(6).optional(),
   derived: z.array(z.object({ metric: z.string(), eventType: z.string().optional(), lineGap: z.number().optional() })).optional(),

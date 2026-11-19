@@ -1,5 +1,5 @@
 import { parseBody, ExploreRequest } from "../../../lib/api-schemas.ts";
-import { buildExplore, buildExploreFederated, buildAssayFacets, buildTreatmentFacets } from "../../../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets, buildTreatmentFacets, buildMutationTypeFacets } from "../../../lib/explore.ts";
 import { ENTITY_RE } from "../../../lib/generic-assay.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
@@ -114,6 +114,12 @@ async function exploreFor(body: any) {
   }));
   // every study's profiles as it describes them (a peer's from the peer), once per profile id, for a plot axis's Data picker
   const profileCatalog = [...new Map(studies.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
+  // a peer's studies are not counted in these tables: its federation API has no mutation-type
+  // counts, so each table names them
+  const mutationTypeFacets = body.mutationTypeCharts && body.mutationTypeCharts.length
+    ? await buildMutationTypeFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, genes: body.mutationTypeCharts, leftOut: remote })
+    : undefined;
+  const mt = mutationTypeFacets ? { mutationTypeFacets } : {};
   // the portal shows its treatment tables whenever a selected study has treatments; a peer's
   // studies are not counted in them, as its federation API has no treatment counts, so the tables
   // name each peer study whose timeline has treatments
@@ -122,7 +128,7 @@ async function exploreFor(body: any) {
     : await buildTreatmentFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, leftOut: peerTreated });
   const tx = treatments ? { treatments } : {};
   if (!local.length) {
-    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...tx };
+    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...mt, ...tx };
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
@@ -134,5 +140,5 @@ async function exploreFor(body: any) {
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...tx };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...mt, ...tx };
 }

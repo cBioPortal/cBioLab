@@ -592,6 +592,33 @@ async function explore({ ok, BASE, page, browser }) {
     txOk = counts.length > 1 && ordered && pinned.length === 1 && pinned[0] === pick && after !== before;
   } catch (e) { txDetail = String(e.message).split("\n")[0]; }
   ok("explore: the treatment tables count patients and samples per treatment, and a treatment applied filters on it", txOk, txDetail);
+
+  // a gene's Mutation Type Counts table (STS-OT-3), from Add chart: # Mut, #, Freq, most samples
+  // first; a checked type applied filters on it, and the table keeps counting without its own filter
+  let mtDetail = "", mtOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Add chart/ }).first().click({ timeout: 240000 });
+    await page.getByRole("tab", { name: "Gene status" }).click();
+    await page.getByPlaceholder("chart a gene (e.g. EGFR)").fill("KRAS");
+    await page.getByRole("button", { name: "Add mutation types" }).click();
+    await page.keyboard.press("Escape");
+    const card = page.locator("[data-mutationtypes='KRAS']");
+    await card.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const header = (await card.locator(".valhead").innerText()).replace(/\s+/g, " ").trim();
+    const rows = await card.locator(".valrow").evaluateAll((rs) => rs.map((r) => [...r.querySelectorAll(".vname, .vn, .vpct")].map((c) => c.textContent)));
+    const num = (t) => Number(String(t).replace(/,/g, ""));
+    const ordered = rows.every(([, m, n], i) => num(m) >= num(n) && (i === 0 || num(rows[i - 1][2]) >= num(n)));
+    const pick = rows[rows.length - 1][0];
+    await card.locator(".valrow", { has: page.locator(".vname", { hasText: new RegExp("^" + pick + "$") }) }).click();
+    await card.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction((t) => document.body.innerText.includes("KRAS mutation type: " + t), pick, { timeout: 240000 });
+    await page.waitForFunction((t) => document.querySelector("[data-mutationtypes='KRAS'] .valrow.on .vname")?.textContent === t, pick, { timeout: 240000 });
+    const after = await card.locator(".valrow .vname").allInnerTexts();
+    mtDetail = JSON.stringify({ header, rows, pick, after });
+    mtOk = header === "# Mut # Freq" && rows.length > 1 && ordered && after[0] === pick && after.length === rows.length;
+  } catch (e) { mtDetail = String(e.message).split("\n")[0]; }
+  ok("explore: a gene's mutation-type table counts mutations and samples by type, and a type applied filters on it", mtOk, mtDetail);
 }
 
 module.exports = { explore };

@@ -6,7 +6,7 @@ import { Fragment } from "react";
 import { isCustomAttr, attributeLabel } from "../../lib/custom-data-names.ts";
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { entityShortName } from "../../lib/profile-names.ts";
-import { DISCRETE_CNA_PROFILE, cnaLevelLabel } from "../../lib/gene-state-clauses.ts";
+import { DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE, cnaLevelLabel, mutationTypeLabel } from "../../lib/gene-state-clauses.ts";
 
 /** opens the uploaded data behind a clause (see custom-data-dialog.tsx) */
 export type OnCustomData = (attribute: string, leaf: any, negated: boolean) => void;
@@ -101,6 +101,8 @@ function leafText(leaf: any) {
   if (k === "split") return leaf.part + " half";
   if (k === "genomicData" && leaf.profileType === DISCRETE_CNA_PROFILE && !leaf.range)
     return `${leaf.gene} copy number: ` + (leaf.values || []).map(cnaLevelLabel).join(" or ");
+  if (k === "genomicData" && leaf.profileType === MUTATION_TYPE_PROFILE)
+    return `${leaf.gene} mutation type: ` + (leaf.values || []).map((v: unknown) => mutationTypeLabel(String(v))).join(" or ");
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
   if (k === "treatment") return (leaf.time ? "sample " + (leaf.time === "Pre" ? "before" : "after") + " treatment: " : "treated with ") + (leaf.agents || []).join(" or ");
   if (k === "genericAssay") return entityShortName(String(leaf.entity), String(leaf.profileType)) + " " + (leaf.range

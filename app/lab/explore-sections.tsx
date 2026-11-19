@@ -29,6 +29,7 @@ import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
+import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
@@ -301,7 +302,7 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
-  const { addChartOpen, setAddChartOpen, addSeqFilter, clearAttributeFilters, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, chartChecked, setChartsChecked, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setSeq, treatmentEventType, unchartGene } = ctx;
+  const { addChartOpen, setAddChartOpen, addSeqFilter, clearAttributeFilters, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, mutationTypeCharts, chartChecked, setChartsChecked, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setSeq, treatmentEventType, unchartGene } = ctx;
   const explore = ctx.explore!;
   return <>
     {explore && (
@@ -447,9 +448,12 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 value={geneChartInput} disabled={exploreBusy}
                 onChange={e => setGeneChartInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
-              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>Add</Button>
+              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}
+                data-tip="its mutation and copy-number status">Add</Button>
+              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput, true)}
+                data-tip="a table of its mutations by type: mutations, samples, and their share of the selected samples">Add mutation types</Button>
             </div>
-            {!geneCharts.length && (
+            {!geneCharts.length && !mutationTypeCharts.length && (
               <p className="note flush mt-1.5">
                 Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
                 it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
@@ -463,10 +467,17 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                   onClick={() => unchartGene(g)}><X /></Button>
               </span>
             ))}
-            {geneCharts.length > 0 && (
+            {mutationTypeCharts.map(g => (
+              <span key={"types|" + g} className="qchip mr-1">
+                {g}<span className="meta"> · mutation types</span>
+                <Button variant="ghost" size="icon-xs" className={CHIP_X} data-tip={"stop charting " + g + "'s mutation types"} aria-label={"stop charting " + g + "'s mutation types"}
+                  onClick={() => unchartGene(g, true)}><X /></Button>
+              </span>
+            ))}
+            {geneCharts.length + mutationTypeCharts.length > 0 && (
               <p className="note flush mt-1.5">
-                Each charted gene's mutation and copy-number status is drawn as its own tile in the
-                facet grid, alongside the clinical attributes — close this dialog to see them.
+                Each chart is drawn as its own tile in the facet grid, alongside the clinical
+                attributes — close this dialog to see them.
               </p>
             )}
           </div>
@@ -1212,13 +1223,14 @@ export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
   const leftOut = t.leftOut && <p className="note flush mt-1" data-leftout>
     Not counted: {t.leftOut.join(", ")}, held by a peer whose federation API has no treatment counts.
   </p>;
-  const table = (level: "patient" | "sample", title: string, meta: string, unit: string, rows: { key: string; name: string; n: number; title: string }[]) => {
+  const table = (level: "patient" | "sample", title: string, meta: string, unit: string, rows: { key: string; name: string; n: number; title: string; extra?: string }[]) => {
     const on = new Set(appliedTreatmentKeys(draft, level));
     return (
       <div className="card" data-treatments={level}>
         <div className="facettitle">{title}<span className="meta"> · {meta}</span></div>
         {leftOut}
         {rows.length ? <ValueList unit={unit} hint={level === "patient" ? "keep the patients treated with any checked treatment" : "keep the samples taken before or after any checked treatment"}
+          extra={level === "sample" ? { head: "Pre / Post", tip: "taken before (Pre) or after (Post) the patient's first treatment with it" } : undefined}
           rows={rows.map((r) => ({ ...r, on: on.has(r.key) }))}
           why={(keys) => { const r = treatmentClause(level, keys); return "why" in r ? r.why : null; }}
           onApply={(keys) => { const r = treatmentClause(level, keys); if ("clauses" in r) addClauses(r.clauses); }} />
@@ -1230,8 +1242,44 @@ export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
     {table("patient", "Treatment per Patient", fmtInt(t.totalPatients) + " patients treated", "patients treated",
       t.patients.map((r) => ({ key: r.agent, name: r.agent, n: r.n, title: r.agent + " — " + fmtInt(r.n) + " patients treated" })))}
     {table("sample", "Treatment per Sample (pre/post)", fmtInt(t.totalSamples) + " samples with a time", "samples acquired before treatment or after/on treatment",
-      sampleTreatmentOrder(t.samples).map((r) => ({ key: sampleTreatmentKey(r.agent, r.time), name: r.agent + " · " + r.time, n: r.n,
+      sampleTreatmentOrder(t.samples).map((r) => ({ key: sampleTreatmentKey(r.agent, r.time), name: r.agent, extra: r.time, n: r.n,
         title: r.agent + " — " + fmtInt(r.n) + " samples taken " + (r.time === "Pre" ? "before" : "after") + " the first treatment with it" })))}
+  </>;
+}
+
+/**
+ * each gene charted by mutation type: the portal's Mutation Type Counts table (STS-OT-3), # Mut,
+ * # and Freq of the selected samples; the checked types filter to samples with any of them
+ */
+export function MutationTypeFacets({ ctx }: { ctx: ExploreCtx }) {
+  const { addClauses, parseDraft } = ctx;
+  return <>
+    {(ctx.explore!.mutationTypeFacets || []).map((f) => {
+      const applied = appliedMutationTypes(parseDraft(), f.gene), on = new Set(applied.types);
+      const counted = !f.leftOut || f.total > 0;
+      return (
+        <div key={f.gene} data-mutationtypes={f.gene} className="card">
+          <div className="facettitle">
+            {f.gene}: mutation types
+            {counted && <span className="meta" data-tip="Freq is of every selected sample, as the portal's table writes it, not of the samples profiled for the gene"> · sample-level · Freq of {f.total.toLocaleString()} samples{f.disjunctive ? " · counted without its own filter" : ""}</span>}
+          </div>
+          {applied.excluded > 0 && <p className="note flush mt-1">
+            {applied.excluded === 1 ? "A filter excludes" : applied.excluded + " filters exclude"} {f.gene} mutation types; this table is counted without {applied.excluded === 1 ? "it" : "them"}.
+          </p>}
+          {f.leftOut && <p className="note flush mt-1" data-leftout>
+            Not counted: {f.leftOut.join(", ")}, held by a peer whose federation API has no mutation-type counts.
+          </p>}
+          {!counted ? null : f.rows.length ? (
+            <ValueList unit="samples with a mutation of this type" pct={portalFreq} hint={"keep the samples with a " + f.gene + " mutation of any checked type"}
+              extra={{ head: "# Mut", tip: "Number of mutations" }}
+              rows={f.rows.map((r) => ({ key: r.type, name: r.label, n: r.samples, extra: r.mutations, total: f.total, on: on.has(r.type),
+                title: r.label + " — " + r.mutations.toLocaleString() + " mutations in " + r.samples.toLocaleString() + " samples" }))}
+              why={(types) => { const r = mutationTypesClause(f.gene, types); return "why" in r ? r.why : null; }}
+              onApply={(types) => { const r = mutationTypesClause(f.gene, types); if ("clauses" in r) addClauses(r.clauses); }} />
+          ) : <p className="note flush mt-1">No {f.gene} mutation in the selected samples.</p>}
+        </div>
+      );
+    })}
   </>;
 }
 
