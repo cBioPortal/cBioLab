@@ -3,12 +3,14 @@
 // list become one filter when its "Apply filter" is pressed — rows of one list are alternatives, so
 // they join as an OR. Only the rows in view are rendered (TanStack Virtual), so a list of thousands
 // of values scrolls as cheaply as a list of ten; rows never wrap, so every row is one height.
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Checkbox } from "../_ui/checkbox";
 import { Button } from "../_ui/button";
+import { Input } from "../_ui/input";
 import { cn } from "@/lib/cn";
 import { fmtPct } from "../../lib/chart/format.ts";
+import { LIST_SEARCH_FROM, listBulk, listRows } from "../../lib/value-list.ts";
 
 /** a list's checked rows, in the order they were checked */
 export function usePicks() {
@@ -17,6 +19,7 @@ export function usePicks() {
     picked,
     has: (k: string) => picked.includes(k),
     toggle: (k: string) => setPicked((p) => p.includes(k) ? p.filter((x) => x !== k) : [...p, k]),
+    set: (keys: string[]) => setPicked(keys),
     clear: () => setPicked([]),
   };
 }
@@ -90,37 +93,74 @@ export function PickBar({ picks, onApply, why, action = "Apply filter", hint, ch
   );
 }
 
-/** a value list's row height in px: one line of --t-md plus the row's padding */
-const VALROW_H = 24;
+/** a value list's row height in px, the portal's table row (STS-TBL-7) */
+const VALROW_H = 25;
 
-export type ValueRow = { key: string; name: string; n: number; total?: number; on?: boolean; muted?: boolean; disabled?: boolean; title: string };
+export type ValueRow = { key: string; name: string; n: number; total?: number; on?: boolean; muted?: boolean; disabled?: boolean; title: string;
+  /** a row that cannot join others in one filter (NA), left out of Select all */
+  solo?: boolean };
+
+/** the list's search box: it owns what is typed, and hands it on 400 ms after the last key, as the portal's */
+function SearchField({ onSearch }: { onSearch: (q: string) => void }) {
+  const [draft, setDraft] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => onSearch(draft), 400);
+    return () => clearTimeout(t);
+  }, [draft, onSearch]);
+  return <Input type="search" className="h-7 w-36 text-md md:text-md" placeholder="Search..." aria-label="search the values" value={draft} onChange={(e) => setDraft(e.target.value)} />;
+}
 
 /**
- * A ranked value list (a categorical facet, a gene's states, timeline events, case lists): name, a
- * bar of its count against the largest, the count, and its share of `total` when there is one.
+ * A ranked value list (a categorical facet, a gene's states, timeline events, case lists), as the
+ * portal's study-view table: a header (#, Freq), then per row its name, a bar of its count against
+ * the largest, the count, and its share of `total` when there is one; the rows the filter holds
+ * pinned first. A list that scrolls gets the portal's search box and Select all / Deselect all over
+ * the rows it shows (lib/value-list.ts).
  */
-export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPct }: {
+export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPct, unit = "cases", cut }: {
   rows: ValueRow[]; onApply: (keys: string[]) => void; why?: (keys: string[]) => string | null; hint?: string;
   /** how a share (0–100) is written */
   pct?: (pct: number) => string;
   /** the checked rows, when something outside the list (its chart menu) reads them too */
   picks?: Picks;
+  /** what the counts count, for the "#" header's tooltip */
+  unit?: string;
+  /** when the list holds only the most frequent values: how many it holds, of how many */
+  cut?: { shown: number; of: number };
 }) {
   const own = usePicks();
   const picks = shared ?? own;
-  const live = picks.picked.filter((k) => rows.some((r) => r.key === k));
+  const [search, setSearch] = useState("");
+  const searchable = rows.length >= LIST_SEARCH_FROM;
+  // a search the box no longer shows filters nothing, and is not there when the box comes back
+  useEffect(() => { if (!searchable) setSearch(""); }, [searchable]);
+  const withShares = useMemo(() => rows.map((r) => ({ ...r, share: r.total ? pct(100 * r.n / r.total) : "" })), [rows, pct]);
+  const shown = useMemo(() => listRows(withShares, searchable ? search : ""), [withShares, searchable, search]);
+  const bulk = listBulk(shown, picks.picked);
+  const keys = useMemo(() => new Set(rows.map((r) => r.key)), [rows]);
+  const live = picks.picked.filter((k) => keys.has(k));
   const max = Math.max(...rows.map((r) => r.n), 1);
   return <>
-    <VirtualRows items={rows} rowKey={(r) => r.key} estimate={VALROW_H} className="vallist">
+    <VirtualRows items={shown} rowKey={(r) => r.key} estimate={VALROW_H} className="vallist"
+      header={<div className="valhead" aria-hidden="true"><span /><span /><span /><span data-tip={"Number of " + unit}>#</span><span>{rows.some((r) => r.total) ? "Freq" : ""}</span></div>}>
       {(r) => (
-        <PickRow className="valrow" picks={picks} k={r.key} on={r.on} disabled={r.disabled} title={r.title} label={r.name}>
+        <PickRow className="valrow" picks={picks} k={r.key} on={r.on} applied={r.on} disabled={r.disabled} title={r.title} label={r.name}>
           <span className="vname" style={r.muted ? { color: "var(--muted)" } : undefined}>{r.name}</span>
           <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * r.n / max)) + "%" }} /></span>
           <span className="vn">{r.n.toLocaleString()}</span>
-          <span className="vpct">{r.total ? pct(100 * r.n / r.total) : ""}</span>
+          <span className="vpct">{r.share}</span>
         </PickRow>
       )}
     </VirtualRows>
+    {searchable && <div className="vsearch">
+      <SearchField onSearch={setSearch} />
+      {bulk.selectAll && <Button variant="ghost" size="xs" onClick={() => picks.set(bulk.selectAll!)}
+        data-tip={(search.trim() ? "check every value the search shows" : "check every value") + (rows.some((r) => r.solo) ? ", but NA, which is applied alone" : "")}>Select all</Button>}
+      {bulk.deselectAll && <Button variant="ghost" size="xs" onClick={() => picks.set(bulk.deselectAll!)}
+        data-tip={search.trim() ? "uncheck the values the search shows" : "uncheck every value"}>Deselect all</Button>}
+    </div>}
+    {searchable && search.trim() && cut && <p className="note flush mt-1">The search covers the {cut.shown.toLocaleString()} most frequent of the {cut.of.toLocaleString()} values.</p>}
+    {searchable && search.trim() && !shown.length && <p className="note flush mt-1">No value {cut ? "among these " : ""}matches “{search.trim()}”.</p>}
     <PickBar picks={picks} hint={hint} why={why ? why(live) : null} onApply={() => onApply(live)} />
   </>;
 }
