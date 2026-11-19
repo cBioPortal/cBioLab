@@ -11,7 +11,9 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "./popove
 const LEAVE_MS = 120;
 
 export function HoverPopover({ trigger, children, pinned: pinnable, side, align = "start", className }: {
-  trigger: React.ReactNode; children: React.ReactNode;
+  trigger: React.ReactNode;
+  /** the popover's content, or a function given `close` for content that closes it (a link opening a window) */
+  children: React.ReactNode | ((close: () => void) => React.ReactNode);
   /** the trigger as a button that pins the popover open, with its name and tip */
   pinned?: { label: string; tip?: string; className?: string };
   side?: "top" | "right" | "bottom" | "left"; align?: "start" | "center" | "end"; className?: string;
@@ -37,7 +39,7 @@ export function HoverPopover({ trigger, children, pinned: pinnable, side, align 
         </PopoverAnchor>}
       <PopoverContent side={side} align={align} className={className} onMouseEnter={enter} onMouseLeave={leave}
         onOpenAutoFocus={(e) => { if (!pinned) e.preventDefault(); }} onCloseAutoFocus={(e) => { if (!wasPinned.current) e.preventDefault(); wasPinned.current = false; }}>
-        {children}
+        {typeof children === "function" ? children(close) : children}
       </PopoverContent>
     </Popover>
   );

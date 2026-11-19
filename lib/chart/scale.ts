@@ -72,3 +72,22 @@ const lead = (t: number) => Math.round(t / 10 ** Math.floor(Math.log10(t) + 1e-9
 // Plex has no superscript minus, so only positive exponents are written this way
 const SUP: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" };
 const sup = (n: number) => String(n).split("").map((c) => SUP[c] ?? c).join("");
+
+/**
+ * A count axis from 0 to `max` (a bar chart's y, STS-BAR-2): integer ticks only, in round steps,
+ * and the axis top the bars are drawn against (the last tick, at least `max`).
+ */
+export function countAxis(max: number, count = 3): { top: number; ticks: number[] } {
+  if (!(max > 0)) return { top: 1, ticks: [0, 1] };
+  const s = linear(0, max, 0, 1, { count });
+  let ticks = s.ticks.filter((t) => Number.isInteger(t) && t >= 0);
+  if (ticks.length < 2) ticks = [0, Math.ceil(max)];
+  // a short chart has room for four labels: past that, every second tick, extended to cover `max`
+  while (ticks.length > 4) {
+    const step = 2 * (ticks[1] - ticks[0]);
+    const kept = ticks.filter((_, i) => i % 2 === 0);
+    if (kept[kept.length - 1] < max) kept.push(kept[kept.length - 1] + step);
+    ticks = kept;
+  }
+  return { top: Math.max(ticks[ticks.length - 1], max), ticks };
+}

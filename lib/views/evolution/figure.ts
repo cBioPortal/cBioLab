@@ -324,6 +324,15 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
 }
 
 /**
+ * The result with only the mutations `keys` names drawn, the portal's "Show only selected mutations"
+ * (VAFChartControls): none named, none drawn; the y axis's data range then follows those drawn.
+ */
+export function onlySelected<T extends DrawnResultOf<"evolution">>(v: T, keys: ReadonlySet<string>): T {
+  const d = v.evolution.drawn;
+  return d ? { ...v, evolution: { ...v.evolution, drawn: d.filter((m) => keys.has(m.key)) } } : v;
+}
+
+/**
  * `o.caption: false` leaves the caveat out, for a page that prints it beside the figure; `o.zoom`, the
  * heatmap's zoom (HEAT_CELL px columns at 1), a zoomed heatmap keeping its width rather than shrinking to the page's.
  */

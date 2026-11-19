@@ -53,8 +53,12 @@ async function main() {
     }
     const page = await ctx.newPage();
     const errors = [];
+    // igv.js (CN Segments, the patient genome overview) reads the reference sequence from UCSC's
+    // hgdownload, which blocks it by CORS now and then; that host is not this app, so its failures
+    // are not this page's errors
+    const outside = (u) => /^https:\/\/hgdownload\.soe\.ucsc\.edu\//.test(u || "");
     page.on("pageerror", e => errors.push("pageerror: " + e.message));
-    page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.text()); });
+    page.on("console", m => { if (m.type() === "error" && !outside((m.location() || {}).url) && !/hgdownload\.soe\.ucsc\.edu/.test(m.text())) errors.push("console: " + m.text()); });
     // A console message about a failed resource does not say WHICH resource, which makes a
     // transient server error impossible to chase. Record the method, url and status too.
     page.on("response", r => {
@@ -62,7 +66,7 @@ async function main() {
     });
     // net::ERR_ABORTED is the page cancelling a request it no longer needs (an analysis query
     // superseded by a later edit, use-analysis.ts), not a failure
-    page.on("requestfailed", r => ((r.failure() || {}).errorText === "net::ERR_ABORTED") || errors.push("requestfailed " + r.method() + " " + r.url() +
+    page.on("requestfailed", r => ((r.failure() || {}).errorText === "net::ERR_ABORTED") || outside(r.url()) || errors.push("requestfailed " + r.method() + " " + r.url() +
       " (" + ((r.failure() || {}).errorText || "?") + ")"));
 
     // "/" is the homepage (choose studies, then explore or query them); the app's

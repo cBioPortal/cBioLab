@@ -7,6 +7,8 @@ import { useState } from "react";
 import { Input } from "../../_ui/input";
 import type { TableResult } from "../../../lib/views/table/types.ts";
 import { transposedRows } from "../../../lib/views/table/transpose.ts";
+import { GenePanelValue, useGenePanelDialog } from "../gene-panel-dialog.tsx";
+import { GENE_PANEL_ATTRIBUTE } from "../../../lib/gene-panel-list.ts";
 
 /**
  * The table on its side, as the portal's Patient page lists clinical data: a row per attribute and a
@@ -16,6 +18,8 @@ import { transposedRows } from "../../../lib/views/table/transpose.ts";
 function TransposedTable({ t }: { t: TableResult }) {
   const [filter, setFilter] = useState("");
   const { heads, rows: attrs } = transposedRows(t);
+  // a "Gene Panel" row's panels open the gene panel window, as the portal's tables link them (PAT-GP-4)
+  const panels = useGenePanelDialog(t.rows[0]?.study || "");
   const f = filter.trim().toLowerCase();
   const shown = f ? attrs.filter((a) => (a.name + " " + a.id + " " + a.values.join(" ")).toLowerCase().includes(f)) : attrs;
   return (
@@ -28,10 +32,11 @@ function TransposedTable({ t }: { t: TableResult }) {
         <thead><tr><th>Attribute</th>{heads.length === 1 && t.unit !== "sample" ? <th>Value</th> : heads.map((h) => <th key={h} className="mono">{h}</th>)}</tr></thead>
         <tbody>
           {shown.map((a) => (
-            <tr key={a.id}><td data-tip={a.id}>{a.name}</td>{a.values.map((v, i) => <td key={i}>{v}</td>)}</tr>
+            <tr key={a.id}><td data-tip={a.id}>{a.name}</td>{a.values.map((v, i) => <td key={i}>{a.name === GENE_PANEL_ATTRIBUTE && v !== "n/a" && v !== "" ? <GenePanelValue value={v} open={(p) => void panels.open(p)} /> : v}</td>)}</tr>
           ))}
         </tbody>
       </table>
+      {panels.node}
     </div>
   );
 }

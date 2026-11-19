@@ -37,3 +37,16 @@ export function panelGeneRows(genes: string[], columns: number): string[][] {
 
 /** The download of the panel's genes, as the portal's: a "Genes" header and a symbol a line. */
 export const panelGenesTsv = (genes: string[]): string => ["Genes", ...genes].join("\n") + "\n";
+
+/**
+ * A "Gene Panel" clinical value as the portal links it (ClinicalInformationPatientTable
+ * renderGenePanelLinks): comma-separated names, each trimmed; one holding "N/A", or "WXS", is text (not
+ * a panel); any other opens the panel its first word names ("TESTPANEL2 (mut)" opens TESTPANEL2).
+ */
+export function genePanelLinks(value: string): { text: string; panel: string | null }[] {
+  return value.split(",").map((s) => s.trim()).filter(Boolean)
+    .map((text) => ({ text, panel: text.includes("N/A") || text === "WXS" ? null : text.split(" ")[0] }));
+}
+
+/** the clinical attribute whose values are gene panels, by the name the portal matches (its display name) */
+export const GENE_PANEL_ATTRIBUTE = "Gene Panel";
