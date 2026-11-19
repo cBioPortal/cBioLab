@@ -220,7 +220,8 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n" +
     "),\n" +
     fusionCtes(p, i, db, gene, pin) +
-    attr("CANCER_TYPE_DETAILED", "ct" + i) + ",\n" +
+    // Cancer Type Detailed as the portal's table reads it: the sample's tumour type, the study's for a sample with neither type attribute
+    sampleTumorTypeCte("ct" + i, p.study, db, "SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n" +
     attr("CANCER_TYPE", "cta" + i) + ",\n" +
     copyNumberCte(p, i, db) + ",\n" +
@@ -234,7 +235,7 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
-    "         m.pid AS patient, m.sid AS sid, ct.v AS cancerType, m.proteinChange AS proteinChange,\n" +
+    "         m.pid AS patient, m.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, m.proteinChange AS proteinChange,\n" +
     // a germline mutation has no protein-change call: the portal asks OncoKB about it by HGVSc
     // (StoreUtils queryOncoKbData), which this store does not hold
     (pin ? "         if(m.germ, '', if(tt.found = 1, tt.oncogenicity, ann.oncogenicity)) AS oncogenicity, if(m.germ, '', if(tt.found = 1, tt.level, ann.level)) AS level,\n" +
@@ -333,7 +334,7 @@ function fusionRows(p: TablePart, i: number, db: string, gene: string, pin: stri
   return "  SELECT " + sq(p.cohort) + " AS cohort, " + sq(p.study) + " AS study, " + i + " AS ord,\n" +
     "         (SELECT rg.name FROM " + db + ".cancer_study cs JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "          WHERE cs.cancer_study_identifier = " + sq(p.study) + ") AS build,\n" +
-    "         v.pid AS patient, v.sid AS sid, ct.v AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
+    "         v.pid AS patient, v.sid AS sid, nullIf(ct.tumorType, '') AS cancerType, " + fusionProteinChangeSql("v.") + " AS proteinChange,\n" +
     // in the mutation rows' column order (the UNION ALL matches by position)
     (pin ? "         " + svCellSql("oncogenicity", "vp", "va1", "va2") + " AS oncogenicity, " + svCellSql("level", "vp", "va1", "va2") + " AS level,\n" +
         "         " + svCellSql("resistance_level", "vp", "va1", "va2") + " AS resistanceLevel, " + svCellSql("diagnostic_level", "vp", "va1", "va2") + " AS diagnosticLevel, " +
