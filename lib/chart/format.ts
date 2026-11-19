@@ -301,3 +301,36 @@ export function portalRound2(x: number): number {
   const [m2, e2] = (String(shifted) + "e").split("e");
   return +(m2 + "e" + (+e2 - 2));
 }
+
+/**
+ * A study-view bar's range as cbioportal.org's bar tooltip writes it (`formatRange`,
+ * StudyViewUtils.tsx): "(20, 25]" for an interval, "≤18" / ">90" for an outlier bar, "≤20-25" when
+ * one has both ends, "5" for one value, the word itself for a category; numbers by toLocaleString.
+ */
+export function portalBinRange(b: { start?: number | null; end?: number | null; special?: string | null; value?: string | null }): string {
+  if (b.value != null) return b.value;
+  const n = (x: number) => x.toLocaleString("en-US");
+  if (b.special) {
+    const sym = b.special === "<=" ? "≤" : b.special;
+    if (b.start != null && b.end != null) return sym + n(b.start) + "-" + n(b.end);
+    const at = b.start ?? b.end;
+    return sym + (at != null ? n(at) : "");
+  }
+  if (b.start != null && b.end != null) return b.start === b.end ? n(b.start) : "(" + n(b.start) + ", " + n(b.end) + "]";
+  return n((b.start ?? b.end)!);
+}
+
+const SUPERSCRIPT: Record<string, string> = { "-": "⁻", "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹" };
+
+/**
+ * A log-scale bar chart's tick as cbioportal.org writes it (`formatNumericalTickValues`,
+ * StudyViewUtils.tsx): −10, −1, 0, 1 and 10 as themselves; another power of ten as 10ⁿ ("−10⁵"
+ * for a negative value); a half-step tick (31, 316, …) blank.
+ */
+export function portalLogTick(v: number): string {
+  if ([-10, -1, 0, 1, 10].includes(v)) return minus(String(v));
+  const e = Math.log10(Math.abs(v));
+  const k = Math.round(e);
+  if (Math.abs(e - k) > 1e-9) return "";
+  return (v < 0 ? "−" : "") + "10" + String(k).split("").map((c) => SUPERSCRIPT[c]).join("");
+}

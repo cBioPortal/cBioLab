@@ -36,7 +36,8 @@ _TYPE_MAP: dict[str, dict[str, Any]] = {
     "INFRAME": {"vt": "mutation", "mt": "In_Frame_Del"},
     "TRUNC": {"vt": "mutation", "mt": "Nonsense_Mutation"},
     "SPLICE": {"vt": "mutation", "mt": "Splice_Site"},
-    "PROMOTER": {"vt": "mutation", "mt": "Other"},
+    # as the warehouse stores a promoter call, which the portal reads by its protein change
+    "PROMOTER": {"vt": "mutation", "mt": "5'Flank", "mv": "Promoter"},
     "OTHER": {"vt": "mutation", "mt": "Other"},
     "FUSION": {"vt": "structural_variant"},
     "AMP": {"vt": "cna", "cna": 2}, "GAIN": {"vt": "cna", "cna": 1}, "HETLOSS": {"vt": "cna", "cna": -1}, "HOMDEL": {"vt": "cna", "cna": -2},
@@ -69,7 +70,7 @@ def events_from_table(rows: Table) -> list[dict[str, Any]]:
         m = _TYPE_MAP.get(typ)
         if m is None:
             raise ValueError(f"events: unknown type '{typ}' for {pid}/{gene} (accepted: {', '.join(_TYPE_MAP)}, optional _DRIVER suffix)")
-        out.append({"pid": pid, "gene": gene, "vt": m["vt"], "mt": m.get("mt"), "cna": m.get("cna"), "mv": _get(r, "alteration", "Alteration"), "driver": driver, **({"germ": True} if germ else {})})
+        out.append({"pid": pid, "gene": gene, "vt": m["vt"], "mt": m.get("mt"), "cna": m.get("cna"), "mv": m.get("mv") or _get(r, "alteration", "Alteration"), "driver": driver, **({"germ": True} if germ else {})})
     return out
 
 

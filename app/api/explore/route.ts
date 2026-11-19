@@ -1,8 +1,9 @@
 import { parseBody, ExploreRequest } from "../../../lib/api-schemas.ts";
-import { buildExplore, buildExploreFederated, buildAssayFacets } from "../../../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets, buildTreatmentFacets, buildMutationTypeFacets } from "../../../lib/explore.ts";
 import { ENTITY_RE } from "../../../lib/generic-assay.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
+import { TREATMENT_EVENT } from "../../../lib/treatment-tables.ts";
 import { mergeExplore } from "../../../lib/explore.ts";
 import { PRIMARY, withChContext, ensureChContext, withoutFailedQueries } from "../../../lib/ch.ts";
 import { pack, throughCache, cacheVersion, resultEntry } from "../../../lib/next-cache.ts";
@@ -113,8 +114,25 @@ async function exploreFor(body: any) {
   }));
   // every study's profiles as it describes them (a peer's from the peer), once per profile id, for a plot axis's Data picker
   const profileCatalog = [...new Map(studies.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
+  // a peer's studies are not counted in these tables: its federation API has no mutation-type
+  // counts, so each table names them
+  const mutationTypeFacets = body.mutationTypeCharts && body.mutationTypeCharts.length
+    ? await buildMutationTypeFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, genes: body.mutationTypeCharts, leftOut: remote })
+    : undefined;
+  const mt = mutationTypeFacets ? { mutationTypeFacets } : {};
+  // the portal shows its treatment tables whenever a selected study has treatments; a peer's
+  // studies are not counted in them, as its federation API has no treatment counts, so the tables
+  // name each peer study whose timeline has treatments
+  const peerTreated = remote.filter((_, i) => (remoteParts[i]?.events || []).some((e) => e.type.trim().toLowerCase() === TREATMENT_EVENT));
+  // started here and awaited with the other builders, which do not depend on it; skipped only where
+  // attributesOnly applies (one study), as buildExplore reads it
+  const treatmentsP = body.attributesOnly === true && studies.length === 1 ? Promise.resolve(null)
+    : buildTreatmentFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, leftOut: peerTreated });
+  // marked handled for the case where another builder throws first; awaiting it below still raises its own error
+  treatmentsP.catch(() => undefined);
+  const tx = (t: Awaited<typeof treatmentsP>) => t ? { treatments: t } : {};
   if (!local.length) {
-    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog };
+    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...mt, ...tx(await treatmentsP) };
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
@@ -125,6 +143,7 @@ async function exploreFor(body: any) {
     ? await buildAssayFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy,
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
+  const treatments = await treatmentsP;
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}) };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...mt, ...tx(treatments) };
 }

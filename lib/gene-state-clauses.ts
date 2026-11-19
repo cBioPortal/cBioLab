@@ -2,11 +2,25 @@
 // and the cohort clauses that select them. Shared by the page and the live check that compares what
 // a state counts with what its click selects (scripts/check-gene-facets.ts); no server imports.
 
+import { ASSAY_VALUES_LIMIT, limitRefusal } from "./filter-limits.ts";
+
 /**
  * `profileType` of a genomicData leaf naming the study's discrete copy-number profile, whatever
  * its stable id (`cna` in some studies, `gistic` in others), so one clause reads every study's.
  */
 export const DISCRETE_CNA_PROFILE = "CNA";
+
+/**
+ * `profileType` of a genomicData leaf whose `values` are mutation types ("Missense_Mutation"): the
+ * samples with a mutation of the gene of any of those types, as the portal's Mutation Type Counts
+ * table selects them (`mutationDataFilters`, categorization MUTATION_TYPE).
+ */
+export const MUTATION_TYPE_PROFILE = "MUTATION_TYPE";
+
+/** a mutation type as the portal's table labels it: "In_Frame_Ins" → "In Frame Ins" */
+export function mutationTypeLabel(type: string): string {
+  return type.replace(/_/g, " ");
+}
 
 /**
  * The levels of a discrete copy-number call, as cBioPortal's gene CNA chart names them
@@ -74,4 +88,37 @@ export function geneStatesClauses(gene: string, type: GeneType, states: string[]
   if (!states.includes("notProfiled")) return { clauses: within ? [prof, within] : [prof] };
   if (!within) return { why: "every state is checked, which is no filter" };
   return { why: "\"Not profiled\" with another state is not one filter — apply them separately" };
+}
+
+/**
+ * The clause a gene's Mutation Type Counts table adds for the checked types (STS-OT-3), or why it
+ * cannot: the samples with a mutation of the gene of any of them. Each application is one more
+ * clause, as the portal appends a `mutationDataFilters` entry.
+ */
+export function mutationTypesClause(gene: string, types: string[]): { clauses: unknown[] } | { why: string } {
+  if (!types.length) return { why: "no mutation type is checked" };
+  const refusal = limitRefusal(types.length, ASSAY_VALUES_LIMIT, "mutation types");
+  if (refusal) return { why: refusal };
+  // ifHeld: over several studies, one with no mutation of a type has none of its samples rather than refusing
+  return { clauses: [{ kind: "genomicData", gene, profileType: MUTATION_TYPE_PROFILE, values: types, ifHeld: true }] };
+}
+
+/** is this leaf a filter of `gene`'s mutation-type table (a genomicData leaf on its mutation types)? */
+export function isMutationTypeLeafFor(leaf: unknown, gene: string): boolean {
+  const l = leaf as { kind?: string; gene?: string; profileType?: string } | null | undefined;
+  return !!l && l.kind === "genomicData" && l.profileType === MUTATION_TYPE_PROFILE && String(l.gene || "").toUpperCase() === gene;
+}
+
+/**
+ * The mutation types a draft's top-level clauses filter `gene` on, for the table's applied rows; a
+ * negated one ("none of these types") is not a row the table can check, so it is counted in `excluded`.
+ */
+export function appliedMutationTypes(def: { all?: unknown[] } | null | undefined, gene: string): { types: string[]; excluded: number } {
+  const out = new Set<string>();
+  let excluded = 0;
+  for (const c of def?.all || []) {
+    if (isMutationTypeLeafFor(c, gene)) for (const v of (c as { values?: unknown[] }).values || []) out.add(String(v));
+    else if (isMutationTypeLeafFor((c as { not?: unknown } | null)?.not, gene)) excluded++;
+  }
+  return { types: [...out], excluded };
 }

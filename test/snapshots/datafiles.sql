@@ -19,8 +19,13 @@ WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_
   JOIN snapshot_db.sample s ON s.internal_id = sll.sample_id
   WHERE sl.stable_id = 'brca_tcga_pan_can_atlas_2018_cnaseq' AND cs.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'))),
 d0_e0 AS (
-  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(ev, note))))), ', ') AS ev
-  FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
+  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(call_, note))))), ', ') AS ev,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 1))) AS k_mut,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 2))) AS k_cna,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 3))) AS k_sv,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'EXP')))) AS k_exp,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'PROT')))) AS k_prot
+  FROM (SELECT sid, o, ev AS call_, note FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
     SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation.oncokb
     WHERE oncokb_version = 'v7.5' AND is_driver))
   OR (g.variant_type = 'structural_variant' AND (g.sample_unique_id, g.hugo_gene_symbol, ifNull(g.sv_event_info, '')) IN (
@@ -47,12 +52,17 @@ SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))
   WHERE sid IN (SELECT sid FROM c0)
   GROUP BY sid),
 d0_e1 AS (
-  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(ev, note))))), ', ') AS ev
-  FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
+  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(call_, note))))), ', ') AS ev,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 1))) AS k_mut,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 2))) AS k_cna,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 3))) AS k_sv,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'EXP')))) AS k_exp,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'PROT')))) AS k_prot
+  FROM (SELECT sid, o, ev AS call_, note FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
     SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation.oncokb
     WHERE oncokb_version = 'v7.5' AND is_driver))
   OR (g.variant_type = 'structural_variant' AND (g.sample_unique_id, g.hugo_gene_symbol, ifNull(g.sv_event_info, '')) IN (
@@ -79,12 +89,17 @@ SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('PIK3CA')
-    AND ((g.hugo_gene_symbol = 'PIK3CA' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+    AND ((g.hugo_gene_symbol = 'PIK3CA' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))
   WHERE sid IN (SELECT sid FROM c0)
   GROUP BY sid),
 d0_e2 AS (
-  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(ev, note))))), ', ') AS ev
-  FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
+  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(call_, note))))), ', ') AS ev,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 1))) AS k_mut,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 2))) AS k_cna,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 3))) AS k_sv,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'EXP')))) AS k_exp,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'PROT')))) AS k_prot
+  FROM (SELECT sid, o, ev AS call_, note FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
     SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation.oncokb
     WHERE oncokb_version = 'v7.5' AND is_driver))
   OR (g.variant_type = 'structural_variant' AND (g.sample_unique_id, g.hugo_gene_symbol, ifNull(g.sv_event_info, '')) IN (
@@ -111,7 +126,7 @@ SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('GATA3')
-    AND ((g.hugo_gene_symbol = 'GATA3' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+    AND ((g.hugo_gene_symbol = 'GATA3' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))
   WHERE sid IN (SELECT sid FROM c0)
   GROUP BY sid),
 d0_prof_TP53_MUTATION AS (SELECT DISTINCT replaceOne(sd.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS profiled_id
@@ -172,7 +187,19 @@ base AS (
   SELECT 'Queried' AS cohort, 'brca_tcga_pan_can_atlas_2018' AS study, 0 AS ord, s.pid AS patient, s.sid AS sid,
          e0.ev AS ev0, (s.sid IN (SELECT profiled_id FROM d0_prof_TP53_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_TP53_SV)) AS pa0, (s.sid IN (SELECT profiled_id FROM d0_prof_TP53_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_TP53_SV)) AS pf0,
          e1.ev AS ev1, (s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_SV)) AS pa1, (s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_SV)) AS pf1,
-         e2.ev AS ev2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pa2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pf2
+         e2.ev AS ev2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pa2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pf2,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', '), 'no alteration') AS h0,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', '), 'no alteration') AS h1,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_MUTATION), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_mut)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_mut)), ', '), 'no alteration') AS h2,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_SV), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_sv)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_sv)), ', '), 'no alteration') AS h3,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', '), 'no alteration') AS h4,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', '), 'no alteration') AS h5,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_MUTATION), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_mut)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_mut)), ', '), 'no alteration') AS h6,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_SV), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_sv)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_sv)), ', '), 'no alteration') AS h7,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', '), 'no alteration') AS h8,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', '), 'no alteration') AS h9,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_mut)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_mut)), ', '), 'no alteration') AS h10,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_sv)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_sv)), ', '), 'no alteration') AS h11
   FROM (SELECT DISTINCT pid, sid FROM c0) s
   LEFT JOIN d0_e0 e0 ON e0.sid = s.sid
   LEFT JOIN d0_e1 e1 ON e1.sid = s.sid
@@ -195,8 +222,13 @@ WITH c0 AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_
   JOIN snapshot_db.sample s ON s.internal_id = sll.sample_id
   WHERE sl.stable_id = 'brca_tcga_pan_can_atlas_2018_cnaseq' AND cs.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'))),
 d0_e0 AS (
-  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(ev, note))))), ', ') AS ev
-  FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
+  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(call_, note))))), ', ') AS ev,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 1))) AS k_mut,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 2))) AS k_cna,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 3))) AS k_sv,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'EXP')))) AS k_exp,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'PROT')))) AS k_prot
+  FROM (SELECT sid, o, ev AS call_, note FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
     SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation.oncokb
     WHERE oncokb_version = 'v7.5' AND is_driver))
   OR (g.variant_type = 'structural_variant' AND (g.sample_unique_id, g.hugo_gene_symbol, ifNull(g.sv_event_info, '')) IN (
@@ -223,12 +255,17 @@ SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('TP53')
-    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+    AND ((g.hugo_gene_symbol = 'TP53' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))
   WHERE sid IN (SELECT sid FROM c0)
   GROUP BY sid),
 d0_e1 AS (
-  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(ev, note))))), ', ') AS ev
-  FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
+  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(call_, note))))), ', ') AS ev,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 1))) AS k_mut,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 2))) AS k_cna,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 3))) AS k_sv,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'EXP')))) AS k_exp,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'PROT')))) AS k_prot
+  FROM (SELECT sid, o, ev AS call_, note FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
     SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation.oncokb
     WHERE oncokb_version = 'v7.5' AND is_driver))
   OR (g.variant_type = 'structural_variant' AND (g.sample_unique_id, g.hugo_gene_symbol, ifNull(g.sv_event_info, '')) IN (
@@ -255,12 +292,17 @@ SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('PIK3CA')
-    AND ((g.hugo_gene_symbol = 'PIK3CA' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+    AND ((g.hugo_gene_symbol = 'PIK3CA' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))
   WHERE sid IN (SELECT sid FROM c0)
   GROUP BY sid),
 d0_e2 AS (
-  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(ev, note))))), ', ') AS ev
-  FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
+  SELECT sid, arrayStringConcat(arrayMap(x -> x.2, arraySort(groupUniqArray((o, concat(call_, note))))), ', ') AS ev,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 1))) AS k_mut,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 2))) AS k_cna,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 3))) AS k_sv,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'EXP')))) AS k_exp,
+    arrayMap(x -> x.2, arraySort(groupUniqArrayIf((o, concat(call_, note)), o = 4 AND startsWith(call_, 'PROT')))) AS k_prot
+  FROM (SELECT sid, o, ev AS call_, note FROM ((SELECT replaceOne(g.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid, multiIf(g.variant_type = 'mutation', 1, g.variant_type = 'cna', 2, 3) AS o, multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMP', 'HOMDEL'), g.sv_event_info) AS ev, concat(if((g.variant_type = 'mutation' AND positionCaseInsensitive(g.mutation_status, 'germline') > 0), ' [germline]', ''), if(g.variant_type IN ('mutation', 'cna') AND ((g.variant_type != 'structural_variant' AND (g.hugo_gene_symbol, multiIf(g.variant_type = 'mutation', 'MUTATION', g.variant_type = 'cna', 'CNA', g.variant_type = 'structural_variant', 'SV', ''), multiIf(g.variant_type = 'mutation', g.mutation_variant, g.variant_type = 'cna', if(g.cna_alteration >= 2, 'AMPLIFICATION', 'DELETION'), 'Fusion')) IN (
     SELECT hugo_gene_symbol, alteration_type, alteration FROM annotation.oncokb
     WHERE oncokb_version = 'v7.5' AND is_driver))
   OR (g.variant_type = 'structural_variant' AND (g.sample_unique_id, g.hugo_gene_symbol, ifNull(g.sv_event_info, '')) IN (
@@ -287,7 +329,7 @@ SELECT sample_unique_id, hugo_gene_symbol, sv_event_info FROM (
   FROM snapshot_db.genomic_event_derived g
   WHERE startsWith(g.genetic_profile_stable_id, 'brca_tcga_pan_can_atlas_2018_') AND g.cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND g.hugo_gene_symbol IN ('GATA3')
-    AND ((g.hugo_gene_symbol = 'GATA3' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2)))))
+    AND ((g.hugo_gene_symbol = 'GATA3' AND g.mutation_status != 'UNCALLED' AND (g.variant_type != 'cna' OR abs(g.cna_alteration) >= 2))))))
   WHERE sid IN (SELECT sid FROM c0)
   GROUP BY sid),
 d0_prof_TP53_MUTATION AS (SELECT DISTINCT replaceOne(sd.sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS profiled_id
@@ -348,7 +390,19 @@ base AS (
   SELECT 'Queried' AS cohort, 'brca_tcga_pan_can_atlas_2018' AS study, 0 AS ord, s.pid AS patient, s.sid AS sid,
          e0.ev AS ev0, (s.sid IN (SELECT profiled_id FROM d0_prof_TP53_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_TP53_SV)) AS pa0, (s.sid IN (SELECT profiled_id FROM d0_prof_TP53_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_TP53_SV)) AS pf0,
          e1.ev AS ev1, (s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_SV)) AS pa1, (s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_SV)) AS pf1,
-         e2.ev AS ev2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pa2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pf2
+         e2.ev AS ev2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) OR s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pa2, (s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA) AND s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV)) AS pf2,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', '), 'no alteration') AS h0,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_cna)), ', '), 'no alteration') AS h1,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_MUTATION), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_mut)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_mut)), ', '), 'no alteration') AS h2,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_TP53_SV), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_sv)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e0.k_sv)), ', '), 'no alteration') AS h3,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', '), 'no alteration') AS h4,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_cna)), ', '), 'no alteration') AS h5,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_MUTATION), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_mut)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_mut)), ', '), 'no alteration') AS h6,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_PIK3CA_SV), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_sv)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e1.k_sv)), ', '), 'no alteration') AS h7,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', '), 'no alteration') AS h8,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_CNA), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_cna)), ', '), 'no alteration') AS h9,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_MUTATION), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_mut)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_mut)), ', '), 'no alteration') AS h10,
+         multiIf(NOT s.sid IN (SELECT profiled_id FROM d0_prof_GATA3_SV), 'not profiled', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_sv)), ', ') != '', arrayStringConcat(arrayDistinct(arrayConcat(e2.k_sv)), ', '), 'no alteration') AS h11
   FROM (SELECT DISTINCT pid, sid FROM c0) s
   LEFT JOIN d0_e0 e0 ON e0.sid = s.sid
   LEFT JOIN d0_e1 e1 ON e1.sid = s.sid

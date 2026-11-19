@@ -503,12 +503,18 @@ async function explore({ ok, BASE, page, browser }) {
     await card.locator(".dtrow", { has: page.locator(".gname", { hasText: /^mutations$/ }) }).first().click();
     const op = (await card.locator(".pickbar").innerText()).replace(/\s+/g, " ");
     await card.getByRole("button", { name: "Clear" }).click();
-    const ev = page.locator(".card", { has: page.locator("h2", { hasText: "Timeline events" }) });
+    // Timeline Events Availability is offered in Add chart, not shown by default (STS-OT-7)
+    const ev = page.locator("[data-special=events]");
+    const hiddenFirst = (await ev.count()) === 0;
+    await page.getByRole("button", { name: /Add chart/ }).first().click();
+    await page.getByRole("checkbox", { name: "chart Timeline Events Availability" }).click();
+    await page.keyboard.press("Escape");
+    await ev.locator(".valrow").first().waitFor({ timeout: 120000 });
     const evText = (await ev.innerText()).replace(/\s+/g, " ");
-    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, evText: evText.slice(0, 120) });
-    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && /\d+(\.\d)?%/.test(evText);
+    dtDetail = JSON.stringify({ top, samples, freqsOk, sorted, op, hiddenFirst, evText: evText.slice(0, 120) });
+    dtOk = samples > 0 && freqsOk && sorted && /Intersection/.test(op) && hiddenFirst && /\d+(\.\d)?%/.test(evText);
   } catch (e) { dtDetail = String(e.message).split("\n")[0]; }
-  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events their Freq", dtOk, dtDetail);
+  ok("explore: Data types show each kind's Freq over the selected samples, highest first, Intersection by default; Timeline events, added from Add chart, their Freq", dtOk, dtDetail);
 
   // Value lists as the portal's tables (STS-TBL-1…5): a # / Freq header; a list that scrolls has a
   // search box and Select all / Deselect all over the rows it shows; the rows the filter holds come first
@@ -569,6 +575,56 @@ async function explore({ ok, BASE, page, browser }) {
     barOk = yTicks.length >= 2 && yTicks.every((t) => /^[\d,]+$/.test(t)) && /^0011100*$/.test(states) && !!filters;
   } catch (e) { barDetail = String(e.message).split("\n")[0]; }
   ok("explore: a histogram has an integer y axis, and a drag across bars selects them, the others greyed", barOk, barDetail);
+
+  // the treatment tables (STS-OT-6), shown when the study has treatments: patients per agent, most
+  // first; a checked agent applied filters on it, and the sample table narrows with it
+  let txDetail = "", txOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const pt = page.locator("[data-treatments='patient']"), st = page.locator("[data-treatments='sample']");
+    await pt.locator(".valrow").first().waitFor({ timeout: 240000 });
+    await st.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const counts = (await pt.locator(".valrow .vn").allInnerTexts()).map((t) => Number(t.replace(/,/g, "")));
+    const ordered = counts.every((n, i) => i === 0 || counts[i - 1] >= n);
+    const pick = (await pt.locator(".valrow .vname").allInnerTexts())[0];
+    const before = (await st.locator(".facettitle").innerText()).trim();
+    await pt.locator(".valrow").first().click();
+    await pt.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction((a) => document.body.innerText.includes("treated with " + a), pick, { timeout: 240000 });
+    await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.textContent || "").trim() !== b, before, { timeout: 240000 });
+    const pinned = await pt.locator(".valrow.on .vname").allInnerTexts();
+    const after = (await st.locator(".facettitle").innerText()).trim();
+    txDetail = JSON.stringify({ rows: counts.length, pick, pinned, before, after });
+    txOk = counts.length > 1 && ordered && pinned.length === 1 && pinned[0] === pick && after !== before;
+  } catch (e) { txDetail = String(e.message).split("\n")[0]; }
+  ok("explore: the treatment tables count patients and samples per treatment, and a treatment applied filters on it", txOk, txDetail);
+
+  // a gene's Mutation Type Counts table (STS-OT-3), from Add chart: # Mut, #, Freq, most samples
+  // first; a checked type applied filters on it, and the table keeps counting without its own filter
+  let mtDetail = "", mtOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Add chart/ }).first().click({ timeout: 240000 });
+    await page.getByRole("tab", { name: "Gene status" }).click();
+    await page.getByPlaceholder("chart a gene (e.g. EGFR)").fill("KRAS");
+    await page.getByRole("button", { name: "Add mutation types" }).click();
+    await page.keyboard.press("Escape");
+    const card = page.locator("[data-mutationtypes='KRAS']");
+    await card.locator(".valrow").first().waitFor({ timeout: 240000 });
+    const header = (await card.locator(".valhead").innerText()).replace(/\s+/g, " ").trim();
+    const rows = await card.locator(".valrow").evaluateAll((rs) => rs.map((r) => [...r.querySelectorAll(".vname, .vn, .vpct")].map((c) => c.textContent)));
+    const num = (t) => Number(String(t).replace(/,/g, ""));
+    const ordered = rows.every(([, m, n], i) => num(m) >= num(n) && (i === 0 || num(rows[i - 1][2]) >= num(n)));
+    const pick = rows[rows.length - 1][0];
+    await card.locator(".valrow", { has: page.locator(".vname", { hasText: new RegExp("^" + pick + "$") }) }).click();
+    await card.getByRole("button", { name: "Apply filter" }).click();
+    await page.waitForFunction((t) => document.body.innerText.includes("KRAS mutation type: " + t), pick, { timeout: 240000 });
+    await page.waitForFunction((t) => document.querySelector("[data-mutationtypes='KRAS'] .valrow.on .vname")?.textContent === t, pick, { timeout: 240000 });
+    const after = await card.locator(".valrow .vname").allInnerTexts();
+    mtDetail = JSON.stringify({ header, rows, pick, after });
+    mtOk = header === "# Mut # Freq" && rows.length > 1 && ordered && after[0] === pick && after.length === rows.length;
+  } catch (e) { mtDetail = String(e.message).split("\n")[0]; }
+  ok("explore: a gene's mutation-type table counts mutations and samples by type, and a type applied filters on it", mtOk, mtDetail);
 }
 
 module.exports = { explore };

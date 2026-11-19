@@ -6,7 +6,7 @@ import { Children, cloneElement, isValidElement, useEffect, useMemo, useRef, use
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
 import CustomBinsDialog from "./custom-bins-dialog";
-import { binsAfterEdit, logScaleOffered, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
+import { binsAfterEdit, logScaleOffered, looksLogarithmic, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
 import { ANALYSIS_MAX_COHORTS, armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
@@ -14,13 +14,13 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
-import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
+import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick } from "../../lib/chart/format.ts";
 import { countAxis } from "../../lib/chart/scale.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
-import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, bulkButtons, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -28,6 +28,8 @@ import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
+import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
+import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
@@ -300,7 +302,7 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
 }
 
 export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
-  const { addChartOpen, setAddChartOpen, addSeqFilter, clearAttributeFilters, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, chartChecked, setChartsChecked, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setSeq, treatmentEventType, unchartGene } = ctx;
+  const { addChartOpen, setAddChartOpen, addSeqFilter, clearAttributeFilters, attrCoverage, attrKey, chartGene, chartTab, clinFilter, exStudies, exploreBusy, fetchExplore, geneChartInput, openCustomManager, geneCharts, mutationTypeCharts, chartChecked, setChartsChecked, seq, seqReady, setAttrCoverage, setChartTab, setClinFilter, setGeneChartInput, setSeq, treatmentEventType, unchartGene } = ctx;
   const explore = ctx.explore!;
   return <>
     {explore && (
@@ -436,6 +438,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
               </div>
               {!rows.length && <p className="note my-3">No attribute matches “{clinFilter}”.</p>}
               {table(rows, false)}
+              <SpecialCharts ctx={ctx} />
             </div>
           );
         })()}
@@ -446,9 +449,12 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                 value={geneChartInput} disabled={exploreBusy}
                 onChange={e => setGeneChartInput(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") chartGene(geneChartInput); }} />
-              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}>Add</Button>
+              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput)}
+                data-tip="its mutation and copy-number status">Add</Button>
+              <Button variant="outline" size="sm" disabled={!geneChartInput.trim() || exploreBusy} onClick={() => chartGene(geneChartInput, true)}
+                data-tip="a table of its mutations by type: mutations, samples, and their share of the selected samples">Add mutation types</Button>
             </div>
-            {!geneCharts.length && (
+            {!geneCharts.length && !mutationTypeCharts.length && (
               <p className="note flush mt-1.5">
                 Name a gene to see how many patients are altered, unaltered, or <strong>never tested</strong> for
                 it. The third is the one a frequency cannot show: in GENIE public, 86,353 patients are on no panel
@@ -462,10 +468,17 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
                   onClick={() => unchartGene(g)}><X /></Button>
               </span>
             ))}
-            {geneCharts.length > 0 && (
+            {mutationTypeCharts.map(g => (
+              <span key={"types|" + g} className="qchip mr-1">
+                {g}<span className="meta"> · mutation types</span>
+                <Button variant="ghost" size="icon-xs" className={CHIP_X} data-tip={"stop charting " + g + "'s mutation types"} aria-label={"stop charting " + g + "'s mutation types"}
+                  onClick={() => unchartGene(g, true)}><X /></Button>
+              </span>
+            ))}
+            {geneCharts.length + mutationTypeCharts.length > 0 && (
               <p className="note flush mt-1.5">
-                Each charted gene's mutation and copy-number status is drawn as its own tile in the
-                facet grid, alongside the clinical attributes — close this dialog to see them.
+                Each chart is drawn as its own tile in the facet grid, alongside the clinical
+                attributes — close this dialog to see them.
               </p>
             )}
           </div>
@@ -860,7 +873,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, selectBars, togglePieValue, toggleNaValue } = ctx;
+  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, selectBars, togglePieValue, toggleNaValue, toggleLogScale } = ctx;
   const picks = usePicks();
   const [binsOpen, setBinsOpen] = useState(false);
   const binSet = c.kind === "num" ? chartBins(c.attribute) : undefined;
@@ -910,7 +923,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 return <ChartMenu label={label} actions={[
                   ...(logScaleOffered(c.bins, binSet) ? [{ label: "Log Scale", checked: !binSet?.disableLog,
                     title: binSet?.disableLog ? "draw the bars on a log scale again" : "draw the bars on a linear scale",
-                    onClick: () => setChartBins(c.attribute, { ...binSet, disableLog: !binSet?.disableLog }) }] : []),
+                    onClick: () => toggleLogScale(c.attribute, binSet) }] : []),
                   ...(addMode ? [] : [
                     ...forBoth((t) => compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label, t), bins, () => compareItems(chart, bins, t), t)),
                     ...selected]),
@@ -1008,18 +1021,20 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           const axis = countAxis(Math.max(...c.bins.map((b: any) => b.count), showNa ? c.naCount! : 0, 1));
           const maxN = axis.top;
           const last = c.bins[c.bins.length - 1];
-          // a bar is a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end]
-          const label = binLabel;
-          const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
+          // a tick is a bar's start (STS-BAR-3); on log-scale bars a power of ten reads 10ⁿ and a half step is blank
+          const log = looksLogarithmic(c.bins);
+          const num = (v: number) => log ? portalLogTick(v) : fmtNum(v);
+          const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + num(b.end) : b.special === ">" ? ">" + num(b.start) : num(b.start);
           const sel = chartSelection(parseDraft(), c.attribute);
           const unit = c.per === "sample" ? "samples" : "patients";
           return (
             <Histogram ticks={[...c.bins.map(tick), ...(showNa ? ["NA"] : [])]} na={c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null}
-              yTicks={axis.ticks} top={axis.top} endTick={!showNa && last.special == null && last.value == null && last.start !== last.end ? fmtNum(last.end!) : null}
+              yTicks={axis.ticks} top={axis.top} endTick={!showNa && last.special == null && last.value == null && last.start !== last.end ? num(last.end!) || null : null}
               onDrag={(from, to) => selectBars(c.attribute, c.bins!, from, to)}>
               {c.bins.map((b: any, i: number) => {
                 const on = binSelected(sel, b);
-                const tip = label(b) + " · " + fmtInt(b.count) + " " + unit + " — click to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter") + ", or drag across bars to select them";
+                // the portal's tooltip (STS-BAR-4), in the chart's own unit
+                const tip = "Number of " + unit + ": " + fmtInt(b.count) + "\nRange: " + portalBinRange(b) + "\nclick to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter") + ", or drag across bars to select them";
                 return (
                   <button key={i} data-bar={i} className={cn("hbar", sel.length > 0 && (on ? "on" : "off"))} data-tip={tip} aria-label={tip} aria-pressed={on}
                     onClick={() => toggleBar(c.attribute, c.bins!, i)}>
@@ -1139,7 +1154,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
             yTicks={axis.ticks} top={axis.top} endTick={last.special == null && last.value == null && last.start !== last.end ? fmtNum(last.end!) : null}>
             {f.bins.map((b, i) => (
               <button key={i} className="hbar" disabled={!clickable}
-                data-tip={label(b) + " · " + fmtInt(b.count) + " " + noun + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
+                data-tip={"Number of " + noun + ": " + fmtInt(b.count) + "\nRange: " + portalBinRange(b) + (clickable ? "\nclick to filter" : "\n" + why.replace(/^ — /, ""))} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
                 onClick={() => addClause({ ...base, ...assayBinWhere(b) })}>
                 <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
               </button>
@@ -1193,6 +1208,78 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
               {f.alteredUnprofiled === 1 ? " It is" : " They are"} counted as not profiled.
             </p>
           ) : null}
+        </div>
+      );
+    })}
+  </>;
+}
+
+/**
+ * the portal's treatment tables (STS-OT-6), when a selected study has treatments: patients per
+ * agent, and samples per agent taken before or after it; the checked rows filter (Union)
+ */
+export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
+  const { addClauses, parseDraft } = ctx;
+  const t = ctx.explore!.treatments;
+  if (!t) return null;
+  const draft = parseDraft();
+  const leftOut = t.leftOut && <p className="note flush mt-1" data-leftout>
+    Not counted: {t.leftOut.join(", ")}, held by a peer whose federation API has no treatment counts.
+  </p>;
+  const table = (level: "patient" | "sample", title: string, meta: string, unit: string, rows: { key: string; name: string; n: number; title: string; extra?: string }[]) => {
+    const on = new Set(appliedTreatmentKeys(draft, level));
+    return (
+      <div className="card" data-treatments={level}>
+        <div className="facettitle">{title}<span className="meta"> · {meta}</span></div>
+        {leftOut}
+        {rows.length ? <ValueList unit={unit} hint={level === "patient" ? "keep the patients treated with any checked treatment" : "keep the samples taken before or after any checked treatment"}
+          extra={level === "sample" ? { head: "Pre / Post", tip: "taken before (Pre) or after (Post) the patient's first treatment with it" } : undefined}
+          rows={rows.map((r) => ({ ...r, on: on.has(r.key) }))}
+          why={(keys) => { const r = treatmentClause(level, keys); return "why" in r ? r.why : null; }}
+          onApply={(keys) => { const r = treatmentClause(level, keys); if ("clauses" in r) addClauses(r.clauses); }} />
+          : !t.leftOut && <p className="note flush mt-1">No {level === "patient" ? "treated patient" : "sample with a time and a treated patient"} in the selection.</p>}
+      </div>
+    );
+  };
+  return <>
+    {table("patient", "Treatment per Patient", fmtInt(t.totalPatients) + " patients treated", "patients treated",
+      t.patients.map((r) => ({ key: r.agent, name: r.agent, n: r.n, title: r.agent + " — " + fmtInt(r.n) + " patients treated" })))}
+    {table("sample", "Treatment per Sample (pre/post)", fmtInt(t.totalSamples) + " samples with a time", "samples acquired before treatment or after/on treatment",
+      sampleTreatmentOrder(t.samples).map((r) => ({ key: sampleTreatmentKey(r.agent, r.time), name: r.agent, extra: r.time, n: r.n,
+        title: r.agent + " — " + fmtInt(r.n) + " samples taken " + (r.time === "Pre" ? "before" : "after") + " the first treatment with it" })))}
+  </>;
+}
+
+/**
+ * each gene charted by mutation type: the portal's Mutation Type Counts table (STS-OT-3), # Mut,
+ * # and Freq of the selected samples; the checked types filter to samples with any of them
+ */
+export function MutationTypeFacets({ ctx }: { ctx: ExploreCtx }) {
+  const { addClauses, parseDraft } = ctx;
+  return <>
+    {(ctx.explore!.mutationTypeFacets || []).map((f) => {
+      const applied = appliedMutationTypes(parseDraft(), f.gene), on = new Set(applied.types);
+      const counted = !f.leftOut || f.total > 0;
+      return (
+        <div key={f.gene} data-mutationtypes={f.gene} className="card">
+          <div className="facettitle">
+            {f.gene}: mutation types
+            {counted && <span className="meta" data-tip="Freq is of every selected sample, as the portal's table writes it, not of the samples profiled for the gene"> · sample-level · Freq of {f.total.toLocaleString()} samples{f.disjunctive ? " · counted without its own filter" : ""}</span>}
+          </div>
+          {applied.excluded > 0 && <p className="note flush mt-1">
+            {applied.excluded === 1 ? "A filter excludes" : applied.excluded + " filters exclude"} {f.gene} mutation types; this table is counted without {applied.excluded === 1 ? "it" : "them"}.
+          </p>}
+          {f.leftOut && <p className="note flush mt-1" data-leftout>
+            Not counted: {f.leftOut.join(", ")}, held by a peer whose federation API has no mutation-type counts.
+          </p>}
+          {!counted ? null : f.rows.length ? (
+            <ValueList unit="samples with a mutation of this type" pct={portalFreq} hint={"keep the samples with a " + f.gene + " mutation of any checked type"}
+              extra={{ head: "# Mut", tip: "Number of mutations" }}
+              rows={f.rows.map((r) => ({ key: r.type, name: r.label, n: r.samples, extra: r.mutations, total: f.total, on: on.has(r.type),
+                title: r.label + " — " + r.mutations.toLocaleString() + " mutations in " + r.samples.toLocaleString() + " samples" }))}
+              why={(types) => { const r = mutationTypesClause(f.gene, types); return "why" in r ? r.why : null; }}
+              onApply={(types) => { const r = mutationTypesClause(f.gene, types); if ("clauses" in r) addClauses(r.clauses); }} />
+          ) : <p className="note flush mt-1">No {f.gene} mutation in the selected samples.</p>}
         </div>
       );
     })}
@@ -1452,33 +1539,56 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   );
 }
 
+/** the tables the portal offers in Add chart rather than showing by default (STS-OT-2, STS-OT-7), each a checkbox */
+const SPECIAL_CHARTS = [
+  { key: SPECIAL_CHART_KEYS.events, name: "Timeline Events Availability", tip: "patients with each type of clinical timeline event" },
+  { key: SPECIAL_CHART_KEYS.caseLists, name: "Case Lists", tip: "samples on each of the studies' case lists; shown by itself while a case list is filtered on" },
+] as const;
+
+function SpecialCharts({ ctx }: { ctx: ExploreCtx }) {
+  const { chartChecked, setChartsChecked } = ctx;
+  const explore = ctx.explore!;
+  // Timeline events only where the study has some, as the portal offers it
+  const offered = SPECIAL_CHARTS.filter((s) => s.key !== SPECIAL_CHART_KEYS.events || explore.events.length > 0);
+  return (
+    <div className="mt-3" data-special-charts>
+      <h3 className="meta">Other charts</h3>
+      {offered.map((s) => (
+        <label key={s.key} className="row baseline g5" data-tip={s.tip}>
+          <Checkbox checked={chartChecked(s.key)} onCheckedChange={(v) => setChartsChecked([s.key], v === true)} aria-label={"chart " + s.name} />
+          {s.name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
-  const { addClause, parseDraft } = ctx;
+  const { addClause, parseDraft, chartChecked } = ctx;
   const explore = ctx.explore!;
   const leaves = ((parseDraft()?.all) || []).flatMap((c: any) => Array.isArray(c?.any) ? c.any : [c]);
   const eventOn = (type: string) => leaves.some((c: any) => c && c.kind === "event" && c.rel?.type === "NONE" && c.a?.eventType === type);
   const listOn = (id: string) => leaves.some((c: any) => c && c.kind === "caseList" && c.id === id);
+  // the portal shows these only when added (Case Lists also while one is filtered on): STS-OT-2, STS-OT-7
+  const shown = specialChartsShown(chartChecked, leaves, explore.events.length > 0);
   const anyOf = (ls: any[]) => { if (ls.length) addClause(ls.length === 1 ? ls[0] : { any: ls }); };
   return <>
-    <div className="card">
-      <h2>Timeline events</h2>
-      {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
-      {explore.events.length > 0 && (
-        <ValueList unit="patients" hint="keep the patients with any of the checked events" pct={portalFreq}
+    {shown.events && <div className="card" data-special="events">
+      <h2>Timeline Events Availability</h2>
+      <ValueList unit="patients with the event type" hint="keep the patients with any of the checked events" pct={portalFreq}
           why={(types) => limitRefusal(types.length, ANY_LEAF_LIMIT, "alternatives")}
           rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
             title: e.n.toLocaleString() + " of " + (explore.totals?.patients ?? 0).toLocaleString() + " selected patients with a " + e.type + " event" }))}
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
-      )}
-    </div>
-    <div className="card">
-      <h2>Case lists</h2>
+    </div>}
+    {shown.caseLists && <div className="card" data-special="caselists">
+      <h2>Case Lists</h2>
       <ValueList unit="samples" hint="keep the samples on any of the checked case lists" pct={portalFreq}
         why={(ids) => limitRefusal(ids.length, ANY_LEAF_LIMIT, "alternatives")}
         rows={explore.caseLists.map((l) => ({ key: l.id, name: l.name, n: l.n, total: explore.totals?.samples, on: listOn(l.id),
           title: l.id + " — " + l.n.toLocaleString() + " of " + (explore.totals?.samples ?? 0).toLocaleString() + " selected samples" }))}
         onApply={(ids) => anyOf(ids.map((id) => ({ kind: "caseList", id })))} />
       <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
-    </div>
+    </div>}
   </>;
 }

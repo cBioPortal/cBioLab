@@ -52,6 +52,90 @@
             "id": "GATA3",
             "name": "GATA3",
             "numeric": false
+          },
+          {
+            "id": "alt_0",
+            "name": "TP53: AMP",
+            "numeric": false,
+            "gene": "TP53",
+            "kind": "cna"
+          },
+          {
+            "id": "alt_1",
+            "name": "TP53: HOMDEL",
+            "numeric": false,
+            "gene": "TP53",
+            "kind": "cna"
+          },
+          {
+            "id": "alt_2",
+            "name": "TP53: MUT",
+            "numeric": false,
+            "gene": "TP53",
+            "kind": "mut"
+          },
+          {
+            "id": "alt_3",
+            "name": "TP53: FUSION",
+            "numeric": false,
+            "gene": "TP53",
+            "kind": "sv"
+          },
+          {
+            "id": "alt_4",
+            "name": "PIK3CA: AMP",
+            "numeric": false,
+            "gene": "PIK3CA",
+            "kind": "cna"
+          },
+          {
+            "id": "alt_5",
+            "name": "PIK3CA: HOMDEL",
+            "numeric": false,
+            "gene": "PIK3CA",
+            "kind": "cna"
+          },
+          {
+            "id": "alt_6",
+            "name": "PIK3CA: MUT",
+            "numeric": false,
+            "gene": "PIK3CA",
+            "kind": "mut"
+          },
+          {
+            "id": "alt_7",
+            "name": "PIK3CA: FUSION",
+            "numeric": false,
+            "gene": "PIK3CA",
+            "kind": "sv"
+          },
+          {
+            "id": "alt_8",
+            "name": "GATA3: AMP",
+            "numeric": false,
+            "gene": "GATA3",
+            "kind": "cna"
+          },
+          {
+            "id": "alt_9",
+            "name": "GATA3: HOMDEL",
+            "numeric": false,
+            "gene": "GATA3",
+            "kind": "cna"
+          },
+          {
+            "id": "alt_10",
+            "name": "GATA3: MUT",
+            "numeric": false,
+            "gene": "GATA3",
+            "kind": "mut"
+          },
+          {
+            "id": "alt_11",
+            "name": "GATA3: FUSION",
+            "numeric": false,
+            "gene": "GATA3",
+            "kind": "sv"
           }
         ],
         "shown": [
@@ -86,7 +170,19 @@
               "1",
               "no alteration",
               "no alteration",
-              "P408Afs*99 (driver)"
+              "P408Afs*99 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "P408Afs*99 (driver)",
+              "no alteration"
             ]
           },
           {
@@ -100,6 +196,18 @@
               "TCGA-3C-AALI",
               "1",
               "S183* (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "S183* (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration",
               "no alteration"
             ]
@@ -116,7 +224,19 @@
               "1",
               "no alteration",
               "no alteration",
-              "H423Afs*84 (driver)"
+              "H423Afs*84 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "H423Afs*84 (driver)",
+              "no alteration"
             ]
           },
           {
@@ -131,6 +251,18 @@
               "1",
               "no alteration",
               "E542K (driver), M1004I (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "E542K (driver), M1004I (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -146,6 +278,18 @@
               "1",
               "no alteration",
               "H1047L (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "H1047L (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -161,7 +305,19 @@
               "1",
               "no alteration",
               "no alteration",
-              "S436Pfs*40 (driver)"
+              "S436Pfs*40 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "S436Pfs*40 (driver)",
+              "no alteration"
             ]
           },
           {
@@ -176,6 +332,18 @@
               "1",
               "no alteration",
               "AMP (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "AMP (driver)",
+              "AMP (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -191,6 +359,18 @@
               "1",
               "R175H (driver)",
               "E726K, H1047R (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "R175H (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "E726K, H1047R (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -205,6 +385,18 @@
               "TCGA-A1-A0SK",
               "1",
               "M133K (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "M133K (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration",
               "no alteration"
             ]
@@ -221,6 +413,18 @@
               "1",
               "Y220C (driver)",
               "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "Y220C (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -235,6 +439,18 @@
               "TCGA-A1-A0SP",
               "1",
               "S183* (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "S183* (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration",
               "no alteration"
             ]
@@ -251,7 +467,19 @@
               "1",
               "no alteration",
               "no alteration",
-              "S436Lfs*71 (driver)"
+              "S436Lfs*71 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "S436Lfs*71 (driver)",
+              "no alteration"
             ]
           },
           {
@@ -266,6 +494,18 @@
               "1",
               "no alteration",
               "E542K (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "E542K (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -281,6 +521,18 @@
               "1",
               "G108Vfs*15 (driver)",
               "R88Q (driver), AMP (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "G108Vfs*15 (driver)",
+              "no alteration",
+              "AMP (driver)",
+              "AMP (driver)",
+              "R88Q (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -296,6 +548,18 @@
               "1",
               "D208G, R273H (driver)",
               "H1047Y (driver), AMP (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "D208G, R273H (driver)",
+              "no alteration",
+              "AMP (driver)",
+              "AMP (driver)",
+              "H1047Y (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -310,6 +574,18 @@
               "TCGA-A2-A04U",
               "1",
               "Y107Cfs*16 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "Y107Cfs*16 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration",
               "no alteration"
             ]
@@ -326,6 +602,18 @@
               "1",
               "no alteration",
               "G118D (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "G118D (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -341,6 +629,18 @@
               "1",
               "V272M (driver)",
               "H1047R (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "V272M (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "H1047R (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -356,6 +656,18 @@
               "1",
               "R273L (driver)",
               "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "R273L (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration"
             ]
           },
@@ -370,6 +682,18 @@
               "TCGA-A2-A0CM",
               "1",
               "E204Sfs*43 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "E204Sfs*43 (driver)",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
+              "no alteration",
               "no alteration",
               "no alteration"
             ]
@@ -438,6 +762,14 @@
         ],
         "files": [
           {
+            "id": "cna",
+            "name": "Copy-number Alterations (OQL is not in effect)",
+            "description": "per sample and gene: its value in its study's discrete copy-number profile (gistic); NA when none is stored; NP when its panel did not cover the gene",
+            "group": "data",
+            "portalFile": "cna.txt",
+            "rows": 996
+          },
+          {
             "id": "mutations",
             "name": "Mutations (OQL is not in effect)",
             "description": "per sample and gene: its mutations' protein changes, space-separated ([germline] marked); WT when profiled with none; NP when its panel did not cover the gene",
@@ -454,12 +786,25 @@
             "rows": 996
           },
           {
-            "id": "cna",
-            "name": "Copy-number Alterations (OQL is not in effect)",
-            "description": "per sample and gene: its value in its study's discrete copy-number profile (gistic); NA when none is stored; NP when its panel did not cover the gene",
-            "group": "data",
-            "portalFile": "cna.txt",
-            "rows": 996
+            "id": "altered",
+            "name": "Altered samples",
+            "group": "list",
+            "rows": 704,
+            "description": "the samples the query alters (any line), one per row"
+          },
+          {
+            "id": "unaltered",
+            "name": "Unaltered samples",
+            "group": "list",
+            "rows": 292,
+            "description": "the samples no line alters that were profiled for every queried gene in every data type the query reads, one per row"
+          },
+          {
+            "id": "matrix",
+            "name": "Sample matrix: every sample, 1 = altered, 0 = unaltered, NP = not profiled",
+            "group": "list",
+            "rows": 996,
+            "description": "per sample: whether the query alters it, and per line whether that line does"
           },
           {
             "id": "profile:log2CNA",
@@ -532,27 +877,6 @@
             "group": "data",
             "portalFile": "Protein expression z-scores (RPPA).txt",
             "rows": 996
-          },
-          {
-            "id": "altered",
-            "name": "Altered samples",
-            "group": "list",
-            "rows": 704,
-            "description": "the samples the query alters (any line), one per row"
-          },
-          {
-            "id": "unaltered",
-            "name": "Unaltered samples",
-            "group": "list",
-            "rows": 292,
-            "description": "the samples no line alters that were profiled for every queried gene in every data type the query reads, one per row"
-          },
-          {
-            "id": "matrix",
-            "name": "Sample matrix: every sample, 1 = altered, 0 = unaltered, NP = not profiled",
-            "group": "list",
-            "rows": 996,
-            "description": "per sample: whether the query alters it, and per line whether that line does"
           }
         ],
         "tables": {},

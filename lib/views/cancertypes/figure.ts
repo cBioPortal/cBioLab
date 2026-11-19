@@ -1,6 +1,6 @@
 // Cancer types figure: a gene list's alteration frequency per cancer type, as the portal draws it.
 import {
-  esc, palette, frame, caption, linear, axisLeft, leftAxisWidth, bandLabels, legend, label, textWidth,
+  esc, palette, frame, caption, linear, axisLeft, leftAxisWidth, legend, label, textWidth,
   fmtInt, fmtNum, fmtPct, FS, SW, type SvgOpts, type LegendItem
 } from "../../svg-kit.ts";
 import type { ViewResultOf, DrawnResultOf } from "../../types.ts";
@@ -68,18 +68,22 @@ export function filterAlert(r: CtResult, g: { groups: unknown[]; categories: num
   return g.filtered ? g.groups.length + " of " + g.categories + " categories (" + categoryLabel(r.groupBy) + ") are shown based on filtering." : null;
 }
 
-/** a bar's band never narrows below this: labels turned 45° then sit a line of text apart */
-const MIN_BAND = 16;
-/** nor widens past this: a few groups get bars, not slabs */
-const MAX_BAR = 32;
-const PAD = 8, PLOT_H = 240, MARK_ROW = 13, LABEL_H = 150;
+/** the portal's bars (CancerSummaryChart barWidth, barSeparation): 20 px wide, 8 px apart */
+const BAR = 20, BAND = BAR + 8;
+/** its plot: a 400 px chart less 50 px of padding above and below, the largest value 20 px under the top */
+const PLOT_H = 300, TOP_PAD = 20;
+/** its group labels, under the strip: turned 50° from their start, hanging; ours cut past LABEL_W */
+const LABEL_ANGLE = 50, LABEL_W = 260;
+const PAD = 8, MARK_ROW = 13;
+const COS = Math.cos((LABEL_ANGLE * Math.PI) / 180), SIN = Math.sin((LABEL_ANGLE * Math.PI) / 180);
 
 /**
  * One cohort's Cancer Types Summary as the portal draws it: a vertical bar per group, highest first,
  * stacked by kind of alteration; group names under the bars; the kinds present keyed at the foot.
- * Under them the portal's profiled-data strip (profiledStrip): a row per data type, a "+" or "−" per group. Laid out for `o.width`; with
- * more groups than fit it grows (`grown`) rather than squeezing bars below a label's height. `gene`
- * picks one gene's bars (the portal's per-gene tabs); omitted, the genes together.
+ * Under them the portal's profiled-data strip (profiledStrip): a row per data type, a "+" or "−" per group.
+ * Bars, plot and labels at the portal's sizes; the title, alert and legend take `o.width`, and with more
+ * groups than that holds the figure grows (`grown`) to hold every bar. `gene` picks one gene's bars (the
+ * portal's per-gene tabs); omitted, the genes together.
  */
 export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { gene?: string | null; title?: boolean;
   /** the page shows its own popover per bar (CTS-CH-7): each bar's marks name their group (data-group) and carry their text as an aria-label, not a <title> */
@@ -98,22 +102,17 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
 
   let W = Math.max(360, o.width || 860);
   const T = (o.title === false ? 10 : 34) + (alert ? 18 : 0);
-  const ys = linear(0, freq ? Math.min(100, top) : top, T + PLOT_H, T);
+  // no rounding of the top: the portal sets no y domain, so its largest value is always TOP_PAD under the plot's top
+  const ys = linear(0, freq ? Math.min(100, top) : top, T + PLOT_H, T + TOP_PAD, { nice: false });
   const yFmt = freq ? (v: number) => fmtNum(v) + "%" : (v: number) => fmtInt(v);
   const markW = Math.max(0, ...strip.map((row) => textWidth(row.label, FS.small) + 6));
-  let L = PAD + Math.max(leftAxisWidth(ys, yTitle, yFmt), markW) + 4;
-  const R = 12, n = Math.max(1, groups.length);
-  let band = Math.max(MIN_BAND, (W - L - R) / n);
-  // labels turned 45° reach left of their bar by up to LABEL_H: the first one must not leave the figure
-  const widest = Math.max(0, ...groups.map((g) => textWidth(g.label, FS.small)));
-  if (widest > band - 4) {
-    const reach = Math.min(LABEL_H, widest * Math.SQRT1_2) + PAD - band / 2;
-    if (reach > L) { L = Math.ceil(reach); band = Math.max(MIN_BAND, (W - L - R) / n); }
-  }
-  const grown = L + R + band * n > W + 0.5;
-  if (grown) W = Math.ceil(L + R + band * n);
-  const bw = Math.min(MAX_BAR, Math.max(3, band * 0.78));
+  const L = PAD + Math.max(leftAxisWidth(ys, yTitle, yFmt), markW) + 4;
+  const band = BAND, bw = BAR, n = Math.max(1, groups.length);
   const plotR = L + band * groups.length;
+  // each label runs right of its bar's centre: the figure holds the furthest
+  const reach = Math.max(plotR + 12, ...groups.map((g, i) => L + i * band + band / 2 + Math.min(LABEL_W, textWidth(g.label, FS.small)) * COS + FS.small * SIN + PAD));
+  const grown = Math.max(L + band * n + 12, reach) > W + 0.5;
+  if (grown) W = Math.ceil(Math.max(L + band * n + 12, reach));
   const X = (i: number) => L + i * band + (band - bw) / 2;
 
   const out: string[] = [];
@@ -162,10 +161,10 @@ export function cancertypesPanelSvg(r: CtResult, panel: number, o: SvgOpts & { g
     });
     y += MARK_ROW;
   }
-  const centers = groups.map((_, i) => L + i * band + band / 2);
-  const bl = bandLabels(groups.map((g) => g.label), centers, band, y, p, { maxH: LABEL_H });
-  out.push(bl.svg);
-  y += bl.height + 6;
+  const widest = Math.min(LABEL_W, Math.max(0, ...groups.map((g) => textWidth(g.label, FS.small))));
+  groups.forEach((g, i) => out.push(label(L + i * band + band / 2 - FS.small * 0.3, y + 4, g.label,
+    { size: FS.small, fill: p.ink, rotate: LABEL_ANGLE, baseline: "hanging", maxW: LABEL_W })));
+  y += Math.ceil(widest * SIN + FS.small * COS) + 12;
   const items: LegendItem[] = r.alterationTypes === false ? [] : [...CT_KINDS].reverse().filter(([k]) => groups.some((g) => Number(g[k] ?? 0) > 0)).map(([, name, col]) => ({ label: name, color: col }));
   const lg = legend(items, L, y, W - L - PAD, p, { size: FS.small });
   out.push(lg.svg);

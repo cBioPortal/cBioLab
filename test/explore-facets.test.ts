@@ -20,7 +20,7 @@ const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
 const { dataBins } = await import("../lib/data-binner.ts");
 const CG29 = JSON.parse(readFileSync(new URL("./fixtures/assay-bins-brca-cg00000029.json", import.meta.url), "utf8")) as { values: string[]; portalBins: unknown[] };
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
-const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT } = await import("../lib/explore.ts");
+const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildTreatmentFacets, buildMutationTypeFacets } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -653,7 +653,7 @@ describe("one study", () => {
       assert.deepEqual(genes, ["EGFR", "KRAS", "A", "B", "C", "D"], "upper-cased, de-duplicated, malformed dropped, at most six");
       const mut = r.geneFacets!.find((f) => f.gene === "EGFR" && f.type === "MUTATION")!;
       assert.deepEqual([mut.total, mut.profiled, mut.alteredUnprofiled], [120, 90, 2]);
-      assert.deepEqual(mut.states.map((s) => [s.label, s.n]), [["Mutated", 10], ["Not mutated", 80], ["Not profiled", 30]]);
+      assert.deepEqual(mut.states.map((s) => [s.label, s.n]), [["Mutated", 10], ["Not Mutated", 80], ["Not Profiled", 30]]);
       const cna = r.geneFacets!.find((f) => f.gene === "EGFR" && f.type === "CNA")!;
       assert.equal(cna.overlap, undefined, "one value per sample: the levels partition the cohort");
       assert.equal(cna.profiled, 102, "samples with a value in the profile");
@@ -684,7 +684,7 @@ describe("one study", () => {
       const r = await buildExplore({ study: S, skipBins: true, skipGenes: true, geneCharts: ["EGFR"], drivers: true, oncokbPin: "v7.5" });
       assert.equal(r.drivers, "v7.5");
       assert.deepEqual(r.geneFacets!.flatMap((f) => f.states.map((s) => s.label)),
-        ["Driver mutation", "No driver mutation", "Not profiled", "Driver amplification", "Driver deletion", "No driver call", "Not profiled"]);
+        ["Driver mutation", "No driver mutation", "Not Profiled", "Driver amplification", "Driver deletion", "No driver call", "Not profiled"]);
       for (const q of sent.filter((x) => /AS all_altered|cna_alteration AS c/.test(x))) assert.match(q, /oncokb_version = 'v7\.5'/);
     });
 
@@ -1068,5 +1068,145 @@ describe("review of #276 (multi-study Freq): one attribute charted as different 
   test("when either study lacks samples, the merged facet has none", () => {
     assert.equal(grade([num(30), cat()])[0].samples, undefined);
     assert.equal(grade([num(), cat(12)])[0].samples, undefined);
+  });
+});
+
+// ---- the treatment tables (STS-OT-6) --------------------------------------------------------
+describe("treatment tables", () => {
+  const profiles = new Map([["st1", {}], ["st2", {}]]);
+  // the two statements, told apart by what they read
+  const PATIENTS = /GROUP BY agent WITH TOTALS/, SAMPLES = /GROUP BY agent, time WITH TOTALS/, ANY = /SELECT count\(\) AS n FROM \(SELECT 1 FROM/;
+
+  test("patients per agent, most first; samples per agent and time; the totals as the database counts them", async () => {
+    // chQuery hands back the database's JSON, totals included; the stand-in carries them on the reply
+    setChTransport(async ({ query }) => {
+      sent.push(query);
+      const body = ANY.test(query) ? { data: [{ n: 1 }] } : PATIENTS.test(query) ? { data: [{ agent: "Leucovorin", n: 137 }, { agent: "Fluorouracil", n: 156 }], totals: { n: 214 } }
+        : SAMPLES.test(query) ? { data: [{ agent: "Fluorouracil", time: "Pre", n: 155 }, { agent: "Fluorouracil", time: "Post", n: 1 }], totals: { n: 214 } }
+        : { data: [] };
+      return JSON.stringify({ meta: [], rows: body.data.length, ...body });
+    });
+    try {
+      const t = await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles });
+      assert.deepEqual(t, { patients: [{ agent: "Fluorouracil", n: 156 }, { agent: "Leucovorin", n: 137 }],
+        samples: [{ agent: "Fluorouracil", time: "Pre", n: 155 }, { agent: "Fluorouracil", time: "Post", n: 1 }], totalPatients: 214, totalSamples: 214 });
+      const s = sent.find((q) => SAMPLES.test(q))!;
+      // only the study's own samples, each agent's first start, no id projected
+      assert.match(s, /concat\(cancer_study_identifier, '_', value\) IN \(SELECT sample_unique_id FROM cbio_a\.sample_derived/);
+      assert.match(s, /arrayMin\(arrayMap\(x -> x\.2, arrayFilter\(x -> x\.1 = a, t\)\)\)/);
+      assert.match(s, /if\(sa\.2 <= tx\.2, 'Pre', 'Post'\)/);
+      assert.doesNotMatch(s, /(patient|sample)_unique_id AS|SELECT (patient|sample)_unique_id,/, "no id is projected; ids are only grouped on or tested for membership");
+      // the grouping reads only the rows it keeps, and an empty AGENT is no treatment
+      assert.match(s, /GROUP BY patient_unique_id/);
+      assert.match(s, /AND \(\(lower\(event_type\) = 'treatment' AND key = 'AGENT' AND value != ''\) OR \(lower\(event_type\) IN \('sample acquisition','specimen'\) AND key = 'SAMPLE_ID'\)\)/);
+      assert.match(sent.find((q) => PATIENTS.test(q))!, /AND value != ''/);
+    } finally {
+      setChTransport(async ({ query }) => { sent.push(query); for (const [re, rows] of answers) if (re.test(query)) { const data = typeof rows === "function" ? rows(query) : rows; return JSON.stringify({ meta: [], data, rows: data.length }); } return JSON.stringify({ meta: [], data: [], rows: 0 }); });
+    }
+  });
+
+  test("two connections add up, agent by agent", async () => {
+    on(ANY, [{ n: 1 }]);
+    on(PATIENTS, (q) => /cbio_b\./.test(q) ? [{ agent: "Fluorouracil", n: 4 }] : [{ agent: "Fluorouracil", n: 6 }, { agent: "Cisplatin", n: 1 }]);
+    on(SAMPLES, (q) => /cbio_b\./.test(q) ? [{ agent: "Fluorouracil", time: "Post", n: 2 }] : [{ agent: "Fluorouracil", time: "Post", n: 3 }]);
+    const t = await buildTreatmentFacets({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy: new Map([["st2", SECOND]]) });
+    assert.deepEqual(t!.patients, [{ agent: "Fluorouracil", n: 10 }, { agent: "Cisplatin", n: 1 }]);
+    assert.deepEqual(t!.samples, [{ agent: "Fluorouracil", time: "Post", n: 5 }]);
+  });
+
+  test("the tables are counted under every filter, their own included, as the portal's", async () => {
+    on(ANY, [{ n: 1 }]);
+    const draft = { all: [{ kind: "treatment", agents: ["Fluorouracil"], ifHeld: true }] } as never;
+    await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, draft });
+    assert.ok(sent.filter((q) => PATIENTS.test(q) || SAMPLES.test(q)).every((q) => /value IN \('Fluorouracil'\)/.test(q)),
+      "the draft's treatment clause narrows both tables");
+  });
+
+  test("no table without treatments; a peer's treated studies are named, also when they are all there is", async () => {
+    assert.equal(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles }), null);
+    sent = [];
+    assert.deepEqual(await buildTreatmentFacets({ studies: [], profilesByStudy: profiles, leftOut: ["peer_study"] }),
+      { patients: [], samples: [], totalPatients: 0, totalSamples: 0, leftOut: ["peer_study"] });
+    assert.equal(sent.length, 0);
+    assert.equal(await buildTreatmentFacets({ studies: [], profilesByStudy: profiles }), null);
+    on(ANY, [{ n: 1 }]);
+    on(PATIENTS, [{ agent: "Cisplatin", n: 1 }]);
+    const t = await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, leftOut: ["peer_study"] });
+    assert.deepEqual(t!.leftOut, ["peer_study"]);
+  });
+
+  test("a study without treatments is not asked; one with them gets its tables even when a filter empties them", async () => {
+    assert.equal(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles }), null);
+    assert.deepEqual(sent.filter((q) => PATIENTS.test(q) || SAMPLES.test(q)), [], "only the existence check ran");
+    on(ANY, [{ n: 1 }]);
+    const draft = { all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] } as never;
+    assert.deepEqual(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, draft }),
+      { patients: [], samples: [], totalPatients: 0, totalSamples: 0 }, "empty tables, which say so, rather than none");
+  });
+});
+
+// ---- a gene's Mutation Type Counts table (STS-OT-3) -----------------------------------------
+describe("mutation-type tables", () => {
+  const profiles = new Map([["st1", { profiles: ["mutations"] }], ["st2", { profiles: ["mutations"] }]]);
+  // cbioportal.org, msk_impact_2017 TP53: /api/mutation-data-counts/fetch?categorization=MUTATION_TYPE, label · count (# Mut) · uniqueCount (#)
+  const PORTAL_TP53: [string, string, number, number][] = [
+    ["Frame_Shift_Del", "Frame Shift Del", 517, 510], ["Frame_Shift_Ins", "Frame Shift Ins", 157, 157],
+    ["In_Frame_Del", "In Frame Del", 91, 91], ["In_Frame_Ins", "In Frame Ins", 25, 25],
+    ["Missense_Mutation", "Missense Mutation", 3154, 2967], ["Nonsense_Mutation", "Nonsense Mutation", 683, 674],
+    ["Nonstop_Mutation", "Nonstop Mutation", 2, 2], ["Splice_Site", "Splice Site", 325, 324],
+  ];
+
+  test("each type's mutations and samples as the portal's, its label, most samples first; Freq over the selected samples", async () => {
+    on(/FROM cbio_a\.sample_derived/, [{ n: 10945 }]);
+    on(/GROUP BY t/, PORTAL_TP53.map(([t, , m, n]) => ({ t, m, n })));
+    const [f] = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, genes: ["tp53"] });
+    assert.equal(f.gene, "TP53");
+    assert.equal(f.total, 10945);
+    assert.deepEqual(f.rows.map((r) => [r.type, r.label, r.mutations, r.samples]),
+      [...PORTAL_TP53].sort((a, b) => b[3] - a[3]));
+    assert.equal(f.disjunctive, undefined);
+    const q = sent.find((s) => /GROUP BY t/.test(s))!;
+    assert.match(q, /variant_type = 'mutation' AND hugo_gene_symbol = 'TP53'/);
+    assert.doesNotMatch(q, /mutation_status|driver/, "every mutation, uncalled ones and passengers included, as the portal counts");
+  });
+
+  test("studies on two connections add up, type by type", async () => {
+    on(/sample_derived/, (q) => [{ n: /cbio_b\./.test(q) ? 50 : 100 }]);
+    on(/GROUP BY t/, (q) => /cbio_b\./.test(q) ? [{ t: "Missense_Mutation", m: 4, n: 3 }] : [{ t: "Missense_Mutation", m: 10, n: 8 }, { t: "Splice_Site", m: 1, n: 1 }]);
+    const [f] = await buildMutationTypeFacets({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy: new Map([["st2", SECOND]]), genes: ["KRAS"] });
+    assert.equal(f.total, 150);
+    assert.deepEqual(f.rows.map((r) => [r.type, r.mutations, r.samples]), [["Missense_Mutation", 14, 11], ["Splice_Site", 1, 1]]);
+  });
+
+  test("a peer's studies are named on every table, never counted silently; with only a peer's, no query runs", async () => {
+    const none = await buildMutationTypeFacets({ studies: [], profilesByStudy: profiles, genes: ["KRAS"], leftOut: ["peer_study"] });
+    assert.deepEqual(none, [{ gene: "KRAS", total: 0, rows: [], leftOut: ["peer_study"] }]);
+    assert.equal(sent.length, 0);
+    on(/sample_derived/, [{ n: 100 }]);
+    const [mixed] = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, genes: ["KRAS"], leftOut: ["peer_study"] });
+    assert.deepEqual([mixed.total, mixed.leftOut], [100, ["peer_study"]]);
+  });
+
+  test("genes without a filter of their own share one count of the selection", async () => {
+    on(/sample_derived/, [{ n: 100 }]);
+    const fs = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, genes: ["KRAS", "TP53", "EGFR"] });
+    assert.deepEqual(fs.map((f) => f.total), [100, 100, 100]);
+    assert.equal(sent.filter((q) => /FROM cbio_a\.sample_derived/.test(q) && !/genomic_event_derived/.test(q)).length, 1);
+  });
+
+  test("the table is counted without its own filter, and with every other one", async () => {
+    const draft = { all: [
+      { not: { kind: "genomicData", gene: "TP53", profileType: "MUTATION_TYPE", values: ["Nonsense_Mutation"] } },
+      { kind: "genomicData", gene: "KRAS", profileType: "MUTATION_TYPE", values: ["Missense_Mutation"] },
+    ] } as never;
+    const [tp53, kras] = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, draft, genes: ["TP53", "KRAS"] });
+    assert.equal(tp53.disjunctive, true);
+    assert.equal(kras.disjunctive, true);
+    // the table's own count reads the gene on the line it filters mutations by; a filter's subquery on its own line
+    const count = (gene: string) => sent.find((s) => /GROUP BY t/.test(s) && s.includes("variant_type = 'mutation' AND hugo_gene_symbol = '" + gene + "'"))!;
+    assert.match(count("TP53"), /mutation_type IN \('Missense_Mutation'\)/, "KRAS's filter narrows TP53's table");
+    assert.doesNotMatch(count("TP53"), /'Nonsense_Mutation'/, "TP53's own filter does not");
+    assert.match(count("KRAS"), /mutation_type IN \('Nonsense_Mutation'\)/);
+    assert.doesNotMatch(count("KRAS"), /'Missense_Mutation'/);
   });
 });
