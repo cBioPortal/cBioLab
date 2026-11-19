@@ -117,7 +117,7 @@ Data version: every row set, read count and cohort numerator matches, so the war
 | PAT-URL-1 | 🔶 | BC | `/portal/patient?…&tab=<Title>` (title, not path id `/patient/<tab>`); unknown tab → Summary ✅ |
 | PAT-URL-2 | ✅ | B | `studyId` + `caseId` / `sampleId` accepted (also `study`/`patient`/`sample`); sample wins (`page.tsx:57`) |
 | PAT-URL-3 | 🟡 | C | Page state in `?changes=` (GE settings, collapse etc., invariant 9); no `resourceUrl`, plots params, `geneset_list` |
-| PAT-URL-4 | 🟡 | B | `#navCaseIds=study:patient,…` read as a cohort of those patients (an id without its study refused, as PAT-URL-6) ✅; stepped through in the cohort list's order, not the link's; no POSTed list; the page's own links still carry the cohort's definition (`?cohort=`) |
+| PAT-URL-4 | 🟡 | B | `#navCaseIds=study:patient,…` read as a cohort of those patients (an id without its study refused, as PAT-URL-6) ✅; stepped through in the link's order, kept through next/previous/⊖ (`app/portal/cohort-navigation.ts` listed, table view order:"listed") ✅ (lgg P05,P01,P04 → 1:P05, 2:P01, 3:P04); no POSTed list; the page's own links still carry the cohort's definition (`?cohort=`) |
 | PAT-URL-5 | ✅ | C | `PatientView` keyed by study\|patient\|sample (`page.tsx:62`) |
 | PAT-URL-6 | 🐞 ok | C | `#navCaseIds` ids without their study are refused, named, and the patient shown without the pager (`navigationFromHash`), where the portal's parseCohortIds throws: the bug not copied |
 
@@ -205,7 +205,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 |---|---|---|---|
 | PAT-TL-ZM-1 | ✅ | B | Year ticks "0, 1y … 5y" ✅; past 150 px a year, a short tick each month, every 4th labelled ("4m", "1y 8m"; before 0 "-8m", "-1y 8m"), every one past 700 px (monthTicks), as the portal's TickAxis (lgg P04: 0 · 4m · 8m · 1y · 1y 4m …) |
 | PAT-TL-ZM-2 | 🟡 | B | ≥4 empty years cut to a dashed mark ✅; restored by an "every year" checkbox (in the document), not by clicking it |
-| PAT-TL-ZM-3 | ❌ | C | No drag-to-zoom, no cursor line |
+| PAT-TL-ZM-3 | 🟡 | B | Drag > 10 px zooms to the stretch, "reset zoom", cursor line (`lib/timeline-svg.ts` zoom, zoomFromDrag; `app/lab/timeline-body.tsx`) ✅ (lgg P04 zoomed to 7m … 2y); the stretch is drawn at the card's width, not widened and scrolled as the portal's; the day-0 bug not copied |
 | PAT-TL-ZM-4 | ✅ | C | Download ▸ PDF / PNG / SVG of the timeline as drawn (folded tracks, every year or not), named timeline (#345), and Data (ZIP): timeline.zip with a data_timeline_<type>.txt per event type, PATIENT_ID · START_DATE · STOP_DATE · EVENT_TYPE · the type's keys in first-seen order (STYLE_* kept), as legacy's downloadZippedTracks (lgg_ucsf_2014 P04: Specimen 4, Surgery 4, Status 4, Treatment 3 rows, columns and values as the API's clinical events) |
 | PAT-TL-ZM-5 | ✅ | C | Card width (ResizeObserver) |
 
