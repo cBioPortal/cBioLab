@@ -54,6 +54,16 @@ test("CL1: off drops the clinical keys only: a heatmap row keeps its key", () =>
   assert.equal(stageKey(svg), null);
 });
 
+test("CL2: with no altered column a clinical track has nothing to list: no key row at all, not an empty one", () => {
+  const unaltered = (c: ReturnType<typeof contract>) => {
+    for (const t of c.tracks) if (t.kind === "gene") (t.cells as Int32Array).fill(0);
+    return c;
+  };
+  const svg = contractToSvg(unaltered(contract("altered")), 800);
+  assert.equal(stageKey(svg), null, "STAGE: its row label only");
+  assert.match(stageKey(contractToSvg(unaltered(contract()), 800))!, /No data/, "all: its key as before");
+});
+
 test("CL4: the engine takes all, altered and none", () => {
   assert.equal(normalizeDisplay({}).clinicalLegends, "all");
   assert.equal(normalizeDisplay({ clinicalLegends: "altered" }).clinicalLegends, "altered");

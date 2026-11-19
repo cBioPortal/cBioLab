@@ -15,7 +15,7 @@ import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOff
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { portalTipNumber } from "../../lib/chart/format.ts";
-import { STYLE, thresholdColor, stackColor, clinicalLegend, alteredColumns, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
+import { STYLE, thresholdColor, stackColor, clinicalLegend, alteredColumns, emptyClinicalKey, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
 import { contractToTsv, orderFileName, orderFileText, tabularFileName } from "../../lib/oncoprint-tabular.ts";
@@ -90,12 +90,13 @@ export interface FigureDisplay {
   showOql?: boolean;
   /**
    * the clinical tracks' keys under the figure: every value, the altered columns' values only, or none — the portal's
-   * "Show legends for clinical tracks" and, under it, "Only show clinical track legends for altered patients"
+   * "Show legends for clinical tracks" and, under it, "Only show clinical track legends for altered patients";
+   * unset, the view's own (the engine's resolved display)
    */
-  clinicalLegends: "all" | "altered" | "none";
+  clinicalLegends?: "all" | "altered" | "none";
 }
 export const DEFAULT_FIGURE_DISPLAY: FigureDisplay = { showUnaltered: true, whitespace: true, gaps: "none", colorByType: true, colorByGermline: true,
-  sortByMutationType: true, sortByDrivers: true, sortIgnoreVUS: false, clinicalLegends: "all" };
+  sortByMutationType: true, sortByDrivers: true, sortIgnoreVUS: false };
 
 export interface Perf { fetchMs?: number; bytes?: number; engineMs?: number; packMs?: number; decodeMs?: number; drawMs?: number;
   cellsDrawn?: number; bucketsDrawn?: number; sortMs?: number; hideMs?: number; gapMs?: number; frames: number; heapMB?: number;
@@ -181,6 +182,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   useEffect(() => hideHover(), [view.zoom, view.scrollX, hideHover]);
   /** the gutter label under the pointer: a track row, not a column */
   const [labelHover, setLabelHover] = useState<{ ti: number; x: number; y: number } | null>(null);
+  const [legendsOnMode, setLegendsOnMode] = useState<"all" | "altered">("all");
   // per-column specifics, fetched only for the column under the pointer and remembered
   const [detail, setDetail] = useState<Record<string, ColumnDetail | "loading">>({});
   const detailTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -712,11 +714,13 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
    * folding them behind it never hides the fact that one of them is on. Show OQL filters is left
    * out: what it changes is in the figure itself, the grey line after each row's name.
    */
+  // the clinical legends as drawn, and what turning them back on restores (the portal keeps "only for altered" across off and on)
+  const legendMode = display.clinicalLegends ?? data?.display.clinicalLegends ?? "all";
   const offDefaults = (Number(display.showUnaltered !== DEFAULT_FIGURE_DISPLAY.showUnaltered) +
     Number(display.whitespace !== DEFAULT_FIGURE_DISPLAY.whitespace) +
     Number(display.colorByType !== DEFAULT_FIGURE_DISPLAY.colorByType) +
     Number(display.colorByGermline !== DEFAULT_FIGURE_DISPLAY.colorByGermline) +
-    Number(!!display.whiteBackground) + Number(display.gaps !== "none") + Number((display.clinicalLegends ?? "all") !== "all")) || 0;
+    Number(!!display.whiteBackground) + Number(display.gaps !== "none") + Number(legendMode !== "all")) || 0;
   // the staircase switches, as the portal's Sort menu offers them: Mutation Type needs colour by
   // type, Driver an annotation, Ignore VUS the driver switch and VUS not already hidden
   const staircaseOff = Number(!display.sortByMutationType) + Number(!display.sortByDrivers) + Number(display.sortIgnoreVUS);
@@ -828,11 +832,14 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                     onCheckedChange={(c) => set({ whiteBackground: (c === true) || undefined })} /> white background (for print)</label>
                 {data.tracks.some((t) => t.kind === "clinical") && <>
                   <label className="chk" data-tip="each clinical track's key of colours under the figure">
-                    <Checkbox checked={display.clinicalLegends !== "none"} disabled={busy}
-                      onCheckedChange={(c) => set({ clinicalLegends: c === true ? "all" : "none" })} /> show legends for clinical tracks</label>
-                  <label className="chk pl-5" data-tip={display.clinicalLegends === "none" ? "show the clinical tracks' legends first"
+                    <Checkbox checked={legendMode !== "none"} disabled={busy}
+                      onCheckedChange={(c) => {
+                        if (c !== true) setLegendsOnMode(legendMode === "altered" ? "altered" : "all");
+                        set({ clinicalLegends: c === true ? legendsOnMode : "none" });
+                      }} /> show legends for clinical tracks</label>
+                  <label className="chk pl-5" data-tip={legendMode === "none" ? "show the clinical tracks' legends first"
                     : "each clinical key lists only the values of the " + data.unit + "s some gene row alters"}>
-                    <Checkbox checked={display.clinicalLegends === "altered"} disabled={busy || display.clinicalLegends === "none"}
+                    <Checkbox checked={legendMode === "altered" || (legendMode === "none" && legendsOnMode === "altered")} disabled={busy || legendMode === "none"}
                       onCheckedChange={(c) => set({ clinicalLegends: c === true ? "altered" : "all" })} /> only show clinical track legends for altered {data.unit}s</label>
                 </>}
                 {data.tracks.some((t) => t.kind === "gene") && (
@@ -1196,7 +1203,7 @@ function Legend({ data, display, colors, shown }: { data: UnpackedContract; disp
             : <>; {(k.columns - k.noData).toLocaleString()} {data.unit}s as {k.patterns.toLocaleString()} distinct patterns</>}
           {k.noData > 0 && <>; {k.noData.toLocaleString()} with no value placed last</>}</span>;
       })()}
-      {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent" && !(keys === "none" && t.kind === "clinical")).map((t) => (
+      {data.tracks.filter((t) => t.kind !== "gene" && t.kind !== "derivedEvent" && !(keys === "none" && t.kind === "clinical") && !emptyClinicalKey(t, keyColumns)).map((t) => (
         <span key={t.label}>{t.label}: {t.stack
           ? <>{t.stack.map((c, i) => <span key={c} style={{ marginRight: 6 }}>{sw(stackColor(t, i, S, colors))}{c}</span>)}</>
           : t.bar

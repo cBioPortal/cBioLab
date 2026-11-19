@@ -746,6 +746,14 @@ export function alteredColumns(tracks: readonly { kind: string; cells: ArrayLike
   return out;
 }
 
+/** a categorical clinical track with nothing to list over `shown` (the altered columns hold none of its values): no key row at all */
+export function emptyClinicalKey(t: { kind: string; categories?: string[]; cells: ArrayLike<number>; bar?: boolean; numeric?: boolean; stack?: string[]; label: string; profiledFor?: string },
+  shown?: ArrayLike<number>): boolean {
+  if (t.kind !== "clinical" || t.bar || t.numeric || t.stack || t.profiledFor || !t.categories) return false;
+  const key = clinicalLegend(t, STYLE, undefined, shown);
+  return key.kind === "categories" && !key.entries.length && !key.more;
+}
+
 /** a patient's clinical value when its samples disagree (lib/oncoprint.ts) */
 export const MIXED = "Mixed";
 const darken = (c: string): string =>
