@@ -109,6 +109,20 @@ export function geneHeaderTips(kind: GeneTableKind): Partial<Record<GeneSortColu
 
 const CALL: Record<number, string> = { 2: "AMP", [-2]: "HOMDEL" };
 
+/**
+ * Whether a row matches the table's search, as the portal's: a case-insensitive substring of any
+ * column as shown — gene, # Mut / # SV, #, Freq, and on the CNA table its cytoband and AMP / HOMDEL
+ * (STS-GT-10; the portal's Freq search, which reads the fraction unscaled, is not copied).
+ */
+export function geneRowMatches(kind: GeneTableKind, r: GeneTableRow, search: string): boolean {
+  const needle = search.trim().toUpperCase();
+  if (!needle) return true;
+  const cells = kind === "cna"
+    ? [r.gene, r.cytoband || "", CALL[r.cna ?? 0] || "", String(r.altered), geneFreqText(r)]
+    : [r.gene, String(r.events), String(r.altered), geneFreqText(r)];
+  return cells.some((c) => c.toUpperCase().includes(needle));
+}
+
 /** the table's Data file: every row in the rows' own order */
 export function geneTableTsv(kind: GeneTableKind, rows: GeneTableRow[]): string {
   const header = kind === "mutated" ? ["Gene", "MutSig(Q-value)", "# Mut", "#", "Profiled Samples", "Freq"]

@@ -22,7 +22,7 @@ import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
-import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
+import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
 import { binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
@@ -1265,8 +1265,8 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   const draftClauses = (parseDraft()?.all || []) as unknown[];
   const sorted = useMemo(() => {
     const loaded = meta.rows || [];
-    return sortGeneRows(needle ? loaded.filter((g: any) => g.gene.toUpperCase().includes(needle)) : loaded, sort);
-  }, [meta.rows, needle, sort]);
+    return sortGeneRows(needle ? loaded.filter((g: any) => geneRowMatches(kind, g, needle)) : loaded, sort);
+  }, [meta.rows, needle, sort, kind]);
   // the genes the selection already filters on in this table come first, as the portal pins them
   const applied = appliedLines(draftClauses, sorted.map((g: any) => meta.oql(g)));
   const appliedSet = new Set(applied);
@@ -1288,8 +1288,8 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
         <h2 className="flush">{title}</h2>
         {drivers && <span className="meta" data-tip={"counting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered"}>OncoKB drivers</span>}
         <span className="spacer" />
-        <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="find gene" value={geneFilter[kind] || ""}
-          data-tip={"show the genes whose symbol contains this, of all " + all.length.toLocaleString()}
+        <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="search" aria-label={"search " + name} value={geneFilter[kind] || ""}
+          data-tip={"show the rows with this in any column (gene, " + (kind === "cna" ? "cytoband, CNA" : kind === "sv" ? "# SV" : "# Mut") + ", #, Freq), of all " + all.length.toLocaleString()}
           onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
         {(() => {
           const chart: ChartKey = { kind: "genes", specs: (kind === "mutated" ? ["MUT"] : kind === "cna" ? ["AMP", "HOMDEL"] : ["FUSION"]).map((c) => ": " + callOql(c)) };
