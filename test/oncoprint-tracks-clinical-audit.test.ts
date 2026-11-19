@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { clinicalTrackRows, trackAttrs, trackFreqText, type TrackAttr } from "../app/_oncoprint/track-edits.ts";
+import { AUTO_TRACKS } from "../lib/profile-names.ts";
 
 const FIXTURE = "cbiolab_peer_fixture";
 
@@ -397,8 +398,12 @@ describe("cap", async () => {
 
   test("49: fixture database — all 20 of the study's attributes are drawn as tracks (TM, RVO: no cap)", { skip: dbReason ?? false }, async () => {
     const c = await (await db()).buildContract({ study: FIXTURE, genes: ["KRAS"], clinical: FIXTURE_ATTRS, unit: "sample", display: { annotate: "none" } });
-    const drawn = c.tracks.filter((t: { kind: string }) => t.kind === "clinical").map((t: { label: string }) => t.label);
+    const clinical = c.tracks.filter((t: { kind: string }) => t.kind === "clinical").map((t: { label: string }) => t.label);
+    // the automatic rows are drawn beside them: the fixture's FX-P01…P04 have two samples each, so
+    // sample columns carry # Samples per Patient too (RVO:380-389, ONC-MD-1)
+    const drawn = clinical.filter((l: string) => !AUTO_TRACKS.includes(l));
     assert.equal(drawn.length, 20, "drawn: " + drawn.join(", "));
+    assert.ok(clinical.includes("# Samples per Patient"), "drawn: " + clinical.join(", "));
   });
 
   test("49: refusing past 100 tracks (CLINICAL_TRACK_LIMIT) is OUR documented divergence (PR #196; the portal has no cap)", () => {
