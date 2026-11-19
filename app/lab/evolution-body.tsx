@@ -12,12 +12,16 @@ import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
 import { Button } from "../_ui/button";
 import { Checkbox } from "../_ui/checkbox";
+import { api } from "./api.ts";
+import { selectedRows } from "../../lib/views/evolution/table.ts";
+import { PAGE_ROWS_MAX } from "../../lib/table-pager.ts";
+import type { TableRows } from "../../lib/types";
 import { Slider } from "../_ui/slider";
 import { ZoomIn, ZoomOut } from "lucide-react";
 import { TB } from "../_ui/toolbar.ts";
 import { OptionSelect } from "../_ui/choice.tsx";
 import { patientPatch } from "../../lib/views/evolution/groups.ts";
-import { heatmapTsv, HEATMAP_FILE } from "../../lib/views/evolution/download.ts";
+import { heatmapTsv, selectedCsv, HEATMAP_FILE } from "../../lib/views/evolution/download.ts";
 import { saveText } from "../../lib/study-view-download.ts";
 import { ImageDownload } from "./image-download.tsx";
 
@@ -55,6 +59,11 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
   if ((p ? p.study + ":" + p.id : "") !== pickedFor) { setPickedFor(p ? p.study + ":" + p.id : ""); setPicked(new Set()); }
   const toggle = (key: string) => setPicked((was) => { const n = new Set(was); if (!n.delete(key)) n.add(key); return n; });
   const pickedOnly = onlyPicked && chart === "line";
+  // the table keeps only the picked mutations (the portal's own "Show only selected mutations" above its table, kept in the browser as the picks are)
+  const [tableOnlyPicked, setTableOnlyPicked] = useState(false);
+  const tableFilter = tableOnlyPicked && picked.size > 0;
+  const allRows = useAllRows(tableFilter, e.mutations, vi, docJson);
+  const shownTable = tableFilter && allRows && "rows" in allRows && e.mutations ? selectedRows(e.mutations, allRows.rows, picked) : e.mutations;
   const svg = useMemo(() => evolutionSvg((pickedOnly ? onlySelected(v as never, picked) : v) as never, { width, caption: false, zoom: heatZoom }), [v, width, pickedOnly, picked, heatZoom]);
   // the point under the pointer: its mutation, its sample, and where its tooltip points (in the figure's box)
   const [tip, setTip] = useState<{ key: string; s: number; x: number; y: number; below: number | null } | null>(null);
@@ -183,9 +192,17 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
         {picked.size > 0 && <> {picked.size.toLocaleString()} picked — <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setPicked(new Set())}>clear selection</Button></>}</p>}
       {p && e.mutations && (
         <section className="alt-table" aria-label="Mutations">
-          <DataTable t={e.mutations} query={specQuery((spec.mutations || {}) as Record<string, unknown>)} updating={updating} vi={vi} docJson={docJson} table="mutations" unit="Mutations"
+          <div className="viewtb"><div className="tbz">
+            <label className="chk" data-tip="list only the mutations clicked (a line, a heatmap row or a table row); with none clicked, every row">
+              <Checkbox checked={tableOnlyPicked} onCheckedChange={(on) => setTableOnlyPicked(on === true)} /> Show only selected mutations
+            </label>
+            {tableFilter && allRows && "error" in allRows && <span className="mark" role="status">couldn't list the selected mutations: {allRows.error}</span>}
+          </div></div>
+          <DataTable t={shownTable!} query={specQuery((spec.mutations || {}) as Record<string, unknown>)} updating={updating || (tableFilter && !allRows)} vi={vi} docJson={docJson} table="mutations" unit="Mutations"
             onQuery={setQuery} onHover={(r) => setHot(r ? keyAt(r) : null)} hot={(r) => hot != null && keyAt(r) === hot}
-            onRow={(r) => toggle(keyAt(r))} selected={(r) => picked.has(keyAt(r))} num={(id, x) => id === "maxVaf" ? x.toFixed(2) : x.toLocaleString()}
+            {...(shownTable !== e.mutations && p ? { download: { label: "download CSV (" + shownTable!.total.toLocaleString() + ")", tip: "the selected mutations, with all " + shownTable!.columns.length + " columns, as comma-separated text",
+              onClick: () => { const f = selectedCsv(shownTable!, p); saveText(f.name, f.text); } } } : {})}
+            onRow={(r) => toggle(keyAt(r))} selected={(r) => !tableFilter && picked.has(keyAt(r))} num={(id, x) => id === "maxVaf" ? x.toFixed(2) : x.toLocaleString()}
             cell={(id, x) => id === "gene" ? <b>{x}</b> : id === "samples" ? <SampleMarks ids={String(x || "").split(", ").filter(Boolean)} samples={p.samples} /> : undefined} />
         </section>
       )}
@@ -201,6 +218,34 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
       )}
     </div>
   );
+}
+
+type MutationRows = TableRows<string | number | null>;
+/**
+ * Every row the mutation table's query keeps, in its order, fetched page by page while `on` (the
+ * result's own page when it holds them all); null while they load, or the error that stopped them.
+ */
+function useAllRows(on: boolean, t: MutationRows | undefined, vi: number, docJson?: () => string): { rows: MutationRows["rows"] } | { error: string } | null {
+  const [got, setGot] = useState<{ of: MutationRows; out: { rows: MutationRows["rows"] } | { error: string } } | null>(null);
+  useEffect(() => {
+    if (!on || !t || (got && got.of === t)) return;
+    if (!t.offset && t.rows.length >= t.total) { setGot({ of: t, out: { rows: t.rows } }); return; }
+    if (!docJson) { setGot({ of: t, out: { error: "no document to fetch the rows from" } }); return; }
+    const ctl = new AbortController();
+    void (async () => {
+      const doc = JSON.parse(docJson());
+      const rows: MutationRows["rows"] = [];
+      for (let offset = 0; offset < t.total; offset += PAGE_ROWS_MAX) {
+        const r = await api.viewPage({ doc, view: vi, offset, limit: PAGE_ROWS_MAX, table: "mutations" }, { signal: ctl.signal });
+        const j = await r.json();
+        if (!r.ok || j.error) throw new Error(j.error || "HTTP " + r.status);
+        rows.push(...j.rows);
+      }
+      setGot({ of: t, out: { rows } });
+    })().catch((err) => { if (!ctl.signal.aborted) setGot({ of: t, out: { error: String((err as Error)?.message || err) } }); });
+    return () => ctl.abort();
+  }, [on, t]);   // eslint-disable-line react-hooks/exhaustive-deps -- refetched for a new table only; vi and the document go with it
+  return got && got.of === t ? got.out : null;
 }
 
 /** room a tooltip needs above its point; nearer the figure's top it opens below (the figure scrolls sideways, so it clips) */
