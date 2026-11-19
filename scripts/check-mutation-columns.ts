@@ -513,7 +513,7 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
   // CANCER_TYPE_DETAILED; with neither type attribute (FX-P41) the study's cancer type; with CANCER_TYPE alone (FX-P42) none
   const r = await table("EGFR");
   if (typeof r === "string") ok("CTD EGFR table", false, r);
-  else for (const [sid, want] of [["FX-P41-T1", "non-small cell lung cancer"], ["FX-P42-T1", ""]] as const) {
+  else for (const [sid, want] of [["FX-P41-T1", "Non-Small Cell Lung Cancer"], ["FX-P42-T1", ""]] as const) {
     const got = r.filter((x) => x.sample === sid).map((x) => String(v(x, "cancerType") ?? ""));
     ok("CTD " + sid + " EGFR L858R: Cancer Type Detailed " + JSON.stringify(want), got.length === 1 && got[0] === want, JSON.stringify(got));
   }

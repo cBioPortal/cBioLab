@@ -54,7 +54,7 @@ const OTHER = "fixture-older";
 const STUDY_SAMPLES = 59;
 const LUAD = "Lung Adenocarcinoma", LUSC = "Lung Squamous Cell Carcinoma";
 // the fixture study's cancer type (type_of_cancer nsclc), as its database names it
-const NSCLC = "non-small cell lung cancer";
+const NSCLC = "Non-Small Cell Lung Cancer";
 
 // Genome Nexus's stored release is read at the fixture's pin (no record matches a fusion); the
 // protein (length, domains) is asked of an address that refuses at once, so nothing leaves the machine
