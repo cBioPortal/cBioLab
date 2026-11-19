@@ -152,15 +152,18 @@ export function normalizeDef(def: any) {
 }
 
 /** one top-level clause: a pill, a NOT pill, or an OR group, with an × when it can be removed */
-export function ClausePill({ clause: c, onRemove, onCustomData }: { clause: any; onRemove?: () => void; onCustomData?: OnCustomData }) {
+/** `portal`: an OR group written as the Study View's filter bar writes it, "( a or b )" (STV-FB-2) */
+export function ClausePill({ clause: c, onRemove, onCustomData, portal }: { clause: any; onRemove?: () => void; onCustomData?: OnCustomData; portal?: boolean }) {
   if (c.any) return (
     <span className="fgroup">
+      {portal && <span className="fconn">(</span>}
       {c.any.map((l: any, j: any) => (
         <Fragment key={j}>
-          {j > 0 && <span className="fconn">OR</span>}
+          {j > 0 && <span className="fconn">{portal ? "or" : "OR"}</span>}
           <Pill leaf={l} onCustomData={onCustomData} />
         </Fragment>
       ))}
+      {portal && <span className="fconn">)</span>}
       {onRemove && <button className="fx" aria-label="remove group" onClick={onRemove}>×</button>}
     </span>
   );
