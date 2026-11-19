@@ -412,6 +412,11 @@
                 "numeric": false
               },
               {
+                "id": "genePanel",
+                "name": "Gene panel",
+                "numeric": false
+              },
+              {
                 "id": "proteinChange",
                 "name": "Protein Change",
                 "numeric": false
@@ -532,6 +537,7 @@
                 "values": [
                   "P-0024249-T02-IM7",
                   "KRAS",
+                  "",
                   "G12V",
                   "Oncogenic · Level 1",
                   "Missense",
@@ -548,7 +554,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -575,6 +581,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "PTEN",
+                  "",
                   "G127V",
                   "Likely Oncogenic · Level 1",
                   "Missense",
@@ -591,7 +598,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -618,6 +625,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "TP53",
+                  "",
                   "P151R",
                   "Likely Oncogenic",
                   "Missense",
@@ -634,7 +642,7 @@
                   "G",
                   "C",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -677,6 +685,11 @@
               {
                 "id": "gene",
                 "name": "Gene",
+                "numeric": false
+              },
+              {
+                "id": "genePanel",
+                "name": "Gene panel",
                 "numeric": false
               },
               {
@@ -731,11 +744,12 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "MAP3K1",
+                  "",
                   "HOMDEL",
                   "Likely Oncogenic",
                   "5q11.2",
                   0.3194888178913738,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -752,11 +766,12 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "RAD51B",
+                  "",
                   "HOMDEL",
                   "Likely Oncogenic · Level 1",
                   "14q24.1",
                   0.0878594249201278,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -773,11 +788,12 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "PLK2",
+                  "",
                   "HOMDEL",
                   "Unknown",
                   "5q11.2",
                   0.23963575365444525,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {

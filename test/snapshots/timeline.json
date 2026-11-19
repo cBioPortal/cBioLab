@@ -1469,6 +1469,11 @@
                 "numeric": false
               },
               {
+                "id": "genePanel",
+                "name": "Gene panel",
+                "numeric": false
+              },
+              {
                 "id": "proteinChange",
                 "name": "Protein Change",
                 "numeric": false
@@ -1582,6 +1587,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "ATRX",
+                  "",
                   "K983*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1598,7 +1604,7 @@
                   "T",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1625,6 +1631,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "BLM",
+                  "",
                   "A363fs",
                   "Likely Oncogenic",
                   "FS del",
@@ -1641,7 +1648,7 @@
                   "G",
                   "-",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1668,6 +1675,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FBXW7",
+                  "",
                   "G61*",
                   "Likely Oncogenic · Level 3A",
                   "Nonsense",
@@ -1684,7 +1692,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1711,6 +1719,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FBXW7",
+                  "",
                   "X413_splice",
                   "Likely Oncogenic · Level 3A",
                   "Splice",
@@ -1727,7 +1736,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1754,6 +1763,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "MAP3K1",
+                  "",
                   "E302*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1770,7 +1780,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1797,6 +1807,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "MAP3K1",
+                  "",
                   "X696_splice",
                   "Likely Oncogenic",
                   "Splice",
@@ -1813,7 +1824,7 @@
                   "T",
                   "G",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1840,6 +1851,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRD",
+                  "",
                   "E915*",
                   "Likely Oncogenic",
                   "Nonsense",
@@ -1856,7 +1868,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1883,6 +1895,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRD",
+                  "",
                   "P1338T",
                   "Unknown",
                   "Missense",
@@ -1899,7 +1912,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1926,6 +1939,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRT",
+                  "",
                   "G969V",
                   "Unknown",
                   "Missense",
@@ -1942,7 +1956,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -1969,6 +1983,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "PTPRT",
+                  "",
                   "X1053_splice",
                   "Likely Oncogenic",
                   "Splice",
@@ -1985,7 +2000,7 @@
                   "C",
                   "G",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2012,6 +2027,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "SMARCA4",
+                  "",
                   "E1211*",
                   "Likely Oncogenic · Level 3A",
                   "Nonsense",
@@ -2028,7 +2044,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2055,6 +2071,7 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "TP53",
+                  "",
                   "T256P",
                   "Likely Oncogenic",
                   "Missense",
@@ -2071,7 +2088,7 @@
                   "T",
                   "G",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2098,6 +2115,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "TP53",
+                  "",
                   "P67Qfs*56",
                   "Likely Oncogenic",
                   "FS del",
@@ -2114,7 +2132,7 @@
                   "G",
                   "-",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2141,6 +2159,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "ATR",
+                  "",
                   "R2431M",
                   "Unknown",
                   "Missense",
@@ -2157,7 +2176,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2184,6 +2203,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "AXIN2",
+                  "",
                   "I375M",
                   "Unknown",
                   "Missense",
@@ -2200,7 +2220,7 @@
                   "G",
                   "C",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2227,6 +2247,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "BRIP1",
+                  "",
                   "D393V",
                   "Unknown",
                   "Missense",
@@ -2243,7 +2264,7 @@
                   "T",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2270,6 +2291,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CCNE1",
+                  "",
                   "A47V",
                   "Unknown",
                   "Missense",
@@ -2286,7 +2308,7 @@
                   "C",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2313,6 +2335,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CREBBP",
+                  "",
                   "M2161I",
                   "Unknown",
                   "Missense",
@@ -2329,7 +2352,7 @@
                   "C",
                   "A",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2356,6 +2379,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "DOT1L",
+                  "",
                   "W305C",
                   "Unknown",
                   "Missense",
@@ -2372,7 +2396,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2399,6 +2423,7 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "FLT4",
+                  "",
                   "S293R",
                   "Unknown",
                   "Missense",
@@ -2415,7 +2440,7 @@
                   "G",
                   "T",
                   "SOMATIC",
-                  null
+                  1
                 ],
                 "detail": {
                   "reads": [
@@ -2436,7 +2461,7 @@
               },
               {
                 "…": "5 more",
-                "sha256": "2d243923e47bed5b"
+                "sha256": "5adde494eb68e1d2"
               }
             ],
             "offset": 0,
@@ -2462,6 +2487,11 @@
               {
                 "id": "gene",
                 "name": "Gene",
+                "numeric": false
+              },
+              {
+                "id": "genePanel",
+                "name": "Gene panel",
                 "numeric": false
               },
               {
@@ -2516,11 +2546,12 @@
                 "values": [
                   "P-0000012-T03-IM3",
                   "CDK4",
+                  "",
                   "AMP",
                   "Oncogenic · Level 4",
                   "12q14.1",
                   1.5575079872204474,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -2537,11 +2568,12 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "MCL1",
+                  "",
                   "AMP",
                   "Oncogenic",
                   "1q21.2",
                   1.5095846645367412,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
@@ -2558,11 +2590,12 @@
                 "values": [
                   "P-0000012-T02-IM3",
                   "RIT1",
+                  "",
                   "AMP",
                   "Unknown",
                   "1q22",
                   0.7388769071012061,
-                  null
+                  1
                 ],
                 "detail": {
                   "cohort": {
