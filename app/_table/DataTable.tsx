@@ -6,7 +6,7 @@
 // The search, filters, sort and columns are the view's spec (lib/table-query.ts), so a change
 // re-runs the view and a shared document reproduces the table; the page is this browser's.
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { portalKeptUnits } from "../../lib/chart/format.ts";
+import { portalFreq, portalKeptUnits } from "../../lib/chart/format.ts";
 import type { ColumnFilter, ColumnValues, TableQuery, TableRows, TextFilterOp } from "../../lib/types.ts";
 import { api } from "../lab/api.ts";
 import { Waiting } from "../_oncoprint/OncoprintCard.tsx";
@@ -299,27 +299,54 @@ function FilterMenu({ col, current, vi, docJson, table, onApply }: {
 
 // ---- the column chooser ----------------------------------------------------------------------------
 
-function ColumnsMenu({ columns, shown, onShown }: { columns: { id: string; name: string }[]; shown: string[]; onShown: (ids: string[] | undefined) => void }) {
+/**
+ * The column chooser. A table whose columns name a group (the mutation table's clinical attributes) splits it as
+ * the portal's Columns menu does (AddColumns): a tab of its own columns in table order, and a Clinical tab sorted
+ * by Freq (the share of queried samples with a value), then name, a 0% attribute disabled; each with select-all
+ * and deselect-all.
+ */
+function ColumnsMenu({ columns, shown, onShown }: { columns: { id: string; name: string; group?: "clinical"; freq?: number }[]; shown: string[]; onShown: (ids: string[] | undefined) => void }) {
   const [find, setFind] = useState("");
+  const tabs = columns.some((c) => c.group);
+  const [tab, setTab] = useState<"own" | "clinical">("own");
   const match = (c: { id: string; name: string }) => !find.trim() || (c.name + " " + c.id).toLowerCase().includes(find.trim().toLowerCase());
+  const inTab = (c: { group?: "clinical" }, t: "own" | "clinical") => !tabs || (t === "clinical") === (c.group === "clinical");
+  const list = (t: "own" | "clinical") => {
+    const cs = columns.filter((c) => inTab(c, t));
+    return t === "clinical" ? [...cs].sort((x, y) => (y.freq ?? 0) - (x.freq ?? 0) || x.name.localeCompare(y.name)) : cs;
+  };
+  const visible = list(tab);
+  const offered = (c: { id: string; freq?: number }) => !(tab === "clinical" && (c.freq ?? 0) === 0 && !shown.includes(c.id));
   const toggle = (id: string) => {
     const next = shown.includes(id) ? shown.filter((x) => x !== id) : columns.map((c) => c.id).filter((x) => x === id || shown.includes(x));
     if (next.length) onShown(next);
   };
+  const selectAll = () => onShown(columns.map((c) => c.id).filter((id) => shown.includes(id) || visible.some((c) => c.id === id && offered(c))));
+  const deselectAll = () => { const next = shown.filter((id) => !visible.some((c) => c.id === id)); if (next.length) onShown(next); };
+  const count = (t: "own" | "clinical") => list(t).filter((c) => shown.includes(c.id)).length + " / " + list(t).length;
   return (
     <div className="dt-filter">
       <b>Columns ({shown.length} of {columns.length})</b>
+      {tabs && <div className="row" role="tablist" aria-label="column groups">
+        {(["own", "clinical"] as const).map((t) => (
+          <Button key={t} type="button" variant={tab === t ? "secondary" : "ghost"} size="sm" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}>
+            {t === "own" ? "Mutations" : "Clinical"} <span className="meta">{count(t)}</span></Button>))}
+      </div>}
       {columns.length > 10 && <Input type="search" className={FIELD} value={find} placeholder="find a column" onChange={(e) => setFind(e.target.value)} aria-label="find a column" />}
       <div className="row">
-        <Button type="button" variant="link" size="inline" onClick={() => onShown(columns.map((c) => c.id))}>all</Button>
-        <Button type="button" variant="link" size="inline" onClick={() => onShown(undefined)}>default</Button>
+        {tabs ? <>
+          <Button type="button" variant="link" size="inline" onClick={selectAll}>Select all ({visible.filter(offered).length})</Button>
+          <Button type="button" variant="link" size="inline" onClick={deselectAll}>Deselect all</Button>
+        </> : <Button type="button" variant="link" size="inline" onClick={() => onShown(columns.map((c) => c.id))}>all</Button>}
+        <Button type="button" variant="link" size="inline" onClick={() => onShown(undefined)}>{tabs ? "Reset columns" : "default"}</Button>
       </div>
       <div className="dt-values">
-        {columns.filter(match).map((c) => (
+        {tabs && tab === "clinical" && <span className="meta flex justify-between"><span>Name</span><span>Freq</span></span>}
+        {visible.filter(match).map((c) => (
           <label key={c.id} className="meta">
-            <Checkbox checked={shown.includes(c.id)} disabled={shown.length === 1 && shown.includes(c.id)} onCheckedChange={() => toggle(c.id)} />
+            <Checkbox checked={shown.includes(c.id)} disabled={(shown.length === 1 && shown.includes(c.id)) || !offered(c)} onCheckedChange={() => toggle(c.id)} />
             <span className="dt-grow">{c.name}</span>
-            {c.name !== c.id && <span className="n mono">{c.id}</span>}
+            {tabs && tab === "clinical" ? <span className="n mono">{portalFreq(c.freq ?? 0)}</span> : c.name !== c.id && <span className="n mono">{c.id}</span>}
           </label>))}
       </div>
       <span className="meta">the download holds every column</span>

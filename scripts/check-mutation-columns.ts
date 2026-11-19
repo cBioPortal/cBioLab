@@ -568,5 +568,29 @@ for (const [desc, head] of [[false, [0.0036, 0.02, 0.25]], [true, [0.25, 0.02, 0
     tally.match(/missense (\d+)\/(\d+)/)!.slice(1).reduce((n, x) => n + Number(x), 0) === 7, tally);
 }
 
+{
+  // L1 (MUT-TB-5, MUT-STM-15) the Columns menu's Freq on a first run of KRAS over the whole study: 100 × the
+  // study's samples with a value ÷ its 59 samples (data_clinical_sample.txt lines 6-64):
+  //   PATIENT_FLAG (patient, data_clinical_patient.txt): FX-P01 alone holds one (line 6, TRUE), and counts
+  //     both its samples, FX-P01-T1 and FX-P01-T2 (sample lines 6-7): 2 / 59 = 3.389…% → "3.4%"
+  //   TUMOR_GRADE (sample): FX-P01-T1 1, FX-P01-T2 2, FX-P02-T1 2, FX-P02-T2 2 (lines 6-9), the rest blank: 4 / 59 = 6.779…% → "6.8%"
+  //   CANCER_TYPE_DETAILED (cancerType): blank for FX-P41-T1, FX-P42-T1, FX-P47-T1, FX-P48-T1 (lines 50, 51, 57, 58): 55 / 59 = 93.220…% → "93.2%"
+  //   CANCER_TYPE (cancerTypeAll): blank for FX-P41-T1 and FX-P47-T1 (lines 50, 57): 57 / 59 = 96.610…% → "96.6%"
+  //   SEX (patient): every patient (lines 6-58): 59 / 59 → "100.0%"; Study of Origin 100
+  const L1_FREQ: Record<string, number> = { PATIENT_FLAG: 200 / 59, TUMOR_GRADE: 400 / 59, cancerType: 5500 / 59, cancerTypeAll: 5700 / 59, SEX: 100, studyOfOrigin: 100 };
+  const res = await run("KRAS");
+  if (typeof res === "string") ok("L1 Freq: KRAS table", false, res);
+  else {
+    const cols = (res.mutations!.columns || []) as { id: string; group?: string; freq?: number }[];
+    for (const [id, want] of Object.entries(L1_FREQ)) {
+      const c = cols.find((x) => x.id === id);
+      ok(`L1 Freq of ${id} is ${want.toFixed(3)}% (group clinical)`, !!c && c.group === "clinical" && typeof c.freq === "number" && Math.abs(c.freq - want) < 1e-6,
+        c ? "group " + show(c.group) + " freq " + show(c.freq) : "no such column");
+    }
+    const pc = cols.find((x) => x.id === "proteinChange");
+    ok("L1 Freq: Protein Change carries no group or freq", !!pc && pc.group === undefined && pc.freq === undefined, JSON.stringify(pc));
+  }
+}
+
 console.log(`\n${checks - failures}/${checks} mutation column checks passed`);
 if (failures) { console.log(`${failures} FAILED`); process.exit(1); }

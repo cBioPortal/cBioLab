@@ -22,7 +22,9 @@ import { chromosomeSortSql, proteinChangeSortSql } from "./mutation-sort.ts";
 import { finiteSql } from "./sql-number.ts";
 import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
-export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc" }
+export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc";
+  /** the Columns menu's Clinical tab (MUT-TB-5), with its Freq: the percent of queried samples with a value (MUT-STM-15) */
+  group?: "clinical"; freq?: number }
 
 /** the columns whose first header click sorts descending (MutationTable defaultSortDirection 'desc'); every other column's is ascending, numbers too */
 const FIRST_SORT_DESC = new Set(["gnomad", "clinvar", "dbsnp"]);

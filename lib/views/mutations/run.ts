@@ -3,7 +3,7 @@ import type { ViewResult } from "../../types.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
 import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
 import { MUTATION_COLUMNS, mutationRowSource, alterationOf, mutationDefaultColumns, type MutationColumn, type TablePart } from "../../mutation-table.ts";
-import { mutationClinicalColumns, mutationDefaultFacts } from "../mutation-defaults.ts";
+import { mutationClinicalColumns, mutationClinicalFreq, mutationDefaultFacts } from "../mutation-defaults.ts";
 import { clinicalValue } from "../../mutation-clinical.ts";
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
@@ -97,6 +97,12 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
     r = await runRows(ctx, "mutations", holders, q, defaults, shownColumns(q, columns, defaults), size, source,
       ctx.values ? { column: ctx.values, numeric: !!columns.find((c) => c.id === ctx.values)?.numeric } : undefined);
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
+  // the Columns menu's Clinical tab and its Freq (MUT-TB-5, MUT-STM-15), with the first page only: a later page keeps its columns
+  let freq: Record<string, number> = {};
+  if (!ctx.page && !ctx.values) {
+    try { freq = await mutationClinicalFreq(ctx, holders, clinical); } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
+  }
+  const menuColumns: MutationColumn[] = columns.map((c) => c.id in freq ? { ...c, group: "clinical" as const, freq: freq[c.id] } : c);
   const rows = r.rows.map((x) => {
     const detail = mutationDetail(x, x.build == null ? undefined : String(x.build));
     return { cohort: String(x.cohort ?? ""), study: String(x.study ?? ""), patient: String(x.patient ?? ""), sample: String(x.sid ?? ""),
@@ -104,7 +110,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   });
   const gn = describePins(pins);
   const shown = shownColumns(q, columns, defaults);
-  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns, shown, defaults, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
+  const mutations = { gene, ...(r.duplicates ? { duplicates: r.duplicates } : {}), ...(r.kept && r.total < r.all ? { kept: r.kept } : {}), columns: menuColumns, shown, defaults, query: q, rows, offset: r.offset, pageSize: size, lists: r.lists, total: r.total, all: r.all, oncokbPin: pin, variantPins: pins,
     ...(unannotated.length ? { unannotated } : {}),
     ...(r.groups > 1 ? { instances: r.groups } : {}), ...(excluded.length ? { excluded } : {}), ...(r.values ? { values: r.values } : {}) };
   if (ctx.page || ctx.values) return { kind: "mutations", cohorts: vNames, mutations, participation: ctx.participationFor(ctx.vStudies, true) };

@@ -35,14 +35,18 @@
             "name": "Study of Origin",
             "numeric": false,
             "tip": "Study of Origin",
-            "firstSort": "asc"
+            "firstSort": "asc",
+            "group": "clinical",
+            "freq": 100
           },
           {
             "id": "cancerTypeAll",
             "name": "Cancer Type",
             "numeric": false,
             "tip": "Cancer Type",
-            "firstSort": "asc"
+            "firstSort": "asc",
+            "group": "clinical",
+            "freq": 100
           },
           {
             "id": "sample",
@@ -54,7 +58,9 @@
             "id": "cancerType",
             "name": "Cancer Type Detailed",
             "numeric": false,
-            "firstSort": "asc"
+            "firstSort": "asc",
+            "group": "clinical",
+            "freq": 100
           },
           {
             "id": "proteinChange",
@@ -152,11 +158,13 @@
             "id": "mutCount",
             "name": "# Mut in Sample",
             "numeric": true,
-            "firstSort": "asc"
+            "firstSort": "asc",
+            "group": "clinical",
+            "freq": 100
           },
           {
             "…": "62 more",
-            "sha256": "a9880dcb9aee3e58"
+            "sha256": "09c11bce49349218"
           }
         ],
         "shown": [
