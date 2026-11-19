@@ -14,6 +14,7 @@ import { TranscriptSummary } from "./TranscriptSummary.tsx";
 import { ColorLegend } from "./ColorLegend.tsx";
 import { LollipopTools } from "./LollipopTools.tsx";
 import { useStemClicks } from "./use-stem-clicks.ts";
+import { setStemHover } from "./stem-hover.ts";
 import { lollipopPanelsSvg } from "../../lib/lollipop-svg.ts";
 import { DrawAtWidth } from "../lab/figure.tsx";
 import { fmtShare } from "../../lib/chart/format.ts";
@@ -79,6 +80,7 @@ function GenePlot({ gene, selected, onSelect, annotated, yMax, onYMax }: { gene:
   useStemClicks(box, {
     pick: (codon, multi) => onSelect(clickCodon(selected, codon, multi)),
     clear: () => { if (selected.length) onSelect([]); },
+    hover: (codon) => setStemHover(codon == null ? null : { gene: gene.gene, codon }),
   });
   return (
     <div className="lp-plot flex-[1_1_560px]">

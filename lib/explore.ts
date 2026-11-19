@@ -12,7 +12,7 @@ import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow,
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { clinicalValueFoldSql } from "./event-names.ts";
 import { dataBins, recountBins, type BinInput, type BinSettings } from "./data-binner.ts";
-import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor } from "./custom-data.ts";
+import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor, withSampleLevel } from "./custom-data.ts";
 
 /**
  * cBioPortal's linear bin intervals (LinearDataBinner). The binner picks the
@@ -997,7 +997,29 @@ export interface ExploreFederatedArgs {
 
 /** One context for the whole federated request, so pass 2 can still see pass 1's cohorts. */
 export function buildExploreFederated(args: ExploreFederatedArgs): Promise<ExploreResult> {
-  return ensureChContext(() => buildExploreFederatedInner(args));
+  return ensureChContext(async () => withSampleLevel(await conflictingLevels(args.studies, args.connByStudy), () => buildExploreFederatedInner(args)));
+}
+
+/**
+ * The attributes stored per patient in some of these studies and per sample in others: the portal
+ * charts such an attribute once, counted per sample, a patient's value for each of its samples
+ * (STS-MD-5). Read from every connection's attribute metadata.
+ */
+export async function conflictingLevels(studies: string[], connByStudy?: Map<string, ChConn>): Promise<string[]> {
+  if (studies.length < 2) return [];
+  const levels = new Map<string, Set<string>>();
+  await Promise.all(byConnection(studies, connByStudy).map(async (g) => {
+    const r = await chQuery<ChRow>("SELECT cam.attr_id AS a, groupUniqArray(lower(toString(cam.patient_attribute))) AS lv\n" +
+      "FROM " + clinicalMetaTable(g.conn.db) + " cam\n" +
+      "JOIN " + g.conn.db + ".cancer_study cs ON cs.cancer_study_id = cam.cancer_study_id\n" +
+      "WHERE cs.cancer_study_identifier IN (" + g.studies.map(sq).join(", ") + ")\nGROUP BY a", g.conn);
+    for (const x of r.data) {
+      const set = levels.get(String(x.a)) || new Set<string>();
+      for (const v of (x.lv as unknown as string[] | undefined) || []) set.add(["1", "true"].includes(v) ? "patient" : "sample");
+      levels.set(String(x.a), set);
+    }
+  }));
+  return [...levels].filter(([, l]) => l.size > 1).map(([a]) => a).sort();
 }
 
 async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesByStudy, connByStudy, geneSearch, attributes, geneCharts, derived, drivers, bins: binSettings }: ExploreFederatedArgs): Promise<ExploreResult> {

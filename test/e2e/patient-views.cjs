@@ -82,7 +82,7 @@ async function patientViews({ browser, ok, BASE }) {
       await page.locator(".alt-table .dt-table").first().waitFor({ timeout: 240000 });
       const sec = (name) => page.locator("section.alt-table[aria-label='" + name + "']");
       const titles = await page.locator(".alt-table .dt-title").allInnerTexts();
-      ok("alterations: the patient's three tables, in the portal's order", /^7 Mutations/.test(titles[0]) && /^3 Copy Number Alterations/.test(titles[1]) && /^3 Structural Variants/.test(titles[2]), titles.join(" | "));
+      ok("alterations: the patient's three tables, in the portal's order", /^7 Mutations/.test(titles[0]) && /^3 Structural Variants/.test(titles[1]) && /^3 Copy Number Alterations/.test(titles[2]), titles.join(" | "));
       const muts = await sec("Mutations").locator("tbody tr").allInnerTexts();
       ok("alterations: mutations carry OncoKB's call and the cohort frequency", muts.some((r) => /KRAS\s+G12V\s+Oncogenic · Level 1/.test(r) && /(^|\s)(\d+|<1)%(\s|$)/.test(r)), muts[0]);
       ok("alterations: a fusion lists both genes", (await sec("Structural Variants").locator("tbody tr").allInnerTexts()).some((r) => /TMPRSS2\s+ERG/.test(r)));
