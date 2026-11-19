@@ -82,21 +82,24 @@ describe("a gene's mutation types", () => {
 
   test("the checked types are one clause; none, or more than one clause holds, is refused by name", () => {
     assert.deepEqual(mutationTypesClause("KRAS", ["Missense_Mutation", "Nonsense_Mutation"]),
-      { clauses: [{ kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Missense_Mutation", "Nonsense_Mutation"] }] });
+      { clauses: [{ kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Missense_Mutation", "Nonsense_Mutation"], ifHeld: true }] },
+      "ifHeld: over several studies, one without such a mutation has none of these samples rather than refusing");
     assert.deepEqual(mutationTypesClause("KRAS", []), { why: "no mutation type is checked" });
     const many = Array.from({ length: 21 }, (_, i) => "T" + i);
     assert.deepEqual(mutationTypesClause("KRAS", many), { why: "one filter holds at most 20 mutation types; 21 are checked" });
   });
 
-  test("the applied rows: the types the draft's clauses on this gene hold, and no other gene's", () => {
+  test("the applied rows: the types the draft's clauses on this gene hold, and no other gene's; a negated one is counted apart", () => {
     const def = { all: [
       { kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Missense_Mutation"] },
       { kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Nonsense_Mutation", "Missense_Mutation"] },
       { kind: "genomicData", gene: "TP53", profileType: MUTATION_TYPE_PROFILE, values: ["Splice_Site"] },
+      { not: { kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Silent"] } },
       cna(["2"]),
     ] };
-    assert.deepEqual(appliedMutationTypes(def, "KRAS"), ["Missense_Mutation", "Nonsense_Mutation"]);
-    assert.deepEqual(appliedMutationTypes(null, "KRAS"), []);
+    assert.deepEqual(appliedMutationTypes(def, "KRAS"), { types: ["Missense_Mutation", "Nonsense_Mutation"], excluded: 1 });
+    assert.deepEqual(appliedMutationTypes(def, "TP53"), { types: ["Splice_Site"], excluded: 0 });
+    assert.deepEqual(appliedMutationTypes(null, "KRAS"), { types: [], excluded: 0 });
   });
 
   test("the clause compiles to the samples with a mutation of the gene of any of the types, every mutation counted", () => {
@@ -107,7 +110,11 @@ describe("a gene's mutation types", () => {
     assert.doesNotMatch(sql, /mutation_status/, "uncalled mutations too, as the portal's filter (glioma_msk_2018 ABL1: 6 samples)");
     const bad = (leaf: object) => () => compileCohortDef({ all: [{ kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, ...leaf }] } as never, ctx);
     assert.throws(bad({}), /profileType 'MUTATION_TYPE' needs values\[\]/);
-    assert.throws(bad({ values: ["Missense_Mutation"], range: { gt: 1 } }), /takes values\[\] \(mutation types such as Missense_Mutation\) only/);
+    assert.throws(bad({ values: ["Missense_Mutation"], range: { gt: 1 } }), /takes values\[\] \(mutation types such as Missense_Mutation\), not a range/);
+    // a type the study has no mutation of is refused in the database, naming it; with ifHeld it matches nobody there
+    assert.match(sql, /throwIf\(NOT has\(ts, 'In_Frame_Ins'\), 'genomicData clause on KRAS: no mutation in coadread has type \\'In_Frame_Ins\\'/);
+    const held = compileCohortDef({ all: [{ kind: "genomicData", gene: "KRAS", profileType: MUTATION_TYPE_PROFILE, values: ["Missense"], ifHeld: true }] } as never, ctx);
+    assert.doesNotMatch(held, /throwIf/);
     assert.throws(bad({ values: Array.from({ length: 21 }, (_, i) => "T" + i) }), /genomicData clause on KRAS: at most 20 values; this lists 21/);
   });
 });

@@ -4,7 +4,7 @@
 import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, discreteCnaProfileSql, type DerivedMetric } from "./cohort2.ts";
-import { CNA_LEVELS, DISCRETE_CNA_PROFILE, MUTATION_TYPE_PROFILE, mutationTypeLabel } from "./gene-state-clauses.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE, isMutationTypeLeafFor, mutationTypeLabel } from "./gene-state-clauses.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
 
@@ -1913,51 +1913,48 @@ export async function buildAssayFacets(o: {
 /** a gene's mutation-type tables at most, as its other charts */
 export const MUTATION_TYPE_CHART_LIMIT = 6;
 
-/** Is this top-level clause (or its negation) the gene's mutation-type table's own filter? */
-function isMutationTypeClauseFor(c: unknown, gene: string): boolean {
-  const leaf = (x: unknown) => { const l = x as { kind?: string; gene?: string; profileType?: string };
-    return !!l && l.kind === "genomicData" && l.profileType === MUTATION_TYPE_PROFILE && String(l.gene || "").toUpperCase() === gene; };
-  return leaf(c) || (!!c && leaf((c as { not?: unknown }).not));
-}
-
-/**
- * The portal's Mutation Type Counts table per gene (STS-OT-3): every mutation of the gene in the
- * selected studies by type, over the draft without the table's own filter. Counted as the portal's
- * `/api/mutation-data-counts/fetch?categorization=MUTATION_TYPE`: every mutation the profile holds,
- * uncalled and off-panel ones included, whatever the drivers setting.
- */
 export async function buildMutationTypeFacets(o: {
   studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null;
   profilesByStudy: Map<string, { profiles?: string[]; gaProfiles?: string[] }>;
   connByStudy?: Map<string, ChConn>;
   genes: string[];
+  /** selected studies these tables cannot count (a peer's), named on each */
+  leftOut?: string[];
 }): Promise<MutationTypeFacet[]> {
   const ctx: DefCtx = { oncokbPin: o.oncokbPin, profilesByStudy: o.profilesByStudy };
   const genes = [...new Set(o.genes.map((g) => String(g).toUpperCase().trim()))]
     .filter((g) => /^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(g)).slice(0, MUTATION_TYPE_CHART_LIMIT);
+  const leftOut = o.leftOut && o.leftOut.length ? { leftOut: o.leftOut } : {};
+  if (!o.studies.length) return genes.map((gene) => ({ gene, total: 0, rows: [], ...leftOut }));
+  const groups = byConnection(o.studies, o.connByStudy);
+  /** per connection: the cohort of `def` and its size in samples */
+  const base = (def: CohortDef | null | undefined) => Promise.all(groups.map(async (g) => {
+    const set = cohortSet(g.studies, g.conn.db, def, ctx);
+    const t = await chQuery<ChRow>("SELECT uniqExact(sample_unique_id) AS n FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + inSamples(set), g.conn);
+    return { ...g, set, total: Number(t.data[0]?.n || 0) };
+  }));
+  const own = (gene: string) => (c: unknown) => isMutationTypeLeafFor(c, gene) || isMutationTypeLeafFor((c as { not?: unknown } | null)?.not, gene);
+  // the draft as it is, shared by every gene without a filter of its own
+  let shared: ReturnType<typeof base> | undefined;
   return ensureChContext(() => Promise.all(genes.map(async (gene): Promise<MutationTypeFacet> => {
-    const own = !!o.draft && Array.isArray(o.draft.all) && o.draft.all.some((c) => isMutationTypeClauseFor(c, gene));
-    const def = own ? draftWithout(o.draft!, (c) => isMutationTypeClauseFor(c, gene)) : o.draft;
-    const groups = byConnection(o.studies, o.connByStudy).map((g) => ({ ...g, set: cohortSet(g.studies, g.conn.db, def, ctx) }));
-    const parts = await Promise.all(groups.map((g) => Promise.all([
-      chQuery<ChRow>("SELECT uniqExact(sample_unique_id) AS n FROM " + g.conn.db + ".sample_derived WHERE " + studyIn(g.studies) + inSamples(g.set), g.conn),
-      chQuery<ChRow>("SELECT mutation_type AS t, count() AS m, uniqExact(sample_unique_id) AS n\n" +
-        "FROM " + g.conn.db + ".genomic_event_derived\n" +
-        "WHERE " + genomicStudySql(g.studies) + " AND variant_type = 'mutation' AND hugo_gene_symbol = " + sq(gene) + inSamples(g.set) + "\n" +
-        "GROUP BY t", g.conn),
-    ])));
+    const mine = !!o.draft && Array.isArray(o.draft.all) && o.draft.all.some(own(gene));
+    const parts = await (mine ? base(draftWithout(o.draft!, own(gene))) : (shared ??= base(o.draft)));
+    const counts = await Promise.all(parts.map((g) => chQuery<ChRow>("SELECT mutation_type AS t, count() AS m, uniqExact(sample_unique_id) AS n\n" +
+      "FROM " + g.conn.db + ".genomic_event_derived\n" +
+      "WHERE " + genomicStudySql(g.studies) + " AND variant_type = 'mutation' AND hugo_gene_symbol = " + sq(gene) + inSamples(g.set) + "\n" +
+      "GROUP BY t", g.conn)));
     const rows = new Map<string, { mutations: number; samples: number }>();
-    for (const [, r] of parts) for (const x of r.data) {
+    for (const r of counts) for (const x of r.data) {
       const t = String(x.t), was = rows.get(t) || { mutations: 0, samples: 0 };
       // the studies' samples are disjoint, so their counts add
       rows.set(t, { mutations: was.mutations + Number(x.m), samples: was.samples + Number(x.n) });
     }
     return {
-      gene, total: parts.reduce((n, [t]) => n + Number(t.data[0]?.n || 0), 0),
+      gene, total: parts.reduce((n, g) => n + g.total, 0),
       // the portal's default order: Freq, then # Mut, descending
       rows: [...rows].map(([type, c]) => ({ type, label: mutationTypeLabel(type), ...c }))
         .sort((a, b) => b.samples - a.samples || b.mutations - a.mutations || (a.type < b.type ? -1 : 1)),
-      ...(own ? { disjunctive: true as const } : {}),
+      ...(mine ? { disjunctive: true as const } : {}), ...leftOut,
     };
   })));
 }

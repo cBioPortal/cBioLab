@@ -1104,9 +1104,25 @@ describe("mutation-type tables", () => {
     assert.deepEqual(f.rows.map((r) => [r.type, r.mutations, r.samples]), [["Missense_Mutation", 14, 11], ["Splice_Site", 1, 1]]);
   });
 
+  test("a peer's studies are named on every table, never counted silently; with only a peer's, no query runs", async () => {
+    const none = await buildMutationTypeFacets({ studies: [], profilesByStudy: profiles, genes: ["KRAS"], leftOut: ["peer_study"] });
+    assert.deepEqual(none, [{ gene: "KRAS", total: 0, rows: [], leftOut: ["peer_study"] }]);
+    assert.equal(sent.length, 0);
+    on(/sample_derived/, [{ n: 100 }]);
+    const [mixed] = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, genes: ["KRAS"], leftOut: ["peer_study"] });
+    assert.deepEqual([mixed.total, mixed.leftOut], [100, ["peer_study"]]);
+  });
+
+  test("genes without a filter of their own share one count of the selection", async () => {
+    on(/sample_derived/, [{ n: 100 }]);
+    const fs = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, genes: ["KRAS", "TP53", "EGFR"] });
+    assert.deepEqual(fs.map((f) => f.total), [100, 100, 100]);
+    assert.equal(sent.filter((q) => /FROM cbio_a\.sample_derived/.test(q) && !/genomic_event_derived/.test(q)).length, 1);
+  });
+
   test("the table is counted without its own filter, and with every other one", async () => {
     const draft = { all: [
-      { kind: "genomicData", gene: "TP53", profileType: "MUTATION_TYPE", values: ["Nonsense_Mutation"] },
+      { not: { kind: "genomicData", gene: "TP53", profileType: "MUTATION_TYPE", values: ["Nonsense_Mutation"] } },
       { kind: "genomicData", gene: "KRAS", profileType: "MUTATION_TYPE", values: ["Missense_Mutation"] },
     ] } as never;
     const [tp53, kras] = await buildMutationTypeFacets({ studies: ["st1"], profilesByStudy: profiles, draft, genes: ["TP53", "KRAS"] });

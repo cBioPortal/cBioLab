@@ -430,7 +430,7 @@ export default function AnalysisPage() {
     } catch { return []; }
   });
   const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
-  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
+  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, mutationTypeCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();
   /** one of the reader's saved cohorts open in Explore to change its filters; false while their list has not arrived */
@@ -628,7 +628,7 @@ export default function AnalysisPage() {
                 return shown < all && <span className="meta" data-charted={shown + "/" + all}>
                   {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
               })()}
-              {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
+              {geneCharts.length + mutationTypeCharts.length > 0 && <span className="meta">{geneCharts.length + mutationTypeCharts.length} gene chart{geneCharts.length + mutationTypeCharts.length === 1 ? "" : "s"}</span>}
               {(() => {
                 // drivers only where every selected study has OncoKB calls here; the server refuses the rest too
                 const without = exStudies.filter((id) => studies.find((x) => x.id === id)?.oncokb === false);

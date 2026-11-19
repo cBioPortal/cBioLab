@@ -142,10 +142,10 @@ export function useExploreState(page: ExplorePage) {
   /** genes charted as their own alteration facet (the portal's per-gene charts) */
   const [geneCharts, setGeneCharts] = useState<string[]>([]);
   const geneChartsRef = useRef<string[]>([]);   // fetchExplore reads this, not the closure
-  /** generic-assay entities charted one each (a signature, an arm, a probe) */
-  // genes charted as the portal's Mutation Type Counts table
+  /** genes charted as the portal's Mutation Type Counts table */
   const [mutationTypeCharts, setMutationTypeCharts] = useState<string[]>([]);
   const mutationTypeChartsRef = useRef<string[]>([]);
+  /** generic-assay entities charted one each (a signature, an arm, a probe) */
   const [assayCharts, setAssayCharts] = useState<{ profileType: string; entity: string }[]>([]);
   const assayChartsRef = useRef<{ profileType: string; entity: string }[]>([]);
   /** derived facets beyond the fixed three, switched on from "show more derivations" */

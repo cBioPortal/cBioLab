@@ -165,7 +165,7 @@ export interface CaseListLeaf { kind: "caseList"; id?: string; category?: string
 export interface GenomicDataLeaf {
   kind: "genomicData"; gene: string; profileType: string;
   range?: ClinicalRange; values?: (string | number)[];
-  /** with profileType "CNA": a study without a discrete copy-number profile matches nobody rather than refusing */
+  /** with profileType "CNA": a study without a discrete copy-number profile matches nobody rather than refusing; with "MUTATION_TYPE", a study with no mutation of a listed type */
   ifHeld?: true;
 }
 export interface GenericAssayLeaf {
@@ -980,12 +980,6 @@ export type ClinicalFacet =
     });
 
 /**
- * One entity of a generic-assay profile as an Explore chart: a histogram of its numbers, or its
- * values' counts. Counted in PATIENTS with a value in the bar, the unit a click filters in (a
- * genericAssay clause keeps a patient with any sample in range), so a patient whose samples fall
- * in two bars is in both. Over the selected studies that hold the profile (`studies`).
- */
-/**
  * The portal's Mutation Type Counts table for one gene (STS-OT-3): per mutation type, its mutations
  * (`mutations`, the portal's # Mut) and the samples holding one (`samples`, its #), over the
  * selection without this table's own filter. Freq is `samples` ÷ `total`, the selected samples.
@@ -997,8 +991,16 @@ export interface MutationTypeFacet {
   rows: { type: string; label: string; mutations: number; samples: number }[];
   /** the draft holds this table's own filter, left out of these counts */
   disjunctive?: true;
+  /** selected studies not counted here (a peer's, whose federation API has no mutation-type counts) */
+  leftOut?: string[];
 }
 
+/**
+ * One entity of a generic-assay profile as an Explore chart: a histogram of its numbers, or its
+ * values' counts. Counted in PATIENTS with a value in the bar, the unit a click filters in (a
+ * genericAssay clause keeps a patient with any sample in range), so a patient whose samples fall
+ * in two bars is in both. Over the selected studies that hold the profile (`studies`).
+ */
 export interface AssayFacet {
   profileType: string; entity: string;
   /** the entity's display name, where the study gives one */

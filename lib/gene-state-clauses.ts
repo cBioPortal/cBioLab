@@ -99,16 +99,26 @@ export function mutationTypesClause(gene: string, types: string[]): { clauses: u
   if (!types.length) return { why: "no mutation type is checked" };
   const refusal = limitRefusal(types.length, ASSAY_VALUES_LIMIT, "mutation types");
   if (refusal) return { why: refusal };
-  return { clauses: [{ kind: "genomicData", gene, profileType: MUTATION_TYPE_PROFILE, values: types }] };
+  // ifHeld: over several studies, one with no mutation of a type has none of its samples rather than refusing
+  return { clauses: [{ kind: "genomicData", gene, profileType: MUTATION_TYPE_PROFILE, values: types, ifHeld: true }] };
 }
 
-/** the mutation types a draft's top-level clauses already filter `gene` on, for the table's applied rows */
-export function appliedMutationTypes(def: { all?: unknown[] } | null | undefined, gene: string): string[] {
+/** is this leaf a filter of `gene`'s mutation-type table (a genomicData leaf on its mutation types)? */
+export function isMutationTypeLeafFor(leaf: unknown, gene: string): boolean {
+  const l = leaf as { kind?: string; gene?: string; profileType?: string } | null | undefined;
+  return !!l && l.kind === "genomicData" && l.profileType === MUTATION_TYPE_PROFILE && String(l.gene || "").toUpperCase() === gene;
+}
+
+/**
+ * The mutation types a draft's top-level clauses filter `gene` on, for the table's applied rows; a
+ * negated one ("none of these types") is not a row the table can check, so it is counted in `excluded`.
+ */
+export function appliedMutationTypes(def: { all?: unknown[] } | null | undefined, gene: string): { types: string[]; excluded: number } {
   const out = new Set<string>();
+  let excluded = 0;
   for (const c of def?.all || []) {
-    const l = c as { kind?: string; gene?: string; profileType?: string; values?: unknown[] };
-    if (l && l.kind === "genomicData" && l.profileType === MUTATION_TYPE_PROFILE && String(l.gene || "").toUpperCase() === gene)
-      for (const v of l.values || []) out.add(String(v));
+    if (isMutationTypeLeafFor(c, gene)) for (const v of (c as { values?: unknown[] }).values || []) out.add(String(v));
+    else if (isMutationTypeLeafFor((c as { not?: unknown } | null)?.not, gene)) excluded++;
   }
-  return [...out];
+  return { types: [...out], excluded };
 }

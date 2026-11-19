@@ -457,15 +457,21 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
  * off-panel ones included).
  */
 function mutationTypeLeafSql(gene: string, leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
-  if (leaf.range != null || leaf.ifHeld != null)
-    throw new Error("genomicData clause: profileType '" + MUTATION_TYPE_PROFILE + "' takes values[] (mutation types such as Missense_Mutation) only");
+  if (leaf.range != null)
+    throw new Error("genomicData clause: profileType '" + MUTATION_TYPE_PROFILE + "' takes values[] (mutation types such as Missense_Mutation), not a range");
+  if (leaf.ifHeld != null && leaf.ifHeld !== true) throw new Error("genomicData clause: ifHeld is true or absent");
   if (!Array.isArray(leaf.values) || !leaf.values.length)
     throw new Error("genomicData clause: profileType '" + MUTATION_TYPE_PROFILE + "' needs values[], the mutation types");
   tooManyValues("genomicData clause on " + gene, leaf.values.length, ASSAY_VALUES_LIMIT);
+  const mutations = dbOf(ctx) + ".genomic_event_derived\n  WHERE " + genomicStudySql(ctx.study) + " AND variant_type = 'mutation'";
+  // a type no mutation of the study has (a misspelling, or a study without mutations) is refused by
+  // name, unless ifHeld, when it matches nobody there (a clause over several studies)
+  const typeCheck = leaf.ifHeld === true ? "" : "\n  UNION DISTINCT\nSELECT '' AS sid FROM (SELECT groupUniqArray(mutation_type) AS ts FROM " + mutations + ")\n" +
+    "  WHERE " + leaf.values.map((v) => "throwIf(NOT has(ts, " + sq(String(v)) + "), " +
+      sq("genomicData clause on " + gene + ": no mutation in " + ctx.study + " has type '" + String(v) + "' (types are spelled as the study writes them, e.g. Missense_Mutation, Splice_Site); add ifHeld: true to match nobody there instead") + ")").join(" + ") + " != 0";
   return ofSamples("SELECT DISTINCT " + PID("sample_unique_id", ctx.study) + " AS sid\n" +
-    "  FROM " + dbOf(ctx) + ".genomic_event_derived\n" +
-    "  WHERE " + genomicStudySql(ctx.study) + " AND variant_type = 'mutation'\n" +
-    "    AND hugo_gene_symbol = " + sq(gene) + " AND mutation_type IN (" + leaf.values.map((v) => sq(String(v))).join(",") + ")");
+    "  FROM " + mutations + "\n" +
+    "    AND hugo_gene_symbol = " + sq(gene) + " AND mutation_type IN (" + leaf.values.map((v) => sq(String(v))).join(",") + ")" + typeCheck);
 }
 
 function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): LeafIds {

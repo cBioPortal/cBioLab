@@ -475,8 +475,8 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
             ))}
             {geneCharts.length + mutationTypeCharts.length > 0 && (
               <p className="note flush mt-1.5">
-                Each charted gene's mutation and copy-number status is drawn as its own tile in the
-                facet grid, alongside the clinical attributes — close this dialog to see them.
+                Each chart is drawn as its own tile in the facet grid, alongside the clinical
+                attributes — close this dialog to see them.
               </p>
             )}
           </div>
@@ -1216,17 +1216,23 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
  */
 export function MutationTypeFacets({ ctx }: { ctx: ExploreCtx }) {
   const { addClauses, parseDraft } = ctx;
-  const applied = (gene: string) => new Set(appliedMutationTypes(parseDraft(), gene));
   return <>
     {(ctx.explore!.mutationTypeFacets || []).map((f) => {
-      const on = applied(f.gene);
+      const applied = appliedMutationTypes(parseDraft(), f.gene), on = new Set(applied.types);
+      const counted = !f.leftOut || f.total > 0;
       return (
         <div key={f.gene} data-mutationtypes={f.gene} className="card">
           <div className="facettitle">
             {f.gene}: mutation types
-            <span className="meta"> · sample-level · {f.total.toLocaleString()} samples</span>
+            {counted && <span className="meta" data-tip="Freq is of every selected sample, as the portal's table writes it, not of the samples profiled for the gene"> · sample-level · Freq of {f.total.toLocaleString()} samples{f.disjunctive ? " · counted without its own filter" : ""}</span>}
           </div>
-          {f.rows.length ? (
+          {applied.excluded > 0 && <p className="note flush mt-1">
+            {applied.excluded === 1 ? "A filter excludes" : applied.excluded + " filters exclude"} {f.gene} mutation types; this table is counted without {applied.excluded === 1 ? "it" : "them"}.
+          </p>}
+          {f.leftOut && <p className="note flush mt-1" data-leftout>
+            Not counted: {f.leftOut.join(", ")}, held by a peer whose federation API has no mutation-type counts.
+          </p>}
+          {!counted ? null : f.rows.length ? (
             <ValueList unit="samples with a mutation of this type" pct={portalFreq} hint={"keep the samples with a " + f.gene + " mutation of any checked type"}
               extra={{ head: "# Mut", tip: "Number of mutations" }}
               rows={f.rows.map((r) => ({ key: r.type, name: r.label, n: r.samples, extra: r.mutations, total: f.total, on: on.has(r.type),
