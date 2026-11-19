@@ -5,7 +5,7 @@ import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  validateCustomData, withCustomData, clinicalTable, clinicalMetaTable, customExternalsFor, encodeCustomData,
+  validateCustomData, withCustomData, withSampleLevel, clinicalTable, clinicalMetaTable, customExternalsFor, encodeCustomData,
   hasCustomData, customAttr, parseCustomAttr, ATTR_NAME_RE, tsvField, LIMITS, type CustomDataset
 } from "../lib/custom-data.ts";
 import { compileCohortDef } from "../lib/cohort2.ts";
@@ -178,5 +178,21 @@ describe("custom data: every reader of the clinical tables goes through the merg
       if (/\+\s*"\.clinical_(data_derived|attribute_meta)\b/.test(src)) offenders.push(f);
     }
     assert.deepEqual(offenders, [], "read these through clinicalTable()/clinicalMetaTable(), or uploads are silently ignored there");
+  });
+});
+
+describe("attributes read per sample (STS-MD-5)", () => {
+  test("a listed attribute's patient rows become a row per sample of the patient; others are as stored", () => withSampleLevel(["GRADE"], async () => {
+    const sql = clinicalTable("db1", ["GRADE", "SEX"]);
+    assert.match(sql, /FROM db1\.clinical_data_derived WHERE [^\n]* AND NOT \(type = 'patient' AND attribute_name IN \('GRADE'\)\)/);
+    assert.match(sql, /SELECT c\.internal_id, sd\.sample_unique_id, c\.patient_unique_id, c\.attribute_name, c\.attribute_value, c\.cancer_study_identifier, 'sample' AS type/);
+    assert.match(sql, /JOIN db1\.sample_derived sd ON sd\.patient_unique_id = c\.patient_unique_id AND sd\.cancer_study_identifier = c\.cancer_study_identifier/);
+    assert.match(sql, /WHERE c\.type = 'patient' AND c\.attribute_name IN \('GRADE'\)/);
+    assert.equal(clinicalTable("db1", ["SEX"]), OWN("db1"), "a statement that reads none of them is unchanged");
+    assert.match(clinicalTable("db1", "all"), /attribute_name IN \('GRADE'\)/);
+  }));
+  test("outside it, and for a name that is no attribute id, nothing is lifted", async () => {
+    assert.equal(clinicalTable("db1", ["GRADE"]), OWN("db1"));
+    await withSampleLevel(["GR'ADE", "custom:x/Y"], async () => assert.equal(clinicalTable("db1", "all"), OWN("db1")));
   });
 });

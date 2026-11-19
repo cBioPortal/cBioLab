@@ -118,6 +118,36 @@ export interface CustomCtx {
 }
 const store = new AsyncLocalStorage<CustomCtx>();
 
+// ---------------------------------------------------------------------------
+// Attributes read per sample
+// ---------------------------------------------------------------------------
+
+/** attributes whose patient-level rows the clinical tables give once per sample of the patient */
+const sampleLevel = new AsyncLocalStorage<string[]>();
+
+/**
+ * Run `fn` with these attributes read per sample: a patient's value of one is a row for each of
+ * its samples, as cBioPortal counts an attribute that is patient-level in one selected study and
+ * sample-level in another (STS-MD-5), so every study's rows are counted alike and chart as one.
+ */
+export function withSampleLevel<T>(attrs: string[], fn: () => Promise<T>): Promise<T> {
+  const names = attrs.filter((a) => COLUMN_RE.test(a));
+  return names.length ? sampleLevel.run(names, fn) : fn();
+}
+
+/** the warehouse's clinical rows, those of `lifted` stored per patient given once per sample of the patient */
+function liftedClinicalSql(db: string, lifted: string[]): string {
+  const names = lifted.map((a) => "'" + a + "'").join(", ");
+  return "SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type\n" +
+    "   FROM " + db + ".clinical_data_derived WHERE " + clinicalRecordedSql("attribute_value") +
+    " AND NOT (type = 'patient' AND attribute_name IN (" + names + "))\n" +
+    " UNION ALL\n" +
+    " SELECT c.internal_id, sd.sample_unique_id, c.patient_unique_id, c.attribute_name, c.attribute_value, c.cancer_study_identifier, 'sample' AS type\n" +
+    "   FROM " + db + ".clinical_data_derived c\n" +
+    "   JOIN " + db + ".sample_derived sd ON sd.patient_unique_id = c.patient_unique_id AND sd.cancer_study_identifier = c.cancer_study_identifier\n" +
+    "   WHERE c.type = 'patient' AND c.attribute_name IN (" + names + ") AND " + clinicalRecordedSql("c.attribute_value");
+}
+
 /** Run `fn` with these datasets merged into the clinical tables of the allowed databases. */
 export function withCustomData<T>(ctx: Omit<CustomCtx, "enc" | "subsets" | "encSubsets">, fn: () => Promise<T>): Promise<T> {
   if (!ctx.datasets.length) return fn();
@@ -159,7 +189,9 @@ export const CUSTOM_PRIORITY = "5000";
  */
 export function clinicalTable(db: string, attrs: readonly string[] | "all"): string {
   const s = activeCustomData();
-  const own = "SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type\n" +
+  const lifted = (sampleLevel.getStore() || []).filter((a) => attrs === "all" || attrs.includes(a));
+  const own = lifted.length ? liftedClinicalSql(db, lifted)
+    : "SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type\n" +
     "   FROM " + db + ".clinical_data_derived WHERE " + clinicalRecordedSql("attribute_value");
   if (!s || !s.allowedDbs.has(db)) return "(" + own + ")";
   let table = CUSTOM_CLINICAL_TABLE;
