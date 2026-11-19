@@ -552,7 +552,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .pikey .pn { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Explore: data-types rows */
-.generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 6rem; }
+.generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 4.5rem 3.5rem; }
 .generow.dtrow.is-static { cursor: default; }
 .generow.dtrow.is-static:hover { background: none; }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
