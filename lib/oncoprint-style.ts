@@ -738,6 +738,22 @@ export function clinicalLegend(t: { label: string; categories?: string[]; cells:
   return { kind: "categories", entries, more: Math.max(0, values.length - 8) };
 }
 
+/** the columns some gene row alters, in column order: the portal's alteredKeys, over which "only altered" legends read */
+export function alteredColumns(tracks: readonly { kind: string; cells: ArrayLike<number> }[]): number[] {
+  const genes = tracks.filter((t) => t.kind === "gene");
+  const n = genes[0]?.cells.length ?? 0, out: number[] = [];
+  for (let i = 0; i < n; i++) if (genes.some((t) => t.cells[i] > 0)) out.push(i);
+  return out;
+}
+
+/** a categorical clinical track with nothing to list over `shown` (the altered columns hold none of its values): no key row at all */
+export function emptyClinicalKey(t: { kind: string; categories?: string[]; cells: ArrayLike<number>; bar?: boolean; numeric?: boolean; stack?: string[]; label: string; profiledFor?: string },
+  shown?: ArrayLike<number>): boolean {
+  if (t.kind !== "clinical" || t.bar || t.numeric || t.stack || t.profiledFor || !t.categories) return false;
+  const key = clinicalLegend(t, STYLE, undefined, shown);
+  return key.kind === "categories" && !key.entries.length && !key.more;
+}
+
 /** a patient's clinical value when its samples disagree (lib/oncoprint.ts) */
 export const MIXED = "Mixed";
 const darken = (c: string): string =>

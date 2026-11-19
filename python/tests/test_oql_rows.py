@@ -145,5 +145,17 @@ class DisplayShowOql(unittest.TestCase):
             normalize_display({"showOql": "no"})
 
 
+class DisplayClinicalLegends(unittest.TestCase):
+    """The port of normalizeDisplay takes the clinical legends' three modes, as the TypeScript does (CL4)."""
+
+    def test_modes(self):
+        from cohortlab.local import normalize_display
+        self.assertEqual(normalize_display(None)["clinicalLegends"], "all")
+        for mode in ("all", "altered", "none"):
+            self.assertEqual(normalize_display({"clinicalLegends": mode})["clinicalLegends"], mode)
+        with self.assertRaises(ValueError):
+            normalize_display({"clinicalLegends": "some"})
+
+
 if __name__ == "__main__":
     unittest.main()
