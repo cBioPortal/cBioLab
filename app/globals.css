@@ -512,8 +512,16 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--t-sm); }
 
-/* Explore: numeric clinical histograms (cBioPortal study-view bins) */
-.histo { display: flex; align-items: flex-end; gap: 2px; height: 62px; }
+/* Explore: numeric clinical histograms (cBioPortal study-view bins): a y axis of counts beside
+   the bars and their tick row (app/lab/explore-sections.tsx Histogram) */
+.histowrap { display: flex; align-items: flex-start; gap: 4px; }
+.histo-main { flex: 1 1 0; min-width: 0; }
+.histo-y { position: relative; height: 62px; flex: none; border-right: 1px solid var(--line); }
+.histo-y > span {
+  position: absolute; right: 4px; transform: translateY(50%); line-height: 1;
+  font-size: var(--t-xs); color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.histo { display: flex; align-items: flex-end; gap: 2px; height: 62px; touch-action: none; user-select: none; }
 .hbar {
   position: relative; flex: 1 1 0; min-width: 10px; height: 100%;
   display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch;
@@ -526,7 +534,11 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .hbar.off .hfill { background: var(--control-line); opacity: 0.5; }
 /* the bins' labels, a row of their own under the bars (app/lab/explore-sections.tsx Histogram
    thins them to what fits, so none is cut or runs into the next) */
-.histo-ticks { display: flex; gap: 2px; }
+.histo-ticks { display: flex; gap: 2px; position: relative; }
+/* the last bin's end, at the bars' right edge (STS-BAR-3) */
+.histo-ticks > .histo-end { position: absolute; top: 0; flex: none; min-width: 0; transform: translateX(50%); }
+/* bars a drag is passing over (STS-BAR-5) */
+.hbar.dragged .hfill { background: var(--accent); opacity: 1; }
 .histo-ticks > span {
   flex: 1 1 0; min-width: 10px; text-align: left; white-space: nowrap; overflow: visible;
   font-size: var(--t-xs); color: var(--muted); font-variant-numeric: tabular-nums;

@@ -128,6 +128,18 @@ export function toggleBin(draft: CohortDef | null | undefined, attribute: string
   return { draft: replaceChart(draft, attribute, leaves.length ? asClause(leaves) : null) };
 }
 
+/**
+ * A drag across bars `from`…`to` of a clinical histogram (STS-BAR-5): those bars become the chart's
+ * selection, replacing what it held, as the portal's brush does.
+ */
+export function selectBins(draft: CohortDef | null | undefined, attribute: string, bins: NumericBin[], from: number, to: number): { draft: CohortDef } | { why: string } {
+  const lo = Math.max(0, Math.min(from, to)), hi = Math.min(bins.length - 1, Math.max(from, to));
+  const leaves = binsToLeaves(attribute, bins, bins.map((_, i) => i >= lo && i <= hi));
+  if (leaves.length > ANY_LEAF_LIMIT)
+    return { why: "a chart's selection holds at most " + ANY_LEAF_LIMIT + " separate ranges" };
+  return { draft: replaceChart(draft, attribute, leaves.length ? asClause(leaves) : null) };
+}
+
 /** the values a chart's clauses select, when they are one plain value list (`=` or `values`) */
 function chartValues(draft: CohortDef | null | undefined, attribute: string): (string | number)[] | null {
   const sel = chartSelection(draft, attribute);

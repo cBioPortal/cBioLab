@@ -1,5 +1,5 @@
 // The figures' shared layout layer (lib/chart/): measured text, number formats, ticks, axes, legends.
-import { test } from "node:test";
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { textWidth, ellipsize, wrapWidth, label } from "../lib/chart/text.ts";
 import { portalFreq, fmtNum, fmtPct, fmtP, pDigits, fmtInt, tickFormat, portalP, portalCorr, portalPMin, portalAlteredPct, portalMedianCi, portalSig2, portalPct, fmtCI95, fmtEstimateCI, fmtShare, fmtMonths, portalTipNumber, fmtFloat32, portalTrackPct, portalFixed, portalLocale, portalRange, portalRound1, portalClinicalValue, portalPercentage, portalVaf, portalEvolutionVaf } from "../lib/chart/format.ts";
@@ -13,7 +13,7 @@ test("an estimate and its 95% interval read alike in every view", () => {
   assert.deepEqual([fmtShare(3 / 0), fmtShare(NaN), fmtShare(0), fmtShare(0.4567, 0)], ["–", "–", "0%", "46%"]);
   assert.deepEqual([fmtMonths(12.34), fmtMonths(1234.5)], ["12.3 mo", "1,234.5 mo"]);
 });
-import { linear, log, symlog } from "../lib/chart/scale.ts";
+import { linear, log, symlog, countAxis } from "../lib/chart/scale.ts";
 import { axisBottom, bandLabels, leftAxisWidth } from "../lib/chart/axis.ts";
 import { legend } from "../lib/chart/legend.ts";
 import { seriesStyle, textOn } from "../lib/chart/style.ts";
@@ -203,4 +203,25 @@ test("F1: portalVaf gives 4 decimals below 0.01, otherwise 2", () => {
 test("F1 (PTB-GE-LC-6): portalEvolutionVaf is toFixed(2)", () => {
   const cases: [number, string][] = [[0.375, "0.38"], [0.0098, "0.01"], [1, "1.00"]];
   for (const [f, want] of cases) assert.equal(portalEvolutionVaf(f), want, String(f));
+});
+
+describe("a bar chart's count axis (STS-BAR-2: integer ticks only)", () => {
+  const cases: [number, number[], number][] = [
+    [219, [0, 100, 200, 300], 300],
+    [40, [0, 20, 40], 40],
+    [7, [0, 4, 8], 8],
+    [13, [0, 5, 10, 15], 15],
+    [5, [0, 2, 4, 6], 6],
+    [2, [0, 1, 2], 2],
+    [1, [0, 1], 1],
+  ];
+  for (const [max, ticks, top] of cases) test("max " + max + ": ticks " + ticks.join(", ") + ", top " + top, () => {
+    const a = countAxis(max);
+    assert.deepEqual(a.ticks, ticks);
+    assert.equal(a.top, top);
+    assert.ok(a.ticks.every(Number.isInteger));
+    assert.ok(a.top >= max, "every bar fits under the top");
+    assert.ok(a.ticks.length <= 4, "at most four labels on a short chart");
+  });
+  test("no count: a 0–1 axis, never a division by zero", () => assert.deepEqual(countAxis(0), { top: 1, ticks: [0, 1] }));
 });

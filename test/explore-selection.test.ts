@@ -3,7 +3,7 @@
 // (STS-PIE-6), and other charts' clauses are left alone.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { assayBinText, assayBinWhere, binSelected, binsToLeaves, chartSelection, naClause, naSelected, toggleBin, toggleNa, toggleValue, ANY_LEAF_LIMIT } from "../lib/explore-selection.ts";
+import { assayBinText, assayBinWhere, binSelected, selectBins, binsToLeaves, chartSelection, naClause, naSelected, toggleBin, toggleNa, toggleValue, ANY_LEAF_LIMIT } from "../lib/explore-selection.ts";
 import type { CohortDef, NumericBin } from "../lib/types.ts";
 
 // AGE as coadread draws it: ≤35, then 5-year bars to 90, then >90
@@ -123,5 +123,30 @@ describe("a generic-assay bar as a filter and a label (STS-BAR-5)", () => {
   for (const [name, b, where, text] of cases) test(name, () => {
     assert.deepEqual(assayBinWhere(b), where);
     assert.equal(assayBinText(b), text);
+  });
+});
+
+describe("a drag across bars (STS-BAR-5): they replace the chart's selection", () => {
+  const bars: NumericBin[] = [
+    { special: "<=", end: 30, count: 5 }, { start: 30, end: 40, count: 9 }, { start: 40, end: 50, count: 12 },
+    { start: 50, end: 60, count: 8 }, { special: ">", start: 60, count: 3 },
+  ];
+  const other = { kind: "clinical" as const, attribute: "SEX", values: ["Female"] };
+  test("neighbouring interval bars become one range, other charts' filters kept", () => {
+    const r = selectBins({ all: [other] }, "AGE", bars, 1, 3);
+    assert.ok("draft" in r);
+    assert.deepEqual(r.draft.all, [other, { kind: "clinical", attribute: "AGE", range: { gt: 30, lte: 60 } }]);
+  });
+  test("a drag replaces what the chart held, in its place", () => {
+    const held = { kind: "clinical" as const, attribute: "AGE", range: { gt: 50, lte: 60 } };
+    const r = selectBins({ all: [held, other] }, "AGE", bars, 2, 1);
+    assert.ok("draft" in r);
+    assert.deepEqual(r.draft.all, [{ kind: "clinical", attribute: "AGE", range: { gt: 30, lte: 50 } }, other], "either direction");
+  });
+  test("from the low outlier bar: no lower bound; to the high one: no upper bound", () => {
+    const low = selectBins(null, "AGE", bars, 0, 1), high = selectBins(null, "AGE", bars, 3, 4);
+    assert.ok("draft" in low && "draft" in high);
+    assert.deepEqual(low.draft.all, [{ kind: "clinical", attribute: "AGE", range: { lte: 40 } }]);
+    assert.deepEqual(high.draft.all, [{ kind: "clinical", attribute: "AGE", range: { gt: 50 } }]);
   });
 });

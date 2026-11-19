@@ -545,6 +545,28 @@ async function explore({ ok, BASE, page, browser }) {
     vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0;
   } catch (e) { vlDetail = String(e.message).split("\n")[0]; }
   ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first", vlOk, vlDetail);
+
+  // a histogram as the portal's bar chart (STS-BAR-2/3/5): a y axis of integer counts, and a drag
+  // across bars selects them, the rest greyed; a click on a bar still adds it
+  let barDetail = "", barOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    const chart = page.locator("[data-attr='patient|AGE']");
+    await chart.locator(".hbar[data-bar]").nth(5).waitFor({ timeout: 240000 });
+    const yTicks = await chart.locator(".histo-y span").allInnerTexts();
+    const bars = chart.locator(".hbar[data-bar]");
+    const at = async (i) => { const b = await bars.nth(i).boundingBox(); return [b.x + b.width / 2, b.y + b.height - 4]; };
+    const [ax, ay] = await at(2), [zx] = await at(4);
+    await page.mouse.move(ax, ay); await page.mouse.down();
+    await page.mouse.move(zx, ay, { steps: 8 }); await page.mouse.up();
+    await page.waitForFunction(() => /[\d,]+ patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    await page.waitForFunction(() => document.querySelectorAll("[data-attr='patient|AGE'] .hbar.on").length > 0, null, { timeout: 120000 });
+    const states = await bars.evaluateAll((els) => els.map((e) => e.classList.contains("on") ? "1" : "0").join(""));
+    const filters = new URL(page.url()).searchParams.get("filters");
+    barDetail = JSON.stringify({ yTicks, states, filters: !!filters });
+    barOk = yTicks.length >= 2 && yTicks.every((t) => /^[\d,]+$/.test(t)) && /^0011100*$/.test(states) && !!filters;
+  } catch (e) { barDetail = String(e.message).split("\n")[0]; }
+  ok("explore: a histogram has an integer y axis, and a drag across bars selects them, the others greyed", barOk, barDetail);
 }
 
 module.exports = { explore };
