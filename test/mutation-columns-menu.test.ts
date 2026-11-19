@@ -8,6 +8,7 @@ import { clinicalFreq } from "../lib/mutation-clinical-freq.ts";
 import { MUTATION_COLUMNS } from "../lib/mutation-table.ts";
 import { portalFreq } from "../lib/chart/format.ts";
 import { runMutations } from "../lib/views/mutations/run.ts";
+import { CLINICAL_TAB_BUILTINS } from "../lib/views/mutation-defaults.ts";
 import { Untimed, type ViewRun, type EvaluatedCohort } from "../lib/views/run.ts";
 import type { ViewParticipation, ViewResult } from "../lib/types.ts";
 import type { MutationsView } from "../lib/views/mutations/types.ts";
@@ -132,4 +133,9 @@ test("F6 portalFreq writes a share as the Study View does", () => {
   assert.equal(portalFreq(2 / 61 * 100), "3.3%");
   assert.equal(portalFreq(0), "0%");
   assert.equal(portalFreq(0.05), "<0.1%");
+});
+
+// the table's own columns the Clinical tab lists, and the attribute each one's Freq counts (Study of Origin: every sample)
+test("F7 CLINICAL_TAB_BUILTINS: Study of Origin, Cancer Type, Cancer Type Detailed and # Mut in Sample, with their attributes", () => {
+  assert.deepEqual([...CLINICAL_TAB_BUILTINS], [["studyOfOrigin", null], ["cancerTypeAll", "CANCER_TYPE"], ["cancerType", "CANCER_TYPE_DETAILED"], ["mutCount", "MUTATION_COUNT"]]);
 });
