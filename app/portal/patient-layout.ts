@@ -21,6 +21,8 @@ export interface PatientData {
   samples?: number;
   /** whether some mutation of the patient's has an allele frequency above 0 (variant and reference reads), once known: Genomic Evolution needs one */
   vaf?: boolean;
+  /** the patient's clinical events, once known: the Summary's timeline is laid out only with one or more */
+  events?: number | null;
 }
 
 export const PATIENT_COHORT = "Patient";
@@ -46,7 +48,8 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
   }, [
     // Summary: the clinical timeline, then the genomic overview, then the patient's alteration tables
     { title: "Summary", views: [
-      v("Clinical timeline", { kind: "timeline" }),
+      // the portal's timeline, only for a patient with a clinical event (PAT-SUM layout); laid out while the count is not known
+      ...(data.events === 0 ? [] : [v("Clinical timeline", { kind: "timeline" })]),
       // the portal's genomic overview: the patient's samples' mutations and copy-number segments along the genome, in IGV
       ...(data.held.includes("CNA") || data.held.includes("MUTATION") ? [v("Genomic overview", { kind: "segments", overview: true })] : []),
       // in sample mode, the sample's alterations alone, as the portal's sample view lists them
