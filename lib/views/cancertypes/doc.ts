@@ -11,7 +11,7 @@ export const cancertypesDoc: KindDoc = {
     {
       title: "Cancer types summary: RAS genes across 50,000 tumours",
       snapshot: "cancertypes",
-      demonstrates: "A `cancertypes` view, cBioPortal's Cancer Types Summary: the share of samples altered in at least one of a gene list per cancer type, each bar split by mutation, amplification, deep deletion, structural variant or several at once, over the samples profiled for at least one of the genes. Cancer types with fewer profiled patients than \`minSamples\` are left out, and the figure says how many.",
+      demonstrates: "A `cancertypes` view, cBioPortal's Cancer Types Summary: the share of patients altered in at least one of a gene list per cancer type, each bar split by mutation, amplification, deep deletion, structural variant or several at once, over the patients profiled for at least one of the genes (with `unit: sample`, the samples). Cancer types with fewer profiled patients than \`minSamples\` are left out, and the figure says how many.",
       tags: ["frequency", "pan-cancer"],
       note: "KRAS, NRAS and HRAS across MSK-IMPACT 50K. Pancreatic cancer leads at 82%, appendiceal and colorectal follow, and the bars show where RAS is amplified rather than mutated — germ cell tumours and esophagogastric cancer.",
       doc: {
