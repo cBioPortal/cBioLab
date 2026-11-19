@@ -21,7 +21,8 @@
  * study (test/fixtures/peer-study, served by scripts/peer-db.ts), built to hold
  * both shapes: FX-P33, FX-P35 and FX-P37 are EGFR-mutant on PEERFIX_NO_EGFR, a
  * panel without EGFR, and FX-P02 is FAT1-amplified in one sample and FAT1-deleted
- * in the other.
+ * in the other. KRAS is Gained in two samples (FX-P08-T1, FX-P21-T1), so the copy-number chart's
+ * Diploid row is checked against a click that must leave them out.
  *
  * Run: node --env-file=.env.local scripts/check-gene-facets.ts
  */
@@ -38,7 +39,7 @@ import { geneStatesClauses } from "../lib/gene-state-clauses.ts";
  * 400 on every drafted request. An undrafted-only check passed it.
  */
 const CASES = [
-  { conn: "b", study: "cbiolab_peer_fixture", genes: ["EGFR", "TP53", "FAT1"] },
+  { conn: "b", study: "cbiolab_peer_fixture", genes: ["EGFR", "TP53", "FAT1", "KRAS"] },
   { conn: "a", study: "nsclc_ctdx_msk_2022", genes: ["EGFR", "KRAS"] }
 ] as const;
 /** applied as the second pass over every case */

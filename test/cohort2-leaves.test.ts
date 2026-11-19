@@ -225,8 +225,18 @@ describe("caseList, genomicData and genericAssay leaves", () => {
     assert.match(sql, /ga\.alteration_value IN \('1','-1'\)/);
     assert.match(discreteCnaProfileSql("s1", "cbio"),
       /^\(SELECT replaceOne\(gp\.stable_id, 's1_', ''\) FROM cbio\.genetic_profile gp[\s\S]*cs\.cancer_study_identifier = 's1'[\s\S]*gp\.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp\.datatype = 'DISCRETE' ORDER BY gp\.genetic_profile_id DESC LIMIT 1\)$/);
-    assert.doesNotThrow(() => one({ kind: "genomicData", gene: "KRAS", profileType: "CNA", values: ["0"] }, { ...ctx, profiles: [] }),
-      "a study without the profile selects no sample rather than refusing, so a clause over several studies runs in each");
+  });
+  test("genomicData on profile CNA in a study without one: refused by the database naming the study and its profiles, unless ifHeld", () => {
+    const sql = one({ kind: "genomicData", gene: "KRAS", profileType: "CNA", values: ["0"] }, { ...ctx, profiles: ["log2CNA"] });
+    assert.ok(sql.includes("SELECT '' AS sid FROM system.one WHERE throwIf(ifNull(" + discreteCnaProfileSql("s1", "cbio") + ", '') = '', " +
+      "'genomicData clause: s1 has no discrete copy-number profile for profileType \\'CNA\\' (its other profiles: log2CNA); add ifHeld: true to match nobody there instead') != 0"));
+    const held = one({ kind: "genomicData", gene: "KRAS", profileType: "CNA", values: ["0"], ifHeld: true }, { ...ctx, profiles: ["log2CNA"] });
+    assert.ok(!held.includes("throwIf"), "ifHeld: a study without the profile matches nobody");
+    assert.throws(() => one({ kind: "genomicData", gene: "KRAS", profileType: "gistic", values: ["0"], ifHeld: true }, { ...ctx, profiles: ["gistic"] }),
+      /`ifHeld: true` goes with profileType 'CNA'/);
+    assert.throws(() => one({ kind: "genomicData", gene: "KRAS", profileType: "CNA", values: ["0"], ifHeld: false }), /`ifHeld: true` goes with/);
+    assert.equal(describeClause({ kind: "genomicData", gene: "KRAS", profileType: "CNA", values: ["0"], ifHeld: true }),
+      'KRAS CNA ["0"] (in each study holding it; none in a study without it)');
   });
   test("genericAssay: the study's exact profile, at the level it records, measured / values / range", () => {
     const sql = one({ kind: "genericAssay", profileType: "armlevel_cna", entity: "1p", measured: true });

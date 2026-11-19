@@ -92,7 +92,12 @@ export interface GeneStateFacet {
   per: "sample";
   /** samples in the cohort, the base of the notProfiled slice */
   total: number;
-  /** samples on a panel covering this gene */
+  /**
+   * Mutations, and copy number counting OncoKB drivers only: samples on a panel covering this gene.
+   * Copy number counting every alteration: samples with a level in the study's discrete profile, as
+   * the portal's chart counts them (its NA is a sample with none); the profile's values agree with
+   * panel coverage in the studies compared (msk_impact_2017, nsclc_ctdx_msk_2022).
+   */
   profiled: number;
   /**
    * Mutations: altered / unaltered / notProfiled. Copy number: the discrete profile's levels
@@ -160,6 +165,8 @@ export interface CaseListLeaf { kind: "caseList"; id?: string; category?: string
 export interface GenomicDataLeaf {
   kind: "genomicData"; gene: string; profileType: string;
   range?: ClinicalRange; values?: (string | number)[];
+  /** with profileType "CNA": a study without a discrete copy-number profile matches nobody rather than refusing */
+  ifHeld?: true;
 }
 export interface GenericAssayLeaf {
   kind: "genericAssay"; profileType: string; entity: string;

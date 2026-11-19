@@ -5,9 +5,9 @@
 // Whether each clause selects what its state counts is checked live by scripts/check-gene-facets.ts.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { CNA_LEVELS, DISCRETE_CNA_PROFILE, cnaLevelLabel, geneStatesClauses } from "../lib/gene-state-clauses.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE, cnaLevelLabel, driverOql, geneStatesClauses } from "../lib/gene-state-clauses.ts";
 
-const cna = (values: string[]) => ({ kind: "genomicData", gene: "KRAS", profileType: DISCRETE_CNA_PROFILE, values });
+const cna = (values: string[]) => ({ kind: "genomicData", gene: "KRAS", profileType: DISCRETE_CNA_PROFILE, values, ifHeld: true });
 
 describe("the copy-number levels", () => {
   test("the portal's five levels and labels, highest first", () => {
@@ -25,6 +25,10 @@ describe("the copy-number levels", () => {
 });
 
 describe("a copy-number chart's clauses, every alteration counted", () => {
+  test("a click matches nobody in a study without the profile, so it runs over several studies", () => {
+    const r = geneStatesClauses("KRAS", "CNA", ["amp"], false);
+    assert.ok("clauses" in r && (r.clauses[0] as { ifHeld?: boolean }).ifHeld === true);
+  });
   const cases: [string, string[], unknown][] = [
     ["one level", ["gain"], { clauses: [cna(["1"])] }],
     ["Diploid alone, without GAIN or HETLOSS", ["diploid"], { clauses: [cna(["0"])] }],
@@ -58,4 +62,11 @@ describe("the charts read from called events", () => {
   ];
   for (const [name, type, states, drivers, want] of cases)
     test(name, () => assert.deepEqual(geneStatesClauses("KRAS", type, states, drivers), want));
+});
+
+describe("driver calls", () => {
+  test("each call gets _DRIVER", () => {
+    assert.equal(driverOql("AMP HOMDEL"), "AMP_DRIVER HOMDEL_DRIVER");
+    assert.equal(driverOql("MUT"), "MUT_DRIVER");
+  });
 });

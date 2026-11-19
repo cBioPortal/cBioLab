@@ -650,7 +650,6 @@ describe("one study", () => {
       on(/AS all_altered/, [{ all_altered: 12, in_panel: 10 }]);
       on(/cna_alteration AS c, uniqExact/, [{ c: 2, n: 6 }, { c: -2, n: 3 }]);
       on(/^SELECT alteration_value AS v, uniqExact/, [{ v: "2", n: 6 }, { v: "1", n: 28 }, { v: "0", n: 50 }, { v: "-1", n: 17 }, { v: "-2", n: 1 }]);
-      on(/^SELECT uniqExact\(sample_unique_id\) AS n\nFROM cbio_a\.genetic_alteration_derived/, [{ n: 102 }]);
       on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_a\.genomic_event_derived/, [{ n: 8 }]);
       on(/^SELECT uniqExact\(sample_unique_id\) AS n\nFROM cbio_a\.sample_derived/, (q) => [{ n: /MUTATION_EXTENDED/.test(q) ? 90 : 80 }]);
       on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_a\.sample_derived\nWHERE/, [{ n: 70 }]);
@@ -680,7 +679,7 @@ describe("one study", () => {
       const cna = r.geneFacets!.find((f) => f.type === "CNA")!;
       assert.equal(cna.states.find((s) => s.state === "notProfiled")!.n, 18, "the cohort (120) less the samples with a level (102)");
       const reads = sent.filter((q) => /FROM cbio_a\.genetic_alteration_derived/.test(q));
-      assert.equal(reads.length, 2, "the levels and the samples with any level");
+      assert.equal(reads.length, 1, "one read: the levels, whose sum is the samples with one");
       for (const q of reads) {
         assert.ok(q.includes("AND profile_type = " + discreteCnaProfileSql(S, "cbio_a")));
         assert.match(q, /hugo_gene_symbol = 'KRAS'/);
@@ -714,6 +713,42 @@ describe("one study", () => {
       assert.equal(total("KRAS"), 70);
       assert.equal(total("TP53"), 1, "a gene the draft does not name keeps the draft's own size");
       assert.equal(sent.filter((q) => /^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_a\.sample_derived\nWHERE/.test(q)).length, 2);
+    });
+
+    test("each of a gene's charts leaves out its own clauses only: a copy-number click still narrows the mutation chart", async () => {
+      facetAnswers();
+      geneAnswers();
+      on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }]);
+      const draft = { all: [
+        { kind: "genomicData" as const, gene: "KRAS", profileType: "CNA", values: ["1"], ifHeld: true as const },
+        { kind: "clinical" as const, attribute: "SEX", values: ["Female"] },
+      ] };
+      const r = await buildExplore({ study: S, draft, skipBins: true, skipGenes: true, geneCharts: ["KRAS"] });
+      const total = (type: string) => r.geneFacets!.find((f) => f.type === type)!.total;
+      assert.equal(total("CNA"), 70, "the copy-number chart is counted without its own click");
+      assert.equal(total("MUTATION"), 1, "the mutation chart keeps it: the draft's own size");
+    });
+
+    test("a typed copy-number range, or an OQL copy-number call, is the copy-number chart's; a mutation call the mutation chart's", async () => {
+      for (const [clause, own] of [
+        [{ kind: "genomicData", gene: "KRAS", profileType: "CNA", range: { lte: -1 } }, null],
+        [{ kind: "oql", q: "KRAS: AMP HOMDEL" }, "CNA"],
+        [{ not: { kind: "oql", q: "KRAS: AMP" } }, "CNA"],
+        [{ kind: "oql", q: "KRAS: MUT" }, "MUTATION"],
+        [{ kind: "profiled", type: "CNA", gene: "KRAS" }, "CNA"],
+        [{ kind: "oql", q: "KRAS:" }, "both"],
+        [{ kind: "oql", q: "KRAS: MUT AMP" }, "both"],
+      ] as const) {
+        sent = []; answers = [];
+        facetAnswers();
+        geneAnswers();
+        on(/SELECT DISTINCT pid, sid FROM/, [{ pid: "P1", sid: "S1" }]);
+        const r = await buildExplore({ study: S, draft: { all: [clause as never, { kind: "clinical" as const, attribute: "SEX", values: ["Female"] }] }, skipBins: true, skipGenes: true, geneCharts: ["KRAS"] });
+        const total = (type: string) => r.geneFacets!.find((f) => f.type === type)!.total;
+        const label = JSON.stringify(clause);
+        assert.equal(total("CNA"), own === "CNA" || own === "both" ? 70 : 1, label + ": copy-number chart");
+        assert.equal(total("MUTATION"), own === "MUTATION" || own === "both" ? 70 : 1, label + ": mutation chart");
+      }
     });
 
     test("a gene whose own clause is the whole draft is counted over the whole study", async () => {

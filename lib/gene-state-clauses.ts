@@ -31,6 +31,14 @@ export function cnaLevelLabel(value: string | number): string {
 type GeneType = "MUTATION" | "CNA";
 
 /**
+ * OQL alterations as driver calls (MUT_DRIVER, AMP_DRIVER…): what the charts' clicks select when they
+ * count OncoKB drivers only, so a click selects exactly the samples its number counts.
+ */
+export function driverOql(calls: string): string {
+  return calls.split(" ").map((c) => c + "_DRIVER").join(" ");
+}
+
+/**
  * The clauses that select any of several states of one gene's chart, or why that cannot be one
  * filter. `drivers`: the chart counts OncoKB driver calls only (its states are then altered / amp /
  * del / unaltered / notProfiled, read from the driver-annotated events).
@@ -41,7 +49,8 @@ type GeneType = "MUTATION" | "CNA";
  */
 export function geneStatesClauses(gene: string, type: GeneType, states: string[], drivers: boolean): { clauses: unknown[] } | { why: string } {
   if (type === "CNA" && !drivers) {
-    const level = (vals: number[]) => ({ kind: "genomicData", gene, profileType: DISCRETE_CNA_PROFILE, values: vals.map(String) });
+    // ifHeld: over several studies, one without the profile has none of these samples rather than refusing
+    const level = (vals: number[]) => ({ kind: "genomicData", gene, profileType: DISCRETE_CNA_PROFILE, values: vals.map(String), ifHeld: true });
     const picked = CNA_LEVELS.filter((l) => states.includes(l.state)).map((l) => l.value);
     if (!states.includes("notProfiled")) return picked.length ? { clauses: [level(picked)] } : { why: "no state is checked" };
     const rest = CNA_LEVELS.filter((l) => !states.includes(l.state)).map((l) => l.value);
@@ -49,7 +58,7 @@ export function geneStatesClauses(gene: string, type: GeneType, states: string[]
     return { clauses: [{ not: level(rest) }] };
   }
   const prof = { kind: "profiled", type, gene };
-  const oql = (calls: string) => ({ kind: "oql", q: gene + ": " + (drivers ? calls.split(" ").map((c) => c + "_DRIVER").join(" ") : calls) });
+  const oql = (calls: string) => ({ kind: "oql", q: gene + ": " + (drivers ? driverOql(calls) : calls) });
   const calls: Record<string, string> = type === "CNA" ? { amp: "AMP", del: "HOMDEL" } : { altered: "MUT" };
   if (states.length === 1) {
     const s = states[0];

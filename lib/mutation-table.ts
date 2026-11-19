@@ -8,7 +8,7 @@ import { mutationStudySql, sq } from "./compiler.ts";
 import { whereSql, type QueryColumn, type RowSource, type TableQuery } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS, LOLLIPOP_OWN_FILTERS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
-import { inCohortSamples } from "./cohort2.ts";
+import { discreteCnaProfileSql, inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
@@ -237,9 +237,7 @@ function copyNumberCte(p: TablePart, i: number, db: string): string {
   const pre = sq(p.study + "_");
   return "cn" + i + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, hugo_gene_symbol AS g, any(" + finiteSql("alteration_value") + ") AS v\n" +
     "  FROM " + db + ".genetic_alteration_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND profile_type = (SELECT replaceOne(gp.stable_id, " + pre + ", '') FROM " + db + ".genetic_profile gp\n" +
-    "      JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = " + sq(p.study) + "\n" +
-    "        AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)\n" +
+    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND profile_type = " + discreteCnaProfileSql(p.study, db) + "\n" +
     "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM (SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i + "))\n" +
     "  GROUP BY sid, g)";
 }

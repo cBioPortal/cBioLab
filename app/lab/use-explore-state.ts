@@ -37,7 +37,7 @@ export type GroupsTarget = "comparison" | "analysis";
 export type EditingCohort = { id: string; name: string; def: CohortDef };
 
 import { toggleQueued } from "../../lib/study-view-gene-tables.ts";
-import { geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
+import { driverOql, geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
 
@@ -586,7 +586,7 @@ export function useExploreState(page: ExplorePage) {
    * An OQL alteration as the facets on screen count it: a driver call (MUT_DRIVER, AMP_DRIVER…)
    * when they count OncoKB drivers only, so a click selects exactly the samples its number counts.
    */
-  const callOql = (calls: string): string => explore?.drivers ? calls.split(" ").map((c) => c + "_DRIVER").join(" ") : calls;
+  const callOql = (calls: string): string => explore?.drivers ? driverOql(calls) : calls;
 
   /** the clauses that select any of several states of one gene's facet, or why that cannot be one filter */
   const geneStatesClauses = (gene: string, type: "MUTATION" | "CNA", states: string[]): { clauses: any[] } | { why: string } =>

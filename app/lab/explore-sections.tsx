@@ -1088,16 +1088,18 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
   return <>
     {(explore.geneFacets || []).map(f => {
       const apply = (states: string[]) => geneStatesClauses(f.gene, f.type, states);
+      // the copy-number levels the portal draws: none at 0 (the drivers-only chart keeps its fixed rows)
+      const states = f.type === "CNA" && !explore.drivers ? f.states.filter((st) => st.n > 0) : f.states;
       return (
         <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
           <div className="facettitle">
             {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
             <span className="meta"> · sample-level · {f.total.toLocaleString()} samples</span>
             <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
-              f.states.filter((st) => f.type !== "CNA" || st.n > 0).map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg)]} />
+              states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg)]} />
           </div>
           <ValueList hint={"keep the samples in any of the checked states of " + f.gene}
-            rows={f.states.filter((st) => f.type !== "CNA" || st.n > 0).map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",
+            rows={states.map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",
               title: st.label + " — " + st.n.toLocaleString() + " samples" }))}
             why={(states) => { const r = apply(states); return "why" in r ? r.why : null; }}
             onApply={(states) => { const r = apply(states); if ("clauses" in r) addClauses(r.clauses); }} />
