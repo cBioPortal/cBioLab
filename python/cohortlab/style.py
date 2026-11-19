@@ -447,8 +447,12 @@ def glyph_presence(codes: Any, S: dict[str, Any] = STYLE) -> dict[str, Any]:
 
     `codes` may repeat; pass distinct ones (np.unique) for a large contract."""
     B, G = S["bits"], S["glyph"]
-    out = {"bits": 0, "mutDriver": 0, "mutVus": 0, "svDriver": False, "svVus": False, "germline": False}
-    for c in {int(x) for x in codes if int(x) > 0}:
+    out = {"bits": 0, "mutDriver": 0, "mutVus": 0, "svDriver": False, "svVus": False, "germline": False,
+           "profiled": False, "notProfiled": False}
+    distinct = {int(x) for x in codes}
+    out["profiled"] = any(c >= 0 for c in distinct)
+    out["notProfiled"] = -1 in distinct
+    for c in {c for c in distinct if c > 0}:
         out["bits"] |= c
         if c & B[G["sv"]["bit"]]:
             out["svDriver" if c & B["SV_DRIVER"] else "svVus"] = True
@@ -489,7 +493,11 @@ def gene_legend(S: dict[str, Any] = STYLE, present: dict[str, Any] | None = None
     items += [(o["label"], o["color"], "swatch") for o in G["cna"]["options"] if has(o["bit"])]
     items += [(o["label"], o["color"], "outline") for o in G["mrna"]["options"] if has(o["bit"])]
     items += [(o["label"], o["color"], "swatch") for o in G["protein"]["options"] if has(o["bit"])]
-    items.append((G["notProfiled"]["label"], G["notProfiled"]["stripe"]["color"], "notProfiled"))
+    # last, as the portal's: the grey cell whenever a cell is profiled, Not profiled only when some cell is not
+    if present is None or present.get("profiled"):
+        items.append((G["unalteredLabel"], S["palette"]["unaltered"], "swatch"))
+    if present is None or present.get("notProfiled"):
+        items.append((G["notProfiled"]["label"], G["notProfiled"]["stripe"]["color"], "notProfiled"))
     seen: set[tuple[str, str]] = set()
     out = []
     for it in items:

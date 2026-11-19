@@ -209,7 +209,7 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
         if "freqPct" in t.meta:
             ax.text(gutter - 8, y, format_gutter_pct(t.meta, c.n), fontsize=7.5, color=P["muted"], va="center", ha="right")
     gene_cells = np.concatenate([np.asarray(t.cells) for t in c.tracks if t.kind == "gene"] or [np.zeros(0, dtype=np.int32)])
-    present = glyph_presence(np.unique(gene_cells[gene_cells > 0]), S)
+    present = glyph_presence(np.unique(gene_cells), S)
     handles = [Patch(color=color, label=label) for label, color, kind in gene_legend(S, present)]
     if any(t.kind == "derivedEvent" for t in c.tracks):
         handles.append(Patch(color=P["derived"], label="Derived event"))

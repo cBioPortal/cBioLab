@@ -35,7 +35,10 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   // gene legend, wrapped to the available width; each row is 16 px
   // only the alterations these cells actually carry
   const items: { label: string; color: string; kind: string }[] = geneLegend(S, glyphPresence(contract.tracks as { kind: string; cells: ArrayLike<number> }[], S));
-  if (contract.tracks.some((t) => t.kind === "derivedEvent")) items.splice(items.length - 1, 0, { label: "Derived event", color: P.derived, kind: "swatch" });
+  if (contract.tracks.some((t) => t.kind === "derivedEvent")) {
+    const tail = items.findIndex((it) => it.label === S.glyph.unalteredLabel || it.kind === "notProfiled");
+    items.splice(tail < 0 ? items.length : tail, 0, { label: "Derived event", color: P.derived, kind: "swatch" });
+  }
   const itemW = (label: string): number => 14 + label.length * 6.2 + 16;
   const legendRows: typeof items[] = [[]];
   { let lx = GUTTER; for (const it of items) { if (lx + itemW(it.label) > width - 8 && legendRows[legendRows.length - 1].length) { legendRows.push([]); lx = GUTTER; } legendRows[legendRows.length - 1].push(it); lx += itemW(it.label); } }

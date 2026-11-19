@@ -550,7 +550,9 @@ export interface LegendItem { label: string; color: string; kind: "swatch" | "ou
  * entry is the one `cellLayers` picks by priority, not every class a cell carries, so a legend
  * never lists a colour the figure does not show.
  */
-export interface GlyphPresence { bits: number; mutDriver: number; mutVus: number; svDriver: boolean; svVus: boolean; germline?: boolean }
+export interface GlyphPresence { bits: number; mutDriver: number; mutVus: number; svDriver: boolean; svVus: boolean; germline?: boolean;
+  /** some gene cell is profiled (the portal's always rule, "No alterations", is used), and some is not ("Not profiled") */
+  profiled?: boolean; notProfiled?: boolean }
 export function glyphPresence(tracks: readonly { kind: string; cells: ArrayLike<number> }[], S: Style = STYLE): GlyphPresence {
   const B = S.bits as Record<string, number>;
   const out: GlyphPresence = { bits: 0, mutDriver: 0, mutVus: 0, svDriver: false, svVus: false, germline: false };
@@ -559,7 +561,7 @@ export function glyphPresence(tracks: readonly { kind: string; cells: ArrayLike<
   for (const t of tracks) {
     if (t.kind !== "gene") continue;
     const cs = t.cells;
-    for (let i = 0; i < cs.length; i++) { const c = cs[i]; if (c > 0) seen.add(c); }
+    for (let i = 0; i < cs.length; i++) { const c = cs[i]; if (c > 0) seen.add(c); if (c >= 0) out.profiled = true; else if (c === -1) out.notProfiled = true; }
   }
   for (const c of seen) {
     out.bits |= c;
@@ -593,7 +595,10 @@ export function geneLegend(S: Style = STYLE, present?: GlyphPresence): LegendIte
   for (const o of G.cna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "swatch" });
   for (const o of G.mrna.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "outline" });
   for (const o of G.protein.options) if (has(o.bit)) items.push({ label: o.label, color: o.color, kind: "swatch" });
-  items.push({ label: G.notProfiled.label, color: G.notProfiled.stripe.color, kind: "notProfiled" });
+  // last, as the portal's (both at legend order infinity, then by label): the grey cell whenever a cell is profiled,
+  // and Not profiled only when some cell is not
+  if (!present || present.profiled) items.push({ label: G.unalteredLabel, color: S.palette.unaltered, kind: "swatch" });
+  if (!present || present.notProfiled) items.push({ label: G.notProfiled.label, color: G.notProfiled.stripe.color, kind: "notProfiled" });
   // colour-by-type off gives every mutation class one label and colour; list it once
   const seen = new Set<string>();
   return items.filter((it) => { const k = it.label + it.color; return seen.has(k) ? false : (seen.add(k), true); });
