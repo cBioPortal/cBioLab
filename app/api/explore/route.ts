@@ -1,5 +1,5 @@
 import { parseBody, ExploreRequest } from "../../../lib/api-schemas.ts";
-import { buildExplore, buildExploreFederated, buildAssayFacets } from "../../../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets, buildMutationTypeFacets } from "../../../lib/explore.ts";
 import { ENTITY_RE } from "../../../lib/generic-assay.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
@@ -113,8 +113,14 @@ async function exploreFor(body: any) {
   }));
   // every study's profiles as it describes them (a peer's from the peer), once per profile id, for a plot axis's Data picker
   const profileCatalog = [...new Map(studies.flatMap((st) => (profilesByStudy.get(st)?.catalog || []).map((p: ProfileInfo) => [p.profile, p] as const))).values()];
+  // a peer's studies are not counted in these tables: its federation API has no mutation-type
+  // counts, so each table names them
+  const mutationTypeFacets = body.mutationTypeCharts && body.mutationTypeCharts.length
+    ? await buildMutationTypeFacets({ studies: local, draft, oncokbPin: pin, profilesByStudy, connByStudy, genes: body.mutationTypeCharts, leftOut: remote })
+    : undefined;
+  const mt = mutationTypeFacets ? { mutationTypeFacets } : {};
   if (!local.length) {
-    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog };
+    return { ...(remoteParts.length === 1 ? remoteParts[0] : mergeExplore(remoteParts)), profileCatalog, ...mt };
   }
   const { catalog: _c, ...oneProfiles } = profilesByStudy.get(local[0]) || {};
   const localResult = local.length === 1
@@ -126,5 +132,5 @@ async function exploreFor(body: any) {
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}) };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...mt };
 }

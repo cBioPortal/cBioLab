@@ -24,6 +24,8 @@ export interface ExploreRequest {
   /** narrows the server's work to the attributes that will be shown; empty asks for all */
   attributes: string[];
   geneCharts: string[];
+  /** genes charted as a mutation-type table each */
+  mutationTypeCharts: string[];
   /** generic-assay entities charted one each */
   assayCharts: { profileType: string; entity: string }[];
   /** the derived facets to compute; the server computes none it is not asked for */
@@ -76,6 +78,7 @@ export function useExplore(onError: (message: string) => void) {
         ...(r.attributes.length ? { attributes: r.attributes } : {}),
         ...(r.geneCharts.length ? { geneCharts: r.geneCharts } : {}),
         ...(r.assayCharts.length ? { assayCharts: r.assayCharts } : {}),
+        ...(r.mutationTypeCharts.length ? { mutationTypeCharts: r.mutationTypeCharts } : {}),
         ...(r.derived.length ? { derived: r.derived } : {}),
         ...(r.drivers ? { drivers: true } : {}),
         ...(Object.keys(r.bins || {}).length ? { bins: r.bins } : {}),

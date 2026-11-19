@@ -585,6 +585,9 @@ main.analysis-main { max-width: min(132rem, 100%); }
   /* every value is present; the list scrolls rather than being trimmed */
   max-height: var(--vallist-h); overflow-y: auto; overscroll-behavior: contain;
 }
+/* checkbox · name · a second count in place of the bar · count · share */
+.vallist.withextra { --valrow-cols: calc(0.75rem + 2px) 1fr minmax(2.5rem, auto) minmax(2.5rem, auto) 3.25rem; }
+.vallist.withextra .valhead > span:nth-child(3) { text-align: right; }
 .vlistfoot { display: block; margin-top: var(--s1); }
 .valrow {
   /* name · a thin proportion rule · count · share — the bar is a hint at

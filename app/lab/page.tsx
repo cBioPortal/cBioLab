@@ -34,7 +34,7 @@ import { ExamplesTab } from "./examples-tab.tsx";
 import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
-import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, AssayFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
@@ -430,7 +430,7 @@ export default function AnalysisPage() {
     } catch { return []; }
   });
   const exploreState = useExploreState({ linkedStudies, addCohortToView: (...a) => addCohortToView(...a), analysisStudies, canSave, doc, docs, evalDef, featureSaved, goTab, persist, proposePartition, runEdited, setError, setStudy, setToast, study });
-  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
+  const { openEditCohort, saveEditedCohort, setAddChartOpen, addClause, addClauses, addDraftToAnalysis, addMode, analyzeDraft, barDef, clearDraft, closeAddCohort, exMsg, exSel, exStudies, explore, exploreBusy, fetchExplore, geneCharts, mutationTypeCharts, drivers, setDrivers, openAddCohort, openCustomManager, parseDraft, removeDraftClause, setExStudies, setExploreStudies, visibleClinical } = exploreState;
   // The saved-work manager, opened over this page, opens what is chosen in it here, in place
   const savedWork = useSaved();
   /** one of the reader's saved cohorts open in Explore to change its filters; false while their list has not arrived */
@@ -628,7 +628,7 @@ export default function AnalysisPage() {
                 return shown < all && <span className="meta" data-charted={shown + "/" + all}>
                   {shown} of {all.toLocaleString()} clinical attributes charted — the rest are in Add chart</span>;
               })()}
-              {geneCharts.length > 0 && <span className="meta">{geneCharts.length} gene{geneCharts.length === 1 ? "" : "s"} charted</span>}
+              {geneCharts.length + mutationTypeCharts.length > 0 && <span className="meta">{geneCharts.length + mutationTypeCharts.length} gene chart{geneCharts.length + mutationTypeCharts.length === 1 ? "" : "s"}</span>}
               {(() => {
                 // drivers only where every selected study has OncoKB calls here; the server refuses the rest too
                 const without = exStudies.filter((id) => studies.find((x) => x.id === id)?.oncokb === false);
@@ -665,6 +665,7 @@ export default function AnalysisPage() {
                   so a chart you configured actually reaches this grid rather than only
                   living inside the dialog that configured it. */}
               <GeneFacets ctx={exploreCtx} />
+              <MutationTypeFacets ctx={exploreCtx} />
               <AssayFacets ctx={exploreCtx} />
               <StudyBreakdown ctx={exploreCtx} />
               <DataTypes ctx={exploreCtx} />
