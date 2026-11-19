@@ -104,6 +104,23 @@ test("K6 clinicalQueryColumn: num only for NUMBER; the text reads the sample map
   assert.match(sn.text, /\bclinS\b/);
 });
 
+// Legacy (cbioportal-frontend cd8c6df, ClinicalAttributeColumnFormatter): a column carries ONE attribute
+// description (the first queried study's) and every row is read at that level —
+// `entityId: attribute.patientAttribute ? d[0].patientId : d[0].sampleId` — so a row of a study that
+// records the attribute at the other level is blank.
+test("K7 a column reads only its description's level: a row recording the attribute at the other level is blank", () => {
+  const ageSample: ClinicalColumn = { ...AGE_COL, per: "sample" };
+  assert.equal(clinicalValue({ [CLIN_SAMPLE]: {}, [CLIN_PATIENT]: { AGE: "42" } }, ageSample), null, "K7a");
+  assert.equal(clinicalValue({ [CLIN_SAMPLE]: { AGE: "7" }, [CLIN_PATIENT]: {} }, ageSample), 7, "K7b");
+  assert.equal(clinicalValue({ [CLIN_SAMPLE]: { AGE: "7" }, [CLIN_PATIENT]: {} }, AGE_COL), null, "K7c");
+  const s = clinicalQueryColumn(ageSample);
+  assert.match(s.text, /\bclinS\b/, "K7d sample");
+  assert.doesNotMatch(s.text, /\bclinP\b/, "K7d sample");
+  const p = clinicalQueryColumn(AGE_COL);
+  assert.match(p.text, /\bclinP\b/, "K7d patient");
+  assert.doesNotMatch(p.text, /\bclinS\b/, "K7d patient");
+});
+
 // ---- R: runMutations / runHotspots over stand-in resolvers ---------------------------------------
 
 const DISCRETE_CNA: ProfileInfo = { profile: "gistic", type: "COPY_NUMBER_ALTERATION", datatype: "DISCRETE", name: "Putative copy-number alterations from GISTIC", order: 0 };

@@ -13,6 +13,7 @@ import { z } from "zod";
 import { PAGE_ROWS_MAX } from "./table-pager.ts";
 import { ATTR_NAME_RE } from "./custom-data-names.ts";
 import { VIOLIN_CHART_LIMIT } from "./study-view-violin.ts";
+import { BIOMARKERS } from "./biomarkers.ts";
 import type { CohortDef, View } from "./types.ts";
 import type { OncoprintSpec } from "./views/oncoprint/types.ts";
 
@@ -172,6 +173,13 @@ export const GenesRequest = z.object({
   panel: z.object({ id: z.string().regex(/^[A-Za-z0-9._ -]{1,120}$/), study: z.string().regex(/^[A-Za-z0-9._-]{1,120}$/) }).optional(),
 });
 
+/** POST /api/biomarkers — OncoKB's stored TMB-H / MSI-H calls at one tumour type (null: the study's), for the Patient page header. */
+export const BiomarkersRequest = z.object({
+  study: z.string().regex(/^[A-Za-z0-9._-]{1,120}$/),
+  tumorType: z.string().max(200).nullable(),
+  alterations: z.array(z.enum(BIOMARKERS)).max(BIOMARKERS.length),
+});
+
 /** POST /api/assay-entities — a generic-assay profile's entities matching `q`, for an axis's entity picker. */
 export const AssayEntitiesRequest = z.object({
   study: z.string().regex(/^[A-Za-z0-9._-]{1,120}$/),
@@ -194,6 +202,7 @@ export type ViewPageBody = z.input<typeof ViewPageRequest>;
 export type TableBody = z.input<typeof TableRequest>;
 export type LockBody = z.input<typeof LockRequest>;
 export type GenesBody = z.input<typeof GenesRequest>;
+export type BiomarkersBody = z.input<typeof BiomarkersRequest>;
 export type AssayEntitiesBody = z.input<typeof AssayEntitiesRequest>;
 
 /**

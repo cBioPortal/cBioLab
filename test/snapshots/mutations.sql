@@ -12,6 +12,35 @@
   WHERE cancer_study_identifier = 'msk_chord_2024'
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer'))))))
 
+-- view 0 mutations: mutations:clinical-freq · msk_chord_2024
+WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS pid, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid FROM snapshot_db.sample_derived
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND (('sample', replaceOne(sample_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))) OR ('patient', replaceOne(patient_unique_id, 'msk_chord_2024_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'msk_chord_2024_', ''), replaceOne(patient_unique_id, 'msk_chord_2024_', '')) AS id
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024'
+    AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Colorectal Cancer')))))))
+SELECT '' AS a, uniqExact(sid) AS n FROM cohort
+UNION ALL
+SELECT a, uniqExact(sid) AS n FROM (
+  SELECT v.a AS a, c.sid AS sid FROM cohort AS c JOIN (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS k, attribute_name AS a
+    FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_value != '' AND attribute_name IN ('CLINICAL_GROUP', 'CLINICAL_SUMMARY', 'DIAGNOSIS_DESCRIPTION', 'ICD_O_HISTOLOGY_DESCRIPTION', 'PATHOLOGICAL_GROUP', 'OS_STATUS', 'SAMPLE_TYPE', 'RACE', 'GENDER', 'STAGE_HIGHEST_RECORDED', 'ETHNICITY', 'MSI_TYPE', 'GENE_PANEL', 'CURRENT_AGE_DEID', 'SMOKING_PREDICTIONS_3_CLASSES', 'SOMATIC_STATUS', 'SAMPLE_CLASS', 'PRIOR_MED_TO_MSK', 'GLEASON_HIGHEST_REPORTED', 'HISTORY_OF_PDL1', 'NUM_ICDO_DX', 'FRACTION_GENOME_ALTERED', 'SAMPLE_COUNT', 'TMB_NONSYNONYMOUS', 'GLEASON_SAMPLE_LEVEL', 'GLEASON_FIRST_REPORTED', 'HER2', 'HR', 'MSI_COMMENT', 'MSI_SCORE', 'METASTATIC_SITE', 'ONCOTREE_CODE', 'OS_MONTHS', 'PRIMARY_SITE', 'PDL1_POSITIVE', 'SAMPLE_COVERAGE', 'TUMOR_PURITY', 'ADRENAL_GLANDS', 'BONE', 'CNS_BRAIN', 'INTRA_ABDOMINAL', 'LIVER', 'LUNG', 'LYMPH_NODES', 'OTHER', 'PLEURA', 'REPRODUCTIVE_ORGANS', 'CANCER_TYPE', 'CANCER_TYPE_DETAILED', 'MUTATION_COUNT')
+  ) AS v ON v.k = c.sid
+  UNION ALL
+  SELECT v.a AS a, c.sid AS sid FROM cohort AS c JOIN (SELECT replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS k, attribute_name AS a
+    FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+    WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient' AND attribute_value != '' AND attribute_name IN ('CLINICAL_GROUP', 'CLINICAL_SUMMARY', 'DIAGNOSIS_DESCRIPTION', 'ICD_O_HISTOLOGY_DESCRIPTION', 'PATHOLOGICAL_GROUP', 'OS_STATUS', 'SAMPLE_TYPE', 'RACE', 'GENDER', 'STAGE_HIGHEST_RECORDED', 'ETHNICITY', 'MSI_TYPE', 'GENE_PANEL', 'CURRENT_AGE_DEID', 'SMOKING_PREDICTIONS_3_CLASSES', 'SOMATIC_STATUS', 'SAMPLE_CLASS', 'PRIOR_MED_TO_MSK', 'GLEASON_HIGHEST_REPORTED', 'HISTORY_OF_PDL1', 'NUM_ICDO_DX', 'FRACTION_GENOME_ALTERED', 'SAMPLE_COUNT', 'TMB_NONSYNONYMOUS', 'GLEASON_SAMPLE_LEVEL', 'GLEASON_FIRST_REPORTED', 'HER2', 'HR', 'MSI_COMMENT', 'MSI_SCORE', 'METASTATIC_SITE', 'ONCOTREE_CODE', 'OS_MONTHS', 'PRIMARY_SITE', 'PDL1_POSITIVE', 'SAMPLE_COVERAGE', 'TUMOR_PURITY', 'ADRENAL_GLANDS', 'BONE', 'CNS_BRAIN', 'INTRA_ABDOMINAL', 'LIVER', 'LUNG', 'LYMPH_NODES', 'OTHER', 'PLEURA', 'REPRODUCTIVE_ORGANS', 'CANCER_TYPE', 'CANCER_TYPE_DETAILED', 'MUTATION_COUNT')
+  ) AS v ON v.k = c.pid
+) GROUP BY a
+
+
 -- view 0 mutations: mutations:counts · msk_chord_2024
 WITH ann AS (SELECT alteration, c.1 AS oncogenicity, c.2 AS level, c.3 AS resistance_level, CAST(NULL AS Nullable(String)) AS diagnostic_level,
     CAST(NULL AS Nullable(String)) AS prognostic_level, toUInt8(c.1 IN ('Oncogenic', 'Likely Oncogenic', 'Resistance')) AS driver

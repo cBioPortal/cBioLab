@@ -17,6 +17,8 @@ import type { PatientEvent, PatientSample } from "../../lib/types";
 import { cleanAndDerive, inlineAttributes, liftCommon, type Attrs } from "./patient-attrs.ts";
 import { GenePanelValue, useGenePanelDialog } from "../lab/gene-panel-dialog.tsx";
 import { GENE_PANEL_ATTRIBUTE } from "../../lib/gene-panel-list.ts";
+import { AnnotationBadge } from "../lab/portal-bodies.tsx";
+import { biomarkerCallText, biomarkerTumorType, sampleBiomarkers, type Biomarker, type BiomarkerCall } from "../../lib/biomarkers.ts";
 
 /** an attribute's id and display name, and its value */
 type Field = { id: string; name: string; value: string };
@@ -97,6 +99,48 @@ function HoverCard({ title, fields, children, openPanel }: { title: string; fiel
   );
 }
 
+/** OncoKB's TMB-H / MSI-H calls for the shown samples, by biomarker; `error` when they could not be read */
+type BiomarkerCalls = { calls: Map<Biomarker, BiomarkerCall>; error: string | null };
+
+/**
+ * OncoKB's TMB-H / MSI-H calls for the shown samples: asked at the one tumour type the shown samples
+ * give (lib/biomarkers.ts), once per page. None while loading or when the store has none, as the
+ * portal shows none until OncoKB answers; a failed read is an error, not "no call".
+ */
+function useBiomarkerCalls(study: string, shown: { id: string; attrs: Attrs }[]): BiomarkerCalls {
+  const [out, setOut] = useState<BiomarkerCalls>({ calls: new Map(), error: null });
+  const wanted = [...new Set(shown.flatMap((s) => sampleBiomarkers(s.attrs)))].sort();
+  const tumorType = biomarkerTumorType(shown);
+  const key = JSON.stringify([study, tumorType, wanted]);
+  useEffect(() => {
+    const [st, tt, alterations] = JSON.parse(key) as [string, string | null, Biomarker[]];
+    setOut({ calls: new Map(), error: null });
+    if (!alterations.length) return;
+    const ctl = new AbortController();
+    api.biomarkers({ study: st, tumorType: tt, alterations }, { signal: ctl.signal })
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({})) as { calls?: BiomarkerCall[]; error?: string };
+        if (!r.ok || j.error) throw new Error(j.error || "HTTP " + r.status);
+        setOut({ calls: new Map((j.calls || []).map((c) => [c.alteration, c])), error: null });
+      })
+      .catch((e) => { if (!ctl.signal.aborted) setOut({ calls: new Map(), error: String((e as Error)?.message || e) }); });
+    return () => ctl.abort();
+  }, [key]);
+  return out;
+}
+
+/** A sample's TMB-H / MSI-H, each with OncoKB's call, after its attributes (SampleSummaryList); a marker when the calls could not be read. */
+function BiomarkerBadges({ attrs, calls: { calls, error } }: { attrs: Attrs; calls: BiomarkerCalls }) {
+  const mine = sampleBiomarkers(attrs);
+  if (error && mine.length) return <span className="text-muted-foreground" data-attr="biomarkers-failed" data-tip={"OncoKB's " + mine.join(" / ") + " call could not be loaded: " + error}>
+    , {mine.join(", ")}: couldn&apos;t load</span>;
+  return <>{mine.map((b) => {
+    const call = calls.get(b);
+    return call && <span key={b} data-attr={b} data-tip={call.summary || undefined}>
+      , <span className="inline-flex items-center gap-1">{b}<AnnotationBadge text={biomarkerCallText(call)} /></span>
+    </span>;
+  })}</>;
+}
 
 export function PatientHeader({ record, study, sample, hrefFor }: {
   record: PatientRecord;
@@ -117,6 +161,7 @@ export function PatientHeader({ record, study, sample, hrefFor }: {
   // the gene panel window a sample's "Gene Panel" value opens (PAT-GP-4)
   const panels = useGenePanelDialog(study);
   const shown = samples.filter((s) => !sample || s.id === sample).sort((a, b) => order(a.id) - order(b.id));
+  const calls = useBiomarkerCalls(study, shown.map((s) => ({ id: s.id, attrs: attrsOf(s.fields) })));
   return (<>
     <table data-tw className="patient-header mt-3 border-separate border-spacing-x-0 border-spacing-y-1 text-md">
       <tbody>
@@ -141,6 +186,7 @@ export function PatientHeader({ record, study, sample, hrefFor }: {
                   </Link>
                 </HoverCard>
                 <InlineAttrs attrs={s.attrs} />
+                <BiomarkerBadges attrs={attrsOf(s.fields)} calls={calls} />
               </div>
             ))}
             {sample && record.samples.length > 1 && (

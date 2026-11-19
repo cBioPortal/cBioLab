@@ -120,8 +120,8 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 |---|---|---|---|
 | MUT-GT-1 | ✅ | B | One chip per query gene, query order (KRAS NRAS BRAF TP53 APC) |
 | MUT-GT-2 | ✅ | B | Symbol only; a gene with no mutation in the tab (its mutations and fusion rows, under the query's OQL where the tab follows it) greyed, still clickable (coadread_tcga_pub MYC, CDKN2A as cbioportal.org) (`mutationsChipEmpties`) (#425) |
-| MUT-GT-3 | 🟡 | B | Unchanged: first gene default ✅; active gene in the document, not `mutations_gene`; not shared with the SV tab |
-| MUT-GT-4 | 🔶 | C | Unchanged: switching gene clears sort, search, filters and codons (`results-layout.ts:328`) |
+| MUT-GT-3 | 🟡 | B | First gene default ✅; the active gene is the document's, not `mutations_gene`, not shared with the SV tab: kept by decision (user, 2026-11-19) |
+| MUT-GT-4 | 🔶 | C | Switching gene clears sort, search, filters, badges and codons (`results-layout.ts`): kept by decision (user, 2026-11-19; invariant 9) |
 
 ### §2 Layout and header column
 
@@ -246,14 +246,14 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-TB-3 | ✅ | B | Search "G12D" → table 59 of 223, the lollipop and badges 59 too (the hotspots view's `table`, `linkMutations`) |
 | MUT-TB-4 | ✅ | B | ‹ Show more › with Reset, 25 → 50 → 100 → 200, hidden at ≤ 25 rows, no per-page select (`lib/table-pager.ts`, ShowMorePager) (#409) |
 | MUT-TB-5 | 🟡 | B | Unchanged: one list "Columns (6 of 35)"; no Clinical tab, no Freq |
-| MUT-TB-6 | 🟡 | BC | Unchanged |
+| MUT-TB-6 | 🟡 | BC | The portal's nine text conditions in its order, case-insensitive but regex, no text keeps every row (#463); no numeric slider, no per-value counts or Compare |
 | MUT-TB-7 | ❌ | B | Unchanged: no annotation filter |
 | MUT-TB-8 | ✅ | BC | table.tsv: every row in the current sort whatever the search and filters, every column by name, tab-separated, CRLF (`lib/table-tsv.ts`, /api/table format table-tsv) (#411) |
 | MUT-TB-9 | ✅ | BC | Was 🔶: default order is the Annotation column descending, then codon (`lib/mutation-table.ts:398`) (#309). KRAS's first row is still A11_G12dup where the portal's is G12C, because every KRAS row carries the gene's "Level 1" (MUT-AN-3), so they tie |
 | MUT-FM-1 | 🟡 | B | Search and header filters now reach the lollipop and badges; no mutation-status filter (FM-2) or tracks |
 | MUT-FM-2 | ✅ | BC | The mutation-status filter is the badges: status lower-cased equals the kept one, both off keeps none, both on no filter; lollipop, impact badges and table follow, rates do not (`lib/lollipop.ts` statusFilter, `linkMutations`) (#396) |
 | MUT-FM-3 | ✅ | B | A stem selection narrows only the table; badge counts ignore the badge filter; Somatic Mutation Frequency ignores every in-tab filter |
-| MUT-FM-4 | 🔶 | C | Unchanged |
+| MUT-FM-4 | 🔶 | C | Filters live in the document (invariant 9), not per gene in the browser: kept by decision (user, 2026-11-19) |
 | MUT-FM-5 | 🟡 | B | The filtered table's count says "(n samples / m patients)", as the portal's reset panel; in the table's title, not a panel on the lollipop; no Study View link (#307) |
 
 ### §9 Modes and conditions
@@ -282,7 +282,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-STM-1 | 🟡 | BC | KRAS 36.7 %, TP53 52.9 %, TMPRSS2 41.5 % (#230), ERG 2.8 % as legacy; germline test /germline/i (#250); format still `fmtShare`: lgg_ucsf_2014 IDH1 "100%", the portal "100.0%" (2026-11-18) |
+| MUT-STM-1 | ✅ | BC | KRAS 36.7 %, TP53 52.9 %, TMPRSS2 41.5 % (#230), ERG 2.8 % as legacy; germline test /germline/i (#250); written as the portal's formatPercentValue + "%": lgg_ucsf_2014 IDH1 "100.0%", "< 0.1%" for a rate that rounds to nothing (`mutationRateText`) (#464) |
 | MUT-STM-2 | ✅ | B | Distinct patient + change per codon; 125/125 stems identical |
 | MUT-STM-3 | ✅ | BC | M = the queried patients, whatever their profiling, as the portal's filteredPatients (its "profiled" wording copied); summed over studies (`LollipopReport.cohortPatients`, `buildLollipopGene`); Q1 594 (#379) |
 | MUT-STM-4 | 🟡 | B | Totals as legacy; driver split differs where the stores are not loaded: TP53 325/7 vs 329/3 (hotspots), TMPRSS2 Fusion 0/236 vs 207/29 (no OncoKB pair calls in the pinned v7.5 store; #230 matched at v7.7); tally follows the table's search and filters |

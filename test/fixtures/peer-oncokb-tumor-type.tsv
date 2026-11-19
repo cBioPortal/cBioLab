@@ -1,4 +1,4 @@
-alteration_type	hugo_gene_symbol	alteration	consequence	tumor_type	oncogenicity	mutation_effect	highest_sensitive_level	highest_resistance_level	highest_diagnostic_level	highest_prognostic_level	oncokb_version
+alteration_type	hugo_gene_symbol	alteration	consequence	tumor_type	oncogenicity	mutation_effect	highest_sensitive_level	highest_resistance_level	highest_diagnostic_level	highest_prognostic_level	oncokb_version	data
 MUTATION	EGFR	L858R	Missense_Mutation	Lung Adenocarcinoma	Oncogenic	Gain-of-function	LEVEL_2		LEVEL_Dx1		
 MUTATION	EGFR	L858R	Missense_Mutation	Lung Squamous Cell Carcinoma	Likely Neutral	Inconclusive					
 MUTATION	EGFR	L858R	Missense_Mutation	Non-Small Cell Lung Cancer	Likely Oncogenic	Gain-of-function	LEVEL_3A			LEVEL_Px2	
@@ -8,3 +8,7 @@ MUTATION	EGFR	C797S	Missense_Mutation	Lung Adenocarcinoma	Resistance	Gain-of-fun
 MUTATION	EGFR	A289V	Missense_Mutation	Lung Adenocarcinoma							
 MUTATION	EGFR	V769M	Missense_Mutation	Lung Adenocarcinoma	Unknown	Unknown					
 MUTATION	EGFR	E746_A750del	In_Frame_Del	Lung Adenocarcinoma	Likely Neutral	Inconclusive					fixture-older
+MUTATION	Other Biomarkers	TMB-H		Lung Adenocarcinoma	Unknown		LEVEL_1					{"tumorTypeSummary":"fixture: TMB-H in Lung Adenocarcinoma","variantSummary":"fixture: TMB-H"}
+MUTATION	Other Biomarkers	MSI-H		Lung Adenocarcinoma	Unknown		LEVEL_1					{"variantSummary":"fixture: MSI-H"}
+MUTATION	Other Biomarkers	TMB-H		Non-Small Cell Lung Cancer	Oncogenic							{}
+MUTATION	Other Biomarkers	MSI-H		Lung Squamous Cell Carcinoma	Unknown		LEVEL_1				fixture-older	{}
