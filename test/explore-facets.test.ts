@@ -379,6 +379,23 @@ describe("one study", () => {
     assert.deepEqual(r.geneFacets, []);
   });
 
+  test("every numeric chart gets its bars, past the 14th too (STS-BAR-1: coadread's 19)", async () => {
+    const attrs = Array.from({ length: 19 }, (_, i) => "NUM_" + String(i).padStart(2, "0"));
+    on(/AS pts, uniqExact\(sample_unique_id\) AS smp/, [{ s: S, pts: 100, smp: 120 }]);
+    on(/cam\.attr_id AS a/, attrs.map((a, i) => ({ s: S, a, datatype: "NUMBER", display_name: a, description: "", priority: String(100 - i) })));
+    on(/AS numratio/, attrs.map((a) => ({ s: S, type: "patient", a, nv: 2, numratio: 1, np: 90, mn: 1, mx: 9, md: 5, na: 10 })));
+    on(/attribute_value AS v, uniqExact/, attrs.flatMap((a) => [{ type: "patient", a, v: "1", n: 40 }, { type: "patient", a, v: "9", n: 50 }]));
+    const r = await buildExplore({ study: S, conn: PRIMARY, skipGenes: true });
+    const num = r.clinical.filter((c) => c.kind === "num");
+    assert.equal(num.length, 19);
+    const unbinned = num.filter((c) => !c.bins?.length).map((c) => c.attribute);
+    assert.deepEqual(unbinned, [], "every numeric chart is binned");
+    for (const c of num) assert.equal(c.bins!.reduce((n, b) => n + b.count, 0), 90, c.attribute + ": its 90 patients with a value");
+    const reads = sent.filter((q) => /attribute_value AS v, uniqExact/.test(q));
+    assert.equal(reads.length, 1, "one statement counts every chart's values");
+    for (const a of attrs) assert.ok(reads[0].includes("('patient', '" + a + "')"), a + " in the statement");
+  });
+
   test("skipping bins and genes sends neither the histogram nor any gene-table statement", async () => {
     facetAnswers();
     const r = await buildExplore({ study: S, skipBins: true, skipGenes: true });
