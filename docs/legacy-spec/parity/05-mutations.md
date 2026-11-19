@@ -119,7 +119,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | ID | verdict | how | note |
 |---|---|---|---|
 | MUT-GT-1 | ✅ | B | One chip per query gene, query order (KRAS NRAS BRAF TP53 APC) |
-| MUT-GT-2 | 🟡 | BC | Unchanged: symbol only ✅; nothing greys a gene with no mutations (`results-layout.ts`) |
+| MUT-GT-2 | ✅ | B | Symbol only; a gene with no mutation in the tab (its mutations and fusion rows, under the query's OQL where the tab follows it) greyed, still clickable (coadread_tcga_pub MYC, CDKN2A as cbioportal.org) (`mutationsChipEmpties`) (#425) |
 | MUT-GT-3 | 🟡 | B | Unchanged: first gene default ✅; active gene in the document, not `mutations_gene`; not shared with the SV tab |
 | MUT-GT-4 | 🔶 | C | Unchanged: switching gene clears sort, search, filters and codons (`results-layout.ts:328`) |
 
