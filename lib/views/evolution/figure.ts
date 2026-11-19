@@ -10,6 +10,7 @@ import { STYLE, rampColor } from "../../oncoprint-style.ts";
 import { heatmapOrder, mutationName } from "./order.ts";
 import { axisMarks, dayScale, type AxisTick } from "../../timeline-tracks.ts";
 import type { EvolutionCell, EvolutionMutation, EvolutionSample } from "./types.ts";
+import { timelineSvg } from "../../timeline-svg.ts";
 
 /** the table columns that identify a mutation: one key names its line or heatmap row and its table row alike */
 export const EVOLUTION_KEY_COLUMNS = ["gene", "proteinChange", "chr", "start", "end", "ref", "var"];
@@ -129,7 +130,11 @@ function markerRows(groups: { value: string; color: string | null; samples: numb
   return y;
 }
 
-function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>): { svg: string; height: number } {
+/**
+ * The line chart; `plot`, the timeline's plot span drawn above it: the chart's x axis then spans the
+ * same pixels, so a sample sits under its own day on the timeline (the portal widens its header to match).
+ */
+function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof palette>, plot?: { x: number; width: number }): { svg: string; height: number } {
   const e = v.evolution, samples = e.patient!.samples, drawn = e.drawn!, d = e.display;
   const out: string[] = [];
   // the samples' groups (Group by): a line per mutation and group, a marker row per group
@@ -145,7 +150,7 @@ function lineChart(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeo
   const yTitle = "Variant allele frequency";
   // grouped, the left margin also holds each group's label (at most a fifth of the width)
   const groupW = groups.length > 1 ? Math.min(W / 5, Math.max(0, ...groups.map((g) => textWidth(g.value, FS.small))) + 12) : 0;
-  const left = Math.max(leftAxisWidth(y, yTitle), groupW) + 8, right = W - 16;
+  const left = plot ? plot.x : Math.max(leftAxisWidth(y, yTitle), groupW) + 8, right = plot ? plot.x + plot.width : W - 16;
   // the samples along x: evenly in order, or by the day each was collected
   const pad = 20;
   let xs: number[], bottom: number;
@@ -340,7 +345,12 @@ export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { capti
   const e = v.evolution, pt = e.patient;
   if (!pt || !e.drawn || !e.drawn.length) return null;
   const p = palette(o.theme), W = Math.max(420, o.width || 760);
-  const body: { svg: string; height: number; width?: number } = e.display.chart === "heatmap" ? heatmap(v, W, p, o.zoom) : lineChart(v, W, p);
+  // Show Timeline: the patient's timeline above the line chart, the chart on its axis
+  const tl = e.timeline && e.display.chart === "line" ? timelineSvg(e.timeline, { width: W, expandGaps: e.display.expandGaps, theme: o.theme }) : null;
+  const chart: { svg: string; height: number; width?: number } = e.display.chart === "heatmap" ? heatmap(v, W, p, o.zoom)
+    : lineChart(v, W, p, tl && e.x === "time" && e.axis?.length ? tl.layout.plot : undefined);
+  const body: { svg: string; height: number; width?: number } = tl
+    ? { svg: tl.body + `<g transform="translate(0,${tl.layout.height + 8})">${chart.svg}</g>`, height: tl.layout.height + 8 + chart.height } : chart;
   const FW = Math.max(W, body.width ?? W);
   let y = body.height + 4;
   const key = sampleKey(pt.samples, y, W, p);

@@ -909,6 +909,7 @@
             "end": 1299
           }
         ],
+        "events": 4,
         "groupOptions": [
           {
             "id": "MUTATION_COUNT",
@@ -963,7 +964,8 @@
           "transpose": false,
           "cluster": true,
           "mutationLabels": true,
-          "groupBy": null
+          "groupBy": null,
+          "showTimeline": false
         }
       },
       "participation": {

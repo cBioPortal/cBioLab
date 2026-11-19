@@ -150,7 +150,7 @@ function expectGenes(tag: string, rows: Row[], genes: string[]) {
 // With KRAS: MUT=G12D, by sample: P02-T1 G12D + FAT1 amp = mutation and copy number: multiple (C3); P02-T2 G12D + FAT1 homdel:
 //   multiple; P07, P12, P17 mutation; P34 homdel.
 // By patient: FX-P02's samples together are G12D, amp and homdel: two types, multiple. FAT1 alone, FX-P02 is amp and homdel,
-//   one type (copy number): counted once, as amp (C4: ours amp before homdel; the portal keeps the first it meets, T1's amp).
+//   one type (copy number): counted once, as the first it meets, T1's amp (C4; C14 for the rule).
 {
   const lines = ["KRAS: MUT=G12D", "FAT1: AMP HOMDEL"];
   const s = await rowsOf({ lines }, "sample");
@@ -269,6 +269,63 @@ for (const [sid, gene, prof, v] of EXPR)
   expectRow("C8/C10 patients:", p, "EGFR", NSCLC, { profiled: 43, altered: 1, mrnaHigh: 1 });
   expectRow("C6/C10 patients:", p, "*", NSCLC, { profiled: 51, altered: 10, mutation: 2, multiple: 2, mrnaHigh: 3, mrnaLow: 1, protHigh: 1, protLow: 1 });
   expectRow("C6/C10 patients:", p, "*", ALL, { profiled: 53, altered: 10 });
+}
+
+// ---- C14: of a unit's copy-number (mRNA, protein) alterations, the first the portal meets names the kind ----
+// countSampleAlterationOccurences / countPatientAlterationOccurences keep _.uniqBy(alterations, alterationType):
+// the first of each type. A sample's list is its genes' in query order (getAlterationCountsForCancerTypesForAllGenes
+// merges oqlFilteredAlterationsByGene, keyed in the order of store.genes); a patient's, its samples' in the order the
+// page's sample list holds them (the API's getSamplesBySampleListIds: by stable id), each in gene order.
+// Over a scratch database of views onto the fixture, with these rows added:
+//   FX-P05-T1 FAT1 amplification (it has a CDKN2A deep deletion); FX-P02-T2 CDKN2A deep deletion (P02-T1 FAT1 amp,
+//   P02-T2 FAT1 homdel); FX-P21-T1 mRNA z-scores KRAS 3 (high) and EGFR -3 (low).
+// [CDKN2A: HOMDEL, FAT1: AMP] samples: CDKN2A homdel on P02-T2, P05-T1, P16, P29, P38; FAT1 amp on P02-T1, P05-T1.
+//   P05-T1 meets CDKN2A first: homdel. Altered 6: homdel 5, amp 1 (P02-T1).
+//   Patients: P02 meets T1's FAT1 amp before T2's CDKN2A homdel: amp; P05 homdel. Altered 5: homdel 4, amp 1.
+// [FAT1: AMP, CDKN2A: HOMDEL]: P05-T1 meets FAT1 first: amp. Samples amp 2, homdel 4; patients amp 2 (P02, P05), homdel 3.
+// No OQL, genes [CDKN2A, FAT1], any alteration: also the mutations FAT1 R1627* (P06, P10, P12, P18, P25, P32) and CDKN2A
+//   R80* (P19, P22, P27), D84Y (P29, with its homdel: multiple); P34-T1 FAT1 homdel. Samples: mutation 9, multiple 1,
+//   homdel 5 (P02-T2, P05, P16, P34, P38), amp 1 (P02-T1); patients: mutation 9, multiple 1, homdel 4, amp 1 (P02).
+// [EGFR: EXP<=-2, KRAS: EXP>=2]: P21-T1 meets EGFR's low first: mRNA low; reversed, high.
+{
+  const firstMet = "cbiolab_check_cts_first_met";
+  await write("DROP DATABASE IF EXISTS " + firstMet);
+  await write("CREATE DATABASE " + firstMet);
+  const own = ["genomic_event_derived", "genetic_alteration_derived"];
+  const tables = (await chQuery<{ name: string }>("SELECT name FROM system.tables WHERE database = " + sq(conn.db) + " AND engine LIKE '%MergeTree'", conn)).data.map((r) => r.name);
+  for (const t of tables) {
+    if (own.includes(t)) {
+      await write("CREATE TABLE " + firstMet + "." + t + " AS " + conn.db + "." + t);
+      await write("INSERT INTO " + firstMet + "." + t + " SELECT * FROM " + conn.db + "." + t + " WHERE cancer_study_identifier = " + sq(STUDY));
+    } else await write("CREATE VIEW " + firstMet + "." + t + " AS SELECT * FROM " + conn.db + "." + t);
+  }
+  const cnaRow = (sid: string, gene: string, v: number) =>
+    write("INSERT INTO " + firstMet + ".genomic_event_derived SELECT * REPLACE (" + sq(STUDY + "_" + sid) + " AS sample_unique_id, " + sq(gene) + " AS hugo_gene_symbol, " +
+      v + " AS cna_alteration, " + sq(STUDY + "_" + sid.replace(/-T\d+$/, "")) + " AS patient_unique_id) FROM (SELECT * FROM " + conn.db + ".genomic_event_derived " +
+      "WHERE sample_unique_id = " + sq(STUDY + "_FX-P05-T1") + " AND hugo_gene_symbol = 'CDKN2A' AND variant_type = 'cna')");
+  await cnaRow("FX-P05-T1", "FAT1", 2);
+  await cnaRow("FX-P02-T2", "CDKN2A", -2);
+  for (const [gene, v] of [["KRAS", "3"], ["EGFR", "-3"]])
+    await write("INSERT INTO " + firstMet + ".genetic_alteration_derived (sample_unique_id, cancer_study_identifier, hugo_gene_symbol, profile_type, alteration_value) VALUES (" +
+      sq(STUDY + "_FX-P21-T1") + ", " + sq(STUDY) + ", " + sq(gene) + ", " + sq(EXP_PROFILE) + ", " + sq(v) + ")");
+
+  const cn = ["CDKN2A: HOMDEL", "FAT1: AMP"];
+  expectRow("C14 [CDKN2A: HOMDEL, FAT1: AMP] samples:", await rowsOf({ lines: cn }, "sample", firstMet), "*", NSCLC, { profiled: 57, altered: 6, homdel: 5, amp: 1 });
+  expectRow("C14 [CDKN2A: HOMDEL, FAT1: AMP] patients:", await rowsOf({ lines: cn }, "patient", firstMet), "*", NSCLC, { profiled: 51, altered: 5, homdel: 4, amp: 1 });
+  const nc = ["FAT1: AMP", "CDKN2A: HOMDEL"];
+  expectRow("C14 [FAT1: AMP, CDKN2A: HOMDEL] samples:", await rowsOf({ lines: nc }, "sample", firstMet), "*", NSCLC, { profiled: 57, altered: 6, homdel: 4, amp: 2 });
+  expectRow("C14 [FAT1: AMP, CDKN2A: HOMDEL] patients:", await rowsOf({ lines: nc }, "patient", firstMet), "*", NSCLC, { profiled: 51, altered: 5, homdel: 3, amp: 2 });
+  const cohort = compileCohortDef(null, { study: STUDY, db: firstMet });
+  for (const [unit, want] of [["sample", { profiled: 57, altered: 16, mutation: 9, multiple: 1, homdel: 5, amp: 1 }],
+    ["patient", { profiled: 51, altered: 15, mutation: 9, multiple: 1, homdel: 4, amp: 1 }]] as const)
+    expectRow("C14 no OQL [CDKN2A, FAT1] " + unit + "s:",
+      (await chQuery<Row>(cancerTypesSql(cohort, STUDY, firstMet, ["CDKN2A", "FAT1"], "CANCER_TYPE", null, "any", unit), conn)).data, "*", NSCLC, want);
+  const profiles = ["mutations", "cna", "structural_variants", EXP_PROFILE];
+  expectRow("C14 [EGFR: EXP<=-2, KRAS: EXP>=2] samples:", await rowsOf({ lines: ["EGFR: EXP<=-2", "KRAS: EXP>=2"], profiles }, "sample", firstMet), "*", NSCLC,
+    { profiled: 57, altered: 1, mrnaLow: 1 });
+  expectRow("C14 [KRAS: EXP>=2, EGFR: EXP<=-2] patients:", await rowsOf({ lines: ["KRAS: EXP>=2", "EGFR: EXP<=-2"], profiles }, "patient", firstMet), "*", NSCLC,
+    { profiled: 51, altered: 1, mrnaHigh: 1 });
+  await write("DROP DATABASE IF EXISTS " + firstMet);
 }
 
 // ==== Mutual Exclusivity: pairCountsSql over the query's tracks (M*, PR 6 of the OQL series) ======

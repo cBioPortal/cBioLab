@@ -834,6 +834,11 @@
                 "numeric": false
               },
               {
+                "id": "genePanel",
+                "name": "Gene panel",
+                "numeric": false
+              },
+              {
                 "id": "status",
                 "name": "Status",
                 "numeric": false,
@@ -915,9 +920,8 @@
                 "numeric": false
               },
               {
-                "id": "comments",
-                "name": "Comments",
-                "numeric": false
+                "…": "1 more",
+                "sha256": "71adfe3f3c816775"
               }
             ],
             "shown": [
@@ -949,6 +953,7 @@
                   "P-0024249-T01-IM6",
                   "IRS2",
                   "CHMP1A",
+                  "",
                   "SOMATIC",
                   "TRANSLOCATION",
                   "16:89721445",
@@ -965,7 +970,10 @@
                   0,
                   "NA",
                   "NA",
-                  "NA"
+                  {
+                    "…": "1 more",
+                    "sha256": "5a9f310a3805372a"
+                  }
                 ]
               },
               {
@@ -976,6 +984,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "TCF7L2",
+                  "",
                   "",
                   "SOMATIC",
                   "DELETION",
@@ -993,7 +1002,10 @@
                   4714,
                   "NA",
                   "NA",
-                  "NA"
+                  {
+                    "…": "1 more",
+                    "sha256": "5a9f310a3805372a"
+                  }
                 ]
               },
               {
@@ -1005,6 +1017,7 @@
                   "P-0024249-T01-IM6",
                   "TMPRSS2",
                   "ERG",
+                  "",
                   "SOMATIC",
                   "DELETION",
                   "21:39890681",
@@ -1021,7 +1034,10 @@
                   41084,
                   "NA",
                   "NA",
-                  "NA"
+                  {
+                    "…": "1 more",
+                    "sha256": "5a9f310a3805372a"
+                  }
                 ]
               }
             ],
