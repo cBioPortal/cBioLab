@@ -513,6 +513,35 @@ describe("a whole plot over one study (op 'plot')", () => {
   });
 });
 
+describe("attribute statistics: an attribute with no value in the cohort answers at its declared level (spec E1–E2)", () => {
+  const COHORT = { all: [] };
+  beforeEach(() => on(/AS patients/, [{ patients: 8, samples: 8 }]));
+  /** the study's metadata declares HISTOLOGY as text at `pa`; every count statement returns no rows */
+  const declaredAt = (pa: unknown) => on(/cam\.attr_id AS a/, [{ a: "HISTOLOGY", dt: "STRING", pa, patient_attribute: pa }]);
+
+  test("E1: declared sample-level (patient_attribute 0), no clinical rows → per sample, empty", async () => {
+    declaredAt(0);
+    const res = await resolverFor("s1", {});
+    assert.deepEqual(await res.attributeStats(COHORT as never, ["HISTOLOGY"]), [{ attribute: "HISTOLOGY", per: "sample", kind: "cat", values: [] }]);
+  });
+
+  test("E2: declared patient-level (patient_attribute 1, or true) → per patient, empty", async () => {
+    for (const pa of [1, true]) {
+      answers = [];
+      on(/AS patients/, [{ patients: 8, samples: 8 }]);
+      declaredAt(pa);
+      const res = await resolverFor("s1", {});
+      assert.deepEqual(await res.attributeStats(COHORT as never, ["HISTOLOGY"]), [{ attribute: "HISTOLOGY", per: "patient", kind: "cat", values: [] }], "patient_attribute " + pa);
+    }
+  });
+
+  test("E1 at an aggregate-only study's resolver too", async () => {
+    declaredAt(0);
+    const res = await resolverFor("agg_s", {});
+    assert.deepEqual(await res.attributeStats(COHORT as never, ["HISTOLOGY"]), [{ attribute: "HISTOLOGY", per: "sample", kind: "cat", values: [] }]);
+  });
+});
+
 describe("attribute statistics, as a peer answers them", () => {
   const COHORT = { all: [] };
   beforeEach(() => on(/AS patients/, [{ patients: 8, samples: 8 }]));

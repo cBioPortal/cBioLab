@@ -2,7 +2,7 @@
 // participant's value counts and moments.
 import { benjaminiHochberg, chiSquareTest, welchT, welchAnovaTest, varianceFromMoments, mannWhitneyU, kruskalWallis, quantilesFromHistogram } from "../../stats.ts";
 import type { ViewResult } from "../../types.ts";
-import type { AttrStats } from "../../federation.ts";
+import { attributeLevels, type AttrStats } from "../../federation.ts";
 import { ATTR_NAME_RE } from "../../custom-data.ts";
 import { untimed, type Untimed, type ViewRun, type DocView } from "../run.ts";
 import { overLimit, answering } from "../shared.ts";
@@ -81,7 +81,13 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
         skipped: "the participating studies disagree on its type (" + kinds.join(" vs ") + "); comparing them would mean discarding one side's patients" });
       continue;
     }
-    const kind = kinds[0], per = all[0].per;
+    // patients and samples are never added in one cell
+    const levels = attributeLevels(vNames.flatMap((n) => cohorts[n].studies.map((st) => ({ study: st, stat: pick(n, st) }))));
+    if (levels.conflict) {
+      rows.push({ attribute, per: levels.level ?? all[0].per, kind: kinds[0], cells: [], skipped: levels.conflict });
+      continue;
+    }
+    const kind = kinds[0], per = levels.level ?? all[0].per;
     if (kind === "cat") {
       const cells = vNames.map((n) => {
         const merged = new Map<string, number>();
@@ -165,6 +171,8 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
   const hiddenTested = tested.filter((r) => hidden.has(r.attribute)).length;
   const shown = rows.filter((r) => !hidden.has(r.attribute));
   const untested = shown.filter((r) => r.p == null).length;
+  // tested but not listed, and not tested after all: named here, as nothing else shows them
+  const hiddenUntested = rows.filter((r) => hidden.has(r.attribute) && r.p == null);
   const siteKeys = vNames.flatMap((n) => [...cohorts[n].studies].sort().map((st) => ({ cohort: n, study: st })));
   const testedAttrs = new Set(rows.filter((r) => !r.skipped).map((r) => r.attribute));
   const siteStats = siteKeys.flatMap(({ cohort, study }) =>
@@ -203,7 +211,9 @@ export async function runClinical(view: DocView, c: ViewRun): Promise<ViewResult
         "), but each survival endpoint's _MONTHS / _STATUS pair, AGE_LAST_FU_YEARS and BIRTH_YEAR are not listed, as on cBioPortal" +
         (listed.unlisted.length ? "; " + listed.unlisted.join(", ") + " could not list its attributes, so only those the others declare are asked of it" : "") + "." : "") +
       (untested ? " " + untested + " attribute" + (untested === 1 ? " is" : "s are") + " listed as not tested, each with its reason (a test needs two values and two groups holding any), and left out of the q-values." : "") +
-      (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently is refused rather than merged." :
+      (hiddenUntested.length ? " Of the attributes tested but not listed, " + hiddenUntested.map((r) => r.attribute + " (" + (r.skipped || "not tested") + ")").join("; ") +
+        (hiddenUntested.length === 1 ? " was" : " were") + " not tested and left out of the q-values." : "") +
+      (vStudies.length > 1 ? " Counts are pooled across " + vStudies.length + " studies without harmonizing vocabularies; an attribute the studies type differently, or store at different levels (per patient in one, per sample in another), is refused rather than merged." :
         rank ? " Numeric attributes also show median/IQR, from the same distributions." :
         " Numeric attributes also show median/IQR and a rank-based test alongside the moment-based one — a" +
         " Mann-Whitney U for 2 cohorts, Kruskal-Wallis for 3+ (neither itself part of the q-value correction) —" +
