@@ -20,7 +20,7 @@ const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
 const { dataBins } = await import("../lib/data-binner.ts");
 const CG29 = JSON.parse(readFileSync(new URL("./fixtures/assay-bins-brca-cg00000029.json", import.meta.url), "utf8")) as { values: string[]; portalBins: unknown[] };
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
-const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildTreatmentFacets, buildMutationTypeFacets } = await import("../lib/explore.ts");
+const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildAssayFreqTables, buildTreatmentFacets, buildMutationTypeFacets } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -1218,5 +1218,43 @@ describe("mutation-type tables", () => {
     assert.doesNotMatch(count("TP53"), /'Nonsense_Mutation'/, "TP53's own filter does not");
     assert.match(count("KRAS"), /mutation_type IN \('Nonsense_Mutation'\)/);
     assert.doesNotMatch(count("KRAS"), /'Missense_Mutation'/);
+  });
+});
+
+// ---- the generic-assay frequency tables (STS-OT-5) ------------------------------------------
+describe("generic-assay frequency tables", () => {
+  const holders = new Map([["st1", { gaProfiles: ["armlevel_cna", "mutational_signature"] }], ["st2", { gaProfiles: ["armlevel_cna"] }]]);
+  const catalog = [
+    { profile: "armlevel_cna", type: "GENERIC_ASSAY", datatype: "CATEGORICAL", name: "Putative arm-level copy-number from GISTIC", assayType: "ARMLEVEL_CNA" },
+    { profile: "mutational_signature", type: "GENERIC_ASSAY", datatype: "LIMIT-VALUE", name: "Signatures" },
+    { profile: "loh", type: "GENERIC_ASSAY", datatype: "BINARY", name: "LOH", patientLevel: true },
+  ];
+
+  test("a table per categorical profile held: (entity, value) counts summed over connections, names, the profile's unit, own filter left out", async () => {
+    // the counts first: with a draft they embed the cohort's SQL, which reads sample_derived too
+    on(/GROUP BY e, v/, (q) => /cbio_b\./.test(q) ? [{ e: "1p_status", v: "Loss", n: 2 }]
+      : [{ e: "1p_status", v: "Loss", n: 148 }, { e: "8q_status", v: "Gain", n: 270 }, { e: "8q_status", v: "NA", n: 51 }, { e: "1p_status", v: "", n: 3 }]);
+    on(/WITH ents AS/, [{ entity: "1p_status", name: "1p" }, { entity: "8q_status", name: "8q" }]);
+    on(/FROM cbio_a\.sample_derived/, [{ n: 594 }]);
+    on(/FROM cbio_b\.sample_derived/, [{ n: 100 }]);
+    const draft = { all: [{ kind: "genericAssay", profileType: "armlevel_cna", entity: "1p_status", values: ["Loss"] }, { kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] } as never;
+    const ts = await buildAssayFreqTables({ studies: ["st1", "st2"], profilesByStudy: holders, connByStudy: new Map([["st2", SECOND]]), catalog, draft });
+    assert.equal(ts.length, 1, "the numeric profile has no table; the binary one no selected study holds");
+    const t = ts[0];
+    assert.deepEqual([t.profileType, t.unit, t.binary, t.total, t.disjunctive, t.studies], ["armlevel_cna", "sample", false, 694, true, ["st1", "st2"]]);
+    assert.deepEqual(t.rows.map((r) => [r.name, r.value, r.n]), [["1p", "Loss", 150], ["8q", "Gain", 270]], "NA and empty values dropped");
+    const counts = sent.filter((q) => /GROUP BY e, v/.test(q));
+    assert.ok(counts.every((q) => !/'1p_status'/.test(q)), "the table's own filter does not narrow it");
+    assert.ok(counts.every((q) => /'Female'/.test(q)), "another filter does");
+  });
+
+  test("a patient-level binary profile is counted in patients, its absent values dropped", async () => {
+    const h = new Map([["st1", { gaProfiles: ["loh"] }]]);
+    on(/WITH ents AS/, []);
+    on(/sample_derived/, [{ n: 10 }]);
+    on(/GROUP BY e, v/, [{ e: "HLA-A", v: "1", n: 4 }, { e: "HLA-A", v: "0", n: 6 }]);
+    const [t] = await buildAssayFreqTables({ studies: ["st1"], profilesByStudy: h, catalog });
+    assert.deepEqual([t.unit, t.binary, t.rows], ["patient", true, [{ entity: "HLA-A", value: "1", n: 4, name: "HLA-A" }]]);
+    assert.ok(sent.filter((q) => /GROUP BY e, v/.test(q)).every((q) => /uniqExact\(patient_unique_id\)/.test(q)));
   });
 });

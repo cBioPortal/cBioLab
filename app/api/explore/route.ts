@@ -1,5 +1,5 @@
 import { parseBody, ExploreRequest } from "../../../lib/api-schemas.ts";
-import { buildExplore, buildExploreFederated, buildAssayFacets, buildTreatmentFacets, buildMutationTypeFacets } from "../../../lib/explore.ts";
+import { buildExplore, buildExploreFederated, buildAssayFacets, buildAssayFreqTables, buildTreatmentFacets, buildMutationTypeFacets } from "../../../lib/explore.ts";
 import { ENTITY_RE } from "../../../lib/generic-assay.ts";
 import { studyRouting, carriesPatientIds, instanceForStudy } from "../../../lib/federation.ts";
 import { peerForStudy, remoteFacets } from "../../../lib/federation-remote.ts";
@@ -144,6 +144,9 @@ async function exploreFor(body: any) {
         charts: body.assayCharts.filter((c: { profileType: string; entity: string }) => ENTITY_RE.test(c.entity)) })
     : undefined;
   const treatments = await treatmentsP;
+  // the portal's frequency table per binary or categorical generic-assay profile (STS-OT-5), local studies only
+  const assayFreqTables = body.attributesOnly === true && studies.length === 1 ? [] : await buildAssayFreqTables({ studies: local, draft, oncokbPin: pin,
+    profilesByStudy, connByStudy, catalog: profileCatalog });
   const result = remoteParts.length ? mergeExplore([localResult, ...remoteParts]) : localResult;
-  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...mt, ...tx(treatments) };
+  return { ...result, profileCatalog, ...(assayFacets ? { assayFacets } : {}), ...(assayFreqTables.length ? { assayFreqTables } : {}), ...mt, ...tx(treatments) };
 }
