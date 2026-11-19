@@ -143,6 +143,19 @@ describe("a drag across bars (STS-BAR-5): they replace the chart's selection", (
     assert.ok("draft" in r);
     assert.deepEqual(r.draft.all, [{ kind: "clinical", attribute: "AGE", range: { gt: 30, lte: 50 } }, other], "either direction");
   });
+  test("a drag replaces the chart's NA too, as the portal's brush replaces its whole filter", () => {
+    const r = selectBins({ all: [naClause("AGE"), other] }, "AGE", bars, 1, 2);
+    assert.ok("draft" in r);
+    assert.deepEqual(r.draft.all, [other, { kind: "clinical", attribute: "AGE", range: { gt: 30, lte: 50 } }]);
+  });
+  test("a click on a bar while the chart's NA is selected is refused, as NA cannot join other values", () => {
+    const r = toggleBin({ all: [naClause("AGE")] }, "AGE", bars, 1);
+    assert.ok("why" in r && /NA can't be selected together/.test(r.why));
+  });
+  test("a drag whose bars changed under it is refused, leaving the filter as it was", () => {
+    const r = selectBins({ all: [other] }, "AGE", bars, 3, 7);
+    assert.deepEqual(r, { why: "the chart's bars changed during the drag; drag again" });
+  });
   test("from the low outlier bar: no lower bound; to the high one: no upper bound", () => {
     const low = selectBins(null, "AGE", bars, 0, 1), high = selectBins(null, "AGE", bars, 3, 4);
     assert.ok("draft" in low && "draft" in high);

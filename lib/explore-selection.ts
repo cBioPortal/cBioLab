@@ -114,14 +114,8 @@ function replaceChart(draft: CohortDef | null | undefined, attribute: string, cl
   return { ...(draft || {}), all: rest };
 }
 
-/**
- * A click on bar `i` of a clinical histogram: the bar joins the chart's selection, or leaves it if
- * it was in. Refused, saying why, past the number of separate ranges one clause can hold.
- */
-export function toggleBin(draft: CohortDef | null | undefined, attribute: string, bins: NumericBin[], i: number): { draft: CohortDef } | { why: string } {
-  const sel = chartSelection(draft, attribute);
-  const on = bins.map((b) => binSelected(sel, b));
-  on[i] = !on[i];
+/** the draft with the chart's selection set to these bars, or why one clause cannot hold them */
+function fromBars(draft: CohortDef | null | undefined, attribute: string, bins: NumericBin[], on: boolean[]): { draft: CohortDef } | { why: string } {
   const leaves = binsToLeaves(attribute, bins, on);
   if (leaves.length > ANY_LEAF_LIMIT)
     return { why: "a chart's selection holds at most " + ANY_LEAF_LIMIT + " separate ranges; select neighbouring bars to join them into one" };
@@ -129,15 +123,28 @@ export function toggleBin(draft: CohortDef | null | undefined, attribute: string
 }
 
 /**
+ * A click on bar `i` of a clinical histogram: the bar joins the chart's selection, or leaves it if
+ * it was in. Refused, saying why, past the number of separate ranges one clause can hold, and while
+ * the chart's NA is selected (NA and bars cannot be one clause yet).
+ */
+export function toggleBin(draft: CohortDef | null | undefined, attribute: string, bins: NumericBin[], i: number): { draft: CohortDef } | { why: string } {
+  if (naSelected(draft, attribute)) return { why: NA_WITH_VALUES };
+  const sel = chartSelection(draft, attribute);
+  const on = bins.map((b) => binSelected(sel, b));
+  on[i] = !on[i];
+  return fromBars(draft, attribute, bins, on);
+}
+
+/**
  * A drag across bars `from`…`to` of a clinical histogram (STS-BAR-5): those bars become the chart's
- * selection, replacing what it held, as the portal's brush does.
+ * whole selection, replacing what it held (its NA too), as the portal's brush does. Refused when
+ * the bars changed under the drag, so a range that no longer exists never clears the filter.
  */
 export function selectBins(draft: CohortDef | null | undefined, attribute: string, bins: NumericBin[], from: number, to: number): { draft: CohortDef } | { why: string } {
-  const lo = Math.max(0, Math.min(from, to)), hi = Math.min(bins.length - 1, Math.max(from, to));
-  const leaves = binsToLeaves(attribute, bins, bins.map((_, i) => i >= lo && i <= hi));
-  if (leaves.length > ANY_LEAF_LIMIT)
-    return { why: "a chart's selection holds at most " + ANY_LEAF_LIMIT + " separate ranges" };
-  return { draft: replaceChart(draft, attribute, leaves.length ? asClause(leaves) : null) };
+  const lo = Math.min(from, to), hi = Math.max(from, to);
+  if (lo < 0 || hi >= bins.length) return { why: "the chart's bars changed during the drag; drag again" };
+  const base = { ...(draft || {}), all: (draft?.all || []).filter((c) => !isNaClause(c, attribute)) };
+  return fromBars(base, attribute, bins, bins.map((_, i) => i >= lo && i <= hi));
 }
 
 /** the values a chart's clauses select, when they are one plain value list (`=` or `values`) */

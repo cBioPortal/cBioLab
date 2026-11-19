@@ -2,7 +2,7 @@
 // Explore's sections: the study picker, the action bar, the add-chart dialog and the facet grid's
 // cards. The page owns Explore's state (app/lab/use-explore.ts and the draft) and hands every
 // section the same ExploreCtx — what it reads and the edits it can make.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Children, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
 import CustomBinsDialog from "./custom-bins-dialog";
@@ -646,28 +646,36 @@ function Histogram({ ticks, endTick, na, yTicks, top, onDrag, children }: {
   // the tick font is --t-xs, 0.66rem; the bars share the row with the NA note and 2px gaps
   const fs = 0.66 * 16;
   const yW = Math.max(...yTicks.map((t) => textWidth(fmtInt(t), fs))) + 6;
-  const room = ((width ?? 280) - yW - (na ? textWidth(na, fs) + 8 : 0)) / Math.max(1, ticks.length);
+  const naPad = na ? textWidth(na, fs) + 8 : 0;
+  const barsW = (width ?? 280) - yW - 4 - naPad;
+  const room = barsW / Math.max(1, ticks.length);
   const widest = Math.max(...ticks.map((t) => textWidth(t, fs))) + 4;
   const every = Math.max(1, Math.ceil(widest / Math.max(1, room)));
+  // the end tick, right-aligned at the bars' edge, only where it clears the last start label shown
+  const lastShown = Math.floor((ticks.length - 1) / every) * every;
+  const endFits = !!endTick && lastShown * room + textWidth(ticks[lastShown] || "", fs) + 4 <= barsW - textWidth(endTick, fs);
   const drag = useRef<{ from: number; to: number } | null>(null);
+  const [dragged, setDragged] = useState<[number, number] | null>(null);
   const swallowClick = useRef(false);
   const barsEl = useRef<HTMLDivElement>(null);
   const barAt = (x: number, y: number): number | null => {
     const el = document.elementFromPoint(x, y)?.closest("[data-bar]");
     return el && barsEl.current?.contains(el) ? Number(el.getAttribute("data-bar")) : null;
   };
-  const mark = (lo: number, hi: number) => barsEl.current?.querySelectorAll("[data-bar]").forEach((el) => {
-    const i = Number(el.getAttribute("data-bar"));
-    el.classList.toggle("dragged", i >= lo && i <= hi);
-  });
-  const naPad = na ? textWidth(na, fs) + 8 : 0;
+  const stop = () => { drag.current = null; setDragged(null); };
+  // the bars a drag is passing over, marked in their own class so a re-render keeps the mark
+  const bars = dragged ? Children.map(children, (ch) => {
+    if (!isValidElement<{ className?: string; "data-bar"?: number }>(ch)) return ch;
+    const i = ch.props["data-bar"];
+    return i != null && i >= dragged[0] && i <= dragged[1] ? cloneElement(ch, { className: cn(ch.props.className, "dragged") }) : ch;
+  }) : children;
   return (
     <div ref={ref} className="mt-1 histowrap">
       <div className="histo-y" aria-hidden="true" style={{ width: yW }}>
         {yTicks.map((t) => <span key={t} style={{ bottom: (100 * t / top) + "%" }}>{fmtInt(t)}</span>)}
       </div>
       <div className="histo-main">
-        <div ref={barsEl} className="histo"
+        <div ref={barsEl} className={cn("histo", onDrag && "draggable")}
           onPointerDown={(e) => {
             swallowClick.current = false;
             if (!onDrag || e.button !== 0) return;
@@ -679,17 +687,18 @@ function Histogram({ ticks, endTick, na, yTicks, top, onDrag, children }: {
           onPointerMove={(e) => {
             const d = drag.current;
             if (!d) return;
+            // released somewhere this chart did not see: no drag any more
+            if (!(e.buttons & 1)) { stop(); return; }
             const i = barAt(e.clientX, e.clientY);
             if (i == null || i === d.to) return;
             // onto another bar: a drag, followed past the chart's edge
             if (!(e.currentTarget as HTMLElement).hasPointerCapture(e.pointerId)) (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
             d.to = i;
-            mark(Math.min(d.from, d.to), Math.max(d.from, d.to));
+            setDragged([Math.min(d.from, d.to), Math.max(d.from, d.to)]);
           }}
           onPointerUp={() => {
             const d = drag.current;
-            drag.current = null;
-            mark(1, 0);
+            stop();
             if (d && d.from !== d.to && onDrag) {
               // the click a drag's release may raise is not a click on a bar; none may come, so it lapses
               swallowClick.current = true;
@@ -697,14 +706,14 @@ function Histogram({ ticks, endTick, na, yTicks, top, onDrag, children }: {
               onDrag(Math.min(d.from, d.to), Math.max(d.from, d.to));
             }
           }}
-          onPointerCancel={() => { drag.current = null; mark(1, 0); }}
+          onPointerCancel={stop}
           onClickCapture={(e) => { if (swallowClick.current) { swallowClick.current = false; e.stopPropagation(); e.preventDefault(); } }}>
-          {children}
+          {bars}
           {na && <span className="meta nacount">{na}</span>}
         </div>
         <div className="histo-ticks" aria-hidden="true" style={{ paddingRight: naPad }}>
           {ticks.map((t, i) => <span key={i}>{i % every === 0 ? t : ""}</span>)}
-          {endTick && <span className="histo-end" style={{ right: naPad }}>{endTick}</span>}
+          {endFits && <span className="histo-end" style={{ right: naPad }}>{endTick}</span>}
         </div>
       </div>
     </div>

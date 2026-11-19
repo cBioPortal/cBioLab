@@ -554,12 +554,7 @@ export function useExploreState(page: ExplorePage) {
     fetchExplore(d.all?.length ? d : null);
   };
   /** A click on bar `i` of a clinical histogram: in or out of that chart's OR'd selection (lib/explore-selection.ts). */
-  const toggleBar = (attribute: string, bins: NumericBin[], i: number) => {
-    const r = toggleBin(currentDraft(), attribute, bins, i);
-    if ("why" in r) { setExMsg(r.why); return; }
-    setExMsg(null);
-    applyDraft(r.draft);
-  };
+  const toggleBar = (attribute: string, bins: NumericBin[], i: number) => { applyOrSay(toggleBin(currentDraft(), attribute, bins, i)); };
   /** A drag across bars of a clinical histogram: they replace the chart's selection (STS-BAR-5). */
   const selectBars = (attribute: string, bins: NumericBin[], from: number, to: number) => { applyOrSay(selectBins(currentDraft(), attribute, bins, from, to)); };
   /** A click on a value of a categorical chart: added to its values, or taken out when already chosen. */
