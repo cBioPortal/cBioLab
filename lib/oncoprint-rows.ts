@@ -6,9 +6,14 @@
 export interface RowTrack { kind: string; profileType?: string }
 export interface RowGeometry { header: number; rowH: number; rowGap: number; trackGroupGap: number }
 
-/** the track's group: clinical (with the Profiled rows), genetic (genes and derived events), or its heatmap's profile */
+/**
+ * The track's group: its heatmap's profile (a heatmap row, or the "(no data)" row of a gene the
+ * profile has no values for, which names its profile), clinical (with the Profiled rows), or
+ * genetic (genes and derived events).
+ */
 export function trackGroupKey(t: RowTrack): string {
-  return t.kind === "clinical" ? "clinical" : t.kind === "heatmap" ? "heatmap:" + (t.profileType ?? "") : "genetic";
+  if (t.kind === "heatmap" || (t.kind === "clinical" && t.profileType != null)) return "heatmap:" + (t.profileType ?? "");
+  return t.kind === "clinical" ? "clinical" : "genetic";
 }
 
 /** each track's top, then where the last row ends: one more entry than tracks */

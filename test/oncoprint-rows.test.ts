@@ -13,11 +13,17 @@
 //   R4  the last entry is where the last row ends; no tracks: the header alone
 //   R5  a y finds its row; a row gap or a group gap finds none; the row's bottom edge is in it
 //   R6  the shared style's gap is the portal's 10 px, and every renderer reads it (SVG height grows by it)
+//   R7  a heatmap gene with no data (its "(no data)" row) stays in its profile's group, as the portal
+//       keeps it among the profile's tracks; the Python port gives the same keys and tops
+//       (test/fixtures/oncoprint/track-groups.json, python/tests/test_track_groups.py)
 import test, { describe } from "node:test";
 import assert from "node:assert/strict";
 import * as rows from "../lib/oncoprint-rows.ts";
 import { STYLE } from "../lib/oncoprint-style.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
+import { assembleContract, type AssembleInput } from "../lib/oncoprint-assemble.ts";
+import { readFileSync } from "node:fs";
+import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
 
 const r = rows as unknown as Record<string, any>;
 const G = { header: 22, rowH: 20, rowGap: 3, trackGroupGap: 10 };
@@ -65,5 +71,30 @@ describe("R6: the style's gap reaches the renderers", () => {
     const twoGenes = height([g, { ...g, label: "KRAS" }]), clinGene = height([c, g]);
     assert.equal(clinGene - twoGenes, 10);
     assert.match(contractToSvg({ ...base, tracks: [c, g] } as any), /<text x="4" y="69"/);
+  });
+});
+
+describe("R7: a heatmap gene with no data stays in its profile", () => {
+  const fix = JSON.parse(readFileSync(new URL("./fixtures/oncoprint/track-groups.json", import.meta.url), "utf8"));
+  test("the shared fixture's keys and tops (the Python port reads the same file)", () => {
+    assert.deepEqual(fix.tracks.map(r.trackGroupKey), fix.keys);
+    assert.deepEqual(r.trackTops(fix.tracks, { ...G, header: 0 }), fix.tops);
+  });
+  test("the engine's (no data) row names its profile, so no gap splits the profile", () => {
+    const pids = ["P1", "P2"];
+    const c = assembleContract({
+      genes: ["KRAS", "NRAS", "TP53"], groups: [{ name: "all", pids }], studies: ["s"], events: [],
+      coverage: pids.map((pid) => ({ pid, genes: ["KRAS", "NRAS", "TP53"] })), isDriver: () => false, annotationSource: "t",
+      clinical: [], derived: [], sort: [{ track: "genomic", dir: "asc" }], lineGap: 90,
+      heatmap: [{ profileType: "mrna_zscore", genes: ["KRAS", "NRAS", "TP53"], isVaf: false,
+        values: new Map([["P1|KRAS", 1], ["P2|KRAS", -1], ["P1|TP53", 0.5]]) }]
+    } as unknown as AssembleInput);
+    const heat = c.tracks.filter((t) => t.kind === "heatmap" || / \(no data\)$/.test(t.label));
+    assert.deepEqual(heat.map((t) => / \(no data\)$/.test(t.label)), [false, true, false]);
+    assert.deepEqual([...new Set(heat.map(r.trackGroupKey))], ["heatmap:mrna_zscore"]);
+    // the browser draws the unpacked contract: the row's profile survives packing
+    const buf = packContract(c);
+    const u = unpackContract(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer);
+    assert.deepEqual(u.tracks.map(r.trackGroupKey), c.tracks.map(r.trackGroupKey));
   });
 });

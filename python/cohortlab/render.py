@@ -21,10 +21,10 @@ ROW_H, ROW_GAP, GROUP_GAP, TRACK_GROUP_GAP = _G["rowH"], _G["rowGap"], _G["group
 
 
 def track_group_key(t: Track) -> str:
-    """The track's group, as lib/oncoprint-rows.ts trackGroupKey: clinical, genetic, or its heatmap's profile."""
-    if t.kind == "clinical":
-        return "clinical"
-    return "heatmap:" + str(t.meta.get("profileType") or "") if t.kind == "heatmap" else "genetic"
+    """The track's group, as lib/oncoprint-rows.ts trackGroupKey: its heatmap's profile (a heatmap row or its "(no data)" row), clinical, or genetic."""
+    if t.kind == "heatmap" or (t.kind == "clinical" and t.meta.get("profileType") is not None):
+        return "heatmap:" + str(t.meta.get("profileType") or "")
+    return "clinical" if t.kind == "clinical" else "genetic"
 
 
 def track_tops(tracks: list[Track]) -> list[int]:
