@@ -81,14 +81,16 @@ async function tables({ browser, ok, BASE }) {
       // the download: the portal's table.tsv (MUT-TB-8), every row whatever the filter, the columns by name, CRLF
       const button = page.locator("form[action='/api/table'] button").first();
       const label = (await button.innerText()).trim();
+      const dl0 = Date.now();
       const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120000 }).catch(() => null), button.click()]);
       const tsv = dl ? require("fs").readFileSync(await dl.path(), "utf8") : "";
+      const dlMs = Date.now() - dl0;
       const lines = tsv.split("\r\n");
       const crlf = tsv.endsWith("\r\n") && !/[^\r]\n/.test(tsv);
       if (lines[lines.length - 1] === "") lines.pop();
       ok("table: the download reads \"download TSV (" + picked.all + ")\" while the table is filtered", picked.kept < picked.all && label === "download TSV (" + picked.all + ")", label);
       ok("table: the table.tsv holds every row, the columns by name, CRLF line ends", !!dl && dl.suggestedFilename() === "table.tsv" && lines[0].startsWith("Gene\tStudy of Origin\tCancer Type\tSample ID") && crlf && lines.length - 1 === picked.all,
-        (dl ? dl.suggestedFilename() : "no download") + " · " + (lines.length - 1) + " rows of " + picked.all + ", crlf " + crlf + ", header " + JSON.stringify(lines[0] ? lines[0].slice(0, 60) : ""));
+        (dl ? dl.suggestedFilename() : "no download") + " in " + dlMs + " ms · " + (lines.length - 1) + " rows of " + picked.all + ", crlf " + crlf + ", header " + JSON.stringify(lines[0] ? lines[0].slice(0, 60) : ""));
       // Copy (MUT-TB-2): before the download, in two clicks, the same text as table.tsv on the clipboard, every row whatever the filter
       await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: new URL(BASE).origin });
       // the portal's two steps: the first click fetches every row ("Copy Ready!"), the second copies within its own click
@@ -97,12 +99,24 @@ async function tables({ browser, ok, BASE }) {
       const copyButton = page.getByRole("button", { name: /^Copy( Ready!|ing…)?$/ }).first();
       const copyLabel = async () => ((await copyButton.innerText().catch(() => "")) || "").trim();
       const statusText = async () => ((await page.getByRole("status").allInnerTexts().catch(() => [])) || []).join(" | ");
+      // the copy's own request (a JSON POST to /api/table), watched so a failure says whether it was sent, answered and when
+      const copyReqs = [];
+      const onReq = (r) => { if (r.url().endsWith("/api/table") && r.method() === "POST" && (r.headers()["content-type"] || "").includes("json")) copyReqs.push({ r, at: Date.now(), status: null, done: null }); };
+      const onResp = (resp) => { const c = copyReqs.find((x) => x.r === resp.request()); if (c) c.status = resp.status(); };
+      const onEnd = (r) => { const c = copyReqs.find((x) => x.r === r); if (c) c.done = Date.now() - c.at; };
+      page.on("request", onReq); page.on("response", onResp); page.on("requestfinished", onEnd); page.on("requestfailed", onEnd);
+      const copyNet = () => copyReqs.length ? copyReqs.map((c) => "request " + (c.status == null ? "unanswered" : c.status) + (c.done == null ? ", open " + (Date.now() - c.at) + " ms" : " in " + c.done + " ms")).join("; ") : "no request sent";
+      // the copy reads every row as the download does, the route's whole run (app/api/table maxDuration, 300 s): the
+      // download above waits on its file without a limit, so the copy gets the route's own, not a shorter one
+      const COPY_BUDGET = 300000;
       let ready = false;
+      const c0 = Date.now();
       for (let attempt = 0; attempt < 2 && !ready; attempt++) {
         if (await copyLabel() === "Copy") await copyButton.click();
-        ready = await page.getByRole("button", { name: "Copy Ready!" }).first().waitFor({ timeout: 60000 }).then(() => true, () => false);
+        ready = await page.getByRole("button", { name: "Copy Ready!" }).first().waitFor({ timeout: Math.max(1, COPY_BUDGET - (Date.now() - c0)) }).then(() => true, () => false);
       }
-      ok("table: a first Copy click fetches the rows and offers \"Copy Ready!\"", ready, ready ? "" : "button \"" + (await copyLabel()) + "\" · status " + JSON.stringify(await statusText()));
+      ok("table: a first Copy click fetches the rows and offers \"Copy Ready!\"", ready, (ready ? "in " + (Date.now() - c0) + " ms" : "button \"" + (await copyLabel()) + "\" · status " + JSON.stringify(await statusText())) + " · " + copyNet() + " · download took " + dlMs + " ms");
+      page.off("request", onReq); page.off("response", onResp); page.off("requestfinished", onEnd); page.off("requestfailed", onEnd);
       if (ready) await page.getByRole("button", { name: "Copy Ready!" }).first().click();
       const copied = await page.getByRole("status").filter({ hasText: "Copied!" }).first().waitFor({ timeout: 60000 }).then(() => true, () => false);
       const copyStatus = copied ? "" : " · status " + JSON.stringify(await statusText());
