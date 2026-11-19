@@ -9,5 +9,8 @@ export const mutants: Mutant[] = [
     find: "return [...shown.filter((r) => r.on), ...shown.filter((r) => !r.on)];", replace: "return shown;" },
   { id: "value-list-select-all-rechecks-applied", layer: "cohorts", guard: "unit", file: "lib/value-list.ts",
     effect: "Select all also checks the values the chart's filter already holds, so applying adds them to the filter a second time.",
-    find: "const checkable = shown.filter((r) => !r.on && !r.disabled).map((r) => r.key);", replace: "const checkable = shown.concat([]).filter((r) => !r.disabled).map((r) => r.key);" },
+    find: "const checkable = shown.filter((r) => !r.on && !r.disabled && !r.solo).map((r) => r.key);", replace: "const checkable = shown.filter((r) => !r.disabled && !r.solo).map((r) => r.key);" },
+  { id: "value-list-select-all-checks-na", layer: "cohorts", guard: "unit", file: "lib/value-list.ts",
+    effect: "Select all on a list with an NA row checks NA too, which cannot join other values, so its Apply filter stays disabled.",
+    find: "const checkable = shown.filter((r) => !r.on && !r.disabled && !r.solo)", replace: "const checkable = shown.filter((r) => !r.on && !r.disabled)" },
 ];

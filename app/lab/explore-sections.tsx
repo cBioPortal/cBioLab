@@ -24,7 +24,7 @@ import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
 import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount, type DownloadUnit } from "../../lib/study-view-download.ts";
-import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
+import { ANY_LEAF_LIMIT, assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
@@ -897,8 +897,9 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           if (asList) {
             const byKey = new Map(values.map((v: any) => [String(v.v), v]));
             return (<>
-              <ValueList picks={picks} pct={portalFreq} unit={c.per === "patient" ? "patients" : "samples"} hint={"keep the cases whose " + (c.displayName || c.attribute) + " is any of the checked values"}
-                rows={values.map((v: any) => ({ key: v.isNa ? NA_KEY : String(v.v), name: String(v.v), n: v.n, total, on: isSel(v), muted: v.isNa,
+              <ValueList picks={picks} pct={portalFreq} unit={c.per === "patient" ? "patients" : "samples"}
+                cut={(c.distinct ?? 0) > c.values.length ? { shown: c.values.length, of: c.distinct! } : undefined} hint={"keep the cases whose " + (c.displayName || c.attribute) + " is any of the checked values"}
+                rows={values.map((v: any) => ({ key: v.isNa ? NA_KEY : String(v.v), name: String(v.v), n: v.n, total, on: isSel(v), muted: v.isNa, solo: v.isNa,
                   title: v.isNa ? "no " + (c.displayName || c.attribute) + " recorded — " + v.n.toLocaleString() : v.v + " — " + v.n.toLocaleString() }))}
                 why={(keys) => keys.includes(NA_KEY) && keys.length > 1 ? "NA can't be combined with other values" : null}
                 onApply={(keys) => {
@@ -1377,6 +1378,10 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   );
 }
 
+/** a list whose checked rows join as one filter of alternatives, each its own condition: refused past the filter's limit, naming it */
+const tooManyAlternatives = (n: number): string | null =>
+  n > ANY_LEAF_LIMIT ? "one filter holds at most " + ANY_LEAF_LIMIT + " alternatives; " + n + " are checked" : null;
+
 export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
   const { addClause, parseDraft } = ctx;
   const explore = ctx.explore!;
@@ -1390,6 +1395,7 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
       {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
       {explore.events.length > 0 && (
         <ValueList unit="patients" hint="keep the patients with any of the checked events" pct={portalFreq}
+          why={(types) => tooManyAlternatives(types.length)}
           rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
             title: e.n.toLocaleString() + " of " + (explore.totals?.patients ?? 0).toLocaleString() + " selected patients with a " + e.type + " event" }))}
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
@@ -1398,6 +1404,7 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
     <div className="card">
       <h2>Case lists</h2>
       <ValueList unit="samples" hint="keep the samples on any of the checked case lists" pct={portalFreq}
+        why={(ids) => tooManyAlternatives(ids.length)}
         rows={explore.caseLists.map((l) => ({ key: l.id, name: l.name, n: l.n, total: explore.totals?.samples, on: listOn(l.id),
           title: l.id + " — " + l.n.toLocaleString() + " of " + (explore.totals?.samples ?? 0).toLocaleString() + " selected samples" }))}
         onApply={(ids) => anyOf(ids.map((id) => ({ kind: "caseList", id })))} />

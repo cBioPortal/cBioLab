@@ -14,16 +14,19 @@ const rows: ListRow[] = [
 const keys = (rs: ListRow[]) => rs.map((r) => r.key);
 
 describe("the search (STS-TBL-3)", () => {
+  const all: ListRow[] = [...rows, { key: "Big", name: "Big", n: 1084, share: "80.0%" }];
   const cases: [string, string, string[]][] = [
     ["the value, by case-insensitive substring", "afric", ["Black"]],
     ["the count as written", "372", ["White"]],
+    ["a count of thousands as written, with its separator", "1,084", ["Big"]],
+    ["… or without it", "1084", ["Big"]],
     ["the share as written", "9.2", ["Black"]],
     ["the share with its %", "1.6%", ["Asian"]],
-    ["nothing typed shows every row", "  ", ["White", "Black", "Asian", "NA"]],
+    ["nothing typed shows every row", "  ", ["White", "Black", "Asian", "NA", "Big"]],
     ["no match", "zzz", []],
   ];
   for (const [name, q, want] of cases)
-    test(name, () => assert.deepEqual(keys(rows.filter((r) => listRowMatches(r, q))), want));
+    test(name, () => assert.deepEqual(keys(all.filter((r) => listRowMatches(r, q))), want));
 });
 
 describe("the order shown (STS-TBL-2)", () => {
@@ -52,6 +55,9 @@ describe("Select all / Deselect all (STS-TBL-5)", () => {
   });
   test("Deselect all is hidden when no row shown is checked", () => {
     assert.equal(listBulk(listRows(rows, "afric"), ["NA"]).deselectAll, null);
+  });
+  test("a row that cannot join others (NA) is left out of Select all", () => {
+    assert.deepEqual(listBulk([{ key: "A", name: "A", n: 3 }, { key: "NA", name: "NA", n: 5, solo: true }], []).selectAll, ["A"]);
   });
   test("a row that cannot be checked is never added", () => {
     assert.equal(listBulk([{ key: "x", name: "x", n: 1, disabled: true }], []).selectAll, null);

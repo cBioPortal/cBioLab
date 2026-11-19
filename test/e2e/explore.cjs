@@ -515,7 +515,8 @@ async function explore({ ok, BASE, page, browser }) {
   let vlDetail = "", vlOk = false;
   try {
     await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
-    const card = page.locator(".card:has(.vsearch)").first();
+    // a clinical attribute's list (an assay chart's rows may be disabled)
+    const card = page.locator(".card[data-attr]:has(.vsearch)").first();
     await card.waitFor({ timeout: 240000 });
     const attr = await card.getAttribute("data-attr");
     const header = (await card.locator(".valhead").innerText()).replace(/\s+/g, " ").trim();
@@ -528,14 +529,20 @@ async function explore({ ok, BASE, page, browser }) {
     await page.waitForFunction(([a, v]) => document.querySelector(".card[data-attr='" + a + "'] .vallist .valrow .vname")?.textContent === v, [attr, pick], { timeout: 240000 });
     const q = names[0].slice(0, 2);
     await c2.getByRole("searchbox", { name: "search the values" }).fill(q);
+    await page.waitForTimeout(600);   // the box hands its text on 400 ms after the last key
     const shown = await c2.locator(".vallist .valrow .vname").allInnerTexts();
     const matchOk = shown.length > 0 && shown.every((n) => n.toUpperCase().includes(q.toUpperCase()) || n === pick);
+    // Select all checks the rows shown that can be: enabled, not already in the filter, not NA (applied alone)
+    const checkable = await c2.locator(".vallist .valrow").evaluateAll((rs) => rs.filter((r) => {
+      const box = r.querySelector("[role=checkbox], button");
+      return box && !box.hasAttribute("disabled") && box.getAttribute("data-state") !== "checked" && r.querySelector(".vname")?.textContent !== "NA";
+    }).length);
     await c2.getByRole("button", { name: "Select all" }).click();
     const checked = Number(((await c2.locator(".pickbar").innerText()).match(/(\d+) checked/) || [])[1]);
     await c2.getByRole("button", { name: "Deselect all" }).click();
     const cleared = await c2.locator(".pickbar").count();
-    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checked, cleared });
-    vlOk = header === "# Freq" && matchOk && checked === shown.filter((n) => n !== pick).length && cleared === 0;
+    vlDetail = JSON.stringify({ attr, header, pick, q, shown: shown.length, checkable, checked, cleared });
+    vlOk = header === "# Freq" && matchOk && checked === checkable && checkable > 0 && cleared === 0;
   } catch (e) { vlDetail = String(e.message).split("\n")[0]; }
   ok("explore: value lists have the portal's header, search and Select all / Deselect all, the applied rows first", vlOk, vlDetail);
 }
