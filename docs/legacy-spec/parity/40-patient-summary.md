@@ -229,7 +229,7 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 |---|---|---|---|
 | PAT-MT-1 | 🟡 | BC | Same rows (80/64/16); uncalled not listed (lgg has none); header "80 Mutations" ✅; 10 rows/page ✅; default sort gene-grouped, driver genes first (`patient-alterations.ts:149`) vs Annotation desc; no "not profiled for mutations" alert |
 | PAT-MT-2 | 🟡 | B | Default: Samples (2+ samples in view) · Gene · Protein Change · Annotation (OncoKB) · Mutation Type (the portal's labels, "FS del") · Allele Freq · Copy # (1 sample in view) · Cohort %, in the portal's order ✅ (lgg P04: Samples … Mutation Type, Allele Freq, Cohort %; TCGA-A6-2671: Gene … Allele Freq, Copy #, Cohort %); no mRNA Expr., Gene panel, Functional Impact, ASCN/CCF/clonal, Exon/gnomAD/ClinVar/dbSNP/SIGNAL; Columns menu ✅; a hidden column stays in the menu where the portal excludes it |
-| PAT-MT-3 | 🟡 | B | One sample in view: the VAF as text ✅; several: a 6-px bar per sample, VAF × 12 px, sample colour ✅ (lgg P04 IDH1 R132C four bars); tooltip "0.38 (46 variant reads out of 121 total)" per sample ✅; sort by the samples' VAFs in sample order, null last ✅ (`check:patient-vaf`); no header VAF plot; download keeps the highest VAF, not the per-sample list |
+| PAT-MT-3 | 🟡 | B | One sample in view: the VAF as text ✅; several: a 6-px bar per sample, VAF × 12 px, sample colour ✅ (lgg P04 IDH1 R132C four bars); tooltip "0.38 (46 variant reads out of 121 total)" per sample ✅; sort by the samples' VAFs in sample order, null last ✅ (`check:patient-vaf`); the header VAF plot ✅ (#415); download keeps the highest VAF, not the per-sample list |
 | PAT-MT-4 | 🟡 | B | Marker per carrying sample, "--" where not (equal-width slots) ✅; no grey not-profiled pill, no uncalled opacity |
 | PAT-MT-5 | ✅ | B | mRNA Expr. after Copy # with one sample in view and an rna_seq…_zscores profile: line, dot (blue < 25, red > 75, grey), whole %, the portal's tooltip and NA words (`app/lab/alterations-body.tsx` MrnaCell, `lib/views/alterations/mrna-cell.ts`); P3 APC 25 %, KMT2C 29 % = portal; absent with several samples (P1) |
 | PAT-MT-6 | ✅ | B | The Gene header's menu, shown with several samples in view and a row whose gene some sample's panel leaves out: "Different gene panels were used for the samples. Filter mutations for:" ◉ Genes profiled in any sample / ○ all samples (the view's `genesProfiled`, both tables); msk_chord P-0025952 (IMPACT468 and IMPACT505): 185 → 182 rows, CTR9, NADK, SPRTN dropped (not on IMPACT468 per the portal API); the Genomic Overview and the VAF plot are not filtered |
@@ -260,9 +260,9 @@ Layout: Timeline → Genomic overview → one "Genomic alterations" card (Mutati
 |---|---|---|---|
 | PAT-NP-1 | ✅ | B | Per table, "Sample(s) <markers> not profiled for <mutations | copy number alterations | structural variants>" for the samples in view outside the profile (sample_profile, what the portal's gene-panel data lists); the table hidden when none is profiled (paad_msk_2025 P-0007179: sample 2 not profiled for structural variants, as the portal API's profiled: false); not shown for a peer's patient |
 | PAT-GP-1 | ✅ | C | Profiled = panel covers the gene (`profiledCte`, `patient-alterations.ts:77`; evolution `np`) |
-| PAT-GP-2 | 🟡 | B | GO panel icons ✅; no not-profiled pill, Gene panel column, tooltip link |
-| PAT-GP-3 | ❌ | C | No gene panel modal |
-| PAT-GP-4 | ❌ | C | No gene-panel links |
+| PAT-GP-2 | 🟡 | B | GO panel icons ✅; not-profiled pill (#398) ✅; Gene panel column on Mutations and CNA, hidden by default: the cell each carrying or unprofiled sample's panel or N/A, the value and download the carrying profiled samples' as the portal's (`genePanelSql`; msk_chord P-0025952 CTR9 shows "IMPACT505, IMPACT468", downloads "IMPACT505") ✅; no Gene panel column on the SV table |
+| PAT-GP-3 | ✅ | B | Gene panel window: "Gene Panel", id, gene count, regex filter, 3 columns as GenesList, download (`app/lab/gene-panel-dialog.tsx`, `lib/gene-panel-list.ts`); IMPACT468 469 genes = portal |
+| PAT-GP-4 | 🟡 | B | Gene panel column links open the window ✅ (#401); a sample's clinical "Gene Panel" value links to it ✅ (#418; P-0025952's panels open 469 and 505 genes, as the portal's); not yet the Genomic Overview's or the mutation table's panel-icon tooltip links |
 
 Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the URL document (invariant 9); legacy keeps most of these local. Selected row / IGV locus local in both.
 
@@ -276,7 +276,7 @@ Persistence: tab, mode, ids, collapse, trims, table query/columns/paging in the 
 | PAT-STM-4 | ✅ | B | First /^.+rna_seq.*_zscores$/i profile in id order; rank with ties at the highest over every numeric value of the gene, rank / n × 100 to 2 places half up (`lib/patient-alterations.ts` mrnaCte); P3 57/57 genes = portal mrna-percentile (z and percentile), 7 without data empty on both |
 | PAT-STM-5 | ✅ | BC | ≥50 kb and \|mean\| ≥ 0.2, toFixed(1) (`igv.ts:75-84`); 48.8 %, 27.8 % |
 | PAT-STM-6 | ✅ | B | 12/28/18/55, 64, 16 |
-| PAT-STM-7 | ❌ | C | No VAF histogram / KDE plot |
+| PAT-STM-7 | ✅ | B | The Allele Freq header's VAF plot: a histogram and density per sample, legend, hover popover (#415); TCGA-A6-2671 bins = the portal's 64 mutations; no gene panel icon in the legend |
 | PAT-STM-8 | ❌ | C | No header signature bar (tracked) |
 | PAT-STM-9 | ❌ | B | No TMB-H / MSI-H badges |
 | PAT-STM-10 | ✅ | BC | Span floors ✅; the header's tooltip tables write a non-integer to one decimal, "< 0.1" when it rounds to 0 (`portalClinicalValue`): TCGA-A6-2671-01 Fraction Genome Altered 0.4881 → "0.5" |
