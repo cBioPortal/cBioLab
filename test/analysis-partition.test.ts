@@ -16,6 +16,7 @@ for (const k of ["CLICKHOUSE2_URL", "FEDERATION_PEERS", "CH_RUN_CACHE", "LOOPBAC
 
 const { setChTransport } = await import("../lib/ch.ts");
 const { proposePartition, resolveStudy, validStudies, studyProfiles, studyProfilesMany, resolveDocCohorts } = await import("../lib/analysis.ts");
+const { HISTOGRAM_CAP } = await import("../lib/federation.ts");
 type Row = Record<string, unknown>;
 
 const PT = "mutational_signature";
@@ -194,9 +195,29 @@ describe("a clinical attribute", () => {
       assert.equal(r.def.other, "AGE at or above median");
       assert.deepEqual(r.def.source, { attribute: "AGE", median: true });
     });
-    test("a cohort over several studies has no one median to split at", async () => {
+    test("a cohort over several studies has no one live median to split at, and says to ask for quantiles: 2", async () => {
       numeric();
-      await assert.rejects(proposePartition({ doc, cohort: "Both", attribute: "AGE" } as never), /needs a cohort in a single study \(“Both” spans 2\)/);
+      await assert.rejects(proposePartition({ doc, cohort: "Both", attribute: "AGE" } as never), /needs a cohort in a single study \(“Both” spans 2\); across studies, ask for quantiles: 2/);
+    });
+    // STS-STM-12: across studies, each study's value counts (attributeStats' histograms) pooled and cut by the one-study rule
+    test("quartiles over several studies: every study's values pooled, cut as within one", async () => {
+      numeric();
+      // st1 holds 20, 30, 40, 50; st2 holds 60, 70, 80, 90: pooled, the quartiles are the 2nd, 4th and 6th of 8
+      on(/SELECT a, per, x, count\(\) AS n/, (q) => /'st2'/.test(q)
+        ? [60, 70, 80, 90].map((x) => ({ a: "AGE", per: "patient", x, n: 1 }))
+        : [20, 30, 40, 50].map((x) => ({ a: "AGE", per: "patient", x, n: 1 })));
+      const r = await proposePartition({ doc, cohort: "Both", attribute: "AGE", quantiles: 4 } as never);
+      assert.match(r.note!, /AGE cut at its quartiles within “Both”/);
+      assert.deepEqual(r.def.arms.map((a) => (a.where as { range: unknown }).range), [{ lte: 40 }, { gt: 40, lte: 60 }, { gt: 60, lte: 80 }, { gt: 80 }]);
+      // both studies were read: neither study alone gives these cuts
+      assert.ok(sent.some((q) => /SELECT a, per, x, count\(\) AS n/.test(q) && /'st1'/.test(q)) && sent.some((q) => /SELECT a, per, x, count\(\) AS n/.test(q) && /'st2'/.test(q)));
+    });
+    test("quartiles over several studies with a study's values past the histogram's cap are refused, naming it", async () => {
+      numeric();
+      on(/SELECT a, per, x, count\(\) AS n/, (q) => /'st2'/.test(q)
+        ? Array.from({ length: HISTOGRAM_CAP + 1 }, (_, i) => ({ a: "AGE", per: "patient", x: i, n: 1 }))
+        : [{ a: "AGE", per: "patient", x: 20, n: 1 }]);
+      await assert.rejects(proposePartition({ doc, cohort: "Both", attribute: "AGE", quantiles: 4 } as never), /a study holds more than 20,000 distinct values of it/);
     });
     test("quartiles: an arm per interval, cuts written in, and a tied cut dropped and said so", async () => {
       numeric();

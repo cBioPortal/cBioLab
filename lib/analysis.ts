@@ -14,13 +14,13 @@ import { describeCohortDef } from "./cohort2.ts";
 import type { AnalysisDoc, AnalysisResult, Clause, CohortDef, PartitionDef, ViewResult, ViewKind, ViewParticipation, TemplateDoc, SplitBy, LockDrift } from "./types.ts";
 import { plainResult } from "./types.ts";
 import { resolveSplitBy, type AttributeDistribution } from "./cohort-splitby.ts";
-import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, attributeCutsSql, attributeLevels, type Resolver } from "./federation.ts";
+import { resolverFor, PatientLevelResolver, AggregateResolver, studyRouting, restrictedStudies, studyAccess, hasViewAggregates, attributeCutsSql, attributeLevels, HISTOGRAM_CAP, type Resolver } from "./federation.ts";
 import { cantDraw } from "./view-coverage.ts";
 import { describeSources, sourceIndex } from "./provenance.ts";
 import { resolveParams } from "./params.ts";
 import { resolveExtends } from "./cohort-extends.ts";
 import { resolvePartitions, comparableChildren, assertPartitionChildrenFit } from "./cohort-partitions.ts";
-import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, quantilePoints, rangeArms, SPLIT_BY_DEFAULT_MIN_COUNT, ANALYSIS_MAX_COHORTS } from "./partition-arms.ts";
+import { partitionFromValues, partitionFromGene, partitionFromOql, uniqueName, expandSplits, viewDrawProblem, flattenSplits, withoutSplitTrees, splitKey, chooseArmValues, armLabel, quantilePoints, pooledCuts, rangeArms, SPLIT_BY_DEFAULT_MIN_COUNT, ANALYSIS_MAX_COHORTS } from "./partition-arms.ts";
 import { ENTITY_RE, isCategoricalAssay, assayCohortMedianSql, assayCohortValuesSql, assayCohortCutsSql } from "./generic-assay.ts";
 import { entityShortName } from "./profile-names.ts";
 import { upgradeDocument } from "./doc-version.ts";
@@ -170,7 +170,8 @@ export interface RunOpts {
  * are studies storing it at different levels, whose counts would add patients to samples.
  */
 async function mergedDistribution(cohortName: string, def: CohortDef, studies: string[],
-  resolverOf: (s: string) => Promise<Resolver>, attribute: string, opts?: { topValues?: number }): Promise<AttributeDistribution & { partial?: boolean }> {
+  resolverOf: (s: string) => Promise<Resolver>, attribute: string, opts?: { topValues?: number; histograms?: boolean }):
+  Promise<AttributeDistribution & { partial?: boolean; valueCounts?: { v: number; n: number }[]; histogramTruncated?: boolean }> {
   const perStudyStats = await Promise.all(studies.map(async (s) => {
     const [stat] = await (await resolverOf(s)).attributeStats(def, [attribute], opts);
     return stat;
@@ -185,7 +186,12 @@ async function mergedDistribution(cohortName: string, def: CohortDef, studies: s
   if (levels.conflict) return { kind: "cat", per: levels.level ?? "patient", skipped: "'" + attribute + "' across “" + cohortName + "”'s studies: " + levels.conflict };
   const kind = (perStudyStats[0]?.kind ?? "cat") as "cat" | "num";
   const per = (levels.level ?? perStudyStats[0]?.per ?? "patient") as "patient" | "sample";
-  if (kind === "num") return { kind, per };
+  // every study's (value, count) pairs, pooled: exact for a quantile cut across studies; none when a study's were cut
+  if (kind === "num") return opts?.histograms
+    ? (perStudyStats.some((st) => st?.histogramTruncated || !st?.valueCounts)
+      ? { kind, per, histogramTruncated: true }
+      : { kind, per, valueCounts: perStudyStats.flatMap((st) => st?.valueCounts || []) })
+    : { kind, per };
   const merged = new Map<string, number>();
   for (const s of perStudyStats) for (const { v, n } of (s?.values || [])) merged.set(v, (merged.get(v) || 0) + n);
   const partial = perStudyStats.some((s) => s?.distinct != null && s.distinct > (s.values || []).length);
@@ -269,20 +275,33 @@ export async function proposePartition(req: PartitionProposalRequest): Promise<{
   const resolverOf = async (s: string) => { const { profiles, gaProfiles } = await studyProfiles(s); return resolverFor(s, { oncokbPin: pin, profiles, gaProfiles }); };
   // Only the most frequent values can earn an arm, so a long tail is not a reason to refuse. The
   // ranking decides which values get arms; every arm's count comes from evaluating its clause.
-  const dist = await mergedDistribution(cohort, def, studies, resolverOf, attribute, { topValues: PARTITION_TOP_VALUES });
+  // over several studies a quantile split pools each study's value counts, so they are asked for then
+  const acrossStudies = studies.length > 1 && req.quantiles != null;
+  const dist = await mergedDistribution(cohort, def, studies, resolverOf, attribute, { topValues: PARTITION_TOP_VALUES, ...(acrossStudies ? { histograms: true } : {}) });
   if (dist.skipped) throw new Error("cannot split by '" + attribute + "': " + dist.skipped);
   if (dist.kind === "num") {
-    // A median split relative to the cohort being split, through a percentile leaf: the engine
-    // resolves the cutoff live from this cohort's own values, at the level the study records them.
-    if (studies.length > 1) throw new Error("'" + attribute + "' is numeric, and a median split needs a cohort in a single study (“" + cohort + "” spans " + studies.length + ")");
+    // Across studies, quantiles cut over every study's value counts pooled, by the one-study rule
+    // (pooledCuts: attributeCutsSql's quantilesExact) (STS-STM-12)
+    if (acrossStudies) {
+      if (dist.histogramTruncated || !dist.valueCounts)
+        throw new Error("cannot cut '" + attribute + "' into quantiles across “" + cohort + "”'s studies: a study holds more than " + HISTOGRAM_CAP.toLocaleString("en-US") +
+          " distinct values of it, and a cut from part of them would be wrong");
+      return quantilePartition(cohort, nameFor(attribute), attribute, req.quantiles!, pooledCuts(dist.valueCounts, quantilePoints(req.quantiles!)),
+        (range) => ({ kind: "clinical", attribute, range }), { attribute });
+    }
+    if (studies.length > 1) throw new Error("'" + attribute + "' is numeric, and a live median split needs a cohort in a single study (“" + cohort + "” spans " + studies.length +
+      "); across studies, ask for quantiles: 2, a median cut over their values pooled");
     const name = nameFor(attribute);
     if (req.quantiles != null) {
+      // within one study, ClickHouse cuts at its quantiles
       const r = await resolverOf(studies[0]);
       if (!hasViewAggregates(r)) throw new Error(studies[0] + " cannot answer a quantile split here");
       const ps = quantilePoints(req.quantiles);
       const [m] = await r.viewAggregate("partition:quantiles", def, (c, s, d) => attributeCutsSql(c, attribute, ps, s, d));
       return quantilePartition(cohort, name, attribute, req.quantiles, m, (range) => ({ kind: "clinical", attribute, range }), { attribute });
     }
+    // A median split relative to the cohort being split, through a percentile leaf: the engine
+    // resolves the cutoff live from this cohort's own values, at the level the study records them.
     return { name, note: "split at the median of " + attribute + " within “" + cohort + "”",
       def: { of: cohort, split: name, arms: [{ name: attribute + " below median", where: { kind: "clinical", attribute, op: "<", percentile: 0.5, percentileOf: cohort } }],
         other: attribute + " at or above median", source: { attribute, median: true } } };

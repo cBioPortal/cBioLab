@@ -190,9 +190,9 @@ export interface AttrStats {
   /** numeric: additive moments, from which mean and variance are exact */
   n?: number; sum?: number; sumsq?: number; min?: number; max?: number;
   /**
-   * numeric, single-study callers only (attributeStats' `histograms` option): the complete
-   * (value, count) distribution — enough for an exact median/IQR or a rank-sum test, computed
-   * by the caller. Not requested (and not meaningful to combine across sites) otherwise.
+   * numeric (attributeStats' `histograms` option): the complete (value, count) distribution —
+   * enough for an exact median/IQR or a rank-sum test, computed by the caller, or summed across
+   * studies for a quantile split's pooled cut (proposePartition). Not requested otherwise.
    */
   valueCounts?: { v: number; n: number }[];
   /** true when histograms were requested but this attribute had more than HISTOGRAM_CAP distinct

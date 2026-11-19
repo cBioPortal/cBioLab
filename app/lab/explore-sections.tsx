@@ -806,12 +806,13 @@ function compareAction(values: (PartitionArm & { n: number })[], checked: Partit
 const past = (n: number) => n > COMPARISON_MAX_ACTIVE ? "; the page compares " + COMPARISON_MAX_ACTIVE + " at a time, so it opens with the first " + COMPARISON_MAX_ACTIVE + " and you swap the others in" : "";
 
 /** a numeric chart's "Compare groups ▸ Quartiles / Median / Current bins", as on cBioPortal (or "Analyze groups ▸ …") */
-function compareNumeric(label: string, singleStudy: boolean, working: boolean, quantiles: (n: number) => void, bins: PartitionArm[], onBins: () => void, target: GroupsTarget = "comparison"): ChartAction {
+/** `cuts`: whether the selection can be cut at its quantiles here — a clinical attribute over every selected study, pooled (STS-STM-12); a generic-assay entity within one study */
+function compareNumeric(label: string, cuts: boolean, working: boolean, quantiles: (n: number) => void, bins: PartitionArm[], onBins: () => void, target: GroupsTarget = "comparison"): ChartAction {
   const g = GROUPS[target];
   const multi = "cut points are computed within one study; select a single study to " + g.doing + " its quartiles or median";
   return { label: g.verb + " groups", working, disabled: working, title: g.opens + " " + label + " divided into groups", sub: [
-    { label: "Quartiles", disabled: !singleStudy, onClick: () => quantiles(4), title: singleStudy ? "four groups of (near) equal size, cut at " + label + "'s quartiles within your selection" : multi },
-    { label: "Median", disabled: !singleStudy, onClick: () => quantiles(2), title: singleStudy ? "two groups, at or below / above " + label + "'s median within your selection" : multi },
+    { label: "Quartiles", disabled: !cuts, onClick: () => quantiles(4), title: cuts ? "four groups of (near) equal size, cut at " + label + "'s quartiles within your selection" : multi },
+    { label: "Median", disabled: !cuts, onClick: () => quantiles(2), title: cuts ? "two groups, at or below / above " + label + "'s median within your selection" : multi },
     { label: "Current bins", disabled: bins.length < 2 || bins.length > g.max, onClick: onBins,
       title: bins.length < 2 ? "the chart has fewer than 2 bins with cases" : bins.length > g.max
         ? "the chart has " + bins.length + " bins with cases, and " + g.holds + " at most " + g.max : "one group per bar of the chart (" + bins.length + ")" + g.past(bins.length) }
@@ -846,7 +847,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, selectBars, togglePieValue, toggleNaValue, toggleLogScale } = ctx;
+  const { addClause, addMode, chartBins, setChartBins, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, selectBars, togglePieValue, toggleNaValue, toggleLogScale } = ctx;
   const picks = usePicks();
   const [binsOpen, setBinsOpen] = useState(false);
   const binSet = c.kind === "num" ? chartBins(c.attribute) : undefined;
@@ -897,7 +898,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                     title: binSet?.disableLog ? "draw the bars on a log scale again" : "draw the bars on a linear scale",
                     onClick: () => toggleLogScale(c.attribute, binSet) }] : []),
                   ...(addMode ? [] : [
-                    ...forBoth((t) => compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label, t), bins, () => compareItems(chart, bins, t), t)),
+                    ...forBoth((t) => compareNumeric(label, true, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label, t), bins, () => compareItems(chart, bins, t), t)),
                     ...selected]),
                   { label: "Custom Bins…", disabled: fixed, onClick: () => setBinsOpen(true),
                     title: fixed ? "every value of " + label + " already has a bar of its own (10 or fewer values), so bins don't apply"
