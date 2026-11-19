@@ -770,7 +770,7 @@ g AS (
          max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount
   FROM s GROUP BY k
 ),
-rows AS (SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec) FROM g)
+rows AS (SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec), '' AS genePanel, '' AS genePanelShown FROM g)
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
 -- view 1 alterations: alterations:vafs · msk_chord_2024

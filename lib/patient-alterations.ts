@@ -40,7 +40,7 @@ export const ALTERATION_COLUMNS: Record<AlterationTable, QueryColumn[]> = {
   ],
   cna: [samples, text("gene", "Gene"), genePanel, text("cna", "CNA"), annotation, text("cytoband", "Cytoband"), freq, number("inAll", "Profiled in all samples")],
   sv: [
-    samples, text("gene1", "Gene 1"), text("gene2", "Gene 2"),
+    samples, text("gene1", "Gene 1"), text("gene2", "Gene 2"), genePanel,
     // the portal's s / g badge, not sorted (StructuralVariantTableWrapper: MutationStatus, sortBy a constant)
     { ...text("status", "Status"), unsorted: true },
     text("class", "Variant Class"), text("pos1", "Site 1 Position"), text("pos2", "Site 2 Position"), text("eventInfo", "Event Info"),
@@ -376,7 +376,13 @@ const SV_FIELDS = ["gene1", "gene2", "class", "eventInfo", "pos1", "pos2", "brea
  * among its samples. With no sort, by the first gene, then by the first sample carrying the event
  * (`order`), then the second gene.
  */
-export function patientSvSource(p: TablePart, patient: string, db: string, order: string[], samples: AlterationSamples = "patient"): RowSource {
+/**
+ * One patient's structural variants, one row per event as the portal keys it. With `cover.panels`, the
+ * Gene panel column (hidden by default), as the portal's SV table fills it: each sample's structural-
+ * variant panel, the gene being site 1's (StructuralVariantTableWrapper genePanelProps).
+ */
+export function patientSvSource(p: TablePart, patient: string, db: string, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE): RowSource {
+  const panels = !!cover.panels;
   return {
     with: "WITH " + cohortCte(p, samples) + "s AS (\n" +
       "  SELECT smp.stable_id AS sid, " + ordinalOf(order, "smp.stable_id") + " AS o,\n" +
@@ -401,10 +407,11 @@ export function patientSvSource(p: TablePart, patient: string, db: string, order
       "  SELECT k, " + sampleCols(order) + ",\n" +
       // one tuple per group, so a NULL field is the record's own (argMin alone skips NULLs, mixing records)
       "         argMin(rec0, r) AS rec, " + SV_FIELDS.map((f, i) => "tupleElement(rec, " + (i + 1) + ") AS " + f).join(", ") + ",\n" +
-      "         max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount\n" +
+      "         max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount" + (panels ? ", gene1 AS gene" : "") + "\n" +
       "  FROM s GROUP BY k\n" +
       "),\n" +
-      "rows AS (SELECT " + labels(p, patient) + ", g.* EXCEPT (rec) FROM g)\n",
+      (panels ? missCte(p, patient, db, "STRUCTURAL_VARIANT", samples, true) : "") +
+      "rows AS (SELECT " + labels(p, patient) + ", g.* EXCEPT (rec), " + genePanelSql(panels, order) + " FROM g" + (panels ? " LEFT JOIN miss ON miss.gene = g.gene CROSS JOIN spn" : "") + ")\n",
     columns: ALTERATION_COLUMNS.sv,
     select: "* EXCEPT (k)",
     defaultOrder: "gene1, so, gene2",
@@ -464,7 +471,7 @@ export function patientSamplesSource(p: TablePart, patient: string, db: string, 
 
 /** A table's row source for one patient of `p`'s study. */
 export function alterationSource(table: AlterationTable, p: TablePart, patient: string, db: string, pin: string | null, order: string[], samples: AlterationSamples = "patient", cover: PanelCoverage = NO_COVERAGE, mrna: MrnaRank | null = null): RowSource {
-  return table === "mutations" ? patientMutationsSource(p, patient, db, pin, order, samples, cover, mrna) : table === "cna" ? patientCnaSource(p, patient, db, pin, order, samples, cover) : patientSvSource(p, patient, db, order, samples);
+  return table === "mutations" ? patientMutationsSource(p, patient, db, pin, order, samples, cover, mrna) : table === "cna" ? patientCnaSource(p, patient, db, pin, order, samples, cover) : patientSvSource(p, patient, db, order, samples, cover);
 }
 
 /**
