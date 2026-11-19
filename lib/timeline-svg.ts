@@ -103,7 +103,8 @@ export interface TimelineLayout {
  * The figure, and what a caption must say about it. `interactive` adds the data- attributes the
  * card reads: `data-ev` (event indices) on each mark, `data-uid` on each header that collapses.
  */
-export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, captionText = ""): { svg: string; layout: TimelineLayout } {
+/** The timeline: `svg` whole, `body` its marks without the frame (for a figure that draws it inside its own), and its layout. */
+export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, captionText = ""): { svg: string; body: string; layout: TimelineLayout } {
   const W = Math.max(480, o.width ?? 900);
   const pal = palette(o.theme);
   const ev = t.events;
@@ -230,8 +231,9 @@ export function timelineSvg(t: PatientTimeline, o: TimelineSvgOpts = {}, caption
     parts.push(cap.svg);
     total += cap.height;
   }
+  const body = parts.join("");
   return {
-    svg: frame(W, total, parts.join(""), pal.bg, false, o.interactive ? undefined : "Timeline of " + t.patient),
+    svg: frame(W, total, body, pal.bg, false, o.interactive ? undefined : "Timeline of " + t.patient), body,
     layout: { tracks, rows, cutYears, censored, width: W, height: total, plot: { x: HW, width: PW } },
   };
 }

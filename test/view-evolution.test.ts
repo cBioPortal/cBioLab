@@ -217,7 +217,7 @@ describe("evolution: the patient drawn", () => {
     const w = await run({ chart: "heatmap", logScale: true, dataRange: true }, one(study({ muts: [MUTS[2]] })));
     assert.deepEqual(evo(w).drawn, []);
     assert.equal(evo(w).noVaf, 1);
-    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false, transpose: false, cluster: true, mutationLabels: true, groupBy: null });
+    assert.deepEqual(evo(w).display, { chart: "heatmap", logScale: true, dataRange: true, expandGaps: false, transpose: false, cluster: true, mutationLabels: true, groupBy: null, showTimeline: false });
     assert.match(w.caveat!, /The heatmap has .*; it colours each sample's VAF/);
   });
 
@@ -1101,5 +1101,32 @@ describe("evolution: the heatmap's Data download (PTB-GE-HM-1, the portal's getD
   test("an unrounded VAF is written as it is, as the portal writes its number", () => {
     const one = [{ key: "x", gene: "IDH1", proteinChange: "R132H", mutationType: "", cells: [{ status: "called", vaf: 0.6923, alt: 45, ref: 20 }] }] as never[];
     assert.equal(heatmapTsv(one, [{ id: "T1" }] as never[], false).split("\n")[1], "T1\tIDH1\tR132H\t0.6923076923076923", "45 / 65 from the reads, not the cell's 4 places");
+  });
+});
+
+describe("evolution: Show Timeline (PTB-GE-LC-1, the portal's genomicEvolutionSettings.showTimeline)", () => {
+  const ys = (svg: string, text: string) => [...svg.matchAll(new RegExp('<text x="([\\d.]+)"[^>]*>' + text + "</text>", "g"))].map((m) => Number(m[1]));
+  test("off by default; on, the line chart carries the patient's timeline, offered only with events, never on the heatmap", async () => {
+    const off = evo(await run({}, one()));
+    assert.equal(off.events, 3); assert.equal(off.timeline, undefined); assert.equal(off.display.showTimeline, false);
+    const on = evo(await run({ showTimeline: true }, one()));
+    assert.equal(on.display.showTimeline, true);
+    assert.deepEqual(on.timeline?.events.map((e) => e.start), [0, 300, 700]);
+    assert.equal(evo(await run({ showTimeline: true, chart: "heatmap" }, one())).timeline, undefined, "the heatmap has no timeline");
+    const none = evo(await run({ showTimeline: true, sequential: true }, one(study(), {}, { events: [] })));
+    assert.equal(none.events, 0); assert.equal(none.timeline, undefined, "no events, no timeline");
+    assert.equal((await run({ showTimeline: "yes" } as never, one())).error, "showTimeline is true or false");
+  });
+  test("drawn above the chart, the chart's time axis on the timeline's: each year's tick at the same x in both", async () => {
+    const v = await run({ showTimeline: true }, one());
+    const svg = evolutionSvg(v as never, { width: 900, theme: "light" })!;
+    assert.match(svg, />Specimen</, "the timeline's track");
+    const year = ys(svg, "1y");
+    assert.equal(year.length, 2, "the timeline's axis and the chart's: " + year);
+    assert.equal(year[0], year[1]);
+    const plain = evolutionSvg(await run({}, one()) as never, { width: 900, theme: "light" })!;
+    assert.doesNotMatch(plain, />Specimen</);
+    assert.notEqual(ys(plain, "1y")[0], year[1], "unaligned, the chart's own margin puts the year elsewhere");
+    assert.deepEqual(lintSvg(svg), [], "nothing overprinted or outside");
   });
 });
