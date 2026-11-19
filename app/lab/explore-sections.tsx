@@ -28,6 +28,7 @@ import { chartFileName, saveText, summaryCut, summaryDataTsv, type CategoryCount
 import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import { assayBinText, assayBinWhere, binSelected, chartSelection, naSelected } from "../../lib/explore-selection.ts";
 import { PORTAL_NA } from "../../lib/chart/style.ts";
+import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
 import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
@@ -1210,6 +1211,42 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
         </div>
       );
     })}
+  </>;
+}
+
+/**
+ * the portal's treatment tables (STS-OT-6), when a selected study has treatments: patients per
+ * agent, and samples per agent taken before or after it; the checked rows filter (Union)
+ */
+export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
+  const { addClauses, parseDraft } = ctx;
+  const t = ctx.explore!.treatments;
+  if (!t) return null;
+  const draft = parseDraft();
+  const leftOut = t.leftOut && <p className="note flush mt-1" data-leftout>
+    Not counted: {t.leftOut.join(", ")}, held by a peer whose federation API has no treatment counts.
+  </p>;
+  const table = (level: "patient" | "sample", title: string, meta: string, unit: string, rows: { key: string; name: string; n: number; title: string; extra?: string }[]) => {
+    const on = new Set(appliedTreatmentKeys(draft, level));
+    return (
+      <div className="card" data-treatments={level}>
+        <div className="facettitle">{title}<span className="meta"> · {meta}</span></div>
+        {leftOut}
+        {rows.length ? <ValueList unit={unit} hint={level === "patient" ? "keep the patients treated with any checked treatment" : "keep the samples taken before or after any checked treatment"}
+          extra={level === "sample" ? { head: "Pre / Post", tip: "taken before (Pre) or after (Post) the patient's first treatment with it" } : undefined}
+          rows={rows.map((r) => ({ ...r, on: on.has(r.key) }))}
+          why={(keys) => { const r = treatmentClause(level, keys); return "why" in r ? r.why : null; }}
+          onApply={(keys) => { const r = treatmentClause(level, keys); if ("clauses" in r) addClauses(r.clauses); }} />
+          : !t.leftOut && <p className="note flush mt-1">No {level === "patient" ? "treated patient" : "sample with a time and a treated patient"} in the selection.</p>}
+      </div>
+    );
+  };
+  return <>
+    {table("patient", "Treatment per Patient", fmtInt(t.totalPatients) + " patients treated", "patients treated",
+      t.patients.map((r) => ({ key: r.agent, name: r.agent, n: r.n, title: r.agent + " — " + fmtInt(r.n) + " patients treated" })))}
+    {table("sample", "Treatment per Sample (pre/post)", fmtInt(t.totalSamples) + " samples with a time", "samples acquired before treatment or after/on treatment",
+      sampleTreatmentOrder(t.samples).map((r) => ({ key: sampleTreatmentKey(r.agent, r.time), name: r.agent, extra: r.time, n: r.n,
+        title: r.agent + " — " + fmtInt(r.n) + " samples taken " + (r.time === "Pre" ? "before" : "after") + " the first treatment with it" })))}
   </>;
 }
 

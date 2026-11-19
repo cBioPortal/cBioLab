@@ -35,7 +35,7 @@ import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
-import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
+import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, TreatmentTables, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
@@ -668,6 +668,7 @@ export default function AnalysisPage() {
               <GeneFacets ctx={exploreCtx} />
               <MutationTypeFacets ctx={exploreCtx} />
               <AssayFacets ctx={exploreCtx} />
+              <TreatmentTables ctx={exploreCtx} />
               <StudyBreakdown ctx={exploreCtx} />
               <DataTypes ctx={exploreCtx} />
               <AlteredGenes ctx={exploreCtx} />
