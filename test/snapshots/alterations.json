@@ -412,6 +412,11 @@
                 "numeric": false
               },
               {
+                "id": "genePanel",
+                "name": "Gene panel",
+                "numeric": false
+              },
+              {
                 "id": "proteinChange",
                 "name": "Protein Change",
                 "numeric": false
@@ -532,6 +537,7 @@
                 "values": [
                   "P-0024249-T02-IM7",
                   "KRAS",
+                  "",
                   "G12V",
                   "Oncogenic · Level 1",
                   "Missense",
@@ -575,6 +581,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "PTEN",
+                  "",
                   "G127V",
                   "Likely Oncogenic · Level 1",
                   "Missense",
@@ -618,6 +625,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "TP53",
+                  "",
                   "P151R",
                   "Likely Oncogenic",
                   "Missense",
@@ -680,6 +688,11 @@
                 "numeric": false
               },
               {
+                "id": "genePanel",
+                "name": "Gene panel",
+                "numeric": false
+              },
+              {
                 "id": "cna",
                 "name": "CNA",
                 "numeric": false
@@ -731,6 +744,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "MAP3K1",
+                  "",
                   "HOMDEL",
                   "Likely Oncogenic",
                   "5q11.2",
@@ -752,6 +766,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "RAD51B",
+                  "",
                   "HOMDEL",
                   "Likely Oncogenic · Level 1",
                   "14q24.1",
@@ -773,6 +788,7 @@
                 "values": [
                   "P-0024249-T01-IM6",
                   "PLK2",
+                  "",
                   "HOMDEL",
                   "Unknown",
                   "5q11.2",
