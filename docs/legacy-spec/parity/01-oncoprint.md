@@ -123,7 +123,7 @@ Counts in Q1–Q5 match as on 2026-11-10; the earlier figures (Q2 per sample, Q3
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| ONC-TR-1 | 🟡 | B | Display names, Freq %, Select all (64) / Deselect all, applied by Update tracks, no cap; 64 attributes as legacy (#196); automatic rows (Profiled for, Mutation spectrum) listed first (#258); a patient-level attribute's Freq over samples (#264): every other Q1 row's Freq as the portal's (2026-11-18). Left: numeric names carry " (numeric)" ("Diagnosis Age (numeric)"); the spectrum's Freq (STM-4); no Save tracks (MD-12) |
+| ONC-TR-1 | 🟡 | B | Display names, Freq %, Select all (64) / Deselect all, applied by Update tracks, no cap; 64 attributes as legacy (#196); automatic rows (Profiled for, Mutation spectrum) listed first (#258); a patient-level attribute's Freq over samples (#264): every other Q1 row's Freq as the portal's (2026-11-18); a numeric attribute by its display name alone ("Diagnosis Age", `track-edits.ts:222` tracksMenuText) (#377). Left: the spectrum's Freq (STM-4); no Save tracks (MD-12) |
 | ONC-TR-2 | 🟡 | BC | Unchanged: Heatmap tab lists raw profile ids (`rna_seq_v2_mrna_median_Zscores`, `gistic`) + VAF + generic assays; not hidden for multi-study; free-text genes per profile; no NG-CHM (tracked: gated features) |
 | ONC-TR-3 | 🟡 | BC | Unchanged: generic assay as heatmap rows with entity search; no Select/Clear all, no bar/stacked chart types |
 | ONC-TR-4 | 🟡 | B | Unchanged: "Cohort rows" (≤3) ≈ Groups; "Custom" tab = uploads ≈ Custom Charts |
@@ -264,7 +264,7 @@ Glyph table (colours, bands, z-order) matches legacy exactly for every row prese
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| ONC-MD-1 | 🟡 | BC | Aggregation now the portal's (TT-12); # Samples per Patient still patient columns only (`oncoprint-assemble.ts:157`), legacy keeps it in sample mode |
+| ONC-MD-1 | ✅ | BC | Aggregation the portal's (TT-12); # Samples per Patient on sample columns too, each its patient's queried samples (`oncoprint.ts:208` columnFactsSql, `oncoprint-assemble.ts:429`), with the row's "Show one column per patient." / "sample." (#377). msk_impact_2017 by sample: 1 × 9,774, 2 × 1,038, 3 × 120, 4 × 8, 5 × 5 samples, as the portal's API |
 | ONC-MD-2 | 🟡 | B | Q4: Study of origin, Profiled for rows, 775 (46%) ✅; Heatmap / GA tabs not hidden |
 | ONC-MD-3 | 🟡 | B | NA glyph, "*", Profiled rows ✅; no Show only profiled (tracked) |
 | ONC-MD-4 | ✅ | C | "Show only drivers" disabled with no source on (`DriverSettingsMenu.tsx:88`) (#168) |

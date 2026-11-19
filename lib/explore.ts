@@ -22,8 +22,6 @@ const BIN_INTERVALS = [0.001, 0.002, 0.0025, 0.005, 0.01, 0.02, 0.025, 0.05, 0.1
   1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
 const BIN_INTERVALS_DISCRETE = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000];
 const TARGET_BINS = 20;
-/** how many numeric attributes get a histogram (each costs two grouped queries per study) */
-const NUM_HISTOGRAM_LIMIT = 14;
 /** values returned per categorical facet (a pie shows a few; a ranked list more) */
 /**
  * Safety bound on values per facet, NOT a display choice — the UI scrolls, so
@@ -338,7 +336,7 @@ async function buildExploreOne(args: ExploreArgs): Promise<ExploreResult> {
 
   // ---- numeric histograms (cBioPortal study-view bins) --------------------
   if (!skipBins) {
-    const numFacets = clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
+    const numFacets = clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num");
     await fillHistograms({ facets: numFacets, groups: [{ conn, studies: [study], set: draftSet, scan }], cohort: totals,
       draft, ctx: sctx, bases, settings: binSettings });
   }
@@ -1054,7 +1052,7 @@ async function buildExploreFederatedInner({ studies, draft, oncokbPin, profilesB
   // runs beside them rather than after.
   const binsP = partsP.then(async (parts) => {
     const facets = mergeExplore(parts, !!draft);
-    const numFacets = facets.clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num").slice(0, NUM_HISTOGRAM_LIMIT);
+    const numFacets = facets.clinical.filter((c): c is Extract<ClinicalFacet, { kind: "num" }> => c.kind === "num");
     await fillHistograms({ facets: numFacets, cohort: facets.totals || { patients: 0, samples: 0 },
       groups: groups.map((g) => ({ ...g, set: setOf.get(g)!, scan: scans.get(g) })), draft, ctx: { oncokbPin, profilesByStudy }, bases: await basesP,
       settings: binSettings });

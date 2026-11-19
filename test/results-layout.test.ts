@@ -3,7 +3,7 @@
 // expression tabs follow cBioPortal's cross-study rule.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { resultsGroups, resultsLayout, linkMutations, samplesLine, svCheckCohort } from "../app/portal/results-layout.ts";
+import { entriesHaveOql, resultsGroups, resultsLayout, linkMutations, samplesLine, svCheckCohort } from "../app/portal/results-layout.ts";
 import { arrange } from "../app/portal/page-doc.ts";
 import type { View, Clause } from "../lib/types.ts";
 import type { SelectedProfile } from "../lib/query-options.ts";
@@ -325,4 +325,24 @@ test("Comparison/Survival › Genomic Alterations is one table over every altera
   assert.equal(view.alteration, "any");
   assert.deepEqual(view.cohorts, ["Altered", "Unaltered"]);
   assert.equal(view.minAltered, 1, "every gene tested is listed");
+});
+
+describe("Oncoprint: Show OQL filters starts as the typed query says (ResultsViewOncoprint 528, ONC-VI-6)", () => {
+  const oncoprint = (l: ReturnType<typeof resultsLayout>) => l.doc.views!.find((v) => v.kind === "oncoprint") as unknown as { genes: string[]; display?: { showOql?: boolean } };
+  test("bare genes written out by the profiles: rows carry the line, the toggle starts off", () => {
+    const o = oncoprint(resultsLayout({ ...q(["s"], ["KRAS: MUT", "TP53: MUT"]), typedOql: false }, data()));
+    assert.deepEqual(o.genes, ["KRAS: MUT", "TP53: MUT"]);
+    assert.deepEqual(o.display, { showOql: false });
+  });
+  test("a typed OQL line: the toggle starts on", () => {
+    assert.deepEqual(oncoprint(resultsLayout({ ...q(["s"], ["KRAS: MUT", "TP53"]), typedOql: true }, data())).display, { showOql: true });
+  });
+  test("not said: the engine's default (on only when a row has OQL)", () => {
+    assert.equal(oncoprint(resultsLayout(q(["s"], ["KRAS", "TP53"]), data())).display, undefined);
+  });
+  test("entriesHaveOql reads OQL, not a bare gene or a merged row", () => {
+    assert.equal(entriesHaveOql(["KRAS", "TP53"]), false);
+    assert.equal(entriesHaveOql(["[KRAS NRAS]"]), false);
+    assert.equal(entriesHaveOql(["KRAS", "TP53: MUT"]), true);
+  });
 });

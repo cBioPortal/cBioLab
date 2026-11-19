@@ -11,7 +11,7 @@ import { useLinkParams } from "../../_links/use-link.ts";
 import { PortalTabs } from "../PortalTabs";
 import { useQueryKnown, expressionProfile, discreteCnaProfile, assayComparisonProfiles } from "../study-known";
 import { usePageDoc } from "../page-doc";
-import { resultsLayout, samplesLine, svCheckCohort, syncDriverCohorts, syncDrivers } from "../results-layout.ts";
+import { entriesHaveOql, resultsLayout, samplesLine, svCheckCohort, syncDriverCohorts, syncDrivers } from "../results-layout.ts";
 import { Button } from "../../_ui/button";
 import { TB } from "../../_ui/toolbar.ts";
 import { Pencil } from "lucide-react";
@@ -54,7 +54,8 @@ export default function ResultsPage() {
   // starts at once; with the profiles and attributes Explore's facets give, the rest
   // whether the queried patients carry a structural variant in a queried gene: asked beside the header's count (below)
   const [svs, setSvs] = useState<boolean | null | undefined>(undefined);
-  const asked = useMemo(() => ({ studies, filters: scope, entries: chosen.entries, genes, exp: chosen.exp, prot: chosen.prot, ifHeld: chosen.ifHeld, ...(chosen.selected ? { selected: chosen.selected } : {}) }), [studies, scope, chosen, genes]);
+  const asked = useMemo(() => ({ studies, filters: scope, entries: chosen.entries, genes, exp: chosen.exp, prot: chosen.prot, ifHeld: chosen.ifHeld, ...(chosen.selected ? { selected: chosen.selected } : {}),
+    typedOql: entriesHaveOql(check.entries.map((e) => e.text)) }), [studies, scope, chosen, genes, check]);
   const fresh = useMemo(() => basics && genes.length && genes.length <= RESULTS_MAX_GENES && !queryError && !chosen.waiting && !chosen.error
     ? resultsLayout(asked, known ? {
         expr: expressionProfile(known.profileCatalog), cna: discreteCnaProfile(known.profileCatalog), clinical: known.clinical,

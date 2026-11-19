@@ -194,7 +194,8 @@ const NO_COVERAGE: PanelCoverage = { genes: "any", inAll: false };
  * One patient's mutations, one row per variant however many of the patient's samples carry it (the
  * portal's patient table): the samples listed, the highest allele frequency among them with that
  * sample's reads, the gene's deep copy-number calls in the patient's samples (Copy #), and the share
- * of the study's samples profiled for the gene with any mutation in it (Cohort %). Uncalled calls are
+ * of the study's samples profiled for the gene with any mutation in it (Cohort %; blank for a mutation
+ * with no keyword, which the portal's variant counts do not answer). Uncalled calls are
  * left out, as the portal leaves them out. With no sort, a gene's rows sit together — genes with a
  * driver first, then by name — and within a gene by the first sample carrying the row (`order`, the
  * patient's sample order), then codon.
@@ -205,13 +206,13 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
   return {
     with: "WITH " + cohortCte(p, samples) + "m AS (\n" +
       "  SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
-      "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon,\n" +
+      "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS ac, tumorRefCount AS rc, mutationStatus AS ms, proteinPosStart AS codon, ifNull(keyword, '') AS kw,\n" +
       "         if(tumorAltCount >= 0 AND tumorRefCount >= 0 AND tumorAltCount + tumorRefCount > 0, tumorAltCount / (tumorAltCount + tumorRefCount), NULL) AS f\n" +
       "  FROM " + db + ".mutation_derived\n" +
       "  WHERE " + mutationStudySql(p.study) + " AND patientId = " + sq(patient) + " AND molecularProfileId NOT LIKE '%uncalled%'" + onlyCohort("sampleId", samples) + "\n" +
       "),\n" +
       "g AS (\n" +
-      "  SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, " + sampleCols(order) + ",\n" +
+      "  SELECT gene, proteinChange, mutationType, variantType, chr, start, end, ref, var, any(ms) AS status, min(codon) AS pos, max(kw) AS kw, " + sampleCols(order) + ",\n" +
       "         max(f) AS vaf, argMax(ac, ifNull(f, -1)) AS altCount, argMax(rc, ifNull(f, -1)) AS refCount,\n" +
       // each sample's reads, in the patient's sample order: what the Allele Freq cell draws, and its sort
       // one record per sample (a variant can repeat within a sample: two called profiles, duplicate rows), the first kept
@@ -232,7 +233,7 @@ export function patientMutationsSource(p: TablePart, patient: string, db: string
       "rows AS (SELECT *, max(drv) OVER (PARTITION BY gene) AS gdrv FROM (\n" +
       "  SELECT " + labels(p, patient) + ", g.samples AS samples, g.so AS so, g.gene AS gene, g.proteinChange AS proteinChange, " + annSelect(pin) + ",\n" +
       "         " + (covered ? "toUInt8(ifNull(miss.n, 0) = 0)" : "CAST(NULL AS Nullable(UInt8))") + " AS inAll,\n" +
-      "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, " + (mrna ? "if(mr.gene != '', mr.pct, NULL) AS mrna, if(mr.gene != '', mr.z, NULL) AS mrnaZ" : "CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ") + ", if(ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
+      "         g.mutationType AS mutationType, ifNull(cn.copy, '') AS copy, " + (mrna ? "if(mr.gene != '', mr.pct, NULL) AS mrna, if(mr.gene != '', mr.z, NULL) AS mrnaZ" : "CAST(NULL AS Nullable(Float64)) AS mrna, CAST(NULL AS Nullable(Float64)) AS mrnaZ") + ", if(g.kw != '' AND ifNull(fp.n, 0) > 0, 100 * ifNull(fa.n, 0) / fp.n, NULL) AS freq,\n" +
       // the value the cell shows, filters and searches, to 4 places (the page writes it as the portal does)
       "         round(g.vaf, 4) AS vaf, g.altCount AS altCount, g.refCount AS refCount, g.reads AS reads,\n" +
       "         " + vafVector(order, "arrayMap(x -> tuple(x.1, if(x.2 > 0, x.2 / (x.2 + x.3), NULL)), g.reads)") + " AS vafs, g.variantType AS variantType, g.chr AS chr, g.start AS start, g.end AS end,\n" +

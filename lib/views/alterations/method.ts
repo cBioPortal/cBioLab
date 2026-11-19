@@ -22,7 +22,7 @@ export function alterationsMethod(t: { cohorts: string[]; oncokbPin: string | nu
       (t.genesProfiled === "all" ? "The Mutations and CNA tables keep only rows whose gene every sample in view was profiled for (a panel of the sample's for that data holds the gene, or it is whole-exome/genome); rows off a sample's panel are left out. " : "") +
       (t.mrnaProfile ? "mRNA Expr. (one sample in view): the gene's percentile in that sample within the study's " + t.mrnaProfile + " profile, the first of its profiles matching rna_seq…_zscores as the portal picks it — " +
         "the sample's z-score ranked among every sample's numeric value of the gene there, ties at the highest rank (the values at or below it), as rank ÷ n × 100 to 2 places, half up; the cell writes it rounded to a whole percent. " : "") +
-      "Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call" +
+      "Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; blank for a mutation with no keyword (in-frame indels, splice region), as the portal's variant counts" +
       (t.oncokbPin ? "; the annotation is the OncoKB " + t.oncokbPin + " call for the protein change, or for AMPLIFICATION / DELETION" : "") + ".",
     params: t.tables.map((x) => [x.name, (x.queryText ? x.total.toLocaleString("en-US") + " of " : "") + x.all.toLocaleString("en-US") + " rows" + (x.queryText ? " (kept: " + x.queryText + ")" : "")] as [string, string]),
   });

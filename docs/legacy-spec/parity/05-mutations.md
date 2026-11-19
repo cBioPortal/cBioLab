@@ -146,7 +146,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-LP-7 | ✅ | B | Heights identical on 125/125 stems (KRAS, TP53) |
 | MUT-LP-8 | ✅ | BC | Palette identical; stem colours identical on 125/125 stems; driver → count → priority rule (`lollipop.ts lollipopColor`) |
 | MUT-LP-9 | ✅ | BC | "G12D/V/C and 3 more", "R175H/C"; tie rule copied (`labelledPosition`) |
-| MUT-LP-10 | 🔶 | B | Unchanged: native SVG title "codon 11: 1 mutation / A11_G12dup 1" |
+| MUT-LP-10 | ✅ | B | "142 mutated of 594 profiled patients" / "AA Change: G12D/V/C/A/S/R" on Q1 KRAS codon 12, as the portal (`lib/lollipop.ts` lollipopStemTip); shown as the native SVG title (#379) |
 | MUT-LP-11 | 🟡 | B | Unchanged: click / shift-click select codons, table narrows; no hover → row highlight |
 | MUT-LP-12 | 🟡 | BC | Unchanged: domain tip "Ras (PF00071): 5–164"; no description, PFAM / Mutation Aligner links |
 
@@ -175,7 +175,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-COL-0 | 🟡 | BC | Unchanged: one row per call, nulls last; no per-column default direction |
+| MUT-COL-0 | ✅ | BC | One row per call, nulls last both ways; a header's first click ascending, gnomAD / ClinVar / dbSNP descending, the sorted column flips (LazyMobXTable getNextSortAscending; `lib/table-sort.ts` headerSort, `firstSort` on MUTATION_COLUMNS) (#383) |
 | MUT-COL-1 | 🐞 ok | C | Multi-study adds cohort + study columns (`DataTable.tsx:448`), so the study is shown (raw id, not a name link) |
 | MUT-COL-2 | ✅ | C | Gene, hidden by default; a fusion row's is its site 1 gene (`mutation-table.ts:23`) (#245) |
 | MUT-COL-3 | ✅ | B | Sample link → `/portal/patient?study=&sample=`, new tab |
@@ -197,7 +197,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-19 | 🟡 | B | Unchanged: "MS" raw; no S / G badges |
 | MUT-COL-20 | ✅ | C | VS, hidden (#245) |
 | MUT-COL-21 | ✅ | C | Center, hidden (#245) |
-| MUT-COL-22 | 🟡 | C | Unchanged: Chromosome sorts as text (`mutation-table.ts:54`, no order) |
+| MUT-COL-22 | ✅ | C | Chromosome sorts by the portal's value: the first integer, X 23, Y 24, else −1, blank last (`lib/mutation-sort.ts` chromosomeSortSql) (#381) |
 | MUT-COL-23 | ✅ | C | Start / End numeric |
 | MUT-COL-24 | ✅ | C | Ref / Var |
 | MUT-COL-25 | ✅ | C | HGVSg from the mutation's coordinates ("12:g.25398283_25398284insCCAGCT") (#245) |
@@ -284,13 +284,13 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 |---|---|---|---|
 | MUT-STM-1 | 🟡 | BC | KRAS 36.7 %, TP53 52.9 %, TMPRSS2 41.5 % (#230), ERG 2.8 % as legacy; germline test /germline/i (#250); format still `fmtShare`: lgg_ucsf_2014 IDH1 "100%", the portal "100.0%" (2026-11-18) |
 | MUT-STM-2 | ✅ | B | Distinct patient + change per codon; 125/125 stems identical |
-| MUT-STM-3 | 🐞 ok | BC | No mislabelled "profiled" denominator; but no denominator at all |
+| MUT-STM-3 | ✅ | BC | M = the queried patients, whatever their profiling, as the portal's filteredPatients (its "profiled" wording copied); summed over studies (`LollipopReport.cohortPatients`, `buildLollipopGene`); Q1 594 (#379) |
 | MUT-STM-4 | 🟡 | B | Totals as legacy; driver split differs where the stores are not loaded: TP53 325/7 vs 329/3 (hotspots), TMPRSS2 Fusion 0/236 vs 207/29 (no OncoKB pair calls in the pinned v7.5 store; #230 matched at v7.7); tally follows the table's search and filters |
 | MUT-STM-5 | 🟡 | BC | 4 decimals below 0.01, else 2 (`portalVaf`, and the same in search and CSV); a negative count gives none; 0 shown blank where the portal writes "NA" on screen |
 | MUT-STM-6 | 🟡 | BC | Raw counts; 0 or less blank; no multi-sample "sampleId: value" form |
 | MUT-STM-7 | ✅ | BC | `MUTATION_COUNT`, identical 555/555 |
 | MUT-STM-8 | N/A | C | Cohort column not on the Results tab |
-| MUT-STM-9 | 🟡 | C | Unchanged |
+| MUT-STM-9 | ✅ | C | Protein Change by codon then the letters' character codes (calcProteinChangeSortValue: V600E < V600K; KRAS G12A < G12C < G12D), Chromosome as a number (X 23, Y 24), HGVSc by the number after "c."; SQL equals the legacy rule on the warehouse's 936,566 protein changes and 26 chromosomes (`lib/mutation-sort.ts`) (#381) |
 | MUT-STM-10 | ✅ | C | Was 🔶: [OncoKB bio 5/0, TxS 1=6…4=1, TxR R1=3…, Dx, Px], then CIViC 0, hotspot 1, reVUE 0, element-wise descending (`lib/mutation-table.ts:85`, `lib/sv-oncokb.ts:130-136`) (#309); the cancer-gene element is left out, the same for every row of one gene's table |
 | MUT-STM-11 | ✅ | C | Copy # is the sample's discrete call for the gene; Q1 KRAS G12C rows ShallowDel / Gain / Diploid as legacy (#245) |
 | MUT-STM-12 | ❌ | C | Unchanged: no ASCN |
