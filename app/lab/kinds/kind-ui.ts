@@ -58,6 +58,8 @@ export interface KindCardCtx {
   locked?: string[];
   /** the page shows one patient (the Patient page): a patient view draws them without the navigator through the cohort's others */
   fixedPatient?: boolean;
+  /** the page's sample order (the Patient page's numbered markers): a per-sample table on its side follows it */
+  sampleOrder?: readonly string[];
 }
 
 /** The add-view dialog's categories, in its sidebar's order. */
