@@ -148,7 +148,8 @@ export function selectBins(draft: CohortDef | null | undefined, attribute: strin
 }
 
 /** the values a chart's clauses select, when they are one plain value list (`=` or `values`) */
-function chartValues(draft: CohortDef | null | undefined, attribute: string): (string | number)[] | null {
+/** the values a categorical chart filters on, when its filter is one list of them; null otherwise */
+export function chartValues(draft: CohortDef | null | undefined, attribute: string): (string | number)[] | null {
   const sel = chartSelection(draft, attribute);
   if (sel.length !== 1 || sel[0].length !== 1) return null;
   const l = sel[0][0];

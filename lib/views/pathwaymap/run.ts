@@ -13,6 +13,8 @@ import { parseOql } from "../../oql-parse.ts";
 import { hasOql } from "../../oql-match.ts";
 import { resolveDrivers } from "../../driver-settings.ts";
 import { variantPins } from "../../variant-annotation.ts";
+import { PATIENT_ID } from "../../patient-timeline.ts";
+import { pathwayNotProfiled } from "./profiled.ts";
 
 const COHORT_LIMIT = 4;
 const QUERY_LIMIT = 100;
@@ -40,6 +42,10 @@ export async function runPathwayMap(view: PathwayMapView, ctx: ViewRun): Promise
     query = [...new Set(raw as string[])];
     { const e = overLimit("a pathwaymap view", QUERY_LIMIT, query.length); if (e) return refuse("pathwaymap", ctx, e.replace("at most " + QUERY_LIMIT, "at most " + QUERY_LIMIT + " query genes")); }
   }
+  if (view.patient != null && (typeof view.patient !== "object" || typeof view.patient.study !== "string" || typeof view.patient.id !== "string" || !PATIENT_ID.test(view.patient.id)))
+    return refuse("pathwaymap", ctx, "patient is {study, id}: a study of the view's cohort and a patient id in it, e.g. {\"study\": \"glioma_msk_2018\", \"id\": \"IM-GBM-28\"}");
+  if (view.patient && !vStudies.includes(view.patient.study))
+    return refuse("pathwaymap", ctx, "patient " + view.patient.id + " is named in " + view.patient.study + ", which this view's cohorts do not span (" + vStudies.join(", ") + ")");
   const empty = vNames.filter((n) => !cohorts[n].count);
   if (empty.length) return refuse("pathwaymap", ctx, "nothing to count: cohort " + empty.map((n) => "“" + n + "”").join(" and ") + (empty.length === 1 ? " is" : " are") + " empty");
 
@@ -92,9 +98,10 @@ export async function runPathwayMap(view: PathwayMapView, ctx: ViewRun): Promise
   catch (e) { problem = (e as Error).message; arranged = arrangeFor({ query: q, genes: rows }, {}); }
   const drawn = PATHWAYS.find((p) => p.name === arranged.pathway)!;
   const multi = vStudies.length > 1;
+  const np = view.patient ? await pathwayNotProfiled(ctx, view.patient) : null;
   const result = {
     kind: "pathwaymap" as const, cohorts: vNames,
-    pathwaymap: { query: q, queryFrom, genes: rows, ...arranged },
+    pathwaymap: { query: q, queryFrom, genes: rows, ...arranged, ...(np ? { notProfiled: np } : {}) },
     method: pathwayMapMethod({
       cohorts: vNames, query: q, queryFrom, settings: arranged.settings,
       perSite: perSite.map((p) => ({ cohort: p.cohort, study: p.study, cohortPatients: cohorts[p.cohort].perStudy[p.study]?.count || 0 })),
@@ -104,7 +111,8 @@ export async function runPathwayMap(view: PathwayMapView, ctx: ViewRun): Promise
       pathways: PATHWAYS.filter((p) => !arranged.settings.pancanOnly || p.pancan).map((p) => ({ name: p.name, genes: p.genes })),
       drawn: drawn.genes.filter((g) => !arranged.labels.includes(g)),
     }),
-    participation: ctx.participationFor(vStudies, false),
+    // naming a patient's samples makes the result patient-level
+    participation: ctx.participationFor(vStudies, np != null && !("error" in np)),
     ...(multi ? { studies: vStudies } : {}),
     caveat: "Each gene node's % is the share of the cohort's samples profiled for THAT gene (on a mutation, copy-number or structural-variant panel covering it) " +
       "with a mutation, a high-level copy-number change (amplification or deep deletion) or a structural variant in it; a sample whose panel omits the gene is not counted, and a gene no sample was profiled for reads N/P, never 0%. " +
@@ -114,7 +122,9 @@ export async function runPathwayMap(view: PathwayMapView, ctx: ViewRun): Promise
         : "Without query genes, the ranking matches the " + q.length + " library gene" + (q.length === 1 ? "" : "s") + " altered in the cohort. ") +
       (vNames.length > 1 ? "With several cohorts a gene's frequency weight is its highest across them. " : "") +
       "Pathway diagrams: PathwayMapper (i-Vis at Bilkent), " + PATHWAYS.length + " pathways from TCGA publications." +
-      (multi ? " Counts are summed across " + vStudies.length + " studies; overlap is not deduplicated." : ""),
+      (multi ? " Counts are summed across " + vStudies.length + " studies; overlap is not deduplicated." : "") +
+      (np && !("error" in np) && np.note ? " " + np.note : "") +
+      (view.patient && !np ? " Which of " + view.patient.id + "'s samples were profiled is not shown: " + view.patient.study + " does not disclose a patient's samples here." : ""),
   };
   return problem ? { ...result, error: problem } : result;
 }

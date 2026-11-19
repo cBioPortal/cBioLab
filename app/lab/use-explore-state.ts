@@ -10,6 +10,7 @@ import { normalizeDef } from "./pills";
 import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, NumericBin, PartitionArm, PartitionDef } from "../../lib/types.ts";
 import { GENOMIC_CHARTS, geneChartsAsked, geneChartsChanged, withoutAttribute, type GeneChartKind } from "../../lib/study-view-add-chart.ts";
 import { densityPairKey, type DensityPair } from "../../lib/study-view-density.ts";
+import { VIOLIN_CHART_LIMIT, violinChartRemoval, violinPairKey, type ViolinPair } from "../../lib/study-view-violin.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, withoutChart, comparisonCohorts, type ChartKey } from "../../lib/partition-arms.ts";
@@ -39,7 +40,7 @@ export type GroupsTarget = "comparison" | "analysis";
 export type EditingCohort = { id: string; name: string; def: CohortDef };
 
 import { toggleQueued, withoutGeneTableClauses } from "../../lib/study-view-gene-tables.ts";
-import { driverOql, geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
+import { driverOql, geneStatesFilter } from "../../lib/gene-state-clauses.ts";
 import { CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
@@ -100,6 +101,8 @@ export function useExploreState(page: ExplorePage) {
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
   const [addChartOpen, setAddChartOpen] = useState(false);
+  /** the chart menu opened as the Clinical Data tab's Columns (Clinical · Genomic · X vs Y only, STV-CD-9) */
+  const [chartMenuColumns, setChartMenuColumns] = useState(false);
   const [chartTab, setChartTab] = useState<"clinical" | "genomic" | "gene" | `assay:${string}` | "derived" | "custom" | "xvsy">("clinical");
   const [cName, setCName] = useState("");
   const [cDefText, setCDefTextState] = useState(JSON.stringify({ all: [] }, null, 2));
@@ -480,6 +483,7 @@ export function useExploreState(page: ExplorePage) {
       geneCharts: geneChartsRef.current,
       assayCharts: assayChartsRef.current,
       mutationTypeCharts: mutationTypeChartsRef.current,
+      violinCharts: violinChartsRef.current,
       derived: exDerivedRef.current,
       uploads: customDataKey(),
       drivers: driversRef.current,
@@ -631,7 +635,8 @@ export function useExploreState(page: ExplorePage) {
 
   /** the clauses that select any of several states of one gene's facet, or why that cannot be one filter */
   const geneStatesClauses = (gene: string, type: "MUTATION" | "CNA", states: string[]): { clauses: any[] } | { why: string } =>
-    geneStatesClausesFor(gene, type, states, !!explore?.drivers);
+    // named for the chart and its states, so the filter bar writes "<chart> : <state>" (STV-FB-3 #5)
+    geneStatesFilter(gene, type, states, !!explore?.drivers);
 
   /** which of a charted gene's two status charts are shown (STV-AC-5: one chart per gene and profile) */
   const [geneKinds, setGeneKinds] = useState<Record<string, ("MUTATION" | "CNA")[]>>({});
@@ -663,6 +668,20 @@ export function useExploreState(page: ExplorePage) {
     const r = xyChartRemoval(xyCharts, densityBins.current, pair);
     setXyCharts(r.pairs);
     densityBins.current = r.bins;
+    clearAttributeFilters(r.clear);
+  };
+  /** the reader's violin tables (STS-VI-1), one per categorical and numeric pair, counted by the server */
+  const [violinCharts, setViolinCharts] = useState<ViolinPair[]>([]);
+  const violinChartsRef = useRef<ViolinPair[]>([]);
+  const setViolins = (next: ViolinPair[]) => { violinChartsRef.current = next; setViolinCharts(next); fetchExplore(); };
+  const addViolinChart = (pair: ViolinPair) => {
+    if (violinCharts.some((p) => violinPairKey(p) === violinPairKey(pair))) return;
+    setViolins([...violinCharts, pair].slice(-VIOLIN_CHART_LIMIT));
+  };
+  /** Remove chart, as the portal's: the table goes with its filters on both attributes */
+  const removeViolinChart = (pair: ViolinPair) => {
+    const r = violinChartRemoval(violinCharts, pair);
+    setViolins(r.pairs);
     clearAttributeFilters(r.clear);
   };
   const chartAssay = (profileType: string, entity: string) => {
@@ -909,7 +928,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, toggleLogScale, addBinEdges, addDensitySelection, chartGene, unchartGene, geneKinds, mutationTypeCharts, assayCharts, chartAssay, unchartAssay, xyCharts, addXyChart, removeXyChart, clearDensitySelection, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, clearGeneTableFilter, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartMenuColumns, setChartMenuColumns, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, toggleLogScale, addBinEdges, addDensitySelection, chartGene, unchartGene, geneKinds, mutationTypeCharts, assayCharts, chartAssay, unchartAssay, xyCharts, addXyChart, removeXyChart, clearDensitySelection, violinCharts, addViolinChart, removeViolinChart, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, clearGeneTableFilter, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

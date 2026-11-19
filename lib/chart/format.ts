@@ -221,6 +221,9 @@ export const fmtFloat32 = (x: number): string => String(Number(x.toPrecision(7))
 /** a number to `d` places, as the portal's `toFixed(d)` writes it, with a hyphen for minus ("-0.3317") */
 export const portalFixed = (x: number, d: number): string => x.toFixed(d);
 
+/** a number to at most `d` places with trailing zeros dropped, as the portal's toFixedWithoutTrailingZeros ("58.25", "69", "52.5") */
+export const portalFixedTrim = (x: number, d: number): string => String(Number(x.toFixed(d)));
+
 /** a number as the portal's bare `toLocaleString()` writes it in an en-US browser: separators, three decimals at most ("1,234.568") */
 export const portalLocale = (x: number): string => x.toLocaleString("en-US");
 

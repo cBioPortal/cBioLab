@@ -3,7 +3,12 @@ import type { ViewKindDef } from "../kind-def.ts";
 import { pathwayMapSvg } from "./figure.ts";
 import { fmtNum } from "../../svg-kit.ts";
 import { pathwayNamed } from "./library.ts";
+import type { PathwayMapNotProfiled } from "./profiled.ts";
 
+/** the Pathways tab's alert as text: a line per profile with samples outside it */
+const notProfiledText = (np: PathwayMapNotProfiled | undefined): string => !np ? ""
+  : "error" in np ? "\n  samples not profiled: not shown (" + np.error + ")"
+  : np.alerts.map((a) => "\n  " + (a.samples.length === 1 ? "Sample " : "Samples ") + a.samples.join(", ") + " not profiled for " + a.what).join("");
 const pathwayGenes = (name: string): string[] => pathwayNamed(name)?.genes || [];
 
 export const pathwaymapKind: ViewKindDef<"pathwaymap"> = {
@@ -18,7 +23,7 @@ export const pathwaymapKind: ViewKindDef<"pathwaymap"> = {
       `${pm.settings.pancanOnly ? ", TCGA PanCanAtlas pathways" : ", all " + pm.ranked.length + " pathways"}; query ${pm.queryFrom === "genes" ? pm.query.join(" ") : pm.query.length + " altered genes"}):\n` +
       `  ranking: ` + pm.ranked.slice(0, 10).map((r) => `${r.name} ${fmtNum(r.score)}${r.matched.length ? " (" + r.matched.join(",") + ")" : ""}`).join("; ") + "\n" +
       `  gene nodes: ` + pathwayGenes(pm.pathway).map((g) => g + " " + (byGene.has(g) ? pct(g) : "(a group, no frequency)")).join("; ") +
-      caveatOf(v) + noteOf(v));
+      notProfiledText(pm.notProfiled) + caveatOf(v) + noteOf(v));
   },
   help: {
     title: "What is this?",

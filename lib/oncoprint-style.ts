@@ -172,6 +172,8 @@ export const STYLE = {
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22,
     // a label past 18 characters prints its first 15 and "..." (oncoprintjs oncoprintlabelview shortenLabelIfNecessary)
     labelMaxChars: 18,
+    // between track groups (clinical, genetic, each heatmap profile): oncoprintjs init_track_group_padding
+    trackGroupGap: 10,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,
     // a row pooling several genes wears the brackets that made it, the way the query spells it

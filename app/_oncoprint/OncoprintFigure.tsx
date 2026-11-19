@@ -11,10 +11,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { unpackContract, type UnpackedContract } from "../../lib/oncoprint-binary.ts";
 import { zoomedTip } from "./zoomed-tip.ts";
 import { clusterSort, clusteredProfile, isEngineSortKey, selectSort, trackSort } from "./track-edits.ts";
-import { GEOM, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
+import { GEOM, rowTops, canvasHeight, decodeGene, draw, fitZoom, fitAlteredView, groupOffsets, hitTest, hitRect, paletteOf, segmentByTrack, sortColumns,
   virtualWidth, type Gap, type Hit, type View, type VisibleGroup } from "./canvas.ts";
 import { FloatingTip, useHoverTip, type TipBox } from "../_ui/tooltip.tsx";
 import { portalTipNumber } from "../../lib/chart/format.ts";
+import { trackAtY, trackTops } from "../../lib/oncoprint-rows.ts";
 import { STYLE, thresholdColor, stackColor, clinicalLegend, alteredColumns, emptyClinicalKey, heatColor, geneLegend, glyphPresence, numericValue, resolveStyle, stackCellText, staircaseOptions, styleForDisplay, trackCategoryColor, trackTooltipLines } from "../../lib/oncoprint-style.ts";
 import { labLinks } from "../../lib/lab-links.ts";
 import type { ColumnDetail } from "../../lib/oncoprint-detail.ts";
@@ -359,7 +360,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   useEffect(() => {
     const cv = canvasRef.current; if (!cv || !data || !visible) return;
     const dpr = window.devicePixelRatio || 1;
-    const H = canvasHeight(data.tracks.length);
+    const H = canvasHeight(data.tracks);
     if (cv.width !== Math.round(cssW * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(cssW * dpr); cv.height = Math.round(H * dpr); }
     cv.style.width = cssW + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
@@ -377,7 +378,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   useEffect(() => {
     const cv = miniRef.current; if (!cv || !data || !visible || !showMini) return;
     const dpr = window.devicePixelRatio || 1;
-    const H = data.tracks.length * MINI_ROW + 2;
+    const mini = { rowH: MINI_ROW - 1, rowGap: 1, header: 0, trackGroupGap: 1 };
+    const H = trackTops(data.tracks, mini).at(-1)! + 2;
     cv.width = Math.round(cssW * dpr); cv.height = Math.round(H * dpr);
     cv.style.width = cssW + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
@@ -385,7 +387,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const S = styleForDisplay(resolveStyle(data.display?.style), display);
     // the same renderer at row height 3 and no gutter: an overview, not a second drawing
     const saved = { ...GEOM };
-    Object.assign(GEOM, { rowH: MINI_ROW - 1, rowGap: 1, gutter: 0, header: 0 });
+    Object.assign(GEOM, { ...mini, gutter: 0 });
     try {
       draw(ctx, data, visible.order, visible.groups, { zoom: fitZoom(visible.groups, cssW, gapPx), scrollX: 0, whitespace: false },
         cssW, paletteOf(S), { gap: gapPx, style: S, colors: display.colors ?? data.display?.colors });
@@ -405,7 +407,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     if (!exportOpen || !data || !visible) return;
     const cv = exportCanvas; if (!cv) return;
     const w = Math.max(200, Math.round(exportWidthIn * EXPORT_LAYOUT_DPI));
-    const H = canvasHeight(data.tracks.length);
+    const H = canvasHeight(data.tracks);
     cv.width = w; cv.height = H;
     cv.style.width = w + "px"; cv.style.height = H + "px";
     const ctx = cv.getContext("2d")!;
@@ -494,8 +496,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
   /** the track whose row contains this canvas y, or -1 */
   const trackAt = (y: number): number => {
     if (!data) return -1;
-    const ti = Math.floor((y - GEOM.header) / (GEOM.rowH + GEOM.rowGap));
-    return ti >= 0 && ti < data.tracks.length && y - GEOM.header - ti * (GEOM.rowH + GEOM.rowGap) <= GEOM.rowH ? ti : -1;
+    return trackAtY(y, rowTops(data.tracks), GEOM.rowH);
   };
 
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -514,7 +515,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
     const hit = hitTest(x, y, data, visible.order, visible.groups, shownView, gapPx);
     // the tip sits against its cell, and stays put while the pointer stays in that cell
     const same = hit && hover && hover.hit.ti === hit.ti && hover.hit.k === hit.k && hover.hit.k1 === hit.k1;
-    const cell = hit && !same ? hitRect(hit, visible.groups, shownView, cssW, gapPx) : null;
+    const cell = hit && !same ? hitRect(hit, data.tracks, visible.groups, shownView, cssW, gapPx) : null;
     hoverAt(same ? hover : hit && cell
       ? { hit, at: { left: rect.left + cell.left, right: rect.left + cell.right, top: rect.top + cell.top, bottom: rect.top + cell.bottom } }
       : null, e.clientX, e.clientY);
@@ -768,7 +769,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
         const scale = exportDpi / EXPORT_LAYOUT_DPI;
         const S2 = figureStyle(data, display);
         const cv = document.createElement("canvas");
-        const H = canvasHeight(data.tracks.length);
+        const H = canvasHeight(data.tracks);
         cv.width = Math.round(w * scale); cv.height = Math.round(H * scale);
         const ctx = cv.getContext("2d")!;
         ctx.setTransform(scale, 0, 0, scale, 0, 0);
@@ -950,8 +951,8 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
               const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
               const x = e.clientX - rect.left, y = e.clientY - rect.top;
               if (x >= GEOM.gutter) { setTrackMenu(null); return; }
-              const ti = Math.floor((y - GEOM.header) / (GEOM.rowH + GEOM.rowGap));
-              setTrackMenu(ti >= 0 && ti < data.tracks.length ? { ti, cx: e.clientX, cy: e.clientY } : null);
+              const ti = trackAtY(y, rowTops(data.tracks), GEOM.rowH);
+              setTrackMenu(ti >= 0 ? { ti, cx: e.clientX, cy: e.clientY } : null);
             }} />
           {trackMenu && (() => {
             const t = data.tracks[trackMenu.ti];
@@ -1027,7 +1028,7 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
             const x0 = Math.max(GEOM.gutter, Math.min(cssW, r.x0)), x1 = Math.max(GEOM.gutter, Math.min(cssW, r.x1));
             if (x1 <= x0) return null;
             return (
-              <div className="onco-marquee" style={{ left: x0, width: x1 - x0, height: canvasHeight(data.tracks.length) }}>
+              <div className="onco-marquee" style={{ left: x0, width: x1 - x0, height: canvasHeight(data.tracks) }}>
                 {sel?.live && <span className="onco-marquee-n">
                   {selCount.toLocaleString()} {data.unit}{selCount === 1 ? "" : "s"}</span>}
               </div>

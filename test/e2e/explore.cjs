@@ -652,6 +652,40 @@ async function explore({ ok, BASE, page, browser }) {
   } catch (e) { ftDetail = String(e.message).split("\n")[0]; }
   ok("explore: the arm-level CNA frequency table shows altered categories, losses first, and a row filters to its cases", ftOk, ftDetail);
 
+  // the clinical violin table (STS-VI-1…6): Sex against Diagnosis Age on luad, its rows, # and
+  // quartiles as cbioportal.org's (/api/clinical-data-violin-plots/fetch: Female 265 58.5 / 66 / 73,
+  // Male 230 59 / 66 / 72), and a category's checkbox filtering on it
+  let vtDetail = "", vtOk = false;
+  try {
+    await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+    await page.locator("[data-chart=mutcount-fga] svg.xc-density").waitFor({ timeout: 240000 });
+    await page.getByRole("button", { name: /Add chart/ }).first().click();
+    await page.getByRole("tab", { name: "X vs Y" }).click();
+    const pick = async (which, name) => { await page.getByRole("combobox", { name: which }).click(); await page.getByRole("option", { name, exact: true }).click(); };
+    await pick("Select first clinical attribute", "Sex"); await pick("Select second clinical attribute", "Diagnosis Age");
+    await page.locator(".addchart button", { hasText: "Add violin/box plot table" }).click();
+    await page.keyboard.press("Escape");
+    const card = page.locator("[data-chart=violin]");
+    await card.locator("tbody tr").first().waitFor({ timeout: 240000 });
+    const title = (await card.locator(".xc-title").innerText()).trim();
+    const rows = await card.locator("tbody tr").evaluateAll((rs) => rs.map((r) => [...r.querySelectorAll("td")].filter((_, i) => i !== 1).map((td) => td.innerText.trim()).join(" ")));
+    const curves = await card.locator("tbody path").count();
+    await card.getByRole("checkbox", { name: /Female/ }).click();
+    await page.waitForFunction(() => /Female/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    await page.waitForFunction(() => document.querySelectorAll("[data-chart=violin] tbody tr").length === 1, null, { timeout: 240000 });
+    const after = await card.locator("tbody tr").evaluateAll((rs) => rs.map((r) => [...r.querySelectorAll("td")].filter((_, i) => i !== 1).map((td) => td.innerText.trim()).join(" ")));
+    const checked = await card.getByRole("checkbox", { name: /Female/ }).isChecked();
+    // Remove chart takes the table and its category filter
+    await card.getByRole("button", { name: /actions for/ }).click();
+    await page.getByRole("menuitem", { name: "Remove chart" }).click();
+    await page.waitForFunction(() => !/Female/.test(document.querySelector(".svpills")?.textContent || ""), null, { timeout: 240000 });
+    const removed = await page.locator("[data-chart=violin]").count();
+    vtDetail = JSON.stringify({ title, rows, curves, after, checked, removed });
+    vtOk = title === "Diagnosis Age vs Sex" && JSON.stringify(rows) === JSON.stringify(["Female 265 66 58.5 73", "Male 230 66 59 72"]) && curves === 2
+      && JSON.stringify(after) === JSON.stringify(["Female 265 66 58.5 73"]) && checked && removed === 0;
+  } catch (e) { vtDetail = String(e.message).split("\n")[0]; }
+  ok("explore: a violin table of Sex against Diagnosis Age, as the portal counts it; a category's checkbox filters on it, Remove chart clears it", vtOk, vtDetail);
+
   // the treatment tables (STS-OT-6), shown when the study has treatments: patients per agent, most
   // first; a checked agent applied filters on it, and the sample table narrows with it
   let txDetail = "", txOk = false;
@@ -697,7 +731,8 @@ async function explore({ ok, BASE, page, browser }) {
     const pick = rows[rows.length - 1][0];
     await card.locator(".valrow", { has: page.locator(".vname", { hasText: new RegExp("^" + pick + "$") }) }).click();
     await card.getByRole("button", { name: "Apply filter" }).click();
-    await page.waitForFunction((t) => document.body.innerText.includes("KRAS mutation type: " + t), pick, { timeout: 240000 });
+    // the filter bar names the table and its type, as the portal's (STV-FB-3 #7): "KRAS: mutation types : <type>"
+    await page.waitForFunction((t) => [...document.querySelectorAll("[data-sv-gene='KRAS: mutation types'] [data-sv-pill]")].some((e) => e.getAttribute("data-sv-pill") === t), pick, { timeout: 240000 });
     await page.waitForFunction((t) => document.querySelector("[data-mutationtypes='KRAS'] .valrow.on .vname")?.textContent === t, pick, { timeout: 240000 });
     const after = await card.locator(".valrow .vname").allInnerTexts();
     mtDetail = JSON.stringify({ header, rows, pick, after });

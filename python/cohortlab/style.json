@@ -591,6 +591,7 @@
     "groupGap": 10,
     "header": 22,
     "labelMaxChars": 18,
+    "trackGroupGap": 10,
     "cellPad": 1,
     "padMinZoom": 6,
     "mergedBrackets": [

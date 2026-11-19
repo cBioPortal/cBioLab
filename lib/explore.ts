@@ -4,17 +4,19 @@
 import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, discreteCnaProfileSql, type DerivedMetric } from "./cohort2.ts";
-import { CNA_LEVELS, DISCRETE_CNA_PROFILE, isMutationTypeLeafFor, mutationTypeLabel } from "./gene-state-clauses.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE, geneStateLabel, isMutationTypeLeafFor, mutationTypeLabel } from "./gene-state-clauses.ts";
 import { SAMPLE_TIME_EVENTS, TREATMENT_EVENT } from "./treatment-tables.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
 
-import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, DerivedFacet, DerivedRequest, AssayFacet, MutationTypeFacet, TreatmentFacets, AssayFreqTable } from "./types.ts";
+import type { ExploreResult, ClinicalFacet, CohortDef, ChRow, StudyBreakdownRow, GeneTableRow, GeneStateFacet, DerivedFacet, DerivedRequest, AssayFacet, MutationTypeFacet, TreatmentFacets, AssayFreqTable, ViolinFacet } from "./types.ts";
 import { assayEntitySearchSql, isCategoricalAssay, ASSAY_MISSING_VALUES } from "./generic-assay.ts";
 import { ASSAY_FREQ_TABLE_LIMIT, freqTableKeeps } from "./assay-frequency-table.ts";
 import { clinicalValueFold, clinicalValueFoldSql, keptSpelling } from "./event-names.ts";
 import { dataBins, recountBins, type BinInput, type BinSettings } from "./data-binner.ts";
 import { clinicalTable, clinicalMetaTable, ATTR_NAME_RE, customAttributesFor, withSampleLevel } from "./custom-data.ts";
+import { fmtInt } from "./chart/format.ts";
+import { VIOLIN_CHART_LIMIT } from "./study-view-violin.ts";
 
 /** values returned per categorical facet (a pie shows a few; a ranked list more) */
 /**
@@ -867,9 +869,9 @@ async function geneStateFacets(opts: {
         gene, type: "MUTATION", per: "sample", total, profiled,
         ...(orphan ? { alteredUnprofiled: orphan } : {}),
         states: [
-          { state: "altered", label: driver ? "Driver mutation" : "Mutated", n: altered },
-          { state: "unaltered", label: driver ? "No driver mutation" : "Not Mutated", n: Math.max(0, profiled - altered) },
-          { state: "notProfiled", label: "Not Profiled", n: Math.max(0, total - profiled) }
+          { state: "altered", label: geneStateLabel("MUTATION", "altered", !!driver), n: altered },
+          { state: "unaltered", label: geneStateLabel("MUTATION", "unaltered", !!driver), n: Math.max(0, profiled - altered) },
+          { state: "notProfiled", label: geneStateLabel("MUTATION", "notProfiled", !!driver), n: Math.max(0, total - profiled) }
         ]
       };
     })(),
@@ -888,7 +890,7 @@ async function geneStateFacets(opts: {
         gene, type: "CNA", per: "sample", total, profiled,
         states: [
           ...CNA_LEVELS.map((l, i) => ({ state: l.state, label: l.label, n: counts[i] })),
-          { state: "notProfiled" as const, label: "Not profiled", n: Math.max(0, total - profiled) }
+          { state: "notProfiled" as const, label: geneStateLabel("CNA", "notProfiled", false), n: Math.max(0, total - profiled) }
         ]
       };
     })() :
@@ -929,10 +931,10 @@ async function geneStateFacets(opts: {
         gene, type: "CNA", per: "sample", total, profiled,
         ...(overlap ? { overlap } : {}),
         states: [
-          { state: "amp", label: "Driver amplification", n: amp },
-          { state: "del", label: "Driver deletion", n: del },
-          { state: "unaltered", label: "No driver call", n: Math.max(0, profiled - anyAltered) },
-          { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
+          { state: "amp", label: geneStateLabel("CNA", "amp", true), n: amp },
+          { state: "del", label: geneStateLabel("CNA", "del", true), n: del },
+          { state: "unaltered", label: geneStateLabel("CNA", "unaltered", true), n: Math.max(0, profiled - anyAltered) },
+          { state: "notProfiled", label: geneStateLabel("CNA", "notProfiled", true), n: Math.max(0, total - profiled) }
         ]
       };
     })()
@@ -2097,6 +2099,65 @@ export async function buildMutationTypeFacets(o: {
       rows: [...rows].map(([type, c]) => ({ type, label: mutationTypeLabel(type), ...c }))
         .sort((a, b) => b.samples - a.samples || b.mutations - a.mutations || (a.type < b.type ? -1 : 1)),
       ...(mine ? { disjunctive: true as const } : {}), ...leftOut,
+    };
+  })));
+}
+
+/** the most (category, value) pairs a violin table may hold */
+export const VIOLIN_VALUE_LIMIT = 50_000;
+
+/**
+ * The clinical violin tables (STS-VI-1): per sample, the categorical attribute's value and the
+ * numeric one's, a patient's value standing for each of its samples, counted by (category, value)
+ * over the selection without the numeric attribute's own filter (`n`, what the portal draws the
+ * curve and box from) and over the whole selection (`sel`, its # column). Samples with either
+ * value missing are not counted, as the portal's.
+ */
+export async function buildViolinFacets(o: {
+  studies: string[]; draft?: CohortDef | null; oncokbPin?: string | null;
+  profilesByStudy: Map<string, { profiles?: string[]; gaProfiles?: string[] }>;
+  connByStudy?: Map<string, ChConn>;
+  charts: { categorical: string; numeric: string }[];
+  /** selected studies these tables cannot count (a peer's), named on each */
+  leftOut?: string[];
+}): Promise<ViolinFacet[]> {
+  const ctx: DefCtx = { oncokbPin: o.oncokbPin, profilesByStudy: o.profilesByStudy };
+  const leftOut = o.leftOut && o.leftOut.length ? { leftOut: o.leftOut } : {};
+  const charts = o.charts.filter((c) => ATTR_NAME_RE.test(c.categorical) && ATTR_NAME_RE.test(c.numeric) && c.categorical !== c.numeric).slice(0, VIOLIN_CHART_LIMIT);
+  const groups = byConnection(o.studies, o.connByStudy);
+  return ensureChContext(() => Promise.all(charts.map(async ({ categorical, numeric }): Promise<ViolinFacet> => {
+    const attrs = [categorical, numeric];
+    const parts = await withSampleLevel(attrs, () => Promise.all(groups.map((g) => {
+      const full = cohortSet(g.studies, g.conn.db, o.draft, ctx);
+      const drawn = o.draft ? cohortSet(g.studies, g.conn.db, draftWithout(o.draft, (c) => clinicalClauseAttr(c) === numeric), ctx) : NO_SET;
+      return chQuery<ChRow>(
+        "SELECT max(c) AS cat, " + clinicalValueFoldSql("c") + " AS ck, x AS v, count() AS n, countIf(kept) AS sel\n" +
+        "FROM (SELECT anyIf(attribute_value, attribute_name = " + sq(categorical) + ") AS c,\n" +
+        "             " + finiteSql("anyIf(attribute_value, attribute_name = " + sq(numeric) + ")") + " AS x,\n" +
+        "             " + (full.samples ? "sample_unique_id IN " + full.samples : "1") + " AS kept\n" +
+        "      FROM " + clinicalTable(g.conn.db, attrs) + "\n" +
+        "      WHERE " + studyIn(g.studies) + " AND type = 'sample' AND attribute_name IN (" + attrs.map(sq).join(", ") + ")" +
+        (drawn.samples ? "\n        AND sample_unique_id IN " + drawn.samples : "") + "\n" +
+        "      GROUP BY sample_unique_id)\n" +
+        "WHERE c != '' AND x IS NOT NULL\n" +
+        "GROUP BY ck, v LIMIT " + (VIOLIN_VALUE_LIMIT + 1), g.conn);
+    })));
+    const cats = new Map<string, { spellings: string[]; values: Map<number, { v: number; n: number; sel: number }> }>();
+    let pairs = 0;
+    for (const r of parts) for (const x of r.data) {
+      pairs++;
+      const k = String(x.ck), c = cats.get(k) || { spellings: [] as string[], values: new Map<number, { v: number; n: number; sel: number }>() };
+      c.spellings.push(String(x.cat));
+      const v = Number(x.v), was = c.values.get(v) || { v, n: 0, sel: 0 };
+      // the studies' samples are disjoint, so their counts add
+      c.values.set(v, { v, n: was.n + Number(x.n), sel: was.sel + Number(x.sel) });
+      cats.set(k, c);
+    }
+    if (pairs > VIOLIN_VALUE_LIMIT) return { categorical, numeric, categories: [], ...leftOut,
+      error: "more than " + fmtInt(VIOLIN_VALUE_LIMIT) + " distinct (category, value) pairs; a violin table is drawn over fewer" };
+    return {
+      categorical, numeric, ...leftOut,
+      categories: [...cats.values()].map((c) => ({ category: c.spellings.reduce(keptSpelling, c.spellings[0]), values: [...c.values.values()] })),
     };
   })));
 }

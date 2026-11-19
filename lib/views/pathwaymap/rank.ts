@@ -26,6 +26,9 @@ export interface RankedPathway {
   score: number;
 }
 
+/** The Patient page's "Pathway altered" (PathwayMapperTable in patient mode, PTB-PW-4): Yes when the pathway scores above 0. */
+export const pathwayAltered = (r: Pick<RankedPathway, "score">): boolean => r.score > 0;
+
 /** to 2 decimals, halves up — the one rounding of a % here, which the method script repeats */
 export const round2 = (x: number) => Math.round(x * 100) / 100;
 

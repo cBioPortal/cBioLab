@@ -5,6 +5,7 @@ import { csvField, describeQuery } from "../../../lib/table-query.ts";
 import { TABLE_TSV_NAME, everyRowQuery, tsvLine } from "../../../lib/table-tsv.ts";
 import { withRequestCustomData } from "../../../lib/custom-data-server.ts";
 import { isDrawn, type AnalysisDoc, type TableRows, type ViewResult } from "../../../lib/types.ts";
+import { pageStream } from "../../../lib/table-stream.ts";
 import { TABLE_COLUMNS_MAX } from "../../../lib/clinical-table.ts";
 import { caseFileBreaks, caseFileHeader, caseFileLine, caseFileLineBreaks, caseFileColumnsCut, type CaseFileFormat } from "../../../lib/study-view-case-files.ts";
 import { portalDisposition, portalMatrix } from "../../../lib/views/datafiles/portal-file.ts";
@@ -41,7 +42,9 @@ export async function POST(req: Request) {
   }
   const run = <T,>(fn: () => Promise<T>) => withRequestCustomData(body.customData, fn, { refs: body.customRefs, req, uses: body });
   const table = typeof body.table === "string" ? body.table : undefined;
-  const first = await run(() => runAnalysis(doc, { table })).catch((e) => ({ views: [{ kind: doc.views![0].kind, cohorts: [], error: String((e as Error)?.message || e) } as ViewResult] }));
+  // the portal's table.tsv reads its first chunk of rows with the run that sizes it, so a table of up to TABLE_CHUNK rows runs once
+  const firstPage = body.format === "table-tsv";
+  const first = await run(() => runAnalysis(doc, { table, ...(firstPage ? { page: { offset: 0, limit: TABLE_CHUNK } } : {}) })).catch((e) => ({ views: [{ kind: doc.views![0].kind, cohorts: [], error: String((e as Error)?.message || e) } as ViewResult] }));
   const v = first.views[0];
   const t = pagedTable(v, table);
   if (!t || !isDrawn(v)) return new Response("cannot download: " + (v.error || "the view returned nothing") + "\n", { status: 400, headers: { "content-type": "text/plain; charset=utf-8" } });
@@ -50,7 +53,7 @@ export async function POST(req: Request) {
     head: () => tsvLine(t.columns.map((c) => c.name)),
     rows: (p) => p.rows.map((row) => tsvLine(row.values)).join(""),
     cut: (why) => tsvLine(["# DOWNLOAD INCOMPLETE: " + why]),
-  }), { headers: { "content-type": "text/tab-separated-values; charset=utf-8", "content-disposition": "attachment; filename=\"" + TABLE_TSV_NAME + "\"" } });
+  }, t), { headers: { "content-type": "text/tab-separated-values; charset=utf-8", "content-disposition": "attachment; filename=\"" + TABLE_TSV_NAME + "\"" } });
   if (body.caseFile) return caseFileResponse(t, body.caseFile as CaseFileFormat, (offset) => run(() => runAnalysis(doc, { page: { offset, limit: TABLE_CHUNK }, table })), table);
   const line = (xs: unknown[]) => xs.map(csvField).join(",") + "\r\n";
   // the header row comes first, so the file opens as a table anywhere; what the query kept and who
@@ -103,31 +106,6 @@ function caseFileResponse(t: TableRows<unknown>, format: CaseFileFormat, page: (
   } });
 }
 
-/**
- * A table's rows streamed whole, a page of TABLE_CHUNK at a time in one order across every cohort and
- * study: the header, each page's lines, and on any failure (the header's included) a last line saying
- * the file was cut short.
- */
-function pageStream(total: number, page: (offset: number) => Promise<{ views: ViewResult[] }>, table: string | undefined,
-  write: { head: () => string; rows: (p: TableRows<unknown>) => string; cut: (why: string) => string }): ReadableStream<Uint8Array> {
-  const enc = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    async start(controller) {
-      try {
-        controller.enqueue(enc.encode(write.head()));
-        for (let offset = 0; offset < total; offset += TABLE_CHUNK) {
-          const r = await page(offset);
-          const p = pagedTable(r.views[0], table);
-          if (!p) throw new Error(r.views[0].error || "the page at row " + offset + " returned nothing");
-          controller.enqueue(enc.encode(write.rows(p)));
-        }
-      } catch (e) {
-        controller.enqueue(enc.encode(write.cut(String((e as Error)?.message || e))));
-      }
-      controller.close();
-    }
-  });
-}
 
 /**
  * A Download-tab gene-by-sample file in the portal's format (Tab Delimited Format, or its Transposed

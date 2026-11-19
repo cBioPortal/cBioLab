@@ -563,7 +563,7 @@ export function assembleContract(input: AssembleInput): Contract {
       let profiledNoValue = false;
       for (const p of allPids) { const v = h.values.get(p + "|" + gene); if (v !== undefined) { if (Number.isNaN(v)) profiledNoValue = true; else vals.push(tx(v)); } }
       if (!vals.length && !profiledNoValue) {
-        heatTracks.push({ kind: "clinical", label: label + " (no data)", categories: [], cells: new Int32Array(allPids.length).fill(-1) });
+        heatTracks.push({ kind: "clinical", label: label + " (no data)", profileType: h.profileType, categories: [], cells: new Int32Array(allPids.length).fill(-1) });
         continue;
       }
       // the portal's fixed ranges and colours (ONC-TT-5..7): VAF 0..1; methylation 0..1, white at

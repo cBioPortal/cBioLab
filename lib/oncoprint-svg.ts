@@ -5,6 +5,7 @@ import type { Contract, Track } from "./types.ts";
 import { thresholdColor, stackColor, heatColor, barBand, cellLayers, clinicalLegend, alteredColumns, emptyClinicalKey, trackCategoryColor, formatGutterPct, truncateLabel, trackLabelText, trackSublabelText, fitSublabel, trackTooltipLines, geneLegend, glyphPresence, resolveStyle, styleForDisplay, PARTIAL_PROFILE_NOTE, type Style } from "./oncoprint-style.ts";
 import { aggregate, bucketEdges } from "./oncoprint-lod.ts";
 import { textWidth } from "./chart/text.ts";
+import { trackTops } from "./oncoprint-rows.ts";
 
 const esc = (s: unknown): string => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
 const r2 = (x: number): number => Math.round(x * 100) / 100;
@@ -26,8 +27,8 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   const S = styleForDisplay(style ?? resolveStyle(contract.display?.style), contract.display);
   const colors = contract.display?.colors;
   const P = S.palette, G = S.geometry;
-  const { rowH: ROW_H, rowGap: ROW_GAP, gutter: GUTTER, groupGap: GROUP_GAP, header: HEADER_H } = G;
-  const nTracks = contract.tracks.length;
+  const { rowH: ROW_H, gutter: GUTTER, groupGap: GROUP_GAP } = G;
+  const tops = trackTops(contract.tracks, G), rowsEnd = tops.at(-1)!;
   // "none" drops the clinical tracks' keys (the portal's "Show legends for clinical tracks"), never a heatmap's
   const keyColumns = contract.display?.clinicalLegends === "altered" ? alteredColumns(contract.tracks) : undefined;
   const catTracks = contract.tracks.filter((t) => (t.kind === "clinical" && contract.display?.clinicalLegends !== "none" &&
@@ -40,7 +41,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   { let lx = GUTTER; for (const it of items) { if (lx + itemW(it.label) > width - 8 && legendRows[legendRows.length - 1].length) { legendRows.push([]); lx = GUTTER; } legendRows[legendRows.length - 1].push(it); lx += itemW(it.label); } }
   const captionLines = Math.max(1, Math.ceil((70 + (contract.conventions?.annotation || "").length) / Math.max(20, Math.floor((width - GUTTER - 8) / 6.2))));
   const LEGEND_H = 26 + (legendRows.length + captionLines) * 16;
-  const height = HEADER_H + nTracks * (ROW_H + ROW_GAP) + LEGEND_H + catTracks.length * 16;
+  const height = rowsEnd + LEGEND_H + catTracks.length * 16;
   const plotW = width - GUTTER - (contract.groups.length - 1) * GROUP_GAP - 8;
   const n = contract.columns.length;
   const colW = plotW / n;
@@ -86,7 +87,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   // paper shows through as a seam every few columns; crisp edges make neighbours meet.
   parts.push(`<g shape-rendering="crispEdges">`);
   contract.tracks.forEach((t, ti: number) => {
-    const y = HEADER_H + ti * (ROW_H + ROW_GAP);
+    const y = tops[ti];
     parts.push(`<text x="4" y="${y + 14}" fill="${P.text}"><title>${esc(trackTooltipLines(t, contract.columns.length, contract.unit).join("\n"))}</title>${esc(trackLabelText(t, S))}</text>`);
     const subX = 4 + textWidth(trackLabelText(t, S), 11);
     const pctW = t.freqPct !== undefined ? textWidth(formatGutterPct(t, contract.columns.length), 11) + 6 : 0;
@@ -123,7 +124,7 @@ export function contractToSvg(contract: Contract, width = 1200, style?: Style, p
   parts.push("</g>");
 
   // legend
-  let ly = HEADER_H + nTracks * (ROW_H + ROW_GAP) + 14;
+  let ly = rowsEnd + 14;
   for (const row of legendRows) {
     let lx = GUTTER;
     for (const it of row) {

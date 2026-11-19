@@ -22,7 +22,8 @@ import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../..
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
-import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView } from "../../lib/study-view-add-chart.ts";
+import { violinPairKey, violinTitle } from "../../lib/study-view-violin.ts";
+import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView, columnsMenuTabs } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -33,7 +34,7 @@ import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { DEFAULT_DENSITY_PAIR, densityChartName, densityChartsShown, densityPairKey } from "../../lib/study-view-density.ts";
 import { ALTERED_ONLY_TYPES, ASSAY_FREQ_TABLE_LIMIT, freqRowKey, freqTableClause, freqTableRows } from "../../lib/assay-frequency-table.ts";
 import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause, treatmentTableTsv, TREATMENT_TABLE_DESCRIPTIONS } from "../../lib/treatment-tables.ts";
-import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
+import { appliedMutationTypes, mutationTypesClause, geneChartName } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
@@ -310,16 +311,20 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
   const explore = ctx.explore!;
   return <>
     {explore && (
-      <Dialog open={addChartOpen} onOpenChange={setAddChartOpen}>
+      <Dialog open={addChartOpen} onOpenChange={(open) => { setAddChartOpen(open); if (!open) ctx.setChartMenuColumns(false); }}>
       <DialogContent aria-describedby={undefined}
         className="addchart flex h-[90vh] w-[94vw] max-w-[94vw] flex-col gap-0 overflow-auto p-6 sm:max-w-[94vw]">
-        <DialogHeader className="mb-2"><DialogTitle className="text-base">Add chart</DialogTitle></DialogHeader>
+        <DialogHeader className="mb-2"><DialogTitle className="text-base">{ctx.chartMenuColumns ? "Columns" : "Add chart"}</DialogTitle></DialogHeader>
         <Tabs value={chartTab} onValueChange={(v) => setChartTab(v as typeof chartTab)} className="mb-3">
           <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
             {/* a tab per generic-assay type, as the portal's (STV-AC-2) */}
-            {([["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"],
-              ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
-              ["derived", "Derived timeline filters"], ["custom", "Custom data"], ["xvsy", "X vs Y"]] as const).map(([t, label]) =>
+            {/* on the Clinical Data tab, its Columns: Clinical, Genomic and X vs Y only (STV-CD-9) */}
+            {(() => {
+              const tabs = [["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"],
+                ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
+                ["derived", "Derived timeline filters"], ["custom", "Custom data"], ["xvsy", "X vs Y"]] as const;
+              return ctx.chartMenuColumns ? columnsMenuTabs(tabs) : tabs;
+            })().map(([t, label]) =>
               <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
@@ -1037,14 +1042,14 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
 
 /** the Add chart dialog's X vs Y tab (STV-AC-7): two clinical attributes, and the portal's button for the pair */
 function XvsYPicker({ ctx }: { ctx: ExploreCtx }) {
-  const { xyCharts, addXyChart } = ctx;
+  const { xyCharts, addXyChart, violinCharts, addViolinChart } = ctx;
   const attrs = xVsYAttributes(ctx.explore!.clinical || []).map((c) => ({ attribute: c.attribute, name: c.displayName || c.attribute, numeric: c.kind === "num" }))
     .sort((a, b) => a.name.localeCompare(b.name));
   const [x, setX] = useState(""), [y, setY] = useState("");
   const [added, setAdded] = useState<string | null>(null);
   const ax = attrs.find((a) => a.attribute === x) ?? null, ay = attrs.find((a) => a.attribute === y) ?? null;
   // the default chart counts as existing, as on the portal
-  const existing = [...xyCharts.map(densityPairKey), densityPairKey(DEFAULT_DENSITY_PAIR)];
+  const existing = [...xyCharts.map(densityPairKey), ...violinCharts.map(violinPairKey), densityPairKey(DEFAULT_DENSITY_PAIR)];
   const button = xVsYButton(ax, ay, existing);
   const options = [["", "—"] as const, ...attrs.map((a) => [a.attribute, a.name] as const)];
   return (
@@ -1053,7 +1058,13 @@ function XvsYPicker({ ctx }: { ctx: ExploreCtx }) {
         <Choice className="w-64" value={x} onChange={setX} title="Select first clinical attribute" options={options} />
         <Choice className="w-64" value={y} onChange={setY} title="Select second clinical attribute" options={options} />
         <Button variant="outline" size="sm" disabled={!button.adds} data-tip={button.tip}
-          onClick={() => { addXyChart({ x, y }); setAdded((ay?.name || y) + " vs " + (ax?.name || x) + " added."); setX(""); setY(""); }}>{button.label}</Button>
+          onClick={() => {
+            // a numeric attribute against a categorical one is a violin table, titled "<numeric> vs <categorical>"
+            const [num, cat] = ax && ay && ax.numeric !== ay.numeric ? (ax.numeric ? [ax, ay] : [ay, ax]) : [null, null];
+            if (num && cat) { addViolinChart({ categorical: cat.attribute, numeric: num.attribute }); setAdded(violinTitle(num.name, cat.name, false) + " added."); }
+            else { addXyChart({ x, y }); setAdded((ay?.name || y) + " vs " + (ax?.name || x) + " added."); }
+            setX(""); setY("");
+          }}>{button.label}</Button>
       </div>
       {added && <p className="note flush mt-1.5">{added}</p>}
     </div>
@@ -1317,9 +1328,9 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
       return (
         <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
           <div className="facettitle">
-            {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
+            {geneChartName(f.gene, f.type)}
             <span className="meta">sample-level · {f.total.toLocaleString()} samples</span>
-            <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
+            <ChartMenu label={f.gene} actions={[summaryDownload(geneChartName(f.gene, f.type), "sample",
               states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg, undefined, undefined,
               // the file writes the portal's codes (SD14); the figure, the names on screen
               (label) => { const st = states.find((x) => x.label === label); return st ? geneStateCode(f.type, st.state, !!explore.drivers, st.label) : label; })]} />

@@ -17,7 +17,26 @@ from .style import BITS, STYLE, stack_color, bar_band, cell_layers, heat_rgb, fo
 
 _G = STYLE["geometry"]
 _MUT = BITS["MISSENSE"] | BITS["TRUNCATING"] | BITS["INFRAME"] | BITS["SPLICE"] | BITS["OTHER_MUT"] | BITS["PROMOTER"]
-ROW_H, ROW_GAP, GROUP_GAP = _G["rowH"], _G["rowGap"], _G["groupGap"]
+ROW_H, ROW_GAP, GROUP_GAP, TRACK_GROUP_GAP = _G["rowH"], _G["rowGap"], _G["groupGap"], _G["trackGroupGap"]
+
+
+def track_group_key(t: Track) -> str:
+    """The track's group, as lib/oncoprint-rows.ts trackGroupKey: its heatmap's profile (a heatmap row or its "(no data)" row), clinical, or genetic."""
+    if t.kind == "heatmap" or (t.kind == "clinical" and t.meta.get("profileType") is not None):
+        return "heatmap:" + str(t.meta.get("profileType") or "")
+    return "clinical" if t.kind == "clinical" else "genetic"
+
+
+def track_tops(tracks: list[Track]) -> list[int]:
+    """Each track's top from 0, then where the last row ends, as lib/oncoprint-rows.ts trackTops."""
+    out: list[int] = []
+    y = 0
+    for i, t in enumerate(tracks):
+        if i > 0 and track_group_key(t) != track_group_key(tracks[i - 1]):
+            y += TRACK_GROUP_GAP
+        out.append(y)
+        y += ROW_H + ROW_GAP
+    return out + [y]
 
 
 def _rgb(h: str) -> np.ndarray:
@@ -102,7 +121,8 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
     plot_w = max(1, width - gutter - GROUP_GAP * max(0, len(c.groups) - 1))
     n = max(1, c.n)
     px_per_col = plot_w / n
-    H = len(c.tracks) * (ROW_H + ROW_GAP)
+    tops = track_tops(c.tracks)
+    H = tops[-1]
     img = np.tile(paper, (H, width, 1))
     x = gutter
     extents = []
@@ -114,7 +134,7 @@ def raster(c: Contract, width: int = 1200, gutter: int = 0, style: dict[str, Any
         xs = x + np.concatenate([[0], np.cumsum(bw)[:-1]])
         extents.append({"name": g["name"], "x0": x, "x1": x + int(bw.sum()), "count": g["count"]})
         for ti, t in enumerate(c.tracks):
-            y0 = ti * (ROW_H + ROW_GAP)
+            y0 = tops[ti]
             codes = aggregate(t, np.asarray(t.cells[g["start"]: g["start"] + g["count"]]), edges)
             for bi in range(nb):
                 x0, x1 = int(xs[bi]), int(xs[bi] + bw[bi])
@@ -196,8 +216,9 @@ def figure(c: Contract, width: int = 1200, gutter: int | None = None, dpi: int =
         probe.remove()
         return w
 
+    tops = track_tops(c.tracks)
     for ti, t in enumerate(c.tracks):
-        y = ti * (ROW_H + ROW_GAP) + ROW_H / 2
+        y = tops[ti] + ROW_H / 2
         label = ax.text(4, y, track_label_text(t, S), fontsize=8, color=P["text"], va="center")
         sub = track_sublabel_text(t.meta, c.display)
         if sub:

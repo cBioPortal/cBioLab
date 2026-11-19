@@ -68,8 +68,8 @@ export function specialChartsShown(checked: (key: string) => boolean, leaves: un
 
 /**
  * The X vs Y tab's button (STV-AC-7), as the portal's: what it says and whether it adds. Two
- * numeric attributes make a density plot; a numeric and a categorical one the portal's violin table,
- * which Explore does not draw yet, so it is refused saying so.
+ * numeric attributes make a density plot; a numeric and a categorical one the portal's violin table
+ * (STS-VI-1).
  */
 export function xVsYButton(x: { attribute: string; numeric: boolean } | null, y: { attribute: string; numeric: boolean } | null, existing: string[]):
   { label: string; adds: boolean; tip?: string } {
@@ -77,7 +77,7 @@ export function xVsYButton(x: { attribute: string; numeric: boolean } | null, y:
   if (x.attribute === y.attribute) return { label: "Please choose two different attributes.", adds: false };
   if (existing.includes([x.attribute, y.attribute].sort().join("|"))) return { label: "A chart with these attributes already exists", adds: false };
   if (!x.numeric && !y.numeric) return { label: "Can't add a chart with two categorical attributes (yet).", adds: false };
-  if (x.numeric !== y.numeric) return { label: "Add violin/box plot table", adds: false, tip: "a numeric attribute against a categorical one is the portal's violin table, not drawn here yet" };
+  if (x.numeric !== y.numeric) return { label: "Add violin/box plot table", adds: true };
   return { label: "Add density plot", adds: true };
 }
 
@@ -199,4 +199,12 @@ export function assayTabLabel(type: string): string {
 export function assayTabs(profiles: { type: string; assayType?: string }[]): { type: string; label: string }[] {
   const types = [...new Set(profiles.filter((p) => p.type === "GENERIC_ASSAY" && p.assayType).map((p) => p.assayType!))];
   return types.map((type) => ({ type, label: assayTabLabel(type) })).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** the Clinical Data tab's Columns menu: the chart menu's Clinical, Genomic and X vs Y tabs only, as the portal's (STV-CD-9) */
+const COLUMNS_TABS = ["clinical", "genomic", "xvsy"];
+
+/** the Clinical Data tab's Columns menu: of the chart menu's tabs, its Clinical, Genomic and X vs Y ones */
+export function columnsMenuTabs<T extends readonly [string, string]>(tabs: readonly T[]): T[] {
+  return tabs.filter(([t]) => COLUMNS_TABS.includes(t));
 }
