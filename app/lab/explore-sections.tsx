@@ -1230,7 +1230,7 @@ export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
     const on = new Set(appliedTreatmentKeys(draft, level));
     return (
       <div className="card" data-treatments={level}>
-        <div className="facettitle">{title}<span className="meta"> · {meta}</span></div>
+        <div className="facettitle">{title}<span className="meta">{meta}</span></div>
         {leftOut}
         {rows.length ? <ValueList unit={unit} hint={level === "patient" ? "keep the patients treated with any checked treatment" : "keep the samples taken before or after any checked treatment"}
           extra={level === "sample" ? { head: "Pre / Post", tip: "taken before (Pre) or after (Post) the patient's first treatment with it" } : undefined}
@@ -1264,7 +1264,7 @@ export function MutationTypeFacets({ ctx }: { ctx: ExploreCtx }) {
         <div key={f.gene} data-mutationtypes={f.gene} className="card">
           <div className="facettitle">
             {f.gene}: mutation types
-            {counted && <span className="meta" data-tip="Freq is of every selected sample, as the portal's table writes it, not of the samples profiled for the gene"> · sample-level · Freq of {f.total.toLocaleString()} samples{f.disjunctive ? " · counted without its own filter" : ""}</span>}
+            {counted && <span className="meta" data-tip="Freq is of every selected sample, as the portal's table writes it, not of the samples profiled for the gene">sample-level · Freq of {f.total.toLocaleString()} samples{f.disjunctive ? " · counted without its own filter" : ""}</span>}
           </div>
           {applied.excluded > 0 && <p className="note flush mt-1">
             {applied.excluded === 1 ? "A filter excludes" : applied.excluded + " filters exclude"} {f.gene} mutation types; this table is counted without {applied.excluded === 1 ? "it" : "them"}.
