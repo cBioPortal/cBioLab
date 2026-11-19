@@ -13,4 +13,7 @@ export const mutants: Mutant[] = [
   { id: "copy-cut-short-as-whole", layer: "counts", guard: "unit", file: "lib/table-tsv.ts",
     effect: "A table download cut short (its # DOWNLOAD INCOMPLETE line) is copied as if it were the whole table.",
     find: "const line = text.split(/\\r?\\n/).find((l) => l.startsWith(INCOMPLETE_MARK));", replace: "const line = undefined as string | undefined;" },
+  { id: "copy-no-fallback-on-refusal", layer: "counts", guard: "unit", file: "app/_table/copy-text.ts",
+    effect: "A secure page whose Clipboard API refuses gives up instead of trying the textarea copy.",
+    find: "      await navigator.clipboard.writeText(text);\n      return;\n    } catch {", replace: "      await navigator.clipboard.writeText(text);\n      return;\n    } finally {" },
 ];

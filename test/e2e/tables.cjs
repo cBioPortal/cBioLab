@@ -101,7 +101,7 @@ async function tables({ browser, ok, BASE }) {
       const clipLines = clip.split(/\r?\n/);
       if (clipLines[clipLines.length - 1] === "") clipLines.pop();
       const same = clip === tsv;
-      ok("table: Copy puts the table.tsv's text on the clipboard and says \"Copied!\"", copied && (same || (clipLines.length === lines.length && clipLines[0] === lines[0])),
+      ok("table: Copy puts the table.tsv's text on the clipboard and says \"Copied!\"", copied && same,
         (copied ? "Copied!" : "no Copied! status") + " · " + (same ? "identical to table.tsv" : (clipLines.length - 1) + " rows vs " + (lines.length - 1) + ", header " + (clipLines[0] === lines[0] ? "same" : JSON.stringify((clipLines[0] || "").slice(0, 60)))));
     } catch (e) {
       ok("table: the mutation table's controls", false, String(e.message).split("\n")[0].slice(0, 200));

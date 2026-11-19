@@ -97,4 +97,25 @@ describe("copyText", () => {
     assert.equal(f.made.length, 1);
     assert.ok(f.made[0].removed && f.attached.length === 0, "the textarea is gone after the failure");
   });
+
+  // the Reviewer's cases (#413 re-review)
+  test("C4: the Clipboard API refusing on a secure page falls back to the textarea copy", async () => {
+    const f = fakeDocument(true);
+    stub("window", { isSecureContext: true });
+    stub("navigator", { clipboard: { writeText: () => Promise.reject(new Error("NotAllowedError")) } });
+    stub("document", f.doc);
+    await copyText("a\tb");
+    assert.deepEqual(f.execCalls, ["copy"]);
+    assert.equal(f.made[0]?.value, "a\tb");
+    assert.equal(f.attached.length, 0, "the textarea is gone");
+  });
+
+  test("C5: execCommand throwing still removes the textarea, and copyText rejects", async () => {
+    const f = fakeDocument(true);
+    stub("window", { isSecureContext: false });
+    stub("navigator", {});
+    stub("document", { ...f.doc, execCommand: () => { throw new Error("not supported"); } });
+    await assert.rejects(copyText("x"));
+    assert.equal(f.attached.length, 0, "the textarea is gone");
+  });
 });

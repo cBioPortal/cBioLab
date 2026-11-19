@@ -419,9 +419,13 @@ export function DataTable<V extends string | number | null>({ t, query, updating
   // the portal's Copy, in its two steps: a first click fetches the table.tsv text ("Copy Ready!"), a second copies
   // it within that click, which the browser's clipboard needs (a copy after a long fetch is refused)
   const [copyState, setCopyState] = useState<{ phase: "idle" } | { phase: "loading" } | { phase: "ready"; text: string } | { phase: "done" } | { phase: "failed"; why: string }>({ phase: "idle" });
-  useEffect(() => { setCopyState({ phase: "idle" }); }, [t]);
+  // a fetch still running when the table changes (a sort, a filter) answers for the old table: its generation tells
+  const copyGen = useRef(0);
+  useEffect(() => { copyGen.current++; setCopyState({ phase: "idle" }); }, [t]);
   const fetchCopy = async () => {
+    const g = ++copyGen.current;
     setCopyState({ phase: "loading" });
+    const settle = (next: typeof copyState) => { if (copyGen.current === g) setCopyState(next); };
     try {
       const doc = JSON.parse(docJson ? docJson() : "");
       const r = await fetch("/api/table", { method: "POST", headers: { "content-type": "application/json" },
@@ -430,8 +434,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
       if (!r.ok) throw new Error(text.trim());
       const cut = cutShort(text);
       if (cut) throw new Error("the table was cut short (" + cut + ")");
-      setCopyState({ phase: "ready", text });
-    } catch (e) { setCopyState({ phase: "failed", why: String((e as Error)?.message || e) }); }
+      settle({ phase: "ready", text });
+    } catch (e) { settle({ phase: "failed", why: String((e as Error)?.message || e) }); }
   };
   const copyNow = (text: string) => {
     copyText(text).then(() => setCopyState({ phase: "done" }), (e) => setCopyState({ phase: "failed", why: String((e as Error)?.message || e) }));
