@@ -1094,10 +1094,10 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
             {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
             <span className="meta"> · sample-level · {f.total.toLocaleString()} samples</span>
             <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
-              f.states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg)]} />
+              f.states.filter((st) => f.type !== "CNA" || st.n > 0).map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg)]} />
           </div>
           <ValueList hint={"keep the samples in any of the checked states of " + f.gene}
-            rows={f.states.map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",
+            rows={f.states.filter((st) => f.type !== "CNA" || st.n > 0).map((st) => ({ key: st.state, name: st.label, n: st.n, total: f.total, muted: st.state === "notProfiled",
               title: st.label + " — " + st.n.toLocaleString() + " samples" }))}
             why={(states) => { const r = apply(states); return "why" in r ? r.why : null; }}
             onApply={(states) => { const r = apply(states); if ("clauses" in r) addClauses(r.clauses); }} />

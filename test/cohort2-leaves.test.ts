@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import {
   compileCohortDef, describeCohortDef, describeClause, cohortClauses, basePatientsSql, baseSamplesSql,
   derivedMetricSql, eventTypeMatchSql, lineClassesParam, profiledCasesSql, splitBucketSql, bareSampleId,
-  inCohortSamples, inCohortPatients, INLINE_ID_SQL_LIMIT, PROFILED_MAX_GENES, SPLIT_SALT
+  inCohortSamples, inCohortPatients, INLINE_ID_SQL_LIMIT, PROFILED_MAX_GENES, SPLIT_SALT, discreteCnaProfileSql
 } from "../lib/cohort2.ts";
 import { withIdSets, idSetTableName, type LoadedIdSet } from "../lib/id-sets.ts";
 import { withCustomData } from "../lib/custom-data.ts";
@@ -217,6 +217,16 @@ describe("caseList, genomicData and genericAssay leaves", () => {
     assert.throws(() => one({ kind: "genomicData", gene: "", profileType: "mrna", range: { gt: 1 } }), /genomicData clause: bad gene/);
     assert.throws(() => one({ kind: "genomicData", gene: "A", profileType: "mrna" }), /needs range\{gt,gte,lt,lte\} or values\[\]/);
     assert.throws(() => one({ kind: "genomicData", gene: "A", profileType: "mrna", range: { lt: "x" } }), /range\.lt must be a number/);
+  });
+  test("genomicData on profile CNA: the study's discrete copy-number profile, whatever its id", () => {
+    const sql = one({ kind: "genomicData", gene: "kras", profileType: "CNA", values: ["1", "-1"] }, { ...ctx, profiles: ["gistic", "log2CNA"] });
+    assert.ok(sql.includes("AND ga.profile_type = " + discreteCnaProfileSql("s1", "cbio")), "named by the subquery, not a stored type");
+    assert.match(sql, /hugo_gene_symbol = 'KRAS'/);
+    assert.match(sql, /ga\.alteration_value IN \('1','-1'\)/);
+    assert.match(discreteCnaProfileSql("s1", "cbio"),
+      /^\(SELECT replaceOne\(gp\.stable_id, 's1_', ''\) FROM cbio\.genetic_profile gp[\s\S]*cs\.cancer_study_identifier = 's1'[\s\S]*gp\.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp\.datatype = 'DISCRETE' ORDER BY gp\.genetic_profile_id DESC LIMIT 1\)$/);
+    assert.doesNotThrow(() => one({ kind: "genomicData", gene: "KRAS", profileType: "CNA", values: ["0"] }, { ...ctx, profiles: [] }),
+      "a study without the profile selects no sample rather than refusing, so a clause over several studies runs in each");
   });
   test("genericAssay: the study's exact profile, at the level it records, measured / values / range", () => {
     const sql = one({ kind: "genericAssay", profileType: "armlevel_cna", entity: "1p", measured: true });

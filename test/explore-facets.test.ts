@@ -16,6 +16,7 @@ process.env.EXPLORE_COHORT_EXTERNAL_LIMIT = "3";
 for (const k of ["CLICKHOUSE2_URL", "ONCOKB_PIN", "FEDERATION_PEERS", "CH_RUN_CACHE"]) delete process.env[k];
 
 const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
+const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
 const { numericBinEdges, mergeExplore, buildExplore, buildExploreFederated, buildAssayFacets, ASSAY_CHART_LIMIT } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
@@ -648,6 +649,8 @@ describe("one study", () => {
     const geneAnswers = () => {
       on(/AS all_altered/, [{ all_altered: 12, in_panel: 10 }]);
       on(/cna_alteration AS c, uniqExact/, [{ c: 2, n: 6 }, { c: -2, n: 3 }]);
+      on(/^SELECT alteration_value AS v, uniqExact/, [{ v: "2", n: 6 }, { v: "1", n: 28 }, { v: "0", n: 50 }, { v: "-1", n: 17 }, { v: "-2", n: 1 }]);
+      on(/^SELECT uniqExact\(sample_unique_id\) AS n\nFROM cbio_a\.genetic_alteration_derived/, [{ n: 102 }]);
       on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_a\.genomic_event_derived/, [{ n: 8 }]);
       on(/^SELECT uniqExact\(sample_unique_id\) AS n\nFROM cbio_a\.sample_derived/, (q) => [{ n: /MUTATION_EXTENDED/.test(q) ? 90 : 80 }]);
       on(/^SELECT uniqExact\(sample_unique_id\) AS n FROM cbio_a\.sample_derived\nWHERE/, [{ n: 70 }]);
@@ -663,8 +666,27 @@ describe("one study", () => {
       assert.deepEqual([mut.total, mut.profiled, mut.alteredUnprofiled], [120, 90, 2]);
       assert.deepEqual(mut.states.map((s) => [s.label, s.n]), [["Mutated", 10], ["Not mutated", 80], ["Not profiled", 30]]);
       const cna = r.geneFacets!.find((f) => f.gene === "EGFR" && f.type === "CNA")!;
-      assert.equal(cna.overlap, 1, "one sample called both amplified and deleted");
-      assert.deepEqual(cna.states.map((s) => [s.label, s.n]), [["Amplified", 6], ["Deleted", 3], ["Diploid", 72], ["Not profiled", 40]]);
+      assert.equal(cna.overlap, undefined, "one value per sample: the levels partition the cohort");
+      assert.equal(cna.profiled, 102, "samples with a value in the profile");
+      assert.deepEqual(cna.states.map((s) => [s.state, s.label, s.n]), [
+        ["amp", "Amplified", 6], ["gain", "Gained", 28], ["diploid", "Diploid", 50],
+        ["hetloss", "Heterozygously deleted", 17], ["del", "Homozygously deleted", 1], ["notProfiled", "Not profiled", 18]]);
+    });
+
+    test("the copy-number levels read the study's discrete profile under the cohort, the values the portal counts", async () => {
+      facetAnswers();
+      geneAnswers();
+      const r = await buildExplore({ study: S, skipBins: true, skipGenes: true, geneCharts: ["KRAS"] });
+      const cna = r.geneFacets!.find((f) => f.type === "CNA")!;
+      assert.equal(cna.states.find((s) => s.state === "notProfiled")!.n, 18, "the cohort (120) less the samples with a level (102)");
+      const reads = sent.filter((q) => /FROM cbio_a\.genetic_alteration_derived/.test(q));
+      assert.equal(reads.length, 2, "the levels and the samples with any level");
+      for (const q of reads) {
+        assert.ok(q.includes("AND profile_type = " + discreteCnaProfileSql(S, "cbio_a")));
+        assert.match(q, /hugo_gene_symbol = 'KRAS'/);
+        assert.match(q, /alteration_value IN \('2', '1', '0', '-1', '-2'\)/);
+      }
+      assert.ok(!sent.some((q) => /cna_alteration AS c/.test(q)), "no read of the called ±2 events");
     });
 
     test("drivers only labels the states as driver calls and puts the driver condition on every call", async () => {

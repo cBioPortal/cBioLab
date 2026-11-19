@@ -27,6 +27,7 @@ import { activeCustomData, clinicalTable } from "./custom-data.ts";
 import { UPLOAD_DATASET_RE, customAttr } from "./custom-data-names.ts";
 import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import { lockClause } from "./cohort-lock.ts";
+import { DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, OqlLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -403,11 +404,22 @@ function numRangeConds(range: ClinicalRange | undefined, expr: string): string[]
   return conds;
 }
 
+/**
+ * The profile type (stable id without the study prefix) of the study's discrete copy-number
+ * profile, as a scalar subquery: the newest when a study has two. No row when it has none.
+ */
+export function discreteCnaProfileSql(study: string, db: string): string {
+  return "(SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') FROM " + db + ".genetic_profile gp\n" +
+    "      JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "        AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)";
+}
+
 function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
   const gene = String(leaf.gene || "").toUpperCase().trim();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("genomicData clause: bad gene");
   const pt = String(leaf.profileType || "");
-  if (ctx.profiles && !ctx.profiles.includes(pt))
+  const discrete = pt === DISCRETE_CNA_PROFILE;
+  if (!discrete && ctx.profiles && !ctx.profiles.includes(pt))
     throw new Error("genomicData: profile '" + pt + "' not in this study (available: " + (ctx.profiles.join(", ") || "none") + ")");
   const conds = numRangeConds(leaf.range, finiteSql("ga.alteration_value"));
   if (Array.isArray(leaf.values) && leaf.values.length)
@@ -416,7 +428,7 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
   return ofSamples("SELECT DISTINCT " + PID("ga.sample_unique_id", ctx.study) + " AS sid\n" +
     "  FROM " + dbOf(ctx) + ".genetic_alteration_derived ga\n" +
     "  WHERE ga.cancer_study_identifier = " + sq(ctx.study) + "\n" +
-    "    AND ga.hugo_gene_symbol = " + sq(gene) + " AND ga.profile_type = " + sq(pt) + "\n" +
+    "    AND ga.hugo_gene_symbol = " + sq(gene) + " AND ga.profile_type = " + (discrete ? discreteCnaProfileSql(ctx.study, dbOf(ctx)) : sq(pt)) + "\n" +
     "    AND " + conds.join(" AND "));
 }
 

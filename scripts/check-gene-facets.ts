@@ -29,6 +29,7 @@ import { compileCohortDef } from "../lib/cohort2.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { chQuery, connById } from "../lib/ch.ts";
 import { studyProfiles } from "../lib/analysis.ts";
+import { geneStatesClauses } from "../lib/gene-state-clauses.ts";
 
 /**
  * Genes chosen because their panel coverage differs sharply. Each case runs
@@ -49,15 +50,11 @@ const ok = (name: string, pass: boolean, detail = "") => {
   if (!pass) failures++;
 };
 
-/** must stay identical to geneStateClauses() in app/lab/page.tsx */
+/** the clauses a click on one state adds, as the page builds them */
 const clausesFor = (gene: string, type: "MUTATION" | "CNA", state: string): unknown[] => {
-  const prof = { kind: "profiled", type, gene };
-  const oql = (q: string) => ({ kind: "oql", q: gene + ": " + q });
-  if (state === "notProfiled") return [{ not: prof }];
-  if (state === "altered") return [prof, oql("MUT")];
-  if (state === "amp") return [prof, oql("AMP")];
-  if (state === "del") return [prof, oql("HOMDEL")];
-  return [prof, { not: oql(type === "CNA" ? "AMP HOMDEL" : "MUT") }];
+  const r = geneStatesClauses(gene, type, [state], false);
+  if (!("clauses" in r)) throw new Error(gene + " " + state + ": " + r.why);
+  return r.clauses;
 };
 
 for (const c of CASES) for (const drafted of [false, true]) {
@@ -94,8 +91,8 @@ for (const c of CASES) for (const drafted of [false, true]) {
       checked++;
       if (got !== st.n) bad.push(`${f.gene}/${f.type}/${st.state}: shows ${st.n}, selects ${got}`);
     }
-    // the mutation states DO partition the cohort; the CNA states do not, and
-    // the facet reports by how much they over-sum
+    // the mutation states partition the cohort, and so do the CNA levels (one value per sample in
+    // the profile); counting drivers only, Amplified and Deleted can overlap by `overlap`
     if (f.type === "MUTATION") {
       const sum = f.states.reduce((a, x) => a + x.n, 0);
       if (sum !== f.total) bad.push(`${f.gene}/MUTATION states sum to ${sum}, cohort is ${f.total}`);
@@ -132,6 +129,18 @@ for (const c of CASES) {
   ok(`${c.study}: ${gene}'s facet survives its own selection`, same,
     a && b ? `undrafted ${a.states.map((x) => x.n).join("/")} vs self-drafted ${b.states.map((x) => x.n).join("/")}`
            : "facet missing");
+
+  // the copy-number chart too: a click on its Diploid level leaves every level's count as it was
+  const cnaDraft = geneStatesClauses(gene, "CNA", ["diploid"], false);
+  const cnaSelf = await buildExplore({
+    study: c.study, conn, geneCharts: [gene], ...(await studyProfiles(c.study)),
+    draft: { all: "clauses" in cnaDraft ? cnaDraft.clauses : [] } as never
+  });
+  const cOf = (r: typeof plain) => (r.geneFacets || []).find((f) => f.gene === gene && f.type === "CNA");
+  const ca = cOf(plain), cb = cOf(cnaSelf);
+  ok(`${c.study}: ${gene}'s copy-number facet survives its own selection`,
+    !!ca && !!cb && ca.total === cb.total && ca.states.every((st, i) => st.n === cb.states[i].n),
+    ca && cb ? `undrafted ${ca.states.map((x) => x.n).join("/")} vs self-drafted ${cb.states.map((x) => x.n).join("/")}` : "facet missing");
 
   // ...while a DIFFERENT gene's facet does narrow to that draft
   const [other] = c.genes.slice(1);

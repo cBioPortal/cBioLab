@@ -94,7 +94,12 @@ export interface GeneStateFacet {
   total: number;
   /** samples on a panel covering this gene */
   profiled: number;
-  states: { state: "altered" | "amp" | "del" | "unaltered" | "notProfiled"; label: string; n: number }[];
+  /**
+   * Mutations: altered / unaltered / notProfiled. Copy number: the discrete profile's levels
+   * amp / gain / diploid / hetloss / del and notProfiled; counting OncoKB drivers only, amp / del /
+   * unaltered / notProfiled.
+   */
+  states: { state: "altered" | "amp" | "gain" | "diploid" | "hetloss" | "del" | "unaltered" | "notProfiled"; label: string; n: number }[];
   /**
    * Samples with a call for this gene that are on NO panel covering it — a
    * source-data inconsistency, not a state a reader can select. genie_public has

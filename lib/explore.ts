@@ -3,7 +3,8 @@
 // Everything returned is designed to be clickable into a DSL clause.
 import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
-import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
+import { derivedMetricSql, basePatientsSql, discreteCnaProfileSql, type DerivedMetric } from "./cohort2.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
 
@@ -772,9 +773,9 @@ async function readQValues(studyId: string, db: string, conn: ChConn): Promise<Q
  */
 function isGeneClauseFor(c: unknown, gene: string): boolean {
   const leaf = (x: unknown): boolean => {
-    const l = x as { kind?: string; gene?: string; q?: string };
+    const l = x as { kind?: string; gene?: string; q?: string; profileType?: string };
     if (!l) return false;
-    if (l.kind === "profiled") return String(l.gene || "").toUpperCase() === gene;
+    if (l.kind === "profiled" || (l.kind === "genomicData" && l.profileType === DISCRETE_CNA_PROFILE)) return String(l.gene || "").toUpperCase() === gene;
     if (l.kind === "oql") {
       const m = /^\s*([A-Za-z0-9.-]+)\s*:/.exec(String(l.q || ""));
       return !!m && m[1].toUpperCase() === gene && !String(l.q).includes(";");
@@ -893,7 +894,26 @@ async function geneStateFacets(opts: {
         ]
       };
     })(),
-    // CNA: amplified / deleted / diploid / not profiled
+    // CNA, every alteration: the levels of the discrete profile, as the portal's chart counts them
+    !driver ? (async (): Promise<GeneStateFacet> => {
+      const from = "FROM " + db + ".genetic_alteration_derived\n" +
+        "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol = " + sq(gene) + "\n" +
+        "  AND profile_type = " + discreteCnaProfileSql(study, db) + "\n" +
+        "  AND alteration_value IN (" + CNA_LEVELS.map((l) => sq(String(l.value))).join(", ") + ")" + cond;
+      const [levels, any] = await Promise.all([
+        chQuery<ChRow>("SELECT alteration_value AS v, uniqExact(sample_unique_id) AS n\n" + from + "\nGROUP BY v", conn),
+        chQuery<ChRow>("SELECT uniqExact(sample_unique_id) AS n\n" + from, conn)
+      ]);
+      const profiled = Number(any.data[0]?.n || 0);
+      return {
+        gene, type: "CNA", per: "sample", total, profiled,
+        states: [
+          ...CNA_LEVELS.map((l) => ({ state: l.state, label: l.label, n: Number(levels.data.find((r) => String(r.v) === String(l.value))?.n || 0) })),
+          { state: "notProfiled" as const, label: "Not profiled", n: Math.max(0, total - profiled) }
+        ]
+      };
+    })() :
+    // CNA, OncoKB drivers only: amplified / deleted / no driver call / not profiled
     (async (): Promise<GeneStateFacet> => {
       const [prof, calls, anyCall] = await Promise.all([
         chQuery<ChRow>(profiledOf(gene, "COPY_NUMBER_ALTERATION", cond), conn),
@@ -929,9 +949,9 @@ async function geneStateFacets(opts: {
         gene, type: "CNA", per: "sample", total, profiled,
         ...(overlap ? { overlap } : {}),
         states: [
-          { state: "amp", label: driver ? "Driver amplification" : "Amplified", n: amp },
-          { state: "del", label: driver ? "Driver deletion" : "Deleted", n: del },
-          { state: "unaltered", label: driver ? "No driver call" : "Diploid", n: Math.max(0, profiled - anyAltered) },
+          { state: "amp", label: "Driver amplification", n: amp },
+          { state: "del", label: "Driver deletion", n: del },
+          { state: "unaltered", label: "No driver call", n: Math.max(0, profiled - anyAltered) },
           { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
         ]
       };
