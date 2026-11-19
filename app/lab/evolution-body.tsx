@@ -6,7 +6,7 @@
 // (app/lab/patient-nav.tsx); the cohort is the header's picker, as for every view.
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DataTable, specQuery } from "../_table/DataTable.tsx";
-import { evolutionSvg, evolutionKey, portalCellTip, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
+import { evolutionSvg, evolutionKey, onlySelected, portalCellTip, EVOLUTION_KEY_COLUMNS } from "../../lib/views/evolution/figure.ts";
 import type { TableQuery } from "../../lib/types";
 import type { EvolutionMutation, EvolutionResult, EvolutionSample } from "../../lib/views/evolution/types";
 import { PatientNav, PatientsDialog, patientKeys, type PatientKey } from "./patient-nav.tsx";
@@ -35,7 +35,9 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     return () => ro.disconnect();
   }, []);
   const p = e.patient;
-  const svg = useMemo(() => evolutionSvg(v as never, { width, caption: false }), [v, width]);
+  const chart = spec.chart || "line";
+  // the line chart draws only the picked mutations (the portal's "Show only selected mutations", kept in the browser as the picks are)
+  const [onlyPicked, setOnlyPicked] = useState(false);
   // the mutation under the pointer, on a line, a heatmap row or a table row: the others are dimmed
   const [hot, setHot] = useState<string | null>(null);
   // the mutations clicked (a line, a heatmap row or a table row; a second click lets go): they stay picked out
@@ -43,6 +45,8 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
   const [pickedFor, setPickedFor] = useState(p ? p.study + ":" + p.id : "");
   if ((p ? p.study + ":" + p.id : "") !== pickedFor) { setPickedFor(p ? p.study + ":" + p.id : ""); setPicked(new Set()); }
   const toggle = (key: string) => setPicked((was) => { const n = new Set(was); if (!n.delete(key)) n.add(key); return n; });
+  const pickedOnly = onlyPicked && chart === "line";
+  const svg = useMemo(() => evolutionSvg((pickedOnly ? onlySelected(v as never, picked) : v) as never, { width, caption: false }), [v, width, pickedOnly, picked]);
   // the point under the pointer: its mutation, its sample, and where its tooltip points (in the figure's box)
   const [tip, setTip] = useState<{ key: string; s: number; x: number; y: number; below: number | null } | null>(null);
   const fig = useRef<HTMLDivElement>(null);
@@ -88,7 +92,6 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
     const next = Object.fromEntries(Object.entries({ ...q, rows }).filter(([, x]) => x !== undefined));
     patch({ mutations: Object.keys(next).length ? next : undefined });
   };
-  const chart = spec.chart || "line";
   const noDayWhy = e.noDay?.length ? "no collection day is recorded for " + e.noDay.join(", ") + ", so the samples are drawn in sequence" : null;
 
   return (
@@ -137,6 +140,9 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
               <label className="chk" data-tip={noDayWhy || "place the samples evenly in their order rather than by the day each was collected"}>
                 <Checkbox checked={!!spec.sequential || !!e.noDay?.length} disabled={!!e.noDay?.length} onCheckedChange={(on) => patch({ sequential: (on === true) || undefined })} /> sequential
               </label>
+              <label className="chk" data-tip="draw only the mutations clicked (a line or a table row); with none clicked, none is drawn">
+                <Checkbox checked={onlyPicked} onCheckedChange={(on) => setOnlyPicked(on === true)} /> only selected
+              </label>
               <label className="chk" data-tip="the y axis on a log scale; a VAF of 0 sits at its floor, 0.001">
                 <Checkbox checked={!!spec.logScale} onCheckedChange={(on) => patch({ logScale: (on === true) || undefined })} /> log scale
               </label>
@@ -154,7 +160,8 @@ export function EvolutionBody({ v, spec, vi, updating, docJson, patch, fixed }: 
         {/* eslint-disable-next-line jsx-a11y-x/click-events-have-key-events, jsx-a11y-x/no-static-element-interactions -- a pointer-only highlight (as the table's clickable rows are); it changes nothing the view shows or shares */}
         {p && (svg ? <div className="evo-fig-wrap"><div ref={fig} className="evo-fig" onMouseMove={overFigure} onClick={clickFigure} onMouseLeave={() => { setHot(null); setTip(null); }} dangerouslySetInnerHTML={{ __html: svg }} />
             {tip && tipped && p.samples[tip.s] && <EvolutionTip m={tipped} sample={p.samples[tip.s]} s={tip.s} x={tip.x} y={tip.below ?? tip.y} below={tip.below != null} />}</div>
-          : <p className="meta tl-empty">{e.undrawn ? "Not drawn: " + e.undrawn + "." : "No mutation the table keeps has an allele frequency to draw."}</p>)}
+          : <p className="meta tl-empty">{e.undrawn ? "Not drawn: " + e.undrawn + "." : pickedOnly && e.drawn?.length ? "No selected mutation to draw: click a table row with an allele frequency, or untick only selected."
+            : "No mutation the table keeps has an allele frequency to draw."}</p>)}
       </div>
       {p && <p className="note vfoot">The figure draws every mutation the table below keeps — filter or search it to follow only some. Hover a line, a heatmap row or a table row to pick out that mutation in both; click to keep it picked out.
         {picked.size > 0 && <> {picked.size.toLocaleString()} picked — <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={() => setPicked(new Set())}>clear selection</Button></>}</p>}

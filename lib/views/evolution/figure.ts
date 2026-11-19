@@ -301,6 +301,15 @@ function heatmap(v: DrawnResultOf<"evolution">, W: number, p: ReturnType<typeof 
   return { svg: out.join(""), height: h, width };
 }
 
+/**
+ * The result with only the mutations `keys` names drawn, the portal's "Show only selected mutations"
+ * (VAFChartControls): none named, none drawn; the y axis's data range then follows those drawn.
+ */
+export function onlySelected<T extends DrawnResultOf<"evolution">>(v: T, keys: ReadonlySet<string>): T {
+  const d = v.evolution.drawn;
+  return d ? { ...v, evolution: { ...v.evolution, drawn: d.filter((m) => keys.has(m.key)) } } : v;
+}
+
 /** `o.caption: false` leaves the caveat out, for a page that prints it beside the figure. */
 export function evolutionSvg(v: DrawnResultOf<"evolution">, o: SvgOpts & { caption?: boolean }): string | null {
   const e = v.evolution, pt = e.patient;
