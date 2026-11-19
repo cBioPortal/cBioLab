@@ -232,6 +232,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
   const c = contract !== undefined ? contract : own;
   const [genesOpen, setGenesOpen] = useState(false);
   const edit = (next: V) => onView(next, true);
+  const setUnit = (u: "patient" | "sample") => { const n = { ...view }; if (u === "sample") n.unit = "sample"; else delete n.unit; edit(n); };
   return (
     <>
       <OncoprintFigure
@@ -245,6 +246,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
         onMoveTrack={(label, dir) => edit(moveTrack(view, label, dir))}
         onRemoveTrack={(label) => edit(removeTrack(view, label))}
         canRemoveTrack={(label) => canRemoveTrack(view, label)}
+        onColumnType={setUnit}
         onExpandTrack={(label) => edit(splitGeneTrack(view, label))}
         onContract={(ct) => { setOwn(ct); onContract?.(ct); }}
         onCreateCohort={onCreateCohort}
@@ -255,7 +257,7 @@ export function OncoprintCard({ view, spec, busy, cohortNames, catalog, onView, 
             data-tip="choose the genes this oncoprint draws" onClick={() => onGenes ? onGenes() : setGenesOpen(true)}>genes ({geneRowCount(view)})</Button>
           <label className="tbfield" data-tip="a cohort selects patients; sample mode draws every sample of those patients">columns <OptionSelect
             value={view.unit || "patient"} disabled={busy}
-            onValueChange={(v) => { const n = { ...view }; if (v === "sample") n.unit = "sample"; else delete n.unit; edit(n); }}>
+            onValueChange={(v) => setUnit(v === "sample" ? "sample" : "patient")}>
             <option value="patient">patients</option><option value="sample">samples</option>
           </OptionSelect></label>
           <DriverSettingsMenu drivers={driversOf(view)} busy={busy} scope={DRIVER_SCOPE}

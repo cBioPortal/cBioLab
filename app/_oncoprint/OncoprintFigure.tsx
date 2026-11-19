@@ -37,6 +37,7 @@ import { Slider } from "../_ui/slider";
 import { FIELD, TB } from "../_ui/toolbar.ts";
 import { cn } from "../../lib/cn";
 import type { OncoprintSpec } from "../../lib/views/oncoprint/types.ts";
+import { SAMPLES_TRACK } from "../../lib/profile-names.ts";
 
 /** one of the zoom group's buttons: the group draws the border */
 const ZOOM = "h-full rounded-none text-muted-foreground hover:bg-muted hover:text-foreground";
@@ -111,6 +112,8 @@ export interface OncoprintFigureProps {
   canRemoveTrack?: (label: string) => boolean;
   /** draw a merged gene row's members as rows of their own */
   onExpandTrack?: (label: string) => void;
+  /** switch the columns between patients and samples (the "# Samples per Patient" row offers it) */
+  onColumnType?: (unit: "patient" | "sample") => void;
   /** the Tracks menu's contents — the page owns what can be added */
   tracksMenu?: React.ReactNode;
   onDisplay: (d: FigureDisplay) => void;
@@ -946,6 +949,9 @@ export default function OncoprintFigure(props: OncoprintFigureProps) {
                 {props.onRemoveTrack && (!props.canRemoveTrack || props.canRemoveTrack(t.key ?? t.label)) && item("Remove track", false, () => props.onRemoveTrack!(t.key ?? t.label))}
                 {props.onExpandTrack && t.members && t.members.length > 1 &&
                   item("Expand into " + t.members.length + " rows", false, () => props.onExpandTrack!(t.key ?? t.label))}
+                {props.onColumnType && t.label === SAMPLES_TRACK && (data.unit === "sample"
+                  ? item("Show one column per patient.", false, () => props.onColumnType!("patient"))
+                  : item("Show one column per sample.", false, () => props.onColumnType!("sample")))}
                 {/* the portal's heatmap group header (Cluster / Don't cluster); each of the profile's rows carries it here */}
                 {t.kind === "heatmap" && t.profileType && item("Cluster", clusteredProfile(sortKeys) === t.profileType, () => onSortKeys(clusterSort(sortKeys, t.profileType!, true)))}
                 {t.kind === "heatmap" && t.profileType && item("Don't cluster", clusteredProfile(sortKeys) !== t.profileType, () => onSortKeys(clusterSort(sortKeys, t.profileType!, false)))}
