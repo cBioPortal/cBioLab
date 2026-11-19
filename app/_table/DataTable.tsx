@@ -124,7 +124,7 @@ export function Pager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
  * shown, Reset once the page is larger than the first size; hidden when one page holds every row.
  */
 export function ShowMorePager({ p, unit }: { p: PageRows<unknown>; unit: string }) {
-  if (pagerHidden(p.total)) return null;
+  if (pagerHidden(p.total, p.size)) return null;
   const from = p.total ? p.page * p.size + 1 : 0, to = Math.min(p.total, (p.page + 1) * p.size);
   return (
     <div className="viewtb pb-pager"><div className="tbz">
