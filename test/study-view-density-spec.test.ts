@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 import {
   MUTATION_COUNT, FGA, DENSITY_GRID, densityAxes, swapDensity, logOffered, densityView, densityTitle,
   densityAxisLabel, lnFromEngine, densityColors, correlationLines, densityTip, densitySelection, densityPairKey, DEFAULT_DENSITY_PAIR,
-  densityBinEdges, withDensityBins, densityBinsAfterDrag, densityBinsWithout, xyChartRemoval,
+  densityBinEdges, withDensityBins, densityHeld, withoutDensitySelection, withDensityDrag, densityBinsAfterDrag, densityBinsWithout, xyChartRemoval,
 } from "../lib/study-view-density.ts";
 import { plotExtent } from "../lib/plot.ts";
 
@@ -325,8 +325,8 @@ test("M2 Log Scale is offered only on the axis holding MC, off at first", () => 
 
 test("D1 a box on linear axes: FGA rounded to the axis's precision, MC to whole counts inside", () => {
   assert.deepEqual(densitySelection({ x0: 0.104, x1: 0.358, y0: 3.2, y1: 10.7 }, {}, { x: 1, y: 40 }), [
-    { kind: "clinical", attribute: FGA, range: { gte: 0.1, lte: 0.36 } },
-    { kind: "clinical", attribute: MUTATION_COUNT, range: { gte: 4, lte: 10 } }
+    { kind: "clinical", attribute: FGA, range: { gte: 0.1, lte: 0.36 }, chart: "density:FRACTION_GENOME_ALTERED|MUTATION_COUNT" },
+    { kind: "clinical", attribute: MUTATION_COUNT, range: { gte: 4, lte: 10 }, chart: "density:FRACTION_GENOME_ALTERED|MUTATION_COUNT" }
   ]);
   // a narrower FGA axis keeps more places: span 0.05 → 2 − floor(log10 0.05) = 4
   const [f] = densitySelection({ x0: 0.10437, x1: 0.13581, y0: 3, y1: 4 }, {}, { x: 0.05, y: 40 });
@@ -339,7 +339,7 @@ test("D1 a box on linear axes: FGA rounded to the axis's precision, MC to whole 
 
 test("D2 a box on a Log Scale MC axis: exp(v) − 1 back to counts", () => {
   const [, m] = densitySelection({ x0: 0.1, x1: 0.2, y0: 1.609, y1: 2.398 }, { yLog: true }, { x: 1, y: 4.6 });
-  assert.deepEqual(m, { kind: "clinical", attribute: MUTATION_COUNT, range: { gte: 4, lte: 10 } });
+  assert.deepEqual(m, { kind: "clinical", attribute: MUTATION_COUNT, range: { gte: 4, lte: 10 }, chart: "density:FRACTION_GENOME_ALTERED|MUTATION_COUNT" });
   // edges exactly at ln 5 and ln 11 are 4 and 10, not 5 and 9 from a rounding error
   const [, e] = densitySelection({ x0: 0.1, x1: 0.2, y0: Math.log(5), y1: Math.log(11) }, { yLog: true }, { x: 1, y: 4.6 });
   assert.deepEqual(e.range, { gte: 4, lte: 10 });
@@ -347,8 +347,8 @@ test("D2 a box on a Log Scale MC axis: exp(v) − 1 back to counts", () => {
 
 test("D3 after Swap Axes: the same rule per attribute, in the order [x attribute, y attribute]", () => {
   assert.deepEqual(densitySelection({ x0: 3.2, x1: 10.7, y0: 0.104, y1: 0.358 }, { swapped: true }, { x: 40, y: 1 }), [
-    { kind: "clinical", attribute: MUTATION_COUNT, range: { gte: 4, lte: 10 } },
-    { kind: "clinical", attribute: FGA, range: { gte: 0.1, lte: 0.36 } }
+    { kind: "clinical", attribute: MUTATION_COUNT, range: { gte: 4, lte: 10 }, chart: "density:FRACTION_GENOME_ALTERED|MUTATION_COUNT" },
+    { kind: "clinical", attribute: FGA, range: { gte: 0.1, lte: 0.36 }, chart: "density:FRACTION_GENOME_ALTERED|MUTATION_COUNT" }
   ]);
   const [m] = densitySelection({ x0: 1.609, x1: 2.398, y0: 0.104, y1: 0.358 }, { swapped: true, xLog: true }, { x: 4.6, y: 1 });
   assert.deepEqual(m.range, { gte: 4, lte: 10 });
@@ -419,4 +419,29 @@ test("Remove chart on an added density chart: the pair goes, with its two attrib
   assert.deepEqual(r.pairs, [other]);
   assert.deepEqual(r.bins, [bins[0]]);
   assert.deepEqual(r.clear, ["AGE", MUTATION_COUNT], "the portal clears the filters on both attributes");
+});
+
+// STV-FB-3b, the user's answer (2026-11-19): a density drag's filter has no pill, as the portal's;
+// its clauses carry the chart's name, so the chart can show and clear its own selection
+test("a drag's clauses name their chart; the chart finds its selection and clears it, other filters kept", () => {
+  const pair = { x: "AGE", y: MUTATION_COUNT };
+  const sel = densitySelection({ x0: 50, x1: 60, y0: 3, y1: 9 }, {}, { x: 50, y: 40 }, pair);
+  assert.ok(sel.every((c) => c.chart === "density:AGE|MUTATION_COUNT"), "either way round, one name");
+  const other = { kind: "clinical", attribute: "SEX", op: "=", value: "Female" };
+  const fromDefault = densitySelection({ x0: 0.1, x1: 0.3, y0: 3, y1: 9 }, {}, { x: 1, y: 40 });
+  const draft = { all: [other, ...sel, ...fromDefault] };
+  assert.deepEqual(densityHeld(draft, pair), { x: { gte: 50, lte: 60 }, y: { gte: 3, lte: 9 } });
+  assert.deepEqual(densityHeld(draft, { x: MUTATION_COUNT, y: "AGE" }), { x: { gte: 3, lte: 9 }, y: { gte: 50, lte: 60 } }, "read by the axes asked for");
+  assert.equal(densityHeld({ all: [other] }, pair), null);
+  assert.deepEqual(withoutDensitySelection(draft, pair).all, [other, ...fromDefault]);
+});
+
+test("a second drag on a density chart replaces its first selection, as the portal's; another chart's stays", () => {
+  const pair = { x: "AGE", y: MUTATION_COUNT };
+  const first = densitySelection({ x0: 50, x1: 60, y0: 3, y1: 9 }, {}, { x: 50, y: 40 }, pair);
+  const other = densitySelection({ x0: 0.1, x1: 0.3, y0: 3, y1: 9 }, {}, { x: 1, y: 40 });
+  const second = densitySelection({ x0: 40, x1: 45, y0: 10, y1: 20 }, {}, { x: 50, y: 40 }, pair);
+  const d = withDensityDrag({ all: [...other, ...first] }, second);
+  assert.deepEqual(d.all, [...other, ...second]);
+  assert.deepEqual(densityHeld(d, pair), { x: { gte: 40, lte: 45 }, y: { gte: 10, lte: 20 } });
 });

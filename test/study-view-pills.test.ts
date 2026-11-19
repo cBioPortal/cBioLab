@@ -51,6 +51,13 @@ describe("groups (STV-FB-3)", () => {
   });
 });
 
+test("a density drag's ranges have no pill, as the portal's (STV-FB-3b); the same range from a bar keeps its pill", () => {
+  const drag = { kind: "clinical", attribute: "AGE", range: { gte: 50, lte: 60 }, chart: "density:AGE|MUTATION_COUNT" } as ClinicalLeaf;
+  const [g, h] = filterGroups({ all: [drag, age({ gte: 50, lte: 60 })] }, labelOf);
+  assert.equal(g.kind, "hidden");
+  assert.equal(h.kind, "chart");
+});
+
 describe("a pill's ×", () => {
   test("a value leaves its list; the last two become one value, the last one the filter", () => {
     const d: CohortDef = { all: [{ ...race, values: ["White", "Asian", "Black"] }, sex] };

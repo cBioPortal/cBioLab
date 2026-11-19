@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api.ts";
 import { Choice } from "../_ui/choice.tsx";
+import { Button } from "../_ui/button";
 import { useWidth } from "./figure.tsx";
 import { linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight } from "../../lib/svg-kit.ts";
 import { fmtInt } from "../../lib/chart/format.ts";
@@ -19,7 +20,7 @@ import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import {
   DEFAULT_DENSITY_PAIR, FGA, MUTATION_COUNT, correlationLines, densityAxes, densityPairKey, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
-  densityTitle, densityView, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensityPair, type DensitySettings
+  densityTitle, densityView, densityHeld, lnFromEngine, logOffered, swapDensity, type DensityAxis, type DensityPair, type DensitySettings
 } from "../../lib/study-view-density.ts";
 
 type Clause = Record<string, unknown>;
@@ -45,6 +46,8 @@ interface Props {
   /** the reader's X vs Y density charts, added from Add chart (STV-AC-7) */
   pairs?: DensityPair[];
   onRemovePair?: (pair: DensityPair) => void;
+  /** a density chart's Reset: its drag's selection, which has no pill (STV-FB-3b) */
+  onClearDensity?: (pair: DensityPair) => void;
   /** the Mutation Count vs FGA density, unless unchecked in Add chart's Genomic tab */
   density?: boolean;
 }
@@ -52,7 +55,7 @@ interface Props {
 type PlotData = { shape: string; n: number; extent?: { x0: number; x1: number; y0: number; y1: number }; grid?: [number, number];
   bins?: PlotCell[]; stats?: { pearson: number | null; spearman: number | null }; coverage?: { total: number; nx: number; ny: number } };
 
-export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km, density = true, pairs = [], onRemovePair }: Props) {
+export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km, density = true, pairs = [], onRemovePair, onClearDensity }: Props) {
   const has = (a: string) => attrs.some((x) => x.attribute === a);
   const hasScatter = density && has(MUTATION_COUNT) && has(FGA);
   const nameOf = (a: string) => attrs.find((x) => x.attribute === a)?.displayName || DENSITY_NAMES[a] || a;
@@ -116,7 +119,7 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
     )}
     {shown.map(({ pair, added }) => (
       <DensityCard key={densityPairKey(pair)} pair={pair} added={added} studies={studies} draft={draft} selection={selection} addClauses={addClauses}
-        nameOf={nameOf} onRemove={added && onRemovePair ? () => onRemovePair(pair) : undefined} />
+        nameOf={nameOf} onRemove={added && onRemovePair ? () => onRemovePair(pair) : undefined} onClear={onClearDensity ? () => onClearDensity(pair) : undefined} />
     ))}
   </>;
 }
@@ -125,8 +128,8 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
  * One X vs Y density chart (STS-SC-1…6): its own settings (Swap Axes, Log Scale; the default
  * chart's kept under its old key), its own request, its menu, and a drag box that filters on both.
  */
-function DensityCard({ pair, added, studies, draft, selection, addClauses, nameOf, onRemove }: { pair: DensityPair; added: boolean; studies: string[];
-  draft: Draft; selection: Props["selection"]; addClauses: Props["addClauses"]; nameOf: (a: string) => string; onRemove?: () => void }) {
+function DensityCard({ pair, added, studies, draft, selection, addClauses, nameOf, onRemove, onClear }: { pair: DensityPair; added: boolean; studies: string[];
+  draft: Draft; selection: Props["selection"]; addClauses: Props["addClauses"]; nameOf: (a: string) => string; onRemove?: () => void; onClear?: () => void }) {
   const storeKey = added ? DENSITY_KEY + "." + densityPairKey(pair) : DENSITY_KEY;
   // the reader's own menu settings, kept by this browser; read after mounting, so a server render never touches storage
   const [dset, setDset] = useState<DensitySettings>({});
@@ -164,12 +167,17 @@ function DensityCard({ pair, added, studies, draft, selection, addClauses, nameO
   const plot = res?.data;
   const title = densityTitle(nameOf(axes.x.attribute), nameOf(axes.y.attribute));
   const names = { x: nameOf(axes.x.attribute), y: nameOf(axes.y.attribute) };
+  // its drag's selection, shown here only (no pill, STV-FB-3b), by the axes as drawn
+  const held = densityHeld(draft, { x: axes.x.attribute, y: axes.y.attribute });
+  const heldText = held ? (["x", "y"] as const).flatMap((k) => held[k] ? [names[k] + " " + String(held[k]!.gte) + "–" + String(held[k]!.lte)] : []).join(", ") : "";
   return (
     <div className="card xc-card" data-chart={added ? "xvsy" : "mutcount-fga"} data-pair={densityPairKey(pair)}>
       <div className="xc-head">
         <span className="xc-title">{title}</span>
         <span className="meta">{plot && plot.coverage && plot.coverage.total > plot.n
-          ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : ""}drag a box to filter</span>
+          ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : ""}{held ? "selected: " + heldText : "drag a box to filter"}</span>
+        {held && onClear && <Button variant="outline" size="xs" data-chart-reset onClick={onClear}
+          data-tip={"Reset filters: clear this chart's selection (" + heldText + ")"}>Reset</Button>}
         <ChartMenu label={"the " + title + " chart"} actions={[
           { label: "Swap Axes", title: "put " + names.y + " along the bottom", onClick: () => saveDensity(swapDensity(dset)) },
           ...(["x", "y"] as const).filter((k) => logOffered(axes[k].attribute)).map((k) => ({
@@ -185,7 +193,7 @@ function DensityCard({ pair, added, studies, draft, selection, addClauses, nameO
       <div className="xc-body">
         {plot && plot.shape === "scatter" && !plot.grid && <p className="note">No data to plot.</p>}
         {plot && plot.shape === "scatter" && plot.grid &&
-          <Density data={plot} axes={axes} names={names} figure={densityFile} onSelect={(box, span) => addClauses(densitySelection(box, dset, span, pair))} />}
+          <Density data={plot} axes={axes} names={names} figure={densityFile} held={held} onSelect={(box, span) => addClauses(densitySelection(box, dset, span, pair))} />}
         {fileError && <p className="note">{fileError}</p>}
         {res && res.error && <p className="note">{res.error}</p>}
         {stale && <div className="xc-wait"><span className="spinner" /> {res ? "updating…" : "loading…"}</div>}
@@ -195,7 +203,9 @@ function DensityCard({ pair, added, studies, draft, selection, addClauses, nameO
 }
 
 /** the portal's density: a dot per non-empty bin coloured by its count, the legend and coefficients beside it, a drag box to filter */
-function Density({ data, axes, names, figure, onSelect }: { data: PlotData; axes: { x: DensityAxis; y: DensityAxis };
+function Density({ data, axes, names, figure, held, onSelect }: { data: PlotData; axes: { x: DensityAxis; y: DensityAxis };
+  /** the chart's held selection, drawn as its box (the portal shows it on the chart only) */
+  held: ReturnType<typeof densityHeld>;
   /** the axes' attributes' names, as the chart's title writes them */
   names: { x: string; y: string };
   /** set to draw the chart as a file */
@@ -255,6 +265,14 @@ function Density({ data, axes, names, figure, onSelect }: { data: PlotData; axes
           ))}
           {/* the axes are drawn by the figures' own kit (lib/chart/axis.ts), which escapes what it writes */}
           <g dangerouslySetInnerHTML={{ __html: axesSvg }} />
+          {held && !drag && (() => {
+            // a count on Log Scale is drawn at ln(1 + v); each range is clamped to the plot
+            const at = (k: "x" | "y", v: number) => axes[k].log ? Math.log1p(v) : v;
+            const clampX = (v: number) => Math.min(L + PW, Math.max(L, v)), clampY = (v: number) => Math.min(T + PH, Math.max(T, v));
+            const x0 = held.x ? clampX(xs(at("x", held.x.gte))) : L, x1 = held.x ? clampX(xs(at("x", held.x.lte))) : L + PW;
+            const y0 = held.y ? clampY(ys(at("y", held.y.lte))) : T, y1 = held.y ? clampY(ys(at("y", held.y.gte))) : T + PH;
+            return <rect x={x0} y={y0} width={Math.max(1, x1 - x0)} height={Math.max(1, y1 - y0)} className="xc-held" data-held />;
+          })()}
           {drag && <rect x={Math.min(drag.x0, drag.x1)} y={Math.min(drag.y0, drag.y1)} width={Math.abs(drag.x1 - drag.x0)} height={Math.abs(drag.y1 - drag.y0)} className="xc-brush" />}
         </svg>
         <div className="xc-legend">

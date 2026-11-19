@@ -22,7 +22,9 @@ export type SvPill =
 
 export type SvGroup =
   | { kind: "chart"; clause: number; attribute: string; label: string; pills: SvPill[] }
-  | { kind: "other"; clause: number };
+  | { kind: "other"; clause: number }
+  /** a density drag's range: no pill, as the portal's (STV-FB-3b); its chart shows and clears it */
+  | { kind: "hidden"; clause: number };
 
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 
@@ -48,6 +50,7 @@ export function intervalText(iv: Interval): string {
 /** the filter bar's groups, in the draft's clause order; `labelOf` names a chart by its attribute */
 export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attribute: string) => string | undefined): SvGroup[] {
   return (draft?.all || []).map((c, i): SvGroup => {
+    if (String((c as { chart?: unknown }).chart || "").startsWith("density:")) return { kind: "hidden", clause: i };
     const na = (c as { not?: ClinicalLeaf }).not;
     if (na && isNaClause(c, na.attribute)) return { kind: "chart", clause: i, attribute: na.attribute, label: labelOf(na.attribute) || na.attribute, pills: [{ kind: "na" }] };
     const attribute = clauseAttribute(c);

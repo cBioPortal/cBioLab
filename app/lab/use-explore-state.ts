@@ -23,7 +23,7 @@ import { toggleBin, selectBins, toggleNa, toggleValue } from "../../lib/explore-
 import { defaultChartKeys } from "../../lib/study-view-config.ts";
 import { FILTERS_PARAM, writeFilters } from "../../lib/study-view-url.ts";
 import { binsAfterEdit, logScaleToggled, oneValueBars, serverBins, type ChartBins } from "../../lib/study-view-bins.ts";
-import { densityBinEdges, densityBinsAfterDrag, densityBinsWithout, withDensityBins, xyChartRemoval, type DensityBins } from "../../lib/study-view-density.ts";
+import { densityBinEdges, densityBinsAfterDrag, densityBinsWithout, withDensityBins, withoutDensitySelection, withDensityDrag, xyChartRemoval, type DensityBins } from "../../lib/study-view-density.ts";
 import { storeCohortLists, storeDocLists } from "./id-sets-client.ts";
 import { encodeParam } from "../portal/page-doc.ts";
 import { currentLinkUrlMax, linkParams, linkTo, writeSearch } from "../_links/link-state.ts";
@@ -609,7 +609,11 @@ export function useExploreState(page: ExplorePage) {
       const { edges } = binsAfterEdit(undefined, f.bins, e.ends).bins as { method: "custom"; edges: number[] };
       return [{ attribute: e.attribute, range: c.range, edges }];
     }));
-    addClauses(clauses);
+    // the chart's earlier selection, which has no pill, is replaced rather than stacked
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
+    const next = withDensityDrag(d && Array.isArray(d.all) ? d : { all: [] }, clauses);
+    setCDefText(JSON.stringify(next, null, 2));
+    fetchExplore(next);
   };
   const addClauses = (clauses: any[]) => {
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
@@ -758,6 +762,19 @@ export function useExploreState(page: ExplorePage) {
       setExMsg("Could not remove the filters on " + attributes.join(", ") + ": " + String((e as Error)?.message || e));
     }
   };
+  /** a density chart's Reset (STV-FB-3b): its drag's two ranges, which have no pill, and their temporary bar edges go */
+  const clearDensitySelection = (pair: DensityPair) => {
+    try {
+      const d = normalizeDef(JSON.parse(cDefText));
+      const next = withoutDensitySelection(d, pair);
+      if (next.all.length === d.all.length) return;
+      densityBins.current = densityBinsWithout(densityBins.current, [pair.x, pair.y]);
+      setCDefText(JSON.stringify(next, null, 2));
+      fetchExplore(next.all.length ? next : null);
+    } catch (e) {
+      setExMsg("Could not reset the density chart's selection: " + String((e as Error)?.message || e));
+    }
+  };
   /** Log Scale switched on or off (STS-BAR-7): the bars change and the chart's filter is cleared (logScaleToggled) */
   const toggleLogScale = (attribute: string, cur: ChartBins | undefined) => {
     let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { d = null; }
@@ -892,7 +909,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, toggleLogScale, addBinEdges, addDensitySelection, chartGene, unchartGene, geneKinds, mutationTypeCharts, assayCharts, chartAssay, unchartAssay, xyCharts, addXyChart, removeXyChart, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, clearGeneTableFilter, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, toggleLogScale, addBinEdges, addDensitySelection, chartGene, unchartGene, geneKinds, mutationTypeCharts, assayCharts, chartAssay, unchartAssay, xyCharts, addXyChart, removeXyChart, clearDensitySelection, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, clearGeneTableFilter, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

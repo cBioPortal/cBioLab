@@ -92,7 +92,8 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
   };
   // two groups in a row from one chart are joined by "and" (STV-FB-2)
   const groups = filterGroups(draft, labelOf), and = joinedByAnd(draft, groups);
-  return <span className="svpills">{groups.map((g, i) => g.kind === "other"
+  // a density drag's ranges have no pill (STV-FB-3b): its chart shows them and resets them
+  return <span className="svpills">{groups.map((g, i) => g.kind === "hidden" ? null : g.kind === "other"
     ? <Fragment key={g.clause}>{and[i] && <span className="svop">and</span>}{other(g.clause)}</Fragment>
     : chart(g))}</span>;
 }
