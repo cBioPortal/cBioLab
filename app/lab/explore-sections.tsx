@@ -309,7 +309,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         <DialogHeader className="mb-2"><DialogTitle className="text-base">Add chart</DialogTitle></DialogHeader>
         <Tabs value={chartTab} onValueChange={(v) => setChartTab(v as typeof chartTab)} className="mb-3">
           <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
-            {([["clinical", "Clinical"], ["genomic", "Genomic"], ["gene", "Gene status"], ["assay", "Generic assays"], ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
+            {([["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"], ["assay", "Generic assays"], ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
               <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
@@ -1062,22 +1062,38 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
 }
 
 /** the Add chart dialog's Genomic tab (STV-AC-2): the gene tables, Data Types and the density, each shown unless unchecked */
-function GenomicCharts({ ctx }: { ctx: ExploreCtx }) {
-  const { chartChecked, setChartsChecked } = ctx;
-  const explore = ctx.explore!;
+/** the Genomic tab's rows for this selection (STV-AC-2, STV-AC-4); none hides the tab, as the portal's */
+function genomicLines(explore: NonNullable<ExploreCtx["explore"]>, attrKey: ExploreCtx["attrKey"]) {
   const byKind = Object.fromEntries((explore.dataTypes || []).map((d) => [d.profile, d.n]));
-  const names = new Set((explore.clinical || []).map((c) => c.attribute));
-  const lines = genomicChartLines({ mutated: profiledSamples("mutated", byKind), cna: profiledSamples("cna", byKind), sv: profiledSamples("sv", byKind) },
-    explore.totals?.samples ?? 0, { datatypes: (explore.dataTypes || []).length > 0, density: names.has("MUTATION_COUNT") && names.has("FRACTION_GENOME_ALTERED") });
+  const clinical = explore.clinical || [];
+  const names = new Set(clinical.map((c) => c.attribute));
+  return genomicChartLines({ mutated: profiledSamples("mutated", byKind), cna: profiledSamples("cna", byKind), sv: profiledSamples("sv", byKind) },
+    explore.totals?.samples ?? 0, { datatypes: (explore.dataTypes || []).length > 0, density: names.has("MUTATION_COUNT") && names.has("FRACTION_GENOME_ALTERED") },
+    clinical.filter((c) => c.attribute === "MUTATION_COUNT" || c.attribute === "FRACTION_GENOME_ALTERED")
+      .map((c) => ({ key: attrKey(c), name: c.displayName || c.attribute, samples: c.samples ?? 0, attribute: c.attribute })));
+}
+
+/** the Add chart dialog's Genomic tab (STV-AC-2): the gene tables, Data Types, the density, Mutation Count and FGA, each shown unless unchecked */
+function GenomicCharts({ ctx }: { ctx: ExploreCtx }) {
+  const { chartChecked, setChartsChecked, clearAttributeFilters, clearGeneTableFilter, attrKey } = ctx;
+  const lines = genomicLines(ctx.explore!, attrKey);
   if (!lines.length) return <p className="note mt-0 mb-3">No selected study has molecular data to chart.</p>;
+  /** checked or unchecked; an unchecked chart takes its filter with it, as the portal's (STV-STM-3) */
+  const toggle = (l: (typeof lines)[number], on: boolean) => {
+    setChartsChecked([l.key], on);
+    if (on) return;
+    if (l.attribute) clearAttributeFilters([l.attribute]);
+    const table = /^genomic\|(mutated|cna|sv)$/.exec(l.key);
+    if (table) clearGeneTableFilter(table[1] as "mutated" | "cna" | "sv");
+  };
   return (
     <div className="attrtablewrap">
       <table className="attrtable">
         <thead><tr><th></th><th>Chart</th><th className="num" data-tip="% samples with data">Freq</th></tr></thead>
         <tbody>
           {lines.map((l) => (
-            <tr key={l.key} onClick={(e) => { if (!(e.target as HTMLElement).closest("[role=checkbox]")) setChartsChecked([l.key], !chartChecked(l.key)); }}>
-              <td><Checkbox checked={chartChecked(l.key)} onCheckedChange={(v) => setChartsChecked([l.key], v === true)} aria-label={"chart " + l.name} /></td>
+            <tr key={l.key} onClick={(e) => { if (!(e.target as HTMLElement).closest("[role=checkbox]")) toggle(l, !chartChecked(l.key)); }}>
+              <td><Checkbox checked={chartChecked(l.key)} onCheckedChange={(v) => toggle(l, v === true)} aria-label={"chart " + l.name} /></td>
               <td>{l.name}</td>
               <td className="num meta">{Number.isNaN(l.freq) ? "—" : portalFreq(l.freq)}</td>
             </tr>

@@ -221,11 +221,15 @@ test("the special tables: drawn when checked, or while the draft filters on what
 
 // STV-AC-2, STV-AC-4: the Genomic tab's charts, as the portal lists them (coadread, seen)
 test("the Genomic tab: each chart the selection has data for, its Freq the samples with that data, by Freq then name", () => {
-  const lines = genomicChartLines({ mutated: 534, cna: 592, sv: 534 }, 594, { datatypes: true, density: true });
+  const clinical = [{ key: "sample|FRACTION_GENOME_ALTERED", name: "Fraction Genome Altered", samples: 583, attribute: "FRACTION_GENOME_ALTERED" },
+    { key: "sample|MUTATION_COUNT", name: "Mutation Count", samples: 534, attribute: "MUTATION_COUNT" }];
+  const lines = genomicChartLines({ mutated: 534, cna: 592, sv: 534 }, 594, { datatypes: true, density: true }, clinical);
+  // the portal's seen list: Data Types 100.0%, CNA Genes 99.7%, FGA 98.1%, Mutated Genes 89.9%, Mutation Count 89.9%, SV Genes 89.9%
   assert.deepEqual(lines.map((l) => [l.name, Number.isNaN(l.freq) ? "—" : portalFreq(l.freq)]), [
-    ["Data Types", "100.0%"], ["CNA Genes", "99.7%"], ["Mutated Genes", "89.9%"], ["Structural Variant Genes", "89.9%"],
-    ["Mutation Count vs Fraction Genome Altered", "—"],
+    ["Data Types", "100.0%"], ["CNA Genes", "99.7%"], ["Fraction Genome Altered", "98.1%"], ["Mutated Genes", "89.9%"], ["Mutation Count", "89.9%"],
+    ["Structural Variant Genes", "89.9%"], ["Mutation Count vs Fraction Genome Altered", "—"],
   ]);
+  assert.equal(lines.find((l) => l.name === "Mutation Count")!.attribute, "MUTATION_COUNT", "a clinical row's filter is its attribute's");
   // a table without its profile, and charts without data, are not offered
   assert.deepEqual(genomicChartLines({ mutated: 10, cna: 0, sv: 0 }, 10, { datatypes: true, density: false }).map((l) => l.name), ["Data Types", "Mutated Genes"]);
   assert.deepEqual(genomicChartLines({ mutated: 0, cna: 0, sv: 0 }, 0, { datatypes: false, density: false }), []);

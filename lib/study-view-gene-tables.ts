@@ -237,3 +237,23 @@ export function withQValues(kind: GeneTableKind, rows: GeneTableRow[], mutsig: M
     return q == null ? r : { ...r, qValue: q };
   });
 }
+
+/** the alteration a gene table's lines name (lib/study-view-gene-tables.ts geneSelection) */
+const TABLE_LINE: Record<GeneTableKind, RegExp> = {
+  mutated: /^[A-Za-z0-9][A-Za-z0-9.-]*:\s*MUT(_DRIVER)?$/,
+  cna: /^[A-Za-z0-9][A-Za-z0-9.-]*:\s*(AMP|HOMDEL)(_DRIVER)?$/,
+  sv: /^[A-Za-z0-9][A-Za-z0-9.-]*:\s*FUSION(_DRIVER)?$/,
+};
+
+/**
+ * The draft without a gene table's own filter, as the portal resets a chart's filter when it is taken
+ * off the page (STV-STM-3): the OQL clauses every line of which that table writes. Typed OQL, or a
+ * clause mixing tables, stays.
+ */
+export function withoutGeneTableClauses(all: unknown[], kind: GeneTableKind): unknown[] {
+  const mine = (c: unknown) => { const l = c as { kind?: string; q?: unknown } | null;
+    if (!l || l.kind !== "oql" || typeof l.q !== "string") return false;
+    const lines = l.q.split(";").map((x) => x.trim()).filter(Boolean);
+    return lines.length > 0 && lines.every((x) => TABLE_LINE[kind].test(x)); };
+  return all.filter((c) => !mine(c));
+}

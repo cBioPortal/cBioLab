@@ -37,7 +37,7 @@ export type GroupsTarget = "comparison" | "analysis";
 /** a saved cohort open in Explore to change its filters */
 export type EditingCohort = { id: string; name: string; def: CohortDef };
 
-import { toggleQueued } from "../../lib/study-view-gene-tables.ts";
+import { toggleQueued, withoutGeneTableClauses } from "../../lib/study-view-gene-tables.ts";
 import { driverOql, geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
 import { CLINICAL_VALUES_LIMIT, limitRefusal } from "../../lib/filter-limits.ts";
 import type { DocStore } from "./doc-store.ts";
@@ -753,6 +753,15 @@ export function useExploreState(page: ExplorePage) {
       fetchExplore(next.all.length ? def : null);
     } else fetchExplore();
   };
+  /** take a gene table's own filter out of the draft (its chart unchecked in Add chart) */
+  const clearGeneTableFilter = (kind: "mutated" | "cna" | "sv") => {
+    let d; try { d = normalizeDef(JSON.parse(cDefText)); } catch { return; }
+    const all = withoutGeneTableClauses(d.all || [], kind);
+    if (all.length === (d.all || []).length) return;
+    d.all = all;
+    setCDefText(JSON.stringify(d, null, 2));
+    fetchExplore(all.length ? d : null);
+  };
   const removeDraftClause = (i: number) => {
     try {
       const d = normalizeDef(JSON.parse(cDefText));
@@ -866,7 +875,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, toggleLogScale, addBinEdges, addDensitySelection, chartGene, unchartGene, mutationTypeCharts, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, selectBars, geneStatesClauses, toggleLogScale, addBinEdges, addDensitySelection, chartGene, unchartGene, mutationTypeCharts, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, clearGeneTableFilter, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

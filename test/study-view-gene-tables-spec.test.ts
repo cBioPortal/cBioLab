@@ -18,6 +18,7 @@ import {
   freqTipLines, geneSelection, appliedLines, toggleQueued, queuedQuery, alteredHeaderTip,
   intersectionRefusal, geneFreqText, geneRowMatches,
   type GeneTableKind, type GeneSort, type GeneSortColumn,
+  withoutGeneTableClauses,
 } from "../lib/study-view-gene-tables.ts";
 import { chartFileName } from "../lib/study-view-download.ts";
 import type { GeneTableRow } from "../lib/types.ts";
@@ -799,4 +800,19 @@ test("GT-10: the search matches any column as shown, case-insensitively", () => 
 test("GT-10: the Freq searched is the percentage shown, not the fraction (the portal's search bug not copied)", () => {
   assert.equal(geneRowMatches("mutated", r("A", 1, 1, 4), "25.0"), true);
   assert.equal(geneRowMatches("mutated", r("A", 1, 1, 4), "0.25"), false);
+});
+
+// STV-STM-3: a gene table taken off the page takes its own filter with it
+test("unchecking a gene table drops the clauses it wrote, every other clause kept", () => {
+  const all = [
+    { kind: "oql", q: "APC: MUT; TP53: MUT" },      // the mutated table's Union
+    { kind: "oql", q: "KRAS: AMP" },                // the CNA table's
+    { kind: "oql", q: "EGFR: MUT_DRIVER" },         // the mutated table's, under drivers only
+    { kind: "oql", q: "KRAS: MUT=G12C" },           // typed OQL
+    { kind: "oql", q: "BRAF: MUT; KRAS: AMP" },     // a mix: not one table's
+    { kind: "clinical", attribute: "SEX", op: "=", value: "Female" },
+  ];
+  assert.deepEqual(withoutGeneTableClauses(all, "mutated"), [all[1], all[3], all[4], all[5]]);
+  assert.deepEqual(withoutGeneTableClauses(all, "cna"), [all[0], all[2], all[3], all[4], all[5]]);
+  assert.deepEqual(withoutGeneTableClauses(all, "sv"), all);
 });
