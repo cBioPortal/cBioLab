@@ -134,6 +134,8 @@ function local(mode: "patient-level" | "aggregate-only" = "patient-level", id = 
     instance: { id, mode, label: "Local " + id, conn: { id, db: id } },
     cohortSql: () => "SELECT 1",
     lollipopCounts: async (...args: Args) => { lollipop.push(args); return { changes: [], types: [], totals: [], cohortSamples: 10, minCount: 1, annotated: true }; },
+    // the table's values, which its default columns follow (no rows: no frequency, no type)
+    rowsValues: async () => [],
   };
 }
 const cohort: EvaluatedCohort = { studies: ["s1"], perStudy: { s1: { sql: "", count: 10, samples: 10, mode: "" } }, count: 10, samples: 10, text: "" };
@@ -197,7 +199,9 @@ describe("V the hotspots view checks table", () => {
     assert.equal(String((res as { error?: string }).error || ""), "", JSON.stringify(res).slice(0, 300));
     assert.equal(pl.lollipop.length, 1);
     assert.equal(agg.lollipop.length, 1);
-    assert.deepEqual(norm(pl.lollipop[0][5]), { gene: "KRAS", search: "G12D" }, "the patient-level study gets the narrowing");
+    // a search reads the table's shown columns: with none named, its defaults from its data (no frequency, no type here)
+    assert.deepEqual(norm(pl.lollipop[0][5]), { gene: "KRAS", search: "G12D", columns: ["sample", "proteinChange", "annotation", "mutationType", "copyNumber", "mutCount"] },
+      "the patient-level study gets the narrowing");
     assert.equal(agg.lollipop[0][5], undefined, "the aggregate-only study gets none: " + JSON.stringify(agg.lollipop[0]));
     const note = String((res as { note?: string }).note || "");
     assert.match(note, /\bs2\b[^.]*counted whole/, note);

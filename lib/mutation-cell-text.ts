@@ -163,3 +163,12 @@ export function mutationStatusCell(raw: string | null | undefined): { kind: "som
   if (low.includes("germline")) return { kind: "germline", text: "G", tip: v };
   return { kind: "other", text: v, tip: null };
 }
+
+/**
+ * The tooltip of an Allele Freq (T) cell with no frequency (none, 0, or a count missing): the portal's
+ * TableCellStatusIndicator NA, which has no text, only this tip (TumorAlleleFreqColumnFormatter
+ * renderFunction); null for a cell that has a frequency.
+ */
+export function vafEmptyTip(value: unknown): string | null {
+  return value == null || value === "" ? "Data not available." : null;
+}

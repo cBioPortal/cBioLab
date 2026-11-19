@@ -25,6 +25,12 @@ export interface TableView extends TableQuery {
    * per-patient table); the page of rows the query keeps, filtered by attribute
    */
   transpose?: boolean;
+  /**
+   * "listed": with no sort, the rows in the order the cohort's patient list names its patients (the
+   * Patient page stepping through a cbioportal.org link's #navCaseIds in the link's order); without
+   * it, by patient and sample id
+   */
+  order?: "listed";
 }
 export interface TableResult extends TableRows<string> {
   unit: "sample" | "patient";

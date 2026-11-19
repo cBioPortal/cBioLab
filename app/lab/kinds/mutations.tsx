@@ -5,6 +5,7 @@ import { DataTable, specQuery } from "../../_table/DataTable.tsx";
 import { portalDuplicatesNote } from "../../../lib/chart/format.ts";
 import { DraftInput } from "./parts.tsx";
 import { sampleHref } from "../../portal/cohort-navigation.ts";
+import { vafEmptyTip } from "../../../lib/mutation-cell-text.ts";
 import type { DrawnResultOf, TableQuery } from "../../../lib/types";
 import type { KindCardCtx, KindUi } from "./kind-ui.ts";
 import { variantTypeColor, variantTypeTip, copyNumberColor, copyNumberTip,
@@ -38,6 +39,8 @@ function MutationsBody({ v, spec, vi, updating, docJson, onQuery }: { v: DrawnRe
           : id === "status" ? <MutationStatusCell raw={String(x ?? "")} />
           : id === "variantType" && x ? <span className="font-semibold" style={{ color: variantTypeColor(String(x)) }} data-tip={variantTypeTip(String(x)) ?? undefined}>{String(x)}</span>
           : id === "copyNumber" ? <CopyNumberCell label={String(x ?? "")} />
+          // the portal's TableCellStatusIndicator NA: no text, its tooltip (TumorAlleleFreqColumnFormatter renderFunction)
+          : id === "vaf" && vafEmptyTip(x) ? <span className="text-[var(--muted)]" data-tip={vafEmptyTip(x)!}>{"\u00a0"}</span>
           : id === "validationStatus" && x ? <ValidationStatus raw={String(x)} />
           : id === "exon" ? <span>{exonCell(String(x ?? ""))}</span>
           // as on the portal's table, a sample id opens that sample's page, in a new tab so the table keeps its place

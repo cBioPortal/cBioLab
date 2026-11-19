@@ -86,6 +86,52 @@ async function lollipop({ browser, ok, BASE }) {
     ok("lollipop: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
     await ctx.close();
   }
+
+  // The Somatic / Germline badges (MUT-HD-3, MUT-FM-2; spec E1): with germline mutations in the gene the
+  // two rates are buttons that filter the table on its status column, as legacy's MutationStatusBadgeSelector.
+  // cbioportal.org's API gives ov_tcga_pub 37 BRCA1 mutations, 26 Germline and 11 Somatic. The rates are
+  // computed before any of the tab's filters, so their text never changes with the badges.
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on("pageerror", e => errors.push("pageerror: " + e.message));
+    try {
+      await page.goto(BASE + "/portal/results?study=ov_tcga_pub&genes=BRCA1&tab=Mutations", { waitUntil: "domcontentloaded" });
+      await page.locator(".lp-status").first().waitFor({ timeout: 240000 });
+      await page.locator(".dt-title").first().waitFor({ timeout: 240000 });
+      const settle = async () => {
+        await page.waitForTimeout(300);
+        await page.waitForFunction(() => !document.querySelector(".dt-wait") && !document.querySelector(".dt-bar .waiting"), null, { timeout: 120000 });
+        await page.waitForTimeout(200);
+      };
+      await settle();
+      const title = async () => (await page.locator(".dt-title").first().innerText()).replace(/\s+/g, " ");
+      const badge = (name) => page.locator(".lp-status").filter({ hasText: name }).first();
+      const rates = () => page.locator(".lp-status").evaluateAll((bs) => bs.map((b) => b.textContent.replace(/\s+/g, " ").trim()));
+      const pressed = () => page.locator(".lp-status").evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-pressed")).join(","));
+      const r0 = await rates();
+      ok("E1 badges: two .lp-status buttons, Somatic and Germline, both pressed",
+        r0.length === 2 && /Somatic/.test(r0[0]) && /Germline/.test(r0[1]) && await pressed() === "true,true", JSON.stringify(r0) + " " + await pressed());
+      const steps = [
+        ["Somatic off: the table keeps the 26 germline mutations", "Somatic", /^26 of 37 BRCA1 mutations/, "false,true"],
+        ["Germline off too: no mutation kept", "Germline", /^0 of 37 BRCA1 mutations/, "false,false"],
+        ["Somatic on: the 11 somatic mutations", "Somatic", /^11 of 37 BRCA1 mutations/, "true,false"],
+        ["both on: every mutation, no filter", "Germline", /^37 BRCA1 mutations/, "true,true"],
+      ];
+      for (const [label, name, want, press] of steps) {
+        await badge(name).click();
+        await settle();
+        const t = await title(), p = await pressed(), r = await rates();
+        ok("E1 badges: " + label + ", the rates' text unchanged", want.test(t) && p === press && JSON.stringify(r) === JSON.stringify(r0),
+          JSON.stringify(t) + " pressed " + p + " rates " + JSON.stringify(r));
+      }
+    } catch (e) {
+      ok("E1 badges: the Somatic / Germline badges", false, String(e.message).split("\n")[0].slice(0, 200));
+    }
+    ok("E1 badges: no JS errors", errors.length === 0, errors.slice(0, 3).join(" | "));
+    await ctx.close();
+  }
 }
 
 module.exports = { lollipop };
