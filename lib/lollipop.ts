@@ -295,6 +295,16 @@ export function lollipopLabelText(changes: { change: string; rows: number }[], s
 }
 
 /**
+ * A stem's tooltip as the portal's results page writes it (LollipopMutationPlot lollipopTooltip with
+ * LollipopTooltipCountInfo): "N mutated of M profiled patients", M the queried patients whatever their
+ * profiling, then "AA Change: " and every change at the codon. With no patient count, "N mutations".
+ */
+export function lollipopStemTip(q: Pick<LollipopPosition, "n" | "changes">, cohortPatients?: number): string {
+  const count = cohortPatients != null ? q.n + " mutated of " + cohortPatients + " profiled patients" : q.n + " mutation" + (q.n === 1 ? "" : "s");
+  return count + "\nAA Change: " + lollipopLabelText(q.changes, 0);
+}
+
+/**
  * maxLabels = 1, maxAllowedTies = 2: the tallest stem is labelled. When MORE than two stems tie
  * for the top, one is picked by preferring a stem inside a domain that has mutations, then the
  * one nearest the midpoint of the mutated range.
@@ -383,9 +393,11 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
   let mutated = 0, pairs = 0, somaticSamples = 0, cohortSamples = 0;
   // the germline rate's parts: a site on older code reports neither, which leaves them unknown, not 0
   let germlineSamples: number | undefined = 0, germlineCohortSamples: number | undefined = 0;
+  let cohortPatients: number | undefined = 0;
   for (const rep of reports) {
     cohortSamples += rep.cohortSamples;
     germlineCohortSamples = germlineCohortSamples === undefined || rep.germlineCohortSamples === undefined ? undefined : germlineCohortSamples + rep.germlineCohortSamples;
+    cohortPatients = cohortPatients != null && rep.cohortPatients != null ? cohortPatients + rep.cohortPatients : undefined;
     for (const c of rep.changes) if (c.gene === gene) {
       const k = c.pos + "\u0000" + c.change, cur = changes.get(k);
       // a class from one site is kept; a site that sent none (older code) leaves it undefined
@@ -441,7 +453,7 @@ export function buildLollipopGene(gene: string, reports: LollipopReport[], prote
     // one is about the data and the other about what a site chose not to disclose
     unpositioned, withheld: Math.max(0, pairs - returned),
     ...(at ? { label: { pos: at.pos, text: lollipopLabelText(at.changes) } } : {}),
-    somaticSamples, cohortSamples, tally, ...(germlineSamples !== undefined && germlineCohortSamples !== undefined ? { germlineSamples, germlineCohortSamples } : {}), ...(protein?.ids ? { ids: protein.ids } : {})
+    somaticSamples, cohortSamples, ...(cohortPatients != null ? { cohortPatients } : {}), tally, ...(germlineSamples !== undefined && germlineCohortSamples !== undefined ? { germlineSamples, germlineCohortSamples } : {}), ...(protein?.ids ? { ids: protein.ids } : {})
   };
 }
 

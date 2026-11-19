@@ -68,10 +68,16 @@ async function tables({ browser, ok, BASE }) {
       await settle();
       const picked = await count();
       ok("table: a value filter keeps exactly that value's rows", !!picked && picked.kept === Number(n), value + " listed " + n + ", table kept " + JSON.stringify(picked));
+      // the portal's first click sorts ascending, numbers too (LazyMobXTable getNextSortAscending); a second flips it
+      const lastColumn = async () => (await page.locator(".dt-table tbody tr td:last-child").allInnerTexts()).map((x) => Number(x.replace(/,/g, ""))).filter((x) => !Number.isNaN(x));
       await page.locator(".dt-sort", { hasText: "# Mut in Sample" }).click();
       await settle();
-      const nums = (await page.locator(".dt-table tbody tr td:last-child").allInnerTexts()).map((x) => Number(x.replace(/,/g, ""))).filter((x) => !Number.isNaN(x));
-      ok("table: a header click sorts the whole table, highest first", nums.length > 2 && nums.every((x, i) => i === 0 || nums[i - 1] >= x), nums.slice(0, 5).join(" "));
+      const up = await lastColumn();
+      ok("table: a header click sorts the whole table, lowest first, as the portal's first click", up.length > 2 && up.every((x, i) => i === 0 || up[i - 1] <= x), up.slice(0, 5).join(" "));
+      await page.locator(".dt-sort", { hasText: "# Mut in Sample" }).click();
+      await settle();
+      const nums = await lastColumn();
+      ok("table: a second click sorts it highest first", nums.length > 2 && nums.every((x, i) => i === 0 || nums[i - 1] >= x), nums.slice(0, 5).join(" "));
       // the download: every kept row, every column, as CSV, from the same document
       const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 120000 }).catch(() => null), page.locator("form[action='/api/table'] button").first().click()]);
       const csv = dl ? require("fs").readFileSync(await dl.path(), "utf8") : "";

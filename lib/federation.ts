@@ -169,6 +169,8 @@ export interface LollipopReport {
   cohortSamples: number; minCount: number; annotated: boolean;
   /** the germline rate's denominator: the cohort's samples on the study's germline-consented list, or every one with no list (absent from a site on older code) */
   germlineCohortSamples?: number;
+  /** the cohort's distinct patients (the stem tooltip's "of M profiled patients"); a site on older code sends none */
+  cohortPatients?: number;
   /** the page's driver settings the split followed, when the caller gave them (lollipopCounts' `drivers`) */
   drivers?: DriverSettings;
 }
@@ -1750,7 +1752,7 @@ abstract class BaseResolver implements AggregateCapable {
     const d = drivers === undefined ? undefined : resolveDrivers(drivers);
     // the settings this report applied, echoed so a caller can tell a site that ignored them
     const echo = drivers !== undefined ? { drivers } : {};
-    if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, minCount, annotated: d ? d.oncokb && !!pin : !!pin, ...echo };
+    if (!genes.length) return { changes: [], types: [], totals: [], cohortSamples: 0, cohortPatients: 0, minCount, annotated: d ? d.oncokb && !!pin : !!pin, ...echo };
     const hotspotPins = await variantPins();
     const src = d ? offeredSources(d, pin, hotspotPins) : null;
     const cohort = this.cohortSql(def), db = this.instance.conn.db, conn = this.instance.conn;
@@ -1770,12 +1772,12 @@ abstract class BaseResolver implements AggregateCapable {
       this.runLogged<ChRow>("lollipop:changes", lollipopChangesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),
       this.runLogged<ChRow>("lollipop:types", lollipopTypesSql(cohort, genes, this.study, minCount, pin, db, hotspotPins, filters, fusionLines, d, rowKeys), conn),
       this.runLogged<ChRow>("lollipop:totals", lollipopTotalsSql(cohort, genes, this.study, db, filters, fusionLines ? { lines: fusionLines, pin } : undefined, d, { pin, hotspotPins }), conn),
-      this.runLogged<ChRow>("lollipop:samples", cohortSampleCountSql(cohort), conn),
+      this.runLogged<ChRow>("lollipop:samples", cohortSizesSql(cohort), conn),
       this.runLogged<ChRow>("lollipop:germline-consented", germlineConsentedCountSql(cohort, this.study, db), conn)
     ]);
     return {
-      germlineCohortSamples: Number(gc.data[0]?.lists) > 0 ? Number(gc.data[0]?.n || 0) : Number(cs.data[0]?.n || 0),
-      minCount, annotated: src ? src.sure || tot.data.some((x) => Number(x.annotating) === 1) : !!pin, cohortSamples: Number(cs.data[0]?.n || 0), ...echo,
+      germlineCohortSamples: Number(gc.data[0]?.lists) > 0 ? Number(gc.data[0]?.n || 0) : Number(cs.data[0]?.samples || 0),
+      minCount, annotated: src ? src.sure || tot.data.some((x) => Number(x.annotating) === 1) : !!pin, cohortSamples: Number(cs.data[0]?.samples || 0), cohortPatients: Number(cs.data[0]?.patients || 0), ...echo,
       changes: c.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), change: String(x.change), n: Number(x.n), rows: Number(x.rows), driver: Number(x.driver) === 1,
         ...(x.impact ? { impact: String(x.impact) } : {}) })),
       types: t.data.map((x) => ({ gene: String(x.gene), pos: pos(x.pos), mtype: String(x.mtype), driver: Number(x.driver) === 1, rows: Number(x.rows) })),

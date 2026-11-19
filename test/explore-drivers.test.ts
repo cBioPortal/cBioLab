@@ -94,11 +94,11 @@ describe("Explore", () => {
     for (const q of chartReads) assert.ok(q.includes(driverEventSql("v7.5", "", { db: "cbio_a", studies: [STUDY] })));
   });
   test("counting every alteration keeps the charts' own labels and no driver field", async () => {
-    answer = profiled;
+    answer = (q) => /^SELECT alteration_value AS v/.test(q) ? [{ v: "0", n: 560 }] : profiled(q);
     const r = await buildExplore({ study: STUDY, oncokbPin: "v7.5", geneCharts: ["KRAS"] });
     assert.equal(r.drivers, undefined);
     assert.deepEqual((r.geneFacets || []).flatMap((f) => f.states.map((s) => s.label)),
-      ["Mutated", "Not mutated", "Not profiled", "Amplified", "Deleted", "Diploid", "Not profiled"]);
+      ["Mutated", "Not mutated", "Not profiled", "Amplified", "Gained", "Diploid", "Heterozygously deleted", "Homozygously deleted", "Not profiled"]);
     assert.ok(sent.every((q) => !/annotation\.oncokb/.test(q)));
   });
 });

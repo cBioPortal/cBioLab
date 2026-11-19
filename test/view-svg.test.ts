@@ -244,9 +244,11 @@ describe("the lollipop draws every codon, the way the portal's mutation tab does
     const words = svg.replace(/<\/text>/g, " ").replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
     assert.ok(words.includes("Hidden: Missense · Driver") && words.includes("drawn: 2 of 8 mutations"));
   });
-  test("a codon's tooltip lists its changes with their counts", () => {
+  test("a codon's tooltip is the portal's: its count, then every change there", () => {
     const svg = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [kras()] } as any)!;
-    assert.match(svg, /<title>codon 12: 9 mutations\nG12D 6\nG12V 3<\/title>/);
+    assert.match(svg, /<title>9 mutations\nAA Change: G12D\/V<\/title>/);
+    const known = viewToSvg({ kind: "hotspots", cohorts: ["A"], hotspots: [{ ...kras(), cohortPatients: 594 }] } as any)!;
+    assert.match(known, /<title>9 mutated of 594 profiled patients\nAA Change: G12D\/V<\/title>/);
   });
 });
 

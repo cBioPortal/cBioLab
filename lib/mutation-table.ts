@@ -8,7 +8,7 @@ import { mutationStudySql, sq } from "./compiler.ts";
 import { whereSql, type QueryColumn, type RowSource, type TableQuery } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS, LOLLIPOP_OWN_FILTERS } from "./lollipop.ts";
 import { clinicalTable } from "./custom-data.ts";
-import { inCohortSamples } from "./cohort2.ts";
+import { discreteCnaProfileSql, inCohortSamples } from "./cohort2.ts";
 import { ONCOKB_TABLE, ONCOKB_TUMOR_TYPE_TABLE } from "./annotation-store.ts";
 import { hgvsgSql, variantAnnotationCte, variantColumnsSql, type VariantPins } from "./variant-annotation.ts";
 import { HOTSPOT_GENES, hotspotCondSql } from "./hotspots.ts";
@@ -17,13 +17,17 @@ import { PUTATIVE_DRIVER, type ResolvedDrivers } from "./driver-settings.ts";
 import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
 import { mutationTypeColumn } from "./mutation-type.ts";
+import { chromosomeSortSql, proteinChangeSortSql } from "./mutation-sort.ts";
 import { finiteSql } from "./sql-number.ts";
 import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
-export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
+export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc" }
+
+/** the columns whose first header click sorts descending (MutationTable defaultSortDirection 'desc'); every other column's is ascending, numbers too */
+const FIRST_SORT_DESC = new Set(["gnomad", "clinvar", "dbsnp"]);
 
 /** The table's columns, in the portal's order. */
-export const MUTATION_COLUMNS: MutationColumn[] = [
+export const MUTATION_COLUMNS: MutationColumn[] = ([
   // a fusion row's gene is its site 1 gene, on its site 2 gene's table too (ResultsViewPageStore mutationsByGene)
   { id: "gene", name: "Gene", numeric: false, tip: "HUGO gene symbol" },
   // not `study`: a downloaded line already leads with the row's study id (app/api/table)
@@ -74,7 +78,7 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
     tip: "The Single Nucleotide Polymorphism Database (dbSNP) is a free public archive for genetic variation within and across different species. NOTE: Currently only SNPs, single base deletions and insertions are supported." },
   // SIGNAL's germline frequency, spelled at two significant digits and sorted by number
   { id: "signal", name: "SIGNAL", numeric: false, tip: "Prevalence of germline mutations in cancer patients from SIGNAL" },
-];
+] as MutationColumn[]).map((c) => ({ ...c, firstSort: FIRST_SORT_DESC.has(c.id) ? "desc" : "asc" }));
 
 /**
  * The Annotation column's order, as SQL over the table's rows: the portal's [OncoKB sort value, CIViC,
@@ -118,7 +122,9 @@ function queryColumn(c: MutationColumn, pin: string | boolean | null): QueryColu
     case "studyOfOrigin": return { ...c, text: str("studyName") };
     // spelled as the table shows it, so search and the value list match what is on screen
     case "annotation": return { ...c, text: "if(oncogenicity = '', '', concat(oncogenicity, if(level = '', '', concat(' · ', replaceOne(level, 'LEVEL_', 'Level ')))))", order: MUTATION_ANNOTATION_ORDER };
-    case "proteinChange": return { ...c, text: str("proteinChange"), order: "pos" };
+    // the portal's sort values (MUT-STM-9): position, then the letters' character codes; chromosome as a number, X 23, Y 24
+    case "proteinChange": return { ...c, text: str("proteinChange"), order: proteinChangeSortSql("proteinChange") };
+    case "chr": return { ...c, text: str("chr"), order: chromosomeSortSql("chr") };
     case "alteration": return { ...c, text: alterationSql(pin) };
     case "proteinPos": return { ...c, text: str("pos"), order: "pos" };
     // as the screen and the download show it (the rows' vafText), so a search finds the shown number
@@ -237,9 +243,7 @@ function copyNumberCte(p: TablePart, i: number, db: string): string {
   const pre = sq(p.study + "_");
   return "cn" + i + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, hugo_gene_symbol AS g, any(" + finiteSql("alteration_value") + ") AS v\n" +
     "  FROM " + db + ".genetic_alteration_derived\n" +
-    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND profile_type = (SELECT replaceOne(gp.stable_id, " + pre + ", '') FROM " + db + ".genetic_profile gp\n" +
-    "      JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = " + sq(p.study) + "\n" +
-    "        AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)\n" +
+    "  WHERE cancer_study_identifier = " + sq(p.study) + " AND profile_type = " + discreteCnaProfileSql(p.study, db) + "\n" +
     "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM (SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i + "))\n" +
     "  GROUP BY sid, g)";
 }

@@ -6,24 +6,18 @@ import { OptionSelect } from "../../_ui/choice.tsx";
 import { useState } from "react";
 import { Input } from "../../_ui/input";
 import type { TableResult } from "../../../lib/views/table/types.ts";
-
-const OWN = new Set(["patient", "sample", "samples"]);
+import { transposedRows } from "../../../lib/views/table/transpose.ts";
 
 /**
- * The table on its side, as the portal's Patient page lists clinical data (ClinicalInformationPatientTable,
- * ClinicalInformationSamplesTable): a row per attribute, in the study's order (priority, then name), and a
- * column per patient — "Value" for one — or per sample, a sample's own attributes only, "n/a" where a
- * sample has none; an attribute no one has is left out. A filter box narrows the attributes.
+ * The table on its side, as the portal's Patient page lists clinical data: a row per attribute and a
+ * column per patient — "Value" for one — or per sample (lib/views/table/transpose.ts). A filter box
+ * narrows the attributes.
  */
 function TransposedTable({ t }: { t: TableResult }) {
   const [filter, setFilter] = useState("");
-  const perSample = t.unit === "sample";
-  const skip = new Set([...OWN, ...(perSample ? t.patientAttrs || [] : [])]);
-  const heads = t.rows.map((r) => perSample ? r.sample : r.patient);
-  const attrs = t.columns.map((c, i) => ({ c, vals: t.rows.map((r) => r.values[i] ?? "") }))
-    .filter(({ c, vals }) => !skip.has(c.id) && vals.some((v) => v !== ""));
+  const { heads, rows: attrs } = transposedRows(t);
   const f = filter.trim().toLowerCase();
-  const shown = f ? attrs.filter(({ c, vals }) => (c.name + " " + c.id + " " + vals.join(" ")).toLowerCase().includes(f)) : attrs;
+  const shown = f ? attrs.filter((a) => (a.name + " " + a.id + " " + a.values.join(" ")).toLowerCase().includes(f)) : attrs;
   return (
     <div data-tw className="flex flex-col gap-2">
       <div className="viewtb"><div className="tbz">
@@ -31,10 +25,10 @@ function TransposedTable({ t }: { t: TableResult }) {
         <span className="text-sm text-muted-foreground">{shown.length === attrs.length ? attrs.length + " attributes" : shown.length + " of " + attrs.length + " attributes"}</span>
       </div></div>
       <table className="dt-table [&_th]:text-left [&_td]:pr-4 [&_th]:pr-4">
-        <thead><tr><th>Attribute</th>{heads.length === 1 && !perSample ? <th>Value</th> : heads.map((h) => <th key={h} className="mono">{h}</th>)}</tr></thead>
+        <thead><tr><th>Attribute</th>{heads.length === 1 && t.unit !== "sample" ? <th>Value</th> : heads.map((h) => <th key={h} className="mono">{h}</th>)}</tr></thead>
         <tbody>
-          {shown.map(({ c, vals }) => (
-            <tr key={c.id}><td data-tip={c.id}>{c.name}</td>{vals.map((v, i) => <td key={i}>{v === "" ? (perSample ? "n/a" : "") : v}</td>)}</tr>
+          {shown.map((a) => (
+            <tr key={a.id}><td data-tip={a.id}>{a.name}</td>{a.values.map((v, i) => <td key={i}>{v}</td>)}</tr>
           ))}
         </tbody>
       </table>

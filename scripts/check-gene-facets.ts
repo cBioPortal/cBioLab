@@ -21,7 +21,8 @@
  * study (test/fixtures/peer-study, served by scripts/peer-db.ts), built to hold
  * both shapes: FX-P33, FX-P35 and FX-P37 are EGFR-mutant on PEERFIX_NO_EGFR, a
  * panel without EGFR, and FX-P02 is FAT1-amplified in one sample and FAT1-deleted
- * in the other.
+ * in the other. KRAS is Gained in two samples (FX-P08-T1, FX-P21-T1), so the copy-number chart's
+ * Diploid row is checked against a click that must leave them out.
  *
  * Run: node --env-file=.env.local scripts/check-gene-facets.ts
  */
@@ -29,6 +30,7 @@ import { compileCohortDef } from "../lib/cohort2.ts";
 import { buildExplore } from "../lib/explore.ts";
 import { chQuery, connById } from "../lib/ch.ts";
 import { studyProfiles } from "../lib/analysis.ts";
+import { geneStatesClauses } from "../lib/gene-state-clauses.ts";
 
 /**
  * Genes chosen because their panel coverage differs sharply. Each case runs
@@ -37,7 +39,7 @@ import { studyProfiles } from "../lib/analysis.ts";
  * 400 on every drafted request. An undrafted-only check passed it.
  */
 const CASES = [
-  { conn: "b", study: "cbiolab_peer_fixture", genes: ["EGFR", "TP53", "FAT1"] },
+  { conn: "b", study: "cbiolab_peer_fixture", genes: ["EGFR", "TP53", "FAT1", "KRAS"] },
   { conn: "a", study: "nsclc_ctdx_msk_2022", genes: ["EGFR", "KRAS"] }
 ] as const;
 /** applied as the second pass over every case */
@@ -49,15 +51,11 @@ const ok = (name: string, pass: boolean, detail = "") => {
   if (!pass) failures++;
 };
 
-/** must stay identical to geneStateClauses() in app/lab/page.tsx */
+/** the clauses a click on one state adds, as the page builds them */
 const clausesFor = (gene: string, type: "MUTATION" | "CNA", state: string): unknown[] => {
-  const prof = { kind: "profiled", type, gene };
-  const oql = (q: string) => ({ kind: "oql", q: gene + ": " + q });
-  if (state === "notProfiled") return [{ not: prof }];
-  if (state === "altered") return [prof, oql("MUT")];
-  if (state === "amp") return [prof, oql("AMP")];
-  if (state === "del") return [prof, oql("HOMDEL")];
-  return [prof, { not: oql(type === "CNA" ? "AMP HOMDEL" : "MUT") }];
+  const r = geneStatesClauses(gene, type, [state], false);
+  if (!("clauses" in r)) throw new Error(gene + " " + state + ": " + r.why);
+  return r.clauses;
 };
 
 for (const c of CASES) for (const drafted of [false, true]) {
@@ -94,8 +92,8 @@ for (const c of CASES) for (const drafted of [false, true]) {
       checked++;
       if (got !== st.n) bad.push(`${f.gene}/${f.type}/${st.state}: shows ${st.n}, selects ${got}`);
     }
-    // the mutation states DO partition the cohort; the CNA states do not, and
-    // the facet reports by how much they over-sum
+    // the mutation states partition the cohort, and so do the CNA levels (one value per sample in
+    // the profile); counting drivers only, Amplified and Deleted can overlap by `overlap`
     if (f.type === "MUTATION") {
       const sum = f.states.reduce((a, x) => a + x.n, 0);
       if (sum !== f.total) bad.push(`${f.gene}/MUTATION states sum to ${sum}, cohort is ${f.total}`);
@@ -132,6 +130,18 @@ for (const c of CASES) {
   ok(`${c.study}: ${gene}'s facet survives its own selection`, same,
     a && b ? `undrafted ${a.states.map((x) => x.n).join("/")} vs self-drafted ${b.states.map((x) => x.n).join("/")}`
            : "facet missing");
+
+  // the copy-number chart too: a click on its Diploid level leaves every level's count as it was
+  const cnaDraft = geneStatesClauses(gene, "CNA", ["diploid"], false);
+  const cnaSelf = await buildExplore({
+    study: c.study, conn, geneCharts: [gene], ...(await studyProfiles(c.study)),
+    draft: { all: "clauses" in cnaDraft ? cnaDraft.clauses : [] } as never
+  });
+  const cOf = (r: typeof plain) => (r.geneFacets || []).find((f) => f.gene === gene && f.type === "CNA");
+  const ca = cOf(plain), cb = cOf(cnaSelf);
+  ok(`${c.study}: ${gene}'s copy-number facet survives its own selection`,
+    !!ca && !!cb && ca.total === cb.total && ca.states.every((st, i) => st.n === cb.states[i].n),
+    ca && cb ? `undrafted ${ca.states.map((x) => x.n).join("/")} vs self-drafted ${cb.states.map((x) => x.n).join("/")}` : "facet missing");
 
   // ...while a DIFFERENT gene's facet does narrow to that draft
   const [other] = c.genes.slice(1);

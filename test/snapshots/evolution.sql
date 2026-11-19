@@ -12,9 +12,11 @@ sm0 AS (
   GROUP BY pid
 ),
 mu0 AS (
-  SELECT patientId AS pid, uniqExact(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, ''))) AS n, uniqExactIf(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')), ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS v
-  FROM snapshot_db.mutation_derived
-  WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion' AND molecularProfileId NOT LIKE '%uncalled%'
+  SELECT pid, countIf(cl) AS n, countIf(cl AND rd) AS v FROM (
+    SELECT patientId AS pid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')) AS k, max(molecularProfileId NOT LIKE '%uncalled%') AS cl, max(ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS rd
+    FROM snapshot_db.mutation_derived
+    WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion'
+    GROUP BY pid, k)
   GROUP BY pid
 ),
 rows AS (
@@ -103,9 +105,11 @@ sm0 AS (
   GROUP BY pid
 ),
 mu0 AS (
-  SELECT patientId AS pid, uniqExact(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, ''))) AS n, uniqExactIf(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')), ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS v
-  FROM snapshot_db.mutation_derived
-  WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion' AND molecularProfileId NOT LIKE '%uncalled%'
+  SELECT pid, countIf(cl) AS n, countIf(cl AND rd) AS v FROM (
+    SELECT patientId AS pid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')) AS k, max(molecularProfileId NOT LIKE '%uncalled%') AS cl, max(ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS rd
+    FROM snapshot_db.mutation_derived
+    WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion'
+    GROUP BY pid, k)
   GROUP BY pid
 ),
 rows AS (
@@ -127,9 +131,11 @@ sm0 AS (
   GROUP BY pid
 ),
 mu0 AS (
-  SELECT patientId AS pid, uniqExact(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, ''))) AS n, uniqExactIf(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')), ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS v
-  FROM snapshot_db.mutation_derived
-  WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion' AND molecularProfileId NOT LIKE '%uncalled%'
+  SELECT pid, countIf(cl) AS n, countIf(cl AND rd) AS v FROM (
+    SELECT patientId AS pid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')) AS k, max(molecularProfileId NOT LIKE '%uncalled%') AS cl, max(ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS rd
+    FROM snapshot_db.mutation_derived
+    WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion'
+    GROUP BY pid, k)
   GROUP BY pid
 ),
 rows AS (
@@ -152,9 +158,11 @@ sm0 AS (
   GROUP BY pid
 ),
 mu0 AS (
-  SELECT patientId AS pid, uniqExact(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, ''))) AS n, uniqExactIf(concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')), ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS v
-  FROM snapshot_db.mutation_derived
-  WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion' AND molecularProfileId NOT LIKE '%uncalled%'
+  SELECT pid, countIf(cl) AS n, countIf(cl AND rd) AS v FROM (
+    SELECT patientId AS pid, concat(ifNull(`GENE.hugoGeneSymbol`, ''), '|', ifNull(proteinChange, ''), '|', ifNull(chr, ''), '|', toString(ifNull(startPosition, 0)), '|', toString(ifNull(endPosition, 0)), '|', ifNull(referenceAllele, ''), '|', ifNull(tumorSeqAllele, '')) AS k, max(molecularProfileId NOT LIKE '%uncalled%') AS cl, max(ifNull(tumorAltCount, 0) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount + tumorRefCount > 0) AS rd
+    FROM snapshot_db.mutation_derived
+    WHERE startsWith(molecularProfileId, 'glioma_msk_2018_') AND studyId = 'glioma_msk_2018' AND patientId IN (SELECT pid FROM c0) AND ifNull(mutationType, '') != 'Fusion'
+    GROUP BY pid, k)
   GROUP BY pid
 ),
 rows AS (

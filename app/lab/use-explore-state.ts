@@ -37,6 +37,7 @@ export type GroupsTarget = "comparison" | "analysis";
 export type EditingCohort = { id: string; name: string; def: CohortDef };
 
 import { toggleQueued } from "../../lib/study-view-gene-tables.ts";
+import { driverOql, geneStatesClauses as geneStatesClausesFor } from "../../lib/gene-state-clauses.ts";
 import type { DocStore } from "./doc-store.ts";
 import type { SavedCohort } from "./use-saved.ts";
 
@@ -585,39 +586,11 @@ export function useExploreState(page: ExplorePage) {
    * An OQL alteration as the facets on screen count it: a driver call (MUT_DRIVER, AMP_DRIVER…)
    * when they count OncoKB drivers only, so a click selects exactly the samples its number counts.
    */
-  const callOql = (calls: string): string => explore?.drivers ? calls.split(" ").map((c) => c + "_DRIVER").join(" ") : calls;
+  const callOql = (calls: string): string => explore?.drivers ? driverOql(calls) : calls;
 
-  /** the clauses that select one state of one gene's alteration facet */
-  const geneStateClauses = (gene: string, type: "MUTATION" | "CNA", state: string): any[] => {
-    const prof = { kind: "profiled", type, gene };
-    const oql = (q: string) => ({ kind: "oql", q: gene + ": " + callOql(q) });
-    if (state === "notProfiled") return [{ not: prof }];
-    if (state === "altered") return [prof, oql("MUT")];
-    if (state === "amp") return [prof, oql("AMP")];
-    if (state === "del") return [prof, oql("HOMDEL")];
-    // unaltered: profiled and none of the calls this facet counts
-    return [prof, { not: oql(type === "CNA" ? "AMP HOMDEL" : "MUT") }];
-  };
-
-  /**
-   * The clauses that select any of several states of one gene's facet, or why that cannot be one
-   * filter. Profiled states combine inside the profiled set; "not profiled" joins them only when
-   * nothing else narrows it, since `any` takes leaves and "not profiled OR mutated" is not one.
-   */
-  const geneStatesClauses = (gene: string, type: "MUTATION" | "CNA", states: string[]): { clauses: any[] } | { why: string } => {
-    if (states.length === 1) return { clauses: geneStateClauses(gene, type, states[0]) };
-    const calls: Record<string, string> = type === "CNA" ? { amp: "AMP", del: "HOMDEL" } : { altered: "MUT" };
-    const prof = { kind: "profiled", type, gene };
-    const oql = (q: string) => ({ kind: "oql", q: gene + ": " + callOql(q) });
-    const picked = Object.keys(calls).filter((s) => states.includes(s)).map((s) => calls[s]);
-    const rest = Object.keys(calls).filter((s) => !states.includes(s)).map((s) => calls[s]);
-    const unaltered = states.includes("unaltered");
-    // the profiled part: every profiled state is no narrowing; with unaltered, "none of the rest"
-    const within = unaltered ? (rest.length ? { not: oql(rest.join(" ")) } : null) : oql(picked.join(" "));
-    if (!states.includes("notProfiled")) return { clauses: within ? [prof, within] : [prof] };
-    if (!within) return { why: "every state is checked, which is no filter" };
-    return { why: "\"Not profiled\" with another state is not one filter — apply them separately" };
-  };
+  /** the clauses that select any of several states of one gene's facet, or why that cannot be one filter */
+  const geneStatesClauses = (gene: string, type: "MUTATION" | "CNA", states: string[]): { clauses: any[] } | { why: string } =>
+    geneStatesClausesFor(gene, type, states, !!explore?.drivers);
 
   const chartGene = (raw: string) => {
     const g = String(raw || "").toUpperCase().trim();
@@ -845,7 +818,7 @@ export function useExploreState(page: ExplorePage) {
     if (target) addCohortToView(target, n, def, studyHint);
   };
 
-  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, geneStateClauses, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
+  return { chartBins, setChartBins, applyOrSay, urlRead, openEditCohort, saveEditedCohort, exMsg, setExMsg, splittingBy, setSplittingBy, addMode, setAddMode, customTab, setCustomTab, saving, setSaving, savingFeature, setSavingFeature, addChartOpen, setAddChartOpen, chartTab, setChartTab, cName, setCName, cDefText, setCDefText, exploring, explore, exploreBusy, sQuery, setSQuery, sCaps, setSCaps, exStudies, setExStudies, exPanelOpen, setExPanelOpen, exSel, exFetchTimer, exDraftStudies, setExDraftStudies, geneCharts, setGeneCharts, geneChartsRef, drivers, setDrivers, callOql, exDerived, setExDerived, exDerivedRef, geneChartInput, setGeneChartInput, studyChipsOpen, setStudyChipsOpen, geneFilter, setGeneFilter, queuedGenes, setQueuedGenes, toggleQueuedGene, clinFilter, setClinFilter, chartChecked, setChartsChecked, attrCoverage, setAttrCoverage, seq, setSeq, barDef, barDefaultName, analyzeDraft, viewPatients, compareQuantiles, selectionArmCount, compareSelection, compareItems, openSaveDialog, confirmSave, openCustomManager, saveDraftAsFeature, confirmSaveFeature, parseDraft, attrKey, visibleClinical, attrsForBar, fetchExplore, addClause, addClauses, toggleBar, togglePieValue, toggleNaValue, geneStatesClauses, chartGene, unchartGene, assayCharts, chartAssay, unchartAssay, exploreEventTypes, treatmentEventType, TREATMENT_DERIVED_KINDS, derivedOn, toggleDerived, seqSelector, seqReady, addSeqFilter, removeDraftClause, clearAttributeFilters, draftScaffold, clearDraft, setExploreStudies, exploreStudy, analyzeStudy, addDataToStudy, openAddCohort, closeAddCohort, addDraftToAnalysis };
 }
 
 export type ExploreState = ReturnType<typeof useExploreState>;

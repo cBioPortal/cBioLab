@@ -3,7 +3,8 @@
 // Everything returned is designed to be clickable into a DSL clause.
 import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
-import { derivedMetricSql, basePatientsSql, type DerivedMetric } from "./cohort2.ts";
+import { derivedMetricSql, basePatientsSql, discreteCnaProfileSql, type DerivedMetric } from "./cohort2.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
 
@@ -761,23 +762,36 @@ async function readQValues(studyId: string, db: string, conn: ChConn): Promise<Q
  * denominator, WES as a separate term for the same reason (it enumerates ~45k
  * genes; joining it multiplied one TCGA study to 47.8M rows).
  */
+/** OQL calls that are copy-number levels; any other call is read as a mutation's */
+const OQL_CNA_CALL = /^(AMP|HOMDEL|GAIN|HETLOSS)(_DRIVER)?$/i;
+
 /**
- * Does this top-level clause constrain the given gene, as the gene-status facet
- * itself would have added it?
+ * Does this top-level clause constrain the given gene's chart of this type, as that chart itself
+ * would have added it? A chart is counted without its own filter, and only its own: a click on the
+ * copy-number chart still narrows the gene's mutation chart.
  *
- * Matched narrowly on purpose: a `profiled` leaf naming the gene, or an OQL leaf
- * whose query is exactly that one gene, either of them possibly negated. A
- * merged multi-gene OQL clause ("EGFR: MUT; KRAS: MUT") does NOT match and stays
- * applied — dropping it would quietly relax somebody else's constraint.
+ * Matched narrowly on purpose: a `profiled` leaf naming the gene (of this data type, or naming a
+ * profile, which is either chart's), a `genomicData` leaf on the discrete copy-number profile listing
+ * levels (the copy-number chart's own; one with a range was typed, not clicked), or an OQL leaf whose
+ * query is exactly that one gene — its calls all copy-number levels for the copy-number chart, all
+ * other calls for the mutation chart, a mix or none for both — either of them possibly negated. A
+ * merged multi-gene OQL clause ("EGFR: MUT; KRAS: MUT") does NOT match and stays applied — dropping
+ * it would quietly relax somebody else's constraint.
  */
-function isGeneClauseFor(c: unknown, gene: string): boolean {
+function isGeneClauseFor(c: unknown, gene: string, type: "MUTATION" | "CNA"): boolean {
   const leaf = (x: unknown): boolean => {
-    const l = x as { kind?: string; gene?: string; q?: string };
+    const l = x as { kind?: string; gene?: string; q?: string; type?: string; profileType?: string; range?: unknown };
     if (!l) return false;
-    if (l.kind === "profiled") return String(l.gene || "").toUpperCase() === gene;
+    const ofGene = String(l.gene || "").toUpperCase() === gene;
+    if (l.kind === "profiled") return ofGene && (l.type == null || String(l.type).toUpperCase() === type);
+    if (l.kind === "genomicData") return ofGene && type === "CNA" && l.profileType === DISCRETE_CNA_PROFILE && l.range == null;
     if (l.kind === "oql") {
-      const m = /^\s*([A-Za-z0-9.-]+)\s*:/.exec(String(l.q || ""));
-      return !!m && m[1].toUpperCase() === gene && !String(l.q).includes(";");
+      const m = /^\s*([A-Za-z0-9.-]+)\s*:([^;]*)$/.exec(String(l.q || ""));
+      if (!m || m[1].toUpperCase() !== gene) return false;
+      const calls = m[2].trim().split(/\s+/).filter(Boolean);
+      const cna = calls.filter((t) => OQL_CNA_CALL.test(t)).length;
+      if (!calls.length || (cna > 0 && cna < calls.length)) return true;
+      return (cna === calls.length) === (type === "CNA");
     }
     return false;
   };
@@ -823,9 +837,9 @@ async function geneStateFacets(opts: {
    * alternatives or widen the choice. That is the disappearing-options bug, and
    * it arrives by default unless this is done.
    */
-  const condFor = (gene: string): string | null => {
+  const condFor = (gene: string, type: "MUTATION" | "CNA"): string | null => {
     if (!draft || !Array.isArray(draft.all) || !draft.all.length) return null;
-    const rest = draftWithout(draft, (c) => isGeneClauseFor(c, gene));
+    const rest = draftWithout(draft, (c) => isGeneClauseFor(c, gene, type));
     if (rest.all!.length === draft.all.length) return null;       // nothing of this gene's: use opts.set
     return inSamples(cohortSet([study], db, rest, oneStudyCtx(study, opts.ctx)));   // "" when only this gene's
   };
@@ -852,15 +866,21 @@ async function geneStateFacets(opts: {
     "FROM " + db + ".sample_derived\n" +
     "WHERE cancer_study_identifier = " + sq(study) + panelPred(gene, alterationType) + c;
 
+  /** a chart's cohort: the draft without the chart's own clauses, and its size */
+  const baseOf = async (gene: string, type: "MUTATION" | "CNA") => {
+    const own = condFor(gene, type);
+    if (own === null) return { cond: inSamples(opts.set), total };
+    return { cond: own, total: await baseTotal(own) };
+  };
   const resolved = await Promise.all(genes.map(async (gene) => {
-    const own = condFor(gene);
-    if (own === null) return { gene, cond: inSamples(opts.set), total };
-    return { gene, cond: own, total: await baseTotal(own) };
+    const [mut, cna] = await Promise.all([baseOf(gene, "MUTATION"), baseOf(gene, "CNA")]);
+    return { gene, mut, cna };
   }));
 
-  const out = await Promise.all(resolved.flatMap(({ gene, cond, total }) => [
+  const out = await Promise.all(resolved.flatMap(({ gene, mut, cna }) => [
     // mutations: altered / unaltered / not profiled
     (async (): Promise<GeneStateFacet> => {
+      const { cond, total } = mut;
       const [prof, alt] = await Promise.all([
         chQuery<ChRow>(profiledOf(gene, "MUTATION_EXTENDED", cond), conn),
         chQuery<ChRow>(
@@ -893,8 +913,28 @@ async function geneStateFacets(opts: {
         ]
       };
     })(),
-    // CNA: amplified / deleted / diploid / not profiled
+    // CNA, every alteration: the levels of the discrete profile, as the portal's chart counts them
+    !driver ? (async (): Promise<GeneStateFacet> => {
+      const { cond, total } = cna;
+      const from = "FROM " + db + ".genetic_alteration_derived\n" +
+        "WHERE cancer_study_identifier = " + sq(study) + " AND hugo_gene_symbol = " + sq(gene) + "\n" +
+        "  AND profile_type = " + discreteCnaProfileSql(study, db) + "\n" +
+        "  AND alteration_value IN (" + CNA_LEVELS.map((l) => sq(String(l.value))).join(", ") + ")" + cond;
+      const levels = await chQuery<ChRow>("SELECT alteration_value AS v, uniqExact(sample_unique_id) AS n\n" + from + "\nGROUP BY v", conn);
+      const counts = CNA_LEVELS.map((l) => Number(levels.data.find((r) => String(r.v) === String(l.value))?.n || 0));
+      // a sample holds one value per gene in the profile, so the levels partition the samples with one
+      const profiled = counts.reduce((a, n) => a + n, 0);
+      return {
+        gene, type: "CNA", per: "sample", total, profiled,
+        states: [
+          ...CNA_LEVELS.map((l, i) => ({ state: l.state, label: l.label, n: counts[i] })),
+          { state: "notProfiled" as const, label: "Not profiled", n: Math.max(0, total - profiled) }
+        ]
+      };
+    })() :
+    // CNA, OncoKB drivers only: amplified / deleted / no driver call / not profiled
     (async (): Promise<GeneStateFacet> => {
+      const { cond, total } = cna;
       const [prof, calls, anyCall] = await Promise.all([
         chQuery<ChRow>(profiledOf(gene, "COPY_NUMBER_ALTERATION", cond), conn),
         chQuery<ChRow>(
@@ -929,9 +969,9 @@ async function geneStateFacets(opts: {
         gene, type: "CNA", per: "sample", total, profiled,
         ...(overlap ? { overlap } : {}),
         states: [
-          { state: "amp", label: driver ? "Driver amplification" : "Amplified", n: amp },
-          { state: "del", label: driver ? "Driver deletion" : "Deleted", n: del },
-          { state: "unaltered", label: driver ? "No driver call" : "Diploid", n: Math.max(0, profiled - anyAltered) },
+          { state: "amp", label: "Driver amplification", n: amp },
+          { state: "del", label: "Driver deletion", n: del },
+          { state: "unaltered", label: "No driver call", n: Math.max(0, profiled - anyAltered) },
           { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
         ]
       };

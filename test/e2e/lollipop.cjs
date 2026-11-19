@@ -52,7 +52,7 @@ async function lollipop({ browser, ok, BASE }) {
       // another, and the table follows through its Protein Position filter; a click on the plot away
       // from any stem clears it, as on the portal's mutation mapper.
       const stems = await page.locator(".lp-plot g[data-codon]").evaluateAll((gs) => gs.map((g) => ({
-        codon: Number(g.getAttribute("data-codon")), n: Number(/: ([\d,]+) mutation/.exec(g.querySelector("title").textContent)[1].replace(/,/g, "")) })));
+        codon: Number(g.getAttribute("data-codon")), n: Number(/^([\d,]+) mutat/.exec(g.querySelector("title").textContent)[1].replace(/,/g, "")) })));
       const [a, b] = [...stems].sort((x, y) => y.n - x.n);
       const clickStem = async (codon, shift) => {
         const box = await page.locator(`.lp-plot g[data-codon="${codon}"] circle`).first().boundingBox();

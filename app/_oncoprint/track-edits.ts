@@ -1,5 +1,6 @@
 // The oncoprint's track edits on a view (the document): pure functions, each returning the next view.
 import { portalFreq } from "../../lib/chart/format.ts";
+import { attributeLabel } from "../../lib/custom-data-names.ts";
 import { normalizeGeneTracks, geneRowKeys, type GeneTrackSpec } from "../../lib/gene-tracks.ts";
 import { heatmapTrackLabel, assayTrackLabel, isAutoTrack, AUTO_TRACKS, SPECTRUM_TRACK, SPECTRUM_NAME } from "../../lib/profile-names.ts";
 
@@ -212,4 +213,14 @@ export function trackSort(keys: string[], label: string, dir: "" | "-" | null): 
 export function selectSort(keys: string[], v: string): string[] {
   const rest = keys.slice(1).filter((k) => !isClusterKey(k));
   return v ? [v, ...rest].slice(0, 4) : rest;
+}
+
+/**
+ * A Tracks menu item's text: the attribute's display name alone, numeric or not, as the portal's
+ * TracksMenu lists it; a generic-assay profile and the VAF row are named for what they are.
+ */
+export function tracksMenuText(name: string, o: { tab: string; rowLabel?: string; assayName?: string }): string {
+  if (name === "VAF") return "VAF (mutation allele fraction)";
+  if (o.assayName) return o.assayName + " (generic assay)";
+  return o.rowLabel ?? attributeLabel(name, o.tab === "custom" ? "short" : "long");
 }

@@ -232,8 +232,12 @@ test("# Samples per Patient: a bar row from zero, only when some patient has mor
   assert.equal(t.cells[c.columns.indexOf("P1")], 85, "one sample of a most of three is a third of the cell");
   const one = assembleContract({ ...input(), samples: samples.map((r) => ({ ...r, n: 1 })) });
   assert.ok(!one.tracks.some((x) => x.label === "# Samples per Patient"), "nobody with more than one: no row");
+  // a sample column carries its patient's count, as the portal's patient attribute (ONC-MD-1)
   const bySample = assembleContract({ ...input(), unit: "sample", samples });
-  assert.ok(!bySample.tracks.some((x) => x.label === "# Samples per Patient"), "a sample column is one sample");
+  const st = bySample.tracks.find((x) => x.label === "# Samples per Patient");
+  assert.ok(st, "sample columns keep the row");
+  assert.equal(st.values![bySample.columns.indexOf("P2")], 3);
+  assert.equal(st.values![bySample.columns.indexOf("P4")], 2);
 });
 
 // ---- merged gene rows (cBioPortal's `[TP53 MDM2]`) -------------------------

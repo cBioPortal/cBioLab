@@ -191,19 +191,26 @@ export function coverageSql(genes: string[], study: string = STUDY, db: string =
 }
 
 /**
- * One row per column: how many samples it has, and a bitmask over PROFILED_TYPES, bit i set when
- * some sample of the column is in a profile of that type whatever its genes — the portal's
- * "# Samples per Patient" and "Profiled for <type>" rows, from one scan.
+ * One row per column: how many queried samples its patient has, and a bitmask over
+ * PROFILED_TYPES, bit i set when some sample of the column is in a profile of that type whatever
+ * its genes — the portal's "# Samples per Patient" and "Profiled for <type>" rows, from one scan.
+ * A sample column carries its patient's count, as the portal's patient attribute does.
  */
 export function columnFactsSql(study: string = STUDY, db: string = DB, unit: Unit = "patient", samples?: string | null): string {
   const puidPrefix = study + "_";
   const types = PROFILED_TYPES.map(([t]) => sq(t)).join(",");
+  const perPatient = unit === "sample"
+    ? "JOIN (SELECT patient_unique_id, uniqExact(sample_unique_id) AS n FROM " + db + ".sample_derived\n" +
+      "      WHERE cancer_study_identifier = " + sq(study) + fromColumnSamples("sample_unique_id", study, samples) + "\n" +
+      "      GROUP BY patient_unique_id) pn ON pn.patient_unique_id = sd.patient_unique_id\n"
+    : "";
   return "SELECT " + idCol(unit, puidPrefix, "sd.") + " AS pid,\n" +
-    "       uniqExact(sd.sample_unique_id) AS samples,\n" +
+    "       " + (unit === "sample" ? "any(pn.n)" : "uniqExact(sd.sample_unique_id)") + " AS samples,\n" +
     "       toUInt8(groupBitOr(if(sp.alteration_type = '', 0, bitShiftLeft(toUInt8(1), toUInt8(indexOf([" + types + "], sp.alteration_type) - 1))))) AS mask\n" +
     "FROM " + db + ".sample_derived sd\n" +
     "LEFT JOIN (SELECT sample_unique_id, alteration_type FROM " + db + ".sample_to_gene_panel_derived\n" +
     "           WHERE cancer_study_identifier = " + sq(study) + " AND alteration_type IN (" + types + ")) sp ON sp.sample_unique_id = sd.sample_unique_id\n" +
+    perPatient +
     "WHERE sd.cancer_study_identifier = " + sq(study) + fromColumnSamples("sd.sample_unique_id", study, samples) + "\n" +
     "GROUP BY pid";
 }

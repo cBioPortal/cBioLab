@@ -27,6 +27,7 @@ import { activeCustomData, clinicalTable } from "./custom-data.ts";
 import { UPLOAD_DATASET_RE, customAttr } from "./custom-data-names.ts";
 import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import { lockClause } from "./cohort-lock.ts";
+import { DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, OqlLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -403,12 +404,32 @@ function numRangeConds(range: ClinicalRange | undefined, expr: string): string[]
   return conds;
 }
 
+/**
+ * The profile type (stable id without the study prefix) of the study's discrete copy-number
+ * profile, as a scalar subquery: the newest when a study has two. No row when it has none.
+ */
+export function discreteCnaProfileSql(study: string, db: string): string {
+  return "(SELECT replaceOne(gp.stable_id, " + sq(study + "_") + ", '') FROM " + db + ".genetic_profile gp\n" +
+    "      JOIN " + db + ".cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = " + sq(study) + "\n" +
+    "        AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)";
+}
+
 function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
   const gene = String(leaf.gene || "").toUpperCase().trim();
   if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/.test(gene)) throw new Error("genomicData clause: bad gene");
   const pt = String(leaf.profileType || "");
-  if (ctx.profiles && !ctx.profiles.includes(pt))
+  const discrete = pt === DISCRETE_CNA_PROFILE;
+  if (leaf.ifHeld != null && (leaf.ifHeld !== true || !discrete))
+    throw new Error("genomicData clause: `ifHeld: true` goes with profileType '" + DISCRETE_CNA_PROFILE + "'");
+  if (!discrete && ctx.profiles && !ctx.profiles.includes(pt))
     throw new Error("genomicData: profile '" + pt + "' not in this study (available: " + (ctx.profiles.join(", ") || "none") + ")");
+  // the study's discrete copy-number profile, resolved in the database; a study without one is refused
+  // there (the context lists continuous profiles only) unless ifHeld, when it matches nobody
+  const profileCheck = discrete && leaf.ifHeld !== true
+    ? "\n  UNION DISTINCT\nSELECT '' AS sid FROM system.one WHERE throwIf(ifNull(" + discreteCnaProfileSql(ctx.study, dbOf(ctx)) + ", '') = '', " +
+      sq("genomicData clause: " + ctx.study + " has no discrete copy-number profile for profileType '" + DISCRETE_CNA_PROFILE + "'" +
+        (ctx.profiles ? " (its other profiles: " + (ctx.profiles.join(", ") || "none") + ")" : "") + "; add ifHeld: true to match nobody there instead") + ") != 0"
+    : "";
   const conds = numRangeConds(leaf.range, finiteSql("ga.alteration_value"));
   if (Array.isArray(leaf.values) && leaf.values.length)
     conds.push("ga.alteration_value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
@@ -416,8 +437,8 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
   return ofSamples("SELECT DISTINCT " + PID("ga.sample_unique_id", ctx.study) + " AS sid\n" +
     "  FROM " + dbOf(ctx) + ".genetic_alteration_derived ga\n" +
     "  WHERE ga.cancer_study_identifier = " + sq(ctx.study) + "\n" +
-    "    AND ga.hugo_gene_symbol = " + sq(gene) + " AND ga.profile_type = " + sq(pt) + "\n" +
-    "    AND " + conds.join(" AND "));
+    "    AND ga.hugo_gene_symbol = " + sq(gene) + " AND ga.profile_type = " + (discrete ? discreteCnaProfileSql(ctx.study, dbOf(ctx)) : sq(pt)) + "\n" +
+    "    AND " + conds.join(" AND ") + profileCheck);
 }
 
 function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): LeafIds {
@@ -722,7 +743,8 @@ function leafText(leaf: any): string {
   if (leaf.kind === "caseList") return leaf.category != null ? "in each study's case list of category " + leaf.category : "in case list " + leaf.id;
   if (leaf.kind === "split") return "in the " + leaf.part + " half (fixed held-out split)";
   if (leaf.kind === "upload") return "with a row in upload " + String(leaf.dataset).slice("custom:".length);
-  if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values);
+  if (leaf.kind === "genomicData") return leaf.gene + " " + leaf.profileType + " " + JSON.stringify(leaf.range || leaf.values) +
+    (leaf.ifHeld ? " (in each study holding it; none in a study without it)" : "");
   if (leaf.kind === "genericAssay") return leaf.entity + " " + JSON.stringify(leaf.range || leaf.values);
   if (leaf.kind === "proteinPosition") return leaf.gene + " protein position " + JSON.stringify(leaf.range || {});
   if (leaf.kind === "sampleList" || leaf.kind === "patientList") {

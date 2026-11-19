@@ -215,7 +215,7 @@ JOIN snapshot_db.sample smp ON smp.internal_id = sll.sample_id
 WHERE sl.stable_id = 'brca_tcga_pan_can_atlas_2018_germline'
 
 -- view 0 mutcompare: lollipop:samples · brca_tcga_pan_can_atlas_2018
-WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
+SELECT uniqExact(pid) AS patients, uniqExact(sid) AS samples FROM ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND (('sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
@@ -226,10 +226,9 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_Basal')))))))
-SELECT uniqExact(sid) AS n FROM cohort
 
 -- view 0 mutcompare: lollipop:samples · brca_tcga_pan_can_atlas_2018
-WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
+SELECT uniqExact(pid) AS patients, uniqExact(sid) AS samples FROM ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND (('sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) IN (SELECT DISTINCT type AS lvl, if(type = 'sample', replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', ''), replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '')) AS id
   FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
@@ -240,7 +239,6 @@ WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2
    FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
   WHERE cancer_study_identifier = 'brca_tcga_pan_can_atlas_2018'
     AND attribute_name = 'SUBTYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('BRCA_LumA')))))))
-SELECT uniqExact(sid) AS n FROM cohort
 
 -- view 0 mutcompare: lollipop:totals · brca_tcga_pan_can_atlas_2018
 WITH cohort AS ((SELECT replaceOne(patient_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS pid, replaceOne(sample_unique_id, 'brca_tcga_pan_can_atlas_2018_', '') AS sid FROM snapshot_db.sample_derived

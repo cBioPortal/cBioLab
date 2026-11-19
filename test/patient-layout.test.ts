@@ -76,7 +76,13 @@ test("PTB-TAB-2: a study holding no mutations gives no Genomic Evolution", () =>
 
 test("PTB-TAB-2: with everything present the tabs come in the legacy order", () => {
   const l = patientLayout(q, { profileCatalog: SIG, held: ["MUTATION", "CNA"], samples: 2, vaf: true });
-  assert.deepEqual(titlesOf(l), ["Summary", "Genomic Evolution", "Pathways", "Clinical Data", "Files & Links", "Mutational Signatures"]);
+  assert.deepEqual(titlesOf(l), ["Summary", "Genomic Evolution", "Pathways", "Clinical Data", "Mutational Signatures"]);
+});
+
+test("PTB-TAB-2: no Files & Links tab without resource data, which no study here holds", () => {
+  for (const l of [patientLayout(q, { profileCatalog: SIG, held: ["MUTATION", "CNA", "SV"], samples: 2, vaf: true }), patientLayout(q, { profileCatalog: [], held: [] }),
+    patientLayout({ study: "s", sample: "S1" }, { profileCatalog: [], held: ["MUTATION"] })])
+    assert.ok(!titlesOf(l).includes("Files & Links"), titlesOf(l).join(", "));
 });
 
 test("PTB-TAB-3, PTB-MD-12: no Clinical Trials tab, whatever the patient holds", () => {
