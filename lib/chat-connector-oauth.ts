@@ -43,7 +43,12 @@ export interface Flow { id: string; state: string; verifier?: string; client?: O
 
 /** where to go back to: a path on this site, never another site */
 export function safeReturnTo(x: string | null | undefined): string {
-  return x && x.startsWith("/") && !x.startsWith("//") && !x.includes("\\") && !/[\r\n]/.test(x) ? x : "/";
+  if (!x || !x.startsWith("/") || x.startsWith("//") || x.includes("\\") || /[\r\n]/.test(x)) return "/";
+  try {
+    // Browsers strip tabs before parsing, so a path such as /\t/host can become an external URL.
+    const origin = "https://cbiolab.invalid";
+    return new URL(x, origin).origin === origin ? x : "/";
+  } catch { return "/"; }
 }
 
 /** this app's address as the reader's browser sees it, behind a proxy too */

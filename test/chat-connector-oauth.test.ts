@@ -127,6 +127,17 @@ describe("what the flow leaves behind", () => {
       assert.equal(safeReturnTo(bad), "/", String(bad));
     assert.equal(readFlow(OAUTH_COOKIE + "=" + Buffer.from(JSON.stringify({ id: "a", state: "s", returnTo: "//evil.example" })).toString("base64url"))!.returnTo, "/");
   });
+  test("browser URL normalization cannot turn a return path into an external redirect", () => {
+    for (const bad of ["/\t/evil.example", "/\t/evil.example/path", "/\t/["]) {
+      assert.equal(safeReturnTo(bad), "/");
+      const cookie = OAUTH_COOKIE + "=" + Buffer.from(JSON.stringify({ id: "a", state: "s", returnTo: bad })).toString("base64url");
+      assert.equal(readFlow(cookie)!.returnTo, "/");
+      assert.match(doneHtml({ id: "a", name: "A" }, { token: "test" }, bad), /location\.replace\("\/"\)/);
+      assert.match(failedHtml("Denied", bad), /location\.replace\("\/"\)/);
+    }
+    for (const path of ["/portal/patient?a=1#summary", "/a/..//evil.example", "/?next=https://example.org"])
+      assert.equal(safeReturnTo(path), path);
+  });
 });
 
 describe("the callback page", () => {
