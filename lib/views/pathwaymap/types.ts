@@ -10,6 +10,7 @@ import type { RankedPathway, RankSettings } from "./rank.ts";
  * counts come back with it, so choosing another pathway re-runs nothing.
  */
 import type { DriverSettings } from "../../driver-settings.ts";
+import type { PathwayMapNotProfiled } from "./profiled.ts";
 
 export interface PathwayMapView {
   note?: string;
@@ -31,6 +32,12 @@ export interface PathwayMapView {
   oql?: string[];
   /** how a line's DRIVER reads (the page's driver settings), and the profiles its EXP / PROT read */
   drivers?: DriverSettings; exp?: string; prot?: string; ifHeld?: boolean;
+  /**
+   * one of the cohort's patients (the Patient page's): the result also names which of their samples
+   * lie outside the study's mutation and discrete copy-number profiles, as the portal's Pathways tab
+   * alerts "Sample(s) … not profiled for …"; asked of a local patient-level participant only
+   */
+  patient?: { study: string; id: string };
 }
 
 export interface PathwayMapCell { cohort: string; profiled: number; altered: number; pct: number | null }
@@ -50,6 +57,8 @@ export interface PathwayMapResult {
   defaulted: boolean;
   /** gene nodes of the drawn pathway that are labels rather than gene symbols, so carry no frequency */
   labels: string[];
+  /** with `patient`: their samples outside the mutation and copy-number profiles; absent when no local participant may name them */
+  notProfiled?: PathwayMapNotProfiled;
 }
 
 declare module "../../types.ts" {
