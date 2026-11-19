@@ -16,7 +16,7 @@ import {
   geneTableName, geneTableTitle, profiledSamples, defaultGeneSort, nextGeneSort,
   geneRowOrder, sortGeneRows, geneHeaderTips, geneTableTsv,
   freqTipLines, geneSelection, appliedLines, toggleQueued, queuedQuery, alteredHeaderTip,
-  intersectionRefusal,
+  intersectionRefusal, geneFreqText,
   type GeneTableKind, type GeneSort, type GeneSortColumn,
 } from "../lib/study-view-gene-tables.ts";
 import { chartFileName } from "../lib/study-view-download.ts";
@@ -748,4 +748,23 @@ test("GI1: filtered, the portal's first line then the filter note on a line of i
 
 test("GI1: every filtered tooltip ends with the note", () => {
   for (const k of KINDS) assert.ok(alteredHeaderTip(k, true).endsWith("\n" + FILTER_NOTE), k);
+});
+
+// ---- the Freq column on screen (STS-GT-5): the portal's getFrequencyStr of the unrounded frequency ----
+
+test("Freq under a tenth of a percent is \"<0.1%\", not \"0%\" (1 of 2,500 profiled is 0.04 %)", () => {
+  assert.equal(geneFreqText(r("A", 1, 1, 2500)), "<0.1%");
+  assert.equal(geneFreqText(r("A", 1, 1, 2500, { freqPct: 0 })), "<0.1%", "the server's rounded freqPct is not what is written");
+});
+
+test("Freq at 100 % is \"100.0%\"; just below is \"99.9%\"; one decimal in between", () => {
+  assert.equal(geneFreqText(r("A", 9, 9, 9)), "100.0%");
+  assert.equal(geneFreqText(r("A", 1, 1999, 2000)), "99.9%");
+  assert.equal(geneFreqText(r("A", 1, 9, 20)), "45.0%");
+  assert.equal(geneFreqText(r("A", 0, 0, 20)), "0%");
+});
+
+test("Freq counts on-panel calls only, and is \"NA\" with no sample profiled", () => {
+  assert.equal(geneFreqText(r("A", 3, 3, 10, { alteredOnPanel: 1 })), "10.0%");
+  assert.equal(geneFreqText(r("A", 1, 1, 0)), "NA");
 });
