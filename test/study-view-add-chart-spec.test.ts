@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { portalFreq } from "../lib/chart/format.ts";
-import { chartFreq, addChartLines, bulkButtons, withoutAttribute, type AddChartRow } from "../lib/study-view-add-chart.ts";
+import { chartFreq, addChartLines, bulkButtons, withoutAttribute, SPECIAL_CHART_KEYS, specialChartsShown, type AddChartRow } from "../lib/study-view-add-chart.ts";
 import type { Clause, Leaf } from "../lib/types.ts";
 
 const row = (key: string, name: string, samples: number, checked = false): AddChartRow => ({ key, name, samples, checked });
@@ -200,4 +200,21 @@ test("AC10 uncounted: not disabled, sorted after every counted row (0% included)
   }
   assert.deepEqual(lines.slice(0, 2).map(l => l.key).sort(), ["h", "z"]);
   assert.deepEqual(lines.slice(2).map(l => l.key).sort(), ["u1", "u2"]);
+});
+
+// STS-OT-2, STS-OT-7: Case Lists and Timeline Events Availability are offered in Add chart, not shown by default
+test("the special tables: drawn when checked, or while the draft filters on what they list", () => {
+  const none = () => false, all = () => true;
+  const ev = { kind: "event", a: { eventType: "Treatment" }, rel: { type: "NONE" } };
+  const seq = { kind: "event", a: { eventType: "Treatment" }, b: { eventType: "Surgery" }, rel: { type: "BEFORE", maxDays: 30 } };
+  const cl = { kind: "caseList", id: "coadread_all" };
+  const cases: [string, (k: string) => boolean, unknown[], boolean, { events: boolean; caseLists: boolean }][] = [
+    ["by default neither", none, [], true, { events: false, caseLists: false }],
+    ["both checked", all, [], true, { events: true, caseLists: true }],
+    ["timeline events checked, but the selection has none", (k) => k === SPECIAL_CHART_KEYS.events, [], false, { events: false, caseLists: false }],
+    ["a case-list filter shows Case Lists, as the portal's initial filters do", none, [cl], true, { events: false, caseLists: true }],
+    ["an event-type filter keeps its table in view", none, [ev], true, { events: true, caseLists: false }],
+    ["a sequence of two events is not this table's filter", none, [seq], true, { events: false, caseLists: false }],
+  ];
+  for (const [name, checked, leaves, hasEvents, want] of cases) assert.deepEqual(specialChartsShown(checked, leaves, hasEvents), want, name);
 });

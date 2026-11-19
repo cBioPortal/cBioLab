@@ -20,7 +20,7 @@ import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
-import { addChartLines, bulkButtons } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, bulkButtons, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -437,6 +437,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
               </div>
               {!rows.length && <p className="note my-3">No attribute matches “{clinFilter}”.</p>}
               {table(rows, false)}
+              <SpecialCharts ctx={ctx} />
             </div>
           );
         })()}
@@ -1501,33 +1502,56 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   );
 }
 
+/** the tables the portal offers in Add chart rather than showing by default (STS-OT-2, STS-OT-7), each a checkbox */
+const SPECIAL_CHARTS = [
+  { key: SPECIAL_CHART_KEYS.events, name: "Timeline Events Availability", tip: "patients with each type of clinical timeline event" },
+  { key: SPECIAL_CHART_KEYS.caseLists, name: "Case Lists", tip: "samples on each of the studies' case lists; shown by itself while a case list is filtered on" },
+] as const;
+
+function SpecialCharts({ ctx }: { ctx: ExploreCtx }) {
+  const { chartChecked, setChartsChecked } = ctx;
+  const explore = ctx.explore!;
+  // Timeline events only where the study has some, as the portal offers it
+  const offered = SPECIAL_CHARTS.filter((s) => s.key !== SPECIAL_CHART_KEYS.events || explore.events.length > 0);
+  return (
+    <div className="mt-3" data-special-charts>
+      <h3 className="meta">Other charts</h3>
+      {offered.map((s) => (
+        <label key={s.key} className="row baseline g5" data-tip={s.tip}>
+          <Checkbox checked={chartChecked(s.key)} onCheckedChange={(v) => setChartsChecked([s.key], v === true)} aria-label={"chart " + s.name} />
+          {s.name}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
-  const { addClause, parseDraft } = ctx;
+  const { addClause, parseDraft, chartChecked } = ctx;
   const explore = ctx.explore!;
   const leaves = ((parseDraft()?.all) || []).flatMap((c: any) => Array.isArray(c?.any) ? c.any : [c]);
   const eventOn = (type: string) => leaves.some((c: any) => c && c.kind === "event" && c.rel?.type === "NONE" && c.a?.eventType === type);
   const listOn = (id: string) => leaves.some((c: any) => c && c.kind === "caseList" && c.id === id);
+  // the portal shows these only when added (Case Lists also while one is filtered on): STS-OT-2, STS-OT-7
+  const shown = specialChartsShown(chartChecked, leaves, explore.events.length > 0);
   const anyOf = (ls: any[]) => { if (ls.length) addClause(ls.length === 1 ? ls[0] : { any: ls }); };
   return <>
-    <div className="card">
-      <h2>Timeline events</h2>
-      {explore.events.length === 0 && <p className="note">This study has no clinical timeline events.</p>}
-      {explore.events.length > 0 && (
-        <ValueList unit="patients" hint="keep the patients with any of the checked events" pct={portalFreq}
+    {shown.events && <div className="card" data-special="events">
+      <h2>Timeline Events Availability</h2>
+      <ValueList unit="patients with the event type" hint="keep the patients with any of the checked events" pct={portalFreq}
           why={(types) => limitRefusal(types.length, ANY_LEAF_LIMIT, "alternatives")}
           rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
             title: e.n.toLocaleString() + " of " + (explore.totals?.patients ?? 0).toLocaleString() + " selected patients with a " + e.type + " event" }))}
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
-      )}
-    </div>
-    <div className="card">
-      <h2>Case lists</h2>
+    </div>}
+    {shown.caseLists && <div className="card" data-special="caselists">
+      <h2>Case Lists</h2>
       <ValueList unit="samples" hint="keep the samples on any of the checked case lists" pct={portalFreq}
         why={(ids) => limitRefusal(ids.length, ANY_LEAF_LIMIT, "alternatives")}
         rows={explore.caseLists.map((l) => ({ key: l.id, name: l.name, n: l.n, total: explore.totals?.samples, on: listOn(l.id),
           title: l.id + " — " + l.n.toLocaleString() + " of " + (explore.totals?.samples ?? 0).toLocaleString() + " selected samples" }))}
         onApply={(ids) => anyOf(ids.map((id) => ({ kind: "caseList", id })))} />
       <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
-    </div>
+    </div>}
   </>;
 }
