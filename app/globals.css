@@ -1613,6 +1613,8 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .xc-title { font-size: var(--t-md); font-weight: 600; }
 .xc-body { position: relative; min-height: 12rem; }
 .xc-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--s2); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--muted); font-size: var(--t-sm); }
+/* the Clinical Data tab's table scrolls within the window, as the portal's (STV-CD-5: max height 100vh − 220px) */
+[data-tab="clinical-data"] .tv-scroll { max-height: calc(100vh - 220px); overflow: auto; }
 /* the clinical violin table (STS-VI-2): category, curve and box, # with its checkbox, quartiles */
 .vtable { width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
 .vtable th, .vtable td { padding: 0 var(--s1); border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
