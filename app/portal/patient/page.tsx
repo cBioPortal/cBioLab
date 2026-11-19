@@ -155,7 +155,7 @@ function PatientView({ study, patient, sample, nav, tab, note }: { study: string
   const query: PatientQuery | null = sample ? { study, sample } : patient ? { study, patient } : null;
   // laid out from the study list at once; the profiles only add the Mutational Signatures tab
   const fresh = useMemo(() => basics && query
-    ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known || (!sample && (!record || vaf == null)), samples: record?.samples.length, vaf: vaf ?? undefined })
+    ? patientLayout(query, { profileCatalog: known?.profileCatalog || [], held: basics.held.every, partial: !known || (!sample && (!record || vaf == null)), samples: record?.samples.length, vaf: vaf ?? undefined, events: record?.events })
     : null, [basics, known, study, patient, sample, record, vaf]);   // eslint-disable-line react-hooks/exhaustive-deps -- `query` is rebuilt every render from these ids
   const page = usePageDoc(fresh);
   // the portal's title, "Patient: P04" or "Sample: P04_Pri", and "<id> from <study name>"
