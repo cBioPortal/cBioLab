@@ -14,10 +14,17 @@ export const heatmapLabels = (v: V): string[] => (v.heatmap || []).flatMap((h: V
   h.entities && h.entities.length ? h.entities.map((e: unknown) => assayTrackLabel(String(e), h.profileType))
     : (h.genes && h.genes.length ? h.genes : v.genes || []).map((g: unknown) => heatmapTrackLabel(String(g).toUpperCase(), h.profileType)));
 
-/** drop sort keys whose track no longer exists; a cluster key lives as long as its heatmap profile */
+/**
+ * A sort key only the engine can apply, so a figure sorted by it keeps the order it was given: a
+ * clustering (from values the browser never receives) and the case list order (from the cohort's
+ * typed list, which the contract does not carry).
+ */
+export const isEngineSortKey = (k: string): boolean => { const t = k.replace(/^-/, ""); return t.startsWith("cluster:") || t === "caseList"; };
+
+/** drop sort keys whose track no longer exists; a cluster key lives as long as its heatmap profile, the case-list order as long as the cohort (the engine refuses it without a typed list) */
 export const pruneSort = (v: V): V => {
   const hidden: string[] = v.hideTracks || [];
-  const keep = new Set(["genomic", "id", ...AUTO_TRACKS.filter((l) => !hidden.includes(l)), ...(v.clinical || []), ...heatmapLabels(v),
+  const keep = new Set(["genomic", "id", "caseList", ...AUTO_TRACKS.filter((l) => !hidden.includes(l)), ...(v.clinical || []), ...heatmapLabels(v),
     ...(v.heatmap || []).map((h: V) => "cluster:" + h.profileType)]);
   const sort = (v.sort || []).filter((s: unknown) => keep.has(sortKeyText(s).replace(/^-/, "")));
   const next = { ...v };

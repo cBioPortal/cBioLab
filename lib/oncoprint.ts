@@ -30,6 +30,7 @@ import { germlineCondSql } from "./driver-sql.ts";
 import { forData } from "./driver-settings.ts";
 import { compileCohortDef, baseSamplesSql } from "./cohort2.ts";
 import { clusterHeatmap } from "./oncoprint-cluster.ts";
+import { caseListOf, caseListRanks } from "./oncoprint-case-list.ts";
 
 import { defaultOqlSublabel } from "./oql-match.ts";
 import { PROFILED_TYPES, SPECTRUM_TRACK, SPECTRUM_NAME, AUTO_TRACKS, isAutoTrack, type ProfiledType } from "./profile-names.ts";
@@ -873,6 +874,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
 
   // ---- columns: groups of patients or samples ----------------------------
   let groups: { name: string; pids: string[] }[]; // [{name, pids: [columnId]}] — a column lands in its first matching group
+  let caseListRank: Map<string, number> | undefined;
   const studyOf = new Map<string, string>(); // columnId -> study (avoids prefix-ambiguity parsing)
   // each study's cohort rows per column group, in group order: what patient columns are built from
   const rowsByStudy = new Map<string, string[]>(studies.map((s) => [s, []]));
@@ -882,6 +884,19 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   const peerColumns = async (s: string, gi: number): Promise<{ s: string; cols: ColumnRows }> =>
     ({ s, cols: { pids: (await peerShare(s)).groups[gi], samples: new Map() } });
   const inStudyOrder = <T extends { s: string }>(xs: T[]): T[] => studies.flatMap((s) => xs.filter((x) => x.s === s));
+  // each column's place in the user-defined case list its cohort is chosen by, when it is (ONC-SO-3)
+  const rankByCaseList = async (dsl: unknown, s: string, rows: string, cols: ColumnRows): Promise<void> => {
+    const list = caseListOf(dsl, s);
+    if (!list) return;
+    let patientOf: Map<string, string> | undefined;
+    if (unit === "sample" && list.level === "patient") {
+      const r = await lqRows("oncoprint:caseListPatients", "SELECT DISTINCT sid, pid FROM (\n" + rows + "\n)", s);
+      patientOf = new Map(r.rows.map((x) => [x[0] as string, x[1] as string]));
+    }
+    caseListRank ??= new Map();
+    for (const [c, r] of caseListRanks(list, cols.pids, unit, (c) => cols.samples.get(c), patientOf && ((x) => patientOf!.get(x))))
+      if (!caseListRank.has(qual(s, c))) caseListRank.set(qual(s, c), r);
+  };
   if (gbGroups) {
     groups = [];
     const seen = new Set<string>();
@@ -893,14 +908,19 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
         // parallel, merge in study order (deterministic column order)
         const held = studies.filter((s) => typeof (v as Record<string, string>)[s] === "string");
         for (const s of held) rowsByStudy.get(s)!.push((v as Record<string, string>)[s]);
-        per = await Promise.all(held.map(async (s) =>
-          ({ s, cols: columnRows((await lqRows("oncoprint:columns", columnRowsSql((v as Record<string, string>)[s], unit), s)).rows) })));
+        per = await Promise.all(held.map(async (s) => {
+          const cols = columnRows((await lqRows("oncoprint:columns", columnRowsSql((v as Record<string, string>)[s], unit), s)).rows);
+          await rankByCaseList(g.dsl, s, (v as Record<string, string>)[s], cols);
+          return { s, cols };
+        }));
       } else {
         // no pre-compiled SQL: compile the definition against each study in turn
         per = await Promise.all(studies.filter((s) => !peers.has(s)).map(async (s) => {
           const rows = cohortRowsSql({ ...g.dsl, lineGap }, s, dbOf(s), pin);
           rowsByStudy.get(s)!.push(rows);
-          return { s, cols: await cohortColumns(rows, s, opts.log, "oncoprint:columns", unit, connOf(s)) };
+          const cols = await cohortColumns(rows, s, opts.log, "oncoprint:columns", unit, connOf(s));
+          await rankByCaseList(g.dsl, s, rows, cols);
+          return { s, cols };
         }));
       }
       per = inStudyOrder([...per, ...await Promise.all([...peers.keys()].map((s) => peerColumns(s, gi)))]);
@@ -932,6 +952,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
     const cols = await cohortColumns(rows, study, opts.log, "oncoprint:columns", unit, connOf(study));
     for (const p of cols.pids) { studyOf.set(p, study); columnSamples.get(study)!.push(...cols.samples.get(p)!); }
     groups = [{ name: "cohort", pids: cols.pids }];
+    await rankByCaseList(spec.cohort.dsl, study, rows, cols);
   } else {
     // every column of the study, each built from all of its samples: no sample to carry
     const pids = (await lqRows("oncoprint:columns", cohortColumnsSql(null, study, dbOf(study), unit, pin), study)).rows.map((x) => x[0] as string);
@@ -1135,7 +1156,7 @@ async function buildContractIn(spec: OncoprintSpec, opts: ContractOpts): Promise
   const contract = assembleContract({
     genes: geneList, groups, studies, studyOf, events, coverage, profiled: { types: profiledTypes, masks: profiledMasks }, samples: samplesPer, defaultOql,
     isDriver: (r) => annotation.isDriver(r as Parameters<typeof annotation.isDriver>[0]), annotationSource: annotation.source,
-    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank, clusterMethod,
+    clinical: clinicalIn, heatmap: heatmapIn, overlays: overlaysIn, zReference: spec.zReference, derived: derivedIn, sort, lineGap, display, unit, clusterRank, clusterMethod, caseListRank,
     ...(hideTracks.length ? { hideTracks } : {})
   });
   contract.stats.ms = Date.now() - t0;

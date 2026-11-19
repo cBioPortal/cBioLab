@@ -219,6 +219,12 @@ export interface AssembleInput {
   clusterRank?: Map<string, number>;
   /** how the clustering was done, echoed in the contract's conventions for the caption */
   clusterMethod?: ClusterMethod;
+  /**
+   * Column id -> its place in the user-defined case list the cohort is chosen by
+   * (lib/oncoprint-case-list.ts). Present whenever the cohort names one; the sort key "caseList"
+   * reads it, and the contract then says the order is on offer.
+   */
+  caseListRank?: Map<string, number>;
   /** automatic rows (lib/profile-names.ts AUTO_TRACKS) the reader switched off */
   hideTracks?: string[];
 }
@@ -693,8 +699,19 @@ export function assembleContract(input: AssembleInput): Contract {
       const at = (i: number): number => rank.get(allPids[i]) ?? Number.MAX_SAFE_INTEGER;
       return (x: number, y: number) => sign * (at(x) - at(y));
     }
+    if (s.track === "caseList") {
+      const rank = input.caseListRank;
+      if (!rank) throw new Error("sort: 'caseList' needs a cohort chosen by a user-defined case list (a sampleList or patientList clause in its all)");
+      const at = allPids.map((p) => rank.get(p));
+      return (x: number, y: number) => {
+        const a = at[x], b = at[y];
+        if (a === undefined || b === undefined) return a === b ? 0 : a === undefined ? 1 : -1;
+        return sign * (a - b);
+      };
+    }
     const t = sortableTracks.get(s.track);
     if (!t) throw new Error("sort: '" + s.track + "' is not a track in this oncoprint — sortable: genomic, id, cluster:<profileType>" +
+      (input.caseListRank ? ", caseList" : "") +
       (sortableTracks.size ? ", " + [...sortableTracks.keys()].join(", ") : "") +
       " (clinical sort keys must also be listed in clinical)");
     return trackCmp(t, sign);
@@ -781,6 +798,7 @@ export function assembleContract(input: AssembleInput): Contract {
       annotation: input.annotationSource, lineGap,
       sort: sort.map((s) => (s.dir === "desc" ? "-" : "") + s.track),
       ...(input.clusterMethod ? { cluster: input.clusterMethod } : {}),
+      ...(input.caseListRank ? { caseList: true } : {}),
       ...(autoTracks.length ? { autoTracks } : {}),
       ...customDriverReport(events) },
     display: input.display ?? { showUnaltered: true, whitespace: true, gaps: "none", clinicalLegends: "all", colorByType: true, hideVUS: false, annotate: "oncokb", whiteBackground: false, showOql: true },
