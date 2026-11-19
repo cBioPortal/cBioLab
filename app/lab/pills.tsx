@@ -104,6 +104,7 @@ function leafText(leaf: any) {
   if (k === "genomicData" && leaf.profileType === MUTATION_TYPE_PROFILE)
     return `${leaf.gene} mutation type: ` + (leaf.values || []).map((v: unknown) => mutationTypeLabel(String(v))).join(" or ");
   if (k === "genomicData") return `${leaf.gene} ${leaf.profileType} ` + (leaf.range ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ") : "");
+  if (k === "treatment") return (leaf.time ? "sample " + (leaf.time === "Pre" ? "before" : "after") + " treatment: " : "treated with ") + (leaf.agents || []).join(" or ");
   if (k === "genericAssay") return entityShortName(String(leaf.entity), String(leaf.profileType)) + " " + (leaf.range
     ? Object.entries(leaf.range).map(([a, b]) => ({ gt: ">", gte: "≥", lt: "<", lte: "≤" }[a] || a) + b).join(" ")
     : (leaf.values || []).join(" or "));

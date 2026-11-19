@@ -116,6 +116,7 @@ warehouse_checks() (
   phase "denominators"              && npm run check:denominators 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
   phase "gene facets"               && npm run check:genefacets 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
   phase "mutation-type tables"      && npm run check:mutationtypes 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
+  phase "treatment tables"          && npm run check:treatments 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
   phase "value folding"             && npm run check:values 2>&1 | summary grep -E "^FAIL|checks passed|FAILED"
   phase "oncoprint patient values"  && npm run check:oncoprint-values 2>&1 | summary grep -E "^FAIL|value checks passed|FAILED"
   phase "oncoprint mutation spectrum" && npm run check:oncoprint-spectrum 2>&1 | summary grep -E "^FAIL|spectrum checks passed|FAILED"
