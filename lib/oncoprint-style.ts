@@ -169,7 +169,9 @@ export const STYLE = {
     curveWidth: 1.5, curveOpacity: 0.9 },
   // the Patient tables' Samples cell where the row's gene is off the sample's panel (SampleLabelNotProfiled): a grey pill
   notProfiledPill: { fill: "#cccccc", width: 12, height: 2.5, y: 5 },
-  geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
+  geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22,
+    // a label past 18 characters prints its first 15 and "..." (oncoprintjs oncoprintlabelview shortenLabelIfNecessary)
+    labelMaxChars: 18,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,
     // a row pooling several genes wears the brackets that made it, the way the query spells it
@@ -465,7 +467,7 @@ export function naturalRanks(values: readonly string[]): Int32Array {
 
 export function truncateLabel(label: string, S: Style = STYLE): string {
   const n = S.geometry.labelMaxChars;
-  return label.length > n ? label.slice(0, n - 1) + "…" : label;
+  return label.length > n ? label.slice(0, n - 3) + "..." : label;
 }
 
 /**
@@ -501,7 +503,7 @@ export function trackLabelText(track: { label: string; members?: string[] }, S: 
   const [open, close] = S.geometry.mergedBrackets;
   if (!track.members || track.members.length < 2) return truncateLabel(track.label, S);
   const n = Math.max(1, S.geometry.labelMaxChars - open.length - close.length);
-  return open + (track.label.length > n ? track.label.slice(0, n - 1) + "…" : track.label) + close;
+  return open + (track.label.length > n ? track.label.slice(0, Math.max(1, n - 3)) + "..." : track.label) + close;
 }
 
 /**
