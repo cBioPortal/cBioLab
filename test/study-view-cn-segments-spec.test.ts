@@ -82,6 +82,11 @@ test("CI5: more than 20,000 (20,001 and far more) is not read", () => {
 
 // ---- cnSegmentsInfo (CI1–CI6) ----
 
+test("CI3: 0 selected samples have no segments, said at once (the tab stays, as the portal's)", () => {
+  assert.equal(cnSegmentsInfo(0, null), "No segmented copy-number data for the selected 0 samples.");
+  assert.equal(cnSegmentsInfo(0, 0), "No segmented copy-number data for the selected 0 samples.");
+});
+
 test("CI1: with data, the selected count written plainly", () => {
   assert.equal(cnSegmentsInfo(1084, 1084), withData("1084 samples"));
   assert.equal(cnSegmentsInfo(1084, 12), withData("1084 samples"), "N is the selected samples, not the segmented ones");

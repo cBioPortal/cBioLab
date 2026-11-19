@@ -21,9 +21,11 @@ export interface ClinicalTabProps {
   studies: string[];
   /** the visible clinical-attribute charts */
   charts: TabChart[];
+  /** shown: a tab kept mounted while another is shown reads nothing, and catches up when shown again */
+  active?: boolean;
 }
 
-export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps) {
+export function ClinicalDataTab({ selection, studies, charts, active = true }: ClinicalTabProps) {
   const [query, setQuery] = useState<TableQuery>({});
   const columns = useMemo(() => clinicalTabColumns(charts), [charts]);
   const doc = useMemo(() => selection ? clinicalTabDoc(selection.def, selection.study, columns, query) : null, [selection, columns, query]);
@@ -34,7 +36,7 @@ export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!doc) return;
+    if (!doc || !active || res?.doc === docText) return;
     const ac = new AbortController();
     api.analysis(doc, { signal: ac.signal })
       .then((r) => r.json())
@@ -48,7 +50,7 @@ export function ClinicalDataTab({ selection, studies, charts }: ClinicalTabProps
       })
       .catch((e) => { if (!ac.signal.aborted) setRes((prev) => ({ doc: prev?.doc ?? docText, shown: prev?.shown, table: prev?.table, error: String((e as Error)?.message || e), failed: docText })); });
     return () => ac.abort();
-  }, [docText]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on docText, the string form of doc
+  }, [docText, active]);   // eslint-disable-line react-hooks/exhaustive-deps -- keyed on docText, the string form of doc
 
   if (!selection) return <div className="card"><p className="note">Select a study first.</p></div>;
   if (!res) return <div className="card"><p className="waiting" role="status"><span className="spinner" /> loading clinical data…</p></div>;

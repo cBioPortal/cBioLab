@@ -27,7 +27,8 @@ export function cnSegmentsReads(selected: number): boolean {
 export function cnSegmentsInfo(selected: number, segmented: number | null): string {
   if (!cnSegmentsReads(selected))
     return "Too many samples (>" + CN_SEGMENTS_SAMPLE_LIMIT + ") for copy number segmentation view, make a selection on Summary tab first.";
-  return (segmented === 0 ? "No segmented" : "Segmented") + " copy-number data for the selected " + selected + " " + (selected === 1 ? "sample" : "samples") + ".";
+  // no selected sample has none to read: the portal reads the empty selection and finds none
+  return (segmented === 0 || selected === 0 ? "No segmented" : "Segmented") + " copy-number data for the selected " + selected + " " + (selected === 1 ? "sample" : "samples") + ".";
 }
 
 /** the analysis document the tab runs: the segments view over the selection */

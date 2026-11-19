@@ -400,6 +400,43 @@ async function explore({ ok, BASE, page }) {
     binOk = before > 2 && kept === 2 && back === before;
   } catch (e) { binDetail = String(e.message).split("\n")[0]; }
   ok("explore: a histogram's Custom Bins redraws its bars, kept by the browser, an empty box restores them, and Show NA adds a bar", binOk, binDetail);
+
+  // Explore's tabs (STV-URL-1, STV-TAB-1, STV-STM-13): a link opens the tab it names, a tab keeps its search
+  // across a switch, the URL follows the tab through a reload, and CN Segments stays at 0 selected samples
+  let tabDetail = "", tabOk = false;
+  try {
+    const ST = "luad_tcga_pan_can_atlas_2018";
+    const tabs = page.getByRole("tablist", { name: "study view sections" });
+    const active = async () => (await tabs.locator("[role=tab][data-state=active]").innerText()).trim();
+    const svtab = () => new URL(page.url()).searchParams.get("svtab");
+    await page.goto(BASE + "/lab?tab=explore&study=" + ST + "&svtab=clinicalData", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => /Showing 1–\d+ of [\d,]+ results/.test(document.body.innerText), null, { timeout: 240000 });
+    const opened = await active();
+    const count = async () => (/Showing 1–\d+ of ([\d,]+) results/.exec(await page.locator("body").innerText()) || [])[1];
+    const all = await count();
+    const search = page.getByRole("searchbox", { name: "search results" });
+    await search.fill("Female"); await search.press("Enter");
+    await page.waitForFunction((n) => { const m = /Showing 1–\d+ of ([\d,]+) results/.exec(document.body.innerText); return m && m[1] !== n; }, all, { timeout: 120000 });
+    const shown = await count();
+    await tabs.getByRole("tab", { name: "Summary" }).click();
+    const onSummary = svtab();
+    await tabs.getByRole("tab", { name: "Clinical Data" }).click();
+    const back = { search: await search.inputValue(), shown: await count() };
+    await tabs.getByRole("tab", { name: "CN Segments" }).click();
+    const onCn = svtab();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator("[data-test=cn-segments-info]").waitFor({ timeout: 240000 });
+    const reloaded = await active();
+    await page.goto(BASE + "/lab?tab=explore&study=" + ST + "&filterAttributeId=AGE&filterValues=150-200&svtab=cnSegments", { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(() => /\b0 patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
+    const info = await page.locator("[data-test=cn-segments-info]").innerText({ timeout: 60000 });
+    const names = (await tabs.locator("[role=tab]").allInnerTexts()).map((x) => x.trim());
+    tabDetail = JSON.stringify({ opened, all, shown, onSummary, back, onCn, reloaded, names, info });
+    tabOk = opened === "Clinical Data" && !!shown && onSummary === null && back.search === "Female" && back.shown === shown &&
+      onCn === "cnSegments" && reloaded === "CN Segments" && names.join("|") === "Summary|CN Segments" &&
+      info === "No segmented copy-number data for the selected 0 samples.";
+  } catch (e) { tabDetail = String(e.message).split("\n")[0]; }
+  ok("explore: the tab is in the URL, keeps its search across a switch, and CN Segments stays at 0 samples", tabOk, tabDetail);
 }
 
 module.exports = { explore };
