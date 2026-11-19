@@ -20,7 +20,7 @@ const { setChTransport, PRIMARY } = await import("../lib/ch.ts");
 const { dataBins } = await import("../lib/data-binner.ts");
 const CG29 = JSON.parse(readFileSync(new URL("./fixtures/assay-bins-brca-cg00000029.json", import.meta.url), "utf8")) as { values: string[]; portalBins: unknown[] };
 const { discreteCnaProfileSql } = await import("../lib/cohort2.ts");
-const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildMutationTypeFacets } = await import("../lib/explore.ts");
+const { mergeExplore, buildExplore, buildExploreFederated, conflictingLevels, buildAssayFacets, ASSAY_CHART_LIMIT, buildTreatmentFacets, buildMutationTypeFacets } = await import("../lib/explore.ts");
 type ExploreResult = import("../lib/types.ts").ExploreResult;
 type ChConn = import("../lib/ch.ts").ChConn;
 type Row = Record<string, unknown>;
@@ -53,6 +53,16 @@ describe("merging participants' facets", () => {
   test("one participant is returned as it is", () => {
     const p = part({ study: "only" });
     assert.equal(mergeExplore([p]), p);
+  });
+
+  test("STS-STM-1: values spelled differently across studies are one row, under the greatest spelling, as the portal's", () => {
+    const sex = (study: string, values: { v: string; n: number }[]) => part({ study, totals: { patients: 1000, samples: 1000 },
+      clinical: [{ attribute: "SEX", per: "patient", kind: "cat", patients: values.reduce((n, x) => n + x.n, 0), values }] });
+    // coadread writes "Female", brca_mbcproject_2022 "FEMALE": cbioportal.org lists Female 536
+    const m = mergeExplore([sex("coadread", [{ v: "Female", n: 264 }, { v: "Male", n: 312 }]), sex("mbc", [{ v: "FEMALE", n: 272 }, { v: " male ", n: 1 }])]);
+    const c = m.clinical.find((x) => x.attribute === "SEX")!;
+    assert.ok(c.kind === "cat");
+    assert.deepEqual(c.values, [{ v: "Female", n: 536 }, { v: "Male", n: 313 }]);
   });
 
   describe("SD15: values cut across studies", () => {
@@ -565,7 +575,7 @@ describe("one study", () => {
         // bits: 0 = all but SEX, 1 = all but AGE, 2 = all but TMB, 3 = the draft
         on(/^SELECT st, s, p, pm FROM/, [{ st: S, s: S + "_S1", p: S + "_P1", pm: "15" }, { st: S, s: S + "_S2", p: S + "_P1", pm: "1" },
           { st: S, s: S + "_S3", p: S + "_P2", pm: "8" }]);
-        on(/topKIf\(1\)/, [{ s: S, type: "patient", a: "SEX", v: "Female", vkey: "female", n: 2 }, { s: S, type: "patient", a: "SEX", v: "Male", vkey: "male", n: 1 },
+        on(/maxIf\(c\.val/, [{ s: S, type: "patient", a: "SEX", v: "Female", vkey: "female", n: 2 }, { s: S, type: "patient", a: "SEX", v: "Male", vkey: "male", n: 1 },
           { s: S, type: "sample", a: "CODE", v: "1", vkey: "1", n: 2 }]);
         on(/AS n_all/, [{ type: "patient", a: "AGE", v: "30", n: 1, n_all: 40 }, { type: "patient", a: "AGE", v: "60", n: 2, n_all: 50 }, { type: "sample", a: "TMB", v: "5", n: 2, n_all: 100 }]);
         on(/ARRAY JOIN range\(3\)/, [{ lvl: "patient", k: 0, n: 3 }, { lvl: "sample", k: 0, n: 3 }, { lvl: "patient", k: 1, n: 3 }, { lvl: "sample", k: 1, n: 3 }]);
@@ -835,7 +845,7 @@ describe("several studies", () => {
     // two filtered attributes (bits 0, 1) and the OQL clause as the rest: bit 2 is every filter
     on(/^SELECT st, s, p, pm FROM/, (q) => /cbio_b\./.test(q) ? [{ st: "st2", s: "st2_X1", p: "st2_Y1", pm: "4" }]
       : [{ st: "st1", s: "st1_S1", p: "st1_P1", pm: "7" }, { st: "st1", s: "st1_S2", p: "st1_P2", pm: "1" }]);
-    on(/topKIf\(1\)/, (q) => [{ s: /cbio_b\./.test(q) ? "st2" : "st1", type: "patient", a: "SEX", v: "Female", vkey: "female", n: 1 }]);
+    on(/maxIf\(c\.val/, (q) => [{ s: /cbio_b\./.test(q) ? "st2" : "st1", type: "patient", a: "SEX", v: "Female", vkey: "female", n: 1 }]);
     on(/AS n_all/, (q) => [{ type: "patient", a: "AGE", v: /cbio_b\./.test(q) ? "40" : "60", n: 1, n_all: 5 }]);
     twoConnAnswers();
     const draft = { all: [{ kind: "clinical" as const, attribute: "SEX", values: ["Female"] }, { kind: "clinical" as const, attribute: "AGE", range: { gt: 1 } },
@@ -1068,6 +1078,80 @@ describe("review of #276 (multi-study Freq): one attribute charted as different 
   test("when either study lacks samples, the merged facet has none", () => {
     assert.equal(grade([num(30), cat()])[0].samples, undefined);
     assert.equal(grade([num(), cat(12)])[0].samples, undefined);
+  });
+});
+
+// ---- the treatment tables (STS-OT-6) --------------------------------------------------------
+describe("treatment tables", () => {
+  const profiles = new Map([["st1", {}], ["st2", {}]]);
+  // the two statements, told apart by what they read
+  const PATIENTS = /GROUP BY agent WITH TOTALS/, SAMPLES = /GROUP BY agent, time WITH TOTALS/, ANY = /SELECT count\(\) AS n FROM \(SELECT 1 FROM/;
+
+  test("patients per agent, most first; samples per agent and time; the totals as the database counts them", async () => {
+    // chQuery hands back the database's JSON, totals included; the stand-in carries them on the reply
+    setChTransport(async ({ query }) => {
+      sent.push(query);
+      const body = ANY.test(query) ? { data: [{ n: 1 }] } : PATIENTS.test(query) ? { data: [{ agent: "Leucovorin", n: 137 }, { agent: "Fluorouracil", n: 156 }], totals: { n: 214 } }
+        : SAMPLES.test(query) ? { data: [{ agent: "Fluorouracil", time: "Pre", n: 155 }, { agent: "Fluorouracil", time: "Post", n: 1 }], totals: { n: 214 } }
+        : { data: [] };
+      return JSON.stringify({ meta: [], rows: body.data.length, ...body });
+    });
+    try {
+      const t = await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles });
+      assert.deepEqual(t, { patients: [{ agent: "Fluorouracil", n: 156 }, { agent: "Leucovorin", n: 137 }],
+        samples: [{ agent: "Fluorouracil", time: "Pre", n: 155 }, { agent: "Fluorouracil", time: "Post", n: 1 }], totalPatients: 214, totalSamples: 214 });
+      const s = sent.find((q) => SAMPLES.test(q))!;
+      // only the study's own samples, each agent's first start, no id projected
+      assert.match(s, /concat\(cancer_study_identifier, '_', value\) IN \(SELECT sample_unique_id FROM cbio_a\.sample_derived/);
+      assert.match(s, /arrayMin\(arrayMap\(x -> x\.2, arrayFilter\(x -> x\.1 = a, t\)\)\)/);
+      assert.match(s, /if\(sa\.2 <= tx\.2, 'Pre', 'Post'\)/);
+      assert.doesNotMatch(s, /(patient|sample)_unique_id AS|SELECT (patient|sample)_unique_id,/, "no id is projected; ids are only grouped on or tested for membership");
+      // the grouping reads only the rows it keeps, and an empty AGENT is no treatment
+      assert.match(s, /GROUP BY patient_unique_id/);
+      assert.match(s, /AND \(\(lower\(event_type\) = 'treatment' AND key = 'AGENT' AND value != ''\) OR \(lower\(event_type\) IN \('sample acquisition','specimen'\) AND key = 'SAMPLE_ID'\)\)/);
+      assert.match(sent.find((q) => PATIENTS.test(q))!, /AND value != ''/);
+    } finally {
+      setChTransport(async ({ query }) => { sent.push(query); for (const [re, rows] of answers) if (re.test(query)) { const data = typeof rows === "function" ? rows(query) : rows; return JSON.stringify({ meta: [], data, rows: data.length }); } return JSON.stringify({ meta: [], data: [], rows: 0 }); });
+    }
+  });
+
+  test("two connections add up, agent by agent", async () => {
+    on(ANY, [{ n: 1 }]);
+    on(PATIENTS, (q) => /cbio_b\./.test(q) ? [{ agent: "Fluorouracil", n: 4 }] : [{ agent: "Fluorouracil", n: 6 }, { agent: "Cisplatin", n: 1 }]);
+    on(SAMPLES, (q) => /cbio_b\./.test(q) ? [{ agent: "Fluorouracil", time: "Post", n: 2 }] : [{ agent: "Fluorouracil", time: "Post", n: 3 }]);
+    const t = await buildTreatmentFacets({ studies: ["st1", "st2"], profilesByStudy: profiles, connByStudy: new Map([["st2", SECOND]]) });
+    assert.deepEqual(t!.patients, [{ agent: "Fluorouracil", n: 10 }, { agent: "Cisplatin", n: 1 }]);
+    assert.deepEqual(t!.samples, [{ agent: "Fluorouracil", time: "Post", n: 5 }]);
+  });
+
+  test("the tables are counted under every filter, their own included, as the portal's", async () => {
+    on(ANY, [{ n: 1 }]);
+    const draft = { all: [{ kind: "treatment", agents: ["Fluorouracil"], ifHeld: true }] } as never;
+    await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, draft });
+    assert.ok(sent.filter((q) => PATIENTS.test(q) || SAMPLES.test(q)).every((q) => /value IN \('Fluorouracil'\)/.test(q)),
+      "the draft's treatment clause narrows both tables");
+  });
+
+  test("no table without treatments; a peer's treated studies are named, also when they are all there is", async () => {
+    assert.equal(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles }), null);
+    sent = [];
+    assert.deepEqual(await buildTreatmentFacets({ studies: [], profilesByStudy: profiles, leftOut: ["peer_study"] }),
+      { patients: [], samples: [], totalPatients: 0, totalSamples: 0, leftOut: ["peer_study"] });
+    assert.equal(sent.length, 0);
+    assert.equal(await buildTreatmentFacets({ studies: [], profilesByStudy: profiles }), null);
+    on(ANY, [{ n: 1 }]);
+    on(PATIENTS, [{ agent: "Cisplatin", n: 1 }]);
+    const t = await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, leftOut: ["peer_study"] });
+    assert.deepEqual(t!.leftOut, ["peer_study"]);
+  });
+
+  test("a study without treatments is not asked; one with them gets its tables even when a filter empties them", async () => {
+    assert.equal(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles }), null);
+    assert.deepEqual(sent.filter((q) => PATIENTS.test(q) || SAMPLES.test(q)), [], "only the existence check ran");
+    on(ANY, [{ n: 1 }]);
+    const draft = { all: [{ kind: "clinical", attribute: "SEX", op: "=", value: "Female" }] } as never;
+    assert.deepEqual(await buildTreatmentFacets({ studies: ["st1"], profilesByStudy: profiles, draft }),
+      { patients: [], samples: [], totalPatients: 0, totalSamples: 0 }, "empty tables, which say so, rather than none");
   });
 });
 

@@ -69,3 +69,38 @@ export function chartBinSettings(all: Record<string, BinSettings> | undefined, a
   const initial = INITIAL_BIN_EDGES[attribute];
   return s?.bins === undefined && initial ? { ...s, bins: { method: "custom", edges: initial } } : s;
 }
+
+/**
+ * The portal's priorities for the charts that are not clinical attributes (`StudyViewConfig.ts`
+ * 131-170, STS-LY-8), by the selector of their card on Explore's grid.
+ */
+export const CARD_PRIORITY: readonly { selector: string; name: string; priority: number }[] = [
+  { selector: '[data-chart="datatypes"]', name: "Data Types", priority: 1000 },           // GENOMIC_PROFILES_SAMPLE_COUNT
+  { selector: '[data-special="caselists"]', name: "Case Lists", priority: 1000 },          // CASE_LISTS_SAMPLE_COUNT
+  { selector: '[data-chart="survival"]', name: "Survival", priority: 400 },                 // OS survival
+  { selector: '[data-chart="mutcount-fga"]', name: "Mutation Count vs FGA", priority: 200 }, // X-VS-Y FGA–MUTATION_COUNT
+  { selector: '[data-genetable="mutated"]', name: "Mutated Genes", priority: 90 },
+  { selector: '[data-genetable="sv"]', name: "Structural Variant Genes", priority: 85 },
+  { selector: '[data-genetable="cna"]', name: "CNA Genes", priority: 80 },
+  { selector: '[data-treatments="patient"]', name: "Treatment per Patient", priority: 75 },
+  { selector: '[data-treatments="sample"]', name: "Treatment per Sample (pre/post)", priority: 75 },
+  { selector: '[data-special="events"]', name: "Timeline Events Availability", priority: 75 },
+  { selector: '[data-chart="studies"]', name: "Cancer Studies", priority: 70 },
+];
+
+/**
+ * Every card's place on the grid, as the portal lays a page out on first load (STS-LY-3): by
+ * priority, highest first, then by name A–Z, clinical charts and the other kinds together. Each is
+ * a CSS `order`, negative so a card not ranked here (a chart the reader added: a gene, an assay
+ * entity) comes after them all, as the portal puts newly added charts last.
+ */
+export function cardOrders(clinical: { per: string; attribute: string; displayName?: string; priority?: number }[]): { selector: string; order: number }[] {
+  const cards = [
+    ...clinical.map((c) => ({ selector: '[data-attr="' + (c.per + "|" + c.attribute).replace(/["\\]/g, "\\$&") + '"]', name: c.displayName || c.attribute, priority: c.priority ?? 0 })),
+    ...CARD_PRIORITY,
+  ].sort((a, b) => b.priority - a.priority || a.name.localeCompare(b.name));
+  return cards.map((c, i) => ({ selector: c.selector, order: i - cards.length }));
+}
+
+/** whether Add chart offers an attribute: priority 0 is offered but hidden by default; below 0 it is dropped entirely (STS-LY-8) */
+export const chartOffered = (priority: number | undefined): boolean => (priority ?? 0) >= 0;
