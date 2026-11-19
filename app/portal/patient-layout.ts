@@ -64,7 +64,7 @@ export function patientLayout(q: PatientQuery, data: PatientData): PageLayout {
       // the portal's "Timeline Data": the patient's events, a table per event type (PTB-CD-4)
       v("Timeline Data", { kind: "timeline", tables: true }),
     ] },
-    { title: "Files & Links", views: [], pending: "Links out for the patient and each sample: the study's resource data (pathology reports, slide images) as the portal's Files & Links tab lists them." },
+    // no Files & Links tab: the portal shows it only when the study has resource data (links per study, patient or sample), which no study here holds yet
     // the view refuses, naming what there is, when this patient has no signature values
     ...(signatures ? [{ title: "Mutational Signatures", views: [v("Mutational signatures", { kind: "signatures", ...(q.sample ? { samples: "cohort" } : {}) })] }] : []),
   ], left, { partial: data.partial });

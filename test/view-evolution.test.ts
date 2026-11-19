@@ -469,6 +469,11 @@ describe("evolution: its row sources name one patient and live only with patient
     assert.match(list, /c\.pid AS patient/);
     assert.match(list, /WHERE samples >= 2 AND withVaf > 0/);
     assert.doesNotMatch(pageSql(evolutionPatientsSource([part], "db", false), {}, [], 10, 0), /WHERE samples >= 2/);
+    // PTB-TAB-2: a mutation counts toward the gate when called in the patient and read in some record, called or uncalled
+    assert.match(list, /countIf\(cl AND rd\) AS v/);
+    assert.match(list, /max\(molecularProfileId NOT LIKE '%uncalled%'\) AS cl/);
+    assert.match(list, / AS cl, max\(ifNull\(tumorAltCount, 0\) > 0 AND tumorRefCount IS NOT NULL AND tumorAltCount \+ tumorRefCount > 0\) AS rd\n/, "rd is any record's reads, called or uncalled");
+    assert.doesNotMatch(list.slice(list.indexOf("mu0 AS"), list.indexOf("GROUP BY pid, k")), /AND molecularProfileId NOT LIKE/);
     assert.throws(() => evolutionPatientsSource([], "db"), /at least one part/);
     const m = pageSql(evolutionMutationsSource(part, "P-1", "db", ["S1", "S2"]), {}, [], 10, 0);
     assert.match(m, /'P-1' AS patient/);
