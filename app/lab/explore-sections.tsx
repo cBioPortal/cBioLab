@@ -5,7 +5,7 @@
 import { Children, cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
-import { chartNames } from "../../lib/study-view-pills.ts";
+import { chartNames, type AssayChartOf } from "../../lib/study-view-pills.ts";
 import CustomBinsDialog from "./custom-bins-dialog";
 import { logScaleOffered, looksLogarithmic, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
@@ -289,7 +289,8 @@ export function ExploreBar({ ctx }: { ctx: ExploreCtx }) {
               const drawn = new Set(explore?.draftCount === 0 ? [] : densityChartsShown((explore?.clinical || []).map((c) => c.attribute),
                 ctx.chartChecked("genomic|density"), ctx.xyCharts).map((d) => densityChartName(d.pair)));
               return <StudyViewPills draft={dr} labelOf={nameOf} apply={applyOrSay} onIntervalEdited={ctx.addBinEdges}
-                onRemoveClause={removeDraftClause} onCustomData={showClauseData()} drawnDensity={drawn} />;
+                onRemoveClause={removeDraftClause} onCustomData={showClauseData()} drawnDensity={drawn}
+                assayChartOf={explore ? assayChartNames(explore) : undefined} />;
             })()}
           </div>
           {exMsg && <p className="note flush mt-1.5">{exMsg}</p>}
@@ -1246,12 +1247,32 @@ export function AssayFacets({ ctx }: { ctx: ExploreCtx }) {
   </>;
 }
 
+/** a generic-assay chart's title: the entity, short, and its profile's name */
+function assayChartTitle(explore: NonNullable<ExploreCtx["explore"]>, profileType: string, entity: string, name?: string): string {
+  const profileName = (explore.profileCatalog || []).find((p) => p.profile === profileType)?.name || profileType;
+  return (name || entityShortName(entity, profileType)) + ": " + profileName;
+}
+
+/**
+ * Names a generic-assay filter for the filter bar: by its chart when the entity is charted, else by the
+ * profile's frequency table when one is drawn (a filter over several entities can only be the table's),
+ * else as its chart would be titled.
+ */
+function assayChartNames(explore: NonNullable<ExploreCtx["explore"]>): AssayChartOf {
+  return (profileType, entity) => {
+    const facet = entity != null ? (explore.assayFacets || []).find((f) => f.profileType === profileType && f.entity === entity) : undefined;
+    if (facet) return { label: assayChartTitle(explore, profileType, facet.entity, facet.name), freq: false };
+    const table = (explore.assayFreqTables || []).find((t) => t.profileType === profileType);
+    if (table) return { label: "Frequency Table: " + table.name, freq: true, entityName: (e) => table.rows.find((r) => r.entity === e)?.name };
+    return entity != null ? { label: assayChartTitle(explore, profileType, entity), freq: false } : undefined;
+  };
+}
+
 function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore"]>["assayFacets"]>[number]; ctx: ExploreCtx }) {
   const { addClause, exStudies, unchartAssay, addMode, splittingBy, compareQuantiles, compareItems } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
-  const profileName = (explore.profileCatalog || []).find((p) => p.profile === f.profileType)?.name || f.profileType;
-  const title = (f.name || entityShortName(f.entity, f.profileType)) + ": " + profileName;
+  const title = assayChartTitle(explore, f.profileType, f.entity, f.name);
   // a study without the profile cannot compile the clause, so a partial chart only shows
   const clickable = f.studies.length >= exStudies.length;
   const why = clickable ? "" : " — held by " + f.studies.length + " of " + exStudies.length + " selected studies, so it cannot filter them all";

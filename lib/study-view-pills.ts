@@ -8,6 +8,7 @@
 import type { ClinicalLeaf, CohortDef } from "./types.ts";
 import { chartLeaves, isNaClause } from "./explore-selection.ts";
 import { STYLE } from "./oncoprint-style.ts";
+import { entityShortName } from "./profile-names.ts";
 import { MUTATION_TYPE_PROFILE, geneChartName, geneStateLabel, geneStatesFilter, mutationTypeLabel, mutationTypesClause, parseGeneChartTag } from "./gene-state-clauses.ts";
 
 type Clause = NonNullable<CohortDef["all"]>[number];
@@ -34,7 +35,20 @@ export type SvGroup =
    * A gene chart's filter (STV-FB-3 #5, #7): "<chart> : <state> or <state>", each removable. `tag`
    * names a status chart's clauses (geneChartTag); a mutation-type table's is its one clause.
    */
-  | { kind: "gene"; clause: number; label: string; tag?: string; pills: { key: string; label: string }[] };
+  | { kind: "gene"; clause: number; label: string; tag?: string; pills: { key: string; label: string }[] }
+  /**
+   * A generic-assay chart's or frequency table's filter (STV-FB-3 #13, #14): "<chart> : <pill> or
+   * <pill>", a row or value per pill, or an interval; each removable, an interval editable.
+   */
+  | { kind: "assay"; clause: number; label: string; pills: { pill: SvPill; text: string }[] };
+
+/**
+ * A generic-assay filter's chart: its name, and whether it is a frequency table, whose pills name the
+ * row's entity as the table does (`entityName`, else the entity's id, short).
+ */
+export type AssayChartOf = (profileType: string, entity: string | null) => { label: string; freq: boolean; entityName?: (entity: string) => string | undefined } | undefined;
+
+type AssayLeaf = { kind: "genericAssay"; profileType: string; entity: string; values?: unknown[]; range?: ClinicalLeaf["range"]; op?: string; value?: unknown };
 
 const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
 
@@ -90,7 +104,9 @@ export function chartNames(current: { attribute: string; displayName?: string }[
 /** the filter bar's groups, in the draft's clause order; `labelOf` names a chart by its attribute */
 export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attribute: string) => string | undefined,
   /** the density charts drawn (densityChartName): a drag's ranges have no pill only while their chart shows them (STV-FB-3b) */
-  drawnDensity: ReadonlySet<string> = new Set()): SvGroup[] {
+  drawnDensity: ReadonlySet<string> = new Set(),
+  /** names a generic-assay filter by the chart or frequency table that shows it */
+  assayChartOf: AssayChartOf = () => undefined): SvGroup[] {
   const seen = new Set<string>();
   return (draft?.all || []).map((c, i): SvGroup => {
     if (drawnDensity.has(String((c as { chart?: unknown }).chart || ""))) return { kind: "hidden", clause: i };
@@ -106,6 +122,8 @@ export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attr
     const mt = c as { kind?: string; profileType?: string; gene?: string; values?: unknown[] };
     if (mt && mt.kind === "genomicData" && mt.profileType === MUTATION_TYPE_PROFILE && Array.isArray(mt.values))
       return { kind: "gene", clause: i, label: String(mt.gene) + ": mutation types", pills: mt.values.map((v) => ({ key: String(v), label: mutationTypeLabel(String(v)) })) };
+    const assay = assayGroup(c, i, assayChartOf);
+    if (assay) return assay;
     const na = (c as { not?: ClinicalLeaf }).not;
     if (na && isNaClause(c, na.attribute)) return { kind: "chart", clause: i, attribute: na.attribute, label: labelOf(na.attribute) || na.attribute, pills: [{ kind: "na" }] };
     const attribute = clauseAttribute(c);
@@ -122,6 +140,27 @@ export function filterGroups(draft: CohortDef | null | undefined, labelOf: (attr
     });
     return { kind: "chart", clause: i, attribute, label: labelOf(attribute) || attribute, pills };
   });
+}
+
+/** a clause of generic-assay leaves on one profile, as its chart's pills; null for any other clause */
+function assayGroup(c: Clause, i: number, assayChartOf: AssayChartOf): SvGroup | null {
+  const leaves = (c as { any?: unknown[] }).any || [c];
+  const ls = leaves as AssayLeaf[];
+  if (!ls.length || !ls.every((l) => l && l.kind === "genericAssay" && l.profileType === ls[0].profileType)) return null;
+  const one = ls.every((l) => l.entity === ls[0].entity);
+  const chart = assayChartOf(ls[0].profileType, one ? ls[0].entity : null);
+  const label = chart?.label ?? (one ? ls[0].entity + " (" + ls[0].profileType + ")" : ls[0].profileType);
+  const pills: { pill: SvPill; text: string }[] = [];
+  ls.forEach((l, j) => {
+    const iv = leafInterval(l as unknown as ClinicalLeaf);
+    if (iv) { pills.push({ pill: { kind: "interval", leaf: j, interval: iv }, text: intervalText(iv) }); return; }
+    for (const v of l.values || []) {
+      const value = String(v);
+      const entity = chart?.entityName?.(l.entity) ?? entityShortName(l.entity, l.profileType);
+      pills.push({ pill: { kind: "value", leaf: j, value }, text: chart?.freq || !one ? entity + " " + value : value });
+    }
+  });
+  return pills.length ? { kind: "assay", clause: i, label, pills } : null;
 }
 
 function clauseAttribute(c: Clause): string | null {
@@ -184,7 +223,7 @@ export function removePill(draft: CohortDef, clause: number, pill: SvPill): Coho
   const l = leaves[pill.leaf];
   if (pill.kind === "value" && l && Array.isArray(l.values)) {
     const rest = l.values.filter((v) => v !== pill.value);
-    const next: ClinicalLeaf | null = !rest.length ? null : rest.length === 1
+    const next: ClinicalLeaf | null = !rest.length ? null : rest.length === 1 && l.kind === "clinical"
       ? { kind: "clinical", attribute: l.attribute, op: "=", value: rest[0] } : { ...l, values: rest };
     return withLeaves(draft, clause, leaves.flatMap((x, j) => j !== pill.leaf ? [x] : next ? [next] : []));
   }
@@ -207,7 +246,8 @@ export function editInterval(draft: CohortDef, clause: number, leaf: number, end
   const v = Number(t);
   if (!t || !Number.isFinite(v)) return { why: "an interval's end is a number" };
   let next: ClinicalLeaf;
-  if (iv.kind === "point" || end === "point") next = { kind: "clinical", attribute: l.attribute, op: "=", value: v };
+  const base = leafBase(l);
+  if (iv.kind === "point" || end === "point") next = { ...base, op: "=", value: v } as ClinicalLeaf;
   else {
     let { lo, hi } = iv;
     const { loIn, hiIn } = iv;
@@ -219,9 +259,15 @@ export function editInterval(draft: CohortDef, clause: number, leaf: number, end
     const range: { gt?: number; gte?: number; lt?: number; lte?: number } = {};
     if (lo != null) range[loIn ? "gte" : "gt"] = lo;
     if (hi != null) range[hiIn ? "lte" : "lt"] = hi;
-    next = { kind: "clinical", attribute: l.attribute, range };
+    next = { ...base, range } as ClinicalLeaf;
   }
   return { draft: withLeaves(draft, clause, all ? [next] : leaves.map((x, j) => j === leaf ? next : x)) };
+}
+
+/** what a leaf filters, without its predicate: a clinical attribute or a generic-assay entity */
+function leafBase(l: ClinicalLeaf): object {
+  const a = l as unknown as AssayLeaf;
+  return a.kind === "genericAssay" ? { kind: a.kind, profileType: a.profileType, entity: a.entity } : { kind: "clinical", attribute: l.attribute };
 }
 
 /** the numbers an interval pill's leaf now holds: its ends, or its one value */
@@ -285,7 +331,7 @@ function chartOfClause(c: unknown): string {
 
 /**
  * The words between the filter bar's groups (STV-FB-2): two generic groups in a row from the same
- * chart (two gene-table selections, two case-list selections) are joined by "and", as the portal
+ * chart (two gene-table selections, two case-list selections, two generic-assay filters) are joined by "and", as the portal
  * writes "( APC or TP53 ) and ( KRAS )"; a clinical chart's pill, or a group from another chart,
  * gets no word. One entry per group: whether "and" goes before it.
  */
@@ -293,6 +339,7 @@ export function joinedByAnd(draft: CohortDef | null | undefined, groups: SvGroup
   const all = draft?.all || [];
   return groups.map((g, i) => {
     const prev = groups[i - 1];
+    if (i > 0 && g.kind === "assay" && prev.kind === "assay") return g.label === prev.label;
     return i > 0 && g.kind === "other" && prev.kind === "other" && chartOfClause(all[g.clause]) === chartOfClause(all[prev.clause]);
   });
 }
