@@ -35,7 +35,8 @@ export const EVOLUTION_PATIENT_DEFAULT_COLUMNS = ["patient", "samples", "mutatio
 /**
  * Every (cohort, study) part's patients, one row each: how many samples they have, how many distinct
  * mutations were called in them, and how many of those have a VAF (variant reads, with reference
- * reads) in some sample. With `drawable`, only the patients the view can draw — two or more samples
+ * reads) in some sample, called or uncalled there (the portal's mergeMutationsIncludingUncalled: an
+ * uncalled record counts for a mutation called elsewhere in the patient). With `drawable`, only the patients the view can draw — two or more samples
  * and a mutation with a VAF, the portal's condition for showing its Genomic Evolution tab; without,
  * every patient (what says why one is left out). Most samples first, then by patient id.
  */
@@ -52,9 +53,11 @@ export function evolutionPatientsSource(parts: TablePart[], db: string, drawable
       "  GROUP BY pid\n" +
       "),\n" +
       "mu" + i + " AS (\n" +
-      "  SELECT patientId AS pid, uniqExact(" + MUTATION_KEY + ") AS n, uniqExactIf(" + MUTATION_KEY + ", " + HAS_VAF + ") AS v\n" +
-      "  FROM " + db + ".mutation_derived\n" +
-      "  WHERE " + MUTATIONS_OF(p.study, inCohortPatients("patientId", "c" + i)) + " AND " + CALLED + "\n" +
+      "  SELECT pid, countIf(cl) AS n, countIf(cl AND rd) AS v FROM (\n" +
+      "    SELECT patientId AS pid, " + MUTATION_KEY + " AS k, max(" + CALLED + ") AS cl, max(" + HAS_VAF + ") AS rd\n" +
+      "    FROM " + db + ".mutation_derived\n" +
+      "    WHERE " + MUTATIONS_OF(p.study, inCohortPatients("patientId", "c" + i)) + "\n" +
+      "    GROUP BY pid, k)\n" +
       "  GROUP BY pid\n" +
       "),\n");
     rows.push(
