@@ -170,6 +170,8 @@ export const STYLE = {
   // the Patient tables' Samples cell where the row's gene is off the sample's panel (SampleLabelNotProfiled): a grey pill
   notProfiledPill: { fill: "#cccccc", width: 12, height: 2.5, y: 5 },
   geometry: { rowH: 20, rowGap: 3, gutter: 168, groupGap: 10, header: 22, labelMaxChars: 17,
+    // between track groups (clinical, genetic, each heatmap profile): oncoprintjs init_track_group_padding
+    trackGroupGap: 10,
     // whitespace between columns: a hairline of this many px, once a column is padMinZoom px wide
     cellPad: 1, padMinZoom: 6,
     // a row pooling several genes wears the brackets that made it, the way the query spells it

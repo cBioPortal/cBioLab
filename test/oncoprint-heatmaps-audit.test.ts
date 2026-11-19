@@ -20,7 +20,7 @@ import { heatmapSql, assayHeatmapSql } from "../lib/oncoprint.ts";
 import { assembleContract, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE, rampColor, heatColor } from "../lib/oncoprint-style.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
-import { draw, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
+import { draw, GEOM, rowTops, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
 import type { Contract } from "../lib/types.ts";
 
@@ -282,7 +282,7 @@ function colours(profileType: string, v: number, opts: { isVaf?: boolean } = {})
   const groups: VisibleGroup[] = [{ name: "all", start: 0, count: 1, patients: 1 }];
   draw(ctx, data, Uint32Array.from([0]), groups, { zoom: 10, scrollX: 0, whitespace: true }, 1200, undefined, { gap: 0 });
   const ti = data.tracks.findIndex((x: { kind: string }) => x.kind === "heatmap");
-  const rowY = GEOM.header + ti * (GEOM.rowH + GEOM.rowGap);
+  const rowY = rowTops(data.tracks)[ti];
   const cell = fills.filter((f) => f.h === GEOM.rowH && Math.abs(f.y - rowY) < 1e-9 && f.x >= GEOM.gutter);
   assert.ok(cell.length >= 1, "canvas drew the heatmap cell");
   const canvas = hex(cell[0].style);

@@ -13,6 +13,7 @@ import { STUDY_TRACK } from "../../lib/profile-names.ts";
 import { STYLE, heatColor, stackCompare, thresholdColor, stackColor, barBand, cellLayers, numericColor as styleNumericColor, trackCategoryColor, formatPct, formatLabelPct, formatGutterPct, trackLabelText, trackSublabelText, fitSublabel, resolveStyle, type Style, staircaseRank, type StaircaseOptions, naturalVector, compareVectors, naturalRanks } from "../../lib/oncoprint-style.ts";
 export { resolveStyle, type Style };
 import { aggregate as lodAggregate } from "../../lib/oncoprint-lod.ts";
+import { trackAtY, trackTops, type RowTrack } from "../../lib/oncoprint-rows.ts";
 
 export const BITS = STYLE.bits;
 export const PALETTE = {
@@ -27,7 +28,9 @@ export type Palette = typeof PALETTE;
  * row with no gutter by swapping these for one call and putting them back, rather than
  * threading a geometry argument through every function for one caller.
  */
-export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap, footer: 10 };
+export const GEOM = { header: STYLE.geometry.header, rowH: STYLE.geometry.rowH, rowGap: STYLE.geometry.rowGap, gutter: STYLE.geometry.gutter, groupGap: STYLE.geometry.groupGap, trackGroupGap: STYLE.geometry.trackGroupGap, footer: 10 };
+/** each track's top at the current geometry, then the end of the last row */
+export const rowTops = (tracks: readonly RowTrack[]): number[] => trackTops(tracks, GEOM);
 
 export interface VisibleGroup {
   name: string; start: number; count: number; patients: number;
@@ -130,7 +133,7 @@ export function segmentByTrack(data: UnpackedContract, order: Uint32Array, group
   return out;
 }
 /** the drawing plus breathing room under the last track */
-export function canvasHeight(nTracks: number): number { return GEOM.header + nTracks * (GEOM.rowH + GEOM.rowGap) + GEOM.footer; }
+export function canvasHeight(tracks: readonly RowTrack[]): number { return rowTops(tracks).at(-1)! + GEOM.footer; }
 
 export function numericColor(t: { center?: number | null }, v: number): string { return styleNumericColor(v, t.center, STYLE); }
 
@@ -203,9 +206,10 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   const gapPx = gapOf(gap).px;
   const pctLeft = typeof gap === "object" && gap.edge === "left";
   const t0 = performance.now();
-  const { header, rowH, rowGap, gutter } = GEOM;
+  const { rowH, gutter } = GEOM;
   const plotW = Math.max(0, cssW - gutter);
-  const H = canvasHeight(data.tracks.length);
+  const tops = rowTops(data.tracks);
+  const H = tops.at(-1)! + GEOM.footer;
   ctx.fillStyle = P.paper; ctx.fillRect(0, 0, cssW, H);
   ctx.font = "11px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
   ctx.textBaseline = "alphabetic";
@@ -232,7 +236,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
     ctx.fillStyle = P.muted;
     if (gw >= 24) ctx.fillText(g.name + (gw >= 90 ? " (" + g.patients.toLocaleString("en-US") + ")" : ""), Math.max(gutter, gx - sx + gutter), 13, Math.max(20, gw + gapPx - 4));
     data.tracks.forEach((t, ti) => {
-      const y = snap(header + ti * (rowH + rowGap));
+      const y = snap(tops[ti]);
       if (opts.pctLabels && g.pct && g.pct[ti] != null) {
         ctx.fillStyle = P.muted; ctx.font = "10px 'IBM Plex Sans', Helvetica, Arial, sans-serif";
         if (pctLeft) { ctx.textAlign = "right"; ctx.fillText(formatLabelPct(g.pct[ti]), gx - sx + gutter - 3, y + 14, gapPx - 4); ctx.textAlign = "left"; }
@@ -272,7 +276,7 @@ export function draw(ctx: CanvasRenderingContext2D, data: UnpackedContract, orde
   // gutter: labels and frequencies (drawn last so they sit over any bleed)
   ctx.fillStyle = P.paper; ctx.fillRect(0, 0, gutter, H);
   data.tracks.forEach((t, ti) => {
-    const y = header + ti * (rowH + rowGap);
+    const y = tops[ti];
     ctx.fillStyle = P.text; ctx.textAlign = "left";
     const label = trackLabelText(t, S);
     ctx.fillText(label, 4, y + 14);
@@ -293,10 +297,9 @@ export interface Hit { ti: number; gi: number; k: number; ci: number; k1: number
 
 /** Map a canvas-space point to (track, group, column or bucket). */
 export function hitTest(x: number, y: number, data: UnpackedContract, order: Uint32Array, groups: VisibleGroup[], view: View, gap: Gap = GEOM.groupGap): Hit | null {
-  const { header, rowH, rowGap, gutter } = GEOM;
-  const ti = Math.floor((y - header) / (rowH + rowGap));
-  if (ti < 0 || ti >= data.tracks.length || y - header - ti * (rowH + rowGap) > rowH) return null;
-  if (x < gutter) return null;
+  const { gutter } = GEOM;
+  const ti = trackAtY(y, rowTops(data.tracks), GEOM.rowH);
+  if (ti < 0 || x < gutter) return null;
   const vx = x - gutter + view.scrollX;
   const offs = groupOffsets(groups, view.zoom, gap);
   for (let gi = 0; gi < groups.length; gi++) {
@@ -314,12 +317,12 @@ export function hitTest(x: number, y: number, data: UnpackedContract, order: Uin
 }
 
 /** the box, in canvas coordinates, of the cell a hit names (its columns in its track's row), cut to the plot */
-export function hitRect(hit: Hit, groups: VisibleGroup[], view: View, width: number, gap: Gap = GEOM.groupGap): { left: number; top: number; right: number; bottom: number } {
-  const { header, rowH, rowGap, gutter } = GEOM;
+export function hitRect(hit: Hit, tracks: readonly RowTrack[], groups: VisibleGroup[], view: View, width: number, gap: Gap = GEOM.groupGap): { left: number; top: number; right: number; bottom: number } {
+  const { rowH, gutter } = GEOM;
   const g = groups[hit.gi], gx = groupOffsets(groups, view.zoom, gap)[hit.gi];
   const x0 = gutter - view.scrollX + gx + (hit.k - g.start) * view.zoom;
   const x1 = x0 + Math.max(1, (hit.k1 - hit.k) * view.zoom);
-  const top = header + hit.ti * (rowH + rowGap);
+  const top = rowTops(tracks)[hit.ti];
   return { left: Math.max(gutter, x0), right: Math.min(width, x1), top, bottom: top + rowH };
 }
 
