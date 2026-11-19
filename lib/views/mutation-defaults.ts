@@ -12,16 +12,19 @@ import { runRows } from "./rows.ts";
 /**
  * Over every row of the gene's table whatever its search and filters (the portal reads its table's
  * allData): whether a queried study has a discrete CNA profile, whether a row has a non-zero allele
- * frequency, how many Cancer Type Detailed values the rows hold. A study whose profiles could not be
- * read (an empty catalog: every study has at least its mutation profile) leaves the first unknown.
+ * frequency, how many Cancer Type Detailed values the rows hold. A study whose peer did not describe
+ * its profiles (`unanswered`) leaves the first unknown, unless another study has the profile.
  */
 export async function mutationDefaultFacts(ctx: ViewRun, holders: string[], source: (parts: TablePart[]) => (db: string) => RowSource): Promise<MutationDefaultFacts> {
   const valuesOf = async (column: string, numeric: boolean) =>
     (await runRows(ctx, "mutations", holders, {}, MUTATION_DEFAULT_COLUMNS, MUTATION_DEFAULT_COLUMNS, 1, source, { column, numeric })).values;
-  const [vaf, types, catalogs] = await Promise.all([valuesOf("vaf", true), valuesOf("cancerType", false),
-    Promise.all(ctx.vStudies.map(async (st) => (await ctx.studyProfiles(st)).catalog))]);
+  const [vaf, types, studies] = await Promise.all([valuesOf("vaf", true), valuesOf("cancerType", false),
+    Promise.all(ctx.vStudies.map((st) => ctx.studyProfiles(st)))]);
+  // a study with the profile settles it; otherwise every study must have answered for "none" to be known
+  const discrete = studies.some((p) => (p.catalog || []).some((x) => x.type === "COPY_NUMBER_ALTERATION" && x.datatype === "DISCRETE"));
+  const known = studies.every((p) => p.catalog && !p.unanswered);
   return {
-    ...(catalogs.every((c) => c && c.length) ? { discreteCna: catalogs.some((c) => c!.some((p) => p.type === "COPY_NUMBER_ALTERATION" && p.datatype === "DISCRETE")) } : {}),
+    ...(discrete || known ? { discreteCna: discrete } : {}),
     ...(vaf?.numeric ? { nonZeroVaf: vaf.max != null && vaf.max > 0 } : {}),
     ...(types && !types.numeric ? { cancerTypes: types.truncated ? Infinity : types.values.filter((x) => x.value !== "").length } : {}),
   };

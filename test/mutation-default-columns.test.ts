@@ -100,7 +100,7 @@ function standIn(cohort: string, study: string, answers: Answers, calls: Calls, 
   };
 }
 
-type StudySetup = { catalog?: ProfileInfo[]; answers: Answers; conn?: string; rows?: Record<string, unknown>[] };
+type StudySetup = { catalog?: ProfileInfo[]; unanswered?: true; answers: Answers; conn?: string; rows?: Record<string, unknown>[] };
 function ctxFor(studies: Record<string, StudySetup>, calls: Calls): ViewRun {
   const ids = Object.keys(studies);
   const cohort: EvaluatedCohort = { studies: ids, perStudy: Object.fromEntries(ids.map((s) => [s, { sql: "", count: 10, samples: 10, mode: "" }])), count: 10 * ids.length, samples: 10 * ids.length, text: "" };
@@ -111,7 +111,7 @@ function ctxFor(studies: Record<string, StudySetup>, calls: Calls): ViewRun {
     vNames: ["Q"], vStudies: ids,
     participationFor: (_s: string[], requiresPatientLevel: boolean): ViewParticipation => ({ studies: [], requiresPatientLevel, aggregateOnly: [] }),
     pin: "v7",
-    studyProfiles: async (study: string) => ({ profiles: ["mutations"], gaProfiles: [], ...(studies[study].catalog ? { catalog: studies[study].catalog } : {}) }),
+    studyProfiles: async (study: string) => ({ profiles: ["mutations"], gaProfiles: [], ...(studies[study].catalog ? { catalog: studies[study].catalog } : {}), ...(studies[study].unanswered ? { unanswered: true as const } : {}) }),
   };
 }
 
@@ -242,11 +242,23 @@ test("R8 the page and counts queries receive the facts' defaults", async () => {
   for (const c of [...none.page, ...none.counts]) assert.deepEqual(c.defaults, ["sample", "proteinChange", "annotation", "mutationType", "mutCount"], c.label);
 });
 
-test("R9 an empty catalog (a peer that failed to answer) leaves Copy # unknown, so kept; a mutations-only catalog drops it", async () => {
-  const { m } = await run({ s1: { catalog: [], answers: keep } });
+test("R9 a study whose peer did not describe its profiles (unanswered) leaves Copy # unknown, so kept; a mutations-only catalog drops it", async () => {
+  const { m } = await run({ s1: { catalog: [], unanswered: true, answers: keep } });
   assert.ok(m.defaults.includes("copyNumber"), m.defaults.join(","));
   const { m: only } = await run({ s1: { catalog: [MUTATIONS], answers: keep } });
   assert.ok(!only.defaults.includes("copyNumber"), only.defaults.join(","));
+});
+
+test("R10 a mutations-only study and a local study with no profiles at all (an empty catalog that answered): no Copy #, as legacy", async () => {
+  const { m } = await run({ s1: { catalog: [MUTATIONS], answers: keep }, s2: { catalog: [], answers: keep } });
+  assert.ok(!m.defaults.includes("copyNumber"), m.defaults.join(","));
+});
+
+test("R11 a study with a discrete CNA profile settles Copy # whatever another study's peer answered", async () => {
+  const { m } = await run({ s1: { catalog: [MUTATIONS, DISCRETE_CNA], answers: keep }, s2: { catalog: [], unanswered: true, answers: keep } });
+  assert.ok(m.defaults.includes("copyNumber"), m.defaults.join(","));
+  const { m: unknown } = await run({ s1: { catalog: [MUTATIONS], answers: keep }, s2: { catalog: [], unanswered: true, answers: keep } });
+  assert.ok(unknown.defaults.includes("copyNumber"), "no discrete profile known, one study unanswered: kept as unknown");
 });
 
 // ---- H: the hotspots view narrowed by the table -------------------------------------------------
