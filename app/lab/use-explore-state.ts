@@ -99,7 +99,7 @@ export function useExploreState(page: ExplorePage) {
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
   const [addChartOpen, setAddChartOpen] = useState(false);
-  const [chartTab, setChartTab] = useState<"clinical" | "genomic" | "gene" | "assay" | "derived" | "custom">("clinical");
+  const [chartTab, setChartTab] = useState<"clinical" | "genomic" | "gene" | `assay:${string}` | "derived" | "custom">("clinical");
   const [cName, setCName] = useState("");
   const [cDefText, setCDefTextState] = useState(JSON.stringify({ all: [] }, null, 2));
   // The draft as last set, for callers holding an older render's closure (a mount effect, a

@@ -7,8 +7,17 @@ import type { TableView } from "./views/table/types.ts";
 import { DOC_VERSION } from "./doc-version.ts";
 import { CASE_FILE_COHORT } from "./study-view-case-files.ts";
 
-/** a visible clinical-attribute chart: its attribute id, display name and priority */
-export interface TabChart { attribute: string; name: string; priority: number }
+/** a visible clinical-attribute chart: its attribute id, display name, priority and description */
+export interface TabChart { attribute: string; name: string; priority: number; description?: string }
+
+/**
+ * A column header's tooltip, as the portal's Clinical Data tab writes it (STV-CD-3): the name, the
+ * description and the attribute id, one per line, each once (a description that only repeats the
+ * name, or an id that is the name, is not written again).
+ */
+export function clinicalColumnTip(c: TabChart): string {
+  return [...new Set([c.name, c.description || "", c.attribute].filter(Boolean))].join("\n");
+}
 
 /** rows a page holds */
 export const CLINICAL_TAB_ROWS = 20;

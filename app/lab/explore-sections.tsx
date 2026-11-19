@@ -14,14 +14,14 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
-import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick } from "../../lib/chart/format.ts";
+import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick, portalSelectedInfo } from "../../lib/chart/format.ts";
 import { countAxis } from "../../lib/chart/scale.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
-import { addChartLines, bulkButtons, genomicChartLines, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
+import { addChartLines, assayTabs, bulkButtons, genomicChartLines, SPECIAL_CHART_KEYS, specialChartsShown } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
 import type { CohortDef } from "../../lib/types.ts";
 import { alteredHeaderTip, appliedLines, queuedQuery, defaultGeneSort, geneHeaderTips, geneSelection, geneFreqText, geneRowMatches, geneTableName, geneTableTitle, geneTableTsv, intersectionRefusal, nextGeneSort, profiledSamples, qValueIcon, sortGeneRows, type GeneSort, type GeneSortColumn } from "../../lib/study-view-gene-tables.ts";
@@ -138,7 +138,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               // the new set is worse than showing the study list's own sum
               // and saying it is still counting.
               (exploreBusy || !explore?.totals ? ""
-                : explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples" +
+                : portalSelectedInfo(explore.totals.patients, explore.totals.samples, explore.draftCount != null) +
                   (exStudies.length > 1 ? " (overlap not deduplicated)" : ""))}
               {/* the counts arrive with the facets; until then a placeholder holds their
                   place, so the header neither shows a wrong number nor jumps */}
@@ -309,7 +309,10 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
         <DialogHeader className="mb-2"><DialogTitle className="text-base">Add chart</DialogTitle></DialogHeader>
         <Tabs value={chartTab} onValueChange={(v) => setChartTab(v as typeof chartTab)} className="mb-3">
           <TabsList variant="line" className="w-full justify-start gap-1.5 border-b border-border p-0 group-data-[orientation=horizontal]/tabs:h-auto">
-            {([["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"], ["assay", "Generic assays"], ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
+            {/* a tab per generic-assay type, as the portal's (STV-AC-2) */}
+            {([["clinical", "Clinical"], ...(genomicLines(explore, attrKey).length ? [["genomic", "Genomic"] as const] : []), ["gene", "Gene status"],
+              ...assayTabs(explore.profileCatalog || []).map((a) => ["assay:" + a.type, a.label] as const),
+              ["derived", "Derived timeline filters"], ["custom", "Custom data"]] as const).map(([t, label]) =>
               <TabsTrigger key={t} value={t} className="h-auto flex-none rounded-none px-3 pt-1.5 pb-1.5 text-md after:bottom-[-1px] data-[state=active]:text-accent-foreground data-[state=active]:after:bg-primary">{label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
@@ -481,7 +484,7 @@ export function AddChartDialog({ ctx }: { ctx: ExploreCtx }) {
           </div>
         )}
         {chartTab === "genomic" && <GenomicCharts ctx={ctx} />}
-        {chartTab === "assay" && <AssayChartPicker ctx={ctx} />}
+        {chartTab.startsWith("assay:") && <AssayChartPicker ctx={ctx} assayType={chartTab.slice("assay:".length)} />}
         {chartTab === "derived" && (explore.events.length === 0 ? (
           <p className="note mt-0 mb-3">This study has no clinical timeline events to derive a filter from.</p>
         ) : (() => {
@@ -1105,10 +1108,10 @@ function GenomicCharts({ ctx }: { ctx: ExploreCtx }) {
 }
 
 /** the Add chart dialog's generic-assay tab: a profile, then one of its entities found by search */
-function AssayChartPicker({ ctx }: { ctx: ExploreCtx }) {
+function AssayChartPicker({ ctx, assayType }: { ctx: ExploreCtx; assayType: string }) {
   const { assayCharts, chartAssay, unchartAssay, exploreBusy } = ctx;
   const explore = ctx.explore!;
-  const profiles = plottableProfiles(explore.profileCatalog || []).filter((p) => p.type === "GENERIC_ASSAY" && p.study);
+  const profiles = plottableProfiles(explore.profileCatalog || []).filter((p) => p.type === "GENERIC_ASSAY" && p.study && p.assayType === assayType);
   const [profile, setProfile] = useState("");
   const current = profiles.find((p) => p.profile === profile) || profiles[0];
   if (!profiles.length) return <p className="note mt-0 mb-3">No selected study has generic-assay data (mutational signatures, arm-level copy number, methylation, …).</p>;
