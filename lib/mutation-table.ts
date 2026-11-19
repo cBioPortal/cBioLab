@@ -20,10 +20,13 @@ import { mutationTypeColumn } from "./mutation-type.ts";
 import { finiteSql } from "./sql-number.ts";
 import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
 
-export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean }
+export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc" }
+
+/** the columns whose first header click sorts descending (MutationTable defaultSortDirection 'desc'); every other column's is ascending, numbers too */
+const FIRST_SORT_DESC = new Set(["gnomad", "clinvar", "dbsnp"]);
 
 /** The table's columns, in the portal's order. */
-export const MUTATION_COLUMNS: MutationColumn[] = [
+export const MUTATION_COLUMNS: MutationColumn[] = ([
   // a fusion row's gene is its site 1 gene, on its site 2 gene's table too (ResultsViewPageStore mutationsByGene)
   { id: "gene", name: "Gene", numeric: false, tip: "HUGO gene symbol" },
   // not `study`: a downloaded line already leads with the row's study id (app/api/table)
@@ -74,7 +77,7 @@ export const MUTATION_COLUMNS: MutationColumn[] = [
     tip: "The Single Nucleotide Polymorphism Database (dbSNP) is a free public archive for genetic variation within and across different species. NOTE: Currently only SNPs, single base deletions and insertions are supported." },
   // SIGNAL's germline frequency, spelled at two significant digits and sorted by number
   { id: "signal", name: "SIGNAL", numeric: false, tip: "Prevalence of germline mutations in cancer patients from SIGNAL" },
-];
+] as MutationColumn[]).map((c) => ({ ...c, firstSort: FIRST_SORT_DESC.has(c.id) ? "desc" : "asc" }));
 
 /**
  * The Annotation column's order, as SQL over the table's rows: the portal's [OncoKB sort value, CIViC,

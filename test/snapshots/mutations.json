@@ -27,116 +27,136 @@
             "id": "gene",
             "name": "Gene",
             "numeric": false,
-            "tip": "HUGO gene symbol"
+            "tip": "HUGO gene symbol",
+            "firstSort": "asc"
           },
           {
             "id": "studyOfOrigin",
             "name": "Study of Origin",
             "numeric": false,
-            "tip": "Study of Origin"
+            "tip": "Study of Origin",
+            "firstSort": "asc"
           },
           {
             "id": "cancerTypeAll",
             "name": "Cancer Type",
             "numeric": false,
-            "tip": "Cancer Type"
+            "tip": "Cancer Type",
+            "firstSort": "asc"
           },
           {
             "id": "sample",
             "name": "Sample ID",
-            "numeric": false
+            "numeric": false,
+            "firstSort": "asc"
           },
           {
             "id": "cancerType",
             "name": "Cancer Type Detailed",
-            "numeric": false
+            "numeric": false,
+            "firstSort": "asc"
           },
           {
             "id": "proteinChange",
             "name": "Protein Change",
-            "numeric": false
+            "numeric": false,
+            "firstSort": "asc"
           },
           {
             "id": "proteinPos",
             "name": "Protein Position",
-            "numeric": false
+            "numeric": false,
+            "firstSort": "asc"
           },
           {
             "id": "annotation",
             "name": "Annotation (OncoKB)",
-            "numeric": false
+            "numeric": false,
+            "firstSort": "asc"
           },
           {
             "id": "functionalImpact",
             "name": "Functional Impact",
             "numeric": false,
             "unsorted": true,
-            "tip": "Functional impact of the variant on the protein: Mutation Assessor, SIFT, PolyPhen-2 and AlphaMissense predictions. Hover over a dot to see the prediction and its score."
+            "tip": "Functional impact of the variant on the protein: Mutation Assessor, SIFT, PolyPhen-2 and AlphaMissense predictions. Hover over a dot to see the prediction and its score.",
+            "firstSort": "asc"
           },
           {
             "id": "mutationType",
             "name": "Mutation Type",
             "numeric": false,
-            "tip": "Consequence of the mutation on the protein (variant classification). Missense: Single amino acid substitution. IF: In-frame: adds or removes amino acids without a frameshift. Truncating: Truncates the protein. Nonsense: Premature stop codon. Nonstop: Loss of the stop codon. Nonstart: Loss of the start codon. FS: Frameshift: shifts the reading frame. FS del: Frameshift deletion: shifts the reading frame. FS ins: Frameshift insertion: shifts the reading frame. IF ins: In-frame insertion: adds amino acids without a frameshift. IF del: In-frame deletion: removes amino acids without a frameshift. Splice: Affects a splice site. Fusion: Gene fusion. Silent: No change to the amino acid sequence."
+            "tip": "Consequence of the mutation on the protein (variant classification). Missense: Single amino acid substitution. IF: In-frame: adds or removes amino acids without a frameshift. Truncating: Truncates the protein. Nonsense: Premature stop codon. Nonstop: Loss of the stop codon. Nonstart: Loss of the start codon. FS: Frameshift: shifts the reading frame. FS del: Frameshift deletion: shifts the reading frame. FS ins: Frameshift insertion: shifts the reading frame. IF ins: In-frame insertion: adds amino acids without a frameshift. IF del: In-frame deletion: removes amino acids without a frameshift. Splice: Affects a splice site. Fusion: Gene fusion. Silent: No change to the amino acid sequence.",
+            "firstSort": "asc"
           },
           {
             "id": "alteration",
             "name": "Alteration",
-            "numeric": false
+            "numeric": false,
+            "firstSort": "asc"
           },
           {
             "id": "variantType",
             "name": "Variant Type",
             "numeric": false,
-            "tip": "Type of change at the DNA level (variant type). SNP: Single Nucleotide Polymorphism. DNP: Di-Nucleotide Polymorphism. TNP: Tri-Nucleotide Polymorphism. ONP: Oligo-Nucleotide Polymorphism. INS: Insertion. DEL: Deletion."
+            "tip": "Type of change at the DNA level (variant type). SNP: Single Nucleotide Polymorphism. DNP: Di-Nucleotide Polymorphism. TNP: Tri-Nucleotide Polymorphism. ONP: Oligo-Nucleotide Polymorphism. INS: Insertion. DEL: Deletion.",
+            "firstSort": "asc"
           },
           {
             "id": "copyNumber",
             "name": "Copy #",
             "numeric": false,
-            "tip": "Putative copy number call for the gene in this sample. Hover over a value for details. Amp: High-level amplification. Gain: Low-level gain. Diploid: No copy number change. ShallowDel: Shallow (possibly heterozygous) deletion. DeepDel: Deep (possibly homozygous) deletion."
+            "tip": "Putative copy number call for the gene in this sample. Hover over a value for details. Amp: High-level amplification. Gain: Low-level gain. Diploid: No copy number change. ShallowDel: Shallow (possibly heterozygous) deletion. DeepDel: Deep (possibly homozygous) deletion.",
+            "firstSort": "asc"
           },
           {
             "id": "vaf",
             "name": "Allele Freq (T)",
-            "numeric": true
+            "numeric": true,
+            "firstSort": "asc"
           },
           {
             "id": "vafNormal",
             "name": "Allele Freq (N)",
             "numeric": true,
-            "tip": "Variant allele frequency in the matched normal sample (variant reads / total reads)"
+            "tip": "Variant allele frequency in the matched normal sample (variant reads / total reads)",
+            "firstSort": "asc"
           },
           {
             "id": "altCount",
             "name": "Variant Reads",
-            "numeric": true
+            "numeric": true,
+            "firstSort": "asc"
           },
           {
             "id": "refCount",
             "name": "Ref Reads",
-            "numeric": true
+            "numeric": true,
+            "firstSort": "asc"
           },
           {
             "id": "normalAltCount",
             "name": "Variant Reads (Normal)",
             "numeric": true,
-            "tip": "Number of reads supporting the variant allele in the matched normal sample"
+            "tip": "Number of reads supporting the variant allele in the matched normal sample",
+            "firstSort": "asc"
           },
           {
             "id": "normalRefCount",
             "name": "Ref Reads (Normal)",
             "numeric": true,
-            "tip": "Number of reads supporting the reference allele in the matched normal sample"
+            "tip": "Number of reads supporting the reference allele in the matched normal sample",
+            "firstSort": "asc"
           },
           {
             "id": "mutCount",
             "name": "# Mut in Sample",
-            "numeric": true
+            "numeric": true,
+            "firstSort": "asc"
           },
           {
             "…": "15 more",
-            "sha256": "eed771d4f8c5f13a"
+            "sha256": "a9cbf125a7b85336"
           }
         ],
         "shown": [
