@@ -18,6 +18,7 @@ import { cohortBar, cohortTooltip } from "../../lib/views/alterations/cohort-cel
 import { STYLE } from "../../lib/oncoprint-style.ts";
 import { useGenePanelDialog } from "./gene-panel-dialog.tsx";
 import { portalPercentage, portalVaf } from "../../lib/chart/format.ts";
+import { mrnaDot, mrnaTooltip } from "../../lib/views/alterations/mrna-cell.ts";
 import { emitLocus, onLocus, patientKey } from "./locus-bus";
 
 type Spec = { patient?: PatientKey } & Record<string, unknown>;
@@ -152,7 +153,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 },
                 selected: (r: { values: unknown[] }) => picked?.table === key && picked.row === JSON.stringify(r),
               })}
-              num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : x.toLocaleString()}
+              num={(id, x) => id === "vaf" ? portalVaf(x) : id === "freq" ? portalPercentage(x / 100) : id === "mrna" ? Math.round(x) + "%" : x.toLocaleString()}
               colHead={(id) => id === "gene" && (key === "mutations" || key === "cna") && marks.size > 1 && a.mixedPanels?.[key]
                 ? <GenesProfiledMenu table={key} value={(spec.genesProfiled as "any" | "all" | undefined) || "any"} what={key === "mutations" ? "mutations" : "copy number alterations"} disabled={updating}
                     onChange={(g) => patch({ genesProfiled: g === "any" ? undefined : g })} /> : null}
@@ -161,6 +162,7 @@ export function AlterationsBody({ a, spec, vi, updating, docJson, patch, fixed }
                 : id === "annotation" ? <AnnotationBadge text={String(x || "")} />
                 : id === "mutationType" ? <MutationTypeCell raw={String(row.detail?.mutationType ?? x ?? "")} />
                 : id === "genePanel" ? <PanelLinks text={String(x || "")} open={(panel) => void panels.open(panel)} />
+                : id === "mrna" && key === "mutations" ? <MrnaCell percentile={x == null ? null : Number(x)} z={row.detail?.mrnaZ as number | undefined} />
                 : id === "freq" && (key === "mutations" || key === "cna") ? <CohortCell row={row} gene={String(row.values[t.columns.findIndex((c) => c.id === "gene")] ?? "")}
                     cna={key === "cna" ? String(row.values[t.columns.findIndex((c) => c.id === "cna")] ?? "") : undefined} shown={x != null} />
                 : id === "cna" && x ? <span className={"alt-cna " + (x === "AMP" ? "amp" : "del")}>{x}</span>
@@ -192,6 +194,24 @@ function PanelLinks({ text, open }: { text: string; open: (panel: string) => voi
   const ids = text ? text.split(", ") : [];
   return <span>{ids.map((id, i) => <span key={i}>{i > 0 && ", "}{id === "N/A" ? id
     : <button type="button" className="linkish" data-tip={"the genes of " + id} onClick={() => open(id)}>{id}</button>}</span>)}</span>;
+}
+
+/**
+ * The mRNA Expr. cell as the portal's (MrnaExprColumnFormatter): a grey line with a dot at the gene's
+ * mRNA percentile in the sample, blue when low, red when high, the percent beside it and the z-score
+ * on hover; nothing drawn where the gene has no mRNA value, with the portal's words on hover.
+ */
+function MrnaCell({ percentile, z }: { percentile: number | null; z?: number }) {
+  const tip = mrnaTooltip(percentile, z);
+  if (percentile == null) return <span className="alt-mrna-na" data-tip={tip}>&nbsp;</span>;
+  const d = mrnaDot(percentile);
+  return (
+    <svg width={d.width} height={d.height} data-tip={tip} role="img" aria-label={tip.replace(/\n/g, "; ")}>
+      <text x={d.textX} y={d.textY} fontSize={d.fontSize} fill="currentColor">{d.text}</text>
+      <line x1={0} y1={d.lineY} x2={d.lineWidth} y2={d.lineY} stroke={d.line} strokeWidth={d.lineStroke} />
+      <circle cx={d.cx} cy={d.lineY} r={d.r} fill={d.fill} />
+    </svg>
+  );
 }
 
 /**
