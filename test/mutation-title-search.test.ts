@@ -12,7 +12,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { mutationUnit } from "../lib/mutation-cell-text.ts";
+import { mutationUnit, mutationTableUnit } from "../lib/mutation-cell-text.ts";
+import { register } from "node:module";
 import { whereSql, type RowSource, type TableQuery } from "../lib/table-query.ts";
 
 describe("U1 U2 mutationUnit", () => {
@@ -93,4 +94,46 @@ describe("Q2 a filter on a column with `search` reads `text`", () => {
     assert.deepEqual(kept({ filters: { pc: { values: ["G12D"] } } }), ["r1", "r2"]);
     assert.deepEqual(kept({ filters: { pc: { values: ["G12DGermline"] } } }), []);
   });
+});
+
+// a mutation table's unit is numbered by every row it holds (t.all), the M a filtered "N of M" title ends on
+describe("U3 U4 mutationTableUnit", () => {
+  test("U3 one kept row of 223 is counted in Mutations", () => assert.equal(mutationTableUnit({ all: 223, total: 1 } as { all: number }), "Mutations"));
+  test("U4 a table holding one row is counted in Mutation", () => assert.equal(mutationTableUnit({ all: 1, total: 1 } as { all: number }), "Mutation"));
+});
+
+register("./support/tsx-loader.mjs", import.meta.url);
+const { renderToStaticMarkup } = await import("react-dom/server");
+const { createElement } = await import("react");
+const dataTable = await import("../app/_table/DataTable.tsx") as Record<string, unknown>;
+
+const COLS = [{ id: "sample", name: "Sample ID", numeric: false }];
+const table = (total: number, all: number, search?: string) => ({
+  columns: COLS, shown: ["sample"], defaults: ["sample"], query: search ? { search } : {},
+  rows: [{ cohort: "A", study: "s1", patient: "P1", sample: "S1", values: ["S1"] }], offset: 0, pageSize: 25,
+  lists: [{ cohort: "A", study: "s1", total, all }], total, all,
+});
+const markupOf = (props: Record<string, unknown>): string =>
+  renderToStaticMarkup(createElement(dataTable.DataTable as never, { vi: 0, onQuery: () => {}, ...props } as never));
+/** the title's text: the dt-title span up to the bar's spacer, with React's text separators and any markup dropped */
+const titleOf = (html: string): string => {
+  const m = /<span class="dt-title[^"]*">([\s\S]*?)<span class="spacer"/.exec(html);
+  assert.ok(m, "the table has a title");
+  return m[1].replace(/<!-- -->/g, "").replace(/<[^>]*>/g, "");
+};
+const searchPlaceholderOf = (html: string): string => {
+  const m = /<input[^>]*type="search"[^>]*placeholder="(search [^"]*)"/.exec(html);
+  assert.ok(m, "the table has a search box");
+  return m[1];
+};
+
+describe("U5 U6 a searched mutation table with 1 of 223 rows kept", () => {
+  const t = table(1, 223, "G12D");
+  const html = markupOf({ t, query: t.query, unit: mutationTableUnit(t) });
+  test("U5 the title reads \"1 of 223 Mutations\"", () => {
+    const title = titleOf(html);
+    assert.equal(title, "1 of 223 Mutations");
+    assert.doesNotMatch(title, /Mutation$/);
+  });
+  test("U6 the search box reads \"search Mutations\"", () => assert.equal(searchPlaceholderOf(html), "search Mutations"));
 });

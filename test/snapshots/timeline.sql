@@ -13,7 +13,7 @@
     AND attribute_name = 'CANCER_TYPE' AND lowerUTF8(trimBoth(attribute_value)) IN (lowerUTF8(trimBoth('Breast Cancer'))))))
 
 -- view 0 timeline: table:attributes · msk_chord_2024
-SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
+SELECT m.attr_id AS id, m.display_name AS name, m.description AS description, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
 FROM snapshot_db.clinical_attribute_meta m
 JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = m.cancer_study_id
 WHERE cs.cancer_study_identifier = 'msk_chord_2024'

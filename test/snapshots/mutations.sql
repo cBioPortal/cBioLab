@@ -877,7 +877,7 @@ rows AS (SELECT r.*, cs.m AS clinS, cp.m AS clinP FROM rows0 AS r
 SELECT v, count() AS n FROM (SELECT ifNull(toString(cancerType), '') AS v FROM rows WHERE 1) GROUP BY v ORDER BY n DESC, v LIMIT 500
 
 -- view 0 mutations: table:attributes · msk_chord_2024
-SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
+SELECT m.attr_id AS id, m.display_name AS name, m.description AS description, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
 FROM snapshot_db.clinical_attribute_meta m
 JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = m.cancer_study_id
 WHERE cs.cancer_study_identifier = 'msk_chord_2024'

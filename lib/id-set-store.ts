@@ -25,7 +25,7 @@ import { dbQuery } from "./db.ts";
 import { AccessError } from "./auth.ts";
 import { groupsOf, readableWhere, canShare, rightsOf, sharingOf, validateSharing, type Rights, type Shareable, type Sharing } from "./access.ts";
 import { linksNaming } from "./link-store.ts";
-import { ID_SET_UUID, type IdSetLevel, type LoadedIdSet } from "./id-sets.ts";
+import { ID_SET_UUID, tidyIdSet, type IdSetLevel, type LoadedIdSet } from "./id-sets.ts";
 import { withdrawalNote, withdrawnMessage, type IdSetWithdrawal } from "./id-set-withdrawal.ts";
 
 /** how the list was matched when it was saved; for a lock's set, which cohort it froze and when */
@@ -141,34 +141,28 @@ export async function readIdSet(principal: string | null, id: string): Promise<{
   return { meta: metaOf(r, principal, groups), perStudy: unpack<PerStudy>(ids_gz)!, parts: unpack<Record<string, PerStudy>>(parts_gz) };
 }
 
-/** Distinct, sorted ids per study, empty studies dropped. */
-function tidy(m: PerStudy): PerStudy {
-  const out: PerStudy = {};
-  for (const study of Object.keys(m).sort()) {
-    const ids = [...new Set(m[study].map(String))].sort();
-    if (ids.length) out[study] = ids;
-  }
-  return out;
-}
 const sizeOf = (m: PerStudy) => Object.values(m).reduce((n, x) => n + x.length, 0);
 
 /**
  * Save a set: members already matched to the studies' own ids (lib/id-set-import.ts), as bare
  * ids per study. Empty studies are dropped; a set with no members at all is refused unless
  * `allowEmpty` (a lock freezing a cohort or arm that held nobody). With no principal the set is
- * unowned and stored by content: the same ids at the same level answer the set already stored.
+ * unowned and stored by content: the same ids at the same level (a typed list's in the
+ * same order) answer the set already stored.
  */
 export async function saveIdSet(principal: string | null, input: { name: string; level: IdSetLevel; perStudy: Record<string, string[]>; source: IdSetSource;
   /** a lock's other lists, kept in the same row (db/migrations/0007) */
-  parts?: Record<string, PerStudy> },
+  parts?: Record<string, PerStudy>;
+  /** keep each study's ids in the order given (a typed list), rather than sorted */
+  ordered?: boolean },
   opts: { allowEmpty?: boolean } = {}): Promise<IdSetMeta> {
   const name = String(input.name ?? "").trim().slice(0, 200);
   if (!name) throw new Error("a stored id set needs a name");
   if (input.level !== "patient" && input.level !== "sample") throw new Error("level must be 'patient' or 'sample'");
-  const perStudy = tidy(input.perStudy);
+  const perStudy = tidyIdSet(input.perStudy, !!input.ordered);
   const studies = Object.keys(perStudy);
   const count = sizeOf(perStudy);
-  const parts = input.parts ? Object.fromEntries(Object.entries(input.parts).map(([k, m]) => [k, tidy(m)])) : null;
+  const parts = input.parts ? Object.fromEntries(Object.entries(input.parts).map(([k, m]) => [k, tidyIdSet(m)])) : null;
   // a pasted list that matched nothing is a mistake; a locked arm that held nobody is a fact (lib/cohort-lock-server.ts)
   if (!count && !opts.allowEmpty) throw new Error("none of the ids matched a " + input.level + " of the studies given; nothing to save");
   if (count > ID_SET_MAX) throw new Error("a stored id set holds at most " + ID_SET_MAX.toLocaleString("en-US") + " ids; this one has " + count.toLocaleString("en-US"));

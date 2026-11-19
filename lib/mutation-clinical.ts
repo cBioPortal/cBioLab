@@ -6,8 +6,8 @@ import { sq } from "./compiler.ts";
 import { finiteSql } from "./sql-number.ts";
 import type { QueryColumn } from "./table-query.ts";
 
-/** an attribute as a column: its id (the column's id, as the portal's), display name, whose it is and its type */
-export interface ClinicalColumn { id: string; name: string; per: "patient" | "sample"; numeric: boolean }
+/** an attribute as a column: its id (the column's id, as the portal's), display name, whose it is and its type; its description, the header's tooltip */
+export interface ClinicalColumn { id: string; name: string; per: "patient" | "sample"; numeric: boolean; description?: string }
 
 /**
  * Attributes the table already shows as columns of its own, so not repeated: Cancer Type Detailed and
@@ -27,7 +27,8 @@ export function clinicalColumns(perStudy: Record<string, unknown>[][], taken: Re
   for (const rows of perStudy) for (const m of rows) {
     const id = String(m.id ?? "");
     if (!id || CLINICAL_SKIP.has(id) || taken.has(id) || out.some((c) => c.id === id)) continue;
-    out.push({ id, name: String(m.name || id), per: Number(m.patient) === 1 ? "patient" : "sample", numeric: String(m.datatype ?? "").toUpperCase() === "NUMBER" });
+    const description = String(m.description ?? "").trim();
+    out.push({ id, name: String(m.name || id), per: Number(m.patient) === 1 ? "patient" : "sample", numeric: String(m.datatype ?? "").toUpperCase() === "NUMBER", ...(description ? { description } : {}) });
   }
   return out;
 }

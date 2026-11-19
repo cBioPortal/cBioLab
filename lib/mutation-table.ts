@@ -24,7 +24,9 @@ import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, s
 
 export interface MutationColumn { id: string; name: string; numeric: boolean; tip?: string; unsorted?: boolean; firstSort?: "asc" | "desc";
   /** the Columns menu's Clinical tab (MUT-TB-5), with its Freq: the percent of queried samples with a value (MUT-STM-15) */
-  group?: "clinical"; freq?: number }
+  group?: "clinical"; freq?: number;
+  /** a clinical attribute's column (MUT-COL-36): its cell is the attribute's value, cut at 30 characters, "not available" when none */
+  attribute?: true }
 
 /** the columns whose first header click sorts descending (MutationTable defaultSortDirection 'desc'); every other column's is ascending, numbers too */
 const FIRST_SORT_DESC = new Set(["gnomad", "clinvar", "dbsnp"]);
