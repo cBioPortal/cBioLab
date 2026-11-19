@@ -7,7 +7,7 @@
 // carries the summary and the selection in its caption instead.
 import React, { useMemo, useRef, useState } from "react";
 import type { ViewResultOf } from "../../lib/types.ts";
-import { filterHotspotGene, clickCodon, defaultYMax, lollipopGeneEmpty, nextYMax, hasGermlineRate, statusFilter, statusSelection, withStatusFilter, STATUS_COLUMN, type CodonSelection, type StatusSelection } from "../../lib/lollipop.ts";
+import { filterHotspotGene, clickCodon, lollipopFilename, LOLLIPOP_FORMATS, defaultYMax, lollipopGeneEmpty, nextYMax, hasGermlineRate, statusFilter, statusSelection, withStatusFilter, STATUS_COLUMN, type CodonSelection, type StatusSelection } from "../../lib/lollipop.ts";
 import type { LollipopRows } from "../../lib/federation.ts";
 import { AlterationGrid, classesOf } from "./AlterationGrid.tsx";
 import { TranscriptSummary } from "./TranscriptSummary.tsx";
@@ -86,7 +86,7 @@ function GenePlot({ gene, selected, onSelect, annotated, yMax, onYMax }: { gene:
     <div className="lp-plot flex-[1_1_560px]">
       <div className="flex items-center justify-end gap-3">
         <YAxisMax gene={gene} value={yMax} onChange={onYMax} />
-        <LollipopTools legend={legend} onLegend={setLegend} filename={gene.gene + "_mutation_diagram"}
+        <LollipopTools legend={legend} onLegend={setLegend} filename={lollipopFilename(gene.gene)} formats={[...LOLLIPOP_FORMATS]}
           svg={() => { const w = box.current?.getBoundingClientRect().width; return w ? lollipopPanelsSvg([gene], { width: Math.round(w), theme: "light" }, "", { [gene.gene]: selected }, caps) : null; }} />
       </div>
       {legend && <ColorLegend drivers={annotated} />}

@@ -531,3 +531,11 @@ export function hasGermlineRate(g: Pick<HotspotGene, "germlineSamples" | "germli
 export function pruneLollipopTable<T extends { gene: string }>(table: T | undefined, genes: string[]): T | undefined {
   return table && genes.includes(table.gene) ? table : undefined;
 }
+
+/** the Mutations tab's lollipop download, as the portal names it (LollipopMutationPlot: `<GENE>_lollipop.<ext>`) */
+export function lollipopFilename(gene: string): string {
+  return gene + "_lollipop";
+}
+
+/** its formats, the portal's DownloadControls order for the plot */
+export const LOLLIPOP_FORMATS = ["svg", "png", "pdf"] as const;
