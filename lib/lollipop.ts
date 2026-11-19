@@ -472,6 +472,15 @@ export function lollipopNarrowing<Q extends TableQuery>(q: Q): Q | null {
   return { ...out, ...(search ? { search } : {}), ...(Object.keys(filters).length ? { filters } : {}) };
 }
 
+/** the stem the pointer is on, as the mutation table highlights its rows (MUT-LP-11): browser state only */
+export interface StemHover { gene: string; codon: number }
+
+/** a row of `gene`'s mutation table, at protein position `pos`, is the hovered stem's (the portal's highlighted rows) */
+export function rowAtStem(hover: StemHover | null, gene: string, pos: unknown): boolean {
+  if (!hover || hover.gene !== gene || pos == null || pos === "") return false;
+  return Number(pos) === hover.codon;
+}
+
 /** the Somatic / Germline badges beside a gene's mutation frequencies: which statuses the tab keeps (MUT-HD-3, MUT-FM-2) */
 export interface StatusSelection { somatic: boolean; germline: boolean }
 
