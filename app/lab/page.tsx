@@ -662,7 +662,7 @@ export default function AnalysisPage() {
                   const eps = [...names].filter((a) => /_MONTHS$/.test(a) && names.has(a.replace(/_MONTHS$/, "_STATUS"))).map((a) => a.replace(/_MONTHS$/, ""));
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
                 })()}
-                addClauses={addClauses} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />} />
+                addClauses={addClauses} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />} density={exploreState.chartChecked("genomic|density")} />
               <ClinicalFacets ctx={exploreCtx} />
               {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
                   gene per alteration type, the same tile shape a clinical attribute gets,
@@ -673,7 +673,7 @@ export default function AnalysisPage() {
               <AssayFacets ctx={exploreCtx} />
               <TreatmentTables ctx={exploreCtx} />
               <StudyBreakdown ctx={exploreCtx} />
-              <DataTypes ctx={exploreCtx} />
+              {exploreState.chartChecked("genomic|datatypes") && <DataTypes ctx={exploreCtx} />}
               <AlteredGenes ctx={exploreCtx} />
               <EventsAndCaseLists ctx={exploreCtx} />
             </div>

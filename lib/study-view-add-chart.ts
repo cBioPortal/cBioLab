@@ -63,3 +63,28 @@ export function specialChartsShown(checked: (key: string) => boolean, leaves: un
     caseLists: checked(SPECIAL_CHART_KEYS.caseLists) || kind("caseList"),
   };
 }
+
+/** the Genomic tab's charts (STV-AC-2): drawn by default, each a checkbox in Add chart that hides or shows it */
+export const GENOMIC_CHARTS = [
+  { key: "genomic|mutated", name: "Mutated Genes", table: "mutated" as const },
+  { key: "genomic|cna", name: "CNA Genes", table: "cna" as const },
+  { key: "genomic|sv", name: "Structural Variant Genes", table: "sv" as const },
+  { key: "genomic|datatypes", name: "Data Types", table: null },
+  { key: "genomic|density", name: "Mutation Count vs Fraction Genome Altered", table: null },
+] as const;
+
+/**
+ * The Genomic tab's rows (STV-AC-2, STV-AC-4), as the portal lists them: each chart the selection
+ * has data for, its Freq the selected samples with that data, a gene table's being those profiled
+ * for its alteration (coadread: CNA Genes 99.7 %, Mutated Genes 89.9 %), Data Types every sample;
+ * by Freq, then name. The density's has no Freq of its own here (NaN, written "—").
+ */
+export function genomicChartLines(profiled: Record<"mutated" | "cna" | "sv", number>, selected: number, has: { datatypes: boolean; density: boolean }):
+  { key: string; name: string; freq: number }[] {
+  const pct = (n: number) => selected ? 100 * n / selected : 0;
+  return GENOMIC_CHARTS.flatMap((c): { key: string; name: string; freq: number }[] => {
+    if (c.table) return profiled[c.table] > 0 ? [{ key: c.key, name: c.name, freq: pct(profiled[c.table]) }] : [];
+    if (c.key === "genomic|datatypes") return has.datatypes ? [{ key: c.key, name: c.name, freq: 100 }] : [];
+    return has.density ? [{ key: c.key, name: c.name, freq: NaN }] : [];
+  }).sort((a, b) => (Number.isNaN(b.freq) ? -1 : b.freq) - (Number.isNaN(a.freq) ? -1 : a.freq) || a.name.localeCompare(b.name));
+}

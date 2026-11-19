@@ -8,7 +8,7 @@ import { useSaved } from "../_saved/saved-context.tsx";
 import { useEffect, useRef, useState } from "react";
 import { normalizeDef } from "./pills";
 import type { AnalysisDoc, Clause, CohortDef, DerivedRequest, NumericBin, PartitionArm, PartitionDef } from "../../lib/types.ts";
-import { withoutAttribute } from "../../lib/study-view-add-chart.ts";
+import { GENOMIC_CHARTS, withoutAttribute } from "../../lib/study-view-add-chart.ts";
 import { foldEventNames, treatmentEventOf } from "../../lib/event-names.ts";
 import { type SplitSpec } from "./partitions.tsx";
 import { armsFromSelection, withoutChart, comparisonCohorts, type ChartKey } from "../../lib/partition-arms.ts";
@@ -98,7 +98,7 @@ export function useExploreState(page: ExplorePage) {
   /** Explore's "+ Add chart": clinical/gene/derived-timeline filter builders live
    *  here instead of as three permanent cards above the facet grid. */
   const [addChartOpen, setAddChartOpen] = useState(false);
-  const [chartTab, setChartTab] = useState<"clinical" | "gene" | "assay" | "derived" | "custom">("clinical");
+  const [chartTab, setChartTab] = useState<"clinical" | "genomic" | "gene" | "assay" | "derived" | "custom">("clinical");
   const [cName, setCName] = useState("");
   const [cDefText, setCDefTextState] = useState(JSON.stringify({ all: [] }, null, 2));
   // The draft as last set, for callers holding an older render's closure (a mount effect, a
@@ -425,8 +425,9 @@ export function useExploreState(page: ExplorePage) {
    * with a single value (lib/study-view-config.ts). Read from the answer with no draft applied
    * (use-explore.ts `vocab`), so a facet click never changes which charts show.
    */
-  const defaultCharts = (): Set<string> => new Set(defaultChartKeys(exploring.vocab.current.attrs,
-    { filtered: false, totalSamples: exploring.vocab.current.samples, allowed: coverageOk }));
+  // the clinical charts the portal draws by default, and every Genomic-tab chart (drawn unless unchecked)
+  const defaultCharts = (): Set<string> => new Set([...defaultChartKeys(exploring.vocab.current.attrs,
+    { filtered: false, totalSamples: exploring.vocab.current.samples, allowed: coverageOk }), ...GENOMIC_CHARTS.map((c) => c.key)]);
   const draftedAttrs = (): Set<string> => {
     const keys = new Set<string>();
     const walk = (cs: any[]) => { for (const c of cs || []) {
