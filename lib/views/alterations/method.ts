@@ -22,13 +22,15 @@ export function alterationsMethod(t: { cohorts: string[]; oncokbPin: string | nu
       (t.genesProfiled === "all" ? "The Mutations and CNA tables keep only rows whose gene every sample in view was profiled for (a panel of the sample's for that data holds the gene, or it is whole-exome/genome); rows off a sample's panel are left out. " : "") +
       (t.mrnaProfile ? "mRNA Expr. (one sample in view): the gene's percentile in that sample within the study's " + t.mrnaProfile + " profile, the first of its profiles matching rna_seq…_zscores as the portal picks it — " +
         "the sample's z-score ranked among every sample's numeric value of the gene there, ties at the highest rank (the values at or below it), as rank ÷ n × 100 to 2 places, half up; the cell writes it rounded to a whole percent. " : "") +
+      "The Allele Freq header's VAF plot (the alterations:vafs query) takes, for each sample in view, the allele frequency of every Mutations row it carries with read counts, whatever the table's search, filters or page: " +
+        "a histogram in 0.05 bins from −0.1 to 1 (the left axis counts mutations) and a Gaussian kernel density over the same range, its bandwidth Silverman's 1.06 × SD × n^(−1/5) of the sample's own frequencies, at least 0.01. " +
       "Cohort % is the share of the study's samples profiled for the gene (by their gene panel) with any mutation in it, or with the same copy-number call; blank for a mutation with no keyword (in-frame indels, splice region), as the portal's variant counts. " +
       "A mutation's Cohort cell also gives its keyword's share (IDH1 R132 missense, APC truncating; the darker part of the bar and the tooltip's \"out of which N (x%) have … mutations\"): " +
       "the study's samples with a called mutation carrying the row's keyword, over the same denominator, the samples profiled for the gene" +
       (t.oncokbPin ? "; the annotation is the OncoKB " + t.oncokbPin + " call for the protein change, or for AMPLIFICATION / DELETION" : "") + ".",
     params: t.tables.map((x) => [x.name, (x.queryText ? x.total.toLocaleString("en-US") + " of " : "") + x.all.toLocaleString("en-US") + " rows" + (x.queryText ? " (kept: " + x.queryText + ")" : "")] as [string, string]),
   });
-  return { steps, implementation: { functions: ["runAlterations", "alterationPatientRowSource", "patientMutationsSource", "patientCnaSource", "patientSvSource", "pageSql", "countsSql", "rankSql"],
+  return { steps, implementation: { functions: ["runAlterations", "alterationPatientRowSource", "patientMutationsSource", "patientVafSource", "patientCnaSource", "patientSvSource", "pageSql", "countsSql", "rankSql"],
     file: "lib/views/alterations/run.ts, lib/patient-alterations.ts, lib/table-query.ts", commit: BUILD_COMMIT },
     verification: "A listing: no statistic is computed, so there is no script — the queries are the numbers." };
 }

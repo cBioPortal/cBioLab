@@ -19,6 +19,8 @@
  *   D  one record per sample: a variant recorded twice in a sample is drawn once (its first record)
  *   N  null last in either direction, on a literal table run through the same ORDER BY (the fixture has
  *      no mutation in a patient's second sample alone).
+ *   P  the VAF plot's values (PAT-STM-7, GenomicOverviewUtils computeMutationFrequencyBySample): per sample,
+ *      alt / (alt + ref) of each mutation row it carries with counts, whatever the table's search or page.
  *
  * Run: node --env-file=.env.local scripts/check-patient-vaf.ts (connection b must be the fixture:
  * `npm run peer-db` prints its CLICKHOUSE2_* lines).
@@ -84,6 +86,25 @@ const genes = (r: Row[] | string) => typeof r === "string" ? r : r.map((x) => x.
   ok("S FX-P02 ascending: KRAS, PIK3CA, SMARCA4", a === "KRAS, PIK3CA, SMARCA4", a);
   const d1 = genes(await rows("FX-P01", { column: "vaf", desc: true }));
   ok("S FX-P01 descending: KRAS (.368 in T1), TP53 (.131)", d1 === "KRAS, TP53", d1);
+}
+
+// ---- P: the VAF plot's values -------------------------------------------------------------------
+async function plotOf(patient: string, q: Record<string, unknown> = {}, genesProfiled: "any" | "all" = "any"): Promise<Record<string, number[]> | string> {
+  const r = await runAlterations({ kind: "alterations", cohorts: ["c"], patient: { study: STUDY, id: patient }, genesProfiled, mutations: { columns: ["gene", "vaf"], ...q } }, ctx) as { alterations?: AlterationsResult; error?: string };
+  return r.alterations?.vafs ?? "no vafs: " + String(r.error);
+}
+const rounded = (x: Record<string, number[]> | string) => typeof x === "string" ? x : show(Object.fromEntries(Object.entries(x).sort().map(([k, v]) => [k, v.map((n) => Math.round(n * 1e4) / 1e4)])));
+{
+  const p02 = rounded(await plotOf("FX-P02"));
+  const want02 = show({ "FX-P02-T1": [0.1949, 0.3371, 0.6869], "FX-P02-T2": [0.6786] });
+  ok("P FX-P02: T1 KRAS 38/195, PIK3CA 267/792, SMARCA4 215/313; T2 KRAS 190/280", p02 === want02, p02);
+  const p01 = rounded(await plotOf("FX-P01"));
+  const want01 = show({ "FX-P01-T1": [0.1314, 0.3682], "FX-P01-T2": [0.2063] });
+  ok("P FX-P01: T1 TP53 79/601, KRAS 88/239; T2 KRAS 145/703", p01 === want01, p01);
+  const searched = rounded(await plotOf("FX-P02", { search: "PIK3CA", rows: 1 }));
+  ok("P the table's search and page size leave the plot whole", searched === want02, searched);
+  const all = rounded(await plotOf("FX-P02", {}, "all"));
+  ok("P genes profiled in all samples: FX-P02's samples share a panel, so every row stays", all === want02, all);
 }
 
 // ---- N: a missing value last in either direction ---------------------------------------------
