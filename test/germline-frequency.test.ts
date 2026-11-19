@@ -75,6 +75,7 @@ let germlineList: { lists: number; n: number } = { lists: 0, n: 0 };
 setChTransport(async ({ query }) => {
   const data = /\bAS lists\b/.test(query) ? [germlineList]
     : /SELECT uniqExact\(sid\) AS n FROM cohort/.test(query) ? [{ n: 7 }]
+    : /AS patients, uniqExact\(sid\) AS samples\b/.test(query) ? [{ patients: 6, samples: 7 }]
     : /\bAS somatic_samples\b/.test(query) ? [{ gene: "KRAS", patients: 2, pairs: 2, somatic_samples: 2, germline_samples: 1 }]
     : [];
   return JSON.stringify({ meta: [], data, rows: data.length });
