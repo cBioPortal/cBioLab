@@ -383,11 +383,13 @@ export interface DataTableProps<V> {
   plain?: boolean;
   /** the rows are one cohort's: no cohort column, the study column alone when there are several studies */
   oneCohort?: boolean;
+  /** the download: CSV of the rows kept (default), or the portal's table.tsv of every row in the current sort (the Mutations table's) */
+  downloadFormat?: "csv" | "table-tsv";
   /** the download button in place of the CSV one: its label, tooltip and action */
   download?: { label: string; tip: string; onClick: () => void; disabled?: boolean };
 }
 
-export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, pager = "pages" }: DataTableProps<V>) {
+export function DataTable<V extends string | number | null>({ t, query, updating, vi, docJson, table, unit, countNote, kept, onQuery, cell, colHead, num, title, onRow, selected, groupBy, onHover, hot, plain, oneCohort, download: ownDownload, pager = "pages", downloadFormat = "csv" }: DataTableProps<V>) {
   const q = query || t.query || {};
   const p = usePages(t.rows, t.total, t.offset || 0, t.pageSize || t.rows.length || 25, vi, docJson, table);
   const multi = t.lists.length > 1;
@@ -439,7 +441,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     const f = e.currentTarget;
     let doc: unknown;
     try { doc = JSON.parse(docJson ? docJson() : ""); } catch { return; }
-    (f.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc: doc as TableBody["doc"], view: vi, ...(table ? { table } : {}) });
+    (f.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc: doc as TableBody["doc"], view: vi, ...(table ? { table } : {}), ...(downloadFormat === "table-tsv" ? { format: "table-tsv" as const } : {}) });
     f.submit();
   };
   return (
@@ -469,7 +471,8 @@ export function DataTable<V extends string | number | null>({ t, query, updating
           <input type="hidden" name="payload" />
           <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
             data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
-              : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />download CSV ({t.total.toLocaleString()})</Button>
+              : downloadFormat === "table-tsv" ? "every row, whatever the search and filters, in the table's order, with all " + t.columns.length + " columns, as tab-separated text (the portal's table.tsv)"
+              : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />{downloadFormat === "table-tsv" ? "download TSV (" + t.all.toLocaleString() + ")" : "download CSV (" + t.total.toLocaleString() + ")"}</Button>
         </form>}
       </div>
       {(filters.length > 0 || (q.search || "").trim()) && (

@@ -16,7 +16,7 @@ import {
   geneTableName, geneTableTitle, profiledSamples, defaultGeneSort, nextGeneSort,
   geneRowOrder, sortGeneRows, geneHeaderTips, geneTableTsv,
   freqTipLines, geneSelection, appliedLines, toggleQueued, queuedQuery, alteredHeaderTip,
-  intersectionRefusal, geneFreqText,
+  intersectionRefusal, geneFreqText, geneRowMatches,
   type GeneTableKind, type GeneSort, type GeneSortColumn,
 } from "../lib/study-view-gene-tables.ts";
 import { chartFileName } from "../lib/study-view-download.ts";
@@ -773,4 +773,30 @@ test("Freq at 100 % is \"100.0%\"; just below is \"99.9%\"; one decimal in betwe
 test("Freq counts on-panel calls only, and is \"NA\" with no sample profiled", () => {
   assert.equal(geneFreqText(r("A", 3, 3, 10, { alteredOnPanel: 1 })), "10.0%");
   assert.equal(geneFreqText(r("A", 1, 1, 0)), "NA");
+});
+
+// ---- the search box (STS-GT-10): a substring of any column as shown ----
+
+test("GT-10: the search matches any column as shown, case-insensitively", () => {
+  const tp53 = r("TP53", 412, 380, 1000);
+  const cases: [GeneTableKind, GeneTableRow, string, boolean][] = [
+    ["mutated", tp53, "tp5", true],
+    ["mutated", tp53, "412", true],
+    ["mutated", tp53, "380", true],
+    ["mutated", tp53, "38.0%", true],
+    ["mutated", tp53, "38.0", true],
+    ["mutated", tp53, "999", false],
+    ["mutated", tp53, "  ", true],
+    ["cna", r("MYC", 50, 50, 1000, { cna: 2, cytoband: "8q24.21" }), "8q24", true],
+    ["cna", r("MYC", 50, 50, 1000, { cna: 2, cytoband: "8q24.21" }), "amp", true],
+    ["cna", r("CDKN2A", 70, 70, 1000, { cna: -2, cytoband: "9p21.3" }), "homdel", true],
+    ["cna", r("CDKN2A", 70, 70, 1000, { cna: -2, cytoband: "9p21.3" }), "amp", false],
+    ["sv", r("ALK", 4, 3, 1000), "4", true],
+  ];
+  for (const [kind, row, q, want] of cases) assert.equal(geneRowMatches(kind, row, q), want, kind + " " + row.gene + " '" + q + "'");
+});
+
+test("GT-10: the Freq searched is the percentage shown, not the fraction (the portal's search bug not copied)", () => {
+  assert.equal(geneRowMatches("mutated", r("A", 1, 1, 4), "25.0"), true);
+  assert.equal(geneRowMatches("mutated", r("A", 1, 1, 4), "0.25"), false);
 });
