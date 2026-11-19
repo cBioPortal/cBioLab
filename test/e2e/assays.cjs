@@ -53,6 +53,24 @@ async function assays({ browser, ok, BASE }) {
       await facet.getByRole("button", { name: "Apply filter" }).click();
       await page.waitForFunction((n) => new RegExp("\\b" + n.toLocaleString("en-US") + " patients match").test(document.body.innerText), gain, { timeout: 120000 });
       ok("generic assays: Explore charts an entity, and a click filters to exactly the patients its bar counts", gain > 0, gain + " patients with 8q gained");
+      const tip = await facet.locator(".valrow", { hasText: "Gain" }).getAttribute("data-tip");
+      ok("generic assays: a sample-level entity's rows are counted, and their tooltips say, in samples", /^Gain — [\d,]+ samples$/.test(tip || ""), tip);
+
+      // two studies holding the profile: the chart keeps Compare groups, and its groups span both (STV-GR-10)
+      await page.goto(BASE + "/lab?tab=explore&study=" + STUDY + ",coadread_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
+      await page.locator(".facettitle").first().waitFor({ timeout: 120000 });
+      await page.getByRole("button", { name: /add chart/i }).first().click();
+      await page.getByRole("tab", { name: "Generic assays" }).click();
+      await page.locator(".addchart [role=combobox]").first().click();
+      await page.getByRole("option", { name: /arm-level/i }).click();
+      await pick("chart entity", "8q", /^8q/);
+      for (let i = 0; i < 3 && await page.locator(".addchart").count(); i++) { await page.keyboard.press("Escape"); await page.waitForTimeout(400); }
+      await facet.locator(".valrow").first().waitFor({ timeout: 120000 });
+      await facet.getByRole("button", { name: /actions for/ }).click();
+      const menu = await page.locator("[role=menuitem]").allInnerTexts();
+      await page.keyboard.press("Escape");
+      ok("generic assays: across two studies holding the profile, the chart keeps Compare and Analyze groups",
+        menu.includes("Compare groups") && menu.includes("Analyze groups"), menu.join(" / "));
 
       // a split on an entity: its arms and a "No … measured" child add up to the cohort
       const base = { study: STUDY, cohorts: { all: { all: [] } }, views: [] };
