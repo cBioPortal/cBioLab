@@ -119,7 +119,7 @@ g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allel
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')
     AND (chr, start_position, end_position, reference_allele, variant_allele) IN (SELECT chr, start, end, ref, var FROM m0)
   GROUP BY chr, start, end, ref, var),
-rows AS (
+rows0 AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
@@ -197,7 +197,27 @@ rows AS (
   LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''
   LEFT JOIN ct0 AS ct ON ct.sid = v.sid LEFT JOIN mc0 AS mc ON mc.sid = v.sid
   LEFT JOIN cta0 AS cta ON cta.sid = v.sid LEFT JOIN cn0 AS cn ON cn.sid = v.sid AND cn.g = v.gene1
-)
+),
+clins AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CLINICAL_GROUP', 'CLINICAL_SUMMARY', 'DIAGNOSIS_DESCRIPTION', 'ICD_O_HISTOLOGY_DESCRIPTION', 'PATHOLOGICAL_GROUP', 'SAMPLE_TYPE', 'MSI_TYPE', 'GENE_PANEL', 'SOMATIC_STATUS', 'SAMPLE_CLASS', 'FRACTION_GENOME_ALTERED', 'TMB_NONSYNONYMOUS', 'GLEASON_SAMPLE_LEVEL', 'MSI_COMMENT', 'MSI_SCORE', 'METASTATIC_SITE', 'ONCOTREE_CODE', 'PRIMARY_SITE', 'PDL1_POSITIVE', 'SAMPLE_COVERAGE', 'TUMOR_PURITY') AND attribute_value != ''
+    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT sid AS x FROM m0 UNION ALL SELECT sid AS x FROM v0))
+  GROUP BY k
+),
+clinp AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient' AND attribute_name IN ('OS_STATUS', 'RACE', 'GENDER', 'STAGE_HIGHEST_RECORDED', 'ETHNICITY', 'CURRENT_AGE_DEID', 'SMOKING_PREDICTIONS_3_CLASSES', 'PRIOR_MED_TO_MSK', 'GLEASON_HIGHEST_REPORTED', 'HISTORY_OF_PDL1', 'NUM_ICDO_DX', 'SAMPLE_COUNT', 'GLEASON_FIRST_REPORTED', 'HER2', 'HR', 'OS_MONTHS', 'ADRENAL_GLANDS', 'BONE', 'CNS_BRAIN', 'INTRA_ABDOMINAL', 'LIVER', 'LUNG', 'LYMPH_NODES', 'OTHER', 'PLEURA', 'REPRODUCTIVE_ORGANS') AND attribute_value != ''
+    AND patient_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT pid AS x FROM m0 UNION ALL SELECT pid AS x FROM v0))
+  GROUP BY k
+),
+rows AS (SELECT r.*, cs.m AS clinS, cp.m AS clinP FROM rows0 AS r
+  LEFT JOIN clins AS cs ON cs.st = r.study AND cs.k = r.sid LEFT JOIN clinp AS cp ON cp.st = r.study AND cp.k = r.patient)
 SELECT cohort, study, countIf((match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS n, count() AS all, count() - uniqExact((study, patient, ifNull(proteinChange, ''))) AS dup, uniqExactIf(sid, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS ns, uniqExactIf(patient, (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)) AS np FROM rows GROUP BY cohort, study
 
 -- view 0 mutations: mutations:rows · msk_chord_2024
@@ -307,7 +327,7 @@ g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allel
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')
     AND (chr, start_position, end_position, reference_allele, variant_allele) IN (SELECT chr, start, end, ref, var FROM m0)
   GROUP BY chr, start, end, ref, var),
-rows AS (
+rows0 AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
@@ -385,7 +405,27 @@ rows AS (
   LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''
   LEFT JOIN ct0 AS ct ON ct.sid = v.sid LEFT JOIN mc0 AS mc ON mc.sid = v.sid
   LEFT JOIN cta0 AS cta ON cta.sid = v.sid LEFT JOIN cn0 AS cn ON cn.sid = v.sid AND cn.g = v.gene1
-)
+),
+clins AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CLINICAL_GROUP', 'CLINICAL_SUMMARY', 'DIAGNOSIS_DESCRIPTION', 'ICD_O_HISTOLOGY_DESCRIPTION', 'PATHOLOGICAL_GROUP', 'SAMPLE_TYPE', 'MSI_TYPE', 'GENE_PANEL', 'SOMATIC_STATUS', 'SAMPLE_CLASS', 'FRACTION_GENOME_ALTERED', 'TMB_NONSYNONYMOUS', 'GLEASON_SAMPLE_LEVEL', 'MSI_COMMENT', 'MSI_SCORE', 'METASTATIC_SITE', 'ONCOTREE_CODE', 'PRIMARY_SITE', 'PDL1_POSITIVE', 'SAMPLE_COVERAGE', 'TUMOR_PURITY') AND attribute_value != ''
+    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT sid AS x FROM m0 UNION ALL SELECT sid AS x FROM v0))
+  GROUP BY k
+),
+clinp AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient' AND attribute_name IN ('OS_STATUS', 'RACE', 'GENDER', 'STAGE_HIGHEST_RECORDED', 'ETHNICITY', 'CURRENT_AGE_DEID', 'SMOKING_PREDICTIONS_3_CLASSES', 'PRIOR_MED_TO_MSK', 'GLEASON_HIGHEST_REPORTED', 'HISTORY_OF_PDL1', 'NUM_ICDO_DX', 'SAMPLE_COUNT', 'GLEASON_FIRST_REPORTED', 'HER2', 'HR', 'OS_MONTHS', 'ADRENAL_GLANDS', 'BONE', 'CNS_BRAIN', 'INTRA_ABDOMINAL', 'LIVER', 'LUNG', 'LYMPH_NODES', 'OTHER', 'PLEURA', 'REPRODUCTIVE_ORGANS') AND attribute_value != ''
+    AND patient_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT pid AS x FROM m0 UNION ALL SELECT pid AS x FROM v0))
+  GROUP BY k
+),
+rows AS (SELECT r.*, cs.m AS clinS, cp.m AS clinP FROM rows0 AS r
+  LEFT JOIN clins AS cs ON cs.st = r.study AND cs.k = r.sid LEFT JOIN clinp AS cp ON cp.st = r.study AND cp.k = r.patient)
 SELECT *, count() OVER () AS total FROM rows
 WHERE (match(ifNull(toString(proteinChange), ''), '^G1[23]')) AND (CAST(vaf AS Nullable(Float64)) IS NOT NULL AND CAST(vaf AS Nullable(Float64)) >= 0.2)
 ORDER BY CAST(vaf AS Nullable(Float64)) DESC NULLS LAST, sid, ord, proteinChange
@@ -498,7 +538,7 @@ g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allel
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')
     AND (chr, start_position, end_position, reference_allele, variant_allele) IN (SELECT chr, start, end, ref, var FROM m0)
   GROUP BY chr, start, end, ref, var),
-rows AS (
+rows0 AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
@@ -576,7 +616,27 @@ rows AS (
   LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''
   LEFT JOIN ct0 AS ct ON ct.sid = v.sid LEFT JOIN mc0 AS mc ON mc.sid = v.sid
   LEFT JOIN cta0 AS cta ON cta.sid = v.sid LEFT JOIN cn0 AS cn ON cn.sid = v.sid AND cn.g = v.gene1
-)
+),
+clins AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CLINICAL_GROUP', 'CLINICAL_SUMMARY', 'DIAGNOSIS_DESCRIPTION', 'ICD_O_HISTOLOGY_DESCRIPTION', 'PATHOLOGICAL_GROUP', 'SAMPLE_TYPE', 'MSI_TYPE', 'GENE_PANEL', 'SOMATIC_STATUS', 'SAMPLE_CLASS', 'FRACTION_GENOME_ALTERED', 'TMB_NONSYNONYMOUS', 'GLEASON_SAMPLE_LEVEL', 'MSI_COMMENT', 'MSI_SCORE', 'METASTATIC_SITE', 'ONCOTREE_CODE', 'PRIMARY_SITE', 'PDL1_POSITIVE', 'SAMPLE_COVERAGE', 'TUMOR_PURITY') AND attribute_value != ''
+    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT sid AS x FROM m0 UNION ALL SELECT sid AS x FROM v0))
+  GROUP BY k
+),
+clinp AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient' AND attribute_name IN ('OS_STATUS', 'RACE', 'GENDER', 'STAGE_HIGHEST_RECORDED', 'ETHNICITY', 'CURRENT_AGE_DEID', 'SMOKING_PREDICTIONS_3_CLASSES', 'PRIOR_MED_TO_MSK', 'GLEASON_HIGHEST_REPORTED', 'HISTORY_OF_PDL1', 'NUM_ICDO_DX', 'SAMPLE_COUNT', 'GLEASON_FIRST_REPORTED', 'HER2', 'HR', 'OS_MONTHS', 'ADRENAL_GLANDS', 'BONE', 'CNS_BRAIN', 'INTRA_ABDOMINAL', 'LIVER', 'LUNG', 'LYMPH_NODES', 'OTHER', 'PLEURA', 'REPRODUCTIVE_ORGANS') AND attribute_value != ''
+    AND patient_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT pid AS x FROM m0 UNION ALL SELECT pid AS x FROM v0))
+  GROUP BY k
+),
+rows AS (SELECT r.*, cs.m AS clinS, cp.m AS clinP FROM rows0 AS r
+  LEFT JOIN clins AS cs ON cs.st = r.study AND cs.k = r.sid LEFT JOIN clinp AS cp ON cp.st = r.study AND cp.k = r.patient)
 SELECT min(v) AS lo, max(v) AS hi, count() AS n FROM (SELECT CAST(vaf AS Nullable(Float64)) AS v FROM rows WHERE 1) WHERE v IS NOT NULL
 
 -- view 0 mutations: mutations:values · msk_chord_2024
@@ -686,7 +746,7 @@ g0 AS (SELECT chr, start_position AS start, end_position AS end, reference_allel
   WHERE (source, version) IN (('genome_nexus', '2.2.3-vep116-clinvar20260208+f2'), ('genome_nexus_grch38', '1.4.1-vepNA-clinvar20250106+f2')) AND source = (SELECT multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id WHERE cs.cancer_study_identifier = 'msk_chord_2024')
     AND (chr, start_position, end_position, reference_allele, variant_allele) IN (SELECT chr, start, end, ref, var FROM m0)
   GROUP BY chr, start, end, ref, var),
-rows AS (
+rows0 AS (
   SELECT 'Colorectal' AS cohort, 'msk_chord_2024' AS study, 0 AS ord,
          (SELECT rg.name FROM snapshot_db.cancer_study cs JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
           WHERE cs.cancer_study_identifier = 'msk_chord_2024') AS build,
@@ -764,5 +824,32 @@ rows AS (
   LEFT JOIN svp AS vn ON vn.site1_entrez = v.k1 AND vn.site2_entrez = v.k2 AND vn.sv_type = if((v.gene1 != '') + (v.gene2 != '') >= 2, 'FUSION', if(ifNull(v.class, '') IN ('DELETION', 'TRANSLOCATION', 'DUPLICATION', 'INSERTION', 'INVERSION', 'FUSION'), v.class, 'UNKNOWN')) AND vn.tumor_type = ''
   LEFT JOIN ct0 AS ct ON ct.sid = v.sid LEFT JOIN mc0 AS mc ON mc.sid = v.sid
   LEFT JOIN cta0 AS cta ON cta.sid = v.sid LEFT JOIN cn0 AS cn ON cn.sid = v.sid AND cn.g = v.gene1
-)
+),
+clins AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'sample' AND attribute_name IN ('CLINICAL_GROUP', 'CLINICAL_SUMMARY', 'DIAGNOSIS_DESCRIPTION', 'ICD_O_HISTOLOGY_DESCRIPTION', 'PATHOLOGICAL_GROUP', 'SAMPLE_TYPE', 'MSI_TYPE', 'GENE_PANEL', 'SOMATIC_STATUS', 'SAMPLE_CLASS', 'FRACTION_GENOME_ALTERED', 'TMB_NONSYNONYMOUS', 'GLEASON_SAMPLE_LEVEL', 'MSI_COMMENT', 'MSI_SCORE', 'METASTATIC_SITE', 'ONCOTREE_CODE', 'PRIMARY_SITE', 'PDL1_POSITIVE', 'SAMPLE_COVERAGE', 'TUMOR_PURITY') AND attribute_value != ''
+    AND sample_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT sid AS x FROM m0 UNION ALL SELECT sid AS x FROM v0))
+  GROUP BY k
+),
+clinp AS (
+  SELECT 'msk_chord_2024' AS st, replaceOne(patient_unique_id, 'msk_chord_2024_', '') AS k,
+         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m
+  FROM (SELECT internal_id, sample_unique_id, patient_unique_id, attribute_name, attribute_value, cancer_study_identifier, type
+   FROM snapshot_db.clinical_data_derived WHERE lowerUTF8(trimBoth(attribute_value)) NOT IN ('', 'na', 'n/a', 'nan'))
+  WHERE cancer_study_identifier = 'msk_chord_2024' AND type = 'patient' AND attribute_name IN ('OS_STATUS', 'RACE', 'GENDER', 'STAGE_HIGHEST_RECORDED', 'ETHNICITY', 'CURRENT_AGE_DEID', 'SMOKING_PREDICTIONS_3_CLASSES', 'PRIOR_MED_TO_MSK', 'GLEASON_HIGHEST_REPORTED', 'HISTORY_OF_PDL1', 'NUM_ICDO_DX', 'SAMPLE_COUNT', 'GLEASON_FIRST_REPORTED', 'HER2', 'HR', 'OS_MONTHS', 'ADRENAL_GLANDS', 'BONE', 'CNS_BRAIN', 'INTRA_ABDOMINAL', 'LIVER', 'LUNG', 'LYMPH_NODES', 'OTHER', 'PLEURA', 'REPRODUCTIVE_ORGANS') AND attribute_value != ''
+    AND patient_unique_id IN (SELECT concat('msk_chord_2024_', x) FROM (SELECT pid AS x FROM m0 UNION ALL SELECT pid AS x FROM v0))
+  GROUP BY k
+),
+rows AS (SELECT r.*, cs.m AS clinS, cp.m AS clinP FROM rows0 AS r
+  LEFT JOIN clins AS cs ON cs.st = r.study AND cs.k = r.sid LEFT JOIN clinp AS cp ON cp.st = r.study AND cp.k = r.patient)
 SELECT v, count() AS n FROM (SELECT ifNull(toString(cancerType), '') AS v FROM rows WHERE 1) GROUP BY v ORDER BY n DESC, v LIMIT 500
+
+-- view 0 mutations: table:attributes · msk_chord_2024
+SELECT m.attr_id AS id, m.display_name AS name, m.datatype AS datatype, m.patient_attribute AS patient, toInt32OrZero(m.priority) AS priority
+FROM snapshot_db.clinical_attribute_meta m
+JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = m.cancer_study_id
+WHERE cs.cancer_study_identifier = 'msk_chord_2024'
+ORDER BY priority DESC, name

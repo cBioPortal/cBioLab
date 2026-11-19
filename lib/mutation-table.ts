@@ -17,6 +17,7 @@ import { PUTATIVE_DRIVER, type ResolvedDrivers } from "./driver-settings.ts";
 import { oqlFusionFilterSql, oqlMutationFilterSql } from "./oql.ts";
 import type { LollipopOql } from "./federation.ts";
 import { mutationTypeColumn } from "./mutation-type.ts";
+import { CLIN_PATIENT, CLIN_SAMPLE, clinicalQueryColumn, type ClinicalColumn } from "./mutation-clinical.ts";
 import { chromosomeSortSql, proteinChangeSortSql } from "./mutation-sort.ts";
 import { finiteSql } from "./sql-number.ts";
 import { entrezOf, fusionProteinChangeSql, oncokbSortSql, siteKey, svCallCtes, svCellSql, svDriverSql, svTypeSql } from "./sv-oncokb.ts";
@@ -386,7 +387,29 @@ function tumorTypeCtes(p: TablePart, i: number, db: string): string {
     "    k.tumorType AS tumorType FROM m" + i + " AS m LEFT JOIN k" + i + " AS k ON k.sid = m.sid),\n";
 }
 
-function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): string {
+/**
+ * Each part's clinical attributes the table's clinical columns read, as one map per sample and one per
+ * patient (as lib/clinical-table.ts keeps them), for the rows' samples and patients only.
+ */
+function clinicalMapCtes(parts: TablePart[], db: string, clinical: ClinicalColumn[]): string {
+  const of = (per: "sample" | "patient") => clinical.filter((c) => c.per === per).map((c) => sq(c.id));
+  const map = (name: string, per: "sample" | "patient", key: "sid" | "pid") => {
+    const attrs = of(per);
+    return name + " AS (\n" + parts.map((p, i) => {
+      const pre = sq(p.study + "_"), col = per === "sample" ? "sample_unique_id" : "patient_unique_id";
+      return "  SELECT " + sq(p.study) + " AS st, replaceOne(" + col + ", " + pre + ", '') AS k,\n" +
+        "         CAST((groupArray(attribute_name), groupArray(attribute_value)), 'Map(String, String)') AS m\n" +
+        "  FROM " + clinicalTable(db, clinical.map((c) => c.id)) + "\n" +
+        "  WHERE cancer_study_identifier = " + sq(p.study) + " AND type = " + sq(per) +
+        (attrs.length ? " AND attribute_name IN (" + attrs.join(", ") + ")" : " AND 0") + " AND attribute_value != ''\n" +
+        "    AND " + col + " IN (SELECT concat(" + pre + ", x) FROM (SELECT " + key + " AS x FROM m" + i + " UNION ALL SELECT " + key + " AS x FROM v" + i + "))\n" +
+        "  GROUP BY k\n";
+    }).join("  UNION ALL\n") + "),\n";
+  };
+  return map("clins", "sample", "sid") + map("clinp", "patient", "pid");
+}
+
+function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers, clinical: ClinicalColumn[] = []): string {
   const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins, oql, drivers));
   return "WITH " +
     (pin
@@ -406,7 +429,12 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
         svCallCtes(db, [gene], pin, { gene: "sva", pair: "svp" })
       : "") +
     built.map((b) => b.ctes).join("") +
-    "rows AS (\n" + built.map((b) => b.rows).join("  UNION ALL\n") + ")\n";
+    (clinical.length
+      // the rows with their sample's and patient's attribute maps (CLIN_SAMPLE, CLIN_PATIENT), which the clinical columns read
+      ? "rows0 AS (\n" + built.map((b) => b.rows).join("  UNION ALL\n") + "),\n" + clinicalMapCtes(parts, db, clinical) +
+        "rows AS (SELECT r.*, cs.m AS " + CLIN_SAMPLE + ", cp.m AS " + CLIN_PATIENT + " FROM rows0 AS r\n" +
+        "  LEFT JOIN clins AS cs ON cs.st = r.study AND cs.k = r.sid LEFT JOIN clinp AS cp ON cp.st = r.study AND cp.k = r.patient)\n"
+      : "rows AS (\n" + built.map((b) => b.rows).join("  UNION ALL\n") + ")\n");
 }
 
 /**
@@ -418,11 +446,11 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
  * and SIGNAL at the pin of the study's reference genome (`pins`), when it has one. With no sort,
  * drivers come first, then by codon. All parts must live in the database this runs in.
  */
-export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): RowSource {
+export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers, clinical: ClinicalColumn[] = []): RowSource {
   if (!parts.length) throw new Error("mutationRowSource needs at least one part");
   return {
-    with: allRows(parts, db, gene, pin, pins, oql, drivers),
-    columns: MUTATION_COLUMNS.map((c) => queryColumn(c, drivers ? true : pin)),
+    with: allRows(parts, db, gene, pin, pins, oql, drivers, clinical),
+    columns: [...MUTATION_COLUMNS.map((c) => queryColumn(c, drivers ? true : pin)), ...clinical.map(clinicalQueryColumn)],
     select: "*",
     // the portal's default: Annotation, descending (skin_results_view_tables_default_sort_column)
     defaultOrder: MUTATION_ANNOTATION_ORDER + " DESC, pos ASC NULLS LAST",
@@ -441,8 +469,8 @@ export function mutationRowSource(parts: TablePart[], db: string, gene: string, 
  * and the plot's own selection, which narrow the table alone (the portal's badge counts ignore the
  * badge filter, and a selected codon narrows only the table).
  */
-export function mutationRowKeysSql(part: TablePart, db: string, gene: string, pin: string | null, pins: VariantPins, oql: LollipopOql | undefined, q: TableQuery): string {
-  const src = mutationRowSource([part], db, gene, pin, pins, oql);
+export function mutationRowKeysSql(part: TablePart, db: string, gene: string, pin: string | null, pins: VariantPins, oql: LollipopOql | undefined, q: TableQuery, clinical: ClinicalColumn[] = []): string {
+  const src = mutationRowSource([part], db, gene, pin, pins, oql, undefined, clinical);
   return src.with + "SELECT sid, proteinChange, ifNull(mutationType, '') AS mutationType, " + rowKeySql("chr", "start", "end", "ref", "var") + " AS rk FROM rows\n" +
     "WHERE " + whereSql(src, { ...q, filters: Object.fromEntries(Object.entries(q.filters || {}).filter(([id]) => !LOLLIPOP_OWN_FILTERS.has(id))) }, MUTATION_DEFAULT_COLUMNS);
 }

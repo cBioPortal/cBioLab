@@ -12,7 +12,8 @@ import { checkQuery, describeQuery } from "../../table-query.ts";
 import { MUTATION_COLUMNS } from "../../mutation-table.ts";
 import { lollipopNarrowing } from "../../lollipop.ts";
 import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
-import { mutationDefaults } from "../mutation-defaults.ts";
+import { mutationClinicalColumns, mutationDefaults } from "../mutation-defaults.ts";
+import type { ClinicalColumn } from "../../mutation-clinical.ts";
 
 export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult | Untimed> {
   const { doc, cohorts, resolvers, vNames, participationFor } = c;
@@ -29,12 +30,18 @@ export async function runHotspots(view: DocView, c: ViewRun): Promise<ViewResult
   { const e = checkYMax(hv.yMax, uniq); if (e) return untimed({ kind: "hotspots", error: e }); }
   const yMax = hv.yMax && Object.keys(hv.yMax).length ? hv.yMax : undefined;
   const codons = pruneCodons(hv.codons && Object.fromEntries(Object.entries(hv.codons).map(([g, ps]) => [g, [...new Set(ps)].sort((a, b) => a - b)])), uniq);
+  // the table's clinical-attribute columns, when its query names any (MUT-COL-36): read as the mutations view reads them
+  let clinical: ClinicalColumn[] = [];
   if (hv.table !== undefined) {
     if (!hv.table || typeof hv.table !== "object" || !uniq.includes(hv.table.gene)) return untimed({ kind: "hotspots", error: "table names a gene of the view (" + uniq.join(", ") + "), not " + String((hv.table as { gene?: unknown } | null)?.gene ?? "none") });
-    const bad = checkQuery(hv.table, MUTATION_COLUMNS);
+    const named = [...(hv.table.columns || []), ...Object.keys(hv.table.filters || {})];
+    if (named.some((id) => !MUTATION_COLUMNS.some((c) => c.id === id)))
+      clinical = await mutationClinicalColumns(c, c.vStudies.filter((st) => isPatientLevel(resolvers[st])));
+    const bad = checkQuery(hv.table, [...MUTATION_COLUMNS, ...clinical]);
     if (bad) return untimed({ kind: "hotspots", error: "table: " + bad });
   }
   let narrowing = hv.table ? lollipopNarrowing(hv.table) : null;
+  if (narrowing && clinical.length) narrowing = { ...narrowing, clinical };
   let drivers: ResolvedDrivers | undefined;
   if (hv.drivers !== undefined) { try { drivers = resolveDrivers(hv.drivers); } catch (e) { return untimed({ kind: "hotspots", error: (e as Error).message }); } }
   // the table's search reads the columns it shows: with none named, its defaults, which follow its data
