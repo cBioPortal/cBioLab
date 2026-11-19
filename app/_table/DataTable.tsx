@@ -505,6 +505,44 @@ export function DataTable<V extends string | number | null>({ t, query, updating
     (f.elements.namedItem("payload") as HTMLInputElement).value = await api.tablePayload({ doc: doc as TableBody["doc"], view: vi, ...(table ? { table } : {}), ...(downloadFormat === "table-tsv" ? { format: "table-tsv" as const } : {}) });
     f.submit();
   };
+  // the toolbar's controls; a portal table (table.tsv) orders them as the portal's: Copy, Download, Columns, search (MUT-TB-2)
+  const searchBox = (
+    <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
+      <Input type="search" className={cn(FIELD, "w-52")} value={search} placeholder={"search " + unit} aria-label={"search " + unit}
+        onChange={(e) => { setSearch(e.target.value); if (!e.target.value && q.search) set({ search: undefined }); }}
+        onBlur={() => { if ((search || "") !== (q.search || "")) set({ search }); }} />
+    </form>
+  );
+  const columnsButton = !plain && (
+    <span className="dt-anchor">
+      <Button type="button" variant="outline" size="sm" className={cn(TB, "aria-expanded:border-primary aria-expanded:bg-accent aria-expanded:text-accent-foreground")}
+        aria-expanded={menu === "\x01columns"} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
+        data-tip="choose the columns shown"><Columns3 />columns ({shownIdx.length} / {t.columns.length})</Button>
+      <Popover open={menu === "\x01columns"} onClose={() => setMenu(null)} align="right">
+        <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set(columnsPatch(q, ids, shownIds, t.defaults || t.shown), true)} />
+      </Popover>
+    </span>
+  );
+  const downloads = (
+    <>{ownDownload ? <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !t.total || ownDownload.disabled}
+      data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download" : ownDownload.tip}
+      onClick={ownDownload.onClick}><Download />{ownDownload.label}</Button> :
+    <>{downloadFormat === "table-tsv" && <>
+      <Button variant="outline" size="sm" className={TB} type="button" disabled={!!copyBlocked}
+        data-tip={copyBlocked ?? (copyState.phase === "ready" ? "the rows are fetched: click to copy them to the clipboard" : "fetch every row, as the download writes it, to copy to the clipboard")}
+        onClick={() => copyState.phase === "ready" ? copyNow(copyState.text) : void fetchCopy()}>
+        <Copy />{copyState.phase === "ready" ? "Copy Ready!" : copyState.phase === "loading" ? "Copying…" : "Copy"}</Button>
+      {(copyState.phase === "done" || copyState.phase === "failed") && <span className="meta" role="status">{copyState.phase === "done" ? "Copied!" : "could not copy: " + copyState.why}</span>}
+    </>}
+    <form method="post" action="/api/table" target="_blank" onSubmit={download}>
+      <input type="hidden" name="payload" />
+      <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
+        data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
+          : downloadFormat === "table-tsv" ? "every row, whatever the search and filters, in the table's order, with all " + t.columns.length + " columns, as tab-separated text (the portal's table.tsv)"
+          : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />{downloadFormat === "table-tsv" ? "download TSV (" + t.all.toLocaleString() + ")" : "download CSV (" + t.total.toLocaleString() + ")"}</Button>
+    </form></>}</>
+  );
+  const portalOrder = downloadFormat === "table-tsv" && !ownDownload;
   return (
     <div className="dt">
       <div className="dt-bar">
@@ -512,36 +550,7 @@ export function DataTable<V extends string | number | null>({ t, query, updating
           {multi ? <span className="meta"> across {t.lists.length} {oneCohort ? "studies" : "cohorts and studies"}</span> : null}{countNote ? ": " + countNote : null}{pager === "showMore" && pageOfText(p.page, p.pages) ? " " + pageOfText(p.page, p.pages) : null}</span>
         {updating && <span className="waiting" role="status"><span className="spinner" /> updating…</span>}
         <span className="spacer" />
-        <form className="dt-search" onSubmit={(e) => { e.preventDefault(); set({ search }); }}>
-          <Input type="search" className={cn(FIELD, "w-52")} value={search} placeholder={"search " + unit} aria-label={"search " + unit}
-            onChange={(e) => { setSearch(e.target.value); if (!e.target.value && q.search) set({ search: undefined }); }}
-            onBlur={() => { if ((search || "") !== (q.search || "")) set({ search }); }} />
-        </form>
-        {!plain && <span className="dt-anchor">
-          <Button type="button" variant="outline" size="sm" className={cn(TB, "aria-expanded:border-primary aria-expanded:bg-accent aria-expanded:text-accent-foreground")}
-            aria-expanded={menu === "\x01columns"} onClick={() => setMenu(menu === "\x01columns" ? null : "\x01columns")}
-            data-tip="choose the columns shown"><Columns3 />columns ({shownIdx.length} / {t.columns.length})</Button>
-          <Popover open={menu === "\x01columns"} onClose={() => setMenu(null)} align="right">
-            <ColumnsMenu columns={t.columns} shown={shownIds} onShown={(ids) => set(columnsPatch(q, ids, shownIds, t.defaults || t.shown), true)} />
-          </Popover>
-        </span>}
-        {ownDownload ? <Button variant="outline" size="sm" className={TB} type="button" disabled={updating || !t.total || ownDownload.disabled}
-          data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download" : ownDownload.tip}
-          onClick={ownDownload.onClick}><Download />{ownDownload.label}</Button> :
-        <>{downloadFormat === "table-tsv" && <>
-          <Button variant="outline" size="sm" className={TB} type="button" disabled={!!copyBlocked}
-            data-tip={copyBlocked ?? (copyState.phase === "ready" ? "the rows are fetched: click to copy them to the clipboard" : "fetch every row, as the download writes it, to copy to the clipboard")}
-            onClick={() => copyState.phase === "ready" ? copyNow(copyState.text) : void fetchCopy()}>
-            <Copy />{copyState.phase === "ready" ? "Copy Ready!" : copyState.phase === "loading" ? "Copying…" : "Copy"}</Button>
-          {(copyState.phase === "done" || copyState.phase === "failed") && <span className="meta" role="status">{copyState.phase === "done" ? "Copied!" : "could not copy: " + copyState.why}</span>}
-        </>}
-                <form method="post" action="/api/table" target="_blank" onSubmit={download}>
-          <input type="hidden" name="payload" />
-          <Button variant="outline" size="sm" className={TB} type="submit" disabled={updating || !docJson || !t.total}
-            data-tip={updating ? "waiting for the table to update, so the download matches it" : !t.total ? "no rows to download"
-              : downloadFormat === "table-tsv" ? "every row, whatever the search and filters, in the table's order, with all " + t.columns.length + " columns, as tab-separated text (the portal's table.tsv)"
-              : "every row kept, with all " + t.columns.length + " columns, as comma-separated text"}><Download />{downloadFormat === "table-tsv" ? "download TSV (" + t.all.toLocaleString() + ")" : "download CSV (" + t.total.toLocaleString() + ")"}</Button>
-        </form></>}
+        {portalOrder ? <>{downloads}{columnsButton}{searchBox}</> : <>{searchBox}{columnsButton}{downloads}</>}
       </div>
       {(filters.length > 0 || (q.search || "").trim()) && (
         <div className="dt-chips">
