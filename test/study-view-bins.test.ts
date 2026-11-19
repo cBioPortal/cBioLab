@@ -2,7 +2,7 @@
 // Custom Bins dialog's input (STS-BAR-8, STS-STM-10), and the edges a typed pill interval adds (STV-FB-4).
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { binEdges, binMethodName, binsAfterEdit, logScaleOffered, looksLogarithmic, oneValueBars, parseEdges, parseGenerate, serverBins } from "../lib/study-view-bins.ts";
+import { binEdges, binMethodName, binsAfterEdit, logScaleOffered, logScaleToggled, looksLogarithmic, oneValueBars, parseEdges, parseGenerate, serverBins } from "../lib/study-view-bins.ts";
 import type { NumericBin } from "../lib/types.ts";
 
 const AGE: NumericBin[] = [
@@ -66,5 +66,21 @@ describe("what the menu keeps and sends", () => {
   test("the server is sent what changes the bars: Show NA stays in the browser, null (the default bars) is sent", () => {
     assert.deepEqual(serverBins({ AGE: { showNa: true }, MC: { disableLog: true }, MSI_SCORE: { bins: null }, FGA: { bins: { method: "median" }, showNa: true } }),
       { MC: { disableLog: true }, MSI_SCORE: { bins: null }, FGA: { bins: { method: "median" } } });
+  });
+});
+
+describe("STS-BAR-7: toggling Log Scale clears the chart's filter", () => {
+  const dtb = { kind: "clinical", attribute: "DAYS_TO_BIRTH", range: { gt: -100000, lte: -31622 } };
+  const other = { kind: "clinical", attribute: "AGE", range: { gt: 45, lte: 50 } };
+  const mixed = { any: [dtb, other] };
+  test("the bars flip, the chart's own clauses go, every other clause stays", () => {
+    const r = logScaleToggled("DAYS_TO_BIRTH", undefined, [dtb, other, mixed] as never);
+    assert.deepEqual(r.bins, { disableLog: true });
+    assert.deepEqual(r.all, [other, mixed], "a clause that also names another attribute is not the chart's alone");
+    assert.deepEqual(logScaleToggled("DAYS_TO_BIRTH", { disableLog: true, showNa: true }, []).bins, { disableLog: false, showNa: true });
+  });
+  test("a custom-data chart keeps its filter, as on the portal", () => {
+    const custom = { kind: "clinical", attribute: "custom:abc:SCORE", range: { gt: 1 } };
+    assert.deepEqual(logScaleToggled("custom:abc:SCORE", undefined, [custom] as never).all, [custom]);
   });
 });

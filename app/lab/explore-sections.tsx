@@ -6,7 +6,7 @@ import { Children, cloneElement, isValidElement, useEffect, useMemo, useRef, use
 import type { Clause, Leaf, PartitionArm } from "../../lib/types";
 import StudyViewPills from "./study-view-pills";
 import CustomBinsDialog from "./custom-bins-dialog";
-import { binsAfterEdit, logScaleOffered, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
+import { binsAfterEdit, logScaleOffered, looksLogarithmic, oneValueBars, binMethodName } from "../../lib/study-view-bins.ts";
 import { ChartMenu, type ChartAction } from "./partitions.tsx";
 import { ANALYSIS_MAX_COHORTS, armLabel, COMPARISON_MAX_ACTIVE, COMPARISON_MAX_GROUPS, type ChartKey } from "../../lib/partition-arms.ts";
 import type { OnCustomData } from "./pills";
@@ -14,7 +14,7 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
-import { fmtInt, fmtNum, fmtPct, portalFreq } from "../../lib/chart/format.ts";
+import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick } from "../../lib/chart/format.ts";
 import { countAxis } from "../../lib/chart/scale.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
@@ -871,7 +871,7 @@ export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
    change when the draft does. One tile per attribute, the portal's
    own study-view density — see .facetgrid's own comment. */
 function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clinical"][number]; ctx: ExploreCtx }) {
-  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, selectBars, togglePieValue, toggleNaValue } = ctx;
+  const { addClause, addMode, chartBins, setChartBins, exStudies, parseDraft, selectionArmCount, compareQuantiles, compareItems, compareSelection, splittingBy, toggleBar, selectBars, togglePieValue, toggleNaValue, toggleLogScale } = ctx;
   const picks = usePicks();
   const [binsOpen, setBinsOpen] = useState(false);
   const binSet = c.kind === "num" ? chartBins(c.attribute) : undefined;
@@ -921,7 +921,7 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 return <ChartMenu label={label} actions={[
                   ...(logScaleOffered(c.bins, binSet) ? [{ label: "Log Scale", checked: !binSet?.disableLog,
                     title: binSet?.disableLog ? "draw the bars on a log scale again" : "draw the bars on a linear scale",
-                    onClick: () => setChartBins(c.attribute, { ...binSet, disableLog: !binSet?.disableLog }) }] : []),
+                    onClick: () => toggleLogScale(c.attribute, binSet) }] : []),
                   ...(addMode ? [] : [
                     ...forBoth((t) => compareNumeric(label, exStudies.length === 1, splittingBy === label, (q) => compareQuantiles({ attribute: c.attribute }, q, label, t), bins, () => compareItems(chart, bins, t), t)),
                     ...selected]),
@@ -1019,18 +1019,20 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           const axis = countAxis(Math.max(...c.bins.map((b: any) => b.count), showNa ? c.naCount! : 0, 1));
           const maxN = axis.top;
           const last = c.bins[c.bins.length - 1];
-          // a bar is a word ("Negative"), one value (start = end), an outlier bar or an interval (start, end]
-          const label = binLabel;
-          const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start) : fmtNum(b.start);
+          // a tick is a bar's start (STS-BAR-3); on log-scale bars a power of ten reads 10ⁿ and a half step is blank
+          const log = looksLogarithmic(c.bins);
+          const num = (v: number) => log ? portalLogTick(v) : fmtNum(v);
+          const tick = (b: any) => b.value != null ? b.value : b.special === "<=" ? "≤" + num(b.end) : b.special === ">" ? ">" + num(b.start) : num(b.start);
           const sel = chartSelection(parseDraft(), c.attribute);
           const unit = c.per === "sample" ? "samples" : "patients";
           return (
             <Histogram ticks={[...c.bins.map(tick), ...(showNa ? ["NA"] : [])]} na={c.naCount && !showNa ? "NA " + fmtInt(c.naCount) : null}
-              yTicks={axis.ticks} top={axis.top} endTick={!showNa && last.special == null && last.value == null && last.start !== last.end ? fmtNum(last.end!) : null}
+              yTicks={axis.ticks} top={axis.top} endTick={!showNa && last.special == null && last.value == null && last.start !== last.end ? num(last.end!) || null : null}
               onDrag={(from, to) => selectBars(c.attribute, c.bins!, from, to)}>
               {c.bins.map((b: any, i: number) => {
                 const on = binSelected(sel, b);
-                const tip = label(b) + " · " + fmtInt(b.count) + " " + unit + " — click to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter") + ", or drag across bars to select them";
+                // the portal's tooltip (STS-BAR-4), in the chart's own unit
+                const tip = "Number of " + unit + ": " + fmtInt(b.count) + "\nRange: " + portalBinRange(b) + "\nclick to " + (on ? "take it out of the filter" : sel.length ? "add it to the filter" : "filter") + ", or drag across bars to select them";
                 return (
                   <button key={i} data-bar={i} className={cn("hbar", sel.length > 0 && (on ? "on" : "off"))} data-tip={tip} aria-label={tip} aria-pressed={on}
                     onClick={() => toggleBar(c.attribute, c.bins!, i)}>
@@ -1150,7 +1152,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
             yTicks={axis.ticks} top={axis.top} endTick={last.special == null && last.value == null && last.start !== last.end ? fmtNum(last.end!) : null}>
             {f.bins.map((b, i) => (
               <button key={i} className="hbar" disabled={!clickable}
-                data-tip={label(b) + " · " + fmtInt(b.count) + " " + noun + (clickable ? " — click to filter" : why)} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
+                data-tip={"Number of " + noun + ": " + fmtInt(b.count) + "\nRange: " + portalBinRange(b) + (clickable ? "\nclick to filter" : "\n" + why.replace(/^ — /, ""))} aria-label={label(b) + " · " + fmtInt(b.count) + " " + noun}
                 onClick={() => addClause({ ...base, ...assayBinWhere(b) })}>
                 <span className="hfill" style={{ height: Math.max(2, Math.round(100 * b.count / maxN)) + "%" }} />
               </button>
