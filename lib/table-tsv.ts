@@ -18,3 +18,12 @@ export function everyRowQuery<V extends { search?: string; filters?: Record<stri
   delete out.search; delete out.filters;
   return out;
 }
+
+/** the line /api/table ends a download cut short with (it answers 200, having streamed what it could) */
+export const INCOMPLETE_MARK = "# DOWNLOAD INCOMPLETE";
+
+/** why a fetched table text is not the whole table — its cut-short line's reason — or null when it is whole */
+export function cutShort(text: string): string | null {
+  const line = text.split(/\r?\n/).find((l) => l.startsWith(INCOMPLETE_MARK));
+  return line === undefined ? null : line.slice(INCOMPLETE_MARK.length).replace(/^[:\s]+/, "").trim() || "the table was cut short";
+}

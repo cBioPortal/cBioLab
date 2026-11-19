@@ -28,6 +28,7 @@ import { UPLOAD_DATASET_RE, customAttr } from "./custom-data-names.ts";
 import { idSetTable, idSetIfLoaded, ID_SET_UUID } from "./id-sets.ts";
 import { lockClause } from "./cohort-lock.ts";
 import { DISCRETE_CNA_PROFILE } from "./gene-state-clauses.ts";
+import { ANY_LEAF_LIMIT, ASSAY_VALUES_LIMIT, CLINICAL_VALUES_LIMIT } from "./filter-limits.ts";
 import type {
   CohortDef, Clause, Leaf, CompileCtx, ClinicalLeaf, ClinicalRange,
   ProfiledLeaf, CaseListLeaf, OqlLeaf, GenomicDataLeaf, GenericAssayLeaf,
@@ -111,7 +112,7 @@ function clinicalLeafSql(leaf: ClinicalLeaf, ctx: Ctx): LeafIds {
     // folded on both sides, exactly as the `=` case is — a multi-value pick is
     // several facet clicks, and must select what those facets counted
     conds.push(clinicalValueFoldSql("attribute_value") + " IN (" +
-      leaf.values.slice(0, 50).map(v => clinicalValueFoldSql(sq(String(v)))).join(",") + ")");
+      leaf.values.slice(0, CLINICAL_VALUES_LIMIT).map(v => clinicalValueFoldSql(sq(String(v)))).join(",") + ")");
   }
   if (leaf.range && typeof leaf.range === "object") {
     const r = leaf.range as Record<string, number | undefined>;
@@ -432,7 +433,7 @@ function genomicDataLeafSql(leaf: GenomicDataLeaf, ctx: Ctx): LeafIds {
     : "";
   const conds = numRangeConds(leaf.range, finiteSql("ga.alteration_value"));
   if (Array.isArray(leaf.values) && leaf.values.length)
-    conds.push("ga.alteration_value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
+    conds.push("ga.alteration_value IN (" + leaf.values.slice(0, ASSAY_VALUES_LIMIT).map(v => sq(String(v))).join(",") + ")");
   if (!conds.length) throw new Error("genomicData clause needs range{gt,gte,lt,lte} or values[]");
   return ofSamples("SELECT DISTINCT " + PID("ga.sample_unique_id", ctx.study) + " AS sid\n" +
     "  FROM " + dbOf(ctx) + ".genetic_alteration_derived ga\n" +
@@ -450,7 +451,7 @@ function genericAssayLeafSql(leaf: GenericAssayLeaf, ctx: Ctx): LeafIds {
     throw new Error("genericAssay: profile '" + pt + "' not in this study (available: " + ctx.gaProfiles.join(", ") + ")");
   const conds = numRangeConds(leaf.range, finiteSql("value"));
   if (Array.isArray(leaf.values) && leaf.values.length)
-    conds.push("value IN (" + leaf.values.slice(0, 20).map(v => sq(String(v))).join(",") + ")");
+    conds.push("value IN (" + leaf.values.slice(0, ASSAY_VALUES_LIMIT).map(v => sq(String(v))).join(",") + ")");
   if (leaf.measured === true) conds.push("trimBoth(value) NOT IN (" + ASSAY_MISSING_VALUES.map(sq).join(",") + ")");
   if (!conds.length) throw new Error("genericAssay clause needs range, values[] or measured: true");
   // a profile is measured per sample or (patient_level) per patient
@@ -663,7 +664,7 @@ function unknownLeaf(leaf: never): never {
 
 function clauseSql(clause: any, ctx: Ctx): string {
   if (clause.any) {
-    if (!Array.isArray(clause.any) || !clause.any.length || clause.any.length > 8) throw new Error("any: 1-8 leaves");
+    if (!Array.isArray(clause.any) || !clause.any.length || clause.any.length > ANY_LEAF_LIMIT) throw new Error("any: 1-" + ANY_LEAF_LIMIT + " leaves");
     // Buckets of one derived metric share a single scan — see derivedAnySql.
     // eventType must match too: two buckets of "lines" naming different event
     // types are not buckets of the same scan, they're two different metrics
