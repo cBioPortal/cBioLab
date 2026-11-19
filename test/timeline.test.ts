@@ -3,7 +3,7 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { buildTracks, flattenTracks, sampleMarks, sampleTipRows, numericResult, axisTicks, dayScale, formatDays, yearLabel, monthTicks, axisMarks, timelineAxisItems, MONTH, YEAR, type AxisMark, type AxisTick } from "../lib/timeline-tracks.ts";
-import { timelineSvg, timelineSummary } from "../lib/timeline-svg.ts";
+import { timelineSvg, timelineSummary, zoomFromDrag, ZOOM_MIN_DRAG } from "../lib/timeline-svg.ts";
 import { standaloneSvg } from "../app/lab/chart-files.ts";
 import { patientEventsSql, timelinePatientRowSource } from "../lib/patient-timeline.ts";
 import { pageSql, rankSql } from "../lib/table-query.ts";
@@ -412,5 +412,42 @@ describe("axisMarks: the timeline's axis layout", () => {
     // a month label running past hi is left out
     const clipped = months(axisMarks(ticks, (d) => d * k, 0, 135, W10));
     assert.equal(clipped.find((m) => m.label === "8m"), undefined);
+  });
+});
+
+describe("drag to zoom (PAT-TL-ZM-3)", () => {
+  const plot = { x: 100, width: 800 };
+  test("a drag of more than 10 px zooms to the stretch it covers, as fractions of the unzoomed plot; 10 px or less is a click", () => {
+    assert.equal(ZOOM_MIN_DRAG, 10);
+    assert.deepEqual(zoomFromDrag(300, 500, plot, null), [0.25, 0.5]);
+    assert.deepEqual(zoomFromDrag(500, 300, plot, null), [0.25, 0.5], "either direction");
+    assert.equal(zoomFromDrag(300, 310, plot, null), null);
+    assert.deepEqual(zoomFromDrag(300, 311, plot, null)!.map((v) => +v.toFixed(5)), [0.25, 0.26375]);
+    assert.deepEqual(zoomFromDrag(0, 2000, plot, null), [0, 1], "held to the plot");
+  });
+  test("a drag inside a zoomed view zooms further, within the stretch shown", () => {
+    assert.deepEqual(zoomFromDrag(100, 500, plot, [0.5, 0.75]), [0.5, 0.625]);
+  });
+  test("the zoomed figure draws the stretch across the plot and clips the rest; the header column and every event mark stay", () => {
+    const t: PatientTimeline = { study: "s", patient: "P-1", events: [ev("Treatment", 0), ev("Treatment", 1000), ev("Status", 2000)], samples: [], source: { label: "here", remote: false } };
+    const full = timelineSvg(t, { width: 1000, interactive: true }), zoomed = timelineSvg(t, { width: 1000, interactive: true, zoom: [0, 0.5] });
+    assert.doesNotMatch(full.svg, /clip-path/);
+    assert.match(zoomed.svg, /<clipPath id="tl-zoom-clip"><rect x="\d+(\.\d+)?" y="0"/);
+    assert.match(zoomed.svg, /<g clip-path="url\(#tl-zoom-clip\)">/);
+    const xs = (svg: string) => [...svg.matchAll(/data-ev="(\d+)" transform="translate\(([\d.-]+) 0\)"/g)].map((m) => [Number(m[1]), Number(m[2])] as const);
+    const f = new Map(xs(full.svg)), z = new Map(xs(zoomed.svg));
+    const { x, width } = full.layout.plot;
+    assert.deepEqual(zoomed.layout.plot, full.layout.plot);
+    for (const i of [0, 1, 2]) {
+      const frac = (f.get(i)! - x) / width;
+      assert.ok(Math.abs(z.get(i)! - (x + frac / 0.5 * width)) < 0.2, "event " + i + " stretched twice as wide from the left edge");
+    }
+    assert.ok(z.get(2)! > x + width, "the last event falls outside, clipped");
+    assert.equal(timelineSvg(t, { width: 1000, zoom: [0.5, 0.5] }).svg.includes("clip-path"), false, "an empty stretch is no zoom");
+    // the axis keeps only the marks inside the stretch: day 0's year label is not held at the left edge
+    const labelsAt = (svg: string) => [...svg.matchAll(/<text[^>]*x="([\d.]+)"[^>]*>([^<]*)<\/text>/g)].map((m) => ({ x: Number(m[1]), text: m[2] }));
+    const inZoom = timelineSvg(t, { width: 1000, zoom: [0.3, 0.6] });
+    const zx = inZoom.layout.plot.x;
+    assert.ok(!labelsAt(inZoom.svg).some((l) => l.text === "0" && Math.abs(l.x - zx) < 20), labelsAt(inZoom.svg).map((l) => l.text + "@" + l.x).join(" "));
   });
 });
