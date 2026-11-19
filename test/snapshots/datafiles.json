@@ -438,6 +438,14 @@
         ],
         "files": [
           {
+            "id": "cna",
+            "name": "Copy-number Alterations (OQL is not in effect)",
+            "description": "per sample and gene: its value in its study's discrete copy-number profile (gistic); NA when none is stored; NP when its panel did not cover the gene",
+            "group": "data",
+            "portalFile": "cna.txt",
+            "rows": 996
+          },
+          {
             "id": "mutations",
             "name": "Mutations (OQL is not in effect)",
             "description": "per sample and gene: its mutations' protein changes, space-separated ([germline] marked); WT when profiled with none; NP when its panel did not cover the gene",
@@ -454,12 +462,25 @@
             "rows": 996
           },
           {
-            "id": "cna",
-            "name": "Copy-number Alterations (OQL is not in effect)",
-            "description": "per sample and gene: its value in its study's discrete copy-number profile (gistic); NA when none is stored; NP when its panel did not cover the gene",
-            "group": "data",
-            "portalFile": "cna.txt",
-            "rows": 996
+            "id": "altered",
+            "name": "Altered samples",
+            "group": "list",
+            "rows": 704,
+            "description": "the samples the query alters (any line), one per row"
+          },
+          {
+            "id": "unaltered",
+            "name": "Unaltered samples",
+            "group": "list",
+            "rows": 292,
+            "description": "the samples no line alters that were profiled for every queried gene in every data type the query reads, one per row"
+          },
+          {
+            "id": "matrix",
+            "name": "Sample matrix: every sample, 1 = altered, 0 = unaltered, NP = not profiled",
+            "group": "list",
+            "rows": 996,
+            "description": "per sample: whether the query alters it, and per line whether that line does"
           },
           {
             "id": "profile:log2CNA",
@@ -532,27 +553,6 @@
             "group": "data",
             "portalFile": "Protein expression z-scores (RPPA).txt",
             "rows": 996
-          },
-          {
-            "id": "altered",
-            "name": "Altered samples",
-            "group": "list",
-            "rows": 704,
-            "description": "the samples the query alters (any line), one per row"
-          },
-          {
-            "id": "unaltered",
-            "name": "Unaltered samples",
-            "group": "list",
-            "rows": 292,
-            "description": "the samples no line alters that were profiled for every queried gene in every data type the query reads, one per row"
-          },
-          {
-            "id": "matrix",
-            "name": "Sample matrix: every sample, 1 = altered, 0 = unaltered, NP = not profiled",
-            "group": "list",
-            "rows": 996,
-            "description": "per sample: whether the query alters it, and per line whether that line does"
           }
         ],
         "tables": {},

@@ -43,7 +43,12 @@ describe("what a study holds and offers", () => {
   });
   test("files in the portal's order, each naming the studies that hold it; generic assays are not offered", () => {
     const fs = fileList({ a: BRCA, b: [p("mutations", "MUTATION_EXTENDED", "MAF"), p("rna_seq_v2_mrna", "MRNA_EXPRESSION", "CONTINUOUS")] }, ["a", "b"]);
-    assert.deepEqual(fs.map((f) => f.id), ["mutations", "sv", "cna", "profile:log2CNA", "profile:rna_seq_v2_mrna", "profile:rppa"]);
+    assert.deepEqual(fs.map((f) => f.id), ["cna", "mutations", "sv", "profile:log2CNA", "profile:rna_seq_v2_mrna", "profile:rppa"]);
+    assert.deepEqual(fs.filter((f) => f.selected).map((f) => f.id), ["cna", "mutations", "sv"]);
+    // a profile the query selected for EXP / PROT comes after them, before the rest, and is selected too
+    const chosen = fileList({ a: BRCA }, ["a"], ["rppa", "rna_seq_v2_mrna"]);
+    assert.deepEqual(chosen.map((f) => f.id), ["cna", "mutations", "sv", "profile:rppa", "profile:rna_seq_v2_mrna", "profile:log2CNA"]);
+    assert.deepEqual(chosen.filter((f) => f.selected).map((f) => f.id), ["cna", "mutations", "sv", "profile:rppa", "profile:rna_seq_v2_mrna"]);
     assert.deepEqual(fs.find((f) => f.id === "sv")!.studies, ["a"]);
     assert.deepEqual(fs.find((f) => f.id === "profile:rna_seq_v2_mrna")!.studies, ["a", "b"]);
     assert.deepEqual(fs.find((f) => f.id === "cna")!.matrix, { kind: "cna", profiles: { a: "gistic" } });
@@ -169,8 +174,9 @@ describe("runDatafiles", () => {
     const d = df(v);
     assert.deepEqual(d.counts, { samples: 3, altered: 1, unaltered: 1, unprofiled: 1 });
     assert.deepEqual(d.frequency.map((f) => [f.line, f.altered, f.profiled, f.percent]), [["TP53", 1, 2, 50], ["KRAS: MUT", 0, 3, 0]]);
-    assert.deepEqual(d.files.map((f) => [f.id, f.rows]), [["mutations", 3], ["sv", 3], ["cna", 3], ["profile:log2CNA", 3], ["profile:rna_seq_v2_mrna", 3], ["profile:rppa", 3],
-      ["altered", 1], ["unaltered", 1], ["matrix", 3]]);
+    // the portal's order (DownloadTab render): copy number, mutations, structural variants, the lists, then the profiles not selected
+    assert.deepEqual(d.files.map((f) => [f.id, f.rows]), [["cna", 3], ["mutations", 3], ["sv", 3], ["altered", 1], ["unaltered", 1], ["matrix", 3],
+      ["profile:log2CNA", 3], ["profile:rna_seq_v2_mrna", 3], ["profile:rppa", 3]]);
     assert.deepEqual(d.lines, [{ line: "TP53", gene: "TP53", column: "TP53" }, { line: "KRAS: MUT", gene: "KRAS", column: "KRAS" }]);
     assert.deepEqual(d.rows.map((r) => r.values), [["s1", "A-01", "A", "1", "R175H", "no alteration"], ["s1", "B-01", "B", "0", "no alteration", "no alteration"],
       ["s1", "C-01", "C", "NP", "not profiled", "no alteration"]]);
@@ -182,6 +188,15 @@ describe("runDatafiles", () => {
     assert.match(out[0], /Mutations \(OQL is not in effect\) \(3 rows\)[\s\S]*TP53 1 of 2 profiled \(50%\)/);
     assert.equal(datafilesKind.title!(v as never), "Downloadable data files for TP53, KRAS: MUT");
     assert.equal(pagedTable(v), d);
+  });
+  test("the query's selected mRNA and protein profiles come before the lists, the other profiles after (DownloadTab render)", async () => {
+    const r1 = local("c1", () => [], { n: 3, altered: 1, unaltered: 1, alt_0: 1, prof_0: 2, off_0: 0, alt_1: 0, prof_1: 3, off_1: 0 });
+    const ids = async (view: Record<string, unknown>) => df(await run(view, ctx({ Q: cohort({ s1: 3 }) }, { s1: r1 },
+      { studyProfiles: async () => ({ profiles: ["rna_seq_v2_mrna", "rppa"], gaProfiles: [], catalog: BRCA }) }))).files.map((f) => f.id);
+    assert.deepEqual(await ids({ exp: "rna_seq_v2_mrna" }),
+      ["cna", "mutations", "sv", "profile:rna_seq_v2_mrna", "altered", "unaltered", "matrix", "profile:log2CNA", "profile:rppa"]);
+    assert.deepEqual(await ids({ exp: "rna_seq_v2_mrna", prot: "rppa" }),
+      ["cna", "mutations", "sv", "profile:rna_seq_v2_mrna", "profile:rppa", "altered", "unaltered", "matrix", "profile:log2CNA"]);
   });
   test("a file's table alone, by name; its rows read as the file's columns", async () => {
     const r1 = local("c1", (l) => l === "datafiles:mutations" ? [{ cohort: "Q", study: "s1", patient: "A", sid: "A-01", g0: "R175H", g1: "WT" }]
@@ -206,7 +221,7 @@ describe("runDatafiles", () => {
     assert.match(String((await run({ oql: [] }, ctx(one, { s1: r1 }))).error), /one OQL entry per line/);
     assert.match(String((await run({ rows: 0 }, ctx(one, { s1: r1 }))).error), /rows \(the page size of the case table\) is 1 to 1000/);
     assert.match(String((await run({ columns: ["nope"] }, ctx(one, { s1: r1 }))).error), /unknown column nope/);
-    assert.match(String((await run({}, ctx(one, { s1: r1 }, { table: "profile:methylation" }))).error), /table is one of cases, altered, unaltered, matrix, mutations, sv, cna/);
+    assert.match(String((await run({}, ctx(one, { s1: r1 }, { table: "profile:methylation" }))).error), /table is one of cases, altered, unaltered, matrix, cna, mutations, sv/);
     const agg = { instance: { id: "agg", mode: "aggregate-only", label: "agg", conn: { id: "agg" } } };
     assert.match(String((await run({}, ctx(one, { s1: agg }))).error), /no study here may disclose patients' samples \(s1: aggregate-only/);
     const failing = { ...local("c1", () => [], {}), viewAggregate: async () => { throw new Error("warehouse down"); } };
