@@ -280,7 +280,7 @@ def assemble_contract(*, genes: list[Any], groups: list[dict[str, Any]], studies
             tx = (lambda v: (v - ref["mean"]) / ref["sd"]) if using_ref else (lambda v: v)  # noqa: B023
             vals = [tx(h["values"][p + "|" + gene]) for p in all_pids if (p + "|" + gene) in h["values"]]
             if not vals:
-                heat.append(Track("clinical", label + " (no data)", np.full(n, -1, dtype=np.int32), {"categories": []}))
+                heat.append(Track("clinical", label + " (no data)", np.full(n, -1, dtype=np.int32), {"categories": [], "profileType": h["profileType"]}))
                 continue
             # the portal's fixed ranges and colours: VAF and methylation 0..1, other profiles -3..3
             ramp = None if h.get("assay") else "vaf" if h.get("isVaf") else "methylation" if re.search("methylation", h["profileType"], re.I) else "expression"

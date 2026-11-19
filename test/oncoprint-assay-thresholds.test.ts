@@ -15,6 +15,7 @@
 // The new exports are read through the module namespace so a missing one fails its own tests
 // rather than the whole file.
 import test from "node:test";
+import { trackTops } from "../lib/oncoprint-rows.ts";
 import assert from "node:assert/strict";
 import * as onc from "../lib/oncoprint.ts";
 import * as style from "../lib/oncoprint-style.ts";
@@ -23,7 +24,7 @@ import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import { contractToTsv } from "../lib/oncoprint-tabular.ts";
 import { aggregate, type TrackShape } from "../lib/oncoprint-lod.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
-import { draw, sortColumns, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
+import { draw, sortColumns, GEOM, rowTops, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
 import type { Contract, Track } from "../lib/types.ts";
 
 type Sign = ">" | "<";
@@ -197,8 +198,8 @@ test("A5: thresholdColor reads the style it is given", () => {
 // ---- A6: drawn (OU) -----------------------------------------------------------------------------
 
 /** the fills of the track's row in the server SVG, inside the plot, left to right */
-function svgRow(svg: string, ti: number): string[] {
-  const G = style.STYLE.geometry, y0 = G.header + ti * (G.rowH + G.rowGap);
+function svgRow(svg: string, c: Contract, ti: number): string[] {
+  const G = style.STYLE.geometry, y0 = trackTops(c.tracks, G)[ti];
   const out: { x: number; fill: string }[] = [];
   for (const m of svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="([^"]+)"\/>/g)) {
     const x = +m[1], y = +m[2], h = +m[4];
@@ -210,7 +211,7 @@ function svgRow(svg: string, ti: number): string[] {
 test("A6 (SVG): a −3−k cell is filled in category k's colour, a plain cell in the gradient", () => {
   const c = thresholdContract([">90", 5, "<1", ">90", 50]);
   const t = assayTrack(c);
-  const row = svgRow(contractToSvg(c, 1200), c.tracks.indexOf(t));
+  const row = svgRow(contractToSvg(c, 1200), c, c.tracks.indexOf(t));
   assert.equal(row.length, c.columns.length, "one rect per column");
   const want = (i: number) => {
     const code = t.cells[col(c, i)];
@@ -253,7 +254,7 @@ test("A6 (canvas): `thresholds` survives packing, and a −3−k cell is filled 
   const n = c.columns.length;
   const groups: VisibleGroup[] = [{ name: "all", start: 0, count: n, patients: n }];
   draw(ctx, data, Uint32Array.from({ length: n }, (_, i) => i), groups, { zoom: 10, scrollX: 0, whitespace: true }, 1200, undefined, { gap: 0 });
-  const rowY = GEOM.header + ti * (GEOM.rowH + GEOM.rowGap);
+  const rowY = rowTops(data.tracks)[ti];
   const byX = new Map<number, string>();
   for (const f of fills) if (f.h === GEOM.rowH && Math.abs(f.y - rowY) < 1e-9 && f.x >= GEOM.gutter) byX.set(f.x, f.style);
   const xs = [...byX.keys()].sort((a, b) => a - b);

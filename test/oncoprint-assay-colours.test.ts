@@ -18,7 +18,7 @@ import assert from "node:assert/strict";
 import { assembleContract, type AssembleInput } from "../lib/oncoprint-assemble.ts";
 import { STYLE, heatColor } from "../lib/oncoprint-style.ts";
 import { contractToSvg } from "../lib/oncoprint-svg.ts";
-import { draw, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
+import { draw, GEOM, rowTops, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
 import type { Contract, Track } from "../lib/types.ts";
 
@@ -97,7 +97,7 @@ function drawn(c: Contract, t: Track) {
   const groups: VisibleGroup[] = [{ name: "all", start: 0, count: n, patients: n }];
   draw(ctx, data, Uint32Array.from({ length: n }, (_, i) => i), groups, { zoom: 10, scrollX: 0, whitespace: true }, 1200, undefined, { gap: 0 });
   const ti = c.tracks.indexOf(t);
-  const rowY = GEOM.header + ti * (GEOM.rowH + GEOM.rowGap);
+  const rowY = rowTops(data.tracks)[ti];
   const cells = fills.filter((f) => f.h === GEOM.rowH && Math.abs(f.y - rowY) < 1e-9 && f.x >= GEOM.gutter);
   const byX = new Map<number, string>();
   for (const f of cells) byX.set(f.x, f.style); // the last fill at an x is the one on top

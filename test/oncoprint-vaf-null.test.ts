@@ -8,6 +8,7 @@
 // Case ids are the case table's (V1…); V2, V4–V6 and V8–V10 are checked against the fixture
 // database, not here.
 import test from "node:test";
+import { trackTops } from "../lib/oncoprint-rows.ts";
 import assert from "node:assert/strict";
 import * as assemble from "../lib/oncoprint-assemble.ts";
 import { assembleContract, normalizeDisplay, type AssembleInput } from "../lib/oncoprint-assemble.ts";
@@ -16,7 +17,7 @@ import { contractToSvg } from "../lib/oncoprint-svg.ts";
 import { contractToTsv } from "../lib/oncoprint-tabular.ts";
 import { clusterHeatmap } from "../lib/oncoprint-cluster.ts";
 import { packContract, unpackContract } from "../lib/oncoprint-binary.ts";
-import { draw, sortColumns, paletteOf, GEOM, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
+import { draw, sortColumns, paletteOf, GEOM, rowTops, type VisibleGroup } from "../app/_oncoprint/canvas.ts";
 import { STYLE, styleForDisplay, resolveStyle } from "../lib/oncoprint-style.ts";
 import { heatmapTrackLabel } from "../lib/profile-names.ts";
 import type { Contract, Track } from "../lib/types.ts";
@@ -134,8 +135,8 @@ test("V3: the VAF query keeps alt 0 (no tumorAltCount > 0 filter remains)", () =
 // ---- SVG ------------------------------------------------------------------------------------
 
 /** the fills of every rect in the given track's row, inside the plot */
-function svgRow(svg: string, ti: number): { fill: string; y: number; h: number }[] {
-  const G = STYLE.geometry, y0 = G.header + ti * (G.rowH + G.rowGap);
+function svgRow(svg: string, c: Contract, ti: number): { fill: string; y: number; h: number }[] {
+  const G = STYLE.geometry, y0 = trackTops(c.tracks, G)[ti];
   const out: { fill: string; y: number; h: number }[] = [];
   for (const m of svg.matchAll(/<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)" fill="([^"]+)"\/>/g)) {
     const x = +m[1], y = +m[2], h = +m[4];
@@ -147,7 +148,7 @@ function svgRow(svg: string, ti: number): { fill: string; y: number; h: number }
 test("V11 (SVG): a HEAT_NULL cell is a full cell filled #e0e0e0, with no not-profiled midline (OU 273-275)", () => {
   const c = assembleContract(vafInput());
   const ti = c.tracks.indexOf(vafTrack(c));
-  const row = svgRow(contractToSvg(c, 1200), ti);
+  const row = svgRow(contractToSvg(c, 1200), c, ti);
   const grey = row.filter((r) => r.fill === GREY);
   assert.equal(grey.length, 2, "one #e0e0e0 rect per HEAT_NULL column: " + JSON.stringify(row));
   for (const r of grey) assert.equal(r.h, STYLE.geometry.rowH, "the whole cell");
@@ -159,7 +160,7 @@ test("V11 (SVG): with display.whiteBackground a HEAT_NULL cell is #ffffff, still
   const c = assembleContract(vafInput());
   const white = { ...c, display: { ...c.display, whiteBackground: true } } as Contract;
   const ti = c.tracks.indexOf(vafTrack(c));
-  const row = svgRow(contractToSvg(white, 1200), ti);
+  const row = svgRow(contractToSvg(white, 1200), white, ti);
   assert.equal(row.filter((r) => r.fill === GREY).length, 0, "no grey with white background");
   const stripe = hex(STYLE.glyph.notProfiled.stripe.color);
   assert.equal(row.filter((r) => r.fill === stripe).length, 2, "the midline only on the two not-profiled columns");
@@ -171,7 +172,7 @@ test("V12: the VAF row's legend keys HEAT_NULL as a #e0e0e0 swatch 'Not mutated/
   const svg = contractToSvg(c, 1200);
   assert.match(svg, />Not mutated\/no VAF data<\/text>/);
   // the swatch: a 10px #e0e0e0 square below the rows
-  const G = STYLE.geometry, below = G.header + c.tracks.length * (G.rowH + G.rowGap);
+  const G = STYLE.geometry, below = trackTops(c.tracks, G).at(-1)!;
   const swatches = [...svg.matchAll(/<rect x="[\d.]+" y="([\d.]+)" width="10" height="10" fill="([^"]+)"\/>/g)]
     .filter((m) => +m[1] >= below && hex(m[2]) === GREY);
   assert.equal(swatches.length, 1, "one grey swatch in the legend");
@@ -191,7 +192,7 @@ test("V13: a HEAT_NULL in an expression or methylation row draws #e0e0e0 too, wi
   const cells = Array.from(t.cells); cells[base.columns.indexOf("P2")] = -2;
   const c = { ...base, tracks: base.tracks.map((x, i) => i === ti ? { ...x, cells } : x) } as Contract;
   const svg = contractToSvg(c, 1200);
-  assert.equal(svgRow(svg, ti).filter((r) => r.fill === GREY).length, 1);
+  assert.equal(svgRow(svg, c, ti).filter((r) => r.fill === GREY).length, 1);
   assert.doesNotMatch(svg, /Not mutated\/no VAF data/);
 });
 
@@ -222,7 +223,7 @@ function canvasRow(c: Contract, whiteBackground: boolean) {
   const { ctx, rects } = recorder();
   draw(ctx, data, Uint32Array.from({ length: data.n }, (_, i) => i), groups, { zoom: 20, scrollX: 0, whitespace: false }, 1200,
     paletteOf(S), { gap: 0, style: S });
-  const y0 = GEOM.header + ti * (GEOM.rowH + GEOM.rowGap);
+  const y0 = rowTops(data.tracks)[ti];
   return rects.filter((r) => r.x >= GEOM.gutter && r.y >= y0 - 1e-6 && r.y < y0 + GEOM.rowH - 1e-6);
 }
 

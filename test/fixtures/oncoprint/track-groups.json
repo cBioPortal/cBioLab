@@ -1,0 +1,16 @@
+{
+  "about": "ONC-LY-1 track groups, read by test/oncoprint-rows.test.ts and python/tests/test_track_groups.py: each track's group key and its top from 0 (rowH 20, rowGap 3, trackGroupGap 10).",
+  "tracks": [
+    { "kind": "clinical", "label": "SEX" },
+    { "kind": "clinical", "label": "Profiled for mutations", "profiledFor": "MUTATION_EXTENDED" },
+    { "kind": "gene", "label": "KRAS" },
+    { "kind": "derivedEvent", "label": "MSI" },
+    { "kind": "heatmap", "label": "KRAS mRNA", "profileType": "mrna_zscore" },
+    { "kind": "clinical", "label": "NRAS mRNA (no data)", "profileType": "mrna_zscore" },
+    { "kind": "heatmap", "label": "TP53 mRNA", "profileType": "mrna_zscore" },
+    { "kind": "clinical", "label": "KRAS methylation (no data)", "profileType": "methylation_hm450" },
+    { "kind": "heatmap", "label": "TP53 methylation", "profileType": "methylation_hm450" }
+  ],
+  "keys": ["clinical", "clinical", "genetic", "genetic", "heatmap:mrna_zscore", "heatmap:mrna_zscore", "heatmap:mrna_zscore", "heatmap:methylation_hm450", "heatmap:methylation_hm450"],
+  "tops": [0, 23, 56, 79, 112, 135, 158, 191, 214, 237]
+}
