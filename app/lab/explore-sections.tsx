@@ -14,7 +14,7 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
-import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick } from "../../lib/chart/format.ts";
+import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick, portalSelectedInfo } from "../../lib/chart/format.ts";
 import { countAxis } from "../../lib/chart/scale.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
@@ -136,7 +136,7 @@ export function StudyPicker({ ctx }: { ctx: ExploreCtx }) {
               // the new set is worse than showing the study list's own sum
               // and saying it is still counting.
               (exploreBusy || !explore?.totals ? ""
-                : explore.totals.patients.toLocaleString() + " patients · " + explore.totals.samples.toLocaleString() + " samples" +
+                : portalSelectedInfo(explore.totals.patients, explore.totals.samples, explore.draftCount != null) +
                   (exStudies.length > 1 ? " (overlap not deduplicated)" : ""))}
               {/* the counts arrive with the facets; until then a placeholder holds their
                   place, so the header neither shows a wrong number nor jumps */}
