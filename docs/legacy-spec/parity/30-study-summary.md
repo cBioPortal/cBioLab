@@ -313,7 +313,7 @@ Filters not in the URL (as legacy); study list and drivers toggle are (`?study=`
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| STS-STM-1 | 🟡 | BC | Count by folded value at the attribute's level, NA row; all 40 categorical charts identical to the portal API on Q1, Q2, Q4; the kept spelling the greatest and values merged across studies by their fold, as the portal (`keptSpelling`). A chart lists at most 200 values (`FACET_VALUE_LIMIT`; OTHER_PATIENT_ID "showing 200 of 592 values") |
+| STS-STM-1 | ✅ | BC | Count by folded value at the attribute's level, NA row; all 40 categorical charts identical to the portal API on Q1, Q2, Q4; the kept spelling the greatest and values merged across studies by their fold, as the portal (`keptSpelling`). Every value listed (`FACET_VALUE_LIMIT` 20,000, above the warehouse's largest list, 5,033) |
 | STS-STM-2 | ✅ | BC | Disjunctive counts for categorical, derived, gene and assay facets; numeric charts counted over the other filters too (#188) |
 | STS-STM-3 | ✅ | B | % of every case (Race White 48.0 % of 594) (#190) |
 | STS-STM-4 | ✅ | C | The whole dispatch: discrete first, then CUSTOM (adjustCustomBins), GENERATE, MEDIAN, QUARTILE (median fallback), log unless disabled, scientific, linear. 29 recorded cases match the portal's bars (`test/fixtures/data-binner-methods.json`) |

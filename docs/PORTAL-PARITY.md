@@ -127,6 +127,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Show / Hide Timeline: the patient's timeline above the line chart, the chart's time axis on the timeline's, in the document (PTB-GE-LC-1) (#427)
   - [ ] Table: Annotation, Allele Freq bars and Cohort columns; the portal's page size (ours 25) (PTB-TB-1) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
   - [ ] The unprofiled-sample alert, here and on Patient → Pathways (ours draws not-profiled cells dashed or NA) (PTB-GE-3, PTB-PW-1, PTB-MD-5) ([41-patient-tabs](legacy-spec/parity/41-patient-tabs.md))
+    - [x] On Genomic Evolution: "Sample(s) ⟨markers⟩ not profiled for mutations" above the chart, from each sample's mutation panel (PTB-GE-3) (#477)
 - [x] **Patient → Mutational Signatures** — the `signatures` view: contributions per sample, the spectrum with the portal's toolbar, and the COSMIC v3.3 reference under a clicked row (#156)
   - [ ] The patient header's significant-signatures badge (no warehouse study has a p-value profile yet, so it would show nothing today)
   - [x] The signature table's download (the portal's table exports; ours is client-side `PortalTable` with no CSV) (#348)
@@ -201,7 +202,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - Ours alone: ids that tie on the portal's id vector ("P2", "P02") then compare as full ids; the portal keeps their fetch order
   - [x] Sort menu: the Mutation Type, Driver and Ignore VUS toggles (ONC-SO-1, ONC-ST-3) (#195)
     - [x] Each switch only where the portal's menu enables it: Mutation Type with colour by type, Driver with driver annotation, Ignore VUS with Driver in effect, so a link that sets a disabled switch sorts as if it were off (DeltaUtils sortByMutationType, sortByDrivers, sortIgnoreVUS) (audit of #195)
-    - [ ] "Case list order" (ONC-SO-3): the portal offers it only for a query naming sample ids, which no Results query here can yet
+    - [x] "Case list order" with a User-defined Case List: the columns in typed order, a patient at its first listed sample; listed and disabled otherwise, as the portal's (ONC-SO-3) (#468)
     - [x] A tie on every sort key: the case id by javascript-natural-sort in the direction of the first sorted clinical, heatmap or spectrum track, else the genetic track's id order (SortUtils alphabeticalDefault, PrecomputedComparator); Q1 sorted by Sex and by Stage each way, 480 and 379 tied pairs all as the portal's (#206)
     - [x] A text clinical track sorts by javascript-natural-sort of its values (STAGE I, IA, II … IVB), its legend still most frequent first (SortUtils stringClinicalComparator) (#206)
       - Known: the library is not a consistent comparator for hex-like values (none in the warehouse); the portal's order of those depends on its input order, ours on the values' ranks
@@ -209,7 +210,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] A patient-level attribute's Freq in samples, as the portal counts it: the queried samples whose patient has a value over the queried samples (the backend's ClinicalAttributeMapper counts, ResultsViewPageStore 1237-1300). msk_impact_2017 OS_MONTHS 8,142 of 10,945 = 74.4 %, as the portal (was 7,574 of 10,336 patients, 73.3 %). Explore counts it with one more query per connection (≈0.1 s on msk_chord_2024, in parallel with the facets); a peer that does not send it keeps the patients' ratio (#264)
     - [x] Study of origin, Mutation spectrum and the Profiled-for rows listed first as rows of the tab, then the rest (# Samples per Patient among them) by Freq; the automatic rows at 100%, the spectrum at the queried samples profiled for mutations; each automatic row ticked unless the reader unticks it, which the view keeps as `hideTracks` (the track's own Remove does the same) (TracksMenu 185-256, ResultsViewPageStore 1147-1316, ResultsViewOncoprint 356-400) (#258)
       - Ours alone: the spectrum's Freq counts the queried samples in the study's mutation profile; the portal counts its `_sequenced` case list. They differ in 5 of 546 warehouse studies (rectal_msk_2022 788 vs 692, ccle_broad_2025 1,981 vs 1,854, pancan_pdx_uthsa_2023 92 vs 68, bowel_colitis_msk_2022, uec_msk_2024)
-      - [ ] The spectrum's Freq differs in Q1 too: coadread_tcga_pan_can_atlas_2018 KRAS NRAS BRAF TP53 APC shows 89.9 % (534 of 594, the mutation profile's `sample_profile` rows: `app/portal/study-known.ts:92`, `lib/explore.ts:1474-1481`), the portal 99.7 %; the five-study list above is not the whole difference (ONC-STM-4, re-measured 2026-11-18) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md))
+      - Ours alone (user's decision, 2026-11-19): Q1's spectrum Freq is 89.9 % (534 of 594, the samples in the study's mutation profile and its own `_sequenced` list), the portal's 99.7 % (592). The portal reads `sample_derived.sequenced`, which populate_derived_tables.sql sets by bare sample id against every study's `_sequenced` list, so 58 TCGA samples count because a same-named sample is sequenced in another study (ONC-STM-4)
     - [x] A numeric attribute is listed with " (numeric)" after its display name ("Diagnosis Age (numeric)"); the portal lists the display name alone (ONC-TR-1, re-measured 2026-11-18) ([01-oncoprint](legacy-spec/parity/01-oncoprint.md)) (#377)
     - [x] Every attribute the studies declare is listed, at 0% where the selection has no value; ties broken by the attribute's stored priority (not the Study View's chart priority: SAMPLE_COUNT is stored 1 in all 552 studies, charted 40), then by name in code-unit order; "Select all (N)" counts every listed row, adds those with data and is not offered once all are on (ResultsViewPageStore clinicalAttributes, TracksMenu, FixedHeaderTable) (audit of #196)
     - [x] Cosmetic: the Freq column's header tooltip ("% samples with data") and the loading text ("Calculating data availability...") (#258)
@@ -292,9 +293,12 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Gene, Study of Origin, Cancer Type, Copy #, VS, Center, Allele Freq (N), the normal read counts, Exon; the portal's Mutation Type labels and upper-cased Variant Type (#245)
     - [ ] The per-query clinical-attribute and namespace columns; the Exon header's "(N in total)"; ASCN (six columns) (MUT-STM-12)
       - [x] A hidden column per clinical attribute of the queried studies (sample attributes by sample, patient by patient; NUMBER as numbers), the lollipop narrowed by them as the table (MUT-COL-36) (#420)
-      - [ ] Their header tooltip (the attribute's description), the "not available" cell tip, the 30-character cut, search on STRING attributes only
+      - [x] Their header tooltip (the attribute's description), the "not available" cell tip, the 30-character cut (MUT-COL-36) (#474)
+      - [ ] Search on STRING attributes only
   - [ ] Table chrome: Show more (ours a numbered pager and per-page select), a Columns menu with a Clinical tab and Freq, TSV of every row (ours CSV of the filtered rows), Copy, an annotation filter (MUT-TB-2, MUT-TB-4, MUT-TB-5, MUT-TB-7, MUT-TB-8, MUT-STM-15)
     - [x] Download as the portal's table.tsv: every row in the table's order whatever its search and filters, columns by name, tab-separated, CRLF (MUT-TB-8) (#411)
+    - [x] The Columns menu's Mutations and Clinical tabs with counts, the Clinical tab's Freq (samples with a value ÷ queried samples, a patient attribute by its samples), sorted, 0% disabled, Select / Deselect all (MUT-TB-5, MUT-STM-15) (#423)
+    - [x] The Columns menu's "(n / m)", and hiding a column clears its header filter (MUT-TB-5) (#476)
     - [x] Show more (25 → 50 → 100 → +100), prev / next, Reset, no per-page select; "(page x of y)" in the title (MUT-TB-4, MUT-TB-1) (#409)
     - [x] Copy: the table.tsv's text to the clipboard, "Copied!" (MUT-TB-2) (#413)
   - [ ] Several samples a patient: the "includes N duplicate mutations" suffix, "n samples / m patients" in the banners (MUT-TB-1, MUT-MD-5, MUT-STM-14, MUT-STM-16, MUT-FM-5)
@@ -321,6 +325,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] A header's first click sorts ascending, gnomAD, ClinVar and dbSNP descending, as the portal's (MUT-COL-0) (#383)
     - [x] Protein Change bold italic, cut at 40, a red Germline tag on germline calls; MS as S / G badges with the status as tooltip, other values grey (MUT-COL-6, MUT-COL-19) (#400)
     - [x] Text filters "does not begin with" / "does not end with", the portal's nine conditions in its order; a condition with no text keeps every row (MUT-TB-6) (#463)
+    - [x] "germline" found through Protein Change's search (the change + a germline call's status, "D92NGermline"); its filter reads the change alone (MUT-COL-6) (#472)
   - [ ] State: the gene's grid and codon selections and the table's query are document fields (`hide`, `codons`, `filters`), where the portal keeps a per-gene store; Genome Nexus unreachable falls back to the highest codon seen, not "No Transcript found" (MUT-FM-4, MUT-MD-8) ([05-mutations](legacy-spec/parity/05-mutations.md))
 - [ ] **Results → Plots tab** ([04-plots](legacy-spec/parity/04-plots.md))
   - [x] Box-plot quartiles by the portal's rule, sorted[round(p·n)−1] and the mean of the two middle values for an even n (ours were `quantilesExact`, sorted[floor(p·n)]): Q1 Amplification median 2668.88, Diploid q1/med/q3 978.62/1217.02/1487.07, as the portal (PLT-STM-8, PLT-BX-4) (#232)
@@ -434,7 +439,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Timeline events: a Freq column (÷ selected patients), the portal's row labels, offered in Add chart rather than shown by default (STS-OT-7) (#441)
     - [ ] A gene's mutation chart in the portal's colours, with the pies (STS-GS-1)
       - [x] The KM curve in the portal's #2986E2 (STS-KM-2); "Not Mutated" / "Not Profiled" labels (STS-GS-1) (#443)
-    - [ ] A chart lists at most 200 values (`FACET_VALUE_LIMIT`; OTHER_PATIENT_ID 200 of 592, said on the card) (STS-STM-1)
+    - [x] A chart lists every value, as the portal (`FACET_VALUE_LIMIT` 20,000, above the warehouse's largest list of 5,033; past it, said on the card) (STS-STM-1) (#465)
       - [x] A value's spelling the greatest, as the portal keeps it, and merged across studies (STS-STM-1) (#445)
     - Not as the portal, on purpose (the user, 2026-11-19): a gene's Mutated chart does not count UNCALLED mutations, as an uncalled mutation is never an alteration in cBioLab (lib/oql.ts); the portal's chart counts them, unlike its own Mutated Genes table and OQL (glioma_msk_2018 ABL1 Mutated: ours 5, the portal 6) (STS-GS-1)
   - [ ] Pie: for any attribute with few values (ours 9 allowlisted ids, else a list), slice labels, unselected slices greyed, the portal's colours (ours Okabe-Ito), the hover table with % and Select all / Compare, the pie ↔ table switch, ordinal values in count order like the rest (STS-LY-9, STS-PIE-1…5, STS-PIE-7, STS-PIE-8, STS-HD-6, STS-MD-10)
@@ -446,7 +451,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] The chart's Download (Data, SVG, PDF) (STS-SC-5; download-cases FG8, PC7) (#270, PR #273)
   - ~~Chart chrome: drag, resize, ✕ delete, ↶ reset, ⓘ overlay (STS-LY-1…6, STS-HD-2…4, STS-MD-16)~~ Decided against (2026-11-13): the Explore page keeps its fixed layout.
   - [ ] Downloads: Summary and Full data, SVG, PDF, gene-table TSV (STS-DL-1…3, STS-HD-5)
-    - [x] Summary Data for every categorical chart (clinical pie or list, generic-assay categorical, gene state): Category, count, percentage of every case with NA last, as the portal writes it; disabled, saying why, when the chart holds only its most frequent values (STS-DL-1; [download-cases](legacy-spec/parity/download-cases.md) SD1–SD16) (#257)
+    - [x] Summary Data for every categorical chart (clinical pie or list, generic-assay categorical, gene state): Category, count, percentage of every case with NA last, as the portal writes it; every value in practice, disabled, saying why, only past the 20,000-value bound (STS-DL-1; [download-cases](legacy-spec/parity/download-cases.md) SD1–SD16) (#257, #465)
     - [x] Full Data of a clinical pie or list chart, and the Data of a clinical bar, the density and the survival chart: per-case files as the portal writes them, read through the patient-level table route (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) PC1–PC14) (PR #273)
       - [ ] Gene-state and generic-assay charts' Full Data / Data: their values are not clinical rows, so they need their own row source
     - [x] SVG and PDF of each chart: a pie or list chart as its pie with the legend below, bars, density (its legend inside the file) and survival as drawn; the gene tables, Data Types and Case Lists have none, as in the portal (STS-DL-1, STS-SC-5, STS-KM-6; [download-cases](legacy-spec/parity/download-cases.md) FG1–FG10) (PR #270 open)
@@ -477,8 +482,9 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] An edited end makes custom bins on the chart (STV-FB-4): its ends join the chart's edges, so the filter is drawn as bars (#203)
     - [ ] Gene-chart and generic-assay pills named by chart (STV-FB-3 #5, #13, #14): ours the generic clause pills
       - [x] Gene-table pills: a pill per gene, coloured by alteration, the OQL in the tooltip, removed one by one (STV-FB-3 #9) (#457)
-    - [ ] Survival-attribute pills; a density drag shown on the chart only, not as two range pills (STV-FB-3a, STV-FB-3b)
-    - [ ] Several separate ranges of one chart show as one pill each (STV-FB-4); the portal merges them into one interval from the first bar's start to the last's end (which reads wider than the filter)
+    - [ ] Survival-attribute pills (STV-FB-3a)
+      - [x] A density drag shown on its chart only, with its Reset, not as pills (STV-FB-3b) (#473)
+    - [x] Several separate ranges of one chart are one pill, from the first range's start to the last's end, as the portal (which reads wider than the filter; the user's choice, 2026-11-19) (STV-FB-4) (#471)
   - [ ] Add chart: the "% samples with data" column, Select all, the X vs Y and Genomic tabs; turning a chart off clears its filter (STV-AC-2, STV-AC-3, STV-AC-7, STV-STM-3)
     - [x] Clinical: the Freq column, its order and greyed 0% rows, Select all (N) / Deselect all, unchecking clears the chart's filter (STV-AC-3, STV-AC-4, STV-STM-3; [add-chart-cases](legacy-spec/parity/add-chart-cases.md) AC1–AC8) (PR #276)
     - [ ] The gene tab's gene sets and chart-type radios; custom data with the portal's sign-in rules and "Unselected" for cases without a value (STV-AC-5, STV-AC-6, STV-STM-7)
@@ -495,7 +501,7 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
   - [ ] Found by the re-measurement of 2026-11-18 (master `bc53b944`):
     - [ ] The Clinical Data tab's Columns menu (Add chart is hidden there), "Show more" and the 100vh − 220px table height (STV-CD-5, STV-CD-9, STV-MD-13)
     - [x] The selection as the portal writes it: "Selected: N patients | M samples" (STV-AB-1) (#452)
-    - [ ] A density drag shown on its chart only, not as two range pills (STV-FB-3b)
+    - [x] A density drag shown on its chart only, not as two range pills (STV-FB-3b) (#473)
       - [x] Gene, case-list and other generic pills with the portal's lower-case "or", parentheses and outer "and" (STV-FB-2) (#453)
     - [ ] The guided tour after load (STV-LD-7)
 - [ ] **Comparison → page, Overlap, Survival and Clinical tabs** ([20-comparison-core](legacy-spec/parity/20-comparison-core.md))
@@ -576,11 +582,13 @@ Wrong on cBioLab's own terms, whatever the portal does. Each is from a scorecard
     - [x] Data (ZIP) in the download menu (PAT-TL-ZM-4) (#354)
     - [x] Drag to zoom, reset zoom and the cursor line (PAT-TL-ZM-3) (#405)
   - [ ] OncoKB TMB-H and MSI-H header badges (msk P-0000004: ", TMB-H") (PAT-SH-6, PAT-STM-9)
+    - [x] The annotation-sync step and the header lookup: TMB-H / MSI-H asked and stored as the portal asks them, in annotation.oncokb_tumor_type under "Other Biomarkers" (PAT-STM-9) (#466)
+    - [ ] The live OncoKB sync run by an administrator (npm run annotate -- oncokb_tumor_type --all)
   - [x] The Gene header's "profiled in all samples" filter (PAT-MT-6, PAT-STM-15) (#325)
   - [ ] Cohort column: the green keyword bar and its tooltip, MutSig and GISTIC badges (PAT-STM-2, PAT-STM-3, PAT-CNA-4)
     - [x] "72%" and "<1%" as the portal writes them (#290)
     - [x] No Cohort % for a mutation without a keyword, as the portal's variant counts (TCGA-A6-2671 CPD, BABAM2, ADAM32 blank) (#385)
-    - [ ] The denominator: the portal's `<study>_sequenced` list for every gene vs invariant 7's samples profiled for the gene (msk_impact_2017 ZFHX3 portal 3%, ours 4%) — a question for the user
+    - [x] The denominator: samples profiled for the gene (invariant 7), kept as a deliberate difference from the portal's `<study>_sequenced` list (user, 2026-11-19; msk_impact_2017 ZFHX3 portal 3%, ours 4%)
     - [x] The green keyword bar and its tooltip, and the CNA column's red/blue bar and tooltip, as the portal's FrequencyBar (#388)
     - [ ] MutSig and GISTIC badges [data: no MutSig q-values or GISTIC peaks in the warehouse]
   - [x] The header's tooltip tables write non-integers to one decimal (PAT-STM-10) (#290)

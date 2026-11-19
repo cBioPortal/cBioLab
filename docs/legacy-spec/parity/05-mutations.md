@@ -181,7 +181,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-3 | ✅ | B | Sample link → `/portal/patient?study=&sample=`, new tab |
 | MUT-COL-4 | ✅ | C | Cancer Type, hidden by default (#245) |
 | MUT-COL-5 | ✅ | B | The portal's tumour-type map (the study's cancer type for a sample with neither attribute; luad_msk_npjpo_2021 TP53 "Lung Adenocarcinoma") (#408); shown by default only when the rows hold more than one type (#389) |
-| MUT-COL-6 | 🟡 | B | Bold italic, cut at 40 with the whole change as tooltip, a red "Germline" tag on germline calls (`proteinChangeCell`) (#400); the search does not match "germline" through this column; no reVUE icon |
+| MUT-COL-6 | 🟡 | B | Bold italic, cut at 40 with the whole change as tooltip, a red "Germline" tag on germline calls (`proteinChangeCell`) (#400); searched as the change + a germline call's status ("D92NGermline"), as the portal's getFilterValue (#472); no reVUE icon |
 | MUT-COL-7 | 🔶 | B | Unchanged: one text badge "Oncogenic · Level 1" |
 | MUT-COL-8 | ❌ | C | Unchanged: no custom driver column (tracked) |
 | MUT-COL-9 | ❌ | C | Unchanged (tracked) |
@@ -211,7 +211,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-COL-33 | 🟡 | C | ClinVar column (#245); blank on Q1 |
 | MUT-COL-34 | 🟡 | C | dbSNP column (#245); blank on Q1 |
 | MUT-COL-35 | 🟡 | C | SIGNAL column (#245); blank on Q1 |
-| MUT-COL-36 | 🟡 | B | A hidden column per attribute of the queried studies but CANCER_TYPE_DETAILED, MUTATION_COUNT (and CANCER_TYPE, our Cancer Type column), by display name, sample attributes by sample and patient by patient, NUMBER as numbers (coadread KRAS: 92 columns, as the portal) (#420); no header description, NA tip or 30-character cut; NUMBER attributes searched |
+| MUT-COL-36 | 🟡 | B | A hidden column per attribute of the queried studies but CANCER_TYPE_DETAILED, MUTATION_COUNT (and CANCER_TYPE, our Cancer Type column), by display name, sample attributes by sample and patient by patient, NUMBER as numbers (coadread KRAS: 92 columns, as the portal) (#420); the description as header tip, the "not available" tip, cut at 30 (#474); NUMBER attributes searched |
 | MUT-COL-37 | ❌ | C | Unchanged: no namespace columns |
 | MUT-COL-38 | ✅ | B | The portal's 8 by default: Sample ID, Cancer Type Detailed, Protein Change, Annotation, Mutation Type, Copy #, Allele Freq (T), # Mut in Sample |
 | MUT-COL-T1 | ✅ | B | Label mapping and colours (`lib/mutation-type.ts`) (#245) |
@@ -241,11 +241,11 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 
 | ID | verdict | how | note |
 |---|---|---|---|
-| MUT-TB-1 | 🟡 | B | "223 KRAS mutations (page 1 of 9)", "59 of 223 KRAS mutations", the duplicate suffix when N > 0 (#409); "KRAS mutations" where the portal writes "Mutations" |
+| MUT-TB-1 | ✅ | B | "223 Mutations (page 1 of 9)", "59 of 223 Mutations", "1 Mutation" (#472), the duplicate suffix when N > 0 (#409) |
 | MUT-TB-2 | 🟡 | B | Search, columns, [Copy] (the table.tsv's text, "Copied!") and download TSV (#413); the order is ours (search first), the portal's Copy · Download · Columns · search |
 | MUT-TB-3 | ✅ | B | Search "G12D" → table 59 of 223, the lollipop and badges 59 too (the hotspots view's `table`, `linkMutations`) |
 | MUT-TB-4 | ✅ | B | ‹ Show more › with Reset, 25 → 50 → 100 → 200, hidden at ≤ 25 rows, no per-page select (`lib/table-pager.ts`, ShowMorePager) (#409) |
-| MUT-TB-5 | 🟡 | B | Unchanged: one list "Columns (6 of 35)"; no Clinical tab, no Freq |
+| MUT-TB-5 | ✅ | B | "Mutations n / m" and "Clinical n / m" tabs; Clinical: Name | Freq, sorted by Freq then name, 0% disabled; Select all (n) / Deselect all / Reset columns (#423); "Columns (n / m)", hiding a column clears its filter (#476) |
 | MUT-TB-6 | 🟡 | BC | The portal's nine text conditions in its order, case-insensitive but regex, no text keeps every row (#463); no numeric slider, no per-value counts or Compare |
 | MUT-TB-7 | ❌ | B | Unchanged: no annotation filter |
 | MUT-TB-8 | ✅ | BC | table.tsv: every row in the current sort whatever the search and filters, every column by name, tab-separated, CRLF (`lib/table-tsv.ts`, /api/table format table-tsv) (#411) |
@@ -296,7 +296,7 @@ Q1 stems, labels, VAF, # Mut and oncogenicity were matched row by row on 2026-11
 | MUT-STM-12 | ❌ | C | Unchanged: no ASCN |
 | MUT-STM-13 | ? | C | gnomAD and SIGNAL columns exist (#245); blank on Q1, not comparable |
 | MUT-STM-14 | ✅ | B | Grouped by patient + protein change (one gene per table), Σ(group − 1) over every row, not the search (`mutationRowSource` duplicateKey); keyed within a study, where legacy keys on the patient id alone (two studies sharing a patient id count no duplicate here) |
-| MUT-STM-15 | ❌ | B | Unchanged: no Freq in the Columns menu |
+| MUT-STM-15 | ✅ | B | 100 × queried samples with a value ÷ queried samples, a patient attribute by its samples (lgg_ucsf_2014: SEX 100.0%, OS_STATUS 96.7%, NOTE 3.3%, as cbioportal.org's counts) (`lib/mutation-clinical-freq.ts`) (#423) |
 | MUT-STM-16 | ✅ | B | Distinct samples and patients of the rows the table keeps, per study, summed (`mutationRowSource` units) (#307) |
 | MUT-STM-17 | ✅ | B | Default max(5, tallest), exact (TP53 coadread: 0 / 17); a set Y-Axis Max is the exact top, ">= N" on it when a stem is capped |
 
