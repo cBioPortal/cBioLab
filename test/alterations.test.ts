@@ -62,6 +62,15 @@ describe("the alterations view's tables", () => {
     // the denominator stays the samples profiled for the gene (invariant 7)
     assert.match(sql, /fp AS \(SELECT pg\.gene AS gene/);
   });
+  test("PAT-GP-2: with panel coverage worked out, each row names the samples in view whose panels leave its gene out, A to Z; without, none", () => {
+    for (const t of ["mutations", "cna"] as const) {
+      const sql = alterationSource(t, part, "P-1", "db", null, [], "patient", { genes: "any", inAll: true }).with;
+      assert.match(sql, /arraySort\(groupArrayIf\(replaceOne\(vs\.su, 'msk_chord_2024_', ''\), vs\.su NOT IN \(SELECT su FROM pan WHERE panel = 'WES'\) AND \(gg\.gene, vs\.su\) NOT IN \(SELECT gene, su FROM cov\)\)\) AS np/, t);
+      assert.match(sql, /miss AS \(SELECT gene, length\(np\) AS n, np FROM/, t);
+      assert.match(sql, /AS inAll, miss\.np AS notProfiled/, t);
+      assert.match(alterationSource(t, part, "P-1", "db", null, []).with, /AS inAll, CAST\(\[\] AS Array\(String\)\) AS notProfiled/, t);
+    }
+  });
   test("samples: \"cohort\" reads only the cohort's samples, in every table and in the patient list's counts", () => {
     const inCohort = /IN \(SELECT sid FROM ck\)/;
     for (const t of ALTERATION_TABLES) {
