@@ -6,10 +6,16 @@ import { biomarkerCallsSql, studyCancerTypeSql, type BiomarkerCall } from "../..
 
 // OncoKB's stored TMB-H / MSI-H calls at the pin for one tumour type (lib/biomarkers.ts), for the
 // Patient page header: reference data, no patient rows. A tumour type of null is the study's.
-// Without a pin, or for a study this instance does not hold, there are no calls.
+// Without a pin, or for a study this instance does not hold, there are no calls. A body that is
+// wrong is a 400; a failure reading the store is a 500, so the header can say it could not load.
 export async function POST(req: Request) {
+  let body;
   try {
-    const body = parseBody(BiomarkersRequest, await req.json());
+    body = parseBody(BiomarkersRequest, await req.json());
+  } catch (e) {
+    return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
+  }
+  try {
     const pin = await oncokbPin();
     if (!pin || !body.alterations.length) return Response.json({ pin, calls: [] });
     let tumorType = body.tumorType;
@@ -21,6 +27,6 @@ export async function POST(req: Request) {
     const calls = (await chQuery<BiomarkerCall>(biomarkerCallsSql(pin, tumorType, body.alterations))).data;
     return Response.json({ pin, calls });
   } catch (e) {
-    return Response.json({ error: String((e as Error)?.message || e) }, { status: 400 });
+    return Response.json({ error: String((e as Error)?.message || e) }, { status: 500 });
   }
 }

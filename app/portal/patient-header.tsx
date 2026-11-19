@@ -99,33 +99,42 @@ function HoverCard({ title, fields, children, openPanel }: { title: string; fiel
   );
 }
 
+/** OncoKB's TMB-H / MSI-H calls for the shown samples, by biomarker; `error` when they could not be read */
+type BiomarkerCalls = { calls: Map<Biomarker, BiomarkerCall>; error: string | null };
+
 /**
- * OncoKB's TMB-H / MSI-H calls for the shown samples, by biomarker: asked at the one tumour type the
- * shown samples give (lib/biomarkers.ts), once per page. None while loading or when the store has none,
- * as the portal shows none until OncoKB answers.
+ * OncoKB's TMB-H / MSI-H calls for the shown samples: asked at the one tumour type the shown samples
+ * give (lib/biomarkers.ts), once per page. None while loading or when the store has none, as the
+ * portal shows none until OncoKB answers; a failed read is an error, not "no call".
  */
-function useBiomarkerCalls(study: string, shown: { id: string; attrs: Attrs }[]): Map<Biomarker, BiomarkerCall> {
-  const [calls, setCalls] = useState<Map<Biomarker, BiomarkerCall>>(new Map());
+function useBiomarkerCalls(study: string, shown: { id: string; attrs: Attrs }[]): BiomarkerCalls {
+  const [out, setOut] = useState<BiomarkerCalls>({ calls: new Map(), error: null });
   const wanted = [...new Set(shown.flatMap((s) => sampleBiomarkers(s.attrs)))].sort();
   const tumorType = biomarkerTumorType(shown);
   const key = JSON.stringify([study, tumorType, wanted]);
   useEffect(() => {
     const [st, tt, alterations] = JSON.parse(key) as [string, string | null, Biomarker[]];
-    setCalls(new Map());
+    setOut({ calls: new Map(), error: null });
     if (!alterations.length) return;
     const ctl = new AbortController();
     api.biomarkers({ study: st, tumorType: tt, alterations }, { signal: ctl.signal })
-      .then((r) => r.json())
-      .then((j: { calls?: BiomarkerCall[] }) => setCalls(new Map((j.calls || []).map((c) => [c.alteration, c]))))
-      .catch(() => {});
+      .then(async (r) => {
+        const j = await r.json().catch(() => ({})) as { calls?: BiomarkerCall[]; error?: string };
+        if (!r.ok || j.error) throw new Error(j.error || "HTTP " + r.status);
+        setOut({ calls: new Map((j.calls || []).map((c) => [c.alteration, c])), error: null });
+      })
+      .catch((e) => { if (!ctl.signal.aborted) setOut({ calls: new Map(), error: String((e as Error)?.message || e) }); });
     return () => ctl.abort();
   }, [key]);
-  return calls;
+  return out;
 }
 
-/** A sample's TMB-H / MSI-H, each with OncoKB's call, after its attributes (SampleSummaryList). */
-function BiomarkerBadges({ attrs, calls }: { attrs: Attrs; calls: Map<Biomarker, BiomarkerCall> }) {
-  return <>{sampleBiomarkers(attrs).map((b) => {
+/** A sample's TMB-H / MSI-H, each with OncoKB's call, after its attributes (SampleSummaryList); a marker when the calls could not be read. */
+function BiomarkerBadges({ attrs, calls: { calls, error } }: { attrs: Attrs; calls: BiomarkerCalls }) {
+  const mine = sampleBiomarkers(attrs);
+  if (error && mine.length) return <span className="text-muted-foreground" data-attr="biomarkers-failed" data-tip={"OncoKB's " + mine.join(" / ") + " call could not be loaded: " + error}>
+    , {mine.join(", ")}: couldn&apos;t load</span>;
+  return <>{mine.map((b) => {
     const call = calls.get(b);
     return call && <span key={b} data-attr={b} data-tip={call.summary || undefined}>
       , <span className="inline-flex items-center gap-1">{b}<AnnotationBadge text={biomarkerCallText(call)} /></span>

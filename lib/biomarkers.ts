@@ -35,7 +35,7 @@ export function sampleBiomarkers(attrs: Attrs): Biomarker[] {
 /**
  * The tumour type every shown sample is asked with: the first CANCER_TYPE_DETAILED among them, else
  * the first CANCER_TYPE, else null for the study's (getSampleTumorTypeMap over all the page's
- * samples, tumorTypeResolver); "first" by sample id, as the sync takes it.
+ * samples, tumorTypeResolver); "first" by sample id, as the sync takes it, where the portal takes its API's order (the samples' import order): the two differ only when a patient's samples name different types and were imported out of id order (msk_chord_2024 P-0000012).
  */
 export function biomarkerTumorType(samples: { id: string; attrs: Attrs }[]): string | null {
   const sorted = [...samples].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
