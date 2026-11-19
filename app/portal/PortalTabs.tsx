@@ -9,6 +9,7 @@ import { ViewFigure } from "../lab/figure.tsx";
 import { useEffect, useRef, useState } from "react";
 import type { AnalysisDoc, AnalysisResult, View, ViewResult } from "../../lib/types";
 import { HotspotsBody } from "../_lollipop/HotspotsBody.tsx";
+import type { LollipopRows } from "../../lib/federation.ts";
 import type { CodonSelection } from "../../lib/lollipop.ts";
 import { KindCardBody, KindCardControls, hasKindCard, drawsOwnWaiting, figureView } from "../lab/kind-cards";
 import { dataPart } from "../_oncoprint/view-display.ts";
@@ -181,7 +182,8 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
         const body = v && !v.error && v.kind === "hotspots" && v.hotspots
           ? <HotspotsBody v={v} hide={spec.hide as string[] | undefined} onHide={(h) => edit(vi, { ...spec, hide: h } as unknown as View)}
               codons={spec.codons as CodonSelection | undefined} onCodons={(c) => edit(vi, { ...spec, codons: c } as unknown as View)}
-              yMax={spec.yMax as Record<string, number> | undefined} onYMax={(y) => edit(vi, { ...spec, yMax: y } as unknown as View)} />
+              yMax={spec.yMax as Record<string, number> | undefined} onYMax={(y) => edit(vi, { ...spec, yMax: y } as unknown as View)}
+              table={spec.table as LollipopRows | undefined} onTable={(t) => edit(vi, { ...spec, table: t } as unknown as View)} />
           : v && !v.error && v.kind === "oncoprint" && v.spec
           // the lab's own oncoprint card; the page's cohorts are its own, so a drag counts but makes no cohort
           ? <OncoprintCard view={spec} spec={v.spec} uploads={doc.uploads} busy={busy} cohortNames={Object.keys(doc.cohorts || {})} catalog={catalog}
