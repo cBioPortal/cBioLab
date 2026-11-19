@@ -313,7 +313,8 @@ async function explore({ ok, BASE, page, browser }) {
     const counted = Number((await egfr.locator(".gnum").nth(1).innerText()).replace(/,/g, ""));
     await egfr.locator("[role=checkbox], input[type=checkbox]").first().click();
     await table.getByRole("button", { name: "Apply filter" }).click();
-    await page.waitForFunction(() => /EGFR: MUT_DRIVER/.test(document.querySelector(".exbar")?.textContent || "") &&
+    // the gene's pill, its OQL line in the tooltip (STV-FB-3 #9)
+    await page.waitForFunction(() => !!document.querySelector('.exbar [data-gene-pills] [data-tip="EGFR: MUT_DRIVER"]') &&
       /[\d,]+ patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
     const matched = Number((/([\d,]+) patients match/.exec(await page.locator(".exbar").innerText()) || [])[1]?.replace(/,/g, ""));
     drv = JSON.stringify({ before: before.slice(0, 5), after: after.slice(0, 5), url, counted, matched });

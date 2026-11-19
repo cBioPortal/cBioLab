@@ -6,6 +6,7 @@
  */
 import type { ClinicalLeaf, CohortDef } from "./types.ts";
 import { chartLeaves, isNaClause } from "./explore-selection.ts";
+import { STYLE } from "./oncoprint-style.ts";
 
 type Clause = NonNullable<CohortDef["all"]>[number];
 
@@ -133,6 +134,43 @@ export function intervalEnds(draft: CohortDef, clause: number, leaf: number): nu
   const iv = l && leafInterval(l);
   if (!iv) return [];
   return iv.kind === "point" ? [iv.value] : [iv.lo, iv.hi].filter((x): x is number => x != null);
+}
+
+/** one line a gene table's selection writes: a gene and the alteration its table counts (lib/study-view-gene-tables.ts geneSelection) */
+const GENE_TABLE_LINE = /^([A-Za-z0-9][A-Za-z0-9.-]*):\s*(MUT|AMP|HOMDEL|FUSION)(_DRIVER)?$/;
+
+export interface GenePill { gene: string; line: string; color: string }
+
+/**
+ * A gene table's selection as the portal's filter bar draws it (STV-FB-3 #9): each gene its own
+ * pill, coloured by what its table counts (a mutation green, a structural variant purple, an
+ * amplification red, a deep deletion blue, the oncoprint's colours), the OQL line in its tooltip.
+ * Null when the clause is not one a gene table writes (typed OQL, a gene chart's), so it keeps
+ * the generic pill.
+ */
+export function geneTablePills(c: unknown): GenePill[] | null {
+  const l = c as { kind?: string; q?: unknown } | null;
+  if (!l || l.kind !== "oql" || typeof l.q !== "string") return null;
+  const lines = l.q.split(";").map((x) => x.trim()).filter(Boolean);
+  const out: GenePill[] = [];
+  for (const line of lines) {
+    const m = GENE_TABLE_LINE.exec(line);
+    if (!m) return null;
+    const g = STYLE.glyph;
+    const color = m[2] === "MUT" ? g.mutation.single.color : m[2] === "FUSION" ? g.sv.color
+      : g.cna.options.find((o) => o.bit === m[2])!.color;
+    out.push({ gene: m[1], line, color });
+  }
+  return out.length ? out : null;
+}
+
+/** the draft without one gene of a gene-table clause (the portal removes that gene's query); the clause goes with its last gene */
+export function removeOqlLine(draft: CohortDef, clause: number, line: string): CohortDef {
+  const all = [...(draft.all || [])];
+  const c = all[clause] as { kind: "oql"; q: string };
+  const rest = c.q.split(";").map((x) => x.trim()).filter((x) => x && x !== line);
+  if (rest.length) all[clause] = { ...c, q: rest.join("; ") } as never; else all.splice(clause, 1);
+  return { ...draft, all };
 }
 
 /** which chart a generic clause comes from, as far as its leaves say: their kind, and the gene or entity of a genomic one */
