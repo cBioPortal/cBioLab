@@ -122,3 +122,45 @@ export function appliedMutationTypes(def: { all?: unknown[] } | null | undefined
   }
   return { types: [...out], excluded };
 }
+
+/** a gene chart's name, as its card and its filter pill write it */
+export function geneChartName(gene: string, type: GeneType): string {
+  return gene + ": " + (type === "CNA" ? "copy-number alterations" : "somatic mutations");
+}
+
+/** a gene chart's state as the chart names it, under OncoKB drivers only too */
+export function geneStateLabel(type: GeneType, state: string, drivers: boolean): string {
+  if (state === "notProfiled") return type === "CNA" ? "Not profiled" : "Not Profiled";
+  if (type === "MUTATION") return state === "altered" ? (drivers ? "Driver mutation" : "Mutated") : (drivers ? "No driver mutation" : "Not Mutated");
+  if (drivers) return state === "amp" ? "Driver amplification" : state === "del" ? "Driver deletion" : "No driver call";
+  return CNA_LEVELS.find((l) => l.state === state)?.label ?? state;
+}
+
+/** the order a chart lists its states in: the copy-number levels highest first, then the rest as on the chart */
+const STATE_ORDER = ["altered", ...CNA_LEVELS.map((l) => l.state), "unaltered", "notProfiled"];
+
+/** the name a gene chart's filter carries: "gene:<GENE>|<TYPE>|<states>[|drivers]" (STV-FB-3 #5) */
+export const geneChartTag = (gene: string, type: GeneType, states: string[], drivers: boolean): string =>
+  "gene:" + gene + "|" + type + "|" + [...new Set(states)].sort((a, b) => STATE_ORDER.indexOf(a) - STATE_ORDER.indexOf(b)).join(",") + (drivers ? "|drivers" : "");
+
+/** a gene chart filter's name read back; null for any other clause */
+export function parseGeneChartTag(tag: unknown): { gene: string; type: GeneType; states: string[]; drivers: boolean } | null {
+  const m = /^gene:([^|]+)\|(MUTATION|CNA)\|([^|]*)(\|drivers)?$/.exec(String(tag ?? ""));
+  return m ? { gene: m[1], type: m[2] as GeneType, states: m[3] ? m[3].split(",") : [], drivers: !!m[4] } : null;
+}
+
+/**
+ * The clauses a gene chart's states select (geneStatesClauses), each carrying the chart and its states
+ * (`chart`, on the leaf of a negated one), so the filter bar can name them (STV-FB-3 #5) and take a
+ * state out; no effect on the cohort.
+ */
+export function geneStatesFilter(gene: string, type: GeneType, states: string[], drivers: boolean): { clauses: unknown[] } | { why: string } {
+  const r = geneStatesClauses(gene, type, states, drivers);
+  if ("why" in r) return r;
+  const chart = geneChartTag(gene, type, states, drivers);
+  const tag = (c: unknown): unknown => {
+    const not = (c as { not?: object }).not;
+    return not ? { not: { ...not, chart } } : { ...(c as object), chart };
+  };
+  return { clauses: r.clauses.map(tag) };
+}

@@ -3,7 +3,7 @@
 // numeric intervals with editable ends; clauses of no clinical chart drawn as the generic pills.
 import { Fragment, useEffect, useState } from "react";
 import type { CohortDef } from "../../lib/types.ts";
-import { editInterval, filterGroups, geneTablePills, intervalEnds, intervalText, removeOqlLine, joinedByAnd, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
+import { editInterval, filterGroups, geneTablePills, removeGeneState, removeMutationType, intervalEnds, intervalText, removeOqlLine, joinedByAnd, removePill, type Interval, type SvPill } from "../../lib/study-view-pills.ts";
 import { ClausePill, CLINICAL_COLOR, type OnCustomData } from "./pills";
 
 type Result = { draft: CohortDef } | { why: string };
@@ -72,6 +72,24 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
       ))}
     </span>
   );
+  type GeneGroup = Extract<ReturnType<typeof filterGroups>[number], { kind: "gene" }>;
+  /** a gene chart's filter: "<chart> : <state> or <state>", a state's × leaving the others (STV-FB-3 #5, #7) */
+  const gene = (g: GeneGroup) => (
+    <span key={g.clause} className="svgroup" data-sv-gene={g.label}>
+      <span className="svname">{g.label}</span>
+      <span className="svop">:</span>
+      {g.pills.map((p, k) => (
+        <Fragment key={p.key}>
+          {k > 0 && <span className="svop">or</span>}
+          <span className="fpill svpill" data-sv-pill={p.label}>
+            <span className="fval">{p.label}</span>
+            <button className="fx" aria-label={"remove " + g.label + " " + p.label}
+              onClick={() => apply(g.tag ? removeGeneState(draft, g.tag, p.key) : { draft: removeMutationType(draft, g.clause, p.key) })}>×</button>
+          </span>
+        </Fragment>
+      ))}
+    </span>
+  );
   /** any other clause: a gene table's selection as the portal draws it, a pill per gene coloured by alteration (STV-FB-3 #9); else the generic pill */
   const other = (clause: number) => {
     const genes = geneTablePills(draft.all![clause]);
@@ -97,5 +115,5 @@ export default function StudyViewPills({ draft, labelOf, apply, onIntervalEdited
   // a density drag's ranges have no pill (STV-FB-3b): its chart shows them and resets them
   return <span className="svpills">{groups.map((g, i) => g.kind === "hidden" ? null : g.kind === "other"
     ? <Fragment key={g.clause}>{and[i] && <span className="svop">and</span>}{other(g.clause)}</Fragment>
-    : chart(g))}</span>;
+    : g.kind === "gene" ? gene(g) : chart(g))}</span>;
 }

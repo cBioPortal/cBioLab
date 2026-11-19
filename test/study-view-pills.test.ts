@@ -2,8 +2,9 @@
 // chart (STV-FB-3), the interval text (STV-FB-4), its editable ends, and each pill's ×.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { ALL_LEAVES, chartNames, editInterval, filterGroups, intervalEnds, intervalText, leafInterval, removePill, geneTablePills, removeOqlLine, joinedByAnd } from "../lib/study-view-pills.ts";
+import { ALL_LEAVES, chartNames, editInterval, filterGroups, removeGeneState, removeMutationType, intervalEnds, intervalText, leafInterval, removePill, geneTablePills, removeOqlLine, joinedByAnd } from "../lib/study-view-pills.ts";
 import { naClause } from "../lib/explore-selection.ts";
+import { geneStatesFilter, mutationTypesClause } from "../lib/gene-state-clauses.ts";
 import type { ClinicalLeaf, CohortDef } from "../lib/types.ts";
 
 const age = (range: ClinicalLeaf["range"]): ClinicalLeaf => ({ kind: "clinical", attribute: "AGE", range });
@@ -188,6 +189,40 @@ test("two generic groups in a row from the same chart are joined by \"and\"; a c
   const groups = filterGroups(draft, () => undefined);
   assert.deepEqual(joinedByAnd(draft, groups), [false, true, false, false, true, false, false]);
   assert.deepEqual(joinedByAnd(null, []), []);
+});
+
+// STV-FB-3 #5 and #7: a gene chart's filter as "<chart> : <state> or <state>", as the portal's
+// (UserSelections genomicDataFilters / mutationDataFilters), each state removable
+describe("gene chart pills", () => {
+  const clauses = (r: { clauses: unknown[] } | { why: string }) => { assert.ok("clauses" in r); return r.clauses as CohortDef["all"] & unknown[]; };
+  const kras = clauses(geneStatesFilter("KRAS", "MUTATION", ["unaltered"], false));
+  const cna = clauses(geneStatesFilter("EGFR", "CNA", ["amp", "gain"], false));
+  const types = clauses(mutationTypesClause("TP53", ["Missense_Mutation", "Nonsense_Mutation"]));
+  const d: CohortDef = { all: [sex, ...kras, ...cna, ...types] as never };
+  const g = filterGroups(d, labelOf);
+  test("one group per chart, named by it, its states by name; its other clauses no pill of their own", () => {
+    assert.deepEqual(g.map((x) => x.kind), ["chart", "gene", "hidden", "gene", "gene"]);
+    const named = g.filter((x) => x.kind === "gene").map((x) => x.kind === "gene" && [x.label, x.pills.map((p) => p.label)]);
+    assert.deepEqual(named, [["KRAS: somatic mutations", ["Not Mutated"]], ["EGFR: copy-number alterations", ["Amplified", "Gained"]],
+      ["TP53: mutation types", ["Missense Mutation", "Nonsense Mutation"]]]);
+  });
+  test("a state's × leaves the chart's other states, as one filter; its last takes the chart's filter", () => {
+    const r = removeGeneState(d, "gene:EGFR|CNA|amp,gain", "gain");
+    assert.ok("draft" in r);
+    assert.deepEqual(r.draft.all, [sex, ...kras, ...clauses(geneStatesFilter("EGFR", "CNA", ["amp"], false)), ...types]);
+    const gone = removeGeneState(d, "gene:KRAS|MUTATION|unaltered", "unaltered");
+    assert.ok("draft" in gone);
+    assert.deepEqual(gone.draft.all, [sex, ...cna, ...types]);
+  });
+  test("a mutation type's × leaves the others; its last takes the clause", () => {
+    assert.deepEqual(removeMutationType(d, 4, "Missense_Mutation").all, [sex, ...kras, ...cna, ...clauses(mutationTypesClause("TP53", ["Nonsense_Mutation"]))]);
+    const one: CohortDef = { all: clauses(mutationTypesClause("TP53", ["Missense_Mutation"])) as never };
+    assert.deepEqual(removeMutationType(one, 0, "Missense_Mutation").all, []);
+  });
+  test("a gene clause without the chart's name (typed, or from before) keeps the generic pill", () => {
+    const [x] = filterGroups({ all: [{ kind: "profiled", type: "MUTATION", gene: "KRAS" }] as never }, labelOf);
+    assert.equal(x.kind, "other");
+  });
 });
 
 // a pill is named by its chart; when the answer holds no chart (no sample left), by the attribute

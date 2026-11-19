@@ -4,7 +4,7 @@
 import { chQuery, PRIMARY, ensureChContext, inChContext, registerChExternal, studiesChangeWhileRunning, type ChConn } from "./ch.ts";
 import { sq, genomicStudySql } from "./compiler.ts";
 import { derivedMetricSql, basePatientsSql, discreteCnaProfileSql, type DerivedMetric } from "./cohort2.ts";
-import { CNA_LEVELS, DISCRETE_CNA_PROFILE, isMutationTypeLeafFor, mutationTypeLabel } from "./gene-state-clauses.ts";
+import { CNA_LEVELS, DISCRETE_CNA_PROFILE, geneStateLabel, isMutationTypeLeafFor, mutationTypeLabel } from "./gene-state-clauses.ts";
 import { SAMPLE_TIME_EVENTS, TREATMENT_EVENT } from "./treatment-tables.ts";
 import { compileCohortDef } from "./cohort2.ts";
 import { driverEventSql } from "./oql.ts";
@@ -867,9 +867,9 @@ async function geneStateFacets(opts: {
         gene, type: "MUTATION", per: "sample", total, profiled,
         ...(orphan ? { alteredUnprofiled: orphan } : {}),
         states: [
-          { state: "altered", label: driver ? "Driver mutation" : "Mutated", n: altered },
-          { state: "unaltered", label: driver ? "No driver mutation" : "Not Mutated", n: Math.max(0, profiled - altered) },
-          { state: "notProfiled", label: "Not Profiled", n: Math.max(0, total - profiled) }
+          { state: "altered", label: geneStateLabel("MUTATION", "altered", !!driver), n: altered },
+          { state: "unaltered", label: geneStateLabel("MUTATION", "unaltered", !!driver), n: Math.max(0, profiled - altered) },
+          { state: "notProfiled", label: geneStateLabel("MUTATION", "notProfiled", !!driver), n: Math.max(0, total - profiled) }
         ]
       };
     })(),
@@ -888,7 +888,7 @@ async function geneStateFacets(opts: {
         gene, type: "CNA", per: "sample", total, profiled,
         states: [
           ...CNA_LEVELS.map((l, i) => ({ state: l.state, label: l.label, n: counts[i] })),
-          { state: "notProfiled" as const, label: "Not profiled", n: Math.max(0, total - profiled) }
+          { state: "notProfiled" as const, label: geneStateLabel("CNA", "notProfiled", false), n: Math.max(0, total - profiled) }
         ]
       };
     })() :
@@ -929,10 +929,10 @@ async function geneStateFacets(opts: {
         gene, type: "CNA", per: "sample", total, profiled,
         ...(overlap ? { overlap } : {}),
         states: [
-          { state: "amp", label: "Driver amplification", n: amp },
-          { state: "del", label: "Driver deletion", n: del },
-          { state: "unaltered", label: "No driver call", n: Math.max(0, profiled - anyAltered) },
-          { state: "notProfiled", label: "Not profiled", n: Math.max(0, total - profiled) }
+          { state: "amp", label: geneStateLabel("CNA", "amp", true), n: amp },
+          { state: "del", label: geneStateLabel("CNA", "del", true), n: del },
+          { state: "unaltered", label: geneStateLabel("CNA", "unaltered", true), n: Math.max(0, profiled - anyAltered) },
+          { state: "notProfiled", label: geneStateLabel("CNA", "notProfiled", true), n: Math.max(0, total - profiled) }
         ]
       };
     })()

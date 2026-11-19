@@ -33,7 +33,7 @@ import { PORTAL_NA } from "../../lib/chart/style.ts";
 import { DEFAULT_DENSITY_PAIR, densityChartName, densityChartsShown, densityPairKey } from "../../lib/study-view-density.ts";
 import { ALTERED_ONLY_TYPES, ASSAY_FREQ_TABLE_LIMIT, freqRowKey, freqTableClause, freqTableRows } from "../../lib/assay-frequency-table.ts";
 import { appliedTreatmentKeys, sampleTreatmentKey, sampleTreatmentOrder, treatmentClause } from "../../lib/treatment-tables.ts";
-import { appliedMutationTypes, mutationTypesClause } from "../../lib/gene-state-clauses.ts";
+import { appliedMutationTypes, mutationTypesClause, geneChartName } from "../../lib/gene-state-clauses.ts";
 import { cn } from "../../lib/cn.ts";
 import { SaveCohortDialog, SaveFeatureDialog } from "./dialogs.tsx";
 import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type GroupsTarget } from "./use-explore-state.ts";
@@ -1317,9 +1317,9 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
       return (
         <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
           <div className="facettitle">
-            {f.gene}: {f.type === "CNA" ? "copy-number alterations" : "somatic mutations"}
+            {geneChartName(f.gene, f.type)}
             <span className="meta">sample-level · {f.total.toLocaleString()} samples</span>
-            <ChartMenu label={f.gene} actions={[summaryDownload(f.gene + ": " + (f.type === "CNA" ? "copy-number alterations" : "somatic mutations"), "sample",
+            <ChartMenu label={f.gene} actions={[summaryDownload(geneChartName(f.gene, f.type), "sample",
               states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg, undefined, undefined,
               // the file writes the portal's codes (SD14); the figure, the names on screen
               (label) => { const st = states.find((x) => x.label === label); return st ? geneStateCode(f.type, st.state, !!explore.drivers, st.label) : label; })]} />
