@@ -3,7 +3,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { currentLinkUrlMax, linkParams, writeSearch } from "../_links/link-state.ts";
 import { TAB_PARAM, readFilters, readTab, writeTab, type StudyViewTab } from "../../lib/study-view-url.ts";
 import { useLinkParams } from "../_links/use-link.ts";
-import { ExploreCharts } from "./explore-charts";
+import { exploreChartCards } from "./explore-charts";
+import { StudyViewGrid } from "./explore-grid.tsx";
+import { chartCells } from "../../lib/study-view-layout.ts";
 import { geneChartCount } from "../../lib/study-view-add-chart.ts";
 import { ViolinCard } from "./explore-violin";
 import { violinPairKey } from "../../lib/study-view-violin.ts";
@@ -39,8 +41,7 @@ import { DrawAtWidth } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
-import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, ClinicalFacets, GeneFacets, MutationTypeFacets, AssayFacets, AssayFreqTables, TreatmentTables, StudyBreakdown, DataTypes, AlteredGenes, EventsAndCaseLists, type ExploreCtx } from "./explore-sections.tsx";
-import { cardOrders } from "../../lib/study-view-config.ts";
+import { StudyPicker, ExploreBar, AddChartDialog, DerivedFacets, clinicalCards, geneFacetCards, mutationTypeCards, assayCards, assayFreqCards, AssayFreqTablesMore, treatmentCards, studyCards, dataTypesCards, geneTableCards, specialCards, type ExploreCtx } from "./explore-sections.tsx";
 import { CohortEditDialog, WorkspaceDialog } from "./dialogs.tsx";
 import { useViewOptions } from "./use-view-options.ts";
 import { useViewEdits } from "./use-view-edits.ts";
@@ -659,40 +660,36 @@ export default function AnalysisPage() {
             </div>
           )}
           {explore && explore.draftCount !== 0 && <>
-            {/* every card's place by the portal's priorities, clinical and other kinds together (STS-LY-3) */}
-            <style>{cardOrders(explore.clinical || []).map((c) => ".facetgrid > " + c.selector + " { order: " + c.order + "; }").join("\n")}</style>
-            <div className="facetgrid">
-              <ExploreCharts studies={explore.studies && explore.studies.length ? explore.studies : [explore.study]} selection={() => tabSelection} draft={parseDraft()}
-                attrs={explore.clinical || []}
-                endpoints={(() => {
+            <AssayFreqTablesMore ctx={exploreCtx} />
+            {/* every card in the portal's grid, by its priorities, clinical and other kinds together (STS-LY-1…3) */}
+            <StudyViewGrid cards={[
+              ...exploreChartCards({ studies: explore.studies && explore.studies.length ? explore.studies : [explore.study], selection: () => tabSelection, draft: parseDraft(),
+                attrs: explore.clinical || [],
+                endpoints: (() => {
                   // an endpoint is a <X>_MONTHS with its <X>_STATUS, the survival view's own convention
                   const names = new Set((explore.clinical || []).map((c: any) => c.attribute));
                   const eps = [...names].filter((a) => /_MONTHS$/.test(a) && names.has(a.replace(/_MONTHS$/, "_STATUS"))).map((a) => a.replace(/_MONTHS$/, ""));
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
-                })()}
-                addClauses={exploreState.addDensitySelection} km={(curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />}
-                density={exploreState.chartChecked("genomic|density")} pairs={exploreState.xyCharts} onRemovePair={exploreState.removeXyChart}
-                onClearDensity={exploreState.clearDensitySelection} />
-              {(explore.violinFacets || []).filter((f) => exploreState.violinCharts.some((p) => violinPairKey(p) === violinPairKey(f))).map((f) => (
-                <ViolinCard key={violinPairKey(f)} facet={f} selected={(chartValues(parseDraft(), f.categorical) || []).map(String)}
+                })(),
+                addClauses: exploreState.addDensitySelection, km: (curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: curves as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />,
+                density: exploreState.chartChecked("genomic|density"), pairs: exploreState.xyCharts, onRemovePair: exploreState.removeXyChart,
+                onClearDensity: exploreState.clearDensitySelection }),
+              ...(explore.violinFacets || []).filter((f) => exploreState.violinCharts.some((p) => violinPairKey(p) === violinPairKey(f))).map((f) => ({
+                key: "violin:" + violinPairKey(f), name: violinPairKey(f), ...chartCells("violin"),
+                node: <ViolinCard facet={f} selected={(chartValues(parseDraft(), f.categorical) || []).map(String)}
                   nameOf={(a) => (explore.clinical || []).find((c: any) => c.attribute === a)?.displayName || a}
-                  onToggle={(v) => exploreState.togglePieValue(f.categorical, v)} onRemove={() => exploreState.removeViolinChart(f)} />
-              ))}
-              <ClinicalFacets ctx={exploreCtx} />
-              {/* Charted genes (added from "+ Add chart" > Gene status) — one tile per
-                  gene per alteration type, the same tile shape a clinical attribute gets,
-                  so a chart you configured actually reaches this grid rather than only
-                  living inside the dialog that configured it. */}
-              <GeneFacets ctx={exploreCtx} />
-              <MutationTypeFacets ctx={exploreCtx} />
-              <AssayFacets ctx={exploreCtx} />
-              <AssayFreqTables ctx={exploreCtx} />
-              <TreatmentTables ctx={exploreCtx} />
-              <StudyBreakdown ctx={exploreCtx} />
-              {exploreState.chartChecked("genomic|datatypes") && <DataTypes ctx={exploreCtx} />}
-              <AlteredGenes ctx={exploreCtx} />
-              <EventsAndCaseLists ctx={exploreCtx} />
-            </div>
+                  onToggle={(v) => exploreState.togglePieValue(f.categorical, v)} onRemove={() => exploreState.removeViolinChart(f)} /> })),
+              ...clinicalCards(exploreCtx),
+              ...geneFacetCards(exploreCtx),
+              ...mutationTypeCards(exploreCtx),
+              ...assayCards(exploreCtx),
+              ...assayFreqCards(exploreCtx),
+              ...treatmentCards(exploreCtx),
+              ...studyCards(exploreCtx),
+              ...dataTypesCards(exploreCtx),
+              ...geneTableCards(exploreCtx),
+              ...specialCards(exploreCtx),
+            ]} />
           </>}
           </div>
         </div>}

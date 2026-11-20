@@ -222,31 +222,19 @@ pre {
 .note { font-size: var(--t-sm); color: var(--muted); margin-top: 0.5rem; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
 @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
-/* Explore: one facet (or gene table, or study breakdown) per tile, packed as many to a
-   row as fit — the portal's own study-view density, instead of a couple of full-width
-   columns each stacking every facet vertically. `auto-fill` + a fixed min width is what
-   makes it collapse to one column on a phone without a media query: below ~280px+gap
-   there is only room for one track. Each tile keeps its own `.card` look; `.vallist`
-   already caps its own height and scrolls (see its own comment), so no facet makes its row
-   tall. The tiles in a row share its height, so the grid reads as rows rather than a ragged
-   edge; the reading order stays left to right. */
-.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.8rem; align-items: stretch; }
+/* Explore's grid, as the portal's (STS-LY-1, app/lab/explore-grid.tsx): react-grid-layout places
+   each card in 195 × 170 px cells 5 px apart, the grid centred at its own width. Each card fills its
+   cells and scrolls within them, so no card sets another's size. The loading placeholders take the
+   same cells. */
+.svgridbox { width: 100%; display: flex; justify-content: center; }
+.svgrid { flex: none; }
+.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 5px; justify-content: center; }
 .nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
 .nosamples p + p { margin-top: 0.6rem; }
-.facetgrid > .card { margin-bottom: 0; min-width: 0; }
-/* A tile whose body is a scrolling list fills the height its row gives it: the list's flex-basis
-   of 0 keeps its rows out of the row's height (its min-height is the least it shows), and it
-   grows into whatever height a taller neighbour sets, so no tile ends in empty space. */
-.facetgrid > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; }
-.facetgrid > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; max-height: none; }
-.facetgrid > .card > .vallist { min-height: var(--vallist-h); }
-.facetgrid > .card > :is(.generows, .sbrows) { min-height: 20rem; }
-/* Studies and data types are dense multi-column rows (see .sbrow/.dtrow's own
-   grid-template-columns) that read as cramped at one tile's width. */
-.facetgrid > .card.wide { grid-column: span 2; }
-/* Explore's card order is the portal's priorities (cardOrders, lib/study-view-config.ts), set by
-   app/lab/page.tsx as a style per card rather than by the order the page builds them in */
-@media (max-width: 620px) { .facetgrid > .card.wide { grid-column: span 1; } }
+.svcell > .card { height: 100%; margin: 0; min-width: 0; overflow: auto; box-sizing: border-box; padding: 0.3rem 0.5rem; border-radius: var(--r-md, 4px); }
+/* A card whose body is a scrolling list gives the list the card's height below its title */
+.svcell > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; overflow: hidden; }
+.svcell > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; min-height: 0; max-height: none; }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
 .qdesc {
@@ -300,7 +288,7 @@ pre {
 .skeleton { background: var(--line); border-radius: var(--r-md); animation: skeleton-pulse 1.3s ease-in-out infinite; }
 .skeleton-cohort { flex: 1 1 18rem; max-width: 26rem; height: 4.6rem; }
 .skeleton-counts { display: inline-block; vertical-align: middle; width: 15rem; height: 0.9em; border-radius: var(--r-sm); }
-.skeleton-facet { height: 13rem; }
+.skeleton-facet { height: 100%; }
 .skeleton-view { height: 16rem; margin-bottom: 1rem; }
 /* under a view's toolbar the figure stands where the drawing will be, as far below it as the drawing */
 .viewtb + .skeleton-view { margin-top: var(--s3); }
@@ -691,9 +679,9 @@ main.analysis-main { max-width: min(132rem, 100%); }
 /* a chart's title as the portal's (STS-HD-1): one line, centred, a long one cut with an ellipsis
    (the whole of it is in the tooltip); padded on both sides alike so the chart menu, placed over
    the card's corner, neither covers it nor pulls it off centre */
-.facetgrid > .card > .facettitle { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 1.75rem; }
+.svcell > .card > .facettitle { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 1.75rem; }
 /* what the chart counts, on a line of its own under the title, so a long title never hides it */
-.facetgrid > .card > .facettitle > .meta { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.svcell > .card > .facettitle > .meta { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- view-card tables (app/lab/kinds/<kind>.tsx) ---------------- */
 .vscroll { overflow-x: auto; }
@@ -1213,9 +1201,9 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .cpick-foot { margin: var(--s1) var(--s3) 0; padding-top: var(--s1); border-top: 1px solid var(--line); font-size: var(--t-sm); color: var(--muted); }
 
 /* an Explore chart's "⋯" menu: pinned to the card's corner, like a cohort box's */
-.facetgrid > .card { position: relative; }
-.facetgrid > .card > div:first-child { padding-right: 1.8rem; }
-.facetgrid > .card .chartgear { position: absolute; top: 0.45rem; right: 0.5rem; }
+.svcell > .card { position: relative; }
+.svcell > .card > div:first-child { padding-right: 1.8rem; }
+.svcell > .card .chartgear { position: absolute; top: 0.45rem; right: 0.5rem; }
 .partrename { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: text; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .partrename:hover { text-decoration: underline dotted; }
 .partrenameinput { font: inherit; height: 1.45rem; width: 100%; box-sizing: border-box; padding: 0 var(--s1); }
