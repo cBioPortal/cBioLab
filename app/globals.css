@@ -222,31 +222,33 @@ pre {
 .note { font-size: var(--t-sm); color: var(--muted); margin-top: 0.5rem; }
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
 @media (max-width: 880px) { .two-col { grid-template-columns: 1fr; } }
-/* Explore: one facet (or gene table, or study breakdown) per tile, packed as many to a
-   row as fit — the portal's own study-view density, instead of a couple of full-width
-   columns each stacking every facet vertically. `auto-fill` + a fixed min width is what
-   makes it collapse to one column on a phone without a media query: below ~280px+gap
-   there is only room for one track. Each tile keeps its own `.card` look; `.vallist`
-   already caps its own height and scrolls (see its own comment), so no facet makes its row
-   tall. The tiles in a row share its height, so the grid reads as rows rather than a ragged
-   edge; the reading order stays left to right. */
-.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.8rem; align-items: stretch; }
+/* Explore's grid, as the portal's (STS-LY-1, app/lab/explore-grid.tsx): react-grid-layout places
+   each card in 195 × 170 px cells 5 px apart, the grid centred at its own width. Each card fills its
+   cells and scrolls within them, so no card sets another's size. The loading placeholders take the
+   same cells. */
+.svgridbox { width: 100%; display: flex; justify-content: center; }
+.svgrid { flex: none; }
+.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 5px; justify-content: center; }
 .nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
 .nosamples p + p { margin-top: 0.6rem; }
-.facetgrid > .card { margin-bottom: 0; min-width: 0; }
-/* A tile whose body is a scrolling list fills the height its row gives it: the list's flex-basis
-   of 0 keeps its rows out of the row's height (its min-height is the least it shows), and it
-   grows into whatever height a taller neighbour sets, so no tile ends in empty space. */
-.facetgrid > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; }
-.facetgrid > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; max-height: none; }
-.facetgrid > .card > .vallist { min-height: var(--vallist-h); }
-.facetgrid > .card > :is(.generows, .sbrows) { min-height: 20rem; }
-/* Studies and data types are dense multi-column rows (see .sbrow/.dtrow's own
-   grid-template-columns) that read as cramped at one tile's width. */
-.facetgrid > .card.wide { grid-column: span 2; }
-/* Explore's card order is the portal's priorities (cardOrders, lib/study-view-config.ts), set by
-   app/lab/page.tsx as a style per card rather than by the order the page builds them in */
-@media (max-width: 620px) { .facetgrid > .card.wide { grid-column: span 1; } }
+.svcell > .card { height: 100%; margin: 0; min-width: 0; overflow: auto; box-sizing: border-box; padding: 0.3rem 0.5rem; border-radius: var(--r-md, 4px); }
+/* A card whose body is a scrolling list gives the list the card's height below its title */
+.svcell > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; overflow: hidden; }
+.svcell > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; min-height: 0; max-height: none; }
+/* Every card's title alike, as the portal's (STS-HD-1): its name only, bold and centred, on one line,
+   a long one cut with an ellipsis (the whole of it, and what it counts, in its tooltip). A header row
+   that also holds controls keeps them on that line and gives the title the rest. */
+.svcell :is(.facettitle, .xc-title) {
+  font-size: var(--t-md); font-weight: 600; line-height: 20px; color: var(--ink); text-transform: none; letter-spacing: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; min-width: 0; margin: 0;
+}
+.svcell .xc-head { flex-wrap: nowrap; gap: 0.3rem; }
+.svcell .xc-head > .xc-title { flex: 1 1 0; }
+.svcell [data-genetable] > .row:first-child { flex-wrap: nowrap; align-items: center; }
+.svcell [data-genetable] > .row:first-child > .facettitle { flex: 1 1 0; }
+.svcell .charticon svg { width: 0.85rem; height: 0.85rem; }
+.svcell .titleicon { display: inline-flex; align-items: center; justify-content: center; height: 20px; width: 20px; vertical-align: top; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.svcell .titleicon[aria-pressed=true] { color: var(--accent-ink); }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
 .qdesc {
@@ -300,7 +302,7 @@ pre {
 .skeleton { background: var(--line); border-radius: var(--r-md); animation: skeleton-pulse 1.3s ease-in-out infinite; }
 .skeleton-cohort { flex: 1 1 18rem; max-width: 26rem; height: 4.6rem; }
 .skeleton-counts { display: inline-block; vertical-align: middle; width: 15rem; height: 0.9em; border-radius: var(--r-sm); }
-.skeleton-facet { height: 13rem; }
+.skeleton-facet { height: 100%; }
 .skeleton-view { height: 16rem; margin-bottom: 1rem; }
 /* under a view's toolbar the figure stands where the drawing will be, as far below it as the drawing */
 .viewtb + .skeleton-view { margin-top: var(--s3); }
@@ -540,25 +542,14 @@ main.analysis-main { max-width: min(132rem, 100%); }
 }
 
 /* Explore: categorical clinical facets as pie charts (portal study-view style) */
-.piewrap { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.3rem; }
-.pie { width: 72px; height: 72px; flex: 0 0 72px; }
-.pie .slice { cursor: pointer; stroke: var(--card); stroke-width: 1; }
-.pie .slice:hover { opacity: 0.82; }
-.pie .slice.on { stroke: var(--ink); stroke-width: 2; }
-.pielegend { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; flex: 1; min-width: 0; }
-.pikey {
-  display: inline-flex; align-items: center; gap: 0.3rem; max-width: 100%;
-  background: none; border: none; padding: 0.06rem 0.2rem; border-radius: var(--r-sm);
-  font: inherit; font-size: var(--t-md); color: var(--ink); cursor: pointer;
-}
-.pikey:hover { background: var(--code-bg); }
-/* Selected, not just hovered: a flat accent tint, not a boxed outline — a
-   bordered, rounded pill sitting inside a plain legend read as clutter. */
-.pikey.on { background: var(--accent-soft); font-weight: 600; }
-.pikey.on .pname { color: var(--accent-ink); }
-.pikey .swatch { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 9px; }
-.pikey .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 11rem; }
-.pikey .pn { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* a pie fills its 1 × 1 card below the title, as the portal's (STS-PIE-2); its values are a table in the hover popover */
+.svcell > .card[data-shape=pie] { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.svcell > .card[data-shape=pie] > .facettitle { flex: none; margin-top: 2px; }
+.svcell > .card[data-shape=pie] > span { display: flex; flex: 1 1 0; min-height: 0; }
+.pie { display: block; width: 100%; height: 100%; }
+.pie .slice { cursor: pointer; }
+.pie .slice:hover path { opacity: 0.82; }
+.pietable .vallist { max-height: 150px; }
 
 /* Explore: data-types rows */
 .generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 4.5rem 3.5rem; }
@@ -691,9 +682,9 @@ main.analysis-main { max-width: min(132rem, 100%); }
 /* a chart's title as the portal's (STS-HD-1): one line, centred, a long one cut with an ellipsis
    (the whole of it is in the tooltip); padded on both sides alike so the chart menu, placed over
    the card's corner, neither covers it nor pulls it off centre */
-.facetgrid > .card > .facettitle { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 1.75rem; }
+.svcell > .card > .facettitle { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 1.75rem; }
 /* what the chart counts, on a line of its own under the title, so a long title never hides it */
-.facetgrid > .card > .facettitle > .meta { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+.svcell > .card > .facettitle > .meta { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- view-card tables (app/lab/kinds/<kind>.tsx) ---------------- */
 .vscroll { overflow-x: auto; }
@@ -1213,9 +1204,9 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 .cpick-foot { margin: var(--s1) var(--s3) 0; padding-top: var(--s1); border-top: 1px solid var(--line); font-size: var(--t-sm); color: var(--muted); }
 
 /* an Explore chart's "⋯" menu: pinned to the card's corner, like a cohort box's */
-.facetgrid > .card { position: relative; }
-.facetgrid > .card > div:first-child { padding-right: 1.8rem; }
-.facetgrid > .card .chartgear { position: absolute; top: 0.45rem; right: 0.5rem; }
+.svcell > .card { position: relative; }
+.svcell > .card > div:first-child { padding-right: 1.8rem; }
+.svcell > .card .chartgear { position: absolute; top: 0.45rem; right: 0.5rem; }
 .partrename { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: text; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .partrename:hover { text-decoration: underline dotted; }
 .partrenameinput { font: inherit; height: 1.45rem; width: 100%; box-sizing: border-box; padding: 0 var(--s1); }

@@ -110,7 +110,7 @@ async function explore({ ok, BASE, page, browser }) {
     await page.waitForSelector("[data-attr]", { timeout: 120000 });
     await page.waitForTimeout(1500);
     const before = await facetShapes();
-    const key = page.locator(".pielegend .pikey").first();
+    const key = page.locator(".pie .slice").first();
     if (await key.count()) {
       await key.click();
       await page.waitForTimeout(6000);
@@ -489,7 +489,7 @@ async function explore({ ok, BASE, page, browser }) {
   let dtDetail = "", dtOk = false;
   try {
     await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
-    const card = page.locator(".card", { has: page.locator("h2", { hasText: "Data types" }) });
+    const card = page.locator("[data-chart=datatypes]");
     await card.locator(".dtrow").first().waitFor({ timeout: 240000 });
     const rows = await card.locator(".dtrow").evaluateAll((els) => els.map((e) => [...e.querySelectorAll(".gcount")].map((s) => s.textContent.trim())));
     const top = Number(rows[0][0].replace(/,/g, ""));
@@ -615,7 +615,7 @@ async function explore({ ok, BASE, page, browser }) {
     const filtered = () => page.evaluate(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""));
     await drag();
     await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
-    const meta = (await card.locator(".meta").first().innerText()).trim();
+    const meta = ((await card.locator(".xc-title").getAttribute("data-tip")) || "").trim();
     const pills = (await page.locator(".svpills").innerText().catch(() => "")).replace(/\s+/g, " ");
     const draggedFilters = await filtered();
     await card.locator("[data-chart-reset]").click();
@@ -697,13 +697,13 @@ async function explore({ ok, BASE, page, browser }) {
     const counts = (await pt.locator(".valrow .vn").allInnerTexts()).map((t) => Number(t.replace(/,/g, "")));
     const ordered = counts.every((n, i) => i === 0 || counts[i - 1] >= n);
     const pick = (await pt.locator(".valrow .vname").allInnerTexts())[0];
-    const before = (await st.locator(".facettitle").textContent()).trim();   // as the wait below reads it
+    const before = (await st.locator(".facettitle").getAttribute("data-tip")) || "";   // as the wait below reads it
     await pt.locator(".valrow").first().click();
     await pt.getByRole("button", { name: "Apply filter" }).click();
     await page.waitForFunction((a) => document.body.innerText.includes("treated with " + a), pick, { timeout: 240000 });
-    await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.textContent || "").trim() !== b, before, { timeout: 240000 });
+    await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.getAttribute("data-tip") || "") !== b, before, { timeout: 240000 });
     const pinned = await pt.locator(".valrow.on .vname").allInnerTexts();
-    const after = (await st.locator(".facettitle").textContent()).trim();
+    const after = (await st.locator(".facettitle").getAttribute("data-tip")) || "";
     txDetail = JSON.stringify({ rows: counts.length, pick, pinned, before, after });
     txOk = counts.length > 1 && ordered && pinned.length === 1 && pinned[0] === pick && after !== before;
   } catch (e) { txDetail = String(e.message).split("\n")[0]; }

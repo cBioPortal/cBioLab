@@ -5,18 +5,21 @@
 // same ones an analysis would report. A density is a filter: drag a rectangle over it to add both
 // axes' ranges to the selection.
 import { useEffect, useRef, useState } from "react";
+import { RotateCcw } from "lucide-react";
+import { cardRank, type GridCard } from "./explore-grid.tsx";
+import { chartCells, kmPlotTitle } from "../../lib/study-view-layout.ts";
 import { api } from "./api.ts";
 import { Choice } from "../_ui/choice.tsx";
 import { Button } from "../_ui/button";
 import { useWidth } from "./figure.tsx";
 import { linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight } from "../../lib/svg-kit.ts";
 import { fmtInt } from "../../lib/chart/format.ts";
-import type { CohortDef } from "../../lib/types.ts";
+import type { CohortDef, KmCurve } from "../../lib/types.ts";
 import type { PlotCell } from "../../lib/plot.ts";
 import { ChartMenu } from "./partitions.tsx";
 import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg } from "./chart-files.ts";
 import { chartFileName } from "../../lib/study-view-download.ts";
-import { survivalSvg } from "../../lib/views/survival/figure.ts";
+import { curveSummary, survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import {
   FGA, MUTATION_COUNT, correlationLines, densityAxes, densityPairKey, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
@@ -55,8 +58,29 @@ interface Props {
 type PlotData = { shape: string; n: number; extent?: { x0: number; x1: number; y0: number; y1: number }; grid?: [number, number];
   bins?: PlotCell[]; stats?: { pearson: number | null; spearman: number | null }; coverage?: { total: number; nx: number; ny: number } };
 
-export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km, density = true, pairs = [], onRemovePair, onClearDensity }: Props) {
+/**
+ * The survival chart and the density charts as grid cards. The survival chart is one card with an
+ * endpoint picker (kept on purpose, 2026-11-13), drawn at 2 × 2 where the portal draws a 1 × 1 tile
+ * per endpoint.
+ */
+export function exploreChartCards(props: Props): GridCard[] {
+  const { attrs, density = true, pairs = [], onRemovePair, onClearDensity, studies, draft, selection, addClauses } = props;
   const nameOf = (a: string) => attrs.find((x) => x.attribute === a)?.displayName || DENSITY_NAMES[a] || a;
+  // the default Mutation Count vs FGA chart (unless unchecked), then the reader's X vs Y charts (STS-SC-1)
+  // the same rule the filter bar reads to hide a drag's pills (STV-FB-3b)
+  const shown = densityChartsShown(attrs.map((a) => a.attribute), density, pairs);
+  return [
+    ...(props.endpoints && props.endpoints.length ? [{ key: "survival", ...cardRank('[data-chart="survival"]'), ...chartCells("density"), node: <SurvivalCard {...props} /> }] : []),
+    ...shown.map(({ pair, added }): GridCard => ({
+      key: "density:" + densityPairKey(pair), ...(added ? { name: nameOf(pair.x) + " vs " + nameOf(pair.y) } : cardRank('[data-chart="mutcount-fga"]')),
+      ...chartCells("density"),
+      node: <DensityCard pair={pair} added={added} studies={studies} draft={draft} selection={selection} addClauses={addClauses}
+        nameOf={nameOf} onRemove={added && onRemovePair ? () => onRemovePair(pair) : undefined} onClear={onClearDensity ? () => onClearDensity(pair) : undefined} />,
+    })),
+  ];
+}
+
+function SurvivalCard({ studies, selection, draft, endpoints, km, attrs }: Props) {
   const [endpoint, setEndpoint] = useState<string>("OS");
   const ep = endpoints && endpoints.length ? (endpoints.includes(endpoint) ? endpoint : endpoints[0]) : null;
   const [res, setRes] = useState<{ key: string; curves?: unknown[]; error?: string } | null>(null);
@@ -84,15 +108,12 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
     return () => ac.abort();
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the default Mutation Count vs FGA chart (unless unchecked), then the reader's X vs Y charts (STS-SC-1)
-  // the same rule the filter bar reads to hide a drag's pills (STV-FB-3b)
-  const shown = densityChartsShown(attrs.map((a) => a.attribute), density, pairs);
   const stale = loading || !res || res.key !== key;
   return <>
     {ep && (
       <div className="card xc-card" data-chart="survival">
         <div className="xc-head">
-          <span className="xc-title">{ep === "OS" ? "Overall survival" : ep + " survival"} of the selection</span>
+          <span className="xc-title" data-tip={"the selection's patients, " + ep + "_MONTHS and " + ep + "_STATUS"}>{kmPlotTitle(attrs.find((a) => a.attribute === ep + "_STATUS")?.displayName || ep + " Status")}</span>
           <ChartMenu label="the survival chart" actions={[{ label: "Download", title: "save this chart as a file",
             sub: [caseFileAction("Data", { kind: "survival", status: ep + "_STATUS", months: ep + "_MONTHS" }, chartFileName((ep === "OS" ? "Overall" : ep) + " survival", "data"),
               selection, (update) => setFileError((cur) => update(cur))),
@@ -101,11 +122,12 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
               return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" }, PORTAL_STUDY_VIEW_KM)) : null;
             }, (message) => setFileError(message))] }]} />
           {endpoints && endpoints.length > 1 && (
-            <Choice className="w-28" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
+            <Choice className="w-20 h-5 data-[size=sm]:h-5 px-1.5 text-xs" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
               options={endpoints.map((x) => [x, x] as const)} />
           )}
         </div>
-        <div className="xc-body">
+        {/* the curve's median, patients and events in its tooltip, where the portal's small KM chart keeps its legend (STS-KM-3) */}
+        <div className="xc-body" data-tip={res?.curves?.length ? (res.curves as KmCurve[]).map((c) => c.cohort + ": " + curveSummary(c)).join("\n") : undefined}>
           {res && res.curves && (res.curves.length ? km(res.curves) : <p className="note">no patient in the selection has a {ep} time and status</p>)}
           {res && res.error && <p className="note">{res.error}</p>}
           {fileError && <p className="note">{fileError}</p>}
@@ -113,10 +135,6 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
         </div>
       </div>
     )}
-    {shown.map(({ pair, added }) => (
-      <DensityCard key={densityPairKey(pair)} pair={pair} added={added} studies={studies} draft={draft} selection={selection} addClauses={addClauses}
-        nameOf={nameOf} onRemove={added && onRemovePair ? () => onRemovePair(pair) : undefined} onClear={onClearDensity ? () => onClearDensity(pair) : undefined} />
-    ))}
   </>;
 }
 
@@ -169,11 +187,10 @@ function DensityCard({ pair, added, studies, draft, selection, addClauses, nameO
   return (
     <div className="card xc-card" data-chart={added ? "xvsy" : "mutcount-fga"} data-pair={densityPairKey(pair)}>
       <div className="xc-head">
-        <span className="xc-title">{title}</span>
-        <span className="meta">{plot && plot.coverage && plot.coverage.total > plot.n
-          ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : ""}{held ? "selected: " + heldText : "drag a box to filter"}</span>
-        {held && onClear && <Button variant="outline" size="xs" data-chart-reset onClick={onClear}
-          data-tip={"Reset filters: clear this chart's selection (" + heldText + ")"}>Reset</Button>}
+        <span className="xc-title" data-tip={title + "\n" + (plot && plot.coverage && plot.coverage.total > plot.n
+          ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : "") + (held ? "selected: " + heldText : "drag a box to filter")}>{title}</span>
+        {held && onClear && <Button variant="ghost" size="icon-xs" className="charticon" data-chart-reset onClick={onClear} aria-label="Reset filters in chart"
+          data-tip={"Reset filters: clear this chart's selection (" + heldText + ")"}><RotateCcw /></Button>}
         <ChartMenu label={"the " + title + " chart"} actions={[
           { label: "Swap Axes", title: "put " + names.y + " along the bottom", onClick: () => saveDensity(swapDensity(dset)) },
           ...(["x", "y"] as const).filter((k) => logOffered(axes[k].attribute)).map((k) => ({
