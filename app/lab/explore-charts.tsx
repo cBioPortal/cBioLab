@@ -5,6 +5,8 @@
 // same ones an analysis would report. A density is a filter: drag a rectangle over it to add both
 // axes' ranges to the selection.
 import { useEffect, useRef, useState } from "react";
+import { cardRank, type GridCard } from "./explore-grid.tsx";
+import { chartCells } from "../../lib/study-view-layout.ts";
 import { api } from "./api.ts";
 import { Choice } from "../_ui/choice.tsx";
 import { Button } from "../_ui/button";
@@ -55,8 +57,29 @@ interface Props {
 type PlotData = { shape: string; n: number; extent?: { x0: number; x1: number; y0: number; y1: number }; grid?: [number, number];
   bins?: PlotCell[]; stats?: { pearson: number | null; spearman: number | null }; coverage?: { total: number; nx: number; ny: number } };
 
-export function ExploreCharts({ studies, selection, draft, attrs, endpoints, addClauses, km, density = true, pairs = [], onRemovePair, onClearDensity }: Props) {
+/**
+ * The survival chart and the density charts as grid cards. The survival chart is one card with an
+ * endpoint picker (kept on purpose, 2026-11-13), drawn at 2 × 2 where the portal draws a 1 × 1 tile
+ * per endpoint.
+ */
+export function exploreChartCards(props: Props): GridCard[] {
+  const { attrs, density = true, pairs = [], onRemovePair, onClearDensity, studies, draft, selection, addClauses } = props;
   const nameOf = (a: string) => attrs.find((x) => x.attribute === a)?.displayName || DENSITY_NAMES[a] || a;
+  // the default Mutation Count vs FGA chart (unless unchecked), then the reader's X vs Y charts (STS-SC-1)
+  // the same rule the filter bar reads to hide a drag's pills (STV-FB-3b)
+  const shown = densityChartsShown(attrs.map((a) => a.attribute), density, pairs);
+  return [
+    ...(props.endpoints && props.endpoints.length ? [{ key: "survival", ...cardRank('[data-chart="survival"]'), ...chartCells("density"), node: <SurvivalCard {...props} /> }] : []),
+    ...shown.map(({ pair, added }): GridCard => ({
+      key: "density:" + densityPairKey(pair), ...(added ? { name: nameOf(pair.x) + " vs " + nameOf(pair.y) } : cardRank('[data-chart="mutcount-fga"]')),
+      ...chartCells("density"),
+      node: <DensityCard pair={pair} added={added} studies={studies} draft={draft} selection={selection} addClauses={addClauses}
+        nameOf={nameOf} onRemove={added && onRemovePair ? () => onRemovePair(pair) : undefined} onClear={onClearDensity ? () => onClearDensity(pair) : undefined} />,
+    })),
+  ];
+}
+
+function SurvivalCard({ studies, selection, draft, endpoints, km }: Props) {
   const [endpoint, setEndpoint] = useState<string>("OS");
   const ep = endpoints && endpoints.length ? (endpoints.includes(endpoint) ? endpoint : endpoints[0]) : null;
   const [res, setRes] = useState<{ key: string; curves?: unknown[]; error?: string } | null>(null);
@@ -84,9 +107,6 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
     return () => ac.abort();
   }, [key]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the default Mutation Count vs FGA chart (unless unchecked), then the reader's X vs Y charts (STS-SC-1)
-  // the same rule the filter bar reads to hide a drag's pills (STV-FB-3b)
-  const shown = densityChartsShown(attrs.map((a) => a.attribute), density, pairs);
   const stale = loading || !res || res.key !== key;
   return <>
     {ep && (
@@ -113,10 +133,6 @@ export function ExploreCharts({ studies, selection, draft, attrs, endpoints, add
         </div>
       </div>
     )}
-    {shown.map(({ pair, added }) => (
-      <DensityCard key={densityPairKey(pair)} pair={pair} added={added} studies={studies} draft={draft} selection={selection} addClauses={addClauses}
-        nameOf={nameOf} onRemove={added && onRemovePair ? () => onRemovePair(pair) : undefined} onClear={onClearDensity ? () => onClearDensity(pair) : undefined} />
-    ))}
   </>;
 }
 

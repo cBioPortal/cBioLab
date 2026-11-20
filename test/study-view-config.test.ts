@@ -3,7 +3,8 @@
 // with a priority above 0 in priority then name order, less the charts with a single value.
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { chartBinSettings, chartPriority, chartOrder, defaultChartKeys, shouldShowChart, DEFAULT_CLINICAL_CHARTS, cardOrders, chartOffered } from "../lib/study-view-config.ts";
+import { chartBinSettings, chartPriority, chartOrder, defaultChartKeys, shouldShowChart, DEFAULT_CLINICAL_CHARTS, CARD_PRIORITY, chartOffered } from "../lib/study-view-config.ts";
+import { orderCards } from "../lib/study-view-layout.ts";
 
 test("the portal's table replaces a priority of exactly 1, and only that", () => {
   assert.equal(chartPriority("SEX", 1), 9);
@@ -66,22 +67,21 @@ describe("a chart's starting bins (initialBins)", () => {
 // STS-LY-3, STS-LY-8: one order for every card, clinical and other kinds together
 test("cards are placed by the portal's priorities, then name; a chart not ranked comes after them all", () => {
   const clinical = [
-    { per: "patient", attribute: "AGE", displayName: "Diagnosis Age", priority: 9 },
-    { per: "sample", attribute: "CANCER_TYPE_DETAILED", displayName: "Cancer Type Detailed", priority: 2000 },
-    { per: "patient", attribute: "SEX", displayName: "Sex", priority: 9 },
-    { per: "sample", attribute: "MUTATION_COUNT", displayName: "Mutation Count", priority: 30 },
+    { key: '[data-attr="patient|AGE"]', name: "Diagnosis Age", priority: 9 },
+    { key: '[data-attr="sample|CANCER_TYPE_DETAILED"]', name: "Cancer Type Detailed", priority: 2000 },
+    { key: '[data-attr="patient|SEX"]', name: "Sex", priority: 9 },
+    { key: '[data-attr="sample|MUTATION_COUNT"]', name: "Mutation Count", priority: 30 },
   ];
-  const order = cardOrders(clinical);
-  const rank = (sel: string) => order.findIndex((o) => o.selector === sel);
+  const cards = [{ key: "added", name: "A gene chart" }, ...clinical, ...CARD_PRIORITY.map((c) => ({ key: c.selector, name: c.name, priority: c.priority }))]
+    .map((c) => ({ ...c, w: 1, h: 1 }));
+  const order = orderCards(cards).map((c) => c.key);
   const seq = ['[data-attr="sample|CANCER_TYPE_DETAILED"]', '[data-special="caselists"]', '[data-chart="datatypes"]', '[data-chart="survival"]',
     '[data-chart="mutcount-fga"]', '[data-genetable="mutated"]', '[data-genetable="sv"]', '[data-genetable="cna"]', '[data-chart="studies"]',
     '[data-attr="sample|MUTATION_COUNT"]', '[data-attr="patient|AGE"]', '[data-attr="patient|SEX"]'];
   // 2000, then the two 1000s by name (Case Lists, Data Types), survival 400, density 200, the gene
   // tables 90 / 85 / 80 (SV before CNA), studies 70, then the 30 and the two 9s by name
-  assert.deepEqual(seq.map(rank), [...seq.map(rank)].sort((a, b) => a - b), "in the portal's order");
-  assert.ok(order.every((o) => o.order < 0), "an unranked card (order 0) comes after every ranked one");
-  assert.equal(new Set(order.map((o) => o.order)).size, order.length);
-  assert.equal(cardOrders([{ per: "patient", attribute: 'A"B', priority: 1 }]).find((o) => o.selector.includes("A"))!.selector, '[data-attr="patient|A\\"B"]', "a quote in an id is escaped");
+  assert.deepEqual(seq.map((k) => order.indexOf(k)), [...seq.map((k) => order.indexOf(k))].sort((x, y) => x - y), "in the portal's order");
+  assert.equal(order[order.length - 1], "added", "an unranked card comes after every ranked one");
 });
 
 test("Add chart drops an attribute of priority below 0, and offers 0 (hidden by default)", () => {

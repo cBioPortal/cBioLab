@@ -22,6 +22,8 @@ import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../..
 import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
+import { chartCells } from "../../lib/study-view-layout.ts";
+import { cardRank, type GridCard } from "./explore-grid.tsx";
 import { violinPairKey, violinTitle } from "../../lib/study-view-violin.ts";
 import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView, columnsMenuTabs } from "../../lib/study-view-add-chart.ts";
 import { StudyHeader } from "./explore-study-header.tsx";
@@ -836,13 +838,15 @@ function binClause(attribute: string, b: any): Clause {
 const binLabel = (b: any): string => b.value != null ? b.value : b.special === "<=" ? "≤" + fmtNum(b.end) : b.special === ">" ? ">" + fmtNum(b.start)
   : b.start === b.end ? fmtNum(b.start) : fmtNum(b.start) + "–" + fmtNum(b.end);
 
-export function ClinicalFacets({ ctx }: { ctx: ExploreCtx }) {
-  const { visibleClinical } = ctx;
+/** the clinical charts shown, by the portal's priority: a numeric one a bar chart, a categorical one a pie or a table of its values */
+export function clinicalCards(ctx: ExploreCtx): GridCard[] {
   const explore = ctx.explore!;
-  return <>
-    {(visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical)
-      .map((c) => <ClinicalFacet key={c.per + c.attribute} c={c} ctx={ctx} />)}
-  </>;
+  return (ctx.visibleClinical(explore.clinical as never) as unknown as typeof explore.clinical).map((c) => ({
+    key: "attr:" + c.per + "|" + c.attribute, name: c.displayName || c.attribute, priority: c.priority ?? 0,
+    ...(c.kind === "num" ? chartCells("bar") : PIE_ATTRIBUTES.has(c.attribute) ? chartCells("pie")
+      : chartCells("list", c.values.length + (c.na ? 1 : 0))),
+    node: <ClinicalFacet c={c} ctx={ctx} />,
+  }));
 }
 
 /* data-attr / data-shape make the facet identifiable from outside
@@ -1194,13 +1198,16 @@ function AssayChartPicker({ ctx, assayType }: { ctx: ExploreCtx; assayType: stri
  * the portal's generic-assay frequency tables (STS-OT-5): a row per (entity, value), its cases and
  * Freq of every selected case; arm-level CNA and LOH tables show altered categories until asked
  */
-export function AssayFreqTables({ ctx }: { ctx: ExploreCtx }) {
+export function assayFreqCards(ctx: ExploreCtx): GridCard[] {
+  return (ctx.explore!.assayFreqTables || []).map((t) => ({ key: "assayfreq:" + t.profileType, name: "Frequency Table: " + t.name,
+    ...chartCells("table"), node: <AssayFreqTable t={t} ctx={ctx} /> }));
+}
+
+/** the frequency tables left undrawn, said above the grid */
+export function AssayFreqTablesMore({ ctx }: { ctx: ExploreCtx }) {
   const more = ctx.explore!.assayFreqTablesNotShown || [];
-  return <>
-    {(ctx.explore!.assayFreqTables || []).map((t) => <AssayFreqTable key={t.profileType} t={t} ctx={ctx} />)}
-    {more.length > 0 && <p className="note" data-assayfreq-more>
-      {ASSAY_FREQ_TABLE_LIMIT} frequency tables are drawn at most; not drawn: {more.join(", ")}.</p>}
-  </>;
+  return more.length > 0 ? <p className="note" data-assayfreq-more>
+    {ASSAY_FREQ_TABLE_LIMIT} frequency tables are drawn at most; not drawn: {more.join(", ")}.</p> : null;
 }
 
 function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["explore"]>["assayFreqTables"]>[number]; ctx: ExploreCtx }) {
@@ -1240,10 +1247,10 @@ function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["exp
 }
 
 /** each charted generic-assay entity: a histogram or its values, a click a genericAssay clause */
-export function AssayFacets({ ctx }: { ctx: ExploreCtx }) {
-  return <>
-    {(ctx.explore!.assayFacets || []).map((f) => <AssayFacet key={f.profileType + "|" + f.entity} f={f} ctx={ctx} />)}
-  </>;
+/** the generic-assay entities the reader charted, in the order added: a bar chart, or a table of values */
+export function assayCards(ctx: ExploreCtx): GridCard[] {
+  return (ctx.explore!.assayFacets || []).map((f) => ({ key: "assay:" + f.profileType + "|" + f.entity, name: f.entity,
+    ...(f.kind === "num" ? chartCells("bar") : chartCells("list", (f.values || []).length)), node: <AssayFacet f={f} ctx={ctx} /> }));
 }
 
 function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore"]>["assayFacets"]>[number]; ctx: ExploreCtx }) {
@@ -1317,16 +1324,16 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   );
 }
 
-export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
+/** the gene status charts the reader added, one per gene and profile: a table of the gene's states */
+export function geneFacetCards(ctx: ExploreCtx): GridCard[] {
   const { addClauses, geneStatesClauses } = ctx;
   const explore = ctx.explore!;
-  return <>
-    {(explore.geneFacets || []).filter((f) => (ctx.geneKinds[f.gene] || []).includes(f.type)).map(f => {
+  return (explore.geneFacets || []).filter((f) => (ctx.geneKinds[f.gene] || []).includes(f.type)).map((f): GridCard => {
       const apply = (states: string[]) => geneStatesClauses(f.gene, f.type, states);
       // the copy-number levels the portal draws: none at 0 (the drivers-only chart keeps its fixed rows)
       const states = f.type === "CNA" && !explore.drivers ? f.states.filter((st) => st.n > 0) : f.states;
-      return (
-        <div key={f.gene + f.type} data-genefacet={f.gene + "|" + f.type} className="card">
+      return { key: "gene:" + f.gene + "|" + f.type, name: geneChartName(f.gene, f.type), ...chartCells("list", states.length), node: (
+        <div data-genefacet={f.gene + "|" + f.type} className="card">
           <div className="facettitle">
             {geneChartName(f.gene, f.type)}
             <span className="meta">sample-level · {f.total.toLocaleString()} samples</span>
@@ -1355,19 +1362,18 @@ export function GeneFacets({ ctx }: { ctx: ExploreCtx }) {
             </p>
           ) : null}
         </div>
-      );
-    })}
-  </>;
+      ) };
+  });
 }
 
 /**
  * the portal's treatment tables (STS-OT-6), when a selected study has treatments: patients per
  * agent, and samples per agent taken before or after it; the checked rows filter (Union)
  */
-export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
+export function treatmentCards(ctx: ExploreCtx): GridCard[] {
   const { addClauses, parseDraft } = ctx;
   const t = ctx.explore!.treatments;
-  if (!t) return null;
+  if (!t) return [];
   const draft = parseDraft();
   const leftOut = t.leftOut && <p className="note flush mt-1" data-leftout>
     Not counted: {t.leftOut.join(", ")}, held by a peer whose federation API has no treatment counts.
@@ -1387,27 +1393,26 @@ export function TreatmentTables({ ctx }: { ctx: ExploreCtx }) {
       </div>
     );
   };
-  return <>
-    {table("patient", "Treatment per Patient", fmtInt(t.totalPatients) + " patients treated", "patients treated",
-      t.patients.map((r) => ({ key: r.agent, name: r.agent, n: r.n, title: r.agent + " — " + fmtInt(r.n) + " patients treated" })))}
-    {table("sample", "Treatment per Sample (pre/post)", fmtInt(t.totalSamples) + " samples with a time", "samples acquired before treatment or after/on treatment",
+  return [
+    { key: "treatments:patient", ...cardRank('[data-treatments="patient"]'), ...chartCells("table"), node: table("patient", "Treatment per Patient", fmtInt(t.totalPatients) + " patients treated", "patients treated",
+      t.patients.map((r) => ({ key: r.agent, name: r.agent, n: r.n, title: r.agent + " — " + fmtInt(r.n) + " patients treated" }))) },
+    { key: "treatments:sample", ...cardRank('[data-treatments="sample"]'), ...chartCells("table"), node: table("sample", "Treatment per Sample (pre/post)", fmtInt(t.totalSamples) + " samples with a time", "samples acquired before treatment or after/on treatment",
       sampleTreatmentOrder(t.samples).map((r) => ({ key: sampleTreatmentKey(r.agent, r.time), name: r.agent, extra: r.time, n: r.n,
-        title: r.agent + " — " + fmtInt(r.n) + " samples taken " + (r.time === "Pre" ? "before" : "after") + " the first treatment with it" })))}
-  </>;
+        title: r.agent + " — " + fmtInt(r.n) + " samples taken " + (r.time === "Pre" ? "before" : "after") + " the first treatment with it" }))) },
+  ];
 }
 
 /**
  * each gene charted by mutation type: the portal's Mutation Type Counts table (STS-OT-3), # Mut,
  * # and Freq of the selected samples; the checked types filter to samples with any of them
  */
-export function MutationTypeFacets({ ctx }: { ctx: ExploreCtx }) {
+export function mutationTypeCards(ctx: ExploreCtx): GridCard[] {
   const { addClauses, parseDraft } = ctx;
-  return <>
-    {(ctx.explore!.mutationTypeFacets || []).map((f) => {
+  return (ctx.explore!.mutationTypeFacets || []).map((f): GridCard => {
       const applied = appliedMutationTypes(parseDraft(), f.gene), on = new Set(applied.types);
       const counted = !f.leftOut || f.total > 0;
-      return (
-        <div key={f.gene} data-mutationtypes={f.gene} className="card">
+      return { key: "mutationtypes:" + f.gene, name: f.gene + ": mutation types", ...chartCells("table"), node: (
+        <div data-mutationtypes={f.gene} className="card">
           <div className="facettitle">
             {f.gene}: mutation types
             {counted && <span className="meta" data-tip="Freq is of every selected sample, as the portal's table writes it, not of the samples profiled for the gene">sample-level · Freq of {f.total.toLocaleString()} samples{f.disjunctive ? " · counted without its own filter" : ""}</span>}
@@ -1427,12 +1432,23 @@ export function MutationTypeFacets({ ctx }: { ctx: ExploreCtx }) {
               onApply={(types) => { const r = mutationTypesClause(f.gene, types); if ("clauses" in r) addClauses(r.clauses); }} />
           ) : <p className="note flush mt-1">No {f.gene} mutation in the selected samples.</p>}
         </div>
-      );
-    })}
-  </>;
+      ) };
+  });
 }
 
-export function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
+/** the Cancer Studies table, for more than one study */
+export function studyCards(ctx: ExploreCtx): GridCard[] {
+  return (ctx.explore!.studyBreakdown || []).length && ctx.exStudies.length > 1
+    ? [{ key: "studies", ...cardRank('[data-chart="studies"]'), ...chartCells("table"), node: <StudyBreakdown ctx={ctx} /> }] : [];
+}
+
+/** the Data Types table, unless unchecked in Add chart */
+export function dataTypesCards(ctx: ExploreCtx): GridCard[] {
+  return ctx.chartChecked("genomic|datatypes") && (ctx.explore!.dataTypes || []).length
+    ? [{ key: "datatypes", ...cardRank('[data-chart="datatypes"]'), ...chartCells("table"), node: <DataTypes ctx={ctx} /> }] : [];
+}
+
+function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
   const { exStudies, setExploreStudies } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
@@ -1473,7 +1489,7 @@ const PROFILED_TYPE: Record<string, "MUTATION" | "CNA" | "SV"> = {
 /** where the browser keeps the Data types table's Union / Intersection choice */
 const DATA_TYPES_OP_KEY = "cbiolab.explore.dataTypesOp";
 
-export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
+function DataTypes({ ctx }: { ctx: ExploreCtx }) {
   const { addClause, addClauses, parseDraft } = ctx;
   const explore = ctx.explore!;
   const picks = usePicks();
@@ -1530,9 +1546,12 @@ export function DataTypes({ ctx }: { ctx: ExploreCtx }) {
   );
 }
 
-export function AlteredGenes({ ctx }: { ctx: ExploreCtx }) {
-  // each table unless unchecked in Add chart's Genomic tab
-  return <>{(["mutated", "cna", "sv"] as const).filter((kind) => ctx.chartChecked("genomic|" + kind)).map((kind) => <GeneTable key={kind} kind={kind} ctx={ctx} />)}</>;
+/** the Mutated, CNA and SV gene tables: each one with genes, unless unchecked in Add chart's Genomic tab */
+export function geneTableCards(ctx: ExploreCtx): GridCard[] {
+  const e = ctx.explore!;
+  const rows = { mutated: e.mutatedGenes, cna: e.cnaGenes, sv: e.svGenes };
+  return (["mutated", "cna", "sv"] as const).filter((kind) => ctx.chartChecked("genomic|" + kind) && (rows[kind] || []).length)
+    .map((kind) => ({ key: "genetable:" + kind, ...cardRank('[data-genetable="' + kind + '"]'), ...chartCells("table"), node: <GeneTable kind={kind} ctx={ctx} /> }));
 }
 
 /** a gene table row's height in px: one line of --t-md plus the row's padding */
@@ -1710,7 +1729,7 @@ function SpecialCharts({ ctx }: { ctx: ExploreCtx }) {
   );
 }
 
-export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
+export function specialCards(ctx: ExploreCtx): GridCard[] {
   const { addClause, parseDraft, chartChecked } = ctx;
   const explore = ctx.explore!;
   const leaves = ((parseDraft()?.all) || []).flatMap((c: any) => Array.isArray(c?.any) ? c.any : [c]);
@@ -1719,16 +1738,16 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
   // the portal shows these only when added (Case Lists also while one is filtered on): STS-OT-2, STS-OT-7
   const shown = specialChartsShown(chartChecked, leaves, explore.events.length > 0);
   const anyOf = (ls: any[]) => { if (ls.length) addClause(ls.length === 1 ? ls[0] : { any: ls }); };
-  return <>
-    {shown.events && <div className="card" data-special="events">
+  return [
+    ...(shown.events ? [{ key: "events", ...cardRank('[data-special="events"]'), ...chartCells("table"), node: <div className="card" data-special="events">
       <h2>Timeline Events Availability</h2>
       <ValueList unit="patients with the event type" hint="keep the patients with any of the checked events" pct={portalFreq}
           why={(types) => limitRefusal(types.length, ANY_LEAF_LIMIT, "alternatives")}
           rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
             title: e.n.toLocaleString() + " of " + (explore.totals?.patients ?? 0).toLocaleString() + " selected patients with a " + e.type + " event" }))}
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
-    </div>}
-    {shown.caseLists && <div className="card" data-special="caselists">
+    </div> }] : []),
+    ...(shown.caseLists ? [{ key: "caselists", ...cardRank('[data-special="caselists"]'), ...chartCells("table"), node: <div className="card" data-special="caselists">
       <h2>Case Lists</h2>
       <ValueList unit="samples" hint="keep the samples on any of the checked case lists" pct={portalFreq}
         why={(ids) => limitRefusal(ids.length, ANY_LEAF_LIMIT, "alternatives")}
@@ -1736,6 +1755,6 @@ export function EventsAndCaseLists({ ctx }: { ctx: ExploreCtx }) {
           title: l.id + " — " + l.n.toLocaleString() + " of " + (explore.totals?.samples ?? 0).toLocaleString() + " selected samples" }))}
         onApply={(ids) => anyOf(ids.map((id) => ({ kind: "caseList", id })))} />
       <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
-    </div>}
-  </>;
+    </div> }] : []),
+  ];
 }
