@@ -74,3 +74,11 @@ export function findSpotLayout(cards: { key: string; w: number; h: number }[], c
     }
   });
 }
+
+/**
+ * A survival chart's title, as the portal's (STS-KM-1): "KM Plot: " + its status attribute's name
+ * without "status" or "survival" + " (months)", e.g. "KM Plot: Overall (months)".
+ */
+export function kmPlotTitle(statusName: string): string {
+  return "KM Plot: " + statusName.replace(/\b(status|survival)\b/gi, " ").replace(/\s+/g, " ").trim() + " (months)";
+}

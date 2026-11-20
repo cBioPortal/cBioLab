@@ -66,8 +66,7 @@ export function ViolinCard({ facet, nameOf, selected, onToggle, onRemove }: {
   return (
     <div className="card xc-card" data-chart="violin" data-pair={violinPairKey(facet)}>
       <div className="xc-head">
-        <span className="xc-title">{title}</span>
-        <span className="meta">sample-level</span>
+        <span className="xc-title" data-tip={title + "\nsample-level"}>{title}</span>
         <ChartMenu label={"the " + title + " chart"} actions={[
           ...(logOffered ? [{ label: "Log Scale", checked: useLog, title: useLog ? "draw " + numName + " on a linear scale" : "draw " + numName + " as ln(1 + count)", onClick: () => setLog(!log) }] : []),
           { label: "Show Violin Plot", checked: showViolin, title: "draw each category's distribution", onClick: () => setShowViolin(!showViolin) },
