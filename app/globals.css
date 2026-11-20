@@ -235,6 +235,20 @@ pre {
 /* A card whose body is a scrolling list gives the list the card's height below its title */
 .svcell > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; overflow: hidden; }
 .svcell > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; min-height: 0; max-height: none; }
+/* Every card's title alike, as the portal's (STS-HD-1): its name only, bold and centred, on one line,
+   a long one cut with an ellipsis (the whole of it, and what it counts, in its tooltip). A header row
+   that also holds controls keeps them on that line and gives the title the rest. */
+.svcell :is(.facettitle, .xc-title) {
+  font-size: var(--t-md); font-weight: 600; line-height: 20px; color: var(--ink); text-transform: none; letter-spacing: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; min-width: 0; margin: 0;
+}
+.svcell .xc-head { flex-wrap: nowrap; gap: 0.3rem; }
+.svcell .xc-head > .xc-title { flex: 1 1 0; }
+.svcell [data-genetable] > .row:first-child { flex-wrap: nowrap; align-items: center; }
+.svcell [data-genetable] > .row:first-child > .facettitle { flex: 1 1 0; }
+.svcell .charticon svg { width: 0.85rem; height: 0.85rem; }
+.svcell .titleicon { display: inline-flex; align-items: center; justify-content: center; height: 20px; width: 20px; vertical-align: top; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.svcell .titleicon[aria-pressed=true] { color: var(--accent-ink); }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
 .qdesc {

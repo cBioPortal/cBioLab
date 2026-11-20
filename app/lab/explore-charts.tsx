@@ -5,8 +5,9 @@
 // same ones an analysis would report. A density is a filter: drag a rectangle over it to add both
 // axes' ranges to the selection.
 import { useEffect, useRef, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { cardRank, type GridCard } from "./explore-grid.tsx";
-import { chartCells } from "../../lib/study-view-layout.ts";
+import { chartCells, kmPlotTitle } from "../../lib/study-view-layout.ts";
 import { api } from "./api.ts";
 import { Choice } from "../_ui/choice.tsx";
 import { Button } from "../_ui/button";
@@ -79,7 +80,7 @@ export function exploreChartCards(props: Props): GridCard[] {
   ];
 }
 
-function SurvivalCard({ studies, selection, draft, endpoints, km }: Props) {
+function SurvivalCard({ studies, selection, draft, endpoints, km, attrs }: Props) {
   const [endpoint, setEndpoint] = useState<string>("OS");
   const ep = endpoints && endpoints.length ? (endpoints.includes(endpoint) ? endpoint : endpoints[0]) : null;
   const [res, setRes] = useState<{ key: string; curves?: unknown[]; error?: string } | null>(null);
@@ -112,7 +113,7 @@ function SurvivalCard({ studies, selection, draft, endpoints, km }: Props) {
     {ep && (
       <div className="card xc-card" data-chart="survival">
         <div className="xc-head">
-          <span className="xc-title">{ep === "OS" ? "Overall survival" : ep + " survival"} of the selection</span>
+          <span className="xc-title" data-tip={"the selection's patients, " + ep + "_MONTHS and " + ep + "_STATUS"}>{kmPlotTitle(attrs.find((a) => a.attribute === ep + "_STATUS")?.displayName || ep + " Status")}</span>
           <ChartMenu label="the survival chart" actions={[{ label: "Download", title: "save this chart as a file",
             sub: [caseFileAction("Data", { kind: "survival", status: ep + "_STATUS", months: ep + "_MONTHS" }, chartFileName((ep === "OS" ? "Overall" : ep) + " survival", "data"),
               selection, (update) => setFileError((cur) => update(cur))),
@@ -185,11 +186,10 @@ function DensityCard({ pair, added, studies, draft, selection, addClauses, nameO
   return (
     <div className="card xc-card" data-chart={added ? "xvsy" : "mutcount-fga"} data-pair={densityPairKey(pair)}>
       <div className="xc-head">
-        <span className="xc-title">{title}</span>
-        <span className="meta">{plot && plot.coverage && plot.coverage.total > plot.n
-          ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : ""}{held ? "selected: " + heldText : "drag a box to filter"}</span>
-        {held && onClear && <Button variant="outline" size="xs" data-chart-reset onClick={onClear}
-          data-tip={"Reset filters: clear this chart's selection (" + heldText + ")"}>Reset</Button>}
+        <span className="xc-title" data-tip={title + "\n" + (plot && plot.coverage && plot.coverage.total > plot.n
+          ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : "") + (held ? "selected: " + heldText : "drag a box to filter")}>{title}</span>
+        {held && onClear && <Button variant="ghost" size="icon-xs" className="charticon" data-chart-reset onClick={onClear} aria-label="Reset filters in chart"
+          data-tip={"Reset filters: clear this chart's selection (" + heldText + ")"}><RotateCcw /></Button>}
         <ChartMenu label={"the " + title + " chart"} actions={[
           { label: "Swap Axes", title: "put " + names.y + " along the bottom", onClick: () => saveDensity(swapDensity(dset)) },
           ...(["x", "y"] as const).filter((k) => logOffered(axes[k].attribute)).map((k) => ({

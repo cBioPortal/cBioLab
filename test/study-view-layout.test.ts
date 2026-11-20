@@ -1,7 +1,7 @@
 // The Study View grid (STS-LY-1…3), from docs/legacy-spec/30-study-summary.md §1.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GRID_CELL, chartCells, findSpotLayout, gridCols, gridWidth, orderCards } from "../lib/study-view-layout.ts";
+import { GRID_CELL, chartCells, findSpotLayout, gridCols, gridWidth, kmPlotTitle, orderCards } from "../lib/study-view-layout.ts";
 
 test("LY-1: a 195 × 170 cell, 5 px apart; the grid cols·195 + (cols+1)·5 wide", () => {
   assert.deepEqual(GRID_CELL, { w: 195, h: 170, margin: 5 });
@@ -56,4 +56,11 @@ test("LY-3: each card in the first free spot, rows top-down then left-right", ()
 test("LY-3: a card wider than the grid is narrowed to it", () => {
   assert.deepEqual(findSpotLayout([{ key: "t", w: 2, h: 2 }, { key: "p", w: 1, h: 1 }], 1),
     [{ i: "t", x: 0, y: 0, w: 1, h: 2 }, { i: "p", x: 0, y: 2, w: 1, h: 1 }]);
+});
+
+test("KM-1: a survival chart's title from its status attribute's name", () => {
+  assert.equal(kmPlotTitle("Overall Survival Status"), "KM Plot: Overall (months)");
+  assert.equal(kmPlotTitle("Disease Free Status"), "KM Plot: Disease Free (months)");
+  assert.equal(kmPlotTitle("Disease-specific Survival status"), "KM Plot: Disease-specific (months)");
+  assert.equal(kmPlotTitle("Progression Free Status"), "KM Plot: Progression Free (months)");
 });

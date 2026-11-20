@@ -43,7 +43,6 @@ import { DEFAULT_CLINICAL_CHARTS, SHOW_DERIVED_FACETS, type ExploreState, type G
 import { LINE_TYPE } from "../../lib/treatment-lines.ts";
 import { Dna, Download, Filter, LoaderCircle, Save, Search, Tag, Users, X } from "lucide-react";
 import { Button } from "../_ui/button";
-import { CHIP } from "../_ui/toolbar.ts";
 import { GearMenu } from "../_ui/gear-menu.tsx";
 import { Checkbox } from "../_ui/checkbox";
 import { Input } from "../_ui/input";
@@ -617,8 +616,6 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
   </>;
 }
 
-/** rows a value list shows before it scrolls (`.vallist`'s max-height) */
-const VALLIST_ROWS = 9;
 
 /**
  * A facet's histogram, as the portal's bar chart: a y axis of integer counts, one bar per bin (the
@@ -874,15 +871,9 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
             : (c.bins || []).reduce((n: number, b: any) => n + b.count, 0);
           const unit = c.per === "sample" ? " samples" : " patients";
           return (
-            <div
- className="facettitle"                data-tip={[c.displayName || c.attribute, c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
-                .filter(Boolean).join(" — ")}>
-              {isCustomAttr(c.attribute) && <span className="customtag" data-tip={c.description}>custom</span>}
-              {c.displayName || c.attribute}{" "}
-              <span className="meta">
-                {(c.per === "sample" ? "sample-level · " : "") + shown.toLocaleString() + unit}
-                {disj ? " · not narrowed by its own filter" : ""}
-              </span>
+            <div className="facettitle" data-tip={[c.displayName || c.attribute, c.displayName && c.displayName !== c.attribute ? c.attribute : "", c.description]
+                .filter(Boolean).join(" — ") + "\n" + (c.per === "sample" ? "sample-level · " : "") + shown.toLocaleString() + unit + (disj ? " · not narrowed by its own filter" : "")}>
+              {c.displayName || c.attribute}
               {(() => {
                 const label = c.displayName || c.attribute;
                 const chart: ChartKey = { kind: "clinical", attribute: c.attribute };
@@ -968,11 +959,9 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 }} />
                 {(c.distinct ?? 0) > c.values.length ? (
                   <span className="meta pad-tight vlistfoot">
-                    showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values{c.values.length > VALLIST_ROWS ? " · scroll for more" : ""}
+                    showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values
                   </span>
-                ) : c.values.length > VALLIST_ROWS && (
-                  <span className="meta pad-tight vlistfoot">{c.values.length.toLocaleString()} values · scroll for more</span>
-                )}
+                ) : null}
             </>);
           }
           return (
@@ -1033,11 +1022,6 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
             </Histogram>
           );
         })()}
-        {c.kind === "num" && <div className="flex items-center gap-1 mt-1 flex-wrap">
-          <span className="meta">min {fmtNum(c.min)} · median {fmtNum(c.median)} · max {fmtNum(c.max)}</span>
-          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { gte: Math.round(c.median * 10) / 10 } })}>≥ median</Button>
-          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ kind: "clinical", attribute: c.attribute, range: { lt: Math.round(c.median * 10) / 10 } })}>&lt; median</Button>
-        </div>}
         {binsOpen && c.kind === "num" && <CustomBinsDialog label={c.displayName || c.attribute} bars={c.bins} current={binSet}
           onApply={(b) => setChartBins(c.attribute, { ...binSet, bins: b })} onClose={() => setBinsOpen(false)} />}
     </div>
@@ -1226,13 +1210,13 @@ function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["exp
   const clickable = !without.length && !peers.length;
   return (
     <div className="card" data-assayfreq={t.profileType}>
-      <div className="facettitle">
+      <div className="facettitle" data-tip={"Frequency Table: " + t.name + "\n" + t.unit + "-level · Freq of " + fmtInt(t.total) + " " + noun + (t.disjunctive ? " · counted without its own filter" : "")}>
         Frequency Table: {t.name}
-        <span className="meta">{t.unit}-level · Freq of {fmtInt(t.total)} {noun}{t.disjunctive ? " · counted without its own filter" : ""}</span>
+        {curated && <button type="button" className="charticon titleicon" aria-pressed={!all} onClick={() => setAll(!all)}
+          aria-label={all ? "show altered categories only" : "show all categories"}
+          data-tip={all ? "Showing all categories. Click to hide unchanged or unknown rows." : "Showing altered categories only. Click to include unchanged or unknown rows."}>
+          <Filter /></button>}
       </div>
-      {curated && <Button variant="ghost" size="xs" aria-pressed={!all} onClick={() => setAll(!all)}
-        data-tip={all ? "Showing all categories. Click to hide unchanged or unknown rows." : "Showing altered categories only. Click to include unchanged or unknown rows."}>
-        <Filter /> {all ? "all categories" : "altered only"}</Button>}
       {without.length > 0 && <p className="note flush mt-1">Not held by {without.join(", ")}: counted in Freq, but its rows cannot filter {without.length === 1 ? "it" : "them"}.</p>}
       {peers.length > 0 && <p className="note flush mt-1">Not counted: {peers.join(", ")} (a peer's {peers.length === 1 ? "study" : "studies"}, whose counts are not shared).</p>}
       {rows.length ? <ValueList unit={noun} pct={portalFreq} hint={"keep the " + noun + " with any checked value"}
@@ -1273,7 +1257,7 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   return (
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
       <div className="facettitle flex items-center gap-1">
-        <span className="min-w-0 flex-1 truncate" data-tip={f.entity}>{title}</span>
+        <span className="min-w-0 flex-1 truncate" data-tip={f.entity + "\n" + noun + " · " + fmtInt(f.measured) + " of " + fmtInt(f.total) + " with a value" + (f.disjunctive ? " · counted without its own filter" : "") + why}>{title}</span>
         <ChartMenu label={title} actions={[...(addMode || !clickable ? [] : f.kind === "cat"
           ? forBoth((t) => compareAction((f.values || []).map((v) => ({ ...valueArm(v.v), n: v.n })), checked.map(valueArm), "value of " + title, (arms) => compareItems(chart, arms, t), t))
           : forBoth((t) => compareNumeric(title, exStudies.length === 1, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title, t),
@@ -1285,7 +1269,6 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
         <Button variant="ghost" size="icon-xs" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
           onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
       </div>
-      <span className="meta">{noun} · {fmtInt(f.measured)} of {fmtInt(f.total)} with a value{f.disjunctive ? " · counted without its own filter" : ""}{why}</span>
       {f.error && <p className="note flush mt-1">{f.error}</p>}
       {f.kind === "cat" && f.values && (
         <ValueList picks={picks} unit={noun} hint={"keep the " + noun + " whose " + title + " is any of the checked values"}
@@ -1313,13 +1296,6 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
           </Histogram>
         );
       })()}
-      {f.kind === "num" && f.median != null && <div className="flex items-center gap-1 mt-1 flex-wrap">
-        <span className="meta">min {fmtNum(f.min!)} · median {fmtNum(f.median)} · max {fmtNum(f.max!)}</span>
-        {clickable && <>
-          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ ...base, range: { gt: f.median } })}>&gt; median</Button>
-          <Button variant="outline" size="xs" className={CHIP} onClick={() => addClause({ ...base, range: { lte: f.median } })}>≤ median</Button>
-        </>}
-      </div>}
     </div>
   );
 }
@@ -1334,9 +1310,8 @@ export function geneFacetCards(ctx: ExploreCtx): GridCard[] {
       const states = f.type === "CNA" && !explore.drivers ? f.states.filter((st) => st.n > 0) : f.states;
       return { key: "gene:" + f.gene + "|" + f.type, name: geneChartName(f.gene, f.type), ...chartCells("list", states.length), node: (
         <div data-genefacet={f.gene + "|" + f.type} className="card">
-          <div className="facettitle">
+          <div className="facettitle" data-tip={geneChartName(f.gene, f.type) + "\nsample-level · " + f.total.toLocaleString() + " samples"}>
             {geneChartName(f.gene, f.type)}
-            <span className="meta">sample-level · {f.total.toLocaleString()} samples</span>
             <ChartMenu label={f.gene} actions={[summaryDownload(geneChartName(f.gene, f.type), "sample",
               states.map((st) => ({ value: st.label, count: st.n })), 0, undefined, ctx.setExMsg, undefined, undefined,
               // the file writes the portal's codes (SD14); the figure, the names on screen
@@ -1382,7 +1357,7 @@ export function treatmentCards(ctx: ExploreCtx): GridCard[] {
     const on = new Set(appliedTreatmentKeys(draft, level));
     return (
       <div className="card" data-treatments={level}>
-        <div className="facettitle">{title}<span className="meta">{meta}</span></div>
+        <div className="facettitle" data-tip={title + "\n" + meta}>{title}</div>
         {leftOut}
         {rows.length ? <ValueList unit={unit} hint={level === "patient" ? "keep the patients treated with any checked treatment" : "keep the samples taken before or after any checked treatment"}
           extra={level === "sample" ? { head: "Pre / Post", tip: "taken before (Pre) or after (Post) the patient's first treatment with it" } : undefined}
@@ -1413,9 +1388,8 @@ export function mutationTypeCards(ctx: ExploreCtx): GridCard[] {
       const counted = !f.leftOut || f.total > 0;
       return { key: "mutationtypes:" + f.gene, name: f.gene + ": mutation types", ...chartCells("table"), node: (
         <div data-mutationtypes={f.gene} className="card">
-          <div className="facettitle">
+          <div className="facettitle" data-tip={f.gene + ": mutation types" + (counted ? "\nsample-level · Freq of " + f.total.toLocaleString() + " samples, every selected sample, as the portal's table writes it, not the samples profiled for the gene" + (f.disjunctive ? " · counted without its own filter" : "") : "")}>
             {f.gene}: mutation types
-            {counted && <span className="meta" data-tip="Freq is of every selected sample, as the portal's table writes it, not of the samples profiled for the gene">sample-level · Freq of {f.total.toLocaleString()} samples{f.disjunctive ? " · counted without its own filter" : ""}</span>}
           </div>
           {applied.excluded > 0 && <p className="note flush mt-1">
             {applied.excluded === 1 ? "A filter excludes" : applied.excluded + " filters exclude"} {f.gene} mutation types; this table is counted without {applied.excluded === 1 ? "it" : "them"}.
@@ -1459,7 +1433,7 @@ function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
   const total = rows.reduce((n, r) => n + r.n, 0) || 1;
   return (
     <div className="card wide" data-chart="studies">
-      <h2>Cancer Studies <span className="plain">— {explore.draftCount != null ? "the draft's" : "the selection's"} samples across the {exStudies.length} selected studies</span></h2>
+      <div className="facettitle" data-tip={"Cancer Studies\n" + (explore.draftCount != null ? "the draft's" : "the selection's") + " samples across the " + exStudies.length + " selected studies"}>Cancer Studies</div>
       <VirtualRows items={rows} rowKey={(r) => r.study} estimate={26} className="sbrows">
         {(r) => (
           <PickRow className="sbrow" picks={picks} k={r.study} label={r.study}
@@ -1516,7 +1490,7 @@ function DataTypes({ ctx }: { ctx: ExploreCtx }) {
   const refusal = op === "intersection" && n > 1 ? intersectionRefusal(filters, n, "kind of data") : null;
   return (
     <div className="card wide" data-chart="datatypes">
-      <h2>Data types <span className="plain">— samples with each kind of molecular data</span></h2>
+      <div className="facettitle" data-tip={"Data Types\nsamples with each kind of molecular data"}>Data Types</div>
       <VirtualRows items={rows} rowKey={(dt) => dt.profile} estimate={26} className="generows">
         {(dt) => {
           const t = PROFILED_TYPE[dt.alterationType];
@@ -1611,9 +1585,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   return (
     <div className="card" data-genetable={kind}>
       <div className="row baseline g5">
-        <h2 className="flush">{title}</h2>
-        {drivers && <span className="meta" data-tip={"counting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered"}>OncoKB drivers</span>}
-        <span className="spacer" />
+        <div className="facettitle grow" data-tip={title + (drivers ? "\ncounting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered" : "")}>{title}</div>
         <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="search" aria-label={"search " + name} value={geneFilter[kind] || ""}
           data-tip={"show the rows with this in any column (gene, " + (kind === "cna" ? "cytoband, CNA" : kind === "sv" ? "# SV" : "# Mut") + ", #, Freq), of all " + all.length.toLocaleString()}
           onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
@@ -1679,9 +1651,6 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
           );
         }}
       </VirtualRows>
-      <span className="meta pad-tight vlistfoot">{needle
-        ? rows.length.toLocaleString() + " of " + all.length.toLocaleString() + " genes match"
-        : all.length.toLocaleString() + " genes"}</span>
       {(() => {
         const n = picks.picked.length;
         const refusal = op === "intersection" && n > 1 ? intersectionRefusal(draftClauses.length, n) : null;
@@ -1740,7 +1709,7 @@ export function specialCards(ctx: ExploreCtx): GridCard[] {
   const anyOf = (ls: any[]) => { if (ls.length) addClause(ls.length === 1 ? ls[0] : { any: ls }); };
   return [
     ...(shown.events ? [{ key: "events", ...cardRank('[data-special="events"]'), ...chartCells("table"), node: <div className="card" data-special="events">
-      <h2>Timeline Events Availability</h2>
+      <div className="facettitle">Timeline Events Availability</div>
       <ValueList unit="patients with the event type" hint="keep the patients with any of the checked events" pct={portalFreq}
           why={(types) => limitRefusal(types.length, ANY_LEAF_LIMIT, "alternatives")}
           rows={explore.events.map((e) => ({ key: e.type, name: e.type, n: e.n, total: explore.totals?.patients, on: eventOn(e.type),
@@ -1748,13 +1717,12 @@ export function specialCards(ctx: ExploreCtx): GridCard[] {
           onApply={(types) => anyOf(types.map((t) => ({ kind: "event", a: { eventType: t }, rel: { type: "NONE" } })))} />
     </div> }] : []),
     ...(shown.caseLists ? [{ key: "caselists", ...cardRank('[data-special="caselists"]'), ...chartCells("table"), node: <div className="card" data-special="caselists">
-      <h2>Case Lists</h2>
+      <div className="facettitle">Case Lists</div>
       <ValueList unit="samples" hint="keep the samples on any of the checked case lists" pct={portalFreq}
         why={(ids) => limitRefusal(ids.length, ANY_LEAF_LIMIT, "alternatives")}
         rows={explore.caseLists.map((l) => ({ key: l.id, name: l.name, n: l.n, total: explore.totals?.samples, on: listOn(l.id),
           title: l.id + " — " + l.n.toLocaleString() + " of " + (explore.totals?.samples ?? 0).toLocaleString() + " selected samples" }))}
         onApply={(ids) => anyOf(ids.map((id) => ({ kind: "caseList", id })))} />
-      <p className="note">Profiles here: {(explore.profiles || []).join(", ") || "none"}{explore.gaProfiles && explore.gaProfiles.length ? " · assays: " + explore.gaProfiles.join(", ") : ""} · facet counts {explore.draftCount != null ? "narrowed to your draft" : "study-wide"} · {explore.stats.ms}ms</p>
     </div> }] : []),
   ];
 }
