@@ -542,25 +542,14 @@ main.analysis-main { max-width: min(132rem, 100%); }
 }
 
 /* Explore: categorical clinical facets as pie charts (portal study-view style) */
-.piewrap { display: flex; gap: 0.6rem; align-items: center; margin-top: 0.3rem; }
-.pie { width: 72px; height: 72px; flex: 0 0 72px; }
-.pie .slice { cursor: pointer; stroke: var(--card); stroke-width: 1; }
-.pie .slice:hover { opacity: 0.82; }
-.pie .slice.on { stroke: var(--ink); stroke-width: 2; }
-.pielegend { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; flex: 1; min-width: 0; }
-.pikey {
-  display: inline-flex; align-items: center; gap: 0.3rem; max-width: 100%;
-  background: none; border: none; padding: 0.06rem 0.2rem; border-radius: var(--r-sm);
-  font: inherit; font-size: var(--t-md); color: var(--ink); cursor: pointer;
-}
-.pikey:hover { background: var(--code-bg); }
-/* Selected, not just hovered: a flat accent tint, not a boxed outline — a
-   bordered, rounded pill sitting inside a plain legend read as clutter. */
-.pikey.on { background: var(--accent-soft); font-weight: 600; }
-.pikey.on .pname { color: var(--accent-ink); }
-.pikey .swatch { width: 9px; height: 9px; border-radius: 2px; flex: 0 0 9px; }
-.pikey .pname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 11rem; }
-.pikey .pn { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* a pie fills its 1 × 1 card below the title, as the portal's (STS-PIE-2); its values are a table in the hover popover */
+.svcell > .card[data-shape=pie] { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.svcell > .card[data-shape=pie] > .facettitle { flex: none; margin-top: 2px; }
+.svcell > .card[data-shape=pie] > span { display: flex; flex: 1 1 0; min-height: 0; }
+.pie { display: block; width: 100%; height: 100%; }
+.pie .slice { cursor: pointer; }
+.pie .slice:hover path { opacity: 0.82; }
+.pietable .vallist { max-height: 150px; }
 
 /* Explore: data-types rows */
 .generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 4.5rem 3.5rem; }

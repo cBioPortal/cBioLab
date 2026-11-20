@@ -110,7 +110,7 @@ async function explore({ ok, BASE, page, browser }) {
     await page.waitForSelector("[data-attr]", { timeout: 120000 });
     await page.waitForTimeout(1500);
     const before = await facetShapes();
-    const key = page.locator(".pielegend .pikey").first();
+    const key = page.locator(".pie .slice").first();
     if (await key.count()) {
       await key.click();
       await page.waitForTimeout(6000);

@@ -15,7 +15,7 @@ import { isCustomAttr } from "../../lib/custom-data-names.ts";
 import { CAT_COLORS } from "./view-chrome.tsx";
 import { useWidth } from "./figure.tsx";
 import { textWidth } from "../../lib/chart/text.ts";
-import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick, portalSelectedInfo } from "../../lib/chart/format.ts";
+import { fmtInt, fmtNum, fmtPct, portalBinRange, portalFreq, portalLogTick, portalPieCount, portalSelectedInfo } from "../../lib/chart/format.ts";
 import { countAxis } from "../../lib/chart/scale.ts";
 import { naturalOrder } from "../../lib/ordinal.ts";
 import { barFigureSvg, pieFigureSvg, type FigureBar, type PieSlice } from "../../lib/study-view-figures.ts";
@@ -23,6 +23,9 @@ import { caseFileAction, figureActions, runCaseFile } from "./chart-files.ts";
 import { caseFileName } from "../../lib/study-view-case-files.ts";
 import { chartOffered } from "../../lib/study-view-config.ts";
 import { chartCells } from "../../lib/study-view-layout.ts";
+import { PIE_AREA, PIE_LIFT, PIE_SELECTED_STROKE, PIE_UNSELECTED, pieLabelFits, pieRadius } from "../../lib/study-view-pie.ts";
+import { HoverPopover } from "../_ui/hover-popover.tsx";
+import { textOn } from "../../lib/chart/style.ts";
 import { cardRank, type GridCard } from "./explore-grid.tsx";
 import { violinPairKey, violinTitle } from "../../lib/study-view-violin.ts";
 import { addChartLines, assayTabs, bulkButtons, genomicChartLines, xVsYAttributes, xVsYButton, SPECIAL_CHART_KEYS, specialChartsShown, geneTabView, columnsMenuTabs } from "../../lib/study-view-add-chart.ts";
@@ -821,6 +824,9 @@ function compareNumeric(label: string, singleStudy: boolean, working: boolean, q
   ] };
 }
 
+/** a pie slice's count label, in px (STS-PIE-3) */
+const PIE_LABEL_SIZE = 11;
+
 /** a value list's key for its NA row, which no value can spell */
 const NA_KEY = "\u0000NA";
 
@@ -930,7 +936,8 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
           const values: any[] = [...naturalOrder(c.values, (v: any) => String(v.v)), ...(c.na ? [{ v: "NA", n: c.na, isNa: true }] : [])];
           const total = values.reduce((n: number, v: any) => n + v.n, 0) || 1;
           let acc = 0;
-          const R = 34, CX = 36, CY = 36;
+          // the pie fills its 1 × 1 cell as the portal's (STS-PIE-2)
+          const R = pieRadius(PIE_AREA.w, PIE_AREA.h), CX = PIE_AREA.w / 2, CY = PIE_AREA.h / 2 - PIE_LIFT;
           const arcs = values.map((v: any, i: number) => {
             const frac = v.n / total, a0 = acc * 2 * Math.PI - Math.PI / 2;
             acc += frac;
@@ -942,11 +949,11 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
             const path = frac >= 0.999
               ? "M " + CX + " " + (CY - R) + " A " + R + " " + R + " 0 1 1 " + (CX - 0.01) + " " + (CY - R) + " Z"
               : "M " + CX + " " + CY + " L " + x0 + " " + y0 + " A " + R + " " + R + " 0 " + large + " 1 " + x1 + " " + y1 + " Z";
-            return { v, path, color: v.isNa ? PORTAL_NA : CAT_COLORS[i % CAT_COLORS.length], frac };
+            const mid = (a0 + a1) / 2;
+            return { v, path, color: v.isNa ? PORTAL_NA : CAT_COLORS[i % CAT_COLORS.length], frac, lx: CX + R * 0.62 * Math.cos(mid), ly: CY + R * 0.62 * Math.sin(mid) };
           });
-          if (asList) {
-            const byKey = new Map(values.map((v: any) => [String(v.v), v]));
-            return (<>
+          const byKey = new Map(values.map((v: any) => [String(v.v), v]));
+          const table = (
               <ValueList picks={picks} pct={portalFreq} unit={c.per === "patient" ? "patients" : "samples"}
                 cut={(c.distinct ?? 0) > c.values.length ? { shown: c.values.length, of: c.distinct! } : undefined} hint={"keep the cases whose " + (c.displayName || c.attribute) + " is any of the checked values"}
                 rows={values.map((v: any) => ({ key: v.isNa ? NA_KEY : String(v.v), name: String(v.v), n: v.n, total, on: isSel(v), muted: v.isNa, solo: v.isNa,
@@ -956,7 +963,10 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                   if (keys.includes(NA_KEY)) { toggleNaValue(c.attribute); return; }
                   const vs = keys.map((k) => byKey.get(k).v);
                   addClause(vs.length === 1 ? clause(byKey.get(keys[0])) : { kind: "clinical", attribute: c.attribute, values: vs });
-                }} />
+                }} />);
+          if (asList) {
+            return (<>
+              {table}
                 {(c.distinct ?? 0) > c.values.length ? (
                   <span className="meta pad-tight vlistfoot">
                     showing {c.values.length.toLocaleString()} of {c.distinct!.toLocaleString()} values
@@ -964,26 +974,29 @@ function ClinicalFacet({ c, ctx }: { c: NonNullable<ExploreCtx["explore"]>["clin
                 ) : null}
             </>);
           }
+          // while the chart has a filter, the values it leaves out are grey (STS-PIE-7)
+          const filtered = values.some(isSel);
+          // the chart's values as a table in the hover popover, where the portal shows its pie's (STS-PIE-5)
           return (
-            <div className="piewrap">
-              <svg viewBox="0 0 72 72" className="pie" role="img" aria-label={c.attribute + " distribution"}>
-                {arcs.map((a: any, i: number) => (
-                  <path key={i} d={a.path} fill={a.color} className={isSel(a.v) ? "slice on" : "slice"}
-                    onClick={() => pick(a.v)}
-                    data-tip={a.v.v + " — " + a.v.n.toLocaleString() + " (" + portalFreq(100 * a.frac) + ")"} />
-                ))}
-              </svg>
-              <div className="pielegend">
-                {arcs.map((a: any, i: number) => (
-                  <button key={i} className={isSel(a.v) ? "pikey on" : "pikey"} onClick={() => pick(a.v)}
-                    aria-pressed={isSel(a.v)} data-tip={isSel(a.v) ? "click to take " + a.v.v + " out of the filter" : "click to filter to " + a.v.v}>
-                    <span className="swatch" style={{ background: a.color }} />
-                    <span className="pname">{a.v.v}</span>
-                    <span className="pn">{a.v.n.toLocaleString()}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <HoverPopover side="right" align="start" className="pietable w-[300px] p-1.5" trigger={
+              <svg viewBox={"0 0 " + PIE_AREA.w + " " + PIE_AREA.h} className="pie" role="img" aria-label={(c.displayName || c.attribute) + " distribution"}>
+                {arcs.map((a: any, i: number) => {
+                  const off = filtered && !isSel(a.v);
+                  const fill = off ? PIE_UNSELECTED.fill : a.color;
+                  const label = portalPieCount(a.v.n);
+                  return (
+                    <g key={i} className="slice" onClick={() => pick(a.v)} data-tip={a.v.v + ":" + a.v.n}>
+                      <path d={a.path} fill={fill} fillOpacity={off ? PIE_UNSELECTED.opacity : 1}
+                        stroke={filtered && !off ? PIE_SELECTED_STROKE.color : "#fff"} strokeWidth={filtered && !off ? PIE_SELECTED_STROKE.width : 1} />
+                      {pieLabelFits(a.frac, R, textWidth(label, PIE_LABEL_SIZE)) && (
+                        <text x={a.lx} y={a.ly} textAnchor="middle" dominantBaseline="central" fontSize={PIE_LABEL_SIZE} fill={textOn(fill)}>{label}</text>
+                      )}
+                    </g>
+                  );
+                })}
+              </svg>}>
+              {table}
+            </HoverPopover>
           );
         })()}
         {c.kind === "num" && c.bins && c.bins.length > 1 && (() => {

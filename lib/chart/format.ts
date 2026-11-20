@@ -54,6 +54,16 @@ export function portalFreq(pct: number): string {
 }
 
 /**
+ * A pie slice's count, as cbioportal.org labels it (numeral `0.[0]a`, k and m upper-cased,
+ * STS-PIE-3): 312 → "312", 1,234 → "1.2K", 1,000 → "1K", 1,500,000 → "1.5M".
+ */
+export function portalPieCount(n: number): string {
+  const unit = Math.abs(n) >= 1e9 ? ["B", 1e9] as const : Math.abs(n) >= 1e6 ? ["M", 1e6] as const : Math.abs(n) >= 1e3 ? ["K", 1e3] as const : ["", 1] as const;
+  const v = Math.round((n / unit[1]) * 10) / 10;
+  return (Number.isInteger(v) ? String(v) : v.toFixed(1)) + unit[0];
+}
+
+/**
  * An oncoprint track's altered percent, `100 * (altered / profiled)` as the portal computes it, as
  * its gutter and gap labels show it: OncoprintUtils percentAltered writes one decimal below 3%
  * and an integer from there, and the track-info view parses that and
