@@ -671,8 +671,8 @@ export default function AnalysisPage() {
                   const eps = [...names].filter((a) => /_MONTHS$/.test(a) && names.has(a.replace(/_MONTHS$/, "_STATUS"))).map((a) => a.replace(/_MONTHS$/, ""));
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
                 })(),
-                addClauses: exploreState.addDensitySelection, // the portal's study-view KM has no risk table (STS-KM-3)
-                km: (curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: (curves as any[]).map((c) => ({ ...c, atRisk: undefined })) as any }, { width }, PORTAL_STUDY_VIEW_KM)} deps={[curves]} />,
+                addClauses: exploreState.addDensitySelection, // the portal's study-view KM: the plot alone, no risk table or legend (STS-KM-3)
+                km: (curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: (curves as any[]).map((c) => ({ ...c, atRisk: undefined })) as any }, { width }, PORTAL_STUDY_VIEW_KM, true)} deps={[curves]} />,
                 density: exploreState.chartChecked("genomic|density"), pairs: exploreState.xyCharts, onRemovePair: exploreState.removeXyChart,
                 onClearDensity: exploreState.clearDensitySelection }),
               ...(explore.violinFacets || []).filter((f) => exploreState.violinCharts.some((p) => violinPairKey(p) === violinPairKey(f))).map((f) => ({

@@ -12,8 +12,12 @@ import {
   seriesStyle, fmtInt, fmtMonths, fmtNum, label, textWidth, esc, FS, SW, type SvgOpts
 } from "../../svg-kit.ts";
 
-/** `single`: one colour for every curve, where a page draws one group as the portal does (the Study View's #2986E2) */
-export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: string): string {
+/**
+ * `single`: one colour for every curve, where a page draws one group as the portal does (the Study
+ * View's #2986E2). `plotOnly`: the axes and curves alone, no legend, tests or caption, as the Study
+ * View's small KM chart draws them (STS-KM-3: its legend is in the tooltip; `curveSummary` writes it).
+ */
+export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: string, plotOnly = false): string {
   const styleOf = (i: number) => single ? { color: single, dash: "" } : seriesStyle(i);
   const p = palette(o.theme), W = Math.max(360, o.width || 720);
   const curves = (v.curves || []) as KmCurve[];
@@ -49,12 +53,10 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: s
   });
 
   let y = T + PLOT + bottomAxisHeight(xTitle) + 10;
+  if (plotOnly) return frame(W, y, out.join(""), p.bg, false, (incidence ? "Cumulative incidence" : "Kaplan–Meier") + " — " + curves.map((c) => c.cohort).join(", "));
   if (risk) { const rt = riskTable(curves, xs, y, W, L, nameW, p, styleOf); out.push(rt.svg); y += rt.height + 8; }
   const items = curves.map((c, i) => ({
-    label: c.cohort, color: styleOf(i).color, dash: styleOf(i).dash, kind: "line" as const,
-    detail: !c.n ? "no patients with data" : (incidence ? "50% incidence by " + (c.median == null ? "not reached" : fmtMonths(c.median))
-      : "median " + (c.median == null ? "not reached" : portalMedianCi(c.median, c.medianCi?.lo ?? null, c.medianCi?.hi ?? null) + " mo")) +
-      " · n = " + fmtInt(c.n) + " · " + fmtInt(c.events) + " events"
+    label: c.cohort, color: styleOf(i).color, dash: styleOf(i).dash, kind: "line" as const, detail: curveSummary(c, incidence),
   }));
   const lg = legend(items, 8, y, W - 16, p, { grid: true });
   out.push(lg.svg);
@@ -68,6 +70,13 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: s
   const cap = caption(v.caveat || "", W, y, p.muted);
   out.push(cap.svg);
   return frame(W, y + cap.height + 8, out.join(""), p.bg, false, (incidence ? "Cumulative incidence" : "Kaplan–Meier") + " — " + curves.map((c) => c.cohort).join(", "));
+}
+
+/** a curve's legend line: its median (or 50% incidence) with its interval, its patients and its events */
+export function curveSummary(c: KmCurve, incidence = false): string {
+  return !c.n ? "no patients with data" : (incidence ? "50% incidence by " + (c.median == null ? "not reached" : fmtMonths(c.median))
+    : "median " + (c.median == null ? "not reached" : portalMedianCi(c.median, c.medianCi?.lo ?? null, c.medianCi?.hi ?? null) + " mo")) +
+    " · n = " + fmtInt(c.n) + " · " + fmtInt(c.events) + " events";
 }
 
 /** the tests, in words: the one the reader asked for and, where studies were pooled, the other */

@@ -14,12 +14,12 @@ import { Button } from "../_ui/button";
 import { useWidth } from "./figure.tsx";
 import { linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight } from "../../lib/svg-kit.ts";
 import { fmtInt } from "../../lib/chart/format.ts";
-import type { CohortDef } from "../../lib/types.ts";
+import type { CohortDef, KmCurve } from "../../lib/types.ts";
 import type { PlotCell } from "../../lib/plot.ts";
 import { ChartMenu } from "./partitions.tsx";
 import { caseFileAction, densityFigureSvg, figureActions, standaloneSvg } from "./chart-files.ts";
 import { chartFileName } from "../../lib/study-view-download.ts";
-import { survivalSvg } from "../../lib/views/survival/figure.ts";
+import { curveSummary, survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import {
   FGA, MUTATION_COUNT, correlationLines, densityAxes, densityPairKey, densityAxisLabel, densityColors, densityGradient, densitySelection, densityTip,
@@ -122,11 +122,12 @@ function SurvivalCard({ studies, selection, draft, endpoints, km, attrs }: Props
               return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" }, PORTAL_STUDY_VIEW_KM)) : null;
             }, (message) => setFileError(message))] }]} />
           {endpoints && endpoints.length > 1 && (
-            <Choice className="w-28" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
+            <Choice className="w-20 h-5 data-[size=sm]:h-5 px-1.5 text-xs" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
               options={endpoints.map((x) => [x, x] as const)} />
           )}
         </div>
-        <div className="xc-body">
+        {/* the curve's median, patients and events in its tooltip, where the portal's small KM chart keeps its legend (STS-KM-3) */}
+        <div className="xc-body" data-tip={res?.curves?.length ? (res.curves as KmCurve[]).map((c) => c.cohort + ": " + curveSummary(c)).join("\n") : undefined}>
           {res && res.curves && (res.curves.length ? km(res.curves) : <p className="note">no patient in the selection has a {ep} time and status</p>)}
           {res && res.error && <p className="note">{res.error}</p>}
           {fileError && <p className="note">{fileError}</p>}
