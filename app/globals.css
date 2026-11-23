@@ -544,6 +544,13 @@ main.analysis-main { max-width: min(132rem, 100%); }
   flex: 1 1 0; min-width: 10px; text-align: left; white-space: nowrap; overflow: visible;
   font-size: var(--t-xs); color: var(--muted); font-variant-numeric: tabular-nums;
 }
+/* in a grid card the histogram fills the room under the title: the bars take what the tick row leaves */
+.svcell > .card:has(> .histowrap) { display: flex; flex-direction: column; }
+.svcell > .card > .histowrap { --histo-ticks-h: 14px; flex: 1 1 0; min-height: 0; align-items: stretch; }
+.svcell .histo-main { display: flex; flex-direction: column; }
+.svcell .histo { flex: 1 1 0; min-height: 0; height: auto; }
+.svcell .histo-y { height: auto; margin-bottom: var(--histo-ticks-h); }
+.svcell .histo-ticks { flex: none; height: var(--histo-ticks-h); }
 
 /* Explore: categorical clinical facets as pie charts (portal study-view style) */
 /* a pie fills its 1 × 1 card below the title, as the portal's (STS-PIE-2); its values are a table in the hover popover */
@@ -1597,6 +1604,13 @@ td.camp-links { flex-direction: column; align-items: flex-start; gap: var(--s1);
 .xc-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s2); }
 .xc-title { font-size: var(--t-md); font-weight: 600; }
 .xc-body { position: relative; min-height: 12rem; }
+/* in a grid card the chart fills the room under the title (app/lab/figure.tsx DrawAtSize, the density's own measure) */
+.svcell > .card.xc-card { display: flex; flex-direction: column; }
+.svcell > .card.xc-card > .xc-head { flex: none; }
+.svcell > .card.xc-card > .xc-body { flex: 1 1 0; min-height: 0; overflow: hidden; }
+.svcell .xc-body > :is(.figsize, .xc-dens) { height: 100%; }
+.figsize { width: 100%; height: 100%; overflow: hidden; }
+.figsize > svg { display: block; }
 .xc-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--s2); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--muted); font-size: var(--t-sm); }
 /* the Clinical Data tab's table scrolls within the window, as the portal's (STV-CD-5: max height 100vh − 220px) */
 [data-tab="clinical-data"] .tv-scroll { max-height: calc(100vh - 220px); overflow: auto; }

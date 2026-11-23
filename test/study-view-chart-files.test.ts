@@ -57,3 +57,12 @@ test("STS-KM-2: the Study View's curve in the portal's #2986E2, its risk-table k
   const plain = survivalSvg({ kind: "survival", curves: [curve] } as never, { width: 480, theme: "light" });
   assert.ok(strokes(plain).every((c) => c === SERIES[0]));
 });
+
+test("survivalSvg plot-only at a height: the figure is that tall, whatever its width", () => {
+  const curve: KmCurve = { cohort: "Selected", points: [{ t: 0, s: 1 } as never, { t: 40, s: 0.5 } as never], median: 40, n: 10, events: 5, tLast: 40 };
+  const tall = (svg: string) => Number(/viewBox="0 0 [\d.]+ ([\d.]+)"/.exec(svg)?.[1]);
+  for (const h of [220, 300]) assert.equal(tall(survivalSvg({ kind: "survival", curves: [curve] } as never, { width: 381 }, PORTAL_STUDY_VIEW_KM, true, h)), h);
+  // without plotOnly the height is ignored: the full figure keeps its own
+  const full = survivalSvg({ kind: "survival", curves: [curve] } as never, { width: 381 }, PORTAL_STUDY_VIEW_KM, false);
+  assert.equal(tall(survivalSvg({ kind: "survival", curves: [curve] } as never, { width: 381 }, PORTAL_STUDY_VIEW_KM, false, 220)), tall(full));
+});

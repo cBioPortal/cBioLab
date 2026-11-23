@@ -16,15 +16,19 @@ import {
  * `single`: one colour for every curve, where a page draws one group as the portal does (the Study
  * View's #2986E2). `plotOnly`: the axes and curves alone, no legend, tests or caption, as the Study
  * View's small KM chart draws them (STS-KM-3: its legend is in the tooltip; `curveSummary` writes it).
+ * `height`, with `plotOnly`: the figure's whole height, the plot taking what its x axis leaves, so
+ * the chart fills its card.
  */
-export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: string, plotOnly = false): string {
+export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: string, plotOnly = false, height?: number): string {
   const styleOf = (i: number) => single ? { color: single, dash: "" } : seriesStyle(i);
   const p = palette(o.theme), W = Math.max(360, o.width || 720);
   const curves = (v.curves || []) as KmCurve[];
   const incidence = v.display === "incidence";
   const { tMax, step } = survivalAxis(curves, { cutoffMonths: v.cutoffMonths, tickMonths: v.tickMonths });
 
-  const T = 12, R = 16, PLOT = plotHeight(W);
+  const xTitle = "Months" + (v.anchoredTo ? " from " + v.anchoredTo : "");
+  const T = 12, R = 16, below = bottomAxisHeight(xTitle) + 10;
+  const PLOT = plotOnly && height ? Math.max(60, height - T - below) : plotHeight(W);
   const yTitle = incidence ? "Cumulative incidence" : "Survival probability";
   const ys = linear(0, 1, T + PLOT, T, { nice: false });
   ys.ticks = [0, 0.25, 0.5, 0.75, 1];
@@ -37,7 +41,6 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: s
   const xs = linear(0, tMax, L, W - R, { nice: false });
   xs.ticks = [];
   for (let t = 0; t <= tMax + 1e-9; t += step) xs.ticks.push(t);
-  const xTitle = "Months" + (v.anchoredTo ? " from " + v.anchoredTo : "");
 
   const out: string[] = [];
   out.push(axisLeft(ys, L, p, { title: yTitle, gridTo: W - R, fmt: yFmt }));
@@ -52,7 +55,7 @@ export function survivalSvg(v: DrawnResultOf<"survival">, o: SvgOpts, single?: s
       (st.dash ? ` stroke-dasharray="${st.dash}"` : "") + ` stroke-linejoin="round"/>`);
   });
 
-  let y = T + PLOT + bottomAxisHeight(xTitle) + 10;
+  let y = T + PLOT + below;
   if (plotOnly) return frame(W, y, out.join(""), p.bg, false, (incidence ? "Cumulative incidence" : "Kaplan–Meier") + " — " + curves.map((c) => c.cohort).join(", "));
   if (risk) { const rt = riskTable(curves, xs, y, W, L, nameW, p, styleOf); out.push(rt.svg); y += rt.height + 8; }
   const items = curves.map((c, i) => ({

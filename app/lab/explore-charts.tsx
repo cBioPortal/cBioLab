@@ -10,7 +10,7 @@ import { cardRank, type GridCard } from "./explore-grid.tsx";
 import { chartCells, kmPlotTitle } from "../../lib/study-view-layout.ts";
 import { api } from "./api.ts";
 import { Button } from "../_ui/button";
-import { useWidth } from "./figure.tsx";
+import { useSize } from "./figure.tsx";
 import { linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight } from "../../lib/svg-kit.ts";
 import { fmtInt } from "../../lib/chart/format.ts";
 import type { CohortDef, KmCurve } from "../../lib/types.ts";
@@ -223,9 +223,11 @@ function Density({ data, axes, names, figure, held, onSelect }: { data: PlotData
   /** set to draw the chart as a file */
   figure: React.MutableRefObject<(() => string | null) | null>;
   onSelect: (box: { x0: number; x1: number; y0: number; y1: number }, span: { x: number; y: number }) => void }) {
-  const { ref, width } = useWidth(260);
+  // the box's size: in a grid card, the room under the title, which the chart fills
+  const { ref, size } = useSize();
+  const width = size?.width ?? null;
   const LEGEND_W = 92;
-  const W = Math.max(200, (width ?? 340) - LEGEND_W), H = Math.round(Math.max(200, Math.min(300, W * 0.72)));
+  const W = Math.max(200, (width ?? 340) - LEGEND_W), H = size && size.height >= 160 ? size.height : Math.round(Math.max(200, Math.min(300, W * 0.72)));
   const [gx, gy] = data.grid!;
   // the engine's log axis is log2(1 + v); the portal draws ln(1 + v)
   const show = (v: number, log: boolean) => log ? lnFromEngine(v) : v;

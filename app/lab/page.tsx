@@ -37,7 +37,7 @@ import { api } from "./api.ts";
 import { useSavedArtifacts } from "./use-saved.ts";
 import { useSaved, useSavedActions } from "../_saved/saved-context.tsx";
 import { ExamplesTab } from "./examples-tab.tsx";
-import { DrawAtWidth } from "./figure.tsx";
+import { DrawAtSize } from "./figure.tsx";
 import { survivalSvg } from "../../lib/views/survival/figure.ts";
 import { PORTAL_STUDY_VIEW_KM } from "../../lib/chart/style.ts";
 import { GenesDialog, CustomDataWarning, CohortColumn, DocDialog, ViewColumn, type AnalysisCtx } from "./analysis-sections.tsx";
@@ -672,7 +672,7 @@ export default function AnalysisPage() {
                   return eps.sort((a, b) => (a === "OS" ? -1 : b === "OS" ? 1 : a.localeCompare(b)));
                 })(),
                 addClauses: exploreState.addDensitySelection, // the portal's study-view KM: the plot alone, no risk table or legend (STS-KM-3)
-                km: (curves) => <DrawAtWidth min={320} draw={(width) => survivalSvg({ kind: "survival", curves: (curves as any[]).map((c) => ({ ...c, atRisk: undefined })) as any }, { width }, PORTAL_STUDY_VIEW_KM, true)} deps={[curves]} />,
+                km: (curves) => <DrawAtSize draw={(width, height) => survivalSvg({ kind: "survival", curves: (curves as any[]).map((c) => ({ ...c, atRisk: undefined })) as any }, { width }, PORTAL_STUDY_VIEW_KM, true, height)} deps={[curves]} />,
                 density: exploreState.chartChecked("genomic|density"), pairs: exploreState.xyCharts, onRemovePair: exploreState.removeXyChart,
                 onClearDensity: exploreState.clearDensitySelection }),
               ...(explore.violinFacets || []).filter((f) => exploreState.violinCharts.some((p) => violinPairKey(p) === violinPairKey(f))).map((f) => ({
