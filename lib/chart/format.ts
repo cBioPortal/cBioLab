@@ -17,6 +17,20 @@ export function fmtNum(n: number, sig = 3): string {
   return minus(trimZeros(n.toPrecision(sig)));
 }
 
+/**
+ * An axis tick where room is short: from a thousand up, at most one decimal and K, M or B
+ * (10000 → "10K", 2500 → "2.5K", 1200000 → "1.2M"); below, as `below` writes it (the scale's own
+ * tick format, so 0.25 keeps its decimals).
+ */
+export function fmtCompactTick(v: number, below: (v: number) => string = fmtNum): string {
+  const a = Math.abs(v);
+  if (!(a >= 1e3) || !Number.isFinite(v)) return below(v);
+  // the smallest unit whose one-decimal value stays under 1000, so 999,999 reads "1M", not "1000K"
+  const units = [["K", 1e3], ["M", 1e6], ["B", 1e9]] as const;
+  const [u, d] = units.find(([, d]) => Math.round(a / d * 10) < 10000) ?? units[2];
+  return minus(trimZeros((v / d).toFixed(1))) + u;
+}
+
 /** a percentage given as 0–100: one decimal, "<0.1%" for a sliver, never "0%" for something */
 export function fmtPct(pct: number, decimals = 1): string {
   if (!Number.isFinite(pct)) return "–";
