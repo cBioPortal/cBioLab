@@ -228,7 +228,9 @@ pre {
    each card in 195 × 170 px cells 5 px apart, the grid centred at its own width. Each card fills its
    cells and scrolls within them, so no card sets another's size. The loading placeholders take the
    same cells. */
-.svgridbox { width: 100%; display: flex; justify-content: flex-start; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.svgridbox { width: 100%; display: flex; justify-content: flex-start; }
+/* a page showing the Study View's chart grid is white behind it, as the portal's */
+body:has(.svgridbox) { --page: var(--card); }
 .svgrid { flex: none; }
 .facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 5px; justify-content: start; }
 .nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
