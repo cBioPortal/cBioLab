@@ -90,7 +90,7 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   const bad = checkQuery(q, columns);
   if (bad) return refuse("mutations", ctx, bad);
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
-  const source = (parts: TablePart[]) => (db: string) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers, clinical));
+  const source = (parts: TablePart[]) => (db: string, materialized: boolean) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers, clinical, materialized));
   let r: Rows, defaults: string[];
   try {
     defaults = mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, source));

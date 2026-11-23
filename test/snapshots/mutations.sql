@@ -130,6 +130,7 @@ cn0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, hugo_
   WHERE cancer_study_identifier = 'msk_chord_2024' AND profile_type = (SELECT replaceOne(gp.stable_id, 'msk_chord_2024_', '') FROM snapshot_db.genetic_profile gp
       JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = 'msk_chord_2024'
         AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)
+    AND hugo_gene_symbol IN (SELECT gene1 FROM v0 UNION ALL SELECT 'KRAS')
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0))
   GROUP BY sid, g),
 k0 AS (SELECT s.sid AS sid,
@@ -338,6 +339,7 @@ cn0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, hugo_
   WHERE cancer_study_identifier = 'msk_chord_2024' AND profile_type = (SELECT replaceOne(gp.stable_id, 'msk_chord_2024_', '') FROM snapshot_db.genetic_profile gp
       JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = 'msk_chord_2024'
         AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)
+    AND hugo_gene_symbol IN (SELECT gene1 FROM v0 UNION ALL SELECT 'KRAS')
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0))
   GROUP BY sid, g),
 k0 AS (SELECT s.sid AS sid,
@@ -549,6 +551,7 @@ cn0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, hugo_
   WHERE cancer_study_identifier = 'msk_chord_2024' AND profile_type = (SELECT replaceOne(gp.stable_id, 'msk_chord_2024_', '') FROM snapshot_db.genetic_profile gp
       JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = 'msk_chord_2024'
         AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)
+    AND hugo_gene_symbol IN (SELECT gene1 FROM v0 UNION ALL SELECT 'KRAS')
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0))
   GROUP BY sid, g),
 k0 AS (SELECT s.sid AS sid,
@@ -757,6 +760,7 @@ cn0 AS (SELECT replaceOne(sample_unique_id, 'msk_chord_2024_', '') AS sid, hugo_
   WHERE cancer_study_identifier = 'msk_chord_2024' AND profile_type = (SELECT replaceOne(gp.stable_id, 'msk_chord_2024_', '') FROM snapshot_db.genetic_profile gp
       JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = gp.cancer_study_id WHERE cs.cancer_study_identifier = 'msk_chord_2024'
         AND gp.genetic_alteration_type = 'COPY_NUMBER_ALTERATION' AND gp.datatype = 'DISCRETE' ORDER BY gp.genetic_profile_id DESC LIMIT 1)
+    AND hugo_gene_symbol IN (SELECT gene1 FROM v0 UNION ALL SELECT 'KRAS')
     AND sample_unique_id IN (SELECT concat('msk_chord_2024_', sid) FROM (SELECT sid FROM m0 UNION ALL SELECT sid FROM v0))
   GROUP BY sid, g),
 k0 AS (SELECT s.sid AS sid,

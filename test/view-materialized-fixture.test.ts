@@ -6,6 +6,8 @@
 //       populates return rows
 //   F2  a resolver's viewAggregate with { materialize: true } on connection b sends the statement
 //       materialized, and its rows are the plain statement's
+//   F3  the mutations table's copy-number lookup reads only the gene and its fusions' site 1 genes:
+//       every row's Copy # is the one it has with the lookup over every gene, and some row has one
 //
 // Runs when CLICKHOUSE2_* point at the fixture (`npm run peer-db` prints the lines; scripts/gate.sh
 // sets them) and is skipped otherwise; skipped naming the version where the database does not run
@@ -25,6 +27,8 @@ const { compileCohortDef } = await import("../lib/cohort2.ts");
 const { cohortSubquery } = await import("../lib/sql-kinds.ts");
 const { PatientLevelResolver } = await import("../lib/federation.ts");
 const { acquiredCountsSql } = await import("../lib/views/acquired/sql.ts");
+const { MUTATION_DEFAULT_COLUMNS, mutationRowSource } = await import("../lib/mutation-table.ts");
+const { pageSql } = await import("../lib/table-query.ts");
 
 const noDb = process.env.CLICKHOUSE2_LABEL === "fixture peer" ? false : "needs the fixture study on connection b: CLICKHOUSE2_* from `npm run peer-db`";
 
@@ -98,5 +102,31 @@ describe("F2 a resolver's viewAggregate on connection b", () => {
     const plain = await run(acquiredCountsSql(r.cohortSql(null), FIXTURE, conn.db, null, sides, null, "any"));
     assert.ok(plain.length > 0);
     assert.deepEqual(asSet(rows), asSet(plain));
+  });
+});
+
+describe("F3 the mutations table's copy-number lookup, narrowed to the table's genes", () => {
+  const GENE_CONDITION = /\n {4}AND hugo_gene_symbol IN \(SELECT gene1 FROM v0 UNION ALL SELECT '[A-Z0-9]+'\)/;
+  for (const gene of ["EGFR", "KRAS", "TP53", "ALK"]) {
+    test(gene + ": every row's Copy # is the one the lookup over every gene gives", { skip: unsupported }, async (t) => {
+      if (unsupported) { t.skip(unsupported); return; }
+      const cohortSql = cohortSubquery(compileCohortDef(null, { study: FIXTURE, db: conn.db }));
+      const sql = String(pageSql(mutationRowSource([{ cohort: "c", study: FIXTURE, cohortSql }], conn.db, gene, null, { hg19: null, hg38: null }),
+        {}, MUTATION_DEFAULT_COLUMNS, 1000, 0));
+      assert.match(sql, GENE_CONDITION, "the lookup names the table's genes");
+      const [narrowed, every] = await Promise.all([run(sql), run(sql.replace(GENE_CONDITION, ""))]);
+      const cn = (rows: Record<string, unknown>[]) => rows.map((r) => JSON.stringify([r.sid, r.proteinChange, r.chr, r.start, r.copyNumber])).sort();
+      t.diagnostic(narrowed.length + " rows, " + narrowed.filter((r) => r.copyNumber !== "").length + " with a Copy #");
+      assert.ok(narrowed.length > 0, "the fixture has " + gene + " rows");
+      assert.deepEqual(cn(narrowed), cn(every));
+      assert.deepEqual(asSet(narrowed), asSet(every));
+    });
+  }
+  test("some row has a Copy #", { skip: unsupported }, async (t) => {
+    if (unsupported) { t.skip(unsupported); return; }
+    const cohortSql = cohortSubquery(compileCohortDef(null, { study: FIXTURE, db: conn.db }));
+    const rows = (await Promise.all(["EGFR", "KRAS", "TP53"].map((g) => run(String(pageSql(
+      mutationRowSource([{ cohort: "c", study: FIXTURE, cohortSql }], conn.db, g, null, { hg19: null, hg38: null }), {}, MUTATION_DEFAULT_COLUMNS, 1000, 0)))))).flat();
+    assert.ok(rows.some((r) => r.copyNumber !== ""), "the comparison covers a Copy # call");
   });
 });

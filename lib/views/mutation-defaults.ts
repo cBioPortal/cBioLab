@@ -19,7 +19,7 @@ import { runRows } from "./rows.ts";
  * frequency, how many Cancer Type Detailed values the rows hold. A study whose peer did not describe
  * its profiles (`unanswered`) leaves the first unknown, unless another study has the profile.
  */
-export async function mutationDefaultFacts(ctx: ViewRun, holders: string[], source: (parts: TablePart[]) => (db: string) => RowSource): Promise<MutationDefaultFacts> {
+export async function mutationDefaultFacts(ctx: ViewRun, holders: string[], source: (parts: TablePart[]) => (db: string, materialized: boolean) => RowSource): Promise<MutationDefaultFacts> {
   const valuesOf = async (column: string, numeric: boolean) =>
     (await runRows(ctx, "mutations", holders, {}, MUTATION_DEFAULT_COLUMNS, MUTATION_DEFAULT_COLUMNS, 1, source, { column, numeric })).values;
   const [vaf, types, studies] = await Promise.all([valuesOf("vaf", true), valuesOf("cancerType", false),
@@ -38,7 +38,7 @@ export async function mutationDefaultFacts(ctx: ViewRun, holders: string[], sour
 export async function mutationDefaults(ctx: ViewRun, holders: string[], gene: string, oql: LollipopOql | undefined, drivers: ResolvedDrivers | undefined): Promise<string[]> {
   if (!holders.length) return MUTATION_DEFAULT_COLUMNS;
   const pins = await variantPins();
-  return mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, (parts) => (db) => mutationRowSource(parts, db, gene, ctx.pin, pins, oql, drivers)));
+  return mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, (parts) => (db, materialized) => mutationRowSource(parts, db, gene, ctx.pin, pins, oql, drivers, [], materialized)));
 }
 
 /**

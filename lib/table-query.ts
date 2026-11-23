@@ -69,6 +69,8 @@ export interface RowSource {
   duplicateKey?: string;
   /** the columns of `rows` naming a row's sample and patient: the counts then say how many of each the query keeps */
   units?: { sample: string; patient: string };
+  /** what ends every statement over `rows`: the setting its materialized subqueries need (lib/ch.ts materializedSetting), or nothing */
+  settings?: string;
 }
 
 export const SEARCH_MAX = 200;
@@ -201,7 +203,7 @@ export function pageSql(src: RowSource, q: TableQuery, defaults: string[], limit
     "SELECT " + src.select + ", count() OVER () AS total FROM rows\n" +
     "WHERE " + whereSql(src, q, defaults) + "\n" +
     "ORDER BY " + orderSql(src, q) + "\n" +
-    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset)));
+    "LIMIT " + Math.max(0, Math.floor(limit)) + " OFFSET " + Math.max(0, Math.floor(offset)) + (src.settings || ""));
 }
 
 /**
@@ -213,7 +215,7 @@ export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study
   return patientSql(src.with +
     "SELECT idx FROM (SELECT study, patient, row_number() OVER (ORDER BY " + orderSql(src, q) + ") - 1 AS idx FROM rows\n" +
     "WHERE " + whereSql(src, q, defaults) + ")\n" +
-    "WHERE study = " + sq(study) + " AND patient = " + sq(patient) + " LIMIT 1");
+    "WHERE study = " + sq(study) + " AND patient = " + sq(patient) + " LIMIT 1" + (src.settings || ""));
 }
 
 /** Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. */
@@ -222,7 +224,7 @@ export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): Pa
   return patientSql(src.with + "SELECT cohort, study, countIf(" + where + ") AS n, count() AS all" +
     (src.duplicateKey ? ", count() - uniqExact(" + src.duplicateKey + ") AS dup" : "") +
     (src.units ? ", uniqExactIf(" + src.units.sample + ", " + where + ") AS ns, uniqExactIf(" + src.units.patient + ", " + where + ") AS np" : "") +
-    " FROM rows GROUP BY cohort, study");
+    " FROM rows GROUP BY cohort, study" + (src.settings || ""));
 }
 
 /**
@@ -234,9 +236,9 @@ export function valuesSql(src: RowSource, q: TableQuery, defaults: string[], col
   const col = src.columns.find((c) => c.id === column);
   if (!col) throw new Error("unknown column " + column);
   const where = whereSql(src, q, defaults, column);
-  return patientSql(col.numeric
+  return patientSql((col.numeric
     ? src.with + "SELECT min(v) AS lo, max(v) AS hi, count() AS n FROM (SELECT " + (col.num || col.text) + " AS v FROM rows WHERE " + where + ") WHERE v IS NOT NULL"
-    : src.with + "SELECT v, count() AS n FROM (SELECT " + col.text + " AS v FROM rows WHERE " + where + ") GROUP BY v ORDER BY n DESC, v LIMIT " + VALUES_MAX);
+    : src.with + "SELECT v, count() AS n FROM (SELECT " + col.text + " AS v FROM rows WHERE " + where + ") GROUP BY v ORDER BY n DESC, v LIMIT " + VALUES_MAX) + (src.settings || ""));
 }
 
 /** A column's values, as valuesSql returns them, merged across databases. */

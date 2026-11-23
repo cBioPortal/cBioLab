@@ -6,6 +6,8 @@ import { acquiredCountsSql, acquiredFunnelSql, type AcquiredSides } from "../../
 import { cancerTypesSql, type CancertypesOql } from "../../lib/views/cancertypes/sql.ts";
 import { txEndpointCountsSql, type TxEndpointOpts } from "../../lib/federation-views.ts";
 import { instabilityScoresSql, type InstabilityOpts } from "../../lib/views/instability/sql.ts";
+import { MUTATION_DEFAULT_COLUMNS, mutationRowSource } from "../../lib/mutation-table.ts";
+import { countsSql, pageSql, valuesSql, type RowSource } from "../../lib/table-query.ts";
 
 export const SETTING = "\nSETTINGS enable_materialized_cte = 1";
 
@@ -94,5 +96,24 @@ export function materializedCases(x: CaseCtx): MaterializedCase[] {
     { name: "instabilityScoresSql: autosomes", names: ["arms"], build: inst({ threshold: 0.2, armShare: 0.5, includeX: false }) },
     { name: "instabilityScoresSql: with X", names: ["arms"], build: inst({ threshold: 0.3, armShare: 0.8, includeX: true }) },
   );
+  // the mutations table's row statements (lib/table-query.ts over mutationRowSource): its mutation and fusion rows
+  const NO_PINS = { hg19: null, hg38: null };
+  const rowSource = (gene: string, m?: boolean): RowSource => {
+    const parts = [{ cohort: "c", study, cohortSql: c }];
+    return m === undefined ? mutationRowSource(parts, db, gene, null, NO_PINS) : mutationRowSource(parts, db, gene, null, NO_PINS, undefined, undefined, [], m);
+  };
+  const MUT = ["m0", "v0"], D = MUTATION_DEFAULT_COLUMNS;
+  for (const gene of x.genes) {
+    cases.push(
+      { name: "mutationRowSource countsSql: " + gene, names: MUT, populated: true, positive: "all",
+        build: (m) => String(countsSql(rowSource(gene, m), {}, D)) },
+      { name: "mutationRowSource pageSql: " + gene, names: MUT, populated: true,
+        build: (m) => String(pageSql(rowSource(gene, m), { sort: { column: "copyNumber", desc: true } }, D, 1000, 0)) },
+      { name: "mutationRowSource valuesSql cancerType: " + gene, names: MUT, populated: true,
+        build: (m) => String(valuesSql(rowSource(gene, m), {}, D, "cancerType")) },
+      { name: "mutationRowSource valuesSql vaf: " + gene, names: MUT, populated: true,
+        build: (m) => String(valuesSql(rowSource(gene, m), {}, D, "vaf")) },
+    );
+  }
   return cases;
 }
