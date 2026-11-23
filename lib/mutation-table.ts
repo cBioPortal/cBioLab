@@ -4,6 +4,7 @@
 // PatientLevelResolver.rowsPage: a participant that may not disclose a patient has no such method.
 // The one other reader is the lollipop narrowed by the table's search (mutationRowKeysSql), which
 // BaseResolver.lollipopCounts builds only on a patient-level participant and refuses everywhere else.
+import { cte, materializedSetting } from "./ch.ts";
 import { mutationStudySql, sq } from "./compiler.ts";
 import { whereSql, type QueryColumn, type RowSource, type TableQuery } from "./table-query.ts";
 import { impactSql, impactType, canonicalType, cellOf, cellLabel, IMPACT_TYPES, IMPACT_COLORS, LOLLIPOP_OWN_FILTERS } from "./lollipop.ts";
@@ -208,7 +209,7 @@ function mutationDrvSql(p: TablePart, db: string, pin: string | null, pins: Vari
 }
 
 /** A part's rows, every column the table has, labelled with its cohort, study and document order. */
-function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers): { ctes: string; rows: string } {
+function partRows(p: TablePart, i: number, db: string, gene: string, pin: string | null, pins: VariantPins, oql: LollipopOql | undefined, drivers: ResolvedDrivers | undefined, materialized: boolean): { ctes: string; rows: string } {
   const filter = oql ? oqlMutationFilterSql(oql.lines, gene, { study: p.study, db, oncokbPin: pin, ...(oql.drivers !== undefined ? { drivers: oql.drivers, hotspotPins: pins } : {}) }) : null;
   const pre = sq(p.study + "_");
   const attr = (name: string, as: string) =>
@@ -217,21 +218,20 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
     "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM (SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i + ")) GROUP BY sid)";
   const ctes =
     "c" + i + " AS (" + p.cohortSql + "),\n" +
-    "m" + i + " AS (\n" +
+    cte("m" + i, "\n" +
     "  SELECT patientId AS pid, sampleId AS sid, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,\n" +
     "         referenceAllele AS ref, tumorSeqAllele AS var, tumorAltCount AS altCount, tumorRefCount AS refCount, mutationStatus AS status, proteinPosStart AS pos,\n" +
     "         center, validationStatus AS vs, normalAltCount AS nAlt, normalRefCount AS nRef" +
     (drivers ? ", driverFilter, driverTiersFilter" : "") + "\n" +
     "  FROM " + db + ".mutation_derived\n" +
     "  WHERE " + mutationStudySql(p.study) + " AND `GENE.hugoGeneSymbol` = " + sq(gene) + "\n" +
-    "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n" +
-    "),\n" +
-    fusionCtes(p, i, db, gene, pin) +
+    "    AND molecularProfileId NOT LIKE '%uncalled%' AND " + inCohortSamples("sampleId", "c" + i) + (filter ? "\n    AND " + filter : "") + "\n", materialized) + ",\n" +
+    fusionCtes(p, i, db, gene, pin, materialized) +
     // Cancer Type Detailed as the portal's table reads it: the sample's tumour type, the study's for a sample with neither type attribute
     sampleTumorTypeCte("ct" + i, p.study, db, "SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i) + ",\n" +
     attr("MUTATION_COUNT", "mc" + i) + ",\n" +
     attr("CANCER_TYPE", "cta" + i) + ",\n" +
-    copyNumberCte(p, i, db) + ",\n" +
+    copyNumberCte(p, i, db, gene) + ",\n" +
     (pin ? tumorTypeCtes(p, i, db) : "");
   const gn = variantAnnotationCte("g" + i, db, p.study, "SELECT chr, start, end, ref, var FROM m" + i, pins);
   // a Cancer Hotspot (recurrent), the Annotation sort's hotspot element; the store holds no 3D hotspots. A call
@@ -272,11 +272,12 @@ function partRows(p: TablePart, i: number, db: string, gene: string, pin: string
  * (the one with the highest id where a study has several), for the gene and the fusion rows' site 1
  * genes. A value that is not a whole number (MSK's −1.5) is no call: the portal's API serves none.
  */
-function copyNumberCte(p: TablePart, i: number, db: string): string {
+function copyNumberCte(p: TablePart, i: number, db: string, gene: string): string {
   const pre = sq(p.study + "_");
   return "cn" + i + " AS (SELECT replaceOne(sample_unique_id, " + pre + ", '') AS sid, hugo_gene_symbol AS g, any(" + finiteSql("alteration_value") + ") AS v\n" +
     "  FROM " + db + ".genetic_alteration_derived\n" +
     "  WHERE cancer_study_identifier = " + sq(p.study) + " AND profile_type = " + discreteCnaProfileSql(p.study, db) + "\n" +
+    "    AND hugo_gene_symbol IN (SELECT gene1 FROM v" + i + " UNION ALL SELECT " + sq(gene) + ")\n" +
     "    AND sample_unique_id IN (SELECT concat(" + pre + ", sid) FROM (SELECT sid FROM m" + i + " UNION ALL SELECT sid FROM v" + i + "))\n" +
     "  GROUP BY sid, g)";
 }
@@ -306,8 +307,8 @@ function extraColumnsSql(p: TablePart, db: string, gene: string, center: string,
  * mutationsByGene): its sites' genes, class and event info, site 1's chromosome and position, its status
  * and, at a pin, its OncoKB SV store keys (lib/sv-oncokb.ts) and its sample's tumour type (`vk<i>`).
  */
-function fusionCtes(p: TablePart, i: number, db: string, gene: string, pin: string | null): string {
-  return "v" + i + " AS (\n" +
+function fusionCtes(p: TablePart, i: number, db: string, gene: string, pin: string | null, materialized: boolean): string {
+  return cte("v" + i, "\n" +
     "  SELECT pt.stable_id AS pid, smp.stable_id AS sid, ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,\n" +
     "         sv.class AS class, sv.event_info AS eventInfo, sv.site1_chromosome AS chr, sv.site1_position AS start, sv.sv_status AS status,\n" +
     "         " + siteKey("sv.site1_entrez_gene_id") + " AS k1, " + siteKey("sv.site2_entrez_gene_id") + " AS k2\n" +
@@ -320,8 +321,7 @@ function fusionCtes(p: TablePart, i: number, db: string, gene: string, pin: stri
     "  LEFT JOIN " + db + ".gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id\n" +
     "  WHERE cs.cancer_study_identifier = " + sq(p.study) + " AND gp.genetic_alteration_type = 'STRUCTURAL_VARIANT'\n" +
     "    AND (sv.site1_entrez_gene_id IN (" + entrezOf(db, [gene]) + ") OR sv.site2_entrez_gene_id IN (" + entrezOf(db, [gene]) + "))\n" +
-    "    AND " + inCohortSamples("smp.stable_id", "c" + i) + "\n" +
-    "),\n" +
+    "    AND " + inCohortSamples("smp.stable_id", "c" + i) + "\n", materialized) + ",\n" +
     (pin ? sampleTumorTypeCte("vk" + i, p.study, db, "SELECT sid FROM v" + i) + ",\n" : "");
 }
 
@@ -415,8 +415,8 @@ function clinicalMapCtes(parts: TablePart[], db: string, clinical: ClinicalColum
   return map("clins", "sample", "sid") + map("clinp", "patient", "pid");
 }
 
-function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers, clinical: ClinicalColumn[] = []): string {
-  const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins, oql, drivers));
+function allRows(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql: LollipopOql | undefined, drivers: ResolvedDrivers | undefined, clinical: ClinicalColumn[], materialized: boolean): string {
+  const built = parts.map((p, i) => partRows(p, i, db, gene, pin, pins, oql, drivers, materialized));
   return "WITH " +
     (pin
       // each call's fields from one stored answer, its latest; the gene-level store holds no diagnostic or prognostic level (NULL: unknown)
@@ -450,12 +450,15 @@ function allRows(parts: TablePart[], db: string, gene: string, pin: string | nul
  * portal leaves them out; the sample's detailed cancer type and mutation count come from the
  * study's own attributes; the OncoKB call at `pin` when there is one; Genome Nexus's HGVSc, ClinVar
  * and SIGNAL at the pin of the study's reference genome (`pins`), when it has one. With no sort,
- * drivers come first, then by codon. All parts must live in the database this runs in.
+ * drivers come first, then by codon. All parts must live in the database this runs in. When
+ * `materialized` (lib/ch.ts materializedCteSupported), each part's mutation and fusion rows are
+ * computed once per statement rather than at each of their many references.
  */
-export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers, clinical: ClinicalColumn[] = []): RowSource {
+export function mutationRowSource(parts: TablePart[], db: string, gene: string, pin: string | null, pins: VariantPins, oql?: LollipopOql, drivers?: ResolvedDrivers, clinical: ClinicalColumn[] = [], materialized = false): RowSource {
   if (!parts.length) throw new Error("mutationRowSource needs at least one part");
   return {
-    with: allRows(parts, db, gene, pin, pins, oql, drivers, clinical),
+    with: allRows(parts, db, gene, pin, pins, oql, drivers, clinical, materialized),
+    settings: materializedSetting(materialized),
     columns: [...MUTATION_COLUMNS.map((c) => queryColumn(c, drivers ? true : pin)), ...clinical.map(clinicalQueryColumn)],
     select: "*",
     // the portal's default: Annotation, descending (skin_results_view_tables_default_sort_column)

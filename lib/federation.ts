@@ -1463,10 +1463,10 @@ export interface PatientLevelCapable extends AggregateCapable {
   /** one row per patient (never an identifier) for a view in lib/views/ (a lab waterfall) — see PatientLevelResolver.viewRows */
   viewRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
   /** a table view's rows (lib/table-query.ts) in this instance, with their ids — see PatientLevelResolver.rowsPage */
-  rowsPage(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }>;
-  rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]>;
-  rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]>;
-  rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null>;
+  rowsPage(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }>;
+  rowsCounts(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]>;
+  rowsValues(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]>;
+  rowsRank(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null>;
   /** one patient's timeline events and samples — see PatientLevelResolver.patientTimeline */
   patientTimeline(patient: string): Promise<PatientTimeline>;
 }
@@ -2487,23 +2487,23 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
    * resolver alone, and the row sources (lib/clinical-table.ts, lib/mutation-table.ts) sit outside
    * the aggregate builders a peer may be sent.
    */
-  async rowsPage(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }> {
-    const r = await this.runPatientRows<ChRow>(label, pageSql(source(this.instance.conn.db), q, defaults, limit, offset), this.instance.conn);
+  async rowsPage(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }> {
+    const r = await this.runPatientRows<ChRow>(label, pageSql(source(this.instance.conn.db, await materializedCteSupported(this.instance.conn)), q, defaults, limit, offset), this.instance.conn);
     return { rows: r.data, total: r.data.length ? Number(r.data[0].total) : 0 };
   }
   /** per part: the rows the query keeps and every row. Counts only. */
-  async rowsCounts(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]> {
-    const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db), q, defaults), this.instance.conn);
+  async rowsCounts(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]> {
+    const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db, await materializedCteSupported(this.instance.conn)), q, defaults), this.instance.conn);
     return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all), ...(x.dup != null ? { dup: Number(x.dup) } : {}),
       ...(x.ns != null && x.np != null ? { ns: Number(x.ns), np: Number(x.np) } : {}) }));
   }
   /** a column's distinct values with counts, or its range — what its filter offers */
-  async rowsValues(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {
-    return (await this.runPatientRows<ChRow>(label, valuesSql(source(this.instance.conn.db), q, defaults, column), this.instance.conn)).data;
+  async rowsValues(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {
+    return (await this.runPatientRows<ChRow>(label, valuesSql(source(this.instance.conn.db, await materializedCteSupported(this.instance.conn)), q, defaults, column), this.instance.conn)).data;
   }
   /** one patient's 0-based place in the query's order, or null when the query leaves it out */
-  async rowsRank(label: string, source: (db: string) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null> {
-    const r = await this.runPatientRows<ChRow>(label, rankSql(source(this.instance.conn.db), q, defaults, study, patient), this.instance.conn);
+  async rowsRank(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null> {
+    const r = await this.runPatientRows<ChRow>(label, rankSql(source(this.instance.conn.db, await materializedCteSupported(this.instance.conn)), q, defaults, study, patient), this.instance.conn);
     return r.data.length ? Number(r.data[0].idx) : null;
   }
 

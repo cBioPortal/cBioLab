@@ -54,7 +54,7 @@ export type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; s
 export type RemoteRows = { of: (r: Resolver) => RemotePatientRows | null; table: PeerRowsRequest["table"]; subject?: PeerRowsRequest["subject"]; samples?: PeerRowsRequest["samples"];
   oncokbPin?: string | null; onAnswer?: (a: { oncokbPin?: string | null }) => void };
 export async function runRows(ctx: ViewRun, label: string, holders: string[], q: TableQuery, defaults: string[], shown: string[], size: number,
-  source: (parts: TablePart[], reads: string[] | "all") => (db: string) => RowSource, values?: { column: string; numeric: boolean },
+  source: (parts: TablePart[], reads: string[] | "all") => (db: string, materialized: boolean) => RowSource, values?: { column: string; numeric: boolean },
   remote?: RemoteRows, locate?: { study: string; patient: string }): Promise<Rows> {
   type PL = Pick<PatientLevelCapable, "rowsPage" | "rowsCounts" | "rowsValues" | "rowsRank">;
   // one backend per database — or per peer, for a view whose rows a peer may page itself (`remote`)
