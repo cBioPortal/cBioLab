@@ -574,7 +574,6 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
         </div>
         <div className="derivedgrid">
           {explore.derived.map(d => {
-            const max = Math.max(...d.buckets.map(b => b.n), 1);
             const dEventType = (d as any).eventType as string | undefined;
             const dLineGap = (d as any).lineGap as number | undefined;
             const picked = (b: { gte?: number; lt?: number }) => {
@@ -605,7 +604,6 @@ export function DerivedFacets({ ctx }: { ctx: ExploreCtx }) {
                         ...(dEventType ? { eventType: dEventType } : {}), ...(dLineGap != null ? { lineGap: dLineGap } : {}),
                         range: { ...(b.gte != null ? { gte: b.gte } : {}), ...(b.lt != null ? { lt: b.lt } : {}) } })}>
                       <span className="vname">{b.label}</span>
-                      <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * b.n / max)) + "%" }} /></span>
                       <span className="vn">{b.n.toLocaleString()}</span>
                     </button>
                   ))}
@@ -1453,7 +1451,6 @@ function StudyBreakdown({ ctx }: { ctx: ExploreCtx }) {
             title={(r.instance !== "a" ? r.instanceLabel + " · " : "") + r.study + " — " + r.n.toLocaleString() + " samples"}>
             <span className="mono">{r.study}</span>
             <span className="meta inst">{r.instance !== "a" ? "⧉ " + r.instanceLabel : ""}</span>
-            <span className="bar"><i style={{ width: Math.max(1, Math.round(100 * r.n / total)) + "%" }} /></span>
             <span className="meta pct">{fmtPct(100 * r.n / total)}</span>
             <span className="n">{r.n.toLocaleString()}</span>
           </PickRow>
@@ -1494,7 +1491,6 @@ function DataTypes({ ctx }: { ctx: ExploreCtx }) {
   if (!rows.length) return null;
   const d = parseDraft();
   const selected = (t: string) => !!(d && d.all.some((cl: any) => cl.kind === "profiled" && cl.type === t));
-  const max = Math.max(...rows.map((x) => x.n), 1);
   const samples = explore.totals?.samples ?? 0;
   const typeOf = new Map(rows.map((dt) => [dt.profile, PROFILED_TYPE[dt.alterationType]]));
   const types = (profiles: string[]) => [...new Set(profiles.map((p) => typeOf.get(p)).filter(Boolean))] as string[];
@@ -1512,7 +1508,6 @@ function DataTypes({ ctx }: { ctx: ExploreCtx }) {
               title={t ? "require " + t + " data (profiled clause)" : "no membership filter for this data type in the DSL — shown for completeness"}>
               <span className="gname">{dt.profile}</span>
               <span className="meta dtlabel">{dt.label}</span>
-              <span className="gbar"><i style={{ width: Math.max(2, Math.round(100 * dt.n / max)) + "%" }} /></span>
               <span className="gcount" data-tip="Number of samples">{dt.n.toLocaleString()}</span>
               <span className="gcount meta" data-tip={"of the " + samples.toLocaleString() + " selected samples"}>{portalFreq(samples ? 100 * dt.n / samples : NaN)}</span>
             </PickRow>

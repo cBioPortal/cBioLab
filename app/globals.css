@@ -251,6 +251,12 @@ pre {
 .svcell .cardctl { position: absolute; top: 4px; right: 26px; height: 20px; display: flex; align-items: center; gap: 2px; }
 .svcell .cardctl :is(.charticon, .titleicon) { width: 20px; height: 20px; min-width: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
 .svcell :is(.chartgear, .charticon, .titleicon) svg { width: 14px; height: 14px; }
+/* a card's header buttons show while the pointer is over it, a button in it has focus, or its menu is open */
+@media (hover: hover) {
+  .svcell > .card :is(.chartgear, .cardctl) { opacity: 0; transition: opacity 0.12s; }
+  .svcell:hover > .card :is(.chartgear, .cardctl), .svcell > .card:focus-within :is(.chartgear, .cardctl),
+  .svcell > .card .chartgear[aria-expanded=true], .svcell > .card .chartgear[data-state=open] { opacity: 1; }
+}
 .svcell .titleicon { border: 0; background: none; color: var(--muted); cursor: pointer; }
 .svcell .titleicon[aria-pressed=true] { color: var(--accent-ink); }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
@@ -454,9 +460,8 @@ main.analysis-main { max-width: min(132rem, 100%); }
 /* Explore: per-study breakdown rows */
 .sbrow {
   display: grid;
-  /* fixed tracks: every row is its own grid, so shared widths must be explicit
-     or the proportion bars would not be comparable between rows */
-  grid-template-columns: calc(0.75rem + 2px) minmax(9rem, 1.6fr) 5.5rem minmax(4rem, 1fr) 3.2rem 5rem;
+  /* fixed tracks: every row is its own grid, so shared widths must be explicit */
+  grid-template-columns: calc(0.75rem + 2px) minmax(9rem, 1.6fr) 5.5rem 3.2rem 5rem;
   gap: 0 0.6rem; align-items: center;
   padding: 0.22rem 0; border-top: 1px solid var(--line);
   font-size: var(--t-md);
@@ -464,8 +469,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .sbrows { max-height: 20rem; overflow-y: auto; overscroll-behavior: contain; }
 .sbrow .mono { font-family: "IBM Plex Mono", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sbrow .inst { color: var(--accent-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-sm); }
-.sbrow .bar { display: block; height: 8px; background: var(--line); border-radius: var(--r-sm); overflow: hidden; }
-.sbrow .bar i { display: block; height: 100%; min-width: 2px; background: var(--accent-ink); opacity: 0.8; }
 .sbrow .pct { text-align: right; font-variant-numeric: tabular-nums; }
 .sbrow .n { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
 
@@ -506,9 +509,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .generow .cnatag { font-size: var(--t-xs); padding: 0.05rem 0.2rem; border-radius: 3px; text-align: center; }
 .generow .cnatag.amp { background: #e41a1c22; color: #b3131a; }
 .generow .cnatag.del { background: #2166ac22; color: #1b4f86; }
-/* a data type's bar: the same frame as a clinical value's (.valrow .vbar) */
-.generow .gbar { height: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
-.generow .gbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .generow .gcount { text-align: right; font-variant-numeric: tabular-nums; font-size: var(--t-sm); }
 
 /* Explore: numeric clinical histograms (cBioPortal study-view bins): a y axis of counts beside
@@ -556,7 +556,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .pietable .vallist { max-height: 150px; }
 
 /* Explore: data-types rows */
-.generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) minmax(3rem, 1.2fr) 4.5rem 3.5rem; }
+.generow.dtrow { grid-template-columns: calc(0.75rem + 2px) minmax(6rem, 1fr) minmax(6rem, 1.4fr) 3.5rem 3.5rem; }
 .generow.dtrow.is-static { cursor: default; }
 .generow.dtrow.is-static:hover { background: none; }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
@@ -567,21 +567,19 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* Explore: high-cardinality categorical facets as a ranked list (portal table) */
 .vallist {
-  /* checkbox · name · bar · count · share, shared by the rows and their header */
-  --valrow-cols: calc(0.75rem + 2px) 1fr 2.25rem minmax(3.5rem, auto) 3.25rem;
+  /* checkbox · name · count · share, shared by the rows and their header */
+  --valrow-cols: calc(0.75rem + 2px) 1fr minmax(3.5rem, auto) 3.25rem;
   margin-top: 0.25rem;
   /* every value is present; the list scrolls rather than being trimmed */
   max-height: var(--vallist-h); overflow-y: auto; overscroll-behavior: contain;
 }
-/* checkbox · name · a second count in place of the bar · count · share */
+/* checkbox · name · a second count · count · share */
 .vallist.withextra { --valrow-cols: calc(0.75rem + 2px) 1fr minmax(2.5rem, auto) minmax(2.5rem, auto) 3.25rem; }
 .vallist.withextra .valhead > span:nth-child(3) { text-align: right; }
 .vlistfoot { display: block; margin-top: var(--s1); }
 .valrow {
-  /* name · a thin proportion rule · count · share — the bar is a hint at
-     relative size, deliberately small so the label and the number stay the
-     content. Declare a column for EVERY child: adding the share without one
-     wrapped it to a second line under each value. */
+  /* name · count · share. Declare a column for EVERY child, or the extra
+     child wraps to a second line under each value. */
   display: grid; grid-template-columns: var(--valrow-cols);
   gap: 0 0.6rem; align-items: center; width: 100%;
   /* the portal's table row (STS-TBL-7): 25 px whatever the font, as VALROW_H in pick-list.tsx */
@@ -592,7 +590,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .valrow:hover { background: var(--code-bg); }
 /* the portal's table header: # and Freq over their columns */
 .valhead { display: grid; grid-template-columns: var(--valrow-cols); gap: 0 0.6rem; width: 100%; height: 22px; box-sizing: border-box; align-items: center; font-size: var(--t-xs); font-weight: 600; color: var(--muted); }
-.valhead > span:nth-child(n + 4) { text-align: right; }
+.valhead > span:nth-child(n + 3) { text-align: right; }
 /* the search box and Select all / Deselect all under a list that scrolls */
 .vsearch { display: flex; align-items: center; gap: var(--s1); margin-top: var(--s1); }
 /* Selected, not just hovered: a flat accent tint flush with the row above and
@@ -600,10 +598,6 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .valrow.on { background: var(--accent-soft); border-radius: 0; }
 .valrow.on .vname { color: var(--accent-ink); font-weight: 600; }
 .valrow .vname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* A bordered 8px track, solid fill, no track tint and no hover-opacity trick: a hint at relative
-   size, not a chart. */
-.valrow .vbar { height: 8px; background: var(--card); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
-.valrow .vbar i { display: block; height: 100%; min-width: 2px; background: var(--accent); }
 .valrow .vn { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 
 /* Explore's lists (app/lab/pick-list.tsx): only the rows in view are mounted, each placed at its

@@ -43,22 +43,14 @@ async function explore({ ok, BASE, page, browser }) {
       scrolls: l.scrollHeight > l.clientHeight + 2,
       capped: [...l.querySelectorAll("span")].some(s2 => /showing .* of .* values/.test(s2.textContent || ""))
     })).sort((a, b) => b.rows - a.rows)[0];
-    return { lists: lists.length, big, bars: document.querySelectorAll(".vbar").length };
+    return { lists: lists.length, big, bars: document.querySelectorAll(".vbar, .gbar, .sbrow .bar").length };
   });
   ok("categorical values are shown in full, scrolled rather than trimmed",
     !!vals.big && vals.big.rows > 20 && vals.big.scrolls,
     vals.big ? vals.big.rows + " values in the largest list, scrolls=" + vals.big.scrolls +
       (vals.big.capped ? ", cap disclosed" : "") : "no value lists");
-  // the proportion rules are a hint, not a chart — guard against them growing
-  const barBox = await page.evaluate(() => {
-    const b2 = document.querySelector(".valrow .vbar");
-    if (!b2) return null;
-    const r = b2.getBoundingClientRect();
-    return { h: Math.round(r.height), w: Math.round(r.width) };
-  });
-  // 8px + a 1px border each side: a hint at relative size, not a chart
-  ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 10 && barBox.w <= 80,
-    barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
+  // the Study View's lists draw no bar per row
+  ok("value lists draw no bar per row", vals.bars === 0, vals.bars + " row bars");
 
   // The grid draws the checked attributes of "+ Add chart" > Clinical, and until the
   // reader changes them those are cBioPortal's default: the first 20 with a priority

@@ -143,15 +143,13 @@ export function ValueList({ rows, onApply, why, hint, picks: shared, pct = fmtPc
   const bulk = listBulk(shown, picks.picked);
   const keys = useMemo(() => new Set(rows.map((r) => r.key)), [rows]);
   const live = picks.picked.filter((k) => keys.has(k));
-  const max = Math.max(...rows.map((r) => r.n), 1);
   return <>
     <VirtualRows items={shown} rowKey={(r) => r.key} estimate={VALROW_H} className={"vallist" + (extra ? " withextra" : "")}
-      header={<div className="valhead" aria-hidden="true"><span /><span />{extra ? <span data-tip={extra.tip}>{extra.head}</span> : <span />}<span data-tip={"Number of " + unit}>#</span><span>{rows.some((r) => r.total) ? "Freq" : ""}</span></div>}>
+      header={<div className="valhead" aria-hidden="true"><span /><span />{extra && <span data-tip={extra.tip}>{extra.head}</span>}<span data-tip={"Number of " + unit}>#</span><span>{rows.some((r) => r.total) ? "Freq" : ""}</span></div>}>
       {(r) => (
         <PickRow className="valrow" picks={picks} k={r.key} on={r.on} applied={r.on} disabled={r.disabled} title={r.title} label={r.name}>
           <span className="vname" style={r.muted ? { color: "var(--muted)" } : undefined}>{r.name}</span>
-          {extra ? <span className="vn">{typeof r.extra === "string" ? r.extra : fmtInt(r.extra ?? 0)}</span>
-            : <span className="vbar"><i style={{ width: Math.max(2, Math.round(100 * r.n / max)) + "%" }} /></span>}
+          {extra && <span className="vn">{typeof r.extra === "string" ? r.extra : fmtInt(r.extra ?? 0)}</span>}
           <span className="vn">{r.n.toLocaleString()}</span>
           <span className="vpct">{r.share}</span>
         </PickRow>
