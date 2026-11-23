@@ -104,7 +104,9 @@
   /* a form control's edge (checkbox, radio, text field, select): dark enough that an
      unchecked box reads as one rather than as disabled; --line is for dividers */
   --control-line: light-dark(#9aa7b0, #4f5f69);
-  --line: light-dark(#dde4e8, #2a353c); --code-bg: light-dark(#f1f5f7, #1a242a); --mark: light-dark(#b25e09, #e0a35c); --mark-soft: light-dark(#fbf0e2, #35270f);
+  --line: light-dark(#dde4e8, #2a353c); --code-bg: light-dark(#f1f5f7, #1a242a);
+  /* a table's alternate rows and its header, as the portal's study-view tables (#f9f9f9 every other row) */
+  --row-stripe: light-dark(#f9f9f9, #1b2329); --table-head: light-dark(#f1f4f6, #1e282e); --mark: light-dark(#b25e09, #e0a35c); --mark-soft: light-dark(#fbf0e2, #35270f);
   --ok: light-dark(#2e7d32, #7bc47f); --ok-soft: light-dark(#e6f2e6, #17301a); --err: light-dark(#b3261e, #f2b8b5); --err-soft: light-dark(#fbeae9, #3a2323);
   /* the NEW mark's text (app/lab/new-mark.tsx) */
   --new: light-dark(#ea580c, #fb923c);
@@ -615,6 +617,13 @@ main.analysis-main { max-width: min(132rem, 100%); }
 .vrows { position: relative; width: 100%; }
 .vrow { position: absolute; top: 0; left: 0; width: 100%; }
 .vrow[data-index="0"] > .generow, .vrow[data-index="0"] > .sbrow { border-top: none; }
+/* the Study View's tables as the portal's: every other row striped (its row index, since only the
+   rows in view are mounted), a shaded header, the scrolling box ruled above and below */
+:is(.svcell, .pietable) .vrow[data-odd] { background: var(--row-stripe); }
+:is(.svcell, .pietable) .vallist:not(:has(> .vrows)) > .valrow:nth-child(even) { background: var(--row-stripe); }
+:is(.svcell, .pietable) .vrow > :is(.generow, .sbrow) { border-top: none; }
+:is(.svcell, .pietable) .vrowshead { background: var(--table-head); border-bottom-color: var(--line); }
+:is(.svcell, .pietable) :is(.vallist, .generows, .sbrows) { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .sbrow { cursor: pointer; }
 .valrow, .generow, .sbrow { margin: 0; }
 /* The checkbox's track (the first of each row's grid) is a little narrower than the 1rem box, which

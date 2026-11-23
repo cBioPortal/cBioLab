@@ -47,7 +47,7 @@ export function VirtualRows<T>({ items, rowKey, estimate, className, header, chi
       {header && <div className="vrowshead">{header}</div>}
       <div className="vrows" style={{ height: v.getTotalSize() }}>
         {v.getVirtualItems().map((r) => (
-          <div key={r.key} data-index={r.index} ref={v.measureElement} className="vrow" style={{ transform: "translateY(" + r.start + "px)" }}>
+          <div key={r.key} data-index={r.index} data-odd={r.index % 2 === 1 || undefined} ref={v.measureElement} className="vrow" style={{ transform: "translateY(" + r.start + "px)" }}>
             {children(items[r.index], r.index)}
           </div>
         ))}
