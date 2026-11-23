@@ -231,23 +231,27 @@ pre {
 .facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 5px; justify-content: center; }
 .nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
 .nosamples p + p { margin-top: 0.6rem; }
-.svcell > .card { height: 100%; margin: 0; min-width: 0; overflow: auto; box-sizing: border-box; padding: 0.3rem 0.5rem; border-radius: var(--r-md, 4px); }
+.svcell > .card { height: 100%; margin: 0; min-width: 0; overflow: auto; box-sizing: border-box; padding: 4px 6px; border-radius: var(--r-md, 4px); position: relative; }
 /* A card whose body is a scrolling list gives the list the card's height below its title */
 .svcell > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; overflow: hidden; }
 .svcell > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; min-height: 0; max-height: none; }
-/* Every card's title alike, as the portal's (STS-HD-1): its name only, bold and centred, on one line,
-   a long one cut with an ellipsis (the whole of it, and what it counts, in its tooltip). A header row
-   that also holds controls keeps them on that line and gives the title the rest. */
+/* A card's header, as the portal's (STS-HD-1…3): one 20 px line at the card's top. The title is its
+   name only, bold and centred over the card's whole width, a long one cut with an ellipsis (the whole
+   of it, and what it counts, in its tooltip). The controls sit on the same line at the top right: the
+   ☰ menu in the corner, any others (.cardctl) to its left. The title keeps as clear of them on its
+   left as on its right, so it stays centred. */
 .svcell :is(.facettitle, .xc-title) {
-  font-size: var(--t-md); font-weight: 600; line-height: 20px; color: var(--ink); text-transform: none; letter-spacing: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; min-width: 0; margin: 0;
+  display: block; height: 20px; line-height: 20px; padding: 0 26px; margin: 0;
+  font-size: var(--t-md); font-weight: 600; color: var(--ink); text-transform: none; letter-spacing: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; min-width: 0;
 }
-.svcell .xc-head { flex-wrap: nowrap; gap: 0.3rem; }
-.svcell .xc-head > .xc-title { flex: 1 1 0; }
-.svcell [data-genetable] > .row:first-child { flex-wrap: nowrap; align-items: center; }
-.svcell [data-genetable] > .row:first-child > .facettitle { flex: 1 1 0; }
-.svcell .charticon svg { width: 0.85rem; height: 0.85rem; }
-.svcell .titleicon { display: inline-flex; align-items: center; justify-content: center; height: 20px; width: 20px; vertical-align: top; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.svcell > .card:has(.cardctl) :is(.facettitle, .xc-title) { padding: 0 50px; }
+.svcell .xc-head { display: block; }
+.svcell > .card .chartgear { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; min-width: 0; padding: 0; }
+.svcell .cardctl { position: absolute; top: 4px; right: 26px; height: 20px; display: flex; align-items: center; gap: 2px; }
+.svcell .cardctl :is(.charticon, .titleicon) { width: 20px; height: 20px; min-width: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+.svcell :is(.chartgear, .charticon, .titleicon) svg { width: 14px; height: 14px; }
+.svcell .titleicon { border: 0; background: none; color: var(--muted); cursor: pointer; }
 .svcell .titleicon[aria-pressed=true] { color: var(--accent-ink); }
 .chk { display: flex; gap: 0.4rem; align-items: center; }
 .chk input { width: auto; }
@@ -543,8 +547,8 @@ main.analysis-main { max-width: min(132rem, 100%); }
 
 /* Explore: categorical clinical facets as pie charts (portal study-view style) */
 /* a pie fills its 1 × 1 card below the title, as the portal's (STS-PIE-2); its values are a table in the hover popover */
-.svcell > .card[data-shape=pie] { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
-.svcell > .card[data-shape=pie] > .facettitle { flex: none; margin-top: 2px; }
+.svcell > .card[data-shape=pie] { padding: 4px 0 0; display: flex; flex-direction: column; overflow: hidden; }
+.svcell > .card[data-shape=pie] > .facettitle { flex: none; }
 .svcell > .card[data-shape=pie] > span { display: flex; flex: 1 1 0; min-height: 0; }
 .pie { display: block; width: 100%; height: 100%; }
 .pie .slice { cursor: pointer; }
@@ -682,9 +686,7 @@ main.analysis-main { max-width: min(132rem, 100%); }
 /* a chart's title as the portal's (STS-HD-1): one line, centred, a long one cut with an ellipsis
    (the whole of it is in the tooltip); padded on both sides alike so the chart menu, placed over
    the card's corner, neither covers it nor pulls it off centre */
-.svcell > .card > .facettitle { text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 1.75rem; }
 /* what the chart counts, on a line of its own under the title, so a long title never hides it */
-.svcell > .card > .facettitle > .meta { display: block; font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
 
 /* ---------------- view-card tables (app/lab/kinds/<kind>.tsx) ---------------- */
 .vscroll { overflow-x: auto; }
@@ -1205,8 +1207,6 @@ details.cohortpick .gearmenu-items { min-width: 22rem; max-width: 30rem; gap: 0;
 
 /* an Explore chart's "⋯" menu: pinned to the card's corner, like a cohort box's */
 .svcell > .card { position: relative; }
-.svcell > .card > div:first-child { padding-right: 1.8rem; }
-.svcell > .card .chartgear { position: absolute; top: 0.45rem; right: 0.5rem; }
 .partrename { border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: text; text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .partrename:hover { text-decoration: underline dotted; }
 .partrenameinput { font: inherit; height: 1.45rem; width: 100%; box-sizing: border-box; padding: 0 var(--s1); }

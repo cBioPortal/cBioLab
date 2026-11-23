@@ -9,7 +9,6 @@ import { RotateCcw } from "lucide-react";
 import { cardRank, type GridCard } from "./explore-grid.tsx";
 import { chartCells, kmPlotTitle } from "../../lib/study-view-layout.ts";
 import { api } from "./api.ts";
-import { Choice } from "../_ui/choice.tsx";
 import { Button } from "../_ui/button";
 import { useWidth } from "./figure.tsx";
 import { linear, axisLeft, axisBottom, leftAxisWidth, bottomAxisHeight } from "../../lib/svg-kit.ts";
@@ -114,17 +113,17 @@ function SurvivalCard({ studies, selection, draft, endpoints, km, attrs }: Props
       <div className="card xc-card" data-chart="survival">
         <div className="xc-head">
           <span className="xc-title" data-tip={"the selection's patients, " + ep + "_MONTHS and " + ep + "_STATUS"}>{kmPlotTitle(attrs.find((a) => a.attribute === ep + "_STATUS")?.displayName || ep + " Status")}</span>
-          <ChartMenu label="the survival chart" actions={[{ label: "Download", title: "save this chart as a file",
+          <ChartMenu label="the survival chart" actions={[
+            // the endpoint the curve follows, where the portal draws a chart per endpoint
+            ...(endpoints && endpoints.length > 1 ? [{ label: "Endpoint", title: "the outcome the curve follows",
+              sub: endpoints.map((x) => ({ label: x, checked: x === ep, title: "follow " + x, onClick: () => setEndpoint(x) })) }] : []),
+            { label: "Download", title: "save this chart as a file",
             sub: [caseFileAction("Data", { kind: "survival", status: ep + "_STATUS", months: ep + "_MONTHS" }, chartFileName((ep === "OS" ? "Overall" : ep) + " survival", "data"),
               selection, (update) => setFileError((cur) => update(cur))),
             ...figureActions((ep === "OS" ? "Overall" : ep) + " survival", () => {
               const curves = res?.curves;
               return curves && curves.length ? standaloneSvg(survivalSvg({ kind: "survival", curves } as never, { width: 480, theme: "light" }, PORTAL_STUDY_VIEW_KM)) : null;
             }, (message) => setFileError(message))] }]} />
-          {endpoints && endpoints.length > 1 && (
-            <Choice className="w-20 h-5 data-[size=sm]:h-5 px-1.5 text-xs" title="the outcome the curve follows" value={ep} onChange={setEndpoint}
-              options={endpoints.map((x) => [x, x] as const)} />
-          )}
         </div>
         {/* the curve's median, patients and events in its tooltip, where the portal's small KM chart keeps its legend (STS-KM-3) */}
         <div className="xc-body" data-tip={res?.curves?.length ? (res.curves as KmCurve[]).map((c) => c.cohort + ": " + curveSummary(c)).join("\n") : undefined}>
@@ -189,8 +188,8 @@ function DensityCard({ pair, added, studies, draft, selection, addClauses, nameO
       <div className="xc-head">
         <span className="xc-title" data-tip={title + "\n" + (plot && plot.coverage && plot.coverage.total > plot.n
           ? fmtInt(plot.n) + " of " + fmtInt(plot.coverage.total) + " samples have both · " : "") + (held ? "selected: " + heldText : "drag a box to filter")}>{title}</span>
-        {held && onClear && <Button variant="ghost" size="icon-xs" className="charticon" data-chart-reset onClick={onClear} aria-label="Reset filters in chart"
-          data-tip={"Reset filters: clear this chart's selection (" + heldText + ")"}><RotateCcw /></Button>}
+        {held && onClear && <span className="cardctl"><Button variant="ghost" size="icon-xs" className="charticon size-5" data-chart-reset onClick={onClear} aria-label="Reset filters in chart"
+          data-tip={"Reset filters: clear this chart's selection (" + heldText + ")"}><RotateCcw /></Button></span>}
         <ChartMenu label={"the " + title + " chart"} actions={[
           { label: "Swap Axes", title: "put " + names.y + " along the bottom", onClick: () => saveDensity(swapDensity(dset)) },
           ...(["x", "y"] as const).filter((k) => logOffered(axes[k].attribute)).map((k) => ({

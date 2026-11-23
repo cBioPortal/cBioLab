@@ -1225,10 +1225,10 @@ function AssayFreqTable({ t, ctx }: { t: NonNullable<NonNullable<ExploreCtx["exp
     <div className="card" data-assayfreq={t.profileType}>
       <div className="facettitle" data-tip={"Frequency Table: " + t.name + "\n" + t.unit + "-level · Freq of " + fmtInt(t.total) + " " + noun + (t.disjunctive ? " · counted without its own filter" : "")}>
         Frequency Table: {t.name}
-        {curated && <button type="button" className="charticon titleicon" aria-pressed={!all} onClick={() => setAll(!all)}
+        {curated && <span className="cardctl"><button type="button" className="charticon titleicon" aria-pressed={!all} onClick={() => setAll(!all)}
           aria-label={all ? "show altered categories only" : "show all categories"}
           data-tip={all ? "Showing all categories. Click to hide unchanged or unknown rows." : "Showing altered categories only. Click to include unchanged or unknown rows."}>
-          <Filter /></button>}
+          <Filter /></button></span>}
       </div>
       {without.length > 0 && <p className="note flush mt-1">Not held by {without.join(", ")}: counted in Freq, but its rows cannot filter {without.length === 1 ? "it" : "them"}.</p>}
       {peers.length > 0 && <p className="note flush mt-1">Not counted: {peers.join(", ")} (a peer's {peers.length === 1 ? "study" : "studies"}, whose counts are not shared).</p>}
@@ -1269,8 +1269,8 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
   const binArms = (f.bins || []).filter((b) => b.count > 0).map((b) => ({ name: armLabel(short + " " + binText(b)), where: { ...base, ...assayBinWhere(b) } as Leaf }));
   return (
     <div data-assayfacet={f.profileType + "|" + f.entity} className="card">
-      <div className="facettitle flex items-center gap-1">
-        <span className="min-w-0 flex-1 truncate" data-tip={f.entity + "\n" + noun + " · " + fmtInt(f.measured) + " of " + fmtInt(f.total) + " with a value" + (f.disjunctive ? " · counted without its own filter" : "") + why}>{title}</span>
+      <div className="facettitle">
+        <span data-tip={f.entity + "\n" + noun + " · " + fmtInt(f.measured) + " of " + fmtInt(f.total) + " with a value" + (f.disjunctive ? " · counted without its own filter" : "") + why}>{title}</span>
         <ChartMenu label={title} actions={[...(addMode || !clickable ? [] : f.kind === "cat"
           ? forBoth((t) => compareAction((f.values || []).map((v) => ({ ...valueArm(v.v), n: v.n })), checked.map(valueArm), "value of " + title, (arms) => compareItems(chart, arms, t), t))
           : forBoth((t) => compareNumeric(title, exStudies.length === 1, splittingBy === title, (q) => compareQuantiles({ assay: { profileType: f.profileType, entity: f.entity } }, q, title, t),
@@ -1279,8 +1279,8 @@ function AssayFacet({ f, ctx }: { f: NonNullable<NonNullable<ExploreCtx["explore
             f.bins!.map((b) => ({ count: b.count, tick: b.special === "<=" ? "≤" + fmtNum(b.end!) : b.special === ">" ? ">" + fmtNum(b.start!) : fmtNum(b.start!) })),
             f.total > f.measured ? "NA " + fmtInt(f.total - f.measured) : null), ctx.setExMsg) }] : []),
           ...(f.kind === "cat" && f.values && f.unit ? [summaryDownload(title, f.unit, f.values.map((v) => ({ value: v.v, count: v.n })), f.total - f.measured, f.distinct, ctx.setExMsg)] : [])]} />
-        <Button variant="ghost" size="icon-xs" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
-          onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button>
+        <span className="cardctl"><Button variant="ghost" size="icon-xs" className="charticon size-5" data-tip="stop charting this" aria-label={"stop charting " + f.entity}
+          onClick={() => unchartAssay(f.profileType, f.entity)}><X /></Button></span>
       </div>
       {f.error && <p className="note flush mt-1">{f.error}</p>}
       {f.kind === "cat" && f.values && (
@@ -1597,11 +1597,8 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   const byKey = new Map(all.map((g: any) => [rowKey(g), g]));
   return (
     <div className="card" data-genetable={kind}>
-      <div className="row baseline g5">
-        <div className="facettitle grow" data-tip={title + (drivers ? "\ncounting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered" : "")}>{title}</div>
-        <Input type="search" className="h-7 w-24 text-md md:text-md" placeholder="search" aria-label={"search " + name} value={geneFilter[kind] || ""}
-          data-tip={"show the rows with this in any column (gene, " + (kind === "cna" ? "cytoband, CNA" : kind === "sv" ? "# SV" : "# Mut") + ", #, Freq), of all " + all.length.toLocaleString()}
-          onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
+      <div className="facettitle" data-tip={title + (drivers ? "\ncounting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered" : "")}>
+        {title}
         {(() => {
           const chart: ChartKey = { kind: "genes", specs: (kind === "mutated" ? ["MUT"] : kind === "cna" ? ["AMP", "HOMDEL"] : ["FUSION"]).map((c) => ": " + callOql(c)) };
           const checked = picks.picked.map((k) => byKey.get(k)).filter(Boolean);
@@ -1664,6 +1661,12 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
           );
         }}
       </VirtualRows>
+      {/* the search box in the card's footer, as every chart's (STS-TBL-3) */}
+      <div className="vsearch">
+        <Input type="search" className="h-7 w-36 text-md md:text-md" placeholder="Search..." aria-label={"search " + name} value={geneFilter[kind] || ""}
+          data-tip={"show the rows with this in any column (gene, " + (kind === "cna" ? "cytoband, CNA" : kind === "sv" ? "# SV" : "# Mut") + ", #, Freq), of all " + all.length.toLocaleString()}
+          onChange={e => setGeneFilter({ ...geneFilter, [kind]: e.target.value })} />
+      </div>
       {(() => {
         const n = picks.picked.length;
         const refusal = op === "intersection" && n > 1 ? intersectionRefusal(draftClauses.length, n) : null;

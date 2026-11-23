@@ -248,7 +248,7 @@ export function ChartMenu({ actions, label }: { actions: ChartAction[]; label: s
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon-xs" className="chartgear" data-tip={"actions for " + label} aria-label={"actions for " + label}><Ellipsis /></Button>
+        <Button variant="outline" size="icon-xs" className="chartgear [.svcell_&]:size-5" data-tip={"actions for " + label} aria-label={"actions for " + label}><Ellipsis /></Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-52">
         {actions.map((a) => <ChartMenuItem key={a.label} a={a} />)}
