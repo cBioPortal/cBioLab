@@ -3,18 +3,19 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { GRID_CELL, chartCells, findSpotLayout, gridCols, gridWidth, kmPlotTitle, orderCards } from "../lib/study-view-layout.ts";
 
-test("LY-1: a 195 × 170 cell, 5 px apart; the grid cols·195 + (cols+1)·5 wide", () => {
-  assert.deepEqual(GRID_CELL, { w: 195, h: 170, margin: 5 });
-  assert.equal(gridWidth(6), 1205);
-  assert.equal(gridWidth(1), 205);
+test("LY-1: a 195 × 170 cell, 7 px apart (the portal's 5, and 2 more); the grid cols·195 + (cols+1)·7 wide", () => {
+  assert.deepEqual(GRID_CELL, { w: 195, h: 170, margin: 7 });
+  assert.equal(gridWidth(6), 1219);
+  assert.equal(gridWidth(1), 209);
 });
 
-test("LY-1: floor((window − 40) / 200) columns, at least one", () => {
+test("LY-1: floor((window − 40) / 202) columns, at least one", () => {
   assert.equal(gridCols(1280), 6);
-  assert.equal(gridCols(1440), 7);
+  assert.equal(gridCols(1440), 6);
+  assert.equal(gridCols(1454), 7);
   assert.equal(gridCols(1920), 9);
-  assert.equal(gridCols(1239), 5);
-  assert.equal(gridCols(1240), 6);
+  assert.equal(gridCols(1251), 5);
+  assert.equal(gridCols(1252), 6);
   assert.equal(gridCols(200), 1);
 });
 

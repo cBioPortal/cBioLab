@@ -1,17 +1,18 @@
 /**
- * The Study View's grid as the portal lays it out (STS-LY-1…3): a cell of 195 × 170 px with 5 px
- * between cells, as many columns as the width holds, each chart a whole number of cells by its
+ * The Study View's grid as the portal lays it out (STS-LY-1…3): a cell of 195 × 170 px with 7 px
+ * between cells (the portal's 5, and 2 more), as many columns as the width holds, each chart a whole number of cells by its
  * kind, placed in priority order into the first free spot (`calculateLayout` / `findSpot`,
  * `StudyViewUtils.tsx`).
  */
 
-/** one cell, and the gap between cells and around the grid (`StudyViewConfig.ts` layout) */
-export const GRID_CELL = { w: 195, h: 170, margin: 5 } as const;
+/** one cell, as the portal's (`StudyViewConfig.ts` layout), and the gap between cells and around the
+ * grid: 7 px, the portal's 5 and 2 more by the user's choice (2026-11-24) */
+export const GRID_CELL = { w: 195, h: 170, margin: 7 } as const;
 
-/** the grid's width in px for `cols` columns: cols·195 + (cols+1)·5 */
+/** the grid's width in px for `cols` columns: cols·195 + (cols+1)·7 */
 export const gridWidth = (cols: number): number => cols * GRID_CELL.w + (cols + 1) * GRID_CELL.margin;
 
-/** the columns for a window `windowWidth` px wide, as the portal counts them: floor((window − 40) / 200), at least one */
+/** the columns for a window `windowWidth` px wide, as the portal counts them, with our gap: floor((window − 40) / (195 + 7)), at least one */
 export function gridCols(windowWidth: number): number {
   return Math.max(1, Math.floor((windowWidth - 40) / (GRID_CELL.w + GRID_CELL.margin)));
 }

@@ -230,7 +230,7 @@ pre {
    same cells. */
 .svgridbox { width: 100%; display: flex; justify-content: flex-start; }
 .svgrid { flex: none; }
-.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 5px; justify-content: start; }
+.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 7px; padding: 7px; justify-content: start; }
 .nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
 .nosamples p + p { margin-top: 0.6rem; }
 .svcell > .card { height: 100%; margin: 0; min-width: 0; overflow: auto; box-sizing: border-box; padding: 4px 6px; border-radius: var(--r-md, 4px); position: relative; }
