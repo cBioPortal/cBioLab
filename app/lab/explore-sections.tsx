@@ -1591,7 +1591,7 @@ function GeneTable({ kind, ctx }: { kind: "mutated" | "cna" | "sv"; ctx: Explore
   const rowKey = (g: any) => g.gene + (g.cna ?? "");
   const byKey = new Map(all.map((g: any) => [rowKey(g), g]));
   return (
-    <div className="card" data-genetable={kind}>
+    <div className="card" data-genetable={kind} data-drivers={drivers || undefined}>
       <div className="facettitle" data-tip={title + (drivers ? "\ncounting only the calls OncoKB " + explore.drivers + " makes drivers (oncogenic, likely oncogenic or resistance); a sample with only other calls counts as unaltered" : "")}>
         {title}
         {(() => {

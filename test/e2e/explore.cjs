@@ -299,7 +299,7 @@ async function explore({ ok, BASE, page, browser }) {
     const before = await top();
     await page.locator(".driverchoice").click();
     await page.getByRole("option", { name: "Alterations: OncoKB drivers only" }).click();
-    await page.waitForFunction(() => /OncoKB drivers/.test(document.querySelector("[data-genetable=mutated]")?.textContent || ""), null, { timeout: 240000 });
+    await page.locator("[data-genetable=mutated][data-drivers]").waitFor({ timeout: 240000 });
     const after = await top(), url = new URL(page.url()).searchParams.get("drivers");
     const egfr = table.locator(".generow", { has: page.locator(".gname", { hasText: /^EGFR$/ }) }).first();
     const counted = Number((await egfr.locator(".gnum").nth(1).innerText()).replace(/,/g, ""));
