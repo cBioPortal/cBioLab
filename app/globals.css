@@ -105,8 +105,8 @@
      unchecked box reads as one rather than as disabled; --line is for dividers */
   --control-line: light-dark(#9aa7b0, #4f5f69);
   --line: light-dark(#dde4e8, #2a353c); --code-bg: light-dark(#f1f5f7, #1a242a);
-  /* a table's alternate rows, as the portal's study-view tables (#f9f9f9 every other row), and a grid card's title bar */
-  --row-stripe: light-dark(#f9f9f9, #1b2329); --card-head: light-dark(#f1f4f6, #1e282e); --mark: light-dark(#b25e09, #e0a35c); --mark-soft: light-dark(#fbf0e2, #35270f);
+  /* a table's alternate rows, as the portal's study-view tables (#f9f9f9 every other row) */
+  --row-stripe: light-dark(#f9f9f9, #1b2329); --mark: light-dark(#b25e09, #e0a35c); --mark-soft: light-dark(#fbf0e2, #35270f);
   --ok: light-dark(#2e7d32, #7bc47f); --ok-soft: light-dark(#e6f2e6, #17301a); --err: light-dark(#b3261e, #f2b8b5); --err-soft: light-dark(#fbeae9, #3a2323);
   /* the NEW mark's text (app/lab/new-mark.tsx) */
   --new: light-dark(#ea580c, #fb923c);
@@ -229,8 +229,6 @@ pre {
    cells and scrolls within them, so no card sets another's size. The loading placeholders take the
    same cells. */
 .svgridbox { width: 100%; display: flex; justify-content: flex-start; }
-/* a page showing the Study View's chart grid is white behind it, as the portal's */
-body:has(.svgridbox) { --page: var(--card); }
 .svgrid { flex: none; }
 .facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 5px; justify-content: start; }
 .nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
@@ -239,7 +237,7 @@ body:has(.svgridbox) { --page: var(--card); }
 /* A card whose body is a scrolling list gives the list the card's height below its title */
 .svcell > .card:has(> .vallist, > .generows, > .sbrows) { display: flex; flex-direction: column; overflow: hidden; }
 .svcell > .card > :is(.vallist, .generows, .sbrows) { flex: 1 1 0; min-height: 0; max-height: none; }
-/* A card's header, as the portal's (STS-HD-1…3): one line at the card's top, a shaded bar edge to edge. The title is its
+/* A card's header, as the portal's (STS-HD-1…3): one line at the card's top, ruled underneath edge to edge. The title is its
    name only, bold and centred over the card's whole width, a long one cut with an ellipsis (the whole
    of it, and what it counts, in its tooltip). The controls sit on the same line at the top right: the
    ☰ menu in the corner, any others (.cardctl) to its left. The title keeps as clear of them on its
@@ -251,9 +249,9 @@ body:has(.svgridbox) { --page: var(--card); }
 }
 .svcell > .card:has(.cardctl) :is(.facettitle, .xc-title) { padding: 0 50px; }
 .svcell .xc-head { display: block; }
-/* the bar: 28 px and a rule under it, across the card's padding; the buttons (top 4 px, 20 px) sit centred in it */
+/* the header: 28 px and a rule under it, across the card's padding; the buttons (top 4 px, 20 px) sit centred in it */
 .svcell > .card > :is(.facettitle, .xc-head) {
-  margin: -4px -6px 4px; height: 29px; flex: none; background: var(--card-head); border-bottom: 1px solid var(--line);
+  margin: -4px -6px 4px; height: 29px; flex: none; border-bottom: 1px solid var(--line);
 }
 .svcell > .card > .facettitle { line-height: 28px; padding: 0 32px; }
 .svcell > .card:has(.cardctl) > .facettitle { padding: 0 56px; }
