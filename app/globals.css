@@ -230,7 +230,7 @@ pre {
    same cells. */
 .svgridbox { width: 100%; display: flex; justify-content: flex-start; }
 .svgrid { flex: none; }
-.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, 195px); grid-auto-rows: 170px; gap: 7px; padding: 7px; justify-content: start; }
+.facetgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); grid-auto-rows: 170px; gap: 7px; padding: 7px 0; justify-content: start; }
 .nosamples { max-width: 40rem; margin: 2rem auto; text-align: center; }
 .nosamples p + p { margin-top: 0.6rem; }
 .svcell > .card { height: 100%; margin: 0; min-width: 0; overflow: auto; box-sizing: border-box; padding: 4px 6px; border-radius: var(--r-md, 4px); position: relative; }
@@ -253,8 +253,8 @@ pre {
 .svcell > .card > :is(.facettitle, .xc-head) {
   margin: -4px -6px 4px; height: 29px; flex: none; border-bottom: 1px solid var(--line);
 }
-.svcell > .card > .facettitle { line-height: 28px; padding: 0 32px; }
-.svcell > .card:has(.cardctl) > .facettitle { padding: 0 56px; }
+.svcell > .card > .facettitle { line-height: 28px; padding: 0 26px; }
+.svcell > .card:has(.cardctl) > .facettitle { padding: 0 50px; }
 .svcell > .card > .xc-head { padding: 4px 6px; }
 .svcell > .card[data-shape=pie] > .facettitle { margin: -4px 0 0; }
 .svcell > .card .chartgear { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; min-width: 0; padding: 0; }

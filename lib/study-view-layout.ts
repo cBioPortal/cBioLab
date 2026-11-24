@@ -1,21 +1,31 @@
 /**
- * The Study View's grid as the portal lays it out (STS-LY-1…3): a cell of 195 × 170 px with 7 px
- * between cells (the portal's 5, and 2 more), as many columns as the width holds, each chart a whole number of cells by its
+ * The Study View's grid as the portal lays it out (STS-LY-1…3): cells of about 195 × 170 px with 7 px
+ * between them (the portal's 5, and 2 more), as many columns as fill the width, each chart a whole number of cells by its
  * kind, placed in priority order into the first free spot (`calculateLayout` / `findSpot`,
  * `StudyViewUtils.tsx`).
  */
 
-/** one cell, as the portal's (`StudyViewConfig.ts` layout), and the gap between cells and around the
- * grid: 7 px, the portal's 5 and 2 more by the user's choice (2026-11-24) */
+/** one cell, as the portal's (`StudyViewConfig.ts` layout), and the gap between cells and above and
+ * below the grid: 7 px, the portal's 5 and 2 more by the user's choice (2026-11-24) */
 export const GRID_CELL = { w: 195, h: 170, margin: 7 } as const;
 
-/** the grid's width in px for `cols` columns: cols·195 + (cols+1)·7 */
-export const gridWidth = (cols: number): number => cols * GRID_CELL.w + (cols + 1) * GRID_CELL.margin;
+/** the narrowest a column may be stretched or squeezed to, filling the width */
+const MIN_CELL_W = 175;
 
-/** the columns for a window `windowWidth` px wide, as the portal counts them, with our gap: floor((window − 40) / (195 + 7)), at least one */
-export function gridCols(windowWidth: number): number {
-  return Math.max(1, Math.floor((windowWidth - 40) / (GRID_CELL.w + GRID_CELL.margin)));
+/**
+ * The columns for a grid `width` px wide, flush with both its sides (the user's choice, 2026-11-24):
+ * the count whose columns, stretched or squeezed to fill the width, come closest to the portal's
+ * 195 px, never under 175 px; at least one.
+ */
+export function gridCols(width: number): number {
+  const { w, margin } = GRID_CELL;
+  let cols = Math.max(1, Math.round((width + margin) / (w + margin)));
+  while (cols > 1 && cellWidth(width, cols) < MIN_CELL_W) cols--;
+  return cols;
 }
+
+/** a column's width when `cols` of them, 7 px apart, fill `width` */
+export const cellWidth = (width: number, cols: number): number => (width - (cols - 1) * GRID_CELL.margin) / cols;
 
 /** what a card draws, as far as its size goes (STS-LY-2) */
 export type CardKind =

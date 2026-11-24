@@ -1,22 +1,27 @@
 // The Study View grid (STS-LY-1…3), from docs/legacy-spec/30-study-summary.md §1.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { GRID_CELL, chartCells, findSpotLayout, gridCols, gridWidth, kmPlotTitle, orderCards } from "../lib/study-view-layout.ts";
+import { GRID_CELL, cellWidth, chartCells, findSpotLayout, gridCols, kmPlotTitle, orderCards } from "../lib/study-view-layout.ts";
 
-test("LY-1: a 195 × 170 cell, 7 px apart (the portal's 5, and 2 more); the grid cols·195 + (cols+1)·7 wide", () => {
+test("LY-1: a 195 × 170 cell, 7 px apart (the portal's 5, and 2 more)", () => {
   assert.deepEqual(GRID_CELL, { w: 195, h: 170, margin: 7 });
-  assert.equal(gridWidth(6), 1219);
-  assert.equal(gridWidth(1), 209);
+  assert.equal(Math.round(cellWidth(1395, 7)), 193);    // 7 columns, 6 gaps of 7, fill 1395
+  assert.equal(cellWidth(195, 1), 195);
 });
 
-test("LY-1: floor((window − 40) / 202) columns, at least one", () => {
-  assert.equal(gridCols(1280), 6);
-  assert.equal(gridCols(1440), 6);
-  assert.equal(gridCols(1454), 7);
-  assert.equal(gridCols(1920), 9);
-  assert.equal(gridCols(1251), 5);
-  assert.equal(gridCols(1252), 6);
-  assert.equal(gridCols(200), 1);
+test("LY-1: the columns that fill the width with cells closest to 195 px, never under 175, at least one", () => {
+  const cases: [number, number][] = [
+    [1395, 7],   // a 1440 px window: 193 px cells (6 would be 226)
+    [1555, 8],   // 1600: 188.4 (7 would be 216)
+    [1407, 7],   // 195 exactly
+    [1205, 6],   // 195 exactly
+    [1306, 7],   // 6.5 cells' worth rounds up to 7 at 180.6; ties go up
+    [1305, 6],   // just under the half: 6 at 211.7
+    [500, 2],    // round gives 2.5→3 at 162, under 175: 2 at 246.5
+    [195, 1], [100, 1], [0, 1],
+  ];
+  for (const [w, cols] of cases) assert.equal(gridCols(w), cols, w + " px");
+  for (const w of [400, 700, 1000, 1395, 1900, 2500]) assert.ok(cellWidth(w, gridCols(w)) >= 175 || gridCols(w) === 1, w + " px");
 });
 
 test("LY-2: each kind's default size", () => {

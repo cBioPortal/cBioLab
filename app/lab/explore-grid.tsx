@@ -1,16 +1,17 @@
 "use client";
 /**
  * The Study View's chart grid, laid out as the portal's (STS-LY-1…3) with the portal's own grid
- * library, react-grid-layout: 195 × 170 px cells 5 px apart, as many columns as the page holds,
+ * library, react-grid-layout: cells of about 195 × 170 px 7 px apart, as many columns as fill the
+ * page's width, flush with both its sides,
  * each card a whole number of cells by its kind, placed in priority order into the first free spot.
  * Cards keep their places: no drag and no resize (decided against, 2026-11-13).
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import ReactGridLayout, { useContainerWidth } from "react-grid-layout";
 import { absoluteStrategy, verticalCompactor } from "react-grid-layout/core";
 import "react-grid-layout/css/styles.css";
 import { CARD_PRIORITY } from "../../lib/study-view-config.ts";
-import { GRID_CELL, findSpotLayout, gridCols, gridWidth, orderCards, type CardSpec } from "../../lib/study-view-layout.ts";
+import { GRID_CELL, findSpotLayout, gridCols, orderCards, type CardSpec } from "../../lib/study-view-layout.ts";
 
 /** a card on the grid: its place in the layout (`lib/study-view-layout.ts`) and what it draws */
 export type GridCard = CardSpec & { node: ReactNode };
@@ -23,31 +24,20 @@ export function cardRank(selector: string): { name: string; priority: number } {
 }
 
 const MARGIN: [number, number] = [GRID_CELL.margin, GRID_CELL.margin];
-
-/** the window's width, followed as it resizes (`fallback` before the first read) */
-function useWindowWidth(fallback: number): number {
-  const [w, setW] = useState<number | null>(null);
-  useEffect(() => {
-    const read = () => setW(window.innerWidth);
-    read();
-    window.addEventListener("resize", read);
-    return () => window.removeEventListener("resize", read);
-  }, []);
-  return w ?? fallback;
-}
+/** no padding at the grid's sides, the gap above and below it */
+const PADDING: [number, number] = [0, GRID_CELL.margin];
 
 export function StudyViewGrid({ cards }: { cards: GridCard[] }) {
-  // measured only to know the page has laid out; the columns follow the window, as the portal's
+  // the grid fills its box's width; the columns stretch or squeeze a little to fill it
   const { width, containerRef, mounted } = useContainerWidth({ measureBeforeMount: true });
-  const windowWidth = useWindowWidth(width);
-  const cols = gridCols(windowWidth);
+  const cols = gridCols(width);
   const ordered = useMemo(() => orderCards(cards), [cards]);
   const layout = useMemo(() => findSpotLayout(ordered, cols), [ordered, cols]);
   return (
     <div ref={containerRef} className="svgridbox">
       {mounted && (
-        <ReactGridLayout className="svgrid" width={gridWidth(cols)} layout={layout} style={{ width: gridWidth(cols) }}
-          gridConfig={{ cols, rowHeight: GRID_CELL.h, margin: MARGIN, containerPadding: MARGIN }}
+        <ReactGridLayout className="svgrid" width={width} layout={layout}
+          gridConfig={{ cols, rowHeight: GRID_CELL.h, margin: MARGIN, containerPadding: PADDING }}
           dragConfig={{ enabled: false }} resizeConfig={{ enabled: false }}
           compactor={verticalCompactor} positionStrategy={absoluteStrategy}>
           {ordered.map((c) => <div key={c.key} className="svcell" data-cell={c.key}>{c.node}</div>)}
