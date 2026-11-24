@@ -206,7 +206,9 @@ no longer match the kind folders and the maps keyed by `ViewKind`.
   (`columns`/`search`/`filters`/`sort`, type `TableQuery`) is part of the view's spec — the page is
   not. The rows name patients, so they run only through `PatientLevelResolver.rowsPage`/
   `rowsCounts`/`rowsValues`/`rowsRank` (asserted in `test/boundary.test.ts`); `lib/views/rows.ts`'s
-  `runRows` groups parts per database and pages across them. UI: **`app/_table/DataTable.tsx`**;
+  `runRows` groups parts per database and pages across them; with one database it asks for the page
+  beside the counts, and its counts can summarise columns over every row (`summarize`: a range or
+  the distinct values), which the mutations view's default columns read instead of a statement each. UI: **`app/_table/DataTable.tsx`**;
   `POST /api/view-page` (a page, or a column's values) and `POST /api/table` (the CSV) serve every
   table view. A view holding several tables (`alterations`, `datafiles`) names one with `table` in those
   requests (`RunOpts.table`), and `pagedTable()` in `lib/views/rows.ts` picks it from the result.

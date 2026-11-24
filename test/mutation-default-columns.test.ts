@@ -232,14 +232,35 @@ test("R7 the facts' values queries are asked with an empty query, even when the 
   assert.ok(calls.page.length && calls.page.every((c) => c.q.search === "G12" && !!c.q.filters?.cancerType), "the page itself keeps the view's query: " + JSON.stringify(calls.page.map((c) => c.q)));
 });
 
-test("R8 the page and counts queries receive the facts' defaults", async () => {
+test("R8 with a search, the page and counts queries receive the facts' defaults", async () => {
   const calls = newCalls();
-  await run({ s1: { catalog: [MUTATIONS, DISCRETE_CNA], answers: { vaf: VAF_NONE, cancerType: TWO_TYPES } } }, {}, calls);
+  await run({ s1: { catalog: [MUTATIONS, DISCRETE_CNA], answers: { vaf: VAF_NONE, cancerType: TWO_TYPES } } }, { search: "G12" }, calls);
   assert.ok(calls.page.length >= 1 && calls.counts.length >= 1, "rowsPage " + calls.page.length + ", rowsCounts " + calls.counts.length);
   for (const c of [...calls.page, ...calls.counts]) assert.deepEqual(c.defaults, without("vaf"), c.label);
   const none = newCalls();
-  await run({ s1: { catalog: [MUTATIONS], answers: { vaf: VAF_NONE, cancerType: ONE_TYPE } } }, {}, none);
+  await run({ s1: { catalog: [MUTATIONS], answers: { vaf: VAF_NONE, cancerType: ONE_TYPE } } }, { search: "G12" }, none);
+  assert.ok(none.page.length >= 1 && none.counts.length >= 1);
   for (const c of [...none.page, ...none.counts]) assert.deepEqual(c.defaults, ["sample", "proteinChange", "annotation", "mutationType", "mutCount"], c.label);
+});
+
+test("R8b without a search, the counts are asked with the fact columns and, when they answer them, no values query runs", async () => {
+  const calls = newCalls();
+  const st = standIn("Q", "s1", {}, calls);
+  const counts = st.rowsCounts;
+  const asked: unknown[] = [];
+  const withSums = async (label: string, src: unknown, q: TableQuery, defaults: string[], summarize?: unknown) => {
+    asked.push(summarize);
+    const rows = await counts(label, src, q, defaults);
+    return rows.map((r) => ({ ...r, sums: [{ column: "vaf", numeric: true, min: null, max: null }, { column: "cancerType", numeric: false, values: ["Colon Adenocarcinoma", "Rectal Adenocarcinoma"], truncated: false }] }));
+  };
+  const ctx = ctxFor({ s1: { catalog: [MUTATIONS, DISCRETE_CNA], answers: keep } }, calls);
+  ctx.resolvers = { s1: { ...st, rowsCounts: withSums } } as never;
+  const r = await runMutations({ kind: "mutations", gene: "KRAS", cohorts: ["Q"], rows: 100 } as MutationsView, ctx);
+  const res = (r instanceof Untimed ? r.result : r) as ViewResult & { mutations?: Mutations; error?: string };
+  assert.equal(res.error, undefined);
+  assert.ok(asked.some((a) => JSON.stringify(a) === JSON.stringify([{ column: "vaf", numeric: true }, { column: "cancerType", numeric: false }])), JSON.stringify(asked));
+  assert.equal(calls.values.length, 0, "rowsValues called: " + JSON.stringify(calls.values.map((c) => c.column)));
+  assert.deepEqual(res.mutations!.defaults, without("vaf"), "the defaults follow the counts' summaries, not the values answers");
 });
 
 test("R9 a study whose peer did not describe its profiles (unanswered) leaves Copy # unknown, so kept; a mutations-only catalog drops it", async () => {

@@ -1045,3 +1045,36 @@ Every page costs less on cBioLab. cbioportal's JVM grows over a run (1.4 GiB in 
 
 Still open: on Genomic Alterations the altered/unaltered cohort query (0.54s, 12M rows) runs twice,
 from two requests sent at once, and the result cache does not share a query that is still running.
+
+# The Mutations tab's rounds and driver reads (November 2026)
+
+After #502, a cold Mutations tab still read 139–162M warehouse rows per load against 43–54M on the
+pre-parity baseline (`140c9239`), and drew 1.3–2.7× slower. Statement captures showed four causes:
+the gene chips' "which genes are empty" request was the lollipop card's own request with one gene,
+and ran in full a second time; the lollipop's driver test read all 19M `mutation_derived` rows
+(its hotspot keys filtered by `studyId`, which is not in the table's sort key) and all 6.9M OncoKB
+rows; and the mutation table ran four rounds one after another — the default columns' facts (two
+statements over the row source), counts, page, then the clinical Freq — where without a search none
+depends on another. The fix shares an in-flight request with the same body, bounds the driver reads
+to the study's profiles and the lollipop's genes, runs the table's statements at once, asks for a
+one-database table's page beside its counts, and reads the facts off the counts statement
+(`countsSql`'s `summarize`), so the table evaluates its row source twice instead of four times.
+
+Production builds on one box, one page load at a time, a fresh server per round; cold, fully drawn,
+median (min–max), n = 3:
+
+| | baseline | before | after | rows read before → after |
+|---|---|---|---|---|
+| coadread_tcga_pan_can_atlas_2018, KRAS | 4.1s (2.5–4.4) | 4.4s (4.1–4.8) | **3.6s** (3.4–4.4) | 139M → 27M |
+| msk_chord_2024, TP53 | 3.5s (3.3–3.8) | 7.5s (6.7–7.6) | **4.3s** (4.1–4.6) | 150M → 33M |
+| msk_impact_50k_2026, TP53 | 3.6s (3.4–4.1) | 9.7s (8.2–12.2) | **4.8s** (4.5–5.1) | 162M → 41M |
+
+The table's own request went from 4.5s to 2.1s (msk_chord) and 6.1s to 2.4s (msk_impact_50k);
+`/api/analysis` calls per load from 4 to 3. Warm loads (the result cache) are 0.7–1.0s either way.
+
+What did not help, measured: reading a whole-study cohort as its definition instead of shipping its
+ids (`COHORT_IDS_LIMIT=0`: 7.5s vs 7.7s), and a page statement that builds only its key columns
+(0.85s vs 0.86s by replay — the cost is in building the row source, not its columns). What remains
+above the baseline is mostly the parity work itself: the row source's lookups (copy number, clinical
+attributes, structural variants, OncoKB by tumour type) and the provenance SQL in each answer
+(about three quarters of the table's bytes).

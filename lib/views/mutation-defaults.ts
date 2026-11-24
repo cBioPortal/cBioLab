@@ -6,23 +6,33 @@ import { clinicalColumns, type ClinicalColumn } from "../mutation-clinical.ts";
 import { clinicalFreq, clinicalFreqSql } from "../mutation-clinical-freq.ts";
 import { tableAttributesSql, TABLE_COLUMNS_MAX } from "../clinical-table.ts";
 import type { ViewResolver } from "./shared.ts";
-import type { RowSource } from "../table-query.ts";
+import { summaryOfValues, type ColumnSummary, type RowSource, type SummaryAsk } from "../table-query.ts";
 import type { LollipopOql } from "../federation.ts";
 import type { ResolvedDrivers } from "../driver-settings.ts";
 import { variantPins } from "../variant-annotation.ts";
 import type { ViewRun } from "./run.ts";
 import { runRows } from "./rows.ts";
 
+/** The columns the facts read off the rows, which a counts statement can summarise (runRows `summarize`). */
+export const MUTATION_FACT_COLUMNS: SummaryAsk[] = [{ column: "vaf", numeric: true }, { column: "cancerType", numeric: false }];
+
 /**
  * Over every row of the gene's table whatever its search and filters (the portal reads its table's
  * allData): whether a queried study has a discrete CNA profile, whether a row has a non-zero allele
  * frequency, how many Cancer Type Detailed values the rows hold. A study whose peer did not describe
- * its profiles (`unanswered`) leaves the first unknown, unless another study has the profile.
+ * its profiles (`unanswered`) leaves the first unknown, unless another study has the profile. The
+ * rows' facts come from `summaries` (Rows.summaries of MUTATION_FACT_COLUMNS) where given; otherwise
+ * each column's values are asked for.
  */
-export async function mutationDefaultFacts(ctx: ViewRun, holders: string[], source: (parts: TablePart[]) => (db: string, materialized: boolean) => RowSource): Promise<MutationDefaultFacts> {
-  const valuesOf = async (column: string, numeric: boolean) =>
-    (await runRows(ctx, "mutations", holders, {}, MUTATION_DEFAULT_COLUMNS, MUTATION_DEFAULT_COLUMNS, 1, source, { column, numeric })).values;
-  const [vaf, types, studies] = await Promise.all([valuesOf("vaf", true), valuesOf("cancerType", false),
+export async function mutationDefaultFacts(ctx: ViewRun, holders: string[], source: (parts: TablePart[]) => (db: string, materialized: boolean) => RowSource,
+  summaries?: ColumnSummary[]): Promise<MutationDefaultFacts> {
+  const summaryOf = async (column: string, numeric: boolean): Promise<ColumnSummary | undefined> => {
+    const given = summaries?.find((x) => x.column === column);
+    if (given) return given;
+    const v = (await runRows(ctx, "mutations", holders, {}, MUTATION_DEFAULT_COLUMNS, MUTATION_DEFAULT_COLUMNS, 1, source, { column, numeric })).values;
+    return v && summaryOfValues(v);
+  };
+  const [vaf, types, studies] = await Promise.all([summaryOf("vaf", true), summaryOf("cancerType", false),
     Promise.all(ctx.vStudies.map((st) => ctx.studyProfiles(st)))]);
   // a study with the profile settles it; otherwise every study must have answered for "none" to be known
   const discrete = studies.some((p) => (p.catalog || []).some((x) => x.type === "COPY_NUMBER_ALTERATION" && x.datatype === "DISCRETE"));
@@ -30,7 +40,7 @@ export async function mutationDefaultFacts(ctx: ViewRun, holders: string[], sour
   return {
     ...(discrete || known ? { discreteCna: discrete } : {}),
     ...(vaf?.numeric ? { nonZeroVaf: vaf.max != null && vaf.max > 0 } : {}),
-    ...(types && !types.numeric ? { cancerTypes: types.truncated ? Infinity : types.values.filter((x) => x.value !== "").length } : {}),
+    ...(types && !types.numeric ? { cancerTypes: types.truncated ? Infinity : types.values.filter((x) => x !== "").length } : {}),
   };
 }
 

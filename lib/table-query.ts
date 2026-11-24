@@ -218,13 +218,65 @@ export function rankSql(src: RowSource, q: TableQuery, defaults: string[], study
     "WHERE study = " + sq(study) + " AND patient = " + sq(patient) + " LIMIT 1" + (src.settings || ""));
 }
 
-/** Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. */
-export function countsSql(src: RowSource, q: TableQuery, defaults: string[]): PatientSql {
+/** A column a counts query also summarises over every row, whatever the query (`summarize`). */
+export type SummaryAsk = { column: string; numeric: boolean };
+/**
+ * A column over every row: a number column's range (nulls left out; null when no row has one), or a
+ * text column's distinct values, '' included — at most VALUES_MAX, `truncated` when there are more.
+ */
+export type ColumnSummary =
+  | { column: string; numeric: true; min: number | null; max: number | null }
+  | { column: string; numeric: false; values: string[]; truncated: boolean };
+
+/**
+ * Per cohort and study: the rows the query keeps (`n`) and every row (`all`). Counts only. With
+ * `summarize`, each column's summary over every row as well (`s<i>lo`/`s<i>hi`, or `s<i>v`: up to
+ * VALUES_MAX + 1 distinct values, so one past the cap shows), read by summaryOf.
+ */
+export function countsSql(src: RowSource, q: TableQuery, defaults: string[], summarize: SummaryAsk[] = []): PatientSql {
   const where = whereSql(src, q, defaults);
+  const sums = summarize.map((s, i) => {
+    const col = src.columns.find((c) => c.id === s.column);
+    if (!col) throw new Error("unknown column " + s.column);
+    return s.numeric
+      ? ", min(" + (col.num || col.text) + ") AS s" + i + "lo, max(" + (col.num || col.text) + ") AS s" + i + "hi"
+      : ", groupUniqArray(" + (VALUES_MAX + 1) + ")(" + col.text + ") AS s" + i + "v";
+  }).join("");
   return patientSql(src.with + "SELECT cohort, study, countIf(" + where + ") AS n, count() AS all" +
     (src.duplicateKey ? ", count() - uniqExact(" + src.duplicateKey + ") AS dup" : "") +
     (src.units ? ", uniqExactIf(" + src.units.sample + ", " + where + ") AS ns, uniqExactIf(" + src.units.patient + ", " + where + ") AS np" : "") +
-    " FROM rows GROUP BY cohort, study" + (src.settings || ""));
+    sums + " FROM rows GROUP BY cohort, study" + (src.settings || ""));
+}
+
+/** One part's summaries from its counts row (countsSql with `summarize`). */
+export function summaryOf(summarize: SummaryAsk[], row: Record<string, unknown>): ColumnSummary[] {
+  const num = (x: unknown) => x == null || x === "" || !Number.isFinite(Number(x)) ? null : Number(x);
+  return summarize.map((s, i) => {
+    if (s.numeric) return { column: s.column, numeric: true, min: num(row["s" + i + "lo"]), max: num(row["s" + i + "hi"]) };
+    const vs = Array.isArray(row["s" + i + "v"]) ? (row["s" + i + "v"] as unknown[]).map((x) => String(x ?? "")) : [];
+    return { column: s.column, numeric: false, values: [...new Set(vs)].sort().slice(0, VALUES_MAX), truncated: new Set(vs).size > VALUES_MAX };
+  });
+}
+
+/** The parts' summaries of the same columns as one: the widest range, the union of the values. */
+export function mergeSummaries(summarize: SummaryAsk[], parts: ColumnSummary[][]): ColumnSummary[] {
+  return summarize.map((s) => {
+    const each = parts.map((p) => p.find((x) => x.column === s.column)).filter((x): x is ColumnSummary => !!x);
+    if (s.numeric) {
+      const lo = each.map((x) => x.numeric ? x.min : null).filter((x): x is number => x != null);
+      const hi = each.map((x) => x.numeric ? x.max : null).filter((x): x is number => x != null);
+      return { column: s.column, numeric: true, min: lo.length ? Math.min(...lo) : null, max: hi.length ? Math.max(...hi) : null };
+    }
+    const all = new Set(each.flatMap((x) => x.numeric ? [] : x.values));
+    return { column: s.column, numeric: false, values: [...all].sort().slice(0, VALUES_MAX),
+      truncated: each.some((x) => !x.numeric && x.truncated) || all.size > VALUES_MAX };
+  });
+}
+
+/** A column's values as a summary: its range, or its distinct values without their counts. */
+export function summaryOfValues(v: ColumnValues): ColumnSummary {
+  return v.numeric ? { column: v.column, numeric: true, min: v.min, max: v.max }
+    : { column: v.column, numeric: false, values: v.values.map((x) => x.value), truncated: v.truncated };
 }
 
 /**

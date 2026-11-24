@@ -2,8 +2,8 @@
 import type { ViewResult } from "../../types.ts";
 import { geneSymbols } from "../../gene-tracks.ts";
 import { driverSourceText, resolveDrivers, type ResolvedDrivers } from "../../driver-settings.ts";
-import { MUTATION_COLUMNS, mutationRowSource, alterationOf, mutationDefaultColumns, type MutationColumn, type TablePart } from "../../mutation-table.ts";
-import { mutationClinicalColumns, mutationClinicalFreq, mutationDefaultFacts } from "../mutation-defaults.ts";
+import { MUTATION_COLUMNS, MUTATION_DEFAULT_COLUMNS, mutationRowSource, alterationOf, mutationDefaultColumns, type MutationColumn, type TablePart } from "../../mutation-table.ts";
+import { MUTATION_FACT_COLUMNS, mutationClinicalColumns, mutationClinicalFreq, mutationDefaultFacts } from "../mutation-defaults.ts";
 import { clinicalValue } from "../../mutation-clinical.ts";
 import { checkQuery, describeQuery, shownColumns } from "../../table-query.ts";
 import type { ViewRun } from "../run.ts";
@@ -69,6 +69,10 @@ function mutationDetail(r: Record<string, unknown>, build: string | undefined): 
   return Object.keys(d).length ? d : undefined;
 }
 
+/** a promise that never rejects, so one started early cannot go unhandled while others are awaited */
+const settled = <T,>(p: Promise<T>): Promise<{ ok: T } | { err: unknown }> => p.then((ok) => ({ ok }), (err) => ({ err }));
+const unwrap = <T,>(s: { ok: T } | { err: unknown }): T => { if ("err" in s) throw s.err; return s.ok; };
+
 export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<ViewResult> {
   const { vNames, pin } = ctx;
   { const e = overLimit("a mutations view", 6, vNames.length); if (e) return refuse("mutations", ctx, e.replace("at most 6", "at most 6 cohorts")); }
@@ -91,17 +95,28 @@ export async function runMutations(view: MutationsView, ctx: ViewRun): Promise<V
   if (bad) return refuse("mutations", ctx, bad);
   if (!holders.length) return refuse("mutations", ctx, "no study here may disclose patients' mutations (" + excluded.map((e) => e.study + ": " + e.reason).join("; ") + ")");
   const source = (parts: TablePart[]) => (db: string, materialized: boolean) => keyOnFirstRun(ctx, mutationRowSource(parts, db, gene, pin, pins, lines.oql, drivers, clinical, materialized));
+  const values = ctx.values ? { column: ctx.values, numeric: !!columns.find((c) => c.id === ctx.values)?.numeric } : undefined;
+  // the Columns menu's Clinical tab and its Freq (MUT-TB-5, MUT-STM-15), with the first page only: a later page keeps its columns
+  const freqAsk = !ctx.page && !ctx.values ? settled(mutationClinicalFreq(ctx, holders, clinical)) : Promise.resolve({ ok: {} as Record<string, number> });
   let r: Rows, defaults: string[];
   try {
-    defaults = mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, source));
-    r = await runRows(ctx, "mutations", holders, q, defaults, shownColumns(q, columns, defaults), size, source,
-      ctx.values ? { column: ctx.values, numeric: !!columns.find((c) => c.id === ctx.values)?.numeric } : undefined);
+    if ((q.search || "").trim()) {
+      // a search reads the shown columns, so the defaults are settled before the rows are asked for
+      defaults = mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, source));
+      r = await runRows(ctx, "mutations", holders, q, defaults, shownColumns(q, columns, defaults), size, source, values);
+    } else if (values) {
+      // without a search the defaults reach no statement, so a column's values and the facts are asked for at once
+      const facts = settled(mutationDefaultFacts(ctx, holders, source));
+      r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, MUTATION_DEFAULT_COLUMNS, size, source, values);
+      defaults = mutationDefaultColumns(unwrap(await facts));
+    } else {
+      // ... and the rows' counts carry the facts' columns, with the page asked for beside them
+      r = await runRows(ctx, "mutations", holders, q, MUTATION_DEFAULT_COLUMNS, MUTATION_DEFAULT_COLUMNS, size, source, undefined, undefined, undefined, MUTATION_FACT_COLUMNS);
+      defaults = mutationDefaultColumns(await mutationDefaultFacts(ctx, holders, source, r.summaries));
+    }
   } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
-  // the Columns menu's Clinical tab and its Freq (MUT-TB-5, MUT-STM-15), with the first page only: a later page keeps its columns
-  let freq: Record<string, number> = {};
-  if (!ctx.page && !ctx.values) {
-    try { freq = await mutationClinicalFreq(ctx, holders, clinical); } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
-  }
+  let freq: Record<string, number>;
+  try { freq = unwrap(await freqAsk); } catch (e) { return refuse("mutations", ctx, (e as Error).message); }
   const menuColumns: MutationColumn[] = columns.map((c) => c.id in freq ? { ...c, group: "clinical" as const, freq: freq[c.id] } : c);
   const rows = r.rows.map((x) => {
     const detail = mutationDetail(x, x.build == null ? undefined : String(x.build));
