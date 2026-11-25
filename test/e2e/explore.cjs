@@ -43,22 +43,14 @@ async function explore({ ok, BASE, page, browser }) {
       scrolls: l.scrollHeight > l.clientHeight + 2,
       capped: [...l.querySelectorAll("span")].some(s2 => /showing .* of .* values/.test(s2.textContent || ""))
     })).sort((a, b) => b.rows - a.rows)[0];
-    return { lists: lists.length, big, bars: document.querySelectorAll(".vbar").length };
+    return { lists: lists.length, big, bars: document.querySelectorAll(".vbar, .gbar, .sbrow .bar").length };
   });
   ok("categorical values are shown in full, scrolled rather than trimmed",
     !!vals.big && vals.big.rows > 20 && vals.big.scrolls,
     vals.big ? vals.big.rows + " values in the largest list, scrolls=" + vals.big.scrolls +
       (vals.big.capped ? ", cap disclosed" : "") : "no value lists");
-  // the proportion rules are a hint, not a chart — guard against them growing
-  const barBox = await page.evaluate(() => {
-    const b2 = document.querySelector(".valrow .vbar");
-    if (!b2) return null;
-    const r = b2.getBoundingClientRect();
-    return { h: Math.round(r.height), w: Math.round(r.width) };
-  });
-  // 8px + a 1px border each side: a hint at relative size, not a chart
-  ok("value bars stay small", !!vals.bars && !!barBox && barBox.h <= 10 && barBox.w <= 80,
-    barBox ? vals.bars + " bars, " + barBox.w + "x" + barBox.h + "px" : "no bars found");
+  // the Study View's lists draw no bar per row
+  ok("value lists draw no bar per row", vals.bars === 0, vals.bars + " row bars");
 
   // The grid draws the checked attributes of "+ Add chart" > Clinical, and until the
   // reader changes them those are cBioPortal's default: the first 20 with a priority
@@ -110,7 +102,7 @@ async function explore({ ok, BASE, page, browser }) {
     await page.waitForSelector("[data-attr]", { timeout: 120000 });
     await page.waitForTimeout(1500);
     const before = await facetShapes();
-    const key = page.locator(".pielegend .pikey").first();
+    const key = page.locator(".pie .slice").first();
     if (await key.count()) {
       await key.click();
       await page.waitForTimeout(6000);
@@ -307,7 +299,7 @@ async function explore({ ok, BASE, page, browser }) {
     const before = await top();
     await page.locator(".driverchoice").click();
     await page.getByRole("option", { name: "Alterations: OncoKB drivers only" }).click();
-    await page.waitForFunction(() => /OncoKB drivers/.test(document.querySelector("[data-genetable=mutated]")?.textContent || ""), null, { timeout: 240000 });
+    await page.locator("[data-genetable=mutated][data-drivers]").waitFor({ timeout: 240000 });
     const after = await top(), url = new URL(page.url()).searchParams.get("drivers");
     const egfr = table.locator(".generow", { has: page.locator(".gname", { hasText: /^EGFR$/ }) }).first();
     const counted = Number((await egfr.locator(".gnum").nth(1).innerText()).replace(/,/g, ""));
@@ -489,7 +481,7 @@ async function explore({ ok, BASE, page, browser }) {
   let dtDetail = "", dtOk = false;
   try {
     await page.goto(BASE + "/lab?tab=explore&study=luad_tcga_pan_can_atlas_2018", { waitUntil: "domcontentloaded" });
-    const card = page.locator(".card", { has: page.locator("h2", { hasText: "Data types" }) });
+    const card = page.locator("[data-chart=datatypes]");
     await card.locator(".dtrow").first().waitFor({ timeout: 240000 });
     const rows = await card.locator(".dtrow").evaluateAll((els) => els.map((e) => [...e.querySelectorAll(".gcount")].map((s) => s.textContent.trim())));
     const top = Number(rows[0][0].replace(/,/g, ""));
@@ -615,7 +607,7 @@ async function explore({ ok, BASE, page, browser }) {
     const filtered = () => page.evaluate(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""));
     await drag();
     await page.waitForFunction(() => /patients match/.test(document.querySelector(".exbar")?.textContent || ""), null, { timeout: 240000 });
-    const meta = (await card.locator(".meta").first().innerText()).trim();
+    const meta = ((await card.locator(".xc-title").getAttribute("data-tip")) || "").trim();
     const pills = (await page.locator(".svpills").innerText().catch(() => "")).replace(/\s+/g, " ");
     const draggedFilters = await filtered();
     await card.locator("[data-chart-reset]").click();
@@ -697,13 +689,13 @@ async function explore({ ok, BASE, page, browser }) {
     const counts = (await pt.locator(".valrow .vn").allInnerTexts()).map((t) => Number(t.replace(/,/g, "")));
     const ordered = counts.every((n, i) => i === 0 || counts[i - 1] >= n);
     const pick = (await pt.locator(".valrow .vname").allInnerTexts())[0];
-    const before = (await st.locator(".facettitle").textContent()).trim();   // as the wait below reads it
+    const before = (await st.locator(".facettitle").getAttribute("data-tip")) || "";   // as the wait below reads it
     await pt.locator(".valrow").first().click();
     await pt.getByRole("button", { name: "Apply filter" }).click();
     await page.waitForFunction((a) => document.body.innerText.includes("treated with " + a), pick, { timeout: 240000 });
-    await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.textContent || "").trim() !== b, before, { timeout: 240000 });
+    await page.waitForFunction((b) => (document.querySelector("[data-treatments='sample'] .facettitle")?.getAttribute("data-tip") || "") !== b, before, { timeout: 240000 });
     const pinned = await pt.locator(".valrow.on .vname").allInnerTexts();
-    const after = (await st.locator(".facettitle").textContent()).trim();
+    const after = (await st.locator(".facettitle").getAttribute("data-tip")) || "";
     txDetail = JSON.stringify({ rows: counts.length, pick, pinned, before, after });
     txOk = counts.length > 1 && ordered && pinned.length === 1 && pinned[0] === pick && after !== before;
   } catch (e) { txDetail = String(e.message).split("\n")[0]; }

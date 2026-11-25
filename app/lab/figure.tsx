@@ -28,6 +28,37 @@ export function useWidth(min = MIN_FIGURE_W) {
   return { ref, width };
 }
 
+/** the box's width and height, in 8px steps, followed as it resizes (null before the first measure) */
+export function useSize() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const width = Math.floor(el.clientWidth / 8) * 8, height = Math.floor(el.clientHeight / 8) * 8;
+      setSize((cur) => cur && cur.width === width && cur.height === height ? cur : { width, height });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return { ref, size };
+}
+
+/**
+ * A figure function drawn to fill its box, width and height: the box takes its size from the page
+ * (a grid card's room under its title), never from the figure, so drawing does not resize it.
+ */
+export function DrawAtSize({ draw, deps }: { draw: (width: number, height: number) => string | null; deps: unknown[] }) {
+  const { ref, size } = useSize();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `deps` are the drawing's inputs, named by the caller
+  const svg = useMemo(() => size && size.width > 0 && size.height > 0 ? draw(size.width, size.height) : null, [size, ...deps]);
+  // the renderer escapes every label it writes (lib/chart/esc.ts)
+  return <div ref={ref} className="figsize" dangerouslySetInnerHTML={{ __html: svg ?? "" }} />;
+}
+
 /**
  * SVG markup laid out at `width` (lib/svg-kit.ts frame()), shown 1:1, scrolling when wider than its box;
  * with `topScroll`, a second scrollbar above it, kept in step, for a figure taller than the screen
