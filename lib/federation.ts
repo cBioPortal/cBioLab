@@ -39,7 +39,7 @@ export type { PlotData, PlotRequest, PlotGroup, PlotPoint, PlotXYPoint, PlotLaye
 import { impactSql } from "./lollipop.ts";
 import type { Moments } from "./stats.ts";
 // a table view's row queries return ids: imported for PatientLevelResolver.rowsPage, never re-exported
-import { checkQuery, pageSql, countsSql, valuesSql, rankSql, type RowSource, type TableQuery } from "./table-query.ts";
+import { checkQuery, pageSql, countsSql, valuesSql, rankSql, summaryOf, type ColumnSummary, type RowSource, type SummaryAsk, type TableQuery } from "./table-query.ts";
 
 /** the colour key: the commonest categories, capped, each with the colour every renderer uses */
 /**
@@ -478,7 +478,9 @@ export function geneCountsSql(cohortSql: string, genes: string[], study: string,
  * patients (`np`) among those kept. The Mutations and SV tables page only their own instances' rows (no
  * `remote`), so today a peer's counts never carry `dup`.
  */
-export interface RowCounts { cohort: string; study: string; n: number; all: number; dup?: number; ns?: number; np?: number }
+export interface RowCounts { cohort: string; study: string; n: number; all: number; dup?: number; ns?: number; np?: number;
+  /** the columns a local count was asked to summarise (countsSql `summarize`), over every row of the part */
+  sums?: ColumnSummary[] }
 /** the query's lines a Mutations tab follows, and how their DRIVER reads */
 export interface LollipopOql { lines: string[]; drivers?: DriverSettings }
 /**
@@ -664,7 +666,7 @@ function lollipopCte(cohortSql: string, genes: string[], study: string, minCount
   const hotspotKeys = pin && hotspotPins ? hotspotKeysSql(db, [study], genes, hotspotPins) : null;
   const driver = pin
     ? "if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM " + ONCOKB_TABLE + "\n" +
-      "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION')" +
+      "        WHERE oncokb_version = " + sq(pin) + " AND is_driver AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (" + list + "))" +
       (hotspotKeys ? "\n        OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (" + hotspotKeys + ")" : "") + ", 1, 0)"
     : "1";
   return lollipopCteSql(cohortSql, genes, study, floor, pin, db, filters, fusionLines, list, driver, fusionDriver, rowKeys);
@@ -685,7 +687,7 @@ function lollipopCteWith(cohortSql: string, genes: string[], study: string, floo
   if (d.tiers === null) or.push("ifNull(driverTiersFilter, '') != ''");
   else if (d.tiers.length) or.push("ifNull(driverTiersFilter, '') IN (" + d.tiers.map(sq).join(", ") + ")");
   if (src.oncokb) or.push("(`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM " + ONCOKB_TABLE + "\n" +
-    "        WHERE oncokb_version = " + sq(pin!) + " AND is_driver AND alteration_type = 'MUTATION')");
+    "        WHERE oncokb_version = " + sq(pin!) + " AND is_driver AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN (" + list + "))");
   const hotspotKeys = src.hotspots ? hotspotKeysSql(db, [study], genes, hotspotPins!) : null;
   if (hotspotKeys) or.push("(`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (" + hotspotKeys + ")");
   const annotating = annotatingSql(d, src.sure, db, study);
@@ -1464,7 +1466,7 @@ export interface PatientLevelCapable extends AggregateCapable {
   viewRows(label: string, def: CohortDef | null | undefined, build: (cohortSql: string, study: string, db: string) => string): Promise<ChRow[]>;
   /** a table view's rows (lib/table-query.ts) in this instance, with their ids — see PatientLevelResolver.rowsPage */
   rowsPage(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], limit: number, offset: number): Promise<{ rows: ChRow[]; total: number }>;
-  rowsCounts(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]>;
+  rowsCounts(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], summarize?: SummaryAsk[]): Promise<RowCounts[]>;
   rowsValues(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]>;
   rowsRank(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], study: string, patient: string): Promise<number | null>;
   /** one patient's timeline events and samples — see PatientLevelResolver.patientTimeline */
@@ -2492,10 +2494,10 @@ export class PatientLevelResolver extends BaseResolver implements PatientLevelCa
     return { rows: r.data, total: r.data.length ? Number(r.data[0].total) : 0 };
   }
   /** per part: the rows the query keeps and every row. Counts only. */
-  async rowsCounts(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[]): Promise<RowCounts[]> {
-    const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db, await materializedCteSupported(this.instance.conn)), q, defaults), this.instance.conn);
+  async rowsCounts(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], summarize: SummaryAsk[] = []): Promise<RowCounts[]> {
+    const r = await this.runPatientRows<ChRow>(label, countsSql(source(this.instance.conn.db, await materializedCteSupported(this.instance.conn)), q, defaults, summarize), this.instance.conn);
     return r.data.map((x) => ({ cohort: String(x.cohort), study: String(x.study), n: Number(x.n), all: Number(x.all), ...(x.dup != null ? { dup: Number(x.dup) } : {}),
-      ...(x.ns != null && x.np != null ? { ns: Number(x.ns), np: Number(x.np) } : {}) }));
+      ...(x.ns != null && x.np != null ? { ns: Number(x.ns), np: Number(x.np) } : {}), ...(summarize.length ? { sums: summaryOf(summarize, x) } : {}) }));
   }
   /** a column's distinct values with counts, or its range — what its filter offers */
   async rowsValues(label: string, source: (db: string, materialized: boolean) => RowSource, q: TableQuery, defaults: string[], column: string): Promise<ChRow[]> {

@@ -109,7 +109,7 @@ export function PortalTabs({ doc, tabs, titles, partial, open, onOpen, onDoc, on
   useEffect(() => {
     if (!emptySlice || !chooser?.empties) return;
     const ctl = new AbortController();
-    api.analysis(emptySlice, { signal: ctl.signal })
+    api.analysis(emptySlice, { signal: ctl.signal, query: "?oncoprint=spec" })
       .then((r) => r.json())
       .then((j) => { const v = j?.views?.[0]; if (!j.error && v && !v.error) setGreyed({ sent: emptySent, options: chooser.empties!.empty(v) }); })
       .catch(() => { /* no answer: no chip greyed, as before */ });

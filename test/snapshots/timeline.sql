@@ -773,6 +773,38 @@ g AS (
 rows AS (SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec), '' AS genePanel, '' AS genePanelShown FROM g)
 SELECT cohort, study, countIf(1) AS n, count() AS all FROM rows GROUP BY cohort, study
 
+-- view 1 alterations: alterations:sv:rows · msk_chord_2024
+WITH s AS (
+  SELECT smp.stable_id AS sid, if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], smp.stable_id) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], smp.stable_id)) AS o,
+         arrayStringConcat(arraySort([ifNull(toString(g1.hugo_gene_symbol), ''), ifNull(toString(g2.hugo_gene_symbol), ''), ifNull(toString(sv.site1_position), ''), ifNull(toString(sv.site2_position), ''), ifNull(toString(sv.site1_chromosome), ''), ifNull(toString(sv.site2_chromosome), ''), ifNull(toString(sv.class), '')]), '_') AS k,
+         tuple(o, sv.internal_id) AS r, tuple(gene1, gene2, class, eventInfo, pos1, pos2, breakpointType, connectionType, frame, site1, site2, length, dnaSupport, rnaSupport, status, svAnnotation, comments) AS rec0,
+         ifNull(g1.hugo_gene_symbol, '') AS gene1, ifNull(g2.hugo_gene_symbol, '') AS gene2,
+         ifNull(sv.class, '') AS class, ifNull(sv.event_info, '') AS eventInfo, sv.breakpoint_type AS breakpointType, sv.connection_type AS connectionType,
+         sv.site2_effect_on_frame AS frame, sv.site1_description AS site1, sv.site2_description AS site2,
+         if(sv.site1_position IS NULL, '', concat(ifNull(sv.site1_chromosome, ''), ':', toString(sv.site1_position))) AS pos1,
+         if(sv.site2_position IS NULL, '', concat(ifNull(sv.site2_chromosome, ''), ':', toString(sv.site2_position))) AS pos2,
+         sv.length AS length, sv.tumor_variant_count AS tumorVariantCount, sv.tumor_read_count AS tumorReadCount,
+         sv.dna_support AS dnaSupport, sv.rna_support AS rnaSupport, sv.sv_status AS status, sv.annotation AS svAnnotation, sv.comments AS comments
+  FROM snapshot_db.structural_variant sv
+  JOIN snapshot_db.sample smp ON smp.internal_id = sv.sample_id
+  LEFT JOIN snapshot_db.gene g1 ON g1.entrez_gene_id = sv.site1_entrez_gene_id
+  LEFT JOIN snapshot_db.gene g2 ON g2.entrez_gene_id = sv.site2_entrez_gene_id
+  WHERE sv.sample_id IN (SELECT s.internal_id FROM snapshot_db.sample s JOIN snapshot_db.patient p ON p.internal_id = s.patient_id
+    JOIN snapshot_db.cancer_study cs ON cs.cancer_study_id = p.cancer_study_id
+    WHERE cs.cancer_study_identifier = 'msk_chord_2024' AND p.stable_id = 'P-0000012')
+),
+g AS (
+  SELECT k, arrayStringConcat(arraySort(x -> if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], x)), groupUniqArray(sid)), ', ') AS samples, min(if(indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid) = 0, 1000000, indexOf(['P-0000012-T02-IM3', 'P-0000012-T03-IM3'], sid))) AS so,
+         argMin(rec0, r) AS rec, tupleElement(rec, 1) AS gene1, tupleElement(rec, 2) AS gene2, tupleElement(rec, 3) AS class, tupleElement(rec, 4) AS eventInfo, tupleElement(rec, 5) AS pos1, tupleElement(rec, 6) AS pos2, tupleElement(rec, 7) AS breakpointType, tupleElement(rec, 8) AS connectionType, tupleElement(rec, 9) AS frame, tupleElement(rec, 10) AS site1, tupleElement(rec, 11) AS site2, tupleElement(rec, 12) AS length, tupleElement(rec, 13) AS dnaSupport, tupleElement(rec, 14) AS rnaSupport, tupleElement(rec, 15) AS status, tupleElement(rec, 16) AS svAnnotation, tupleElement(rec, 17) AS comments,
+         max(tumorVariantCount) AS tumorVariantCount, max(tumorReadCount) AS tumorReadCount
+  FROM s GROUP BY k
+),
+rows AS (SELECT 'Breast' AS cohort, 'msk_chord_2024' AS study, 0 AS ord, 'P-0000012' AS patient, splitByString(', ', g.samples)[1] AS sid, g.* EXCEPT (rec), '' AS genePanel, '' AS genePanelShown FROM g)
+SELECT * EXCEPT (k), count() OVER () AS total FROM rows
+WHERE 1
+ORDER BY gene1, so, gene2, gene1, gene2, pos1, pos2, class, eventInfo, k
+LIMIT 25 OFFSET 0
+
 -- view 1 alterations: alterations:vafs · msk_chord_2024
 WITH m AS (
   SELECT sampleId AS sid, `GENE.hugoGeneSymbol` AS gene, proteinChange, mutationType, variantType, chr, startPosition AS start, endPosition AS end,

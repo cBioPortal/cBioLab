@@ -3,7 +3,7 @@
 import { PATIENT_KIND_NAMES, type PatientKind } from "../disclosure.ts";
 import { isPatientLevel, peerRowsFor, type PatientLevelCapable, type PeerRowsRequest, type RemotePatientRows, type Resolver, type RowCounts } from "../federation.ts";
 import type { TablePart } from "../mutation-table.ts";
-import { cleanQuery, describeQuery, mergeValues, type ColumnValues, type RowSource, type TableQuery } from "../table-query.ts";
+import { cleanQuery, describeQuery, mergeSummaries, mergeValues, type ColumnSummary, type ColumnValues, type RowSource, type SummaryAsk, type TableQuery } from "../table-query.ts";
 import type { TableRows, ViewResult } from "../types.ts";
 import type { ViewRun } from "./run.ts";
 import { plural } from "./shared.ts";
@@ -40,7 +40,9 @@ export type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; s
   /** the distinct samples and patients among the rows the query keeps (a source with RowSource.units), when every part reports them */
   kept?: { samples: number; patients: number };
   /** with `locate`: the patient's place in the list's one order and the rows either side of it — null when the query leaves it out */
-  position?: { index: number; prev: Record<string, unknown> | null; next: Record<string, unknown> | null } | null };
+  position?: { index: number; prev: Record<string, unknown> | null; next: Record<string, unknown> | null } | null;
+  /** with `summarize`: each column over every row of every part, when every database answered it */
+  summaries?: ColumnSummary[] };
 
 /**
  * A table view's rows: its parts grouped per database instance (a group's parts are combined and
@@ -49,13 +51,15 @@ export type Rows = { rows: Record<string, unknown>[]; lists: { cohort: string; s
  * `source(parts, reads)` builds the table's row source; `reads` names the columns a query needs
  * ("all" for a page), so a count need not carry every column. With `locate`, also where that
  * patient falls in the order and its neighbours (the timeline's prev / next). With `remote`, a
- * study whose peer may serve this table (`of`) has its rows paged by that peer, as `table`.
+ * study whose peer may serve this table (`of`) has its rows paged by that peer, as `table`. With
+ * `summarize`, the counts also summarise those columns over every row (Rows.summaries), when every
+ * database answered them.
  */
 export type RemoteRows = { of: (r: Resolver) => RemotePatientRows | null; table: PeerRowsRequest["table"]; subject?: PeerRowsRequest["subject"]; samples?: PeerRowsRequest["samples"];
   oncokbPin?: string | null; onAnswer?: (a: { oncokbPin?: string | null }) => void };
 export async function runRows(ctx: ViewRun, label: string, holders: string[], q: TableQuery, defaults: string[], shown: string[], size: number,
   source: (parts: TablePart[], reads: string[] | "all") => (db: string, materialized: boolean) => RowSource, values?: { column: string; numeric: boolean },
-  remote?: RemoteRows, locate?: { study: string; patient: string }): Promise<Rows> {
+  remote?: RemoteRows, locate?: { study: string; patient: string }, summarize?: SummaryAsk[]): Promise<Rows> {
   type PL = Pick<PatientLevelCapable, "rowsPage" | "rowsCounts" | "rowsValues" | "rowsRank">;
   // one backend per database — or per peer, for a view whose rows a peer may page itself (`remote`)
   type Backend = {
@@ -63,12 +67,15 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
     counts: (parts: TablePart[], reads: string[]) => Promise<RowCounts[]>;
     values: (parts: TablePart[], reads: string[], column: string) => Promise<Record<string, unknown>[]>;
     rank: (parts: TablePart[], study: string, patient: string) => Promise<number | null>;
+    /** whether its counts answer `summarize` */
+    summarizes: boolean;
   };
   const local = (r: PL): Backend => ({
     page: async (parts, limit, offset) => (await r.rowsPage(label + ":rows", source(parts, "all"), q, defaults, limit, offset)).rows,
-    counts: (parts, reads) => r.rowsCounts(label + ":counts", source(parts, reads), q, defaults),
+    counts: (parts, reads) => r.rowsCounts(label + ":counts", source(parts, reads), q, defaults, ...(summarize?.length ? [summarize] : [])),
     values: (parts, reads, column) => r.rowsValues(label + ":values", source(parts, reads), q, defaults, column),
     rank: (parts, study, patient) => r.rowsRank(label + ":rank", source(parts, queryReads(q, shown)), q, defaults, study, patient),
+    summarizes: true,
   });
   const peer = (r: RemotePatientRows, rr: RemoteRows): Backend => {
     const ask = async (parts: TablePart[], req: Pick<PeerRowsRequest, "mode" | "limit" | "offset" | "column" | "patient">) => {
@@ -82,6 +89,7 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
       counts: async (parts) => (await ask(parts, { mode: "counts" })).counts || [],
       values: async (parts, _reads, column) => (await ask(parts, { mode: "values", column })).values || [],
       rank: async (parts, _study, patient) => (await ask(parts, { mode: "rank", patient })).rank ?? null,
+      summarizes: false,
     };
   };
   const groups: { backend: Backend; parts: TablePart[]; total: number }[] = [];
@@ -100,8 +108,15 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
   const lists: Rows["lists"] = [];
   let all = 0, duplicates = 0, dupParts = 0, parts = 0, unitParts = 0;
   const kept = { samples: 0, patients: 0 };
+  const want = ctx.page ? { offset: Math.max(0, Math.floor(ctx.page.offset)), limit: Math.min(TABLE_CHUNK, Math.max(1, Math.floor(ctx.page.limit))) } : { offset: 0, limit: size };
+  // one group needs no count to find where its page starts, so the page is asked for beside the counts
+  const early = groups.length === 1 && !locate ? groups[0].backend.page(groups[0].parts, want.limit, want.offset).then((ok) => ({ ok }), (err: unknown) => ({ err })) : null;
+  const countReads = summarize?.length ? [...new Set([...reads, ...summarize.map((x) => x.column)])] : reads;
+  const sums: ColumnSummary[][] = [];
+  let summarized = !!summarize?.length;
   await Promise.all(groups.map(async (g) => {
-    const counts = await g.backend.counts(g.parts, reads);
+    const counts = await g.backend.counts(g.parts, countReads);
+    for (const c of counts) { if (c.sums) sums.push(c.sums); else summarized = false; }
     for (const p of g.parts) {
       const c = counts.find((x) => x.cohort === p.cohort && x.study === p.study);
       lists.push({ cohort: p.cohort, study: p.study, total: c?.n || 0, all: c?.all || 0 });
@@ -119,7 +134,6 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
     }
   }));
   const total = groups.reduce((n, g) => n + g.total, 0);
-  const want = ctx.page ? { offset: Math.max(0, Math.floor(ctx.page.offset)), limit: Math.min(TABLE_CHUNK, Math.max(1, Math.floor(ctx.page.limit))) } : { offset: 0, limit: size };
   // rows `offset` on, in the one order: each group's rows follow the groups before it
   const pageAt = async (offset: number, limit: number) => {
     const out: Record<string, unknown>[] = [];
@@ -131,7 +145,9 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
     }
     return out;
   };
-  const [rows, position] = await Promise.all([pageAt(want.offset, want.limit), locate ? (async () => {
+  // an offset at or past the end keeps no rows, as pageAt keeps none
+  const first = early ? early.then((e) => { if ("err" in e) throw e.err; return want.offset < total ? e.ok : []; }) : pageAt(want.offset, want.limit);
+  const [rows, position] = await Promise.all([first, locate ? (async () => {
     let before = 0;
     for (const g of groups) {
       // ranked among the whole group's rows: they are sorted together
@@ -147,7 +163,8 @@ export async function runRows(ctx: ViewRun, label: string, holders: string[], q:
   })() : Promise.resolve(undefined)]);
   const order = (l: { cohort: string; study: string }) => ctx.vNames.indexOf(l.cohort) * 1000 + ctx.vStudies.indexOf(l.study);
   lists.sort((a, b) => order(a) - order(b));
-  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}), ...(parts && dupParts === parts ? { duplicates } : {}), ...(parts && unitParts === parts ? { kept } : {}) };
+  return { rows, lists, total, all, offset: want.offset, groups: groups.length, ...(position !== undefined ? { position } : {}),
+    ...(summarize?.length && summarized && groups.every((g) => g.backend.summarizes) ? { summaries: mergeSummaries(summarize, sums) } : {}), ...(parts && dupParts === parts ? { duplicates } : {}), ...(parts && unitParts === parts ? { kept } : {}) };
 }
 
 /** A view's query as the document gives it, with an older `sort.attribute` read as `sort.column`. */

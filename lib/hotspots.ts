@@ -50,7 +50,9 @@ export function hotspotKeysSql(db: string, studies: string[], genes: string[] | 
     "    INNER JOIN (SELECT cs.cancer_study_identifier AS study, " + sourceOf + " AS src FROM " + db + ".cancer_study cs\n" +
     "      JOIN " + db + ".reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id\n" +
     "      WHERE cs.cancer_study_identifier " + inList(studies) + ") st ON st.study = m.studyId\n" +
-    "    WHERE m.studyId " + inList(studies) + " AND m.`GENE.hugoGeneSymbol` " + inList(wanted) + "\n" +
+    // the study's profiles' prefix, so the read uses mutation_derived's sort key (molecularProfileId first)
+    "    WHERE " + (studies.length ? "(" + studies.map((st) => "startsWith(m.molecularProfileId, " + sq(st + "_") + ")").join(" OR ") + ") AND " : "") +
+    "m.studyId " + inList(studies) + " AND m.`GENE.hugoGeneSymbol` " + inList(wanted) + "\n" +
     // a location only when every part is present and non-empty (MutationUtils.extractGenomicLocation)
     "      AND st.src != '' AND ifNull(m.chr, '') != '' AND ifNull(m.startPosition, 0) != 0 AND ifNull(m.endPosition, 0) != 0\n" +
     "      AND ifNull(m.referenceAllele, '') != '' AND ifNull(m.tumorSeqAllele, '') != '' AND ifNull(m.proteinChange, '') != ''";

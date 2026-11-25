@@ -56,7 +56,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, c.1 AS oncogenic
              AND smp.stable_id IN (SELECT sid FROM cohort)),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
                   patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
-        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION')
+        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN ('KRAS','BRAF','PIK3CA','TP53'))
         OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (SELECT DISTINCT mu.hugo_gene_symbol AS hugo_gene_symbol, mu.alteration AS alteration, mu.mutation_type AS mutation_type FROM (
     SELECT m.`GENE.hugoGeneSymbol` AS hugo_gene_symbol, m.proteinChange AS alteration, ifNull(m.mutationType, '') AS mutation_type,
       st.src AS src, assumeNotNull(m.chr) AS chr, m.startPosition AS start, m.endPosition AS end,
@@ -65,7 +65,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, c.1 AS oncogenic
     INNER JOIN (SELECT cs.cancer_study_identifier AS study, multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') AS src FROM snapshot_db.cancer_study cs
       JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
       WHERE cs.cancer_study_identifier IN ('msk_chord_2024')) st ON st.study = m.studyId
-    WHERE m.studyId IN ('msk_chord_2024') AND m.`GENE.hugoGeneSymbol` IN ('KRAS', 'BRAF', 'PIK3CA', 'TP53')
+    WHERE (startsWith(m.molecularProfileId, 'msk_chord_2024_')) AND m.studyId IN ('msk_chord_2024') AND m.`GENE.hugoGeneSymbol` IN ('KRAS', 'BRAF', 'PIK3CA', 'TP53')
       AND st.src != '' AND ifNull(m.chr, '') != '' AND ifNull(m.startPosition, 0) != 0 AND ifNull(m.endPosition, 0) != 0
       AND ifNull(m.referenceAllele, '') != '' AND ifNull(m.tumorSeqAllele, '') != '' AND ifNull(m.proteinChange, '') != ''
   ) mu
@@ -206,7 +206,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, c.1 AS oncogenic
              AND smp.stable_id IN (SELECT sid FROM cohort)),
      m AS (SELECT `GENE.hugoGeneSymbol` AS gene, proteinPosStart AS pos, proteinChange AS change, mutationType AS mtype,
                   patientId AS pid, sampleId AS sid, mutationStatus AS status, if((`GENE.hugoGeneSymbol`, proteinChange) IN (SELECT hugo_gene_symbol, alteration FROM annotation.oncokb
-        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION')
+        WHERE oncokb_version = 'v7.5' AND is_driver AND alteration_type = 'MUTATION' AND hugo_gene_symbol IN ('KRAS','BRAF','PIK3CA','TP53'))
         OR (`GENE.hugoGeneSymbol`, proteinChange, ifNull(mutationType, '')) IN (SELECT DISTINCT mu.hugo_gene_symbol AS hugo_gene_symbol, mu.alteration AS alteration, mu.mutation_type AS mutation_type FROM (
     SELECT m.`GENE.hugoGeneSymbol` AS hugo_gene_symbol, m.proteinChange AS alteration, ifNull(m.mutationType, '') AS mutation_type,
       st.src AS src, assumeNotNull(m.chr) AS chr, m.startPosition AS start, m.endPosition AS end,
@@ -215,7 +215,7 @@ svp AS (SELECT site1_entrez, site2_entrez, sv_type, tumor_type, c.1 AS oncogenic
     INNER JOIN (SELECT cs.cancer_study_identifier AS study, multiIf(rg.name = 'hg19', 'genome_nexus', rg.name = 'hg38', 'genome_nexus_grch38', '') AS src FROM snapshot_db.cancer_study cs
       JOIN snapshot_db.reference_genome rg ON rg.reference_genome_id = cs.reference_genome_id
       WHERE cs.cancer_study_identifier IN ('msk_chord_2024')) st ON st.study = m.studyId
-    WHERE m.studyId IN ('msk_chord_2024') AND m.`GENE.hugoGeneSymbol` IN ('KRAS', 'BRAF', 'PIK3CA', 'TP53')
+    WHERE (startsWith(m.molecularProfileId, 'msk_chord_2024_')) AND m.studyId IN ('msk_chord_2024') AND m.`GENE.hugoGeneSymbol` IN ('KRAS', 'BRAF', 'PIK3CA', 'TP53')
       AND st.src != '' AND ifNull(m.chr, '') != '' AND ifNull(m.startPosition, 0) != 0 AND ifNull(m.endPosition, 0) != 0
       AND ifNull(m.referenceAllele, '') != '' AND ifNull(m.tumorSeqAllele, '') != '' AND ifNull(m.proteinChange, '') != ''
   ) mu

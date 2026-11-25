@@ -17,13 +17,38 @@ interface Opts { signal?: AbortSignal }
 function post(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
 }
+/**
+ * POST, sharing one request among callers that send the same body to the same path while it is in flight; each
+ * gets its own copy of the response, and a caller's signal abandons only its own wait.
+ */
+const inflight = new Map<string, Promise<Response>>();
+function postShared(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
+  const text = JSON.stringify(body), key = path + "\n" + text;
+  let p = inflight.get(key);
+  if (!p) {
+    p = fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: text });
+    inflight.set(key, p);
+    const drop = () => { if (inflight.get(key) === p) inflight.delete(key); };
+    p.then(drop, drop);
+  }
+  const mine = p.then((r) => r.clone());
+  if (!signal) return mine;
+  // as fetch rejects an aborted request: an AbortError, so a caller's abort handling is unchanged
+  const aborted = () => new DOMException("The operation was aborted.", "AbortError");
+  if (signal.aborted) return Promise.reject(aborted());
+  return new Promise<Response>((ok, fail) => {
+    const stop = () => fail(aborted());
+    signal.addEventListener("abort", stop, { once: true });
+    mine.finally(() => signal.removeEventListener("abort", stop)).then(ok, fail);
+  });
+}
 const send = (method: "PATCH" | "PUT", path: string, body: unknown): Promise<Response> =>
   fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 export const api = {
   /** The document's cohorts and views. `query`: "?oncoprint=spec" (the page draws its own figures, the oncoprint included), "?figures=svg". */
   analysis: async (doc: AnalysisBody, opts: Opts & { query?: string } = {}) =>
-    post("/api/analysis" + (opts.query || ""), await withCustomData(doc), opts.signal),
+    postShared("/api/analysis" + (opts.query || ""), await withCustomData(doc), opts.signal),
 
   /** One view's Python script, which the page's analysis requests leave out: the body is the one-view document the page sent for it. */
   methodScript: async (doc: AnalysisBody, opts: Opts = {}) =>
