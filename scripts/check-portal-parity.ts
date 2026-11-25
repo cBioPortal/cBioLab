@@ -37,8 +37,11 @@
  *      (msk_impact_2017): the portal's mean / MUTATION_COUNT max / "Mixed" of its sample data.
  *
  * Every comparison must agree EXACTLY; a count is a count. Differences are reported, never
- * tolerated, so a disagreement caused by the two databases holding different releases of a
- * study shows up as a failure to look at, not as slack.
+ * tolerated. Only the same release of a study is compared: a study whose import date on
+ * cbioportal.org differs from the warehouse's (`cancer_study.import_date`) is stale, cBioPortal
+ * having re-imported it since our copy was loaded. A disagreement on a stale study is listed as
+ * such, apart from the comparisons, and does not fail the run; it asks for the warehouse's copy to
+ * be refreshed. Its agreements still count.
  *
  * Run: npm run check:portal
  * With RECORD=1 (npm run verify) it writes docs/verification/portal-parity.json, which /verification reads
@@ -81,9 +84,13 @@ const OUT = new URL("portal-parity.json", process.env.REPORT_DIR ? pathToFileURL
 
 interface Check { study: string; group: string; what: string; ours: string; portal: string; agree: boolean }
 const checks: Check[] = [];
+/** the disagreements on a stale study: not a comparison of one release, so not a failure */
+const staleChecks: (Check & { stale: string[] })[] = [];
 const record = (c: Check) => {
-  checks.push(c);
-  console.log(`${c.agree ? "PASS" : "FAIL"} ${c.study} ${c.group}: ${c.what}  ours ${c.ours} / cBioPortal ${c.portal}`);
+  const stale = c.agree ? [] : staleIn(c.study);
+  if (stale.length) staleChecks.push({ ...c, stale });
+  else checks.push(c);
+  console.log(`${c.agree ? "PASS" : stale.length ? "STALE" : "FAIL"} ${c.study} ${c.group}: ${c.what}  ours ${c.ours} / cBioPortal ${c.portal}`);
 };
 
 /**
@@ -110,6 +117,29 @@ async function fetchApi<T>(path: string, body?: unknown): Promise<T> {
     if (attempt >= 2) throw new Error(`cBioPortal ${path}: HTTP ${r.status}`);
     await new Promise((res) => setTimeout(res, 2000 * (attempt + 1)));
   }
+}
+
+/**
+ * The studies cBioPortal has re-imported since the warehouse's copy was loaded, each with both
+ * import dates: a study whose import date (to the second) differs between cbioportal.org and the
+ * warehouse. A study missing on either side is not stale; its comparisons fail as they would.
+ */
+const STALE: Map<string, { ours: string; portal: string }> = await (async () => {
+  const portal = new Map((await api<{ studyId: string; importDate?: string }[]>("/studies"))
+    .map((s) => [s.studyId, (s.importDate || "").slice(0, 19)]));
+  const ours = (await chQuery<{ id: string; at: string }>(
+    "SELECT cancer_study_identifier AS id, toString(import_date) AS at FROM " + DB + ".cancer_study", PRIMARY)).data;
+  const stale = new Map<string, { ours: string; portal: string }>();
+  for (const { id, at } of ours) {
+    const theirs = portal.get(id);
+    if (theirs && at.slice(0, 19) !== theirs) stale.set(id, { ours: at.slice(0, 19), portal: theirs });
+  }
+  return stale;
+})();
+
+/** the stale studies a comparison's label names ("a + b · SEX = Female": a and b) */
+function staleIn(label: string): string[] {
+  return label.split(/[^A-Za-z0-9_]+/).filter((id) => STALE.has(id));
 }
 
 interface PortalGene { hugoGeneSymbol: string; numberOfAlteredCases: number; numberOfAlteredCasesOnPanel: number; numberOfProfiledCases: number; alteration?: number }
@@ -752,6 +782,14 @@ if (process.env.RECORD) writeFileSync(OUT, JSON.stringify({
   studies: [...STUDIES, MIXED.join(" + ")],
   total: checks.length, agree: checks.length - failed,
   checks,
+  stale: [...new Set(staleChecks.flatMap((c) => c.stale))].map((study) => ({ study, ...STALE.get(study)!,
+    disagreements: staleChecks.filter((c) => c.stale.includes(study)).length })),
+  staleChecks,
 }, null, 1) + "\n");
+for (const study of new Set(staleChecks.flatMap((c) => c.stale))) {
+  const d = STALE.get(study)!;
+  console.log(`\nSTALE ${study}: cBioPortal re-imported it ${d.portal}, the warehouse's copy is from ${d.ours}; ` +
+    `${staleChecks.filter((c) => c.stale.includes(study)).length} disagreements not counted until the warehouse is refreshed`);
+}
 console.log(failed ? `\n${failed} of ${checks.length} comparisons DISAGREE` : `\nall ${checks.length} comparisons agree with cBioPortal`);
 process.exit(failed ? 1 : 0);
